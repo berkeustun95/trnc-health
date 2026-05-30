@@ -1,1 +1,48 @@
-@AGENTS.md
+# TRNC Health App
+
+## What this is
+A mobile health-access app for newcomers to North Cyprus (TRNC): find and reach
+trusted pharmacies, clinics, hospitals, dentists. Three user roles: customer,
+provider, admin. I (the project owner) am the architect; you are my fast hands.
+I review everything you produce.
+
+## Stack
+- React Native + Expo, **SDK 54** (managed workflow)
+- Supabase (Postgres) for database, auth, and storage
+- Entry: index.js -> App.js
+- Supabase client lives in lib/supabase.js
+
+## CRITICAL: never change package versions
+We are pinned to Expo SDK 54 to match the Expo Go app on the test phone.
+- Do NOT upgrade expo, react, or react-native, and do NOT run `npm install <pkg>`
+  to add versions. Use `npx expo install <pkg>` so versions stay SDK-54 compatible.
+- If a task seems to need a version bump, STOP and ask me first.
+
+## Commands
+- `npx expo start -c` — start dev server with cleared cache
+- `npx expo install <pkg>` — add a package at SDK-54-compatible version
+
+## How I want you to work
+- Make MINIMAL changes. Do not refactor unrelated code.
+- Make the changes according to the prompt then say its done and explain shortly. so dont ask to proceed everytime
+- One bounded task at a time. If scope is unclear, ask.
+- Match the existing data-fetch pattern: query Supabase -> useState -> render.
+
+## Security (non-negotiable — this is a health app)
+- Row Level Security (RLS) is the security boundary. Every table with user data
+  MUST have RLS enabled with role-appropriate policies.
+- When you write or change an RLS policy, explain in plain English exactly who
+  can read/write what, so I can verify it myself.
+- A customer must NEVER be able to read another customer's data.
+- Never put the Supabase service_role key or the database password in app code.
+  Only the anon public key belongs in lib/supabase.js.
+
+## Conventions
+- Functional React components with hooks.
+- Keep components small; one screen per file.
+- Facility types are limited to: pharmacy, clinic, hospital, dentist.
+
+## Don't
+- Don't add analytics, tracking, or third-party SDKs without asking.
+- Don't generate large files of placeholder/sample code — ask what's real.
+- Don't mark a provider `verified: true` in code; verification is a manual step I do.
