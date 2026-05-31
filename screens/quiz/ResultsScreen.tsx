@@ -1,8 +1,9 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuizStore } from '@/lib/quiz/store'
+import { useReviewStore } from './reviewStore'
 import { getT } from '@/data/quiz/translations'
-import type { RecommendedSupplement, TimingSlot } from '@/lib/quiz/engine'
+import type { RecommendedSupplement, TimingSlot, QuizResult } from '@/lib/quiz/engine'
 import type { Interaction } from '@/data/quiz/interactions'
 import { colors, shadow } from '../../constants/theme'
 
@@ -97,11 +98,13 @@ function InteractionCard({ item }: { item: Interaction }) {
   )
 }
 
-export default function ResultsScreen({ onClose }: { onClose?: () => void }) {
-  const result = useQuizStore(s => s.result)
-  const language = useQuizStore(s => s.language)
-  const resetQuiz = useQuizStore(s => s.resetQuiz)
-  const ui = getT(language).ui.results
+export default function ResultsScreen({ onClose, result: resultProp, onBack, readOnly }: { onClose?: () => void; result?: QuizResult | null; onBack?: () => void; readOnly?: boolean }) {
+  const storeResult = useQuizStore(s => s.result)
+  const language    = useQuizStore(s => s.language)
+  const resetQuiz   = useQuizStore(s => s.resetQuiz)
+  const resetReview = useReviewStore(s => s.reset)
+  const ui          = getT(language).ui.results
+  const result      = resultProp ?? storeResult
 
   if (!result) return null
 
@@ -110,6 +113,11 @@ export default function ResultsScreen({ onClose }: { onClose?: () => void }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false}>
+        {onBack && (
+          <TouchableOpacity style={s.backBtn} onPress={onBack}>
+            <Text style={s.backText}>← Back</Text>
+          </TouchableOpacity>
+        )}
         <View style={s.badge}>
           <Text style={s.badgeText}>{ui.badge}</Text>
         </View>
@@ -154,11 +162,15 @@ export default function ResultsScreen({ onClose }: { onClose?: () => void }) {
           </View>
         ))}
 
-        <TouchableOpacity style={s.retakeBtn} onPress={resetQuiz}>
+        {!readOnly && <TouchableOpacity style={s.retakeBtn} onPress={() => { resetQuiz(); resetReview() }}>
           <Text style={s.retakeText}>{ui.retake}</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>}
+
         {onClose && (
-          <TouchableOpacity style={[s.retakeBtn, { marginTop: 10, borderColor: colors.border }]} onPress={onClose}>
+          <TouchableOpacity
+            style={[s.retakeBtn, { marginTop: 10, borderColor: colors.border }]}
+            onPress={() => { resetQuiz(); resetReview(); onClose() }}
+          >
             <Text style={[s.retakeText, { color: colors.textSecondary }]}>← Back to app</Text>
           </TouchableOpacity>
         )}
@@ -180,6 +192,8 @@ const s = StyleSheet.create({
   disclaimer:       { flexDirection: 'row', gap: 8, marginBottom: 10, alignItems: 'flex-start' },
   disclaimerDot:    { fontSize: 16 },
   disclaimerText:   { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18 },
+  backBtn:          { marginBottom: 12 },
+  backText:         { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
   retakeBtn:        { marginTop: 28, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   retakeText:       { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 })

@@ -15,6 +15,7 @@ import MapScreen from './screens/MapScreen'
 import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import QuizNavigator from './screens/quiz/QuizNavigator'
+import ResultsScreen from './screens/quiz/ResultsScreen'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -67,6 +68,8 @@ export default function App() {
   const [view, setView] = useState('list')
   const [showProfile, setShowProfile] = useState(false)
   const [showQuiz, setShowQuiz] = useState(false)
+  const [latestResult, setLatestResult] = useState(null)
+  const [showLatestResult, setShowLatestResult] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [activeType, setActiveType] = useState(null)
 
@@ -77,10 +80,23 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!session) { setProfile(null); return }
+    if (!session) { setProfile(null); setLatestResult(null); return }
     supabase.from('profiles').select('role, preferred_language').eq('id', session.user.id).single()
       .then(({ data }) => setProfile(data ?? null))
+    fetchLatestResult(session.user.id)
   }, [session])
+
+  async function fetchLatestResult(userId) {
+    const { data } = await supabase
+      .from('quiz_submissions')
+      .select('id, final_result, reviewed_at, facilities(name)')
+      .eq('customer_id', userId)
+      .eq('status', 'approved')
+      .order('reviewed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    setLatestResult(data ?? null)
+  }
 
   useEffect(() => {
     if (!session) return
@@ -173,8 +189,14 @@ export default function App() {
     content = <AdminScreen session={session} />
   } else if (profile.role === 'provider') {
     content = <ProviderScreen session={session} />
+  } else if (showLatestResult && latestResult) {
+    content = <ResultsScreen
+      result={latestResult.final_result}
+      onBack={() => setShowLatestResult(false)}
+      readOnly
+    />
   } else if (showQuiz) {
-    content = <QuizNavigator onClose={() => setShowQuiz(false)} />
+    content = <QuizNavigator onClose={() => { setShowQuiz(false); fetchLatestResult(session.user.id) }} profileLang={lang} />
   } else if (showProfile) {
     content = <ProfileScreen
       session={session}
@@ -252,6 +274,21 @@ export default function App() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+
+          {latestResult && (
+            <TouchableOpacity style={styles.resultCard} onPress={() => setShowLatestResult(true)} activeOpacity={0.8}>
+              <View style={styles.resultCardLeft}>
+                <Text style={styles.resultCardEmoji}>💊</Text>
+                <View>
+                  <Text style={styles.resultCardTitle}>Your Supplement Plan</Text>
+                  <Text style={styles.resultCardSub}>
+                    Approved by {latestResult.facilities?.name} · {new Date(latestResult.reviewed_at).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.resultCardArrow}>→</Text>
+            </TouchableOpacity>
+          )}
 
           {view === 'map' ? (
             <MapScreen
@@ -363,4 +400,10 @@ const styles = StyleSheet.create({
   openText:         { color: colors.success },
   closedText:       { color: colors.danger },
   addressText:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  resultCard:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1.5, borderColor: colors.primary + '30' },
+  resultCardLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  resultCardEmoji:  { fontSize: 28 },
+  resultCardTitle:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary, marginBottom: 2 },
+  resultCardSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.primary + 'AA' },
+  resultCardArrow:  { fontSize: 16, color: colors.primary, fontFamily: 'Inter_700Bold' },
 })

@@ -29,6 +29,7 @@ export default function QuizScreen() {
       toggleMultiAnswer(question.id, optionId)
     } else {
       setAnswer(question.id, optionId)
+      setTimeout(() => nextStep(), 150)
     }
   }
 

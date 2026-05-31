@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
+import QuizReviewScreen from './quiz/QuizReviewScreen'
 
 async function sendPushNotification(token, title, body) {
   try {
@@ -19,18 +20,25 @@ export default function ProviderScreen({ session }) {
   const [appointments, setAppointments] = useState([])
   const [facilityName, setFacilityName] = useState(null)
   const [facilityId, setFacilityId] = useState(null)
+  const [isQuizPartner, setIsQuizPartner] = useState(false)
   const [loading, setLoading] = useState(true)
   const [noFacility, setNoFacility] = useState(false)
   const [questions, setQuestions] = useState([])
   const [loadingQ, setLoadingQ] = useState(false)
   const [replyTexts, setReplyTexts] = useState({})
   const [submittingReply, setSubmittingReply] = useState(null)
+  const [quizReviews, setQuizReviews] = useState([])
+  const [loadingReviews, setLoadingReviews] = useState(false)
+  const [activeReview, setActiveReview] = useState(null)
+  const [archivedReviews, setArchivedReviews] = useState([])
+  const [loadingArchive, setLoadingArchive] = useState(false)
+  const [activeArchive, setActiveArchive] = useState(null)
 
   useEffect(() => {
     async function load() {
       const { data: facility } = await supabase
         .from('facilities')
-        .select('id, name')
+        .select('id, name, is_quiz_partner')
         .eq('provider_id', session.user.id)
         .maybeSingle()
 
@@ -42,6 +50,7 @@ export default function ProviderScreen({ session }) {
 
       setFacilityName(facility.name)
       setFacilityId(facility.id)
+      setIsQuizPartner(facility.is_quiz_partner ?? false)
 
       const { data, error } = await supabase
         .from('appointments')
@@ -59,7 +68,32 @@ export default function ProviderScreen({ session }) {
   useEffect(() => {
     if (!facilityId) return
     loadQuestions()
-  }, [facilityId])
+    if (isQuizPartner) { loadQuizReviews(); loadArchivedReviews() }
+  }, [facilityId, isQuizPartner])
+
+  async function loadArchivedReviews() {
+    setLoadingArchive(true)
+    const { data } = await supabase
+      .from('quiz_submissions')
+      .select('id, answers, generated_result, final_result, reviewed_at, created_at')
+      .eq('assigned_facility_id', facilityId)
+      .eq('status', 'approved')
+      .order('reviewed_at', { ascending: false })
+    if (data) setArchivedReviews(data)
+    setLoadingArchive(false)
+  }
+
+  async function loadQuizReviews() {
+    setLoadingReviews(true)
+    const { data } = await supabase
+      .from('quiz_submissions')
+      .select('id, answers, generated_result, created_at')
+      .eq('assigned_facility_id', facilityId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+    if (data) setQuizReviews(data)
+    setLoadingReviews(false)
+  }
 
   async function loadQuestions() {
     setLoadingQ(true)
@@ -113,6 +147,26 @@ export default function ProviderScreen({ session }) {
     }
   }
 
+  if (activeReview) {
+    return (
+      <QuizReviewScreen
+        submission={activeReview}
+        onApproved={() => { setActiveReview(null); loadQuizReviews(); loadArchivedReviews() }}
+        onBack={() => setActiveReview(null)}
+      />
+    )
+  }
+
+  if (activeArchive) {
+    return (
+      <QuizReviewScreen
+        submission={activeArchive}
+        onBack={() => setActiveArchive(null)}
+        readOnly
+      />
+    )
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -161,9 +215,110 @@ export default function ProviderScreen({ session }) {
           >
             <Text style={[styles.tabText, tab === 'qa' && styles.tabTextActive]}>Q&A</Text>
           </TouchableOpacity>
+          {isQuizPartner && (
+            <TouchableOpacity
+              style={[styles.tabBtn, tab === 'quiz' && styles.tabBtnActive]}
+              onPress={() => setTab('quiz')}
+            >
+              <View style={styles.tabWithBadge}>
+                <Text style={[styles.tabText, tab === 'quiz' && styles.tabTextActive]}>💊 Reviews</Text>
+                {quizReviews.length > 0 && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{quizReviews.length}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
+          {isQuizPartner && (
+            <TouchableOpacity
+              style={[styles.tabBtn, tab === 'archive' && styles.tabBtnActive]}
+              onPress={() => setTab('archive')}
+            >
+              <Text style={[styles.tabText, tab === 'archive' && styles.tabTextActive]}>🗂 Archive</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {tab === 'requests' ? (
+        {tab === 'archive' ? (
+          loadingArchive ? (
+            <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
+          ) : archivedReviews.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>No approved reviews yet</Text>
+              <Text style={styles.emptySub}>Quizzes you approve will be archived here for future reference.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={archivedReviews}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContent}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.card, styles.reviewCard]}
+                  onPress={() => setActiveArchive(item)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.reviewCardLeft}>
+                    <View style={[styles.reviewIcon, { backgroundColor: colors.successLight }]}>
+                      <Text style={styles.reviewIconText}>✓</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.reviewTitle}>Approved Review</Text>
+                      <Text style={styles.reviewTime}>
+                        {new Date(item.reviewed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                      </Text>
+                      <Text style={[styles.reviewCount, { color: colors.success }]}>
+                        {item.final_result?.stack?.length ?? 0} supplements approved
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.reviewArrow}>→</Text>
+                </TouchableOpacity>
+              )}
+            />
+          )
+        ) : tab === 'quiz' ? (
+          loadingReviews ? (
+            <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
+          ) : quizReviews.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>No pending reviews</Text>
+              <Text style={styles.emptySub}>Quiz review requests from customers will appear here.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={quizReviews}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContent}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.card, styles.reviewCard]}
+                  onPress={() => setActiveReview(item)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.reviewCardLeft}>
+                    <View style={styles.reviewIcon}>
+                      <Text style={styles.reviewIconText}>💊</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.reviewTitle}>Quiz Review</Text>
+                      <Text style={styles.reviewTime}>
+                        {new Date(item.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                      </Text>
+                      <Text style={styles.reviewCount}>
+                        {item.generated_result?.stack?.length ?? 0} supplements recommended
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.reviewArrow}>→</Text>
+                </TouchableOpacity>
+              )}
+            />
+          )
+        ) : tab === 'requests' ? (
           appointments.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>All clear</Text>
@@ -270,10 +425,21 @@ const styles = StyleSheet.create({
   confirmText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.success },
   declineBtn:   { flex: 1, backgroundColor: colors.dangerLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   declineText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.danger },
-  tabs:         { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, marginBottom: 16 },
-  tabBtn:       { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: 'center' },
-  tabBtnActive: { backgroundColor: colors.surface, ...shadow },
-  tabText:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  tabs:            { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, marginBottom: 16 },
+  tabBtn:          { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: 'center' },
+  tabBtnActive:    { backgroundColor: colors.surface, ...shadow },
+  tabText:         { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  tabWithBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  tabBadge:        { backgroundColor: colors.danger, borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+  tabBadgeText:    { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#fff' },
+  reviewCard:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reviewCardLeft:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  reviewIcon:      { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  reviewIconText:  { fontSize: 20 },
+  reviewTitle:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  reviewTime:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+  reviewCount:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.primary, marginTop: 2 },
+  reviewArrow:     { fontSize: 18, color: colors.primary, fontFamily: 'Inter_700Bold' },
   tabTextActive:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   qBody:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginBottom: 12, lineHeight: 20 },
   answerBlock:  { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10 },
