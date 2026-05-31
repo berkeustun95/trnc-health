@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { supabase } from '../lib/supabase'
 import { colors, typeColors, shadow } from '../constants/theme'
+import { t } from '../constants/i18n'
 
-export default function BookingScreen({ facility, session, onBack }) {
+export default function BookingScreen({ facility, session, lang, onBack }) {
   const [date, setDate] = useState(() => {
     const d = new Date()
     d.setHours(d.getHours() + 1, 0, 0, 0)
@@ -65,12 +66,12 @@ export default function BookingScreen({ facility, session, onBack }) {
           <View style={styles.successRing}>
             <Text style={styles.successCheck}>✓</Text>
           </View>
-          <Text style={styles.successTitle}>Request sent</Text>
+          <Text style={styles.successTitle}>{t('requestSent', lang)}</Text>
           <Text style={styles.successSub}>
-            We'll notify you when {facility.name} confirms your appointment.
+            {t('requestSentSub', lang).replace('{name}', facility.name)}
           </Text>
           <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-            <Text style={styles.backBtnText}>Back to list</Text>
+            <Text style={styles.backBtnText}>{t('backToList', lang)}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -95,7 +96,7 @@ export default function BookingScreen({ facility, session, onBack }) {
           <Text style={styles.facilityAddress}>{facility.address}</Text>
         </View>
 
-        <Text style={styles.sectionLabel}>Requested time</Text>
+        <Text style={styles.sectionLabel}>{t('requestedTime', lang)}</Text>
         <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
           <Text style={styles.dateBtnText}>
             {date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
@@ -127,19 +128,19 @@ export default function BookingScreen({ facility, session, onBack }) {
         <TouchableOpacity style={styles.submit} onPress={submit} disabled={loading}>
           {loading
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitText}>Request appointment</Text>
+            : <Text style={styles.submitText}>{t('requestAppointment', lang)}</Text>
           }
         </TouchableOpacity>
 
         <View style={styles.divider} />
-        <Text style={styles.sectionLabel}>Questions & Answers</Text>
+        <Text style={styles.sectionLabel}>{t('questionsAnswers', lang)}</Text>
 
         <View style={styles.askRow}>
           <TextInput
             style={styles.askInput}
             value={newQ}
             onChangeText={setNewQ}
-            placeholder="Ask a question about this facility…"
+            placeholder={t('askPlaceholder', lang)}
             placeholderTextColor={colors.textSecondary}
             multiline
           />
@@ -156,18 +157,18 @@ export default function BookingScreen({ facility, session, onBack }) {
         </View>
 
         {questions.length === 0 ? (
-          <Text style={styles.noQText}>No questions yet.</Text>
+          <Text style={styles.noQText}>{t('noQuestions', lang)}</Text>
         ) : (
           questions.map(q => (
             <View key={q.id} style={styles.qCard}>
               <Text style={styles.qBody}>{q.body}</Text>
               {q.answers && q.answers.length > 0 ? (
                 <View style={styles.answerBlock}>
-                  <Text style={styles.answerLabel}>Provider answer</Text>
+                  <Text style={styles.answerLabel}>{t('providerAnswer', lang)}</Text>
                   <Text style={styles.answerBody}>{q.answers[0].body}</Text>
                 </View>
               ) : (
-                <Text style={styles.noAnswer}>Awaiting answer</Text>
+                <Text style={styles.noAnswer}>{t('awaitingAnswer', lang)}</Text>
               )}
             </View>
           ))

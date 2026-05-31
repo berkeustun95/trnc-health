@@ -6,10 +6,21 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
+import { t } from '../constants/i18n'
 
-const LANGUAGES = ['English', 'Turkish', 'Arabic', 'Russian', 'Greek', 'French', 'Spanish', 'German', 'Persian']
+const LANGUAGES = [
+  { key: 'English',  label: 'English'    },
+  { key: 'Turkish',  label: 'Türkçe'     },
+  { key: 'Arabic',   label: 'العربية'    },
+  { key: 'Russian',  label: 'Русский'    },
+  { key: 'Greek',    label: 'Ελληνικά'  },
+  { key: 'French',   label: 'Français'   },
+  { key: 'Spanish',  label: 'Español'    },
+  { key: 'German',   label: 'Deutsch'    },
+  { key: 'Persian',  label: 'فارسی'      },
+]
 
-export default function ProfileScreen({ session, onBack }) {
+export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
   const [profile, setProfile] = useState(null)
   const [form, setForm] = useState({ full_name: '', phone: '', nationality: '', preferred_language: 'English' })
   const [loading, setLoading] = useState(true)
@@ -49,11 +60,21 @@ export default function ProfileScreen({ session, onBack }) {
       })
       .eq('id', session.user.id)
     if (err) setError(err.message)
-    else { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+    else {
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+      onLangChange?.(form.preferred_language)
+    }
     setSaving(false)
   }
 
   const set = key => val => setForm(f => ({ ...f, [key]: val }))
+
+  async function selectLang(langKey) {
+    set('preferred_language')(langKey)
+    await supabase.from('profiles').update({ preferred_language: langKey }).eq('id', session.user.id)
+    onLangChange?.(langKey)
+  }
 
   const initials = form.full_name.trim()
     ? form.full_name.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -79,12 +100,12 @@ export default function ProfileScreen({ session, onBack }) {
         >
           <View style={s.header}>
             <TouchableOpacity onPress={onBack}>
-              <Text style={s.backText}>Back</Text>
+              <Text style={s.backText}>{t('back', lang)}</Text>
             </TouchableOpacity>
-            <Text style={s.title}>Profile</Text>
+            <Text style={s.title}>{t('profile', lang)}</Text>
             <TouchableOpacity onPress={save} disabled={saving}>
               <Text style={[s.saveText, saving && { opacity: 0.4 }]}>
-                {saved ? 'Saved!' : saving ? 'Saving…' : 'Save'}
+                {saved ? t('saved', lang) : saving ? t('saving', lang) : t('save', lang)}
               </Text>
             </TouchableOpacity>
           </View>
@@ -102,20 +123,20 @@ export default function ProfileScreen({ session, onBack }) {
           <View style={s.memberCard}>
             <View style={s.memberCardTop}>
               <View>
-                <Text style={s.memberLabel}>Membership ID</Text>
+                <Text style={s.memberLabel}>{t('membershipId', lang)}</Text>
                 <Text style={s.memberId}>{memberId}</Text>
               </View>
               <View style={s.qrPlaceholder}>
                 <Text style={s.qrIcon}>▦</Text>
               </View>
             </View>
-            <Text style={s.memberSub}>Discount QR code coming soon</Text>
+            <Text style={s.memberSub}>{t('discountQrSoon', lang)}</Text>
           </View>
 
-          <Text style={s.sectionTitle}>Personal info</Text>
+          <Text style={s.sectionTitle}>{t('personalInfo', lang)}</Text>
 
           <View style={s.fieldGroup}>
-            <Text style={s.fieldLabel}>Full name</Text>
+            <Text style={s.fieldLabel}>{t('fullName', lang)}</Text>
             <TextInput
               style={s.input}
               value={form.full_name}
@@ -126,7 +147,7 @@ export default function ProfileScreen({ session, onBack }) {
           </View>
 
           <View style={s.fieldGroup}>
-            <Text style={s.fieldLabel}>Phone</Text>
+            <Text style={s.fieldLabel}>{t('phone', lang)}</Text>
             <TextInput
               style={s.input}
               value={form.phone}
@@ -138,7 +159,7 @@ export default function ProfileScreen({ session, onBack }) {
           </View>
 
           <View style={s.fieldGroup}>
-            <Text style={s.fieldLabel}>Nationality</Text>
+            <Text style={s.fieldLabel}>{t('nationality', lang)}</Text>
             <TextInput
               style={s.input}
               value={form.nationality}
@@ -148,17 +169,17 @@ export default function ProfileScreen({ session, onBack }) {
             />
           </View>
 
-          <Text style={s.sectionTitle}>Preferences</Text>
-          <Text style={s.fieldLabel}>Preferred language</Text>
+          <Text style={s.sectionTitle}>{t('preferences', lang)}</Text>
+          <Text style={s.fieldLabel}>{t('preferredLanguage', lang)}</Text>
           <View style={s.langGrid}>
-            {LANGUAGES.map(lang => (
+            {LANGUAGES.map(({ key, label }) => (
               <TouchableOpacity
-                key={lang}
-                style={[s.langChip, form.preferred_language === lang && s.langChipActive]}
-                onPress={() => set('preferred_language')(lang)}
+                key={key}
+                style={[s.langChip, form.preferred_language === key && s.langChipActive]}
+                onPress={() => selectLang(key)}
               >
-                <Text style={[s.langChipText, form.preferred_language === lang && s.langChipTextActive]}>
-                  {lang}
+                <Text style={[s.langChipText, form.preferred_language === key && s.langChipTextActive]}>
+                  {label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -167,7 +188,7 @@ export default function ProfileScreen({ session, onBack }) {
           {error && <Text style={s.errorText}>{error}</Text>}
 
           <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
-            <Text style={s.signOutText}>Sign out</Text>
+            <Text style={s.signOutText}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

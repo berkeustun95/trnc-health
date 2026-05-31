@@ -7,6 +7,7 @@ import * as Location from 'expo-location'
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter'
 import { supabase } from './lib/supabase'
 import { colors, typeColors, shadow } from './constants/theme'
+import { t } from './constants/i18n'
 import AuthScreen from './screens/AuthScreen'
 import BookingScreen from './screens/BookingScreen'
 import ProviderScreen from './screens/ProviderScreen'
@@ -75,7 +76,7 @@ export default function App() {
 
   useEffect(() => {
     if (!session) { setProfile(null); return }
-    supabase.from('profiles').select('role').eq('id', session.user.id).single()
+    supabase.from('profiles').select('role, preferred_language').eq('id', session.user.id).single()
       .then(({ data }) => setProfile(data ?? null))
   }, [session])
 
@@ -156,6 +157,8 @@ export default function App() {
       )
     })
 
+  const lang = profile?.preferred_language || 'English'
+
   let content
 
   if (session === undefined || !fontsLoaded) {
@@ -169,9 +172,14 @@ export default function App() {
   } else if (profile.role === 'provider') {
     content = <ProviderScreen session={session} />
   } else if (showProfile) {
-    content = <ProfileScreen session={session} onBack={() => setShowProfile(false)} />
+    content = <ProfileScreen
+      session={session}
+      lang={lang}
+      onBack={() => setShowProfile(false)}
+      onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
+    />
   } else if (selectedFacility) {
-    content = <BookingScreen facility={selectedFacility} session={session} onBack={() => setSelectedFacility(null)} />
+    content = <BookingScreen facility={selectedFacility} session={session} lang={lang} onBack={() => setSelectedFacility(null)} />
   } else {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -184,13 +192,13 @@ export default function App() {
                   style={[styles.toggleBtn, view === 'list' && styles.toggleBtnActive]}
                   onPress={() => setView('list')}
                 >
-                  <Text style={[styles.toggleText, view === 'list' && styles.toggleTextActive]}>List</Text>
+                  <Text style={[styles.toggleText, view === 'list' && styles.toggleTextActive]}>{t('list', lang)}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.toggleBtn, view === 'map' && styles.toggleBtnActive]}
                   onPress={() => setView('map')}
                 >
-                  <Text style={[styles.toggleText, view === 'map' && styles.toggleTextActive]}>Map</Text>
+                  <Text style={[styles.toggleText, view === 'map' && styles.toggleTextActive]}>{t('map', lang)}</Text>
                 </TouchableOpacity>
               </View>
               <TouchableOpacity style={styles.avatarBtn} onPress={() => setShowProfile(true)}>
@@ -232,7 +240,7 @@ export default function App() {
                 onPress={() => setActiveType(type)}
               >
                 <Text style={[styles.filterChipText, activeType === type && styles.filterChipTextActive]}>
-                  {type ?? 'All'}
+                  {type ? t(type, lang) : t('all', lang)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -248,7 +256,7 @@ export default function App() {
           ) : (
             <>
               {locationDenied && (
-                <Text style={styles.locationNote}>Enable location to see nearest services.</Text>
+                <Text style={styles.locationNote}>{t('enableLocation', lang)}</Text>
               )}
               <FlatList
                 data={listed}
@@ -267,7 +275,7 @@ export default function App() {
                     >
                       {isDuty && (
                         <View style={styles.dutyBanner}>
-                          <Text style={styles.dutyLabel}>On duty tonight</Text>
+                          <Text style={styles.dutyLabel}>{t('onDuty', lang)}</Text>
                         </View>
                       )}
                       <View style={styles.cardTop}>
@@ -278,12 +286,12 @@ export default function App() {
                       </View>
                       <View style={styles.badgeRow}>
                         <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
-                          <Text style={[styles.typeBadgeText, { color: tc.text }]}>{item.type}</Text>
+                          <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
                         </View>
                         {isOpen != null && (
                           <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
                             <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
-                              {isOpen ? 'Open' : 'Closed'}
+                              {isOpen ? t('open', lang) : t('closed', lang)}
                             </Text>
                           </View>
                         )}
