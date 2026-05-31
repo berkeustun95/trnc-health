@@ -1,8 +1,26 @@
 import { useEffect, useState } from 'react'
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform } from 'react-native'
+import * as Notifications from 'expo-notifications'
+import * as Device from 'expo-device'
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
+import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter'
 import { supabase } from './lib/supabase'
+import { colors, typeColors, shadow } from './constants/theme'
 import AuthScreen from './screens/AuthScreen'
+import BookingScreen from './screens/BookingScreen'
+import ProviderScreen from './screens/ProviderScreen'
+import MapScreen from './screens/MapScreen'
+import AdminScreen from './screens/AdminScreen'
+import ProfileScreen from './screens/ProfileScreen'
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+})
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371
@@ -35,12 +53,17 @@ function parseIsOpen(hours) {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_700Bold })
   const [session, setSession] = useState(undefined)
   const [facilities, setFacilities] = useState([])
   const [loading, setLoading] = useState(true)
   const [userLocation, setUserLocation] = useState(null)
   const [locationDenied, setLocationDenied] = useState(false)
   const [dutyFacilityId, setDutyFacilityId] = useState(null)
+  const [selectedFacility, setSelectedFacility] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [view, setView] = useState('list')
+  const [showProfile, setShowProfile] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -49,21 +72,45 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (!session) { setProfile(null); return }
+    supabase.from('profiles').select('role').eq('id', session.user.id).single()
+      .then(({ data }) => setProfile(data ?? null))
+  }, [session])
+
+  useEffect(() => {
+    if (!session) return
+    async function registerPushToken() {
+      try {
+        if (!Device.isDevice) return
+        const { status } = await Notifications.requestPermissionsAsync()
+        if (status !== 'granted') return
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'default',
+            importance: Notifications.AndroidImportance.MAX,
+          })
+        }
+        const { data: token } = await Notifications.getExpoPushTokenAsync()
+        if (token) {
+          await supabase.from('profiles').update({ push_token: token }).eq('id', session.user.id)
+        }
+      } catch (e) {
+        console.log('Push registration skipped:', e.message)
+      }
+    }
+    registerPushToken()
+  }, [session])
+
+  useEffect(() => {
     async function load() {
-      const { data, error } = await supabase
-        .from('facilities')
-        .select('*')
-        .order('name')
+      const { data, error } = await supabase.from('facilities').select('*').order('name')
       if (error) console.error(error)
       else setFacilities(data)
 
       const d = new Date()
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       const { data: duty } = await supabase
-        .from('duty_schedule')
-        .select('facility_id')
-        .eq('date', today)
-        .maybeSingle()
+        .from('duty_schedule').select('facility_id').eq('date', today).maybeSingle()
       if (duty) setDutyFacilityId(duty.facility_id)
 
       try {
@@ -77,7 +124,6 @@ export default function App() {
       } catch {
         setLocationDenied(true)
       }
-
       setLoading(false)
     }
     load()
@@ -88,7 +134,7 @@ export default function App() {
       ...f,
       _dist: userLocation && f.latitude != null && f.longitude != null
         ? haversineKm(userLocation.latitude, userLocation.longitude, f.latitude, f.longitude)
-        : null
+        : null,
     }))
     .sort((a, b) => {
       if (a.id === dutyFacilityId) return -1
@@ -99,71 +145,147 @@ export default function App() {
       return a._dist - b._dist
     })
 
-  if (session === undefined) return <View style={styles.center}><ActivityIndicator size="large" /></View>
-  if (!session) return <AuthScreen />
+  let content
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-      </View>
+  if (session === undefined || !fontsLoaded) {
+    content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+  } else if (!session) {
+    content = <AuthScreen />
+  } else if (loading || !profile) {
+    content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+  } else if (profile.role === 'admin') {
+    content = <AdminScreen session={session} />
+  } else if (profile.role === 'provider') {
+    content = <ProviderScreen session={session} />
+  } else if (showProfile) {
+    content = <ProfileScreen session={session} onBack={() => setShowProfile(false)} />
+  } else if (selectedFacility) {
+    content = <BookingScreen facility={selectedFacility} session={session} onBack={() => setSelectedFacility(null)} />
+  } else {
+    content = (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.wordmark}>TRNC Health</Text>
+            <View style={styles.headerRight}>
+              <View style={styles.viewToggle}>
+                <TouchableOpacity
+                  style={[styles.toggleBtn, view === 'list' && styles.toggleBtnActive]}
+                  onPress={() => setView('list')}
+                >
+                  <Text style={[styles.toggleText, view === 'list' && styles.toggleTextActive]}>List</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.toggleBtn, view === 'map' && styles.toggleBtnActive]}
+                  onPress={() => setView('map')}
+                >
+                  <Text style={[styles.toggleText, view === 'map' && styles.toggleTextActive]}>Map</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.avatarBtn} onPress={() => setShowProfile(true)}>
+                <Text style={styles.avatarBtnText}>
+                  {session.user.email[0].toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {view === 'map' ? (
+            <MapScreen
+              facilities={facilities}
+              dutyFacilityId={dutyFacilityId}
+              userLocation={userLocation}
+              onSelectFacility={setSelectedFacility}
+            />
+          ) : (
+            <>
+              {locationDenied && (
+                <Text style={styles.locationNote}>Enable location to see nearest services.</Text>
+              )}
+              <FlatList
+                data={listed}
+                keyExtractor={item => item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.listContent}
+                renderItem={({ item }) => {
+                  const isOpen = parseIsOpen(item.opening_hours)
+                  const tc = typeColors[item.type] || typeColors.clinic
+                  const isDuty = item.id === dutyFacilityId
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.75}
+                      style={[styles.card, isDuty && styles.dutyCard]}
+                      onPress={() => setSelectedFacility(item)}
+                    >
+                      {isDuty && (
+                        <View style={styles.dutyBanner}>
+                          <Text style={styles.dutyLabel}>On duty tonight</Text>
+                        </View>
+                      )}
+                      <View style={styles.cardTop}>
+                        <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
+                        {item._dist != null && (
+                          <Text style={styles.distanceText}>{item._dist.toFixed(1)} km</Text>
+                        )}
+                      </View>
+                      <View style={styles.badgeRow}>
+                        <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
+                          <Text style={[styles.typeBadgeText, { color: tc.text }]}>{item.type}</Text>
+                        </View>
+                        {isOpen != null && (
+                          <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
+                            <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
+                              {isOpen ? 'Open' : 'Closed'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text>
+                    </TouchableOpacity>
+                  )
+                }}
+              />
+            </>
+          )}
+        </View>
+      </SafeAreaView>
     )
   }
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Health Services Near You</Text>
-      {locationDenied && (
-        <Text style={styles.locationNote}>Enable location to see nearest services.</Text>
-      )}
-      <FlatList
-        data={listed}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
-          const isOpen = parseIsOpen(item.opening_hours)
-          return (
-            <View style={[styles.card, item.id === dutyFacilityId && styles.dutyCard]}>
-              {item.id === dutyFacilityId && (
-                <Text style={styles.dutyLabel}>On duty tonight</Text>
-              )}
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.type}>{item.type}</Text>
-              <Text style={styles.detail}>{item.address}</Text>
-              <Text style={styles.detail}>{item.opening_hours}</Text>
-              {isOpen != null && (
-                <View style={[styles.badge, isOpen ? styles.badgeOpen : styles.badgeClosed]}>
-                  <Text style={[styles.badgeText, isOpen ? styles.badgeTextOpen : styles.badgeTextClosed]}>
-                    {isOpen ? 'Open now' : 'Closed'}
-                  </Text>
-                </View>
-              )}
-              {item._dist != null && (
-                <Text style={styles.distance}>{item._dist.toFixed(1)} km away</Text>
-              )}
-            </View>
-          )
-        }}
-      />
-    </View>
-  )
+  return <SafeAreaProvider>{content}</SafeAreaProvider>
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, paddingTop: 60, paddingHorizontal: 16, backgroundColor: '#fff' },
-  center:          { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  heading:         { fontSize: 22, fontWeight: '700', marginBottom: 16 },
-  locationNote:    { fontSize: 13, color: '#6b7280', marginBottom: 10, textAlign: 'center' },
-  card:            { padding: 14, borderRadius: 10, backgroundColor: '#f3f4f6', marginBottom: 10 },
-  dutyCard:        { backgroundColor: '#fef9c3', borderColor: '#fbbf24', borderWidth: 1 },
-  dutyLabel:       { fontSize: 12, fontWeight: '700', color: '#92400e', marginBottom: 4 },
-  name:            { fontSize: 17, fontWeight: '600' },
-  type:            { fontSize: 13, color: '#2563eb', textTransform: 'capitalize', marginTop: 2 },
-  detail:          { fontSize: 14, color: '#444', marginTop: 4 },
-  badge:           { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginTop: 6 },
-  badgeOpen:       { backgroundColor: '#dcfce7' },
-  badgeClosed:     { backgroundColor: '#fee2e2' },
-  badgeText:       { fontSize: 12, fontWeight: '600' },
-  badgeTextOpen:   { color: '#15803d' },
-  badgeTextClosed: { color: '#dc2626' },
-  distance:        { fontSize: 13, color: '#16a34a', fontWeight: '500', marginTop: 4 },
+  safe:             { flex: 1, backgroundColor: colors.bg },
+  container:        { flex: 1, paddingHorizontal: 16 },
+  center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
+  header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
+  wordmark:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
+  headerRight:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  viewToggle:       { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2 },
+  toggleBtn:        { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6 },
+  toggleBtnActive:  { backgroundColor: colors.surface, ...shadow },
+  toggleText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  toggleTextActive: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  avatarBtn:        { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
+  avatarBtnText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+  locationNote:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 10, textAlign: 'center' },
+  listContent:      { paddingBottom: 32 },
+  card:             { backgroundColor: colors.cardBg, borderRadius: 12, padding: 16, marginBottom: 10, ...shadow },
+  dutyCard:         { borderWidth: 1.5, borderColor: colors.accent },
+  dutyBanner:       { backgroundColor: colors.accentLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
+  dutyLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },
+  cardTop:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  facilityName:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, marginRight: 8 },
+  distanceText:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
+  badgeRow:         { flexDirection: 'row', gap: 6, marginBottom: 8 },
+  typeBadge:        { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  typeBadgeText:    { fontSize: 12, fontFamily: 'Inter_700Bold', textTransform: 'capitalize' },
+  statusBadge:      { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  openBadge:        { backgroundColor: colors.successLight },
+  closedBadge:      { backgroundColor: colors.dangerLight },
+  statusText:       { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  openText:         { color: colors.success },
+  closedText:       { color: colors.danger },
+  addressText:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 })

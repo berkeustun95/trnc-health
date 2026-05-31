@@ -1,0 +1,53 @@
+export const colors = {
+  primary:       '#0E7C7B',
+  primaryLight:  '#E6F4F4',
+  accent:        '#FF8552',
+  accentLight:   '#FFF0EB',
+  bg:            '#FFFFFF',
+  cardBg:        '#F4F6F8',
+  surface:       '#FFFFFF',
+  border:        '#E2E8F0',
+  textPrimary:   '#1A2B33',
+  textSecondary: '#64748B',
+  success:       '#2E9E5B',
+  successLight:  '#E6F5ED',
+  danger:        '#D1495B',
+  dangerLight:   '#FAEAEC',
+}
+
+export const typeColors = {
+  pharmacy: { bg: '#F3E8FF', text: '#7C3AED' },
+  clinic:   { bg: '#E6F4F4', text: '#0E7C7B' },
+  hospital: { bg: '#FAEAEC', text: '#D1495B' },
+  dentist:  { bg: '#E6F5ED', text: '#2E9E5B' },
+}
+
+export const shadow = {
+  shadowColor:   '#1A2B33',
+  shadowOpacity: 0.08,
+  shadowRadius:  8,
+  shadowOffset:  { width: 0, height: 2 },
+  elevation:     2,
+}
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 40,
+}
+
+export const fontSize = {
+  sm: 13,
+  md: 16,
+  lg: 20,
+  xl: 26,
+}
+
+export const radius = {
+  sm: 8,
+  md: 12,
+  card: 12,
+  lg: 16,
+}

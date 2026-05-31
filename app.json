@@ -10,6 +10,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.berkeustun95.trnchealth",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -19,6 +20,17 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "704d192a-1a80-41f8-ab98-cb3c8f078d7c"
+      }
+    },
+    "owner": "berkeustun95"
   }
 }
