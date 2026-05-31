@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
@@ -15,10 +15,16 @@ async function sendPushNotification(token, title, body) {
 }
 
 export default function ProviderScreen({ session }) {
+  const [tab, setTab] = useState('requests')
   const [appointments, setAppointments] = useState([])
   const [facilityName, setFacilityName] = useState(null)
+  const [facilityId, setFacilityId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [noFacility, setNoFacility] = useState(false)
+  const [questions, setQuestions] = useState([])
+  const [loadingQ, setLoadingQ] = useState(false)
+  const [replyTexts, setReplyTexts] = useState({})
+  const [submittingReply, setSubmittingReply] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -35,6 +41,7 @@ export default function ProviderScreen({ session }) {
       }
 
       setFacilityName(facility.name)
+      setFacilityId(facility.id)
 
       const { data, error } = await supabase
         .from('appointments')
@@ -48,6 +55,38 @@ export default function ProviderScreen({ session }) {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    if (!facilityId) return
+    loadQuestions()
+  }, [facilityId])
+
+  async function loadQuestions() {
+    setLoadingQ(true)
+    const { data } = await supabase
+      .from('questions')
+      .select('id, body, created_at, answers(id, body, created_at)')
+      .eq('facility_id', facilityId)
+      .order('created_at', { ascending: false })
+    if (data) setQuestions(data)
+    setLoadingQ(false)
+  }
+
+  async function submitReply(questionId) {
+    const body = replyTexts[questionId]?.trim()
+    if (!body) return
+    setSubmittingReply(questionId)
+    const { error } = await supabase.from('answers').insert({
+      question_id: questionId,
+      provider_id: session.user.id,
+      body,
+    })
+    if (!error) {
+      setReplyTexts(prev => ({ ...prev, [questionId]: '' }))
+      await loadQuestions()
+    }
+    setSubmittingReply(null)
+  }
 
   async function updateStatus(id, status, customerId) {
     const { error } = await supabase
@@ -109,42 +148,103 @@ export default function ProviderScreen({ session }) {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionTitle}>Pending requests</Text>
+        <View style={styles.tabs}>
+          <TouchableOpacity
+            style={[styles.tabBtn, tab === 'requests' && styles.tabBtnActive]}
+            onPress={() => setTab('requests')}
+          >
+            <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>Requests</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, tab === 'qa' && styles.tabBtnActive]}
+            onPress={() => setTab('qa')}
+          >
+            <Text style={[styles.tabText, tab === 'qa' && styles.tabTextActive]}>Q&A</Text>
+          </TouchableOpacity>
+        </View>
 
-        {appointments.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>All clear</Text>
-            <Text style={styles.emptySub}>No pending appointment requests.</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={appointments}
-            keyExtractor={item => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
-              <View style={styles.card}>
-                <Text style={styles.timeLabel}>Requested for</Text>
-                <Text style={styles.timeValue}>
-                  {new Date(item.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                </Text>
-                <View style={styles.actions}>
-                  <TouchableOpacity
-                    style={styles.confirmBtn}
-                    onPress={() => updateStatus(item.id, 'confirmed', item.customer_id)}
-                  >
-                    <Text style={styles.confirmText}>Confirm</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.declineBtn}
-                    onPress={() => updateStatus(item.id, 'cancelled', item.customer_id)}
-                  >
-                    <Text style={styles.declineText}>Decline</Text>
-                  </TouchableOpacity>
+        {tab === 'requests' ? (
+          appointments.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>All clear</Text>
+              <Text style={styles.emptySub}>No pending appointment requests.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={appointments}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContent}
+              renderItem={({ item }) => (
+                <View style={styles.card}>
+                  <Text style={styles.timeLabel}>Requested for</Text>
+                  <Text style={styles.timeValue}>
+                    {new Date(item.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                  </Text>
+                  <View style={styles.actions}>
+                    <TouchableOpacity
+                      style={styles.confirmBtn}
+                      onPress={() => updateStatus(item.id, 'confirmed', item.customer_id)}
+                    >
+                      <Text style={styles.confirmText}>Confirm</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.declineBtn}
+                      onPress={() => updateStatus(item.id, 'cancelled', item.customer_id)}
+                    >
+                      <Text style={styles.declineText}>Decline</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            )}
-          />
+              )}
+            />
+          )
+        ) : (
+          loadingQ ? (
+            <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
+              {questions.length === 0 ? (
+                <View style={styles.empty}>
+                  <Text style={styles.emptyTitle}>No questions yet</Text>
+                  <Text style={styles.emptySub}>Questions from customers will appear here.</Text>
+                </View>
+              ) : (
+                questions.map(q => (
+                  <View key={q.id} style={styles.card}>
+                    <Text style={styles.qBody}>{q.body}</Text>
+                    {q.answers && q.answers.length > 0 ? (
+                      <View style={styles.answerBlock}>
+                        <Text style={styles.answerLabel}>Your answer</Text>
+                        <Text style={styles.answerBody}>{q.answers[0].body}</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.replyRow}>
+                        <TextInput
+                          style={styles.replyInput}
+                          value={replyTexts[q.id] ?? ''}
+                          onChangeText={val => setReplyTexts(prev => ({ ...prev, [q.id]: val }))}
+                          placeholder="Write your answer…"
+                          placeholderTextColor={colors.textSecondary}
+                          multiline
+                        />
+                        <TouchableOpacity
+                          style={[styles.replyBtn, (!replyTexts[q.id]?.trim() || submittingReply === q.id) && { opacity: 0.4 }]}
+                          onPress={() => submitReply(q.id)}
+                          disabled={!replyTexts[q.id]?.trim() || submittingReply === q.id}
+                        >
+                          {submittingReply === q.id
+                            ? <ActivityIndicator color="#fff" size="small" />
+                            : <Text style={styles.replyBtnText}>Send</Text>
+                          }
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          )
         )}
       </View>
     </SafeAreaView>
@@ -170,6 +270,19 @@ const styles = StyleSheet.create({
   confirmText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.success },
   declineBtn:   { flex: 1, backgroundColor: colors.dangerLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   declineText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.danger },
+  tabs:         { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, marginBottom: 16 },
+  tabBtn:       { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: 'center' },
+  tabBtnActive: { backgroundColor: colors.surface, ...shadow },
+  tabText:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  tabTextActive:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  qBody:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginBottom: 12, lineHeight: 20 },
+  answerBlock:  { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10 },
+  answerLabel:  { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  answerBody:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
+  replyRow:     { gap: 8 },
+  replyInput:   { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, padding: 10, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface, maxHeight: 80 },
+  replyBtn:     { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  replyBtnText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
   empty:        { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyTitle:   { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8 },
   emptySub:     { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
