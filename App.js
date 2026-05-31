@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform } from 'react-native'
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
@@ -64,6 +64,8 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [view, setView] = useState('list')
   const [showProfile, setShowProfile] = useState(false)
+  const [searchText, setSearchText] = useState('')
+  const [activeType, setActiveType] = useState(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -144,6 +146,15 @@ export default function App() {
       if (b._dist == null) return -1
       return a._dist - b._dist
     })
+    .filter(f => !activeType || f.type === activeType)
+    .filter(f => {
+      const q = searchText.trim().toLowerCase()
+      if (!q) return true
+      return (
+        f.name.toLowerCase().includes(q) ||
+        (f.address && f.address.toLowerCase().includes(q))
+      )
+    })
 
   let content
 
@@ -189,6 +200,43 @@ export default function App() {
               </TouchableOpacity>
             </View>
           </View>
+
+          <View style={styles.searchBar}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              value={searchText}
+              onChangeText={setSearchText}
+              placeholder="Search by name or address…"
+              placeholderTextColor={colors.textSecondary}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchText('')}>
+                <Text style={styles.searchClear}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterRow}
+            contentContainerStyle={styles.filterContent}
+          >
+            {[null, 'pharmacy', 'clinic', 'hospital', 'dentist'].map(type => (
+              <TouchableOpacity
+                key={type ?? 'all'}
+                style={[styles.filterChip, activeType === type && styles.filterChipActive]}
+                onPress={() => setActiveType(type)}
+              >
+                <Text style={[styles.filterChipText, activeType === type && styles.filterChipTextActive]}>
+                  {type ?? 'All'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
           {view === 'map' ? (
             <MapScreen
@@ -270,6 +318,16 @@ const styles = StyleSheet.create({
   avatarBtn:        { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
   avatarBtnText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   locationNote:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 10, textAlign: 'center' },
+  searchBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10, gap: 8 },
+  searchIcon:       { fontSize: 15 },
+  searchInput:      { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, padding: 0 },
+  searchClear:      { fontSize: 13, color: colors.textSecondary, paddingHorizontal: 4 },
+  filterRow:        { marginBottom: 12 },
+  filterContent:    { gap: 8, paddingRight: 4 },
+  filterChip:       { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
+  filterChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  filterChipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textTransform: 'capitalize' },
+  filterChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
   listContent:      { paddingBottom: 32 },
   card:             { backgroundColor: colors.cardBg, borderRadius: 12, padding: 16, marginBottom: 10, ...shadow },
   dutyCard:         { borderWidth: 1.5, borderColor: colors.accent },

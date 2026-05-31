@@ -11,6 +11,11 @@
     },
     "android": {
       "package": "com.berkeustun95.trnchealth",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDbnSVpyJfUXXwlo9TyIfj8JjpT7nmuNu8"
+        }
+      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
