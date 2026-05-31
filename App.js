@@ -14,6 +14,7 @@ import ProviderScreen from './screens/ProviderScreen'
 import MapScreen from './screens/MapScreen'
 import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
+import QuizNavigator from './screens/quiz/QuizNavigator'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -65,6 +66,7 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [view, setView] = useState('list')
   const [showProfile, setShowProfile] = useState(false)
+  const [showQuiz, setShowQuiz] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [activeType, setActiveType] = useState(null)
 
@@ -171,6 +173,8 @@ export default function App() {
     content = <AdminScreen session={session} />
   } else if (profile.role === 'provider') {
     content = <ProviderScreen session={session} />
+  } else if (showQuiz) {
+    content = <QuizNavigator onClose={() => setShowQuiz(false)} />
   } else if (showProfile) {
     content = <ProfileScreen
       session={session}
@@ -201,6 +205,9 @@ export default function App() {
                   <Text style={[styles.toggleText, view === 'map' && styles.toggleTextActive]}>{t('map', lang)}</Text>
                 </TouchableOpacity>
               </View>
+              <TouchableOpacity style={styles.quizBtn} onPress={() => setShowQuiz(true)}>
+                <Text style={styles.quizBtnText}>💊</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.avatarBtn} onPress={() => setShowProfile(true)}>
                 <Text style={styles.avatarBtnText}>
                   {session.user.email[0].toUpperCase()}
@@ -323,6 +330,8 @@ const styles = StyleSheet.create({
   toggleBtnActive:  { backgroundColor: colors.surface, ...shadow },
   toggleText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   toggleTextActive: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  quizBtn:          { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.accentLight, justifyContent: 'center', alignItems: 'center' },
+  quizBtnText:      { fontSize: 16 },
   avatarBtn:        { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
   avatarBtnText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   locationNote:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 10, textAlign: 'center' },
