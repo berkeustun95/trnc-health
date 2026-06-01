@@ -111,7 +111,7 @@ export default function App() {
             importance: Notifications.AndroidImportance.MAX,
           })
         }
-        const { data: token } = await Notifications.getExpoPushTokenAsync()
+        const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: '704d192a-1a80-41f8-ab98-cb3c8f078d7c' })
         if (token) {
           await supabase.from('profiles').update({ push_token: token }).eq('id', session.user.id)
         }
