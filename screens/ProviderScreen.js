@@ -7,9 +7,9 @@ import QuizReviewScreen from './quiz/QuizReviewScreen'
 
 async function sendPushNotification(token, title, body) {
   try {
-    await fetch('https://exp.host/--/expo-push-notification-service/api/send', {
+    await fetch('https://exp.host/push/send', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ to: token, title, body, sound: 'default' }),
     })
   } catch { /* non-critical */ }
@@ -87,7 +87,7 @@ export default function ProviderScreen({ session }) {
     setLoadingReviews(true)
     const { data } = await supabase
       .from('quiz_submissions')
-      .select('id, answers, generated_result, created_at')
+      .select('id, customer_id, answers, generated_result, created_at')
       .eq('assigned_facility_id', facilityId)
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
@@ -151,7 +151,26 @@ export default function ProviderScreen({ session }) {
     return (
       <QuizReviewScreen
         submission={activeReview}
-        onApproved={() => { setActiveReview(null); loadQuizReviews(); loadArchivedReviews() }}
+        onApproved={async () => {
+          const customerId = activeReview.customer_id
+          if (customerId) {
+            const { data: customerProfile } = await supabase
+              .from('profiles')
+              .select('push_token')
+              .eq('id', customerId)
+              .maybeSingle()
+            if (customerProfile?.push_token) {
+              await sendPushNotification(
+                customerProfile.push_token,
+                '💊 Supplement plan ready',
+                `${facilityName} reviewed and approved your supplement plan. Tap to view.`,
+              )
+            }
+          }
+          setActiveReview(null)
+          loadQuizReviews()
+          loadArchivedReviews()
+        }}
         onBack={() => setActiveReview(null)}
       />
     )
