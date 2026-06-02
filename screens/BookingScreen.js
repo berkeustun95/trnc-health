@@ -19,8 +19,19 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
   const [questions, setQuestions] = useState([])
   const [newQ, setNewQ] = useState('')
   const [submittingQ, setSubmittingQ] = useState(false)
+  const [reviews, setReviews] = useState([])
 
-  useEffect(() => { loadQuestions() }, [])
+  useEffect(() => { loadQuestions(); loadReviews() }, [])
+
+  async function loadReviews() {
+    const { data } = await supabase
+      .from('reviews')
+      .select('id, rating, comment, created_at')
+      .eq('facility_id', facility.id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    if (data) setReviews(data)
+  }
 
   async function loadQuestions() {
     const { data } = await supabase
@@ -85,16 +96,42 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
         showsVerticalScrollIndicator={false}
       >
         <TouchableOpacity onPress={onBack} style={styles.backRow}>
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>{t('back', lang)}</Text>
         </TouchableOpacity>
 
         <View style={styles.facilityCard}>
           <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
-            <Text style={[styles.typeBadgeText, { color: tc.text }]}>{facility.type}</Text>
+            <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(facility.type, lang)}</Text>
           </View>
           <Text style={styles.facilityName}>{facility.name}</Text>
           <Text style={styles.facilityAddress}>{facility.address}</Text>
+          {facility.opening_hours ? (
+            <Text style={styles.facilityHours}>🕐 {facility.opening_hours}</Text>
+          ) : null}
         </View>
+
+        {reviews.length > 0 && (() => {
+          const avg = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+          return (
+            <>
+              <Text style={styles.sectionLabel}>{t('tabReviews', lang)} · ⭐ {avg} ({reviews.length})</Text>
+              {reviews.map(r => (
+                <View key={r.id} style={styles.reviewCard}>
+                  <View style={styles.reviewTop}>
+                    <Text style={styles.reviewStars}>
+                      {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
+                    </Text>
+                    <Text style={styles.reviewDate}>
+                      {new Date(r.created_at).toLocaleDateString([], { dateStyle: 'short' })}
+                    </Text>
+                  </View>
+                  {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : null}
+                </View>
+              ))}
+              <View style={styles.divider} />
+            </>
+          )
+        })()}
 
         <Text style={styles.sectionLabel}>{t('requestedTime', lang)}</Text>
         <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
@@ -119,7 +156,7 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
 
         {showPicker && Platform.OS === 'ios' && (
           <TouchableOpacity style={styles.doneBtn} onPress={() => setShowPicker(false)}>
-            <Text style={styles.doneBtnText}>Done</Text>
+            <Text style={styles.doneBtnText}>{t('done', lang)}</Text>
           </TouchableOpacity>
         )}
 
@@ -151,7 +188,7 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
           >
             {submittingQ
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.askBtnText}>Ask</Text>
+              : <Text style={styles.askBtnText}>{t('ask', lang)}</Text>
             }
           </TouchableOpacity>
         </View>
@@ -188,7 +225,8 @@ const styles = StyleSheet.create({
   typeBadge:       { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
   typeBadgeText:   { fontSize: 12, fontFamily: 'Inter_700Bold', textTransform: 'capitalize' },
   facilityName:    { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
-  facilityAddress: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  facilityAddress: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 2 },
+  facilityHours:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 6 },
   sectionLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   dateBtn:         { backgroundColor: colors.cardBg, borderRadius: 12, padding: 16, marginBottom: 16, ...shadow, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dateBtnText:     { fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
@@ -210,6 +248,11 @@ const styles = StyleSheet.create({
   answerLabel:     { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   answerBody:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
   noAnswer:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic' },
+  reviewCard:      { backgroundColor: colors.cardBg, borderRadius: 10, padding: 12, marginBottom: 8 },
+  reviewTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  reviewStars:     { fontSize: 14, color: '#F5A623', letterSpacing: 1 },
+  reviewDate:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  reviewComment:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
   successRing:     { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.successLight, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   successCheck:    { fontSize: 30, fontFamily: 'Inter_700Bold', color: colors.success },
   successTitle:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },

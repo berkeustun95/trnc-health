@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
@@ -16,6 +17,9 @@ import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import QuizNavigator from './screens/quiz/QuizNavigator'
 import ResultsScreen from './screens/quiz/ResultsScreen'
+import DutyListScreen from './screens/DutyListScreen'
+import OnboardingScreen from './screens/OnboardingScreen'
+import NotificationsScreen from './screens/NotificationsScreen'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -24,6 +28,8 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 })
+
+const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371
@@ -72,6 +78,12 @@ export default function App() {
   const [showLatestResult, setShowLatestResult] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [activeType, setActiveType] = useState(null)
+  const [showDutyList, setShowDutyList] = useState(false)
+  const [onboarded, setOnboarded] = useState(null)
+  const [pendingLang, setPendingLang] = useState('English')
+  const [facilityRatings, setFacilityRatings] = useState({})
+  const [notifications, setNotifications] = useState([])
+  const [showNotifs, setShowNotifs] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -80,10 +92,36 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!session) { setProfile(null); setLatestResult(null); return }
+    Promise.all([
+      AsyncStorage.getItem('@trnc_onboarded'),
+      AsyncStorage.getItem('@trnc_lang'),
+    ]).then(([onboardedVal, langVal]) => {
+      if (langVal) setPendingLang(langVal)
+      setOnboarded(onboardedVal === 'true')
+    })
+  }, [])
+
+  async function markAllNotifsRead() {
+    const unreadIds = notifications.filter(n => !n.read).map(n => n.id)
+    if (!unreadIds.length) return
+    await supabase.from('notifications').update({ read: true }).in('id', unreadIds)
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+  }
+
+  async function completeOnboarding(selectedLang) {
+    await AsyncStorage.multiSet([['@trnc_onboarded', 'true'], ['@trnc_lang', selectedLang]])
+    setPendingLang(selectedLang)
+    setOnboarded(true)
+  }
+
+  useEffect(() => {
+    if (!session) { setProfile(null); setLatestResult(null); setNotifications([]); return }
     supabase.from('profiles').select('role, preferred_language').eq('id', session.user.id).single()
       .then(({ data }) => setProfile(data ?? null))
     fetchLatestResult(session.user.id)
+    supabase.from('notifications').select('id, title, body, read, created_at')
+      .eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
+      .then(({ data }) => { if (data) setNotifications(data) })
   }, [session])
 
   async function fetchLatestResult(userId) {
@@ -134,6 +172,21 @@ export default function App() {
         .from('duty_schedule').select('facility_id').eq('date', today).maybeSingle()
       if (duty) setDutyFacilityId(duty.facility_id)
 
+      const { data: reviewsData } = await supabase.from('reviews').select('facility_id, rating')
+      if (reviewsData?.length) {
+        const map = {}
+        for (const r of reviewsData) {
+          if (!map[r.facility_id]) map[r.facility_id] = { sum: 0, count: 0 }
+          map[r.facility_id].sum += r.rating
+          map[r.facility_id].count++
+        }
+        const ratings = {}
+        for (const [id, v] of Object.entries(map)) {
+          ratings[id] = { avg: (v.sum / v.count).toFixed(1), count: v.count }
+        }
+        setFacilityRatings(ratings)
+      }
+
       try {
         const { status } = await Location.requestForegroundPermissionsAsync()
         if (status !== 'granted') {
@@ -175,20 +228,22 @@ export default function App() {
       )
     })
 
-  const lang = profile?.preferred_language || 'English'
+  const lang = profile?.preferred_language || pendingLang
 
   let content
 
-  if (session === undefined || !fontsLoaded) {
+  if (session === undefined || !fontsLoaded || onboarded === null) {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+  } else if (onboarded === false) {
+    content = <OnboardingScreen onComplete={completeOnboarding} />
   } else if (!session) {
-    content = <AuthScreen />
+    content = <AuthScreen lang={lang} />
   } else if (loading || !profile) {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   } else if (profile.role === 'admin') {
     content = <AdminScreen session={session} />
   } else if (profile.role === 'provider') {
-    content = <ProviderScreen session={session} />
+    content = <ProviderScreen session={session} lang={lang} />
   } else if (showLatestResult && latestResult) {
     content = <ResultsScreen
       result={latestResult.final_result}
@@ -204,6 +259,15 @@ export default function App() {
       onBack={() => setShowProfile(false)}
       onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
     />
+  } else if (showNotifs) {
+    content = <NotificationsScreen
+      notifications={notifications}
+      lang={lang}
+      onBack={() => { setShowNotifs(false); supabase.from('notifications').update({ read: true }).eq('user_id', session.user.id).then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))) }}
+      onMarkAllRead={markAllNotifsRead}
+    />
+  } else if (showDutyList) {
+    content = <DutyListScreen onBack={() => setShowDutyList(false)} lang={lang} />
   } else if (selectedFacility) {
     content = <BookingScreen facility={selectedFacility} session={session} lang={lang} onBack={() => setSelectedFacility(null)} />
   } else {
@@ -230,6 +294,10 @@ export default function App() {
               <TouchableOpacity style={styles.quizBtn} onPress={() => setShowQuiz(true)}>
                 <Text style={styles.quizBtnText}>💊</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={styles.notifBtn} onPress={() => setShowNotifs(true)}>
+                <Text style={styles.notifBtnText}>🔔</Text>
+                {notifications.some(n => !n.read) && <View style={styles.notifDot} />}
+              </TouchableOpacity>
               <TouchableOpacity style={styles.avatarBtn} onPress={() => setShowProfile(true)}>
                 <Text style={styles.avatarBtnText}>
                   {session.user.email[0].toUpperCase()}
@@ -244,7 +312,7 @@ export default function App() {
               style={styles.searchInput}
               value={searchText}
               onChangeText={setSearchText}
-              placeholder="Search by name or address…"
+              placeholder={t('searchPlaceholder', lang)}
               placeholderTextColor={colors.textSecondary}
               returnKeyType="search"
               clearButtonMode="while-editing"
@@ -279,10 +347,10 @@ export default function App() {
             <TouchableOpacity style={styles.resultCard} onPress={() => setShowLatestResult(true)} activeOpacity={0.8}>
               <View style={styles.resultCardLeft}>
                 <Text style={styles.resultCardEmoji}>💊</Text>
-                <View>
-                  <Text style={styles.resultCardTitle}>Your Supplement Plan</Text>
-                  <Text style={styles.resultCardSub}>
-                    Approved by {latestResult.facilities?.name} · {new Date(latestResult.reviewed_at).toLocaleDateString()}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.resultCardTitle}>{t('supplementPlanTitle', lang)}</Text>
+                  <Text style={styles.resultCardSub} numberOfLines={1}>
+                    {t('approvedBy', lang)} {latestResult.facilities?.name}{latestResult.reviewed_at ? ` · ${new Date(latestResult.reviewed_at).toLocaleDateString()}` : ''}
                   </Text>
                 </View>
               </View>
@@ -290,12 +358,24 @@ export default function App() {
             </TouchableOpacity>
           )}
 
+          <TouchableOpacity style={styles.dutyBanner} onPress={() => setShowDutyList(true)} activeOpacity={0.8}>
+            <View style={styles.dutyBannerLeft}>
+              <Text style={styles.dutyBannerEmoji}>🏥</Text>
+              <View>
+                <Text style={styles.dutyBannerTitle}>{t('tonightDuty', lang)}</Text>
+                <Text style={styles.dutyBannerSub}>{t('allRegions', lang)}</Text>
+              </View>
+            </View>
+            <Text style={styles.dutyBannerArrow}>→</Text>
+          </TouchableOpacity>
+
           {view === 'map' ? (
             <MapScreen
               facilities={facilities}
               dutyFacilityId={dutyFacilityId}
               userLocation={userLocation}
               onSelectFacility={setSelectedFacility}
+              lang={lang}
             />
           ) : (
             <>
@@ -318,29 +398,39 @@ export default function App() {
                       onPress={() => setSelectedFacility(item)}
                     >
                       {isDuty && (
-                        <View style={styles.dutyBanner}>
+                        <View style={styles.dutyCardBadge}>
                           <Text style={styles.dutyLabel}>{t('onDuty', lang)}</Text>
                         </View>
                       )}
-                      <View style={styles.cardTop}>
-                        <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
-                        {item._dist != null && (
-                          <Text style={styles.distanceText}>{item._dist.toFixed(1)} km</Text>
-                        )}
-                      </View>
-                      <View style={styles.badgeRow}>
-                        <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
-                          <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
+                      <View style={styles.cardMain}>
+                        <View style={[styles.typeIcon, { backgroundColor: tc.bg }]}>
+                          <Text style={styles.typeIconText}>{TYPE_ICONS[item.type] ?? '🏥'}</Text>
                         </View>
-                        {isOpen != null && (
-                          <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
-                            <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
-                              {isOpen ? t('open', lang) : t('closed', lang)}
-                            </Text>
+                        <View style={styles.cardContent}>
+                          <View style={styles.cardTop}>
+                            <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
+                            {item._dist != null && (
+                              <Text style={styles.distanceText}>{item._dist.toFixed(1)} km</Text>
+                            )}
                           </View>
-                        )}
+                          <View style={styles.badgeRow}>
+                            <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
+                              <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
+                            </View>
+                            {isOpen != null && (
+                              <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
+                                <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
+                                  {isOpen ? t('open', lang) : t('closed', lang)}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text>
+                          {facilityRatings[item.id] && (
+                            <Text style={styles.ratingText}>⭐ {facilityRatings[item.id].avg} ({facilityRatings[item.id].count})</Text>
+                          )}
+                        </View>
                       </View>
-                      <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text>
                     </TouchableOpacity>
                   )
                 }}
@@ -369,6 +459,9 @@ const styles = StyleSheet.create({
   toggleTextActive: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   quizBtn:          { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.accentLight, justifyContent: 'center', alignItems: 'center' },
   quizBtnText:      { fontSize: 16 },
+  notifBtn:         { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
+  notifBtnText:     { fontSize: 16 },
+  notifDot:         { position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
   avatarBtn:        { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
   avatarBtnText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   locationNote:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 10, textAlign: 'center' },
@@ -376,18 +469,22 @@ const styles = StyleSheet.create({
   searchIcon:       { fontSize: 15 },
   searchInput:      { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, padding: 0 },
   searchClear:      { fontSize: 13, color: colors.textSecondary, paddingHorizontal: 4 },
-  filterRow:        { marginBottom: 12 },
-  filterContent:    { gap: 8, paddingRight: 4 },
-  filterChip:       { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
+  filterRow:        { marginBottom: 12, flexGrow: 0 },
+  filterContent:    { gap: 8, paddingRight: 4, alignItems: 'center' },
+  filterChip:       { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignSelf: 'flex-start' },
   filterChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   filterChipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textTransform: 'capitalize' },
   filterChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
   listContent:      { paddingBottom: 32 },
   card:             { backgroundColor: colors.cardBg, borderRadius: 12, padding: 16, marginBottom: 10, ...shadow },
   dutyCard:         { borderWidth: 1.5, borderColor: colors.accent },
-  dutyBanner:       { backgroundColor: colors.accentLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
+  dutyCardBadge:    { backgroundColor: colors.accentLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
   dutyLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },
-  cardTop:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  cardMain:         { flexDirection: 'row', alignItems: 'flex-start' },
+  typeIcon:         { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12, flexShrink: 0 },
+  typeIconText:     { fontSize: 22 },
+  cardContent:      { flex: 1 },
+  cardTop:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
   facilityName:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, marginRight: 8 },
   distanceText:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
   badgeRow:         { flexDirection: 'row', gap: 6, marginBottom: 8 },
@@ -400,6 +497,13 @@ const styles = StyleSheet.create({
   openText:         { color: colors.success },
   closedText:       { color: colors.danger },
   addressText:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  ratingText:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, marginTop: 6 },
+  dutyBanner:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accentLight, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1.5, borderColor: colors.accent + '40' },
+  dutyBannerLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  dutyBannerEmoji:  { fontSize: 26 },
+  dutyBannerTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.accent, marginBottom: 2 },
+  dutyBannerSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.accent + 'AA' },
+  dutyBannerArrow:  { fontSize: 16, color: colors.accent, fontFamily: 'Inter_700Bold' },
   resultCard:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1.5, borderColor: colors.primary + '30' },
   resultCardLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   resultCardEmoji:  { fontSize: 28 },

@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
+import { t } from '../constants/i18n'
 import QuizReviewScreen from './quiz/QuizReviewScreen'
 
 async function sendPushNotification(token, title, body) {
@@ -15,7 +16,13 @@ async function sendPushNotification(token, title, body) {
   } catch { /* non-critical */ }
 }
 
-export default function ProviderScreen({ session }) {
+async function recordNotification(userId, title, body) {
+  try {
+    await supabase.from('notifications').insert({ user_id: userId, title, body })
+  } catch { /* non-critical */ }
+}
+
+export default function ProviderScreen({ session, lang = 'English' }) {
   const [tab, setTab] = useState('requests')
   const [appointments, setAppointments] = useState([])
   const [facilityName, setFacilityName] = useState(null)
@@ -33,6 +40,7 @@ export default function ProviderScreen({ session }) {
   const [archivedReviews, setArchivedReviews] = useState([])
   const [loadingArchive, setLoadingArchive] = useState(false)
   const [activeArchive, setActiveArchive] = useState(null)
+  const [stats, setStats] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -68,8 +76,28 @@ export default function ProviderScreen({ session }) {
   useEffect(() => {
     if (!facilityId) return
     loadQuestions()
+    loadStats()
     if (isQuizPartner) { loadQuizReviews(); loadArchivedReviews() }
   }, [facilityId, isQuizPartner])
+
+  async function loadStats() {
+    const [{ data: apptData }, { data: quizData }] = await Promise.all([
+      supabase.from('appointments').select('status').eq('facility_id', facilityId),
+      supabase.from('quiz_submissions').select('status').eq('assigned_facility_id', facilityId),
+    ])
+    setStats({
+      appt: {
+        pending:   apptData?.filter(a => a.status === 'pending').length   ?? 0,
+        confirmed: apptData?.filter(a => a.status === 'confirmed').length ?? 0,
+        cancelled: apptData?.filter(a => a.status === 'cancelled').length ?? 0,
+      },
+      quiz: {
+        pending:  quizData?.filter(q => q.status === 'pending').length  ?? 0,
+        approved: quizData?.filter(q => q.status === 'approved').length ?? 0,
+        rejected: quizData?.filter(q => q.status === 'rejected').length ?? 0,
+      },
+    })
+  }
 
   async function loadArchivedReviews() {
     setLoadingArchive(true)
@@ -130,18 +158,18 @@ export default function ProviderScreen({ session }) {
     if (!error) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('push_token')
+        .select('push_token, preferred_language')
         .eq('id', customerId)
         .maybeSingle()
-      if (profile?.push_token) {
+      if (profile) {
         const confirmed = status === 'confirmed'
-        await sendPushNotification(
-          profile.push_token,
-          confirmed ? 'Appointment confirmed' : 'Appointment declined',
-          confirmed
-            ? `${facilityName} confirmed your appointment.`
-            : `${facilityName} declined your appointment request.`
-        )
+        const cLang = profile.preferred_language || 'English'
+        const title = confirmed ? t('notifApptConfirmedTitle', cLang) : t('notifApptDeclinedTitle', cLang)
+        const body = confirmed
+          ? t('notifApptConfirmedBody', cLang).replace('{name}', facilityName)
+          : t('notifApptDeclinedBody', cLang).replace('{name}', facilityName)
+        if (profile.push_token) await sendPushNotification(profile.push_token, title, body)
+        await recordNotification(customerId, title, body)
       }
       setAppointments(prev => prev.filter(a => a.id !== id))
     }
@@ -156,15 +184,15 @@ export default function ProviderScreen({ session }) {
           if (customerId) {
             const { data: customerProfile } = await supabase
               .from('profiles')
-              .select('push_token')
+              .select('push_token, preferred_language')
               .eq('id', customerId)
               .maybeSingle()
-            if (customerProfile?.push_token) {
-              await sendPushNotification(
-                customerProfile.push_token,
-                '💊 Supplement plan ready',
-                `${facilityName} reviewed and approved your supplement plan. Tap to view.`,
-              )
+            if (customerProfile) {
+              const cLang = customerProfile.preferred_language || 'English'
+              const title = t('notifQuizTitle', cLang)
+              const body = t('notifQuizBody', cLang).replace('{name}', facilityName)
+              if (customerProfile.push_token) await sendPushNotification(customerProfile.push_token, title, body)
+              await recordNotification(customerId, title, body)
             }
           }
           setActiveReview(null)
@@ -198,10 +226,10 @@ export default function ProviderScreen({ session }) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Text style={styles.emptyTitle}>No facility linked</Text>
-          <Text style={styles.emptySub}>Contact the admin to link your account to a facility.</Text>
+          <Text style={styles.emptyTitle}>{t('noFacilityLinked', lang)}</Text>
+          <Text style={styles.emptySub}>{t('noFacilityLinkedSub', lang)}</Text>
           <TouchableOpacity style={styles.signOutBtn} onPress={() => supabase.auth.signOut()}>
-            <Text style={styles.signOutText}>Sign out</Text>
+            <Text style={styles.signOutText}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -217,7 +245,7 @@ export default function ProviderScreen({ session }) {
             <Text style={styles.facilityTag}>{facilityName}</Text>
           </View>
           <TouchableOpacity style={styles.signOutBtn} onPress={() => supabase.auth.signOut()}>
-            <Text style={styles.signOutText}>Sign out</Text>
+            <Text style={styles.signOutText}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
         </View>
 
@@ -226,13 +254,13 @@ export default function ProviderScreen({ session }) {
             style={[styles.tabBtn, tab === 'requests' && styles.tabBtnActive]}
             onPress={() => setTab('requests')}
           >
-            <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>Requests</Text>
+            <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>{t('tabRequests', lang)}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tabBtn, tab === 'qa' && styles.tabBtnActive]}
             onPress={() => setTab('qa')}
           >
-            <Text style={[styles.tabText, tab === 'qa' && styles.tabTextActive]}>Q&A</Text>
+            <Text style={[styles.tabText, tab === 'qa' && styles.tabTextActive]}>{t('tabQA', lang)}</Text>
           </TouchableOpacity>
           {isQuizPartner && (
             <TouchableOpacity
@@ -240,7 +268,7 @@ export default function ProviderScreen({ session }) {
               onPress={() => setTab('quiz')}
             >
               <View style={styles.tabWithBadge}>
-                <Text style={[styles.tabText, tab === 'quiz' && styles.tabTextActive]}>💊 Reviews</Text>
+                <Text style={[styles.tabText, tab === 'quiz' && styles.tabTextActive]}>{'💊 ' + t('tabReviews', lang)}</Text>
                 {quizReviews.length > 0 && (
                   <View style={styles.tabBadge}>
                     <Text style={styles.tabBadgeText}>{quizReviews.length}</Text>
@@ -254,9 +282,15 @@ export default function ProviderScreen({ session }) {
               style={[styles.tabBtn, tab === 'archive' && styles.tabBtnActive]}
               onPress={() => setTab('archive')}
             >
-              <Text style={[styles.tabText, tab === 'archive' && styles.tabTextActive]}>🗂 Archive</Text>
+              <Text style={[styles.tabText, tab === 'archive' && styles.tabTextActive]}>{'🗂 ' + t('tabArchive', lang)}</Text>
             </TouchableOpacity>
           )}
+          <TouchableOpacity
+            style={[styles.tabBtn, tab === 'stats' && styles.tabBtnActive]}
+            onPress={() => setTab('stats')}
+          >
+            <Text style={[styles.tabText, tab === 'stats' && styles.tabTextActive]}>{'📊 ' + t('tabStats', lang)}</Text>
+          </TouchableOpacity>
         </View>
 
         {tab === 'archive' ? (
@@ -264,8 +298,8 @@ export default function ProviderScreen({ session }) {
             <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
           ) : archivedReviews.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>No approved reviews yet</Text>
-              <Text style={styles.emptySub}>Quizzes you approve will be archived here for future reference.</Text>
+              <Text style={styles.emptyTitle}>{t('noApprovedReviews', lang)}</Text>
+              <Text style={styles.emptySub}>{t('approvedReviewsHere', lang)}</Text>
             </View>
           ) : (
             <FlatList
@@ -284,12 +318,12 @@ export default function ProviderScreen({ session }) {
                       <Text style={styles.reviewIconText}>✓</Text>
                     </View>
                     <View>
-                      <Text style={styles.reviewTitle}>Approved Review</Text>
+                      <Text style={styles.reviewTitle}>{t('approvedReview', lang)}</Text>
                       <Text style={styles.reviewTime}>
                         {new Date(item.reviewed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                       </Text>
                       <Text style={[styles.reviewCount, { color: colors.success }]}>
-                        {item.final_result?.stack?.length ?? 0} supplements approved
+                        {t('supplementsApproved', lang).replace('{n}', item.final_result?.stack?.length ?? 0)}
                       </Text>
                     </View>
                   </View>
@@ -303,8 +337,8 @@ export default function ProviderScreen({ session }) {
             <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
           ) : quizReviews.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>No pending reviews</Text>
-              <Text style={styles.emptySub}>Quiz review requests from customers will appear here.</Text>
+              <Text style={styles.emptyTitle}>{t('noPendingReviews', lang)}</Text>
+              <Text style={styles.emptySub}>{t('quizRequestsHere', lang)}</Text>
             </View>
           ) : (
             <FlatList
@@ -323,12 +357,12 @@ export default function ProviderScreen({ session }) {
                       <Text style={styles.reviewIconText}>💊</Text>
                     </View>
                     <View>
-                      <Text style={styles.reviewTitle}>Quiz Review</Text>
+                      <Text style={styles.reviewTitle}>{t('quizReview', lang)}</Text>
                       <Text style={styles.reviewTime}>
                         {new Date(item.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                       </Text>
                       <Text style={styles.reviewCount}>
-                        {item.generated_result?.stack?.length ?? 0} supplements recommended
+                        {t('supplementsRecommended', lang).replace('{n}', item.generated_result?.stack?.length ?? 0)}
                       </Text>
                     </View>
                   </View>
@@ -337,11 +371,69 @@ export default function ProviderScreen({ session }) {
               )}
             />
           )
+        ) : tab === 'stats' ? (
+          !stats ? (
+            <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
+              <Text style={styles.sectionTitle}>{t('statAppointments', lang)}</Text>
+              <View style={styles.statRow}>
+                <View style={[styles.statTile, { backgroundColor: colors.accentLight }]}>
+                  <Text style={[styles.statNum, { color: colors.accent }]}>{stats.appt.pending}</Text>
+                  <Text style={styles.statLabel}>{t('statusPending', lang)}</Text>
+                </View>
+                <View style={[styles.statTile, { backgroundColor: colors.successLight }]}>
+                  <Text style={[styles.statNum, { color: colors.success }]}>{stats.appt.confirmed}</Text>
+                  <Text style={styles.statLabel}>{t('statusConfirmed', lang)}</Text>
+                </View>
+                <View style={[styles.statTile, { backgroundColor: colors.dangerLight }]}>
+                  <Text style={[styles.statNum, { color: colors.danger }]}>{stats.appt.cancelled}</Text>
+                  <Text style={styles.statLabel}>{t('statusCancelled', lang)}</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('tabQA', lang)}</Text>
+              <View style={styles.statRow}>
+                <View style={[styles.statTile, { backgroundColor: colors.cardBg }]}>
+                  <Text style={[styles.statNum, { color: colors.textPrimary }]}>{questions.length}</Text>
+                  <Text style={styles.statLabel}>{t('statTotal', lang)}</Text>
+                </View>
+                <View style={[styles.statTile, { backgroundColor: colors.successLight }]}>
+                  <Text style={[styles.statNum, { color: colors.success }]}>{questions.filter(q => q.answers?.length > 0).length}</Text>
+                  <Text style={styles.statLabel}>{t('statAnswered', lang)}</Text>
+                </View>
+                <View style={[styles.statTile, { backgroundColor: colors.accentLight }]}>
+                  <Text style={[styles.statNum, { color: colors.accent }]}>{questions.filter(q => !q.answers?.length).length}</Text>
+                  <Text style={styles.statLabel}>{t('statUnanswered', lang)}</Text>
+                </View>
+              </View>
+
+              {isQuizPartner && (
+                <>
+                  <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('statQuizReviews', lang)}</Text>
+                  <View style={styles.statRow}>
+                    <View style={[styles.statTile, { backgroundColor: colors.accentLight }]}>
+                      <Text style={[styles.statNum, { color: colors.accent }]}>{stats.quiz.pending}</Text>
+                      <Text style={styles.statLabel}>{t('statusPending', lang)}</Text>
+                    </View>
+                    <View style={[styles.statTile, { backgroundColor: colors.successLight }]}>
+                      <Text style={[styles.statNum, { color: colors.success }]}>{stats.quiz.approved}</Text>
+                      <Text style={styles.statLabel}>{t('statApproved', lang)}</Text>
+                    </View>
+                    <View style={[styles.statTile, { backgroundColor: colors.dangerLight }]}>
+                      <Text style={[styles.statNum, { color: colors.danger }]}>{stats.quiz.rejected}</Text>
+                      <Text style={styles.statLabel}>{t('statRejected', lang)}</Text>
+                    </View>
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          )
         ) : tab === 'requests' ? (
           appointments.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>All clear</Text>
-              <Text style={styles.emptySub}>No pending appointment requests.</Text>
+              <Text style={styles.emptyTitle}>{t('allClear', lang)}</Text>
+              <Text style={styles.emptySub}>{t('noPendingRequests', lang)}</Text>
             </View>
           ) : (
             <FlatList
@@ -351,7 +443,7 @@ export default function ProviderScreen({ session }) {
               contentContainerStyle={styles.listContent}
               renderItem={({ item }) => (
                 <View style={styles.card}>
-                  <Text style={styles.timeLabel}>Requested for</Text>
+                  <Text style={styles.timeLabel}>{t('requestedTime', lang)}</Text>
                   <Text style={styles.timeValue}>
                     {new Date(item.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                   </Text>
@@ -360,13 +452,13 @@ export default function ProviderScreen({ session }) {
                       style={styles.confirmBtn}
                       onPress={() => updateStatus(item.id, 'confirmed', item.customer_id)}
                     >
-                      <Text style={styles.confirmText}>Confirm</Text>
+                      <Text style={styles.confirmText}>{t('confirm', lang)}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.declineBtn}
                       onPress={() => updateStatus(item.id, 'cancelled', item.customer_id)}
                     >
-                      <Text style={styles.declineText}>Decline</Text>
+                      <Text style={styles.declineText}>{t('decline', lang)}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -380,8 +472,8 @@ export default function ProviderScreen({ session }) {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
               {questions.length === 0 ? (
                 <View style={styles.empty}>
-                  <Text style={styles.emptyTitle}>No questions yet</Text>
-                  <Text style={styles.emptySub}>Questions from customers will appear here.</Text>
+                  <Text style={styles.emptyTitle}>{t('noQuestions', lang)}</Text>
+                  <Text style={styles.emptySub}>{t('questionsFromCustomers', lang)}</Text>
                 </View>
               ) : (
                 questions.map(q => (
@@ -389,7 +481,7 @@ export default function ProviderScreen({ session }) {
                     <Text style={styles.qBody}>{q.body}</Text>
                     {q.answers && q.answers.length > 0 ? (
                       <View style={styles.answerBlock}>
-                        <Text style={styles.answerLabel}>Your answer</Text>
+                        <Text style={styles.answerLabel}>{t('yourAnswer', lang)}</Text>
                         <Text style={styles.answerBody}>{q.answers[0].body}</Text>
                       </View>
                     ) : (
@@ -398,7 +490,7 @@ export default function ProviderScreen({ session }) {
                           style={styles.replyInput}
                           value={replyTexts[q.id] ?? ''}
                           onChangeText={val => setReplyTexts(prev => ({ ...prev, [q.id]: val }))}
-                          placeholder="Write your answer…"
+                          placeholder={t('writeYourAnswer', lang)}
                           placeholderTextColor={colors.textSecondary}
                           multiline
                         />
@@ -409,7 +501,7 @@ export default function ProviderScreen({ session }) {
                         >
                           {submittingReply === q.id
                             ? <ActivityIndicator color="#fff" size="small" />
-                            : <Text style={styles.replyBtnText}>Send</Text>
+                            : <Text style={styles.replyBtnText}>{t('send', lang)}</Text>
                           }
                         </TouchableOpacity>
                       </View>
@@ -468,6 +560,10 @@ const styles = StyleSheet.create({
   replyInput:   { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, padding: 10, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface, maxHeight: 80 },
   replyBtn:     { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
   replyBtnText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
+  statRow:      { flexDirection: 'row', gap: 10, marginBottom: 4 },
+  statTile:     { flex: 1, borderRadius: 12, padding: 16, alignItems: 'center', justifyContent: 'center', minHeight: 80 },
+  statNum:      { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
+  statLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'center' },
   empty:        { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyTitle:   { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8 },
   emptySub:     { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 24 },

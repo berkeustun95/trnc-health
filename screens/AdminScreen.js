@@ -441,7 +441,7 @@ function UsersTab() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('profiles').select('id, role').order('role')
+    const { data } = await supabase.from('profiles').select('id, role, full_name, preferred_language').order('role')
     setUsers(data ?? [])
     setLoading(false)
   }, [])
@@ -464,7 +464,8 @@ function UsersTab() {
       ListEmptyComponent={<SectionEmpty text="No users yet." />}
       renderItem={({ item }) => (
         <View style={s.card}>
-          <Text style={s.cardSub} numberOfLines={1}>ID: {item.id}</Text>
+          <Text style={s.cardTitle} numberOfLines={1}>{item.full_name || 'Unnamed user'}</Text>
+          <Text style={s.cardSub} numberOfLines={1}>ID: {item.id.slice(0, 8)}…  {item.preferred_language ? `· ${item.preferred_language}` : ''}</Text>
           <View style={[s.cardRow, { marginTop: 8, alignItems: 'center' }]}>
             <View style={
               item.role === 'admin' ? s.pillPurple

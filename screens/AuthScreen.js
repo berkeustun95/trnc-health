@@ -4,8 +4,9 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet,
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../constants/theme'
+import { t } from '../constants/i18n'
 
-export default function AuthScreen() {
+export default function AuthScreen({ lang = 'English' }) {
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -39,7 +40,7 @@ export default function AuthScreen() {
               <Text style={styles.logoPlus}>+</Text>
             </View>
             <Text style={styles.wordmark}>TRNC Health</Text>
-            <Text style={styles.tagline}>Your health guide in North Cyprus</Text>
+            <Text style={styles.tagline}>{t('onboardingTagline', lang)}</Text>
           </View>
 
           <View style={styles.toggle}>
@@ -50,14 +51,14 @@ export default function AuthScreen() {
                 onPress={() => setMode(m)}
               >
                 <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
-                  {m === 'login' ? 'Log in' : 'Sign up'}
+                  {m === 'login' ? t('login', lang) : t('signup', lang)}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Email</Text>
+            <Text style={styles.fieldLabel}>{t('email', lang)}</Text>
             <TextInput
               style={styles.input}
               placeholder="you@example.com"
@@ -70,7 +71,7 @@ export default function AuthScreen() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Password</Text>
+            <Text style={styles.fieldLabel}>{t('password', lang)}</Text>
             <TextInput
               style={styles.input}
               placeholder="••••••••"
@@ -83,9 +84,9 @@ export default function AuthScreen() {
 
           {mode === 'signup' && (
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>I am a</Text>
+              <Text style={styles.fieldLabel}>{t('iAmA', lang)}</Text>
               <View style={styles.roleRow}>
-                {[['customer', 'Patient'], ['provider', 'Healthcare provider']].map(([r, label]) => (
+                {[['customer', t('rolePatient', lang)], ['provider', t('roleProvider', lang)]].map(([r, label]) => (
                   <TouchableOpacity
                     key={r}
                     style={[styles.roleBtn, role === r && styles.roleBtnActive]}
@@ -103,7 +104,7 @@ export default function AuthScreen() {
           <TouchableOpacity style={styles.submit} onPress={submit} disabled={loading}>
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.submitText}>{mode === 'login' ? 'Log in' : 'Create account'}</Text>
+              : <Text style={styles.submitText}>{mode === 'login' ? t('login', lang) : t('createAccount', lang)}</Text>
             }
           </TouchableOpacity>
         </ScrollView>

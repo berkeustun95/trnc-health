@@ -1,10 +1,12 @@
 import { StyleSheet, View, Text } from 'react-native'
 import MapView, { Marker, Callout } from 'react-native-maps'
 import { colors } from '../constants/theme'
+import { t } from '../constants/i18n'
 
 const LEFKOSA = { latitude: 35.1856, longitude: 33.3823, latitudeDelta: 0.08, longitudeDelta: 0.08 }
+const PIN_COLORS = { pharmacy: '#7C3AED', clinic: '#0E7C7B', hospital: '#D1495B', dentist: '#2E9E5B' }
 
-export default function MapScreen({ facilities, dutyFacilityId, userLocation, onSelectFacility }) {
+export default function MapScreen({ facilities, dutyFacilityId, userLocation, onSelectFacility, lang = 'English' }) {
   const initialRegion = userLocation
     ? { latitude: userLocation.latitude, longitude: userLocation.longitude, latitudeDelta: 0.08, longitudeDelta: 0.08 }
     : LEFKOSA
@@ -17,13 +19,13 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
         <Marker
           key={facility.id}
           coordinate={{ latitude: facility.latitude, longitude: facility.longitude }}
-          pinColor={facility.id === dutyFacilityId ? colors.accent : colors.danger}
+          pinColor={facility.id === dutyFacilityId ? colors.accent : (PIN_COLORS[facility.type] ?? colors.primary)}
         >
           <Callout onPress={() => onSelectFacility(facility)}>
             <View style={styles.callout}>
               <Text style={styles.calloutName}>{facility.name}</Text>
-              <Text style={styles.calloutType}>{facility.type}</Text>
-              <Text style={styles.calloutAction}>Tap to book</Text>
+              <Text style={styles.calloutType}>{t(facility.type, lang)}</Text>
+              <Text style={styles.calloutAction}>{t('requestAppointment', lang)}</Text>
             </View>
           </Callout>
         </Marker>
