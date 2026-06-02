@@ -1,0 +1,282 @@
+import { useState } from 'react'
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { supabase } from '../lib/supabase'
+import { colors, shadow } from '../constants/theme'
+
+const TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
+const TYPE_ICONS  = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
+const TYPE_LABELS = { pharmacy: 'Pharmacy', clinic: 'Clinic', hospital: 'Hospital', dentist: 'Dentist' }
+
+export default function ProviderOnboardingScreen({ session, onDone }) {
+  const [step, setStep]   = useState(1)
+  const [form, setForm]   = useState({
+    name: '', type: 'clinic', address: '', phone: '', opening_hours: '', membership_tier: 'basic',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState(null)
+
+  const set = key => val => setForm(f => ({ ...f, [key]: val }))
+
+  async function submit() {
+    if (!form.name.trim()) { setError('Facility name is required.'); return }
+    setSaving(true)
+    setError(null)
+    const { error: err } = await supabase.from('facilities').insert({
+      name:           form.name.trim(),
+      type:           form.type,
+      address:        form.address.trim() || null,
+      phone:          form.phone.trim() || null,
+      opening_hours:  form.opening_hours.trim() || null,
+      membership_tier: form.membership_tier,
+      status:         'pending',
+      provider_id:    session.user.id,
+      is_public:      false,
+      verified:       false,
+    })
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    onDone()
+  }
+
+  // ── Step 1: Welcome ────────────────────────────────────────────────────────
+  if (step === 1) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+        <View style={s.welcomeWrap}>
+          <Text style={s.welcomeEmoji}>🏥</Text>
+          <Text style={s.welcomeTitle}>Join TRNC Health</Text>
+          <Text style={s.welcomeSub}>List your facility and connect with patients across Northern Cyprus. Setup takes 2 minutes.</Text>
+
+          <View style={s.featureList}>
+            {[
+              { icon: '📅', text: 'Manage appointment requests' },
+              { icon: '💬', text: 'Answer patient questions' },
+              { icon: '⭐', text: 'Build trust with verified reviews' },
+            ].map(f => (
+              <View key={f.icon} style={s.featureRow}>
+                <Text style={s.featureIcon}>{f.icon}</Text>
+                <Text style={s.featureText}>{f.text}</Text>
+              </View>
+            ))}
+          </View>
+
+          <TouchableOpacity style={s.primaryBtn} onPress={() => setStep(2)}>
+            <Text style={s.primaryBtnText}>Get started</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => supabase.auth.signOut()}>
+            <Text style={s.signOutText}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  // ── Step 2: Facility details ───────────────────────────────────────────────
+  if (step === 2) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={s.formWrap} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={s.formHeader}>
+              <Text style={s.stepLabel}>Step 1 of 2</Text>
+              <Text style={s.formTitle}>Your facility</Text>
+              <Text style={s.formSub}>Tell patients about your practice.</Text>
+            </View>
+
+            <Text style={s.fieldLabel}>FACILITY NAME *</Text>
+            <TextInput
+              style={s.input}
+              value={form.name}
+              onChangeText={set('name')}
+              placeholder="e.g. Lefkoşa Central Clinic"
+              placeholderTextColor={colors.border}
+            />
+
+            <Text style={s.fieldLabel}>TYPE</Text>
+            <View style={s.typeGrid}>
+              {TYPES.map(type => (
+                <TouchableOpacity
+                  key={type}
+                  style={[s.typeCard, form.type === type && s.typeCardActive]}
+                  onPress={() => set('type')(type)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.typeCardIcon}>{TYPE_ICONS[type]}</Text>
+                  <Text style={[s.typeCardLabel, form.type === type && s.typeCardLabelActive]}>{TYPE_LABELS[type]}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={s.fieldLabel}>ADDRESS</Text>
+            <TextInput
+              style={s.input}
+              value={form.address}
+              onChangeText={set('address')}
+              placeholder="Street, City"
+              placeholderTextColor={colors.border}
+            />
+
+            <Text style={s.fieldLabel}>PHONE</Text>
+            <TextInput
+              style={s.input}
+              value={form.phone}
+              onChangeText={set('phone')}
+              placeholder="+90 392 000 0000"
+              placeholderTextColor={colors.border}
+              keyboardType="phone-pad"
+            />
+
+            <Text style={s.fieldLabel}>OPENING HOURS</Text>
+            <TextInput
+              style={s.input}
+              value={form.opening_hours}
+              onChangeText={set('opening_hours')}
+              placeholder="Mon–Fri 08:00–18:00"
+              placeholderTextColor={colors.border}
+            />
+
+            <TouchableOpacity
+              style={[s.primaryBtn, !form.name.trim() && s.primaryBtnDisabled]}
+              onPress={() => { if (form.name.trim()) { setError(null); setStep(3) } }}
+              disabled={!form.name.trim()}
+            >
+              <Text style={s.primaryBtnText}>Next →</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    )
+  }
+
+  // ── Step 3: Tier selection ─────────────────────────────────────────────────
+  return (
+    <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      <ScrollView contentContainerStyle={s.formWrap} showsVerticalScrollIndicator={false}>
+        <TouchableOpacity style={s.backBtn} onPress={() => setStep(2)}>
+          <Text style={s.backBtnText}>← Back</Text>
+        </TouchableOpacity>
+
+        <Text style={s.stepLabel}>Step 2 of 2</Text>
+        <Text style={s.formTitle}>Choose your plan</Text>
+        <Text style={s.formSub}>Both plans include a 5-day free trial. No payment until you're verified and live.</Text>
+
+        <TouchableOpacity
+          style={[s.tierCard, form.membership_tier === 'basic' && s.tierCardSelected]}
+          onPress={() => set('membership_tier')('basic')}
+          activeOpacity={0.8}
+        >
+          <View style={s.tierCardHeader}>
+            <Text style={s.tierName}>Basic</Text>
+            {form.membership_tier === 'basic' && <Text style={s.tierCheck}>✓ Selected</Text>}
+          </View>
+          <Text style={s.tierDesc}>Listing, appointment management, Q&A</Text>
+          {['Listed in directory', 'Appointment requests', 'Q&A with patients', 'Basic stats'].map(f => (
+            <View key={f} style={s.tierFeatureRow}>
+              <Text style={s.tierTick}>✓</Text>
+              <Text style={s.tierFeatureText}>{f}</Text>
+            </View>
+          ))}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.tierCard, form.membership_tier === 'pro' && s.tierCardSelected, form.membership_tier === 'pro' && s.tierCardPro]}
+          onPress={() => set('membership_tier')('pro')}
+          activeOpacity={0.8}
+        >
+          <View style={s.tierCardHeader}>
+            <View style={s.tierNameRow}>
+              <Text style={s.tierName}>Pro</Text>
+              <View style={s.proBadge}><Text style={s.proBadgeText}>RECOMMENDED</Text></View>
+            </View>
+            {form.membership_tier === 'pro' && <Text style={[s.tierCheck, { color: colors.primary }]}>✓ Selected</Text>}
+          </View>
+          <Text style={s.tierDesc}>Everything in Basic, plus premium features</Text>
+          {[
+            'Everything in Basic',
+            'Featured in search results',
+            form.type === 'pharmacy' ? 'Supplement quiz reviews 💊' : 'Priority listing',
+            'Advanced analytics',
+          ].map(f => (
+            <View key={f} style={s.tierFeatureRow}>
+              <Text style={[s.tierTick, { color: colors.primary }]}>✓</Text>
+              <Text style={s.tierFeatureText}>{f}</Text>
+            </View>
+          ))}
+        </TouchableOpacity>
+
+        {error ? <Text style={s.errorText}>{error}</Text> : null}
+
+        <TouchableOpacity style={[s.primaryBtn, saving && s.primaryBtnDisabled]} onPress={submit} disabled={saving}>
+          {saving
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={s.primaryBtnText}>Submit for review</Text>
+          }
+        </TouchableOpacity>
+
+        <Text style={s.disclaimer}>
+          Your listing will be reviewed within 24 hours. You'll get full dashboard access once approved.
+        </Text>
+      </ScrollView>
+    </SafeAreaView>
+  )
+}
+
+const s = StyleSheet.create({
+  safe:               { flex: 1, backgroundColor: colors.bg },
+
+  // Welcome
+  welcomeWrap:        { flex: 1, paddingHorizontal: 28, justifyContent: 'center', alignItems: 'center' },
+  welcomeEmoji:       { fontSize: 56, marginBottom: 20 },
+  welcomeTitle:       { fontSize: 28, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 12 },
+  welcomeSub:         { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+  featureList:        { width: '100%', gap: 14, marginBottom: 40 },
+  featureRow:         { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  featureIcon:        { fontSize: 22, width: 32, textAlign: 'center' },
+  featureText:        { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+
+  // Form
+  formWrap:           { paddingHorizontal: 20, paddingBottom: 48, paddingTop: 16 },
+  formHeader:         { marginBottom: 24 },
+  stepLabel:          { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  formTitle:          { fontSize: 26, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8 },
+  formSub:            { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20 },
+  fieldLabel:         { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: 8, marginTop: 18 },
+  input:              { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, fontSize: 15, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary },
+
+  // Type picker
+  typeGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
+  typeCard:           { flex: 1, minWidth: '45%', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, alignItems: 'center', backgroundColor: colors.surface },
+  typeCardActive:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  typeCardIcon:       { fontSize: 26, marginBottom: 6 },
+  typeCardLabel:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  typeCardLabelActive:{ fontFamily: 'Inter_700Bold', color: colors.primary },
+
+  // Tier cards
+  tierCard:           { borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 18, marginBottom: 14, backgroundColor: colors.cardBg, ...shadow },
+  tierCardSelected:   { borderColor: colors.border },
+  tierCardPro:        { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  tierCardHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  tierNameRow:        { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tierName:           { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  tierCheck:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  proBadge:           { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  proBadgeText:       { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.5 },
+  tierDesc:           { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 12, lineHeight: 18 },
+  tierFeatureRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
+  tierTick:           { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, width: 14 },
+  tierFeatureText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+
+  // Shared
+  primaryBtn:         { backgroundColor: colors.primary, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 28 },
+  primaryBtnDisabled: { opacity: 0.45 },
+  primaryBtnText:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
+  backBtn:            { marginBottom: 20 },
+  backBtnText:        { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  errorText:          { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger, marginTop: 8 },
+  signOutText:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary, marginTop: 16, textAlign: 'center' },
+  disclaimer:         { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 16, lineHeight: 18 },
+})

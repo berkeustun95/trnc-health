@@ -133,41 +133,48 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
           )
         })()}
 
-        <Text style={styles.sectionLabel}>{t('requestedTime', lang)}</Text>
-        <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
-          <Text style={styles.dateBtnText}>
-            {date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-          </Text>
-          <Text style={styles.dateBtnChevron}>›</Text>
-        </TouchableOpacity>
+        {facility.type !== 'pharmacy' && (
+          <>
+            <Text style={styles.sectionLabel}>{t('requestedTime', lang)}</Text>
+            <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
+              <Text style={styles.dateBtnText}>
+                {date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+              </Text>
+              <Text style={styles.dateBtnChevron}>›</Text>
+            </TouchableOpacity>
 
-        {showPicker && (
-          <DateTimePicker
-            value={date}
-            mode="datetime"
-            display={Platform.OS === 'ios' ? 'inline' : 'default'}
-            minimumDate={new Date()}
-            onChange={(_, selected) => {
-              if (Platform.OS !== 'ios') setShowPicker(false)
-              if (selected) setDate(selected)
-            }}
-          />
+            {showPicker && (
+              <DateTimePicker
+                value={date}
+                mode="datetime"
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                minimumDate={new Date()}
+                onChange={(_, selected) => {
+                  if (Platform.OS !== 'ios') setShowPicker(false)
+                  if (selected) setDate(selected)
+                }}
+              />
+            )}
+
+            {showPicker && Platform.OS === 'ios' && (
+              <TouchableOpacity style={styles.doneBtn} onPress={() => setShowPicker(false)}>
+                <Text style={styles.doneBtnText}>{t('done', lang)}</Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
 
-        {showPicker && Platform.OS === 'ios' && (
-          <TouchableOpacity style={styles.doneBtn} onPress={() => setShowPicker(false)}>
-            <Text style={styles.doneBtnText}>{t('done', lang)}</Text>
-          </TouchableOpacity>
+        {facility.type !== 'pharmacy' && (
+          <>
+            {error && <Text style={styles.error}>{error}</Text>}
+            <TouchableOpacity style={styles.submit} onPress={submit} disabled={loading}>
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.submitText}>{t('requestAppointment', lang)}</Text>
+              }
+            </TouchableOpacity>
+          </>
         )}
-
-        {error && <Text style={styles.error}>{error}</Text>}
-
-        <TouchableOpacity style={styles.submit} onPress={submit} disabled={loading}>
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitText}>{t('requestAppointment', lang)}</Text>
-          }
-        </TouchableOpacity>
 
         <View style={styles.divider} />
         <Text style={styles.sectionLabel}>{t('questionsAnswers', lang)}</Text>

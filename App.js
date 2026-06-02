@@ -12,6 +12,7 @@ import { t } from './constants/i18n'
 import AuthScreen from './screens/AuthScreen'
 import BookingScreen from './screens/BookingScreen'
 import ProviderScreen from './screens/ProviderScreen'
+import ProviderOnboardingScreen from './screens/ProviderOnboardingScreen'
 import MapScreen from './screens/MapScreen'
 import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
@@ -84,6 +85,7 @@ export default function App() {
   const [facilityRatings, setFacilityRatings] = useState({})
   const [notifications, setNotifications] = useState([])
   const [showNotifs, setShowNotifs] = useState(false)
+  const [providerFacility, setProviderFacility] = useState(undefined)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -114,10 +116,31 @@ export default function App() {
     setOnboarded(true)
   }
 
+  async function loadProviderFacility() {
+    const { data: fac } = await supabase
+      .from('facilities')
+      .select('id, name, type, status, membership_tier, trial_ends_at, is_quiz_partner')
+      .eq('provider_id', session?.user.id)
+      .maybeSingle()
+    setProviderFacility(fac ?? null)
+  }
+
   useEffect(() => {
-    if (!session) { setProfile(null); setLatestResult(null); setNotifications([]); return }
+    if (!session) {
+      setProfile(null); setLatestResult(null); setNotifications([]); setProviderFacility(undefined); return
+    }
     supabase.from('profiles').select('role, preferred_language').eq('id', session.user.id).single()
-      .then(({ data }) => setProfile(data ?? null))
+      .then(async ({ data }) => {
+        setProfile(data ?? null)
+        if (data?.role === 'provider') {
+          const { data: fac } = await supabase
+            .from('facilities')
+            .select('id, name, type, status, membership_tier, trial_ends_at, is_quiz_partner')
+            .eq('provider_id', session.user.id)
+            .maybeSingle()
+          setProviderFacility(fac ?? null)
+        }
+      })
     fetchLatestResult(session.user.id)
     supabase.from('notifications').select('id, title, body, read, created_at')
       .eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
@@ -243,7 +266,61 @@ export default function App() {
   } else if (profile.role === 'admin') {
     content = <AdminScreen session={session} />
   } else if (profile.role === 'provider') {
-    content = <ProviderScreen session={session} lang={lang} />
+    if (providerFacility === undefined) {
+      content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+    } else if (providerFacility === null) {
+      content = <ProviderOnboardingScreen session={session} onDone={loadProviderFacility} />
+    } else if (providerFacility.status === 'pending') {
+      content = (
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <View style={styles.center}>
+            <Text style={{ fontSize: 48, marginBottom: 20 }}>⏳</Text>
+            <Text style={styles.wordmark}>Pending Verification</Text>
+            <Text style={[styles.subText, { marginTop: 12, marginBottom: 32 }]}>
+              We're reviewing your application. You'll be notified within 24 hours.
+            </Text>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()}>
+              <Text style={styles.signOutLink}>Sign out</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      )
+    } else if (providerFacility.status === 'suspended') {
+      content = (
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <View style={styles.center}>
+            <Text style={{ fontSize: 48, marginBottom: 20 }}>🔒</Text>
+            <Text style={styles.wordmark}>Account Suspended</Text>
+            <Text style={[styles.subText, { marginTop: 12, marginBottom: 32 }]}>
+              Your account has been suspended. Please contact us to resolve your membership.
+            </Text>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()}>
+              <Text style={styles.signOutLink}>Sign out</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      )
+    } else if (providerFacility.status === 'trial' && providerFacility.trial_ends_at && new Date() > new Date(providerFacility.trial_ends_at)) {
+      content = (
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <View style={styles.center}>
+            <Text style={{ fontSize: 48, marginBottom: 20 }}>⌛</Text>
+            <Text style={styles.wordmark}>Trial Ended</Text>
+            <Text style={[styles.subText, { marginTop: 12, marginBottom: 32 }]}>
+              Your 5-day trial has expired. Please contact us to activate your {providerFacility.membership_tier === 'pro' ? 'Pro' : 'Basic'} membership.
+            </Text>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()}>
+              <Text style={styles.signOutLink}>Sign out</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      )
+    } else {
+      const trialDaysLeft = providerFacility.status === 'trial' && providerFacility.trial_ends_at
+        ? Math.max(0, Math.ceil((new Date(providerFacility.trial_ends_at) - new Date()) / 86400000))
+        : null
+      content = <ProviderScreen session={session} lang={lang} facility={providerFacility} trialDaysLeft={trialDaysLeft} />
+    }
   } else if (showLatestResult && latestResult) {
     content = <ResultsScreen
       result={latestResult.final_result}
@@ -450,7 +527,9 @@ const styles = StyleSheet.create({
   container:        { flex: 1, paddingHorizontal: 16 },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
-  wordmark:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
+  wordmark:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5, textAlign: 'center' },
+  subText:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
+  signOutLink:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   headerRight:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
   viewToggle:       { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2 },
   toggleBtn:        { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6 },

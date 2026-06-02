@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "642226758237",
+    "project_id": "trnc-health-58b47",
+    "storage_bucket": "trnc-health-58b47.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:642226758237:android:1b2b11435ea4f5e95123b4",
+        "android_client_info": {
+          "package_name": "com.berkeustun95.trnchealth"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBS9lW_aQdgwcM6J8B_qNfBtFLf9CO4gwo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

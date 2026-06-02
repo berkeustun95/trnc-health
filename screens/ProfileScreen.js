@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform
+  ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Linking
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
@@ -20,19 +20,157 @@ const LANGUAGES = [
   { key: 'Persian',  label: 'فارسی'      },
 ]
 
+const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
+const TYPE_COLORS = {
+  pharmacy: { bg: '#F3E8FF', text: '#7C3AED' },
+  clinic:   { bg: '#E6F7F7', text: '#0E7C7B' },
+  hospital: { bg: '#FDE8EC', text: '#D1495B' },
+  dentist:  { bg: '#E8F5EE', text: '#2E9E5B' },
+}
+
+function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue, ratingComment, reviewError, onRatingChange, onCommentChange, onSubmitReview, onCancelBooking, onBack }) {
+  const f           = booking.facilities ?? {}
+  const isPending   = booking.status === 'pending'
+  const isConfirmed = booking.status === 'confirmed'
+  const reviewed    = reviewedIds.has(booking.id)
+  const review      = reviewsMap.get(booking.id)
+  const tc          = TYPE_COLORS[f.type] ?? TYPE_COLORS.clinic
+
+  const statusLabel     = isConfirmed ? t('statusConfirmed', lang) : isPending ? t('statusPending', lang) : t('statusCancelled', lang)
+  const statusPillStyle = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : s.pillRed
+  const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : s.pillTextRed
+
+  function openMaps() {
+    Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(f.address || f.name || '')}`)
+  }
+
+  return (
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <View style={s.header}>
+            <TouchableOpacity onPress={onBack}>
+              <Text style={s.backText}>{t('back', lang)}</Text>
+            </TouchableOpacity>
+            <Text style={s.title}>{t('bookingDetail', lang)}</Text>
+            <View style={statusPillStyle}>
+              <Text style={statusTextStyle}>{statusLabel}</Text>
+            </View>
+          </View>
+
+          <View style={s.detailFacilityCard}>
+            <View style={[s.detailTypeIcon, { backgroundColor: tc.bg }]}>
+              <Text style={s.detailTypeIconText}>{TYPE_ICONS[f.type] ?? '🏥'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.detailFacilityName}>{f.name}</Text>
+              <View style={[s.typeBadgeSmall, { backgroundColor: tc.bg }]}>
+                <Text style={[s.typeBadgeSmallText, { color: tc.text }]}>{t(f.type, lang)}</Text>
+              </View>
+            </View>
+          </View>
+
+          {f.address ? (
+            <View style={s.detailInfoRow}>
+              <Text style={s.detailInfoIcon}>📍</Text>
+              <Text style={s.detailInfoText} numberOfLines={2}>{f.address}</Text>
+              <TouchableOpacity onPress={openMaps} style={s.detailInfoBtn}>
+                <Text style={s.detailInfoBtnText}>{t('getDirections', lang)}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {f.phone ? (
+            <View style={s.detailInfoRow}>
+              <Text style={s.detailInfoIcon}>📞</Text>
+              <Text style={s.detailInfoText}>{f.phone}</Text>
+              <TouchableOpacity onPress={() => Linking.openURL(`tel:${f.phone}`)} style={s.detailInfoBtn}>
+                <Text style={s.detailInfoBtnText}>{t('call', lang)}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {f.opening_hours ? (
+            <View style={s.detailInfoRow}>
+              <Text style={s.detailInfoIcon}>🕐</Text>
+              <Text style={s.detailInfoText}>{f.opening_hours}</Text>
+            </View>
+          ) : null}
+
+          <View style={s.detailDivider} />
+
+          <Text style={s.detailSectionLabel}>{t('requestedTime', lang)}</Text>
+          <Text style={s.detailApptTime}>
+            {new Date(booking.requested_time).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}
+          </Text>
+          <Text style={s.bookingRef}>{t('bookingRef', lang)}: {booking.id.slice(0, 8).toUpperCase()}</Text>
+
+          {isPending && (
+            <TouchableOpacity style={[s.cancelBtn, { marginTop: 16 }]} onPress={() => onCancelBooking(booking.id)}>
+              <Text style={s.cancelBtnText}>{t('cancelAppt', lang)}</Text>
+            </TouchableOpacity>
+          )}
+
+          {isConfirmed && !reviewed && (
+            <View style={s.detailReviewSection}>
+              <Text style={s.detailSectionLabel}>{t('rateVisit', lang)}</Text>
+              <View style={s.starsRow}>
+                {[1,2,3,4,5].map(star => (
+                  <TouchableOpacity key={star} onPress={() => onRatingChange(star)} activeOpacity={0.7}>
+                    <Text style={[s.star, ratingValue >= star && s.starActive]}>★</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={s.commentInput}
+                value={ratingComment}
+                onChangeText={onCommentChange}
+                placeholder={t('commentOptional', lang)}
+                placeholderTextColor={colors.textSecondary}
+                multiline
+              />
+              {reviewError ? <Text style={s.reviewErrorText}>{reviewError}</Text> : null}
+              <TouchableOpacity
+                style={[s.submitReviewBtn, !ratingValue && { opacity: 0.4 }]}
+                onPress={onSubmitReview}
+                disabled={!ratingValue}
+              >
+                <Text style={s.submitReviewText}>{t('save', lang)}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {isConfirmed && reviewed && review && (
+            <View style={s.detailReviewSection}>
+              <Text style={s.detailSectionLabel}>{t('yourReview', lang)}</Text>
+              <View style={s.starsRow}>
+                {[1,2,3,4,5].map(star => (
+                  <Text key={star} style={[s.star, review.rating >= star && s.starActive]}>★</Text>
+                ))}
+              </View>
+              {review.comment ? <Text style={s.detailReviewComment}>{review.comment}</Text> : null}
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  )
+}
+
 export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
-  const [profile, setProfile] = useState(null)
-  const [form, setForm] = useState({ full_name: '', phone: '', nationality: '', preferred_language: 'English' })
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState(null)
-  const [bookings, setBookings] = useState([])
-  const [reviewedIds, setReviewedIds] = useState(new Set())
-  const [ratingBookingId, setRatingBookingId] = useState(null)
-  const [ratingValue, setRatingValue] = useState(0)
-  const [ratingComment, setRatingComment] = useState('')
-  const [reviewError, setReviewError] = useState(null)
+  const [profile, setProfile]               = useState(null)
+  const [form, setForm]                     = useState({ full_name: '', phone: '', nationality: '', preferred_language: 'English' })
+  const [loading, setLoading]               = useState(true)
+  const [saving, setSaving]                 = useState(false)
+  const [saved, setSaved]                   = useState(false)
+  const [error, setError]                   = useState(null)
+  const [bookings, setBookings]             = useState([])
+  const [reviewedIds, setReviewedIds]       = useState(new Set())
+  const [reviewsMap, setReviewsMap]         = useState(new Map())
+  const [selectedBooking, setSelectedBooking] = useState(null)
+  const [ratingValue, setRatingValue]       = useState(0)
+  const [ratingComment, setRatingComment]   = useState('')
+  const [reviewError, setReviewError]       = useState(null)
 
   useEffect(() => {
     supabase.from('profiles')
@@ -53,16 +191,21 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
       })
 
     supabase.from('appointments')
-      .select('id, requested_time, status, facility_id, facilities(name)')
+      .select('id, requested_time, status, facility_id, facilities(name, address, phone, type, opening_hours)')
       .eq('customer_id', session.user.id)
       .order('requested_time', { ascending: false })
       .limit(10)
       .then(({ data }) => { if (data) setBookings(data) })
 
     supabase.from('reviews')
-      .select('appointment_id')
+      .select('appointment_id, rating, comment')
       .eq('customer_id', session.user.id)
-      .then(({ data }) => { if (data) setReviewedIds(new Set(data.map(r => r.appointment_id))) })
+      .then(({ data }) => {
+        if (data) {
+          setReviewedIds(new Set(data.map(r => r.appointment_id)))
+          setReviewsMap(new Map(data.map(r => [r.appointment_id, { rating: r.rating, comment: r.comment }])))
+        }
+      })
   }, [])
 
   async function cancelBooking(bookingId) {
@@ -73,6 +216,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
       .eq('customer_id', session.user.id)
     if (!error) {
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b))
+      setSelectedBooking(prev => prev?.id === bookingId ? { ...prev, status: 'cancelled' } : prev)
     }
   }
 
@@ -88,7 +232,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
     })
     if (!error) {
       setReviewedIds(prev => new Set([...prev, booking.id]))
-      setRatingBookingId(null)
+      setReviewsMap(prev => new Map([...prev, [booking.id, { rating: ratingValue, comment: ratingComment.trim() || null }]]))
       setRatingValue(0)
       setRatingComment('')
     } else {
@@ -136,6 +280,25 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
       <SafeAreaView style={s.safe}>
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
       </SafeAreaView>
+    )
+  }
+
+  if (selectedBooking) {
+    return (
+      <AppointmentDetail
+        booking={selectedBooking}
+        lang={lang}
+        reviewedIds={reviewedIds}
+        reviewsMap={reviewsMap}
+        ratingValue={ratingValue}
+        ratingComment={ratingComment}
+        reviewError={reviewError}
+        onRatingChange={setRatingValue}
+        onCommentChange={setRatingComment}
+        onSubmitReview={() => submitReview(selectedBooking)}
+        onCancelBooking={cancelBooking}
+        onBack={() => setSelectedBooking(null)}
+      />
     )
   }
 
@@ -192,10 +355,15 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
               const statusLabel = isConfirmed ? t('statusConfirmed', lang)
                 : isPending ? t('statusPending', lang)
                 : t('statusCancelled', lang)
-              const statusStyle = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : s.pillRed
+              const statusStyle     = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : s.pillRed
               const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : s.pillTextRed
               return (
-                <View key={b.id} style={s.bookingCard}>
+                <TouchableOpacity
+                  key={b.id}
+                  style={s.bookingCard}
+                  activeOpacity={0.75}
+                  onPress={() => { setRatingValue(0); setRatingComment(''); setReviewError(null); setSelectedBooking(b) }}
+                >
                   <View style={s.bookingTop}>
                     <Text style={s.bookingFacility} numberOfLines={1}>{b.facilities?.name ?? '—'}</Text>
                     <View style={statusStyle}>
@@ -206,47 +374,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
                     {new Date(b.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                   </Text>
                   <Text style={s.bookingRef}>{t('bookingRef', lang)}: {b.id.slice(0, 8).toUpperCase()}</Text>
-                  {isPending && (
-                    <TouchableOpacity style={s.cancelBtn} onPress={() => cancelBooking(b.id)}>
-                      <Text style={s.cancelBtnText}>{t('cancelAppt', lang)}</Text>
-                    </TouchableOpacity>
-                  )}
                   {isConfirmed && reviewedIds.has(b.id) && (
                     <Text style={s.reviewedBadge}>{t('reviewDone', lang)} ★</Text>
                   )}
-                  {isConfirmed && !reviewedIds.has(b.id) && ratingBookingId !== b.id && (
-                    <TouchableOpacity style={s.rateBtn} onPress={() => { setRatingBookingId(b.id); setRatingValue(0); setRatingComment('') }}>
-                      <Text style={s.rateBtnText}>★ {t('rateVisit', lang)}</Text>
-                    </TouchableOpacity>
-                  )}
-                  {ratingBookingId === b.id && (
-                    <View style={s.ratingForm}>
-                      <View style={s.starsRow}>
-                        {[1,2,3,4,5].map(star => (
-                          <TouchableOpacity key={star} onPress={() => setRatingValue(star)} activeOpacity={0.7}>
-                            <Text style={[s.star, ratingValue >= star && s.starActive]}>★</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                      <TextInput
-                        style={s.commentInput}
-                        value={ratingComment}
-                        onChangeText={setRatingComment}
-                        placeholder={t('commentOptional', lang)}
-                        placeholderTextColor={colors.textSecondary}
-                        multiline
-                      />
-                      {reviewError && <Text style={s.reviewErrorText}>{reviewError}</Text>}
-                      <TouchableOpacity
-                        style={[s.submitReviewBtn, !ratingValue && { opacity: 0.4 }]}
-                        onPress={() => submitReview(b)}
-                        disabled={!ratingValue}
-                      >
-                        <Text style={s.submitReviewText}>{t('save', lang)}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
+                </TouchableOpacity>
               )
             })
           )}
@@ -362,20 +493,35 @@ const s = StyleSheet.create({
   pillTextGreen:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.success },
   pillTextOrange:   { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent },
   pillTextRed:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.danger },
-  cancelBtn:        { alignSelf: 'flex-start', marginTop: 10, backgroundColor: colors.dangerLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  cancelBtn:        { alignSelf: 'flex-start', backgroundColor: colors.dangerLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   cancelBtnText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
   reviewedBadge:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.success, marginTop: 8 },
-  rateBtn:          { alignSelf: 'flex-start', marginTop: 10, backgroundColor: colors.accentLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  rateBtnText:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.accent },
-  ratingForm:       { marginTop: 12, gap: 10 },
   starsRow:         { flexDirection: 'row', gap: 8 },
   star:             { fontSize: 28, color: colors.border },
   starActive:       { color: '#F5A623' },
   commentInput:     { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, padding: 10, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface, maxHeight: 80 },
   submitReviewBtn:  { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   submitReviewText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
-  reviewErrorText:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger, marginBottom: 6 },
+  reviewErrorText:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger },
   errorText:        { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 12 },
   signOutBtn:       { borderWidth: 1.5, borderColor: colors.danger, borderRadius: 12, padding: 15, alignItems: 'center' },
   signOutText:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.danger },
+
+  // Appointment detail view
+  detailFacilityCard:  { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, ...shadow },
+  detailTypeIcon:      { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  detailTypeIconText:  { fontSize: 24 },
+  detailFacilityName:  { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6 },
+  typeBadgeSmall:      { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20 },
+  typeBadgeSmallText:  { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  detailInfoRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  detailInfoIcon:      { fontSize: 16, width: 22, textAlign: 'center' },
+  detailInfoText:      { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
+  detailInfoBtn:       { backgroundColor: colors.primaryLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
+  detailInfoBtnText:   { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
+  detailDivider:       { height: 1, backgroundColor: colors.border, marginVertical: 20 },
+  detailSectionLabel:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  detailApptTime:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6 },
+  detailReviewSection: { marginTop: 24, gap: 12 },
+  detailReviewComment: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20, fontStyle: 'italic' },
 })

@@ -78,6 +78,7 @@ const translations = {
     noReviews: 'No reviews yet.',
     notifications: 'Notifications', noNotifications: 'No notifications yet.', markAllRead: 'Mark all read',
     supplementPlanTitle: 'Your Supplement Plan', approvedBy: 'Approved by',
+    bookingDetail: 'Appointment Details', yourReview: 'Your Review', getDirections: 'Get Directions', call: 'Call',
   },
   tr: {
     list: 'Liste', map: 'Harita', all: 'Tümü',
@@ -152,6 +153,7 @@ const translations = {
     noReviews: 'Henüz değerlendirme yok.',
     notifications: 'Bildirimler', noNotifications: 'Henüz bildirim yok.', markAllRead: 'Tümünü okundu say',
     supplementPlanTitle: 'Takviye Planınız', approvedBy: 'Onaylayan',
+    bookingDetail: 'Randevu Detayı', yourReview: 'Değerlendirmeniz', getDirections: 'Yol Tarifi', call: 'Ara',
   },
   ar: {
     list: 'قائمة', map: 'خريطة', all: 'الكل',
@@ -226,6 +228,7 @@ const translations = {
     noReviews: 'لا توجد تقييمات حتى الآن.',
     notifications: 'الإشعارات', noNotifications: 'لا إشعارات حتى الآن.', markAllRead: 'تحديد الكل كمقروء',
     supplementPlanTitle: 'خطة مكملاتك', approvedBy: 'معتمد من',
+    bookingDetail: 'تفاصيل الموعد', yourReview: 'تقييمك', getDirections: 'الاتجاهات', call: 'اتصل',
   },
   ru: {
     list: 'Список', map: 'Карта', all: 'Все',
@@ -300,6 +303,7 @@ const translations = {
     noReviews: 'Отзывов пока нет.',
     notifications: 'Уведомления', noNotifications: 'Уведомлений пока нет.', markAllRead: 'Отметить все прочитанными',
     supplementPlanTitle: 'Ваш план добавок', approvedBy: 'Одобрено',
+    bookingDetail: 'Детали записи', yourReview: 'Ваш отзыв', getDirections: 'Маршрут', call: 'Позвонить',
   },
   el: {
     list: 'Λίστα', map: 'Χάρτης', all: 'Όλα',
@@ -374,6 +378,7 @@ const translations = {
     noReviews: 'Δεν υπάρχουν αξιολογήσεις ακόμα.',
     notifications: 'Ειδοποιήσεις', noNotifications: 'Δεν υπάρχουν ειδοποιήσεις ακόμα.', markAllRead: 'Σήμανση όλων ως αναγνωσμένα',
     supplementPlanTitle: 'Το πλάνο σας', approvedBy: 'Εγκρίθηκε από',
+    bookingDetail: 'Λεπτομέρειες ραντεβού', yourReview: 'Η αξιολόγησή σας', getDirections: 'Οδηγίες', call: 'Κλήση',
   },
   fr: {
     list: 'Liste', map: 'Carte', all: 'Tout',
@@ -448,6 +453,7 @@ const translations = {
     noReviews: 'Aucun avis pour l\'instant.',
     notifications: 'Notifications', noNotifications: 'Aucune notification pour l\'instant.', markAllRead: 'Tout marquer comme lu',
     supplementPlanTitle: 'Votre plan de suppléments', approvedBy: 'Approuvé par',
+    bookingDetail: 'Détails du rendez-vous', yourReview: 'Votre avis', getDirections: 'Itinéraire', call: 'Appeler',
   },
   es: {
     list: 'Lista', map: 'Mapa', all: 'Todo',
@@ -522,6 +528,7 @@ const translations = {
     noReviews: 'Aún no hay valoraciones.',
     notifications: 'Notificaciones', noNotifications: 'Aún no hay notificaciones.', markAllRead: 'Marcar todo como leído',
     supplementPlanTitle: 'Tu plan de suplementos', approvedBy: 'Aprobado por',
+    bookingDetail: 'Detalles de la cita', yourReview: 'Tu valoración', getDirections: 'Cómo llegar', call: 'Llamar',
   },
   de: {
     list: 'Liste', map: 'Karte', all: 'Alle',
@@ -596,6 +603,7 @@ const translations = {
     noReviews: 'Noch keine Bewertungen.',
     notifications: 'Benachrichtigungen', noNotifications: 'Noch keine Benachrichtigungen.', markAllRead: 'Alle als gelesen markieren',
     supplementPlanTitle: 'Ihr Ergänzungsplan', approvedBy: 'Genehmigt von',
+    bookingDetail: 'Termindetails', yourReview: 'Ihre Bewertung', getDirections: 'Route', call: 'Anrufen',
   },
   fa: {
     list: 'لیست', map: 'نقشه', all: 'همه',
@@ -670,6 +678,7 @@ const translations = {
     noReviews: 'هنوز نظری ثبت نشده.',
     notifications: 'اعلان‌ها', noNotifications: 'هنوز اعلانی وجود ندارد.', markAllRead: 'علامت‌گذاری همه به عنوان خوانده شده',
     supplementPlanTitle: 'برنامه مکمل شما', approvedBy: 'تأیید شده توسط',
+    bookingDetail: 'جزئیات نوبت', yourReview: 'نظر شما', getDirections: 'مسیریابی', call: 'تماس',
   },
 }
 

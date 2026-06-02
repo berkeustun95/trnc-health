@@ -371,65 +371,117 @@ function DutyTab() {
 // ─── Providers Tab ──────────────────────────────────────────────────────────
 
 function ProvidersTab() {
-  const [providers, setProviders] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [pending,  setPending]  = useState([])
+  const [active,   setActive]   = useState([])
+  const [loading,  setLoading]  = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data: profiles } = await supabase.from('profiles').select('id, role').eq('role', 'provider')
-    if (!profiles?.length) { setProviders([]); setLoading(false); return }
-
-    const results = await Promise.all(
-      profiles.map(async p => {
-        const { data: facility } = await supabase.from('facilities').select('id, name, verified, type').eq('provider_id', p.id).maybeSingle()
-        return { ...p, facility }
-      })
-    )
-    setProviders(results)
+    const { data } = await supabase
+      .from('facilities')
+      .select('id, name, type, status, membership_tier, trial_ends_at, verified, provider_id')
+      .not('provider_id', 'is', null)
+      .order('name')
+    const rows = data ?? []
+    setPending(rows.filter(f => f.status === 'pending'))
+    setActive(rows.filter(f => f.status !== 'pending'))
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  async function toggleVerified(facilityId, current) {
-    await supabase.from('facilities').update({ verified: !current }).eq('id', facilityId)
+  async function approve(facilityId) {
+    const trialEnd = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
+    await supabase.from('facilities').update({
+      status: 'trial',
+      trial_ends_at: trialEnd,
+      is_public: true,
+      verified: true,
+    }).eq('id', facilityId)
+    load()
+  }
+
+  async function reject(facilityId) {
+    await supabase.from('facilities').update({ status: 'suspended' }).eq('id', facilityId)
+    load()
+  }
+
+  async function activate(facilityId) {
+    await supabase.from('facilities').update({ status: 'active', trial_ends_at: null }).eq('id', facilityId)
+    load()
+  }
+
+  async function suspend(facilityId) {
+    await supabase.from('facilities').update({ status: 'suspended' }).eq('id', facilityId)
     load()
   }
 
   if (loading) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
 
+  const trialDaysLeft = f => f.trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(f.trial_ends_at) - new Date()) / 86400000))
+    : null
+
   return (
-    <FlatList
-      data={providers}
-      keyExtractor={p => p.id}
-      contentContainerStyle={s.listContent}
-      showsVerticalScrollIndicator={false}
-      ListEmptyComponent={<SectionEmpty text="No providers yet." />}
-      renderItem={({ item }) => (
-        <View style={s.card}>
-          <Text style={s.cardSub} numberOfLines={1}>ID: {item.id}</Text>
-          {item.facility ? (
-            <>
-              <Text style={s.cardTitle}>{item.facility.name}</Text>
-              <Text style={s.cardSub}>{item.facility.type}</Text>
-              <View style={[s.cardRow, { marginTop: 10, alignItems: 'center' }]}>
-                <View style={item.facility.verified ? s.pillGreen : s.pillOrange}>
-                  <Text style={s.pillText}>{item.facility.verified ? 'Verified' : 'Unverified'}</Text>
+    <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
+      <Text style={s.sectionTitle}>Pending approval ({pending.length})</Text>
+      {pending.length === 0
+        ? <SectionEmpty text="No pending applications." />
+        : pending.map(f => (
+          <View key={f.id} style={s.card}>
+            <Text style={s.cardTitle}>{f.name}</Text>
+            <Text style={s.cardSub}>{f.type} · {f.membership_tier === 'pro' ? 'Pro' : 'Basic'}</Text>
+            <Text style={[s.cardSub, { marginTop: 2, fontSize: 10 }]} numberOfLines={1}>Provider: {f.provider_id}</Text>
+            <View style={[s.cardRow, { marginTop: 10, gap: 8 }]}>
+              <TouchableOpacity style={[s.ghostBtn, { backgroundColor: colors.successLight, flex: 1 }]} onPress={() => approve(f.id)}>
+                <Text style={[s.ghostBtnText, { color: colors.success }]}>Approve (5-day trial)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.dangerGhostBtn]} onPress={() => reject(f.id)}>
+                <Text style={s.dangerGhostText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))
+      }
+
+      <Text style={[s.sectionTitle, { marginTop: 24 }]}>Active providers ({active.length})</Text>
+      {active.length === 0
+        ? <SectionEmpty text="No active providers yet." />
+        : active.map(f => {
+          const days = trialDaysLeft(f)
+          const isTrialExpired = f.status === 'trial' && days !== null && days <= 0
+          const statusPill = f.status === 'active' ? s.pillGreen : f.status === 'trial' ? s.pillOrange : s.pillRed
+          const statusLabel = f.status === 'active' ? 'Active'
+            : f.status === 'trial' ? (isTrialExpired ? 'Trial expired' : `Trial · ${days}d left`)
+            : 'Suspended'
+          return (
+            <View key={f.id} style={s.card}>
+              <View style={[s.cardRow, { justifyContent: 'space-between' }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.cardTitle} numberOfLines={1}>{f.name}</Text>
+                  <Text style={s.cardSub}>{f.type} · {f.membership_tier === 'pro' ? 'Pro' : 'Basic'}</Text>
                 </View>
-                <TouchableOpacity
-                  style={[s.ghostBtn, { marginLeft: 10 }]}
-                  onPress={() => toggleVerified(item.facility.id, item.facility.verified)}
-                >
-                  <Text style={s.ghostBtnText}>{item.facility.verified ? 'Unverify' : 'Verify'}</Text>
-                </TouchableOpacity>
+                <View style={statusPill}>
+                  <Text style={s.pillText}>{statusLabel}</Text>
+                </View>
               </View>
-            </>
-          ) : (
-            <Text style={[s.cardSub, { marginTop: 4 }]}>No facility linked yet</Text>
-          )}
-        </View>
-      )}
-    />
+              <View style={[s.cardRow, { marginTop: 10, gap: 8, flexWrap: 'wrap' }]}>
+                {(f.status === 'trial' || f.status === 'suspended') && (
+                  <TouchableOpacity style={[s.ghostBtn, { backgroundColor: colors.successLight }]} onPress={() => activate(f.id)}>
+                    <Text style={[s.ghostBtnText, { color: colors.success }]}>Mark as Paid</Text>
+                  </TouchableOpacity>
+                )}
+                {f.status === 'active' && (
+                  <TouchableOpacity style={s.dangerGhostBtn} onPress={() => suspend(f.id)}>
+                    <Text style={s.dangerGhostText}>Suspend</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )
+        })
+      }
+    </ScrollView>
   )
 }
 
