@@ -330,10 +330,12 @@ export default function App() {
           <View style={styles.center}>
             <Text style={{ fontSize: 48, marginBottom: 20 }}>⏳</Text>
             <Text style={styles.wordmark}>{t('pendingVerification', lang)}</Text>
-            <Text style={[styles.subText, { marginTop: 12, marginBottom: 32 }]}>
+            <Text style={[styles.subText, { marginTop: 12, marginBottom: 24 }]}>
               {t('pendingVerificationSub', lang)}
             </Text>
-            <TouchableOpacity onPress={() => supabase.auth.signOut()}>
+            <Text style={styles.memberIdLabel}>{t('membershipId', lang)}</Text>
+            <Text style={styles.memberIdValue}>{session.user.id.replace(/-/g, '').slice(0, 12).toUpperCase()}</Text>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 32 }}>
               <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
             </TouchableOpacity>
           </View>
@@ -345,10 +347,12 @@ export default function App() {
           <View style={styles.center}>
             <Text style={{ fontSize: 48, marginBottom: 20 }}>🔒</Text>
             <Text style={styles.wordmark}>{t('accountSuspended', lang)}</Text>
-            <Text style={[styles.subText, { marginTop: 12, marginBottom: 32 }]}>
+            <Text style={[styles.subText, { marginTop: 12, marginBottom: 24 }]}>
               {t('accountSuspendedSub', lang)}
             </Text>
-            <TouchableOpacity onPress={() => supabase.auth.signOut()}>
+            <Text style={styles.memberIdLabel}>{t('membershipId', lang)}</Text>
+            <Text style={styles.memberIdValue}>{session.user.id.replace(/-/g, '').slice(0, 12).toUpperCase()}</Text>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 32 }}>
               <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
             </TouchableOpacity>
           </View>
@@ -360,10 +364,12 @@ export default function App() {
           <View style={styles.center}>
             <Text style={{ fontSize: 48, marginBottom: 20 }}>⌛</Text>
             <Text style={styles.wordmark}>{t('trialEnded', lang)}</Text>
-            <Text style={[styles.subText, { marginTop: 12, marginBottom: 32 }]}>
+            <Text style={[styles.subText, { marginTop: 12, marginBottom: 24 }]}>
               {t('trialEndedSub', lang).replace('{tier}', providerFacility.membership_tier === 'pro' ? 'Pro' : 'Basic')}
             </Text>
-            <TouchableOpacity onPress={() => supabase.auth.signOut()}>
+            <Text style={styles.memberIdLabel}>{t('membershipId', lang)}</Text>
+            <Text style={styles.memberIdValue}>{session.user.id.replace(/-/g, '').slice(0, 12).toUpperCase()}</Text>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 32 }}>
               <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
             </TouchableOpacity>
           </View>
@@ -632,6 +638,8 @@ const styles = StyleSheet.create({
   headerIcon:       { width: 40, height: 40, borderRadius: 10 },
   subText:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
   signOutLink:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  memberIdLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  memberIdValue:    { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: 2, marginTop: 6 },
   headerRight:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
   viewToggle:       { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, gap: 2 },
   viewBtn:          { width: 32, height: 32, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
