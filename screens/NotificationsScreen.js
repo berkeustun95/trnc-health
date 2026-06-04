@@ -1,5 +1,6 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -19,7 +20,8 @@ export default function NotificationsScreen({ notifications, lang, onBack, onMar
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <TouchableOpacity onPress={onBack}>
+        <TouchableOpacity onPress={onBack} style={s.backBtn}>
+          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
           <Text style={s.backText}>{t('back', lang)}</Text>
         </TouchableOpacity>
         <Text style={s.title}>{t('notifications', lang)}</Text>
@@ -28,13 +30,15 @@ export default function NotificationsScreen({ notifications, lang, onBack, onMar
             <Text style={s.markRead}>{t('markAllRead', lang)}</Text>
           </TouchableOpacity>
         ) : (
-          <View style={{ width: 60 }} />
+          <View style={{ width: 80 }} />
         )}
       </View>
 
       {notifications.length === 0 ? (
         <View style={s.empty}>
-          <Text style={s.emptyIcon}>🔔</Text>
+          <View style={s.emptyIconWrap}>
+            <Ionicons name="notifications-outline" size={32} color={colors.textSecondary} />
+          </View>
           <Text style={s.emptyText}>{t('noNotifications', lang)}</Text>
         </View>
       ) : (
@@ -62,21 +66,22 @@ export default function NotificationsScreen({ notifications, lang, onBack, onMar
 }
 
 const s = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: colors.bg },
-  header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
-  title:      { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  backText:   { fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textSecondary, width: 60 },
-  markRead:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, textAlign: 'right', width: 90 },
-  empty:      { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 80 },
-  emptyIcon:  { fontSize: 48, marginBottom: 12 },
-  emptyText:  { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  list:       { paddingHorizontal: 16, paddingBottom: 32 },
-  card:       { backgroundColor: colors.cardBg, borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'flex-start', gap: 10, ...shadow },
-  cardUnread: { backgroundColor: colors.primaryLight },
-  unreadDot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginTop: 5, flexShrink: 0 },
-  cardBody:   { flex: 1 },
-  cardTop:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
-  cardTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, marginRight: 8 },
-  cardTime:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  safe:        { flex: 1, backgroundColor: colors.bg },
+  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
+  title:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  backBtn:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  backText:    { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  markRead:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, textAlign: 'right', width: 80 },
+  empty:       { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 80, gap: 12 },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', ...shadow },
+  emptyText:   { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  list:        { paddingHorizontal: 16, paddingBottom: 32 },
+  card:        { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'flex-start', gap: 10, ...shadow },
+  cardUnread:  { backgroundColor: colors.primaryLight },
+  unreadDot:   { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginTop: 5, flexShrink: 0 },
+  cardBody:    { flex: 1 },
+  cardTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
+  cardTitle:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, marginRight: 8 },
+  cardTime:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   cardBodyText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18 },
 })

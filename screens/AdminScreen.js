@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
   Modal, TextInput, Switch, ScrollView, Alert, KeyboardAvoidingView, Platform
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 
@@ -500,9 +501,16 @@ function UsersTab() {
 
   useEffect(() => { load() }, [load])
 
-  async function setRole(id, role) {
-    await supabase.from('profiles').update({ role }).eq('id', id)
-    load()
+  async function setRole(id, newRole) {
+    if (newRole === 'admin') {
+      Alert.alert('Promote to admin?', 'This gives full admin access. Are you sure?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Promote', style: 'destructive', onPress: async () => { await supabase.from('profiles').update({ role: newRole }).eq('id', id); load() } },
+      ])
+    } else {
+      await supabase.from('profiles').update({ role: newRole }).eq('id', id)
+      load()
+    }
   }
 
   if (loading) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
@@ -593,7 +601,7 @@ function BookingsTab() {
               <View style={s.card}>
                 <Text style={s.cardTitle}>{item.facilities?.name ?? 'Unknown facility'}</Text>
                 <Text style={s.cardSub}>{new Date(item.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
-                <Text style={[s.cardSub, { marginTop: 2 }]} numberOfLines={1}>Customer: {item.customer_id}</Text>
+                <Text style={[s.cardSub, { marginTop: 2 }]} numberOfLines={1}>Customer: {item.customer_id.slice(0, 8)}…</Text>
                 {filter === 'pending' && (
                   <View style={[s.cardRow, { marginTop: 10, gap: 8 }]}>
                     <TouchableOpacity style={[s.ghostBtn, { backgroundColor: colors.successLight }]} onPress={() => updateStatus(item.id, 'confirmed')}>
@@ -622,7 +630,10 @@ export default function AdminScreen({ session }) {
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.container}>
         <View style={s.header}>
-          <Text style={s.wordmark}>Admin</Text>
+          <View style={s.headerLeft}>
+            <Image source={require('../assets/ADAicon.png')} style={s.headerIcon} resizeMode="contain" />
+            <Text style={s.headerLabel}>Admin</Text>
+          </View>
           <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
             <Text style={s.signOutText}>Sign out</Text>
           </TouchableOpacity>
@@ -662,6 +673,9 @@ const s = StyleSheet.create({
   center:             { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
   wordmark:           { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
+  headerLeft:         { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerIcon:         { width: 36, height: 36, borderRadius: 8 },
+  headerLabel:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   signOutBtn:         { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.dangerLight },
   signOutText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
 
@@ -677,11 +691,11 @@ const s = StyleSheet.create({
   sectionTitle:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
 
   statsGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statCard:           { backgroundColor: colors.cardBg, borderRadius: 12, padding: 16, minWidth: '45%', flex: 1, ...shadow },
+  statCard:           { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, minWidth: '45%', flex: 1, ...shadow },
   statValue:          { fontSize: 28, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
   statLabel:          { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
-  card:               { backgroundColor: colors.cardBg, borderRadius: 12, padding: 14, marginBottom: 10, ...shadow },
+  card:               { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
   cardSelected:       { borderWidth: 1.5, borderColor: colors.primary },
   cardRow:            { flexDirection: 'row', alignItems: 'flex-start' },
   cardTitle:          { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 3 },
@@ -693,7 +707,7 @@ const s = StyleSheet.create({
   dangerGhostBtn:     { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.dangerLight },
   dangerGhostText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
 
-  primaryBtn:         { backgroundColor: colors.primary, borderRadius: 12, padding: 15, alignItems: 'center', marginBottom: 12 },
+  primaryBtn:         { backgroundColor: colors.primary, borderRadius: 14, padding: 15, alignItems: 'center', marginBottom: 12 },
   primaryBtnDisabled: { opacity: 0.45 },
   primaryBtnText:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
 

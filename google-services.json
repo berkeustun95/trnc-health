@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:642226758237:android:b596aa2832dc67765123b4",
+        "android_client_info": {
+          "package_name": "com.berkeustun95.ada"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBS9lW_aQdgwcM6J8B_qNfBtFLf9CO4gwo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:642226758237:android:1b2b11435ea4f5e95123b4",
         "android_client_info": {
           "package_name": "com.berkeustun95.trnchealth"

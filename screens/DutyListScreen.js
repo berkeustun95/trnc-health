@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, SectionList } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -40,6 +41,7 @@ export default function DutyListScreen({ onBack, lang }) {
       <View style={s.container}>
         <View style={s.header}>
           <TouchableOpacity onPress={onBack} style={s.backBtn}>
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
             <Text style={s.backText}>{t('back', lang)}</Text>
           </TouchableOpacity>
           <View style={s.headerCenter}>
@@ -53,6 +55,9 @@ export default function DutyListScreen({ onBack, lang }) {
           <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
         ) : sections.length === 0 ? (
           <View style={s.center}>
+            <View style={s.emptyIconWrap}>
+              <Ionicons name="medical-outline" size={32} color={colors.textSecondary} />
+            </View>
             <Text style={s.emptyText}>{t('noDutyToday', lang)}</Text>
           </View>
         ) : (
@@ -79,7 +84,10 @@ export default function DutyListScreen({ onBack, lang }) {
                   </View>
                 </View>
                 {item.address ? (
-                  <Text style={s.addressText} numberOfLines={2}>{item.address}</Text>
+                  <View style={s.addressRow}>
+                    <Feather name="map-pin" size={12} color={colors.textSecondary} />
+                    <Text style={s.addressText} numberOfLines={2}>{item.address}</Text>
+                  </View>
                 ) : null}
                 {item.phone ? (
                   <TouchableOpacity
@@ -87,7 +95,8 @@ export default function DutyListScreen({ onBack, lang }) {
                     onPress={() => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`)}
                     activeOpacity={0.7}
                   >
-                    <Text style={s.callBtnText}>📞  {item.phone}</Text>
+                    <Feather name="phone" size={13} color={colors.accent} />
+                    <Text style={s.callBtnText}>{item.phone}</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -104,12 +113,13 @@ const s = StyleSheet.create({
   container:    { flex: 1, paddingHorizontal: 16 },
   center:       { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header:       { flexDirection: 'row', alignItems: 'flex-start', paddingTop: 16, paddingBottom: 16 },
-  backBtn:      { minWidth: 60 },
-  backText:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.primary },
+  backBtn:      { flexDirection: 'row', alignItems: 'center', gap: 2, minWidth: 70 },
+  backText:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   headerCenter: { flex: 1, alignItems: 'center' },
-  headerRight:  { minWidth: 60 },
+  headerRight:  { minWidth: 70 },
   title:        { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   dateText:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 12, ...shadow },
   emptyText:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 },
   listContent:  { paddingBottom: 40 },
 
@@ -118,12 +128,13 @@ const s = StyleSheet.create({
   regionBadge:  { backgroundColor: colors.border, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
   regionCount:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 
-  card:         { backgroundColor: colors.cardBg, borderRadius: 12, padding: 14, marginBottom: 8, ...shadow },
-  cardTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, gap: 8 },
+  card:         { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 8, ...shadow },
+  cardTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 8 },
   pharmacyName: { flex: 1, fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 20 },
   hoursBadge:   { backgroundColor: colors.primaryLight, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   hoursText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
-  addressText:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, marginBottom: 10 },
-  callBtn:      { backgroundColor: colors.accentLight, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 12, alignSelf: 'flex-start' },
+  addressRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 10 },
+  addressText:  { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17 },
+  callBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.accentLight, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 12, alignSelf: 'flex-start' },
   callBtnText:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.accent },
 })

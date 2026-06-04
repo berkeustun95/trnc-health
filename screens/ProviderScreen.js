@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView } from 'react-native'
+import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -193,10 +194,10 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <View>
-            <Text style={styles.wordmark}>TRNC Health</Text>
-            <View style={styles.facilityTagRow}>
-              <Text style={styles.facilityTag}>{facility.name}</Text>
+          <View style={styles.headerLeft}>
+            <Image source={require('../assets/ADAicon.png')} style={styles.headerIcon} resizeMode="contain" />
+            <View>
+              <Text style={styles.facilityTag} numberOfLines={1}>{facility.name}</Text>
               {facility.membership_tier === 'pro' && (
                 <View style={styles.proBadge}><Text style={styles.proBadgeText}>PRO</Text></View>
               )}
@@ -208,11 +209,15 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         </View>
 
         {trialDaysLeft !== null && trialDaysLeft !== undefined && (
-          <View style={styles.trialBanner}>
+          <TouchableOpacity
+            style={styles.trialBanner}
+            onPress={() => Linking.openURL('mailto:berke.ustun95@gmail.com?subject=ADA%20Provider%20Activation')}
+            activeOpacity={0.8}
+          >
             <Text style={styles.trialText}>
-              ⏱ {trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''} left in your free trial · Contact us to activate
+              {trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''} left in your free trial — tap to contact us
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
 
         <View style={styles.tabs}>
@@ -236,7 +241,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
               onPress={() => setTab('quiz')}
             >
               <View style={styles.tabWithBadge}>
-                <Text style={[styles.tabText, tab === 'quiz' && styles.tabTextActive]}>{'💊 ' + t('tabReviews', lang)}</Text>
+                <Text style={[styles.tabText, tab === 'quiz' && styles.tabTextActive]}>{t('tabReviews', lang)}</Text>
                 {quizReviews.length > 0 && (
                   <View style={styles.tabBadge}>
                     <Text style={styles.tabBadgeText}>{quizReviews.length}</Text>
@@ -250,14 +255,14 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
               style={[styles.tabBtn, tab === 'archive' && styles.tabBtnActive]}
               onPress={() => setTab('archive')}
             >
-              <Text style={[styles.tabText, tab === 'archive' && styles.tabTextActive]}>{'🗂 ' + t('tabArchive', lang)}</Text>
+              <Text style={[styles.tabText, tab === 'archive' && styles.tabTextActive]}>{t('tabArchive', lang)}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
             style={[styles.tabBtn, tab === 'stats' && styles.tabBtnActive]}
             onPress={() => setTab('stats')}
           >
-            <Text style={[styles.tabText, tab === 'stats' && styles.tabTextActive]}>{'📊 ' + t('tabStats', lang)}</Text>
+            <Text style={[styles.tabText, tab === 'stats' && styles.tabTextActive]}>{t('tabStats', lang)}</Text>
           </TouchableOpacity>
         </View>
 
@@ -266,6 +271,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
             <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
           ) : archivedReviews.length === 0 ? (
             <View style={styles.empty}>
+              <View style={styles.emptyIconWrap}><Feather name="archive" size={28} color={colors.textSecondary} /></View>
               <Text style={styles.emptyTitle}>{t('noApprovedReviews', lang)}</Text>
               <Text style={styles.emptySub}>{t('approvedReviewsHere', lang)}</Text>
             </View>
@@ -279,7 +285,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 <TouchableOpacity style={[styles.card, styles.reviewCard]} onPress={() => setActiveArchive(item)} activeOpacity={0.7}>
                   <View style={styles.reviewCardLeft}>
                     <View style={[styles.reviewIcon, { backgroundColor: colors.successLight }]}>
-                      <Text style={styles.reviewIconText}>✓</Text>
+                      <Feather name="check" size={16} color={colors.success} />
                     </View>
                     <View>
                       <Text style={styles.reviewTitle}>{t('approvedReview', lang)}</Text>
@@ -289,7 +295,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.reviewArrow}>→</Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.primary} />
                 </TouchableOpacity>
               )}
             />
@@ -299,6 +305,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
             <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
           ) : quizReviews.length === 0 ? (
             <View style={styles.empty}>
+              <View style={styles.emptyIconWrap}><Ionicons name="flask-outline" size={28} color={colors.textSecondary} /></View>
               <Text style={styles.emptyTitle}>{t('noPendingReviews', lang)}</Text>
               <Text style={styles.emptySub}>{t('quizRequestsHere', lang)}</Text>
             </View>
@@ -312,7 +319,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 <TouchableOpacity style={[styles.card, styles.reviewCard]} onPress={() => setActiveReview(item)} activeOpacity={0.7}>
                   <View style={styles.reviewCardLeft}>
                     <View style={styles.reviewIcon}>
-                      <Text style={styles.reviewIconText}>💊</Text>
+                      <Ionicons name="flask-outline" size={20} color={colors.primary} />
                     </View>
                     <View>
                       <Text style={styles.reviewTitle}>{t('quizReview', lang)}</Text>
@@ -320,7 +327,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                       <Text style={styles.reviewCount}>{t('supplementsRecommended', lang).replace('{n}', item.generated_result?.stack?.length ?? 0)}</Text>
                     </View>
                   </View>
-                  <Text style={styles.reviewArrow}>→</Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.primary} />
                 </TouchableOpacity>
               )}
             />
@@ -390,6 +397,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         ) : tab === 'requests' ? (
           appointments.length === 0 ? (
             <View style={styles.empty}>
+              <View style={styles.emptyIconWrap}><Feather name="check-circle" size={28} color={colors.success} /></View>
               <Text style={styles.emptyTitle}>{t('allClear', lang)}</Text>
               <Text style={styles.emptySub}>{t('noPendingRequests', lang)}</Text>
             </View>
@@ -424,6 +432,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
               {questions.length === 0 ? (
                 <View style={styles.empty}>
+                  <View style={styles.emptyIconWrap}><Ionicons name="chatbubble-outline" size={28} color={colors.textSecondary} /></View>
                   <Text style={styles.emptyTitle}>{t('noQuestions', lang)}</Text>
                   <Text style={styles.emptySub}>{t('questionsFromCustomers', lang)}</Text>
                 </View>
@@ -473,10 +482,11 @@ const styles = StyleSheet.create({
   safe:           { flex: 1, backgroundColor: colors.bg },
   container:      { flex: 1, paddingHorizontal: 16 },
   center:         { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
-  header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 16, paddingBottom: 12 },
-  wordmark:       { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
+  header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
+  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 10 },
+  headerIcon:     { width: 36, height: 36, borderRadius: 8, flexShrink: 0 },
   facilityTagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
-  facilityTag:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  facilityTag:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   proBadge:       { backgroundColor: colors.primary, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
   proBadgeText:   { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.5 },
   signOutBtn:     { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.dangerLight },
@@ -485,7 +495,7 @@ const styles = StyleSheet.create({
   trialText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#92400E', textAlign: 'center' },
   sectionTitle:   { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
   listContent:    { paddingBottom: 32 },
-  card:           { backgroundColor: colors.cardBg, borderRadius: 12, padding: 16, marginBottom: 10, ...shadow },
+  card:           { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, ...shadow },
   timeLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
   timeValue:      { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 14 },
   actions:        { flexDirection: 'row', gap: 10 },
@@ -521,7 +531,8 @@ const styles = StyleSheet.create({
   statTile:       { flex: 1, borderRadius: 12, padding: 16, alignItems: 'center', justifyContent: 'center', minHeight: 80 },
   statNum:        { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   statLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'center' },
-  empty:          { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyTitle:     { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8 },
+  empty:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
+  emptyIconWrap:  { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
+  emptyTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
   emptySub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
 })

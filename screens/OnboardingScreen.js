@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -26,10 +27,7 @@ export default function OnboardingScreen({ onComplete }) {
       <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false}>
 
         <View style={s.top}>
-          <View style={s.logoMark}>
-            <Text style={s.logoIcon}>🏥</Text>
-          </View>
-          <Text style={s.wordmark}>TRNC Health</Text>
+          <Image source={require('../assets/Logo.png')} style={s.logoImg} resizeMode="contain" />
           <Text style={s.tagline}>{t('onboardingTagline', lang)}</Text>
         </View>
 
@@ -55,7 +53,7 @@ export default function OnboardingScreen({ onComplete }) {
           {POINTS.map((key, i) => (
             <View key={i} style={s.pointRow}>
               <View style={s.checkCircle}>
-                <Text style={s.checkMark}>✓</Text>
+                <Feather name="check" size={13} color={colors.success} />
               </View>
               <Text style={s.pointText}>{t(key, lang)}</Text>
             </View>
@@ -64,7 +62,7 @@ export default function OnboardingScreen({ onComplete }) {
 
         <TouchableOpacity style={s.cta} onPress={() => onComplete(lang)} activeOpacity={0.85}>
           <Text style={s.ctaText}>{t('getStarted', lang)}</Text>
-          <Text style={s.ctaArrow}>→</Text>
+          <Ionicons name="arrow-forward" size={18} color="#fff" />
         </TouchableOpacity>
 
       </ScrollView>
@@ -77,9 +75,7 @@ const s = StyleSheet.create({
   container:         { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 40, flexGrow: 1 },
 
   top:               { alignItems: 'center', marginBottom: 40 },
-  logoMark:          { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
-  logoIcon:          { fontSize: 34 },
-  wordmark:          { fontSize: 28, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5, marginBottom: 8 },
+  logoImg:           { width: 260, height: 100, marginBottom: 12 },
   tagline:           { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 22, paddingHorizontal: 8 },
 
   langSection:       { marginBottom: 36 },
@@ -92,11 +88,9 @@ const s = StyleSheet.create({
 
   pointsSection:     { marginBottom: 40 },
   pointRow:          { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16, gap: 12 },
-  checkCircle:       { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.successLight, justifyContent: 'center', alignItems: 'center', marginTop: 1, flexShrink: 0 },
-  checkMark:         { fontSize: 13, color: colors.success, fontFamily: 'Inter_700Bold' },
+  checkCircle:       { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.successLight, justifyContent: 'center', alignItems: 'center', marginTop: 1, flexShrink: 0 },
   pointText:         { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 22 },
 
-  cta:               { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 17, paddingHorizontal: 24, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  cta:               { backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 17, paddingHorizontal: 24, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
   ctaText:           { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
-  ctaArrow:          { fontSize: 18, color: '#fff' },
 })

@@ -48,7 +48,7 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
         <View style={s.welcomeWrap}>
           <Text style={s.welcomeEmoji}>🏥</Text>
-          <Text style={s.welcomeTitle}>Join TRNC Health</Text>
+          <Text style={s.welcomeTitle}>Join ADA</Text>
           <Text style={s.welcomeSub}>List your facility and connect with patients across Northern Cyprus. Setup takes 2 minutes.</Text>
 
           <View style={s.featureList}>

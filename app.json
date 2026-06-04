@@ -1,16 +1,23 @@
 {
   "expo": {
-    "name": "trnc-health",
+    "name": "ADA",
     "slug": "trnc-health",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/ADAicon.png",
+    "splash": {
+      "image": "./assets/ADAicon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "scheme": "ada",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.berkeustun95.ada"
     },
     "android": {
-      "package": "com.berkeustun95.trnchealth",
+      "package": "com.berkeustun95.ada",
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
@@ -18,10 +25,8 @@
         }
       },
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/ADAicon.png",
+        "backgroundColor": "#FFFFFF"
       }
     },
     "web": {

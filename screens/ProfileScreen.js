@@ -4,9 +4,11 @@ import {
   ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Linking
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import LegalScreen from './LegalScreen'
 
 const LANGUAGES = [
   { key: 'English',  label: 'English'    },
@@ -49,7 +51,8 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={s.header}>
-            <TouchableOpacity onPress={onBack}>
+            <TouchableOpacity onPress={onBack} style={s.backBtn}>
+              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
               <Text style={s.backText}>{t('back', lang)}</Text>
             </TouchableOpacity>
             <Text style={s.title}>{t('bookingDetail', lang)}</Text>
@@ -72,7 +75,7 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
 
           {f.address ? (
             <View style={s.detailInfoRow}>
-              <Text style={s.detailInfoIcon}>📍</Text>
+              <Feather name="map-pin" size={15} color={colors.textSecondary} style={s.detailInfoIcon} />
               <Text style={s.detailInfoText} numberOfLines={2}>{f.address}</Text>
               <TouchableOpacity onPress={openMaps} style={s.detailInfoBtn}>
                 <Text style={s.detailInfoBtnText}>{t('getDirections', lang)}</Text>
@@ -82,7 +85,7 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
 
           {f.phone ? (
             <View style={s.detailInfoRow}>
-              <Text style={s.detailInfoIcon}>📞</Text>
+              <Feather name="phone" size={15} color={colors.textSecondary} style={s.detailInfoIcon} />
               <Text style={s.detailInfoText}>{f.phone}</Text>
               <TouchableOpacity onPress={() => Linking.openURL(`tel:${f.phone}`)} style={s.detailInfoBtn}>
                 <Text style={s.detailInfoBtnText}>{t('call', lang)}</Text>
@@ -92,7 +95,7 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
 
           {f.opening_hours ? (
             <View style={s.detailInfoRow}>
-              <Text style={s.detailInfoIcon}>🕐</Text>
+              <Feather name="clock" size={15} color={colors.textSecondary} style={s.detailInfoIcon} />
               <Text style={s.detailInfoText}>{f.opening_hours}</Text>
             </View>
           ) : null}
@@ -171,6 +174,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
   const [ratingValue, setRatingValue]       = useState(0)
   const [ratingComment, setRatingComment]   = useState('')
   const [reviewError, setReviewError]       = useState(null)
+  const [legalTab, setLegalTab]             = useState(null)
 
   useEffect(() => {
     supabase.from('profiles')
@@ -283,6 +287,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
     )
   }
 
+  if (legalTab) {
+    return <LegalScreen onBack={() => setLegalTab(null)} lang={lang} initialTab={legalTab} />
+  }
+
   if (selectedBooking) {
     return (
       <AppointmentDetail
@@ -311,7 +319,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
           keyboardShouldPersistTaps="handled"
         >
           <View style={s.header}>
-            <TouchableOpacity onPress={onBack}>
+            <TouchableOpacity onPress={onBack} style={s.backBtn}>
+              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
               <Text style={s.backText}>{t('back', lang)}</Text>
             </TouchableOpacity>
             <Text style={s.title}>{t('profile', lang)}</Text>
@@ -436,6 +445,16 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
 
           {error && <Text style={s.errorText}>{error}</Text>}
 
+          <View style={s.legalRow}>
+            <TouchableOpacity onPress={() => setLegalTab('privacy')}>
+              <Text style={s.legalLink}>Privacy Policy</Text>
+            </TouchableOpacity>
+            <Text style={s.legalDot}>·</Text>
+            <TouchableOpacity onPress={() => setLegalTab('terms')}>
+              <Text style={s.legalLink}>Terms of Service</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
             <Text style={s.signOutText}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
@@ -452,7 +471,8 @@ const s = StyleSheet.create({
 
   header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 20 },
   title:            { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  backText:         { fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  backBtn:          { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  backText:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   saveText:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   avatarSection:    { alignItems: 'center', marginBottom: 24 },
@@ -462,7 +482,7 @@ const s = StyleSheet.create({
   rolePill:         { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.primaryLight },
   rolePillText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'capitalize' },
 
-  memberCard:       { backgroundColor: colors.primary, borderRadius: 16, padding: 20, marginBottom: 28, ...shadow },
+  memberCard:       { backgroundColor: colors.primary, borderRadius: 20, padding: 20, marginBottom: 28, ...shadow },
   memberCardTop:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   memberLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   memberId:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 2 },
@@ -482,7 +502,7 @@ const s = StyleSheet.create({
   langChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   noBookingsText:   { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 20, marginTop: 2 },
-  bookingCard:      { backgroundColor: colors.cardBg, borderRadius: 12, padding: 14, marginBottom: 10, ...shadow },
+  bookingCard:      { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
   bookingTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 },
   bookingFacility:  { flex: 1, fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   bookingTime:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 4 },
@@ -504,18 +524,21 @@ const s = StyleSheet.create({
   submitReviewText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   reviewErrorText:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger },
   errorText:        { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 12 },
+  legalRow:         { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 16 },
+  legalLink:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },
+  legalDot:         { fontSize: 13, color: colors.textSecondary },
   signOutBtn:       { borderWidth: 1.5, borderColor: colors.danger, borderRadius: 12, padding: 15, alignItems: 'center' },
   signOutText:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.danger },
 
   // Appointment detail view
-  detailFacilityCard:  { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, ...shadow },
+  detailFacilityCard:  { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4, backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, ...shadow },
   detailTypeIcon:      { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   detailTypeIconText:  { fontSize: 24 },
   detailFacilityName:  { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6 },
   typeBadgeSmall:      { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20 },
   typeBadgeSmallText:  { fontSize: 11, fontFamily: 'Inter_700Bold' },
   detailInfoRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  detailInfoIcon:      { fontSize: 16, width: 22, textAlign: 'center' },
+  detailInfoIcon:      { width: 22, textAlign: 'center' },
   detailInfoText:      { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
   detailInfoBtn:       { backgroundColor: colors.primaryLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
   detailInfoBtnText:   { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },

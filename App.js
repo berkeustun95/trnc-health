@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView } from 'react-native'
+import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from './lib/supabase'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t } from './constants/i18n'
@@ -21,6 +22,7 @@ import ResultsScreen from './screens/quiz/ResultsScreen'
 import DutyListScreen from './screens/DutyListScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import NotificationsScreen from './screens/NotificationsScreen'
+import ResetPasswordScreen from './screens/ResetPasswordScreen'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -86,11 +88,42 @@ export default function App() {
   const [notifications, setNotifications] = useState([])
   const [showNotifs, setShowNotifs] = useState(false)
   const [providerFacility, setProviderFacility] = useState(undefined)
+  const [favorites, setFavorites] = useState(new Set())
+  const [openOnly, setOpenOnly] = useState(false)
+  const [showPasswordReset, setShowPasswordReset] = useState(false)
+
+  useEffect(() => {
+    AsyncStorage.getItem('ada_favorites').then(val => {
+      if (val) setFavorites(new Set(JSON.parse(val)))
+    })
+  }, [])
+
+  function toggleFavorite(id) {
+    setFavorites(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
+      AsyncStorage.setItem('ada_favorites', JSON.stringify([...next]))
+      return next
+    })
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setSession(session))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session)
+      if (event === 'PASSWORD_RECOVERY') setShowPasswordReset(true)
+    })
     return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    async function handleDeepLink(url) {
+      if (!url?.startsWith('ada://')) return
+      await supabase.auth.exchangeCodeForSession(url)
+    }
+    Linking.getInitialURL().then(url => { if (url) handleDeepLink(url) })
+    const sub = Linking.addEventListener('url', ({ url }) => handleDeepLink(url))
+    return () => sub.remove()
   }, [])
 
   useEffect(() => {
@@ -236,12 +269,16 @@ export default function App() {
     .sort((a, b) => {
       if (a.id === dutyFacilityId) return -1
       if (b.id === dutyFacilityId) return 1
+      const aFav = favorites.has(a.id), bFav = favorites.has(b.id)
+      if (aFav && !bFav) return -1
+      if (!aFav && bFav) return 1
       if (a._dist == null && b._dist == null) return 0
       if (a._dist == null) return 1
       if (b._dist == null) return -1
       return a._dist - b._dist
     })
     .filter(f => !activeType || f.type === activeType)
+    .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)
     .filter(f => {
       const q = searchText.trim().toLowerCase()
       if (!q) return true
@@ -252,6 +289,14 @@ export default function App() {
     })
 
   const lang = profile?.preferred_language || pendingLang
+
+  if (showPasswordReset) {
+    return (
+      <SafeAreaProvider>
+        <ResetPasswordScreen onDone={() => setShowPasswordReset(false)} />
+      </SafeAreaProvider>
+    )
+  }
 
   let content
 
@@ -352,27 +397,27 @@ export default function App() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={styles.wordmark}>TRNC Health</Text>
+            <Image source={require('./assets/ADAicon.png')} style={styles.headerIcon} resizeMode="contain" />
             <View style={styles.headerRight}>
               <View style={styles.viewToggle}>
                 <TouchableOpacity
-                  style={[styles.toggleBtn, view === 'list' && styles.toggleBtnActive]}
+                  style={[styles.viewBtn, view === 'list' && styles.viewBtnActive]}
                   onPress={() => setView('list')}
                 >
-                  <Text style={[styles.toggleText, view === 'list' && styles.toggleTextActive]}>{t('list', lang)}</Text>
+                  <Feather name="list" size={17} color={view === 'list' ? colors.primary : colors.textSecondary} />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.toggleBtn, view === 'map' && styles.toggleBtnActive]}
+                  style={[styles.viewBtn, view === 'map' && styles.viewBtnActive]}
                   onPress={() => setView('map')}
                 >
-                  <Text style={[styles.toggleText, view === 'map' && styles.toggleTextActive]}>{t('map', lang)}</Text>
+                  <Ionicons name="map-outline" size={17} color={view === 'map' ? colors.primary : colors.textSecondary} />
                 </TouchableOpacity>
               </View>
               <TouchableOpacity style={styles.quizBtn} onPress={() => setShowQuiz(true)}>
-                <Text style={styles.quizBtnText}>💊</Text>
+                <Ionicons name="flask-outline" size={18} color={colors.accent} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.notifBtn} onPress={() => setShowNotifs(true)}>
-                <Text style={styles.notifBtnText}>🔔</Text>
+                <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
                 {notifications.some(n => !n.read) && <View style={styles.notifDot} />}
               </TouchableOpacity>
               <TouchableOpacity style={styles.avatarBtn} onPress={() => setShowProfile(true)}>
@@ -384,7 +429,7 @@ export default function App() {
           </View>
 
           <View style={styles.searchBar}>
-            <Text style={styles.searchIcon}>🔍</Text>
+            <Feather name="search" size={16} color={colors.textSecondary} />
             <TextInput
               style={styles.searchInput}
               value={searchText}
@@ -396,7 +441,7 @@ export default function App() {
             />
             {searchText.length > 0 && (
               <TouchableOpacity onPress={() => setSearchText('')}>
-                <Text style={styles.searchClear}>✕</Text>
+                <Feather name="x" size={15} color={colors.textSecondary} />
               </TouchableOpacity>
             )}
           </View>
@@ -407,6 +452,13 @@ export default function App() {
             style={styles.filterRow}
             contentContainerStyle={styles.filterContent}
           >
+            <TouchableOpacity
+              style={[styles.filterChip, openOnly && styles.filterChipOpen]}
+              onPress={() => setOpenOnly(v => !v)}
+            >
+              <Feather name="clock" size={11} color={openOnly ? colors.success : colors.textSecondary} />
+              <Text style={[styles.filterChipText, openOnly && styles.filterChipOpenText]}> {t('open', lang)}</Text>
+            </TouchableOpacity>
             {[null, 'pharmacy', 'clinic', 'hospital', 'dentist'].map(type => (
               <TouchableOpacity
                 key={type ?? 'all'}
@@ -423,7 +475,9 @@ export default function App() {
           {latestResult && (
             <TouchableOpacity style={styles.resultCard} onPress={() => setShowLatestResult(true)} activeOpacity={0.8}>
               <View style={styles.resultCardLeft}>
-                <Text style={styles.resultCardEmoji}>💊</Text>
+                <View style={styles.resultCardIconWrap}>
+                  <Ionicons name="flask-outline" size={20} color={colors.primary} />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.resultCardTitle}>{t('supplementPlanTitle', lang)}</Text>
                   <Text style={styles.resultCardSub} numberOfLines={1}>
@@ -431,19 +485,21 @@ export default function App() {
                   </Text>
                 </View>
               </View>
-              <Text style={styles.resultCardArrow}>→</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.primary} />
             </TouchableOpacity>
           )}
 
           <TouchableOpacity style={styles.dutyBanner} onPress={() => setShowDutyList(true)} activeOpacity={0.8}>
             <View style={styles.dutyBannerLeft}>
-              <Text style={styles.dutyBannerEmoji}>🏥</Text>
+              <View style={styles.dutyBannerIconWrap}>
+                <Ionicons name="medical-outline" size={20} color={colors.accent} />
+              </View>
               <View>
                 <Text style={styles.dutyBannerTitle}>{t('tonightDuty', lang)}</Text>
                 <Text style={styles.dutyBannerSub}>{t('allRegions', lang)}</Text>
               </View>
             </View>
-            <Text style={styles.dutyBannerArrow}>→</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.accent} />
           </TouchableOpacity>
 
           {view === 'map' ? (
@@ -464,10 +520,18 @@ export default function App() {
                 keyExtractor={item => item.id}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.listContent}
+                ListEmptyComponent={(
+                  <View style={styles.emptyWrap}>
+                    <Text style={styles.emptyIcon}>🏥</Text>
+                    <Text style={styles.emptyTitle}>{t('noFacilitiesTitle', lang)}</Text>
+                    <Text style={styles.emptyBody}>{t('noFacilitiesBody', lang)}</Text>
+                  </View>
+                )}
                 renderItem={({ item }) => {
                   const isOpen = parseIsOpen(item.opening_hours)
                   const tc = typeColors[item.type] || typeColors.clinic
                   const isDuty = item.id === dutyFacilityId
+                  const isFav = favorites.has(item.id)
                   return (
                     <TouchableOpacity
                       activeOpacity={0.75}
@@ -485,7 +549,12 @@ export default function App() {
                         </View>
                         <View style={styles.cardContent}>
                           <View style={styles.cardTop}>
-                            <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
+                            <View style={styles.cardNameRow}>
+                              <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
+                              {item.verified && (
+                                <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
+                              )}
+                            </View>
                             {item._dist != null && (
                               <Text style={styles.distanceText}>{item._dist.toFixed(1)} km</Text>
                             )}
@@ -502,10 +571,29 @@ export default function App() {
                               </View>
                             )}
                           </View>
-                          <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text>
+                          {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
                           {facilityRatings[item.id] && (
-                            <Text style={styles.ratingText}>⭐ {facilityRatings[item.id].avg} ({facilityRatings[item.id].count})</Text>
+                            <View style={styles.ratingRow}>
+                              <Ionicons name="star" size={11} color="#F5A623" />
+                              <Text style={styles.ratingText}> {facilityRatings[item.id].avg} ({facilityRatings[item.id].count})</Text>
+                            </View>
                           )}
+                          {item.phone ? (
+                            <TouchableOpacity
+                              style={styles.callPill}
+                              onPress={() => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`)}
+                              activeOpacity={0.7}
+                            >
+                              <Feather name="phone" size={11} color={colors.accent} />
+                              <Text style={styles.callPillText}>{item.phone}</Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                        <View style={styles.cardActions}>
+                          <TouchableOpacity onPress={() => toggleFavorite(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? colors.danger : colors.border} />
+                          </TouchableOpacity>
+                          <Ionicons name="chevron-forward" size={16} color={colors.border} />
                         </View>
                       </View>
                     </TouchableOpacity>
@@ -527,66 +615,70 @@ const styles = StyleSheet.create({
   container:        { flex: 1, paddingHorizontal: 16 },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
-  wordmark:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5, textAlign: 'center' },
+  wordmark:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
+  headerIcon:       { width: 40, height: 40, borderRadius: 10 },
   subText:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
   signOutLink:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
-  headerRight:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  viewToggle:       { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2 },
-  toggleBtn:        { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6 },
-  toggleBtnActive:  { backgroundColor: colors.surface, ...shadow },
-  toggleText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  toggleTextActive: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  quizBtn:          { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.accentLight, justifyContent: 'center', alignItems: 'center' },
-  quizBtnText:      { fontSize: 16 },
-  notifBtn:         { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
-  notifBtnText:     { fontSize: 16 },
-  notifDot:         { position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
-  avatarBtn:        { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
+  headerRight:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  viewToggle:       { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, gap: 2 },
+  viewBtn:          { width: 32, height: 32, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
+  viewBtnActive:    { backgroundColor: colors.surface },
+  quizBtn:          { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.accentLight, justifyContent: 'center', alignItems: 'center' },
+  notifBtn:         { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
+  notifDot:         { position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
+  avatarBtn:        { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
   avatarBtnText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   locationNote:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 10, textAlign: 'center' },
-  searchBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10, gap: 8 },
-  searchIcon:       { fontSize: 15 },
+  searchBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 10, gap: 10, borderWidth: 1, borderColor: colors.border },
   searchInput:      { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, padding: 0 },
-  searchClear:      { fontSize: 13, color: colors.textSecondary, paddingHorizontal: 4 },
   filterRow:        { marginBottom: 12, flexGrow: 0 },
   filterContent:    { gap: 8, paddingRight: 4, alignItems: 'center' },
-  filterChip:       { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignSelf: 'flex-start' },
+  filterChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.cardBg, alignSelf: 'flex-start' },
   filterChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   filterChipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textTransform: 'capitalize' },
+  filterChipOpen:   { borderColor: colors.success, backgroundColor: colors.successLight },
+  filterChipOpenText: { color: colors.success, fontFamily: 'Inter_700Bold' },
   filterChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
   listContent:      { paddingBottom: 32 },
-  card:             { backgroundColor: colors.cardBg, borderRadius: 12, padding: 16, marginBottom: 10, ...shadow },
+  card:             { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, ...shadow },
   dutyCard:         { borderWidth: 1.5, borderColor: colors.accent },
   dutyCardBadge:    { backgroundColor: colors.accentLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
   dutyLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },
-  cardMain:         { flexDirection: 'row', alignItems: 'flex-start' },
-  typeIcon:         { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12, flexShrink: 0 },
+  cardMain:         { flexDirection: 'row', alignItems: 'center' },
+  cardNameRow:      { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
+  cardActions:      { flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginLeft: 6, alignSelf: 'stretch', paddingVertical: 2 },
+  callPill:         { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, backgroundColor: colors.accentLight, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10, alignSelf: 'flex-start' },
+  callPillText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.accent },
+  typeIcon:         { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 12, flexShrink: 0 },
   typeIconText:     { fontSize: 22 },
   cardContent:      { flex: 1 },
   cardTop:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
-  facilityName:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, marginRight: 8 },
-  distanceText:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
-  badgeRow:         { flexDirection: 'row', gap: 6, marginBottom: 8 },
+  facilityName:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1 },
+  distanceText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
+  badgeRow:         { flexDirection: 'row', gap: 6, marginBottom: 6 },
   typeBadge:        { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  typeBadgeText:    { fontSize: 12, fontFamily: 'Inter_700Bold', textTransform: 'capitalize' },
+  typeBadgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', textTransform: 'capitalize' },
   statusBadge:      { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   openBadge:        { backgroundColor: colors.successLight },
   closedBadge:      { backgroundColor: colors.dangerLight },
-  statusText:       { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  statusText:       { fontSize: 11, fontFamily: 'Inter_700Bold' },
   openText:         { color: colors.success },
   closedText:       { color: colors.danger },
-  addressText:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  ratingText:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, marginTop: 6 },
-  dutyBanner:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accentLight, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1.5, borderColor: colors.accent + '40' },
+  addressText:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 4 },
+  ratingRow:        { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  ratingText:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  dutyBanner:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accentLight, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.accent + '30' },
   dutyBannerLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  dutyBannerEmoji:  { fontSize: 26 },
+  dutyBannerIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.accent + '20', justifyContent: 'center', alignItems: 'center' },
   dutyBannerTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.accent, marginBottom: 2 },
   dutyBannerSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.accent + 'AA' },
-  dutyBannerArrow:  { fontSize: 16, color: colors.accent, fontFamily: 'Inter_700Bold' },
-  resultCard:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1.5, borderColor: colors.primary + '30' },
+  resultCard:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primaryLight, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.primary + '25' },
   resultCardLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  resultCardEmoji:  { fontSize: 28 },
-  resultCardTitle:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary, marginBottom: 2 },
+  resultCardIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.primary + '20', justifyContent: 'center', alignItems: 'center' },
+  resultCardTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary, marginBottom: 2 },
   resultCardSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.primary + 'AA' },
-  resultCardArrow:  { fontSize: 16, color: colors.primary, fontFamily: 'Inter_700Bold' },
+  emptyWrap:        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 32 },
+  emptyIcon:        { fontSize: 48, marginBottom: 16 },
+  emptyTitle:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
+  emptyBody:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 21 },
 })

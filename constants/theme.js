@@ -3,10 +3,10 @@ export const colors = {
   primaryLight:  '#E6F4F4',
   accent:        '#FF8552',
   accentLight:   '#FFF0EB',
-  bg:            '#FFFFFF',
-  cardBg:        '#F4F6F8',
+  bg:            '#F7F8FA',
+  cardBg:        '#FFFFFF',
   surface:       '#FFFFFF',
-  border:        '#E2E8F0',
+  border:        '#E8EDF2',
   textPrimary:   '#1A2B33',
   textSecondary: '#64748B',
   success:       '#2E9E5B',
@@ -24,10 +24,10 @@ export const typeColors = {
 
 export const shadow = {
   shadowColor:   '#1A2B33',
-  shadowOpacity: 0.08,
-  shadowRadius:  8,
-  shadowOffset:  { width: 0, height: 2 },
-  elevation:     2,
+  shadowOpacity: 0.07,
+  shadowRadius:  12,
+  shadowOffset:  { width: 0, height: 3 },
+  elevation:     3,
 }
 
 export const spacing = {
@@ -46,8 +46,9 @@ export const fontSize = {
 }
 
 export const radius = {
-  sm: 8,
-  md: 12,
-  card: 12,
-  lg: 16,
+  sm:   8,
+  md:   12,
+  card: 16,
+  lg:   20,
+  xl:   28,
 }

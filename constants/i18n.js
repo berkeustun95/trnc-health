@@ -79,6 +79,7 @@ const translations = {
     notifications: 'Notifications', noNotifications: 'No notifications yet.', markAllRead: 'Mark all read',
     supplementPlanTitle: 'Your Supplement Plan', approvedBy: 'Approved by',
     bookingDetail: 'Appointment Details', yourReview: 'Your Review', getDirections: 'Get Directions', call: 'Call',
+    noFacilitiesTitle: 'No facilities yet', noFacilitiesBody: 'Verified pharmacies, clinics, and hospitals will appear here as they join ADA.',
   },
   tr: {
     list: 'Liste', map: 'Harita', all: 'Tümü',
@@ -154,6 +155,7 @@ const translations = {
     notifications: 'Bildirimler', noNotifications: 'Henüz bildirim yok.', markAllRead: 'Tümünü okundu say',
     supplementPlanTitle: 'Takviye Planınız', approvedBy: 'Onaylayan',
     bookingDetail: 'Randevu Detayı', yourReview: 'Değerlendirmeniz', getDirections: 'Yol Tarifi', call: 'Ara',
+    noFacilitiesTitle: 'Henüz tesis yok', noFacilitiesBody: 'Onaylı eczane, klinik ve hastaneler ADA\'ya katıldıkça burada görünecek.',
   },
   ar: {
     list: 'قائمة', map: 'خريطة', all: 'الكل',
@@ -229,6 +231,7 @@ const translations = {
     notifications: 'الإشعارات', noNotifications: 'لا إشعارات حتى الآن.', markAllRead: 'تحديد الكل كمقروء',
     supplementPlanTitle: 'خطة مكملاتك', approvedBy: 'معتمد من',
     bookingDetail: 'تفاصيل الموعد', yourReview: 'تقييمك', getDirections: 'الاتجاهات', call: 'اتصل',
+    noFacilitiesTitle: 'لا توجد مرافق بعد', noFacilitiesBody: 'ستظهر هنا الصيدليات والعيادات والمستشفيات المعتمدة عند انضمامها إلى ADA.',
   },
   ru: {
     list: 'Список', map: 'Карта', all: 'Все',
@@ -304,6 +307,7 @@ const translations = {
     notifications: 'Уведомления', noNotifications: 'Уведомлений пока нет.', markAllRead: 'Отметить все прочитанными',
     supplementPlanTitle: 'Ваш план добавок', approvedBy: 'Одобрено',
     bookingDetail: 'Детали записи', yourReview: 'Ваш отзыв', getDirections: 'Маршрут', call: 'Позвонить',
+    noFacilitiesTitle: 'Пока нет учреждений', noFacilitiesBody: 'Проверенные аптеки, клиники и больницы появятся здесь по мере присоединения к ADA.',
   },
   el: {
     list: 'Λίστα', map: 'Χάρτης', all: 'Όλα',
@@ -379,6 +383,7 @@ const translations = {
     notifications: 'Ειδοποιήσεις', noNotifications: 'Δεν υπάρχουν ειδοποιήσεις ακόμα.', markAllRead: 'Σήμανση όλων ως αναγνωσμένα',
     supplementPlanTitle: 'Το πλάνο σας', approvedBy: 'Εγκρίθηκε από',
     bookingDetail: 'Λεπτομέρειες ραντεβού', yourReview: 'Η αξιολόγησή σας', getDirections: 'Οδηγίες', call: 'Κλήση',
+    noFacilitiesTitle: 'Δεν υπάρχουν εγκαταστάσεις ακόμα', noFacilitiesBody: 'Εγκεκριμένα φαρμακεία, κλινικές και νοσοκομεία θα εμφανίζονται εδώ καθώς εντάσσονται στο ADA.',
   },
   fr: {
     list: 'Liste', map: 'Carte', all: 'Tout',
@@ -454,6 +459,7 @@ const translations = {
     notifications: 'Notifications', noNotifications: 'Aucune notification pour l\'instant.', markAllRead: 'Tout marquer comme lu',
     supplementPlanTitle: 'Votre plan de suppléments', approvedBy: 'Approuvé par',
     bookingDetail: 'Détails du rendez-vous', yourReview: 'Votre avis', getDirections: 'Itinéraire', call: 'Appeler',
+    noFacilitiesTitle: 'Aucun établissement pour l\'instant', noFacilitiesBody: 'Les pharmacies, cliniques et hôpitaux vérifiés apparaîtront ici au fur et à mesure qu\'ils rejoindront ADA.',
   },
   es: {
     list: 'Lista', map: 'Mapa', all: 'Todo',
@@ -529,6 +535,7 @@ const translations = {
     notifications: 'Notificaciones', noNotifications: 'Aún no hay notificaciones.', markAllRead: 'Marcar todo como leído',
     supplementPlanTitle: 'Tu plan de suplementos', approvedBy: 'Aprobado por',
     bookingDetail: 'Detalles de la cita', yourReview: 'Tu valoración', getDirections: 'Cómo llegar', call: 'Llamar',
+    noFacilitiesTitle: 'Aún no hay centros', noFacilitiesBody: 'Las farmacias, clínicas y hospitales verificados aparecerán aquí cuando se unan a ADA.',
   },
   de: {
     list: 'Liste', map: 'Karte', all: 'Alle',
@@ -604,6 +611,7 @@ const translations = {
     notifications: 'Benachrichtigungen', noNotifications: 'Noch keine Benachrichtigungen.', markAllRead: 'Alle als gelesen markieren',
     supplementPlanTitle: 'Ihr Ergänzungsplan', approvedBy: 'Genehmigt von',
     bookingDetail: 'Termindetails', yourReview: 'Ihre Bewertung', getDirections: 'Route', call: 'Anrufen',
+    noFacilitiesTitle: 'Noch keine Einrichtungen', noFacilitiesBody: 'Verifizierte Apotheken, Kliniken und Krankenhäuser erscheinen hier, sobald sie ADA beitreten.',
   },
   fa: {
     list: 'لیست', map: 'نقشه', all: 'همه',
@@ -679,6 +687,7 @@ const translations = {
     notifications: 'اعلان‌ها', noNotifications: 'هنوز اعلانی وجود ندارد.', markAllRead: 'علامت‌گذاری همه به عنوان خوانده شده',
     supplementPlanTitle: 'برنامه مکمل شما', approvedBy: 'تأیید شده توسط',
     bookingDetail: 'جزئیات نوبت', yourReview: 'نظر شما', getDirections: 'مسیریابی', call: 'تماس',
+    noFacilitiesTitle: 'هنوز مرکزی وجود ندارد', noFacilitiesBody: 'داروخانه‌ها، کلینیک‌ها و بیمارستان‌های تأییدشده با پیوستن به ADA اینجا نمایش داده می‌شوند.',
   },
 }
 

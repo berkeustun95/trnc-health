@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ScrollView, TextInput } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import DateTimePicker from '@react-native-community/datetimepicker'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -75,7 +76,7 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <View style={styles.successRing}>
-            <Text style={styles.successCheck}>✓</Text>
+            <Feather name="check" size={32} color={colors.success} />
           </View>
           <Text style={styles.successTitle}>{t('requestSent', lang)}</Text>
           <Text style={styles.successSub}>
@@ -96,6 +97,7 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
         showsVerticalScrollIndicator={false}
       >
         <TouchableOpacity onPress={onBack} style={styles.backRow}>
+          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
           <Text style={styles.backText}>{t('back', lang)}</Text>
         </TouchableOpacity>
 
@@ -104,9 +106,17 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
             <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(facility.type, lang)}</Text>
           </View>
           <Text style={styles.facilityName}>{facility.name}</Text>
-          <Text style={styles.facilityAddress}>{facility.address}</Text>
+          {facility.address ? (
+            <View style={styles.infoRow}>
+              <Feather name="map-pin" size={13} color={colors.textSecondary} />
+              <Text style={styles.facilityAddress}>{facility.address}</Text>
+            </View>
+          ) : null}
           {facility.opening_hours ? (
-            <Text style={styles.facilityHours}>🕐 {facility.opening_hours}</Text>
+            <View style={styles.infoRow}>
+              <Feather name="clock" size={13} color={colors.textSecondary} />
+              <Text style={styles.facilityHours}>{facility.opening_hours}</Text>
+            </View>
           ) : null}
         </View>
 
@@ -140,7 +150,7 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
               <Text style={styles.dateBtnText}>
                 {date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
               </Text>
-              <Text style={styles.dateBtnChevron}>›</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
 
             {showPicker && (
@@ -224,24 +234,24 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
 
 const styles = StyleSheet.create({
   safe:            { flex: 1, backgroundColor: colors.bg },
-  container:       { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40, flexGrow: 1 },
+  container:       { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40, flexGrow: 1 },
   center:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
-  backRow:         { marginBottom: 20 },
-  backText:        { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.primary },
-  facilityCard:    { backgroundColor: colors.cardBg, borderRadius: 12, padding: 16, marginBottom: 28, ...shadow },
+  backRow:         { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 20 },
+  backText:        { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  facilityCard:    { backgroundColor: colors.cardBg, borderRadius: 16, padding: 18, marginBottom: 28, ...shadow },
   typeBadge:       { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
-  typeBadgeText:   { fontSize: 12, fontFamily: 'Inter_700Bold', textTransform: 'capitalize' },
-  facilityName:    { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
-  facilityAddress: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 2 },
-  facilityHours:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 6 },
-  sectionLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  dateBtn:         { backgroundColor: colors.cardBg, borderRadius: 12, padding: 16, marginBottom: 16, ...shadow, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  typeBadgeText:   { fontSize: 11, fontFamily: 'Inter_700Bold', textTransform: 'capitalize' },
+  facilityName:    { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
+  infoRow:         { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  facilityAddress: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
+  facilityHours:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
+  sectionLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  dateBtn:         { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 16, ...shadow, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dateBtnText:     { fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  dateBtnChevron:  { fontSize: 22, color: colors.textSecondary, lineHeight: 24 },
   doneBtn:         { alignSelf: 'flex-end', paddingVertical: 8, paddingHorizontal: 4, marginBottom: 8 },
   doneBtnText:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.primary },
   error:           { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 10 },
-  submit:          { backgroundColor: colors.accent, borderRadius: 12, padding: 17, alignItems: 'center', marginTop: 8 },
+  submit:          { backgroundColor: colors.primary, borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 8 },
   submitText:      { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.2 },
   divider:         { height: 1, backgroundColor: colors.border, marginVertical: 28 },
   askRow:          { flexDirection: 'row', gap: 10, alignItems: 'flex-end', marginBottom: 16 },
@@ -249,21 +259,20 @@ const styles = StyleSheet.create({
   askBtn:          { backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, justifyContent: 'center', alignItems: 'center' },
   askBtnText:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   noQText:         { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 8, marginBottom: 16 },
-  qCard:           { backgroundColor: colors.cardBg, borderRadius: 12, padding: 14, marginBottom: 10 },
+  qCard:           { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
   qBody:           { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginBottom: 10, lineHeight: 20 },
   answerBlock:     { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10 },
   answerLabel:     { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   answerBody:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
   noAnswer:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic' },
-  reviewCard:      { backgroundColor: colors.cardBg, borderRadius: 10, padding: 12, marginBottom: 8 },
+  reviewCard:      { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 8, ...shadow },
   reviewTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   reviewStars:     { fontSize: 14, color: '#F5A623', letterSpacing: 1 },
   reviewDate:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   reviewComment:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
-  successRing:     { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.successLight, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  successCheck:    { fontSize: 30, fontFamily: 'Inter_700Bold', color: colors.success },
+  successRing:     { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.successLight, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   successTitle:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
   successSub:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginBottom: 32, lineHeight: 22 },
-  backBtn:         { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, paddingHorizontal: 40 },
+  backBtn:         { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 40 },
   backBtnText:     { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' },
 })
