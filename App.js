@@ -91,12 +91,8 @@ export default function App() {
   const [favorites, setFavorites] = useState(new Set())
   const [openOnly, setOpenOnly] = useState(false)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
-
-  useEffect(() => {
-    AsyncStorage.getItem('ada_favorites').then(val => {
-      if (val) setFavorites(new Set(JSON.parse(val)))
-    })
-  }, [])
+  const [facilityLoadError, setFacilityLoadError] = useState(false)
+  const [notifsLoading, setNotifsLoading] = useState(false)
 
   function toggleFavorite(id) {
     setFavorites(prev => {
@@ -119,7 +115,9 @@ export default function App() {
   useEffect(() => {
     async function handleDeepLink(url) {
       if (!url?.startsWith('ada://')) return
-      await supabase.auth.exchangeCodeForSession(url)
+      try {
+        await supabase.auth.exchangeCodeForSession(url)
+      } catch {}
     }
     Linking.getInitialURL().then(url => { if (url) handleDeepLink(url) })
     const sub = Linking.addEventListener('url', ({ url }) => handleDeepLink(url))
@@ -175,9 +173,10 @@ export default function App() {
         }
       })
     fetchLatestResult(session.user.id)
+    setNotifsLoading(true)
     supabase.from('notifications').select('id, title, body, read, created_at')
       .eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
-      .then(({ data }) => { if (data) setNotifications(data) })
+      .then(({ data }) => { if (data) setNotifications(data); setNotifsLoading(false) })
   }, [session])
 
   async function fetchLatestResult(userId) {
@@ -210,17 +209,27 @@ export default function App() {
           await supabase.from('profiles').update({ push_token: token }).eq('id', session.user.id)
         }
       } catch (e) {
-        console.log('Push registration skipped:', e.message)
+        if (__DEV__) console.log('Push registration skipped:', e.message)
       }
     }
     registerPushToken()
   }, [session])
 
   useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(() => {
+      setShowNotifs(true)
+    })
+    return () => sub.remove()
+  }, [])
+
+  useEffect(() => {
     async function load() {
+      const favVal = await AsyncStorage.getItem('ada_favorites')
+      if (favVal) setFavorites(new Set(JSON.parse(favVal)))
+
       const { data, error } = await supabase.from('facilities').select('*').order('name')
-      if (error) console.error(error)
-      else setFacilities(data)
+      if (error) setFacilityLoadError(true)
+      else setFacilities(data ?? [])
 
       const d = new Date()
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -293,7 +302,7 @@ export default function App() {
   if (showPasswordReset) {
     return (
       <SafeAreaProvider>
-        <ResetPasswordScreen onDone={() => setShowPasswordReset(false)} />
+        <ResetPasswordScreen onDone={() => setShowPasswordReset(false)} lang={profile?.preferred_language || pendingLang} />
       </SafeAreaProvider>
     )
   }
@@ -320,12 +329,12 @@ export default function App() {
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
           <View style={styles.center}>
             <Text style={{ fontSize: 48, marginBottom: 20 }}>⏳</Text>
-            <Text style={styles.wordmark}>Pending Verification</Text>
+            <Text style={styles.wordmark}>{t('pendingVerification', lang)}</Text>
             <Text style={[styles.subText, { marginTop: 12, marginBottom: 32 }]}>
-              We're reviewing your application. You'll be notified within 24 hours.
+              {t('pendingVerificationSub', lang)}
             </Text>
             <TouchableOpacity onPress={() => supabase.auth.signOut()}>
-              <Text style={styles.signOutLink}>Sign out</Text>
+              <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -335,12 +344,12 @@ export default function App() {
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
           <View style={styles.center}>
             <Text style={{ fontSize: 48, marginBottom: 20 }}>🔒</Text>
-            <Text style={styles.wordmark}>Account Suspended</Text>
+            <Text style={styles.wordmark}>{t('accountSuspended', lang)}</Text>
             <Text style={[styles.subText, { marginTop: 12, marginBottom: 32 }]}>
-              Your account has been suspended. Please contact us to resolve your membership.
+              {t('accountSuspendedSub', lang)}
             </Text>
             <TouchableOpacity onPress={() => supabase.auth.signOut()}>
-              <Text style={styles.signOutLink}>Sign out</Text>
+              <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -350,12 +359,12 @@ export default function App() {
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
           <View style={styles.center}>
             <Text style={{ fontSize: 48, marginBottom: 20 }}>⌛</Text>
-            <Text style={styles.wordmark}>Trial Ended</Text>
+            <Text style={styles.wordmark}>{t('trialEnded', lang)}</Text>
             <Text style={[styles.subText, { marginTop: 12, marginBottom: 32 }]}>
-              Your 5-day trial has expired. Please contact us to activate your {providerFacility.membership_tier === 'pro' ? 'Pro' : 'Basic'} membership.
+              {t('trialEndedSub', lang).replace('{tier}', providerFacility.membership_tier === 'pro' ? 'Pro' : 'Basic')}
             </Text>
             <TouchableOpacity onPress={() => supabase.auth.signOut()}>
-              <Text style={styles.signOutLink}>Sign out</Text>
+              <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -384,6 +393,7 @@ export default function App() {
   } else if (showNotifs) {
     content = <NotificationsScreen
       notifications={notifications}
+      loading={notifsLoading}
       lang={lang}
       onBack={() => { setShowNotifs(false); supabase.from('notifications').update({ read: true }).eq('user_id', session.user.id).then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))) }}
       onMarkAllRead={markAllNotifsRead}
@@ -512,6 +522,9 @@ export default function App() {
             />
           ) : (
             <>
+              {facilityLoadError && (
+                <Text style={styles.locationNote}>{t('facilityLoadError', lang)}</Text>
+              )}
               {locationDenied && (
                 <Text style={styles.locationNote}>{t('enableLocation', lang)}</Text>
               )}

@@ -1,7 +1,6 @@
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -14,7 +13,7 @@ function timeAgo(isoString) {
   return `${Math.floor(hrs / 24)}d`
 }
 
-export default function NotificationsScreen({ notifications, lang, onBack, onMarkAllRead }) {
+export default function NotificationsScreen({ notifications, loading, lang, onBack, onMarkAllRead }) {
   const unreadCount = notifications.filter(n => !n.read).length
 
   return (
@@ -34,7 +33,11 @@ export default function NotificationsScreen({ notifications, lang, onBack, onMar
         )}
       </View>
 
-      {notifications.length === 0 ? (
+      {loading ? (
+        <View style={s.empty}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : notifications.length === 0 ? (
         <View style={s.empty}>
           <View style={s.emptyIconWrap}>
             <Ionicons name="notifications-outline" size={32} color={colors.textSecondary} />

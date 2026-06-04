@@ -164,6 +164,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
   const [profile, setProfile]               = useState(null)
   const [form, setForm]                     = useState({ full_name: '', phone: '', nationality: '', preferred_language: 'English' })
   const [loading, setLoading]               = useState(true)
+  const [loadError, setLoadError]           = useState(false)
   const [saving, setSaving]                 = useState(false)
   const [saved, setSaved]                   = useState(false)
   const [error, setError]                   = useState(null)
@@ -177,11 +178,13 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
   const [legalTab, setLegalTab]             = useState(null)
 
   useEffect(() => {
-    supabase.from('profiles')
-      .select('full_name, phone, nationality, preferred_language, role')
-      .eq('id', session.user.id)
-      .single()
-      .then(({ data }) => {
+    async function loadProfile() {
+      try {
+        const { data, error } = await supabase.from('profiles')
+          .select('full_name, phone, nationality, preferred_language, role')
+          .eq('id', session.user.id)
+          .single()
+        if (error) { setLoadError(true); return }
         if (data) {
           setProfile(data)
           setForm({
@@ -191,25 +194,33 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
             preferred_language: data.preferred_language ?? 'English',
           })
         }
+      } finally {
         setLoading(false)
-      })
+      }
+    }
 
-    supabase.from('appointments')
-      .select('id, requested_time, status, facility_id, facilities(name, address, phone, type, opening_hours)')
-      .eq('customer_id', session.user.id)
-      .order('requested_time', { ascending: false })
-      .limit(10)
-      .then(({ data }) => { if (data) setBookings(data) })
+    async function loadBookings() {
+      const { data } = await supabase.from('appointments')
+        .select('id, requested_time, status, facility_id, facilities(name, address, phone, type, opening_hours)')
+        .eq('customer_id', session.user.id)
+        .order('requested_time', { ascending: false })
+        .limit(10)
+      if (data) setBookings(data)
+    }
 
-    supabase.from('reviews')
-      .select('appointment_id, rating, comment')
-      .eq('customer_id', session.user.id)
-      .then(({ data }) => {
-        if (data) {
-          setReviewedIds(new Set(data.map(r => r.appointment_id)))
-          setReviewsMap(new Map(data.map(r => [r.appointment_id, { rating: r.rating, comment: r.comment }])))
-        }
-      })
+    async function loadReviews() {
+      const { data } = await supabase.from('reviews')
+        .select('appointment_id, rating, comment')
+        .eq('customer_id', session.user.id)
+      if (data) {
+        setReviewedIds(new Set(data.map(r => r.appointment_id)))
+        setReviewsMap(new Map(data.map(r => [r.appointment_id, { rating: r.rating, comment: r.comment }])))
+      }
+    }
+
+    loadProfile()
+    loadBookings()
+    loadReviews()
   }, [])
 
   async function cancelBooking(bookingId) {
@@ -283,6 +294,22 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
     return (
       <SafeAreaView style={s.safe}>
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+      </SafeAreaView>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={s.safe}>
+        <View style={s.center}>
+          <Text style={{ fontSize: 32, marginBottom: 12 }}>⚠️</Text>
+          <Text style={{ fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 }}>
+            {t('profileLoadError', lang)}
+          </Text>
+          <TouchableOpacity onPress={onBack} style={{ marginTop: 20 }}>
+            <Text style={{ fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary }}>{t('back', lang)}</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     )
   }
@@ -447,11 +474,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
 
           <View style={s.legalRow}>
             <TouchableOpacity onPress={() => setLegalTab('privacy')}>
-              <Text style={s.legalLink}>Privacy Policy</Text>
+              <Text style={s.legalLink}>{t('privacyPolicy', lang)}</Text>
             </TouchableOpacity>
             <Text style={s.legalDot}>·</Text>
             <TouchableOpacity onPress={() => setLegalTab('terms')}>
-              <Text style={s.legalLink}>Terms of Service</Text>
+              <Text style={s.legalLink}>{t('termsOfService', lang)}</Text>
             </TouchableOpacity>
           </View>
 

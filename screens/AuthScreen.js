@@ -19,22 +19,32 @@ export default function AuthScreen({ lang = 'English' }) {
   const [resetLoading, setResetLoading] = useState(false)
 
   async function submit() {
-    if (!email.trim() || !password.trim()) {
-      setError('Please enter your email and password.')
+    const trimmedEmail = email.trim().toLowerCase()
+    if (!trimmedEmail || !password.trim()) {
+      setError(t('enterEmailAndPassword', lang))
+      return
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(trimmedEmail)) {
+      setError(t('invalidEmail', lang))
+      return
+    }
+    if (mode === 'signup' && password.length < 8) {
+      setError(t('passwordTooShort', lang))
       return
     }
     setLoading(true)
     setError(null)
     const { error } = mode === 'signup'
-      ? await supabase.auth.signUp({ email, password, options: { data: { role } } })
-      : await supabase.auth.signInWithPassword({ email, password })
+      ? await supabase.auth.signUp({ email: trimmedEmail, password, options: { data: { role } } })
+      : await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
     if (error) setError(error.message)
     setLoading(false)
   }
 
   async function sendReset() {
     if (!email.trim()) {
-      setError('Enter your email address first.')
+      setError(t('enterEmailFirst', lang))
       return
     }
     setResetLoading(true)
@@ -58,23 +68,23 @@ export default function AuthScreen({ lang = 'English' }) {
                 <View style={styles.resetSuccessIcon}>
                   <Feather name="mail" size={28} color={colors.primary} />
                 </View>
-                <Text style={styles.resetSuccessTitle}>Check your email</Text>
+                <Text style={styles.resetSuccessTitle}>{t('checkEmail', lang)}</Text>
                 <Text style={styles.resetSuccessSub}>
-                  We sent a password reset link to{'\n'}<Text style={styles.resetEmail}>{email.trim()}</Text>
+                  {t('resetEmailSentSub', lang)}{'\n'}<Text style={styles.resetEmail}>{email.trim()}</Text>
                 </Text>
                 <TouchableOpacity style={styles.submit} onPress={() => { setShowReset(false); setResetSent(false) }}>
-                  <Text style={styles.submitText}>Back to sign in</Text>
+                  <Text style={styles.submitText}>{t('backToSignIn', lang)}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <>
                 <TouchableOpacity style={styles.backLink} onPress={() => { setShowReset(false); setError(null) }}>
                   <Feather name="arrow-left" size={16} color={colors.textSecondary} />
-                  <Text style={styles.backLinkText}>Back to sign in</Text>
+                  <Text style={styles.backLinkText}>{t('backToSignIn', lang)}</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.resetTitle}>Reset your password</Text>
-                <Text style={styles.resetSub}>Enter the email you signed up with and we'll send you a reset link.</Text>
+                <Text style={styles.resetTitle}>{t('resetPassword', lang)}</Text>
+                <Text style={styles.resetSub}>{t('resetPasswordSub', lang)}</Text>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>{t('email', lang)}</Text>
@@ -94,7 +104,7 @@ export default function AuthScreen({ lang = 'English' }) {
                 <TouchableOpacity style={styles.submit} onPress={sendReset} disabled={resetLoading}>
                   {resetLoading
                     ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.submitText}>Send reset link</Text>
+                    : <Text style={styles.submitText}>{t('sendResetLink', lang)}</Text>
                   }
                 </TouchableOpacity>
               </>
@@ -152,7 +162,7 @@ export default function AuthScreen({ lang = 'English' }) {
               <Text style={styles.fieldLabel}>{t('password', lang)}</Text>
               {mode === 'login' && (
                 <TouchableOpacity onPress={() => { setShowReset(true); setError(null) }}>
-                  <Text style={styles.forgotLink}>Forgot password?</Text>
+                  <Text style={styles.forgotLink}>{t('forgotPassword', lang)}</Text>
                 </TouchableOpacity>
               )}
             </View>

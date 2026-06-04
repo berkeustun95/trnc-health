@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors } from '../constants/theme'
+import { t } from '../constants/i18n'
 
-export default function ResetPasswordScreen({ onDone }) {
+export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,29 +34,35 @@ export default function ResetPasswordScreen({ onDone }) {
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.container}>
-        <Text style={s.title}>Set new password</Text>
-        <Text style={s.sub}>Choose a password you haven't used before.</Text>
+        {!done && (
+          <TouchableOpacity style={s.cancelBtn} onPress={onDone}>
+            <Feather name="x" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
+        <Text style={s.title}>{t('setNewPassword', lang)}</Text>
+        <Text style={s.sub}>{t('chooseNewPassword', lang)}</Text>
 
         {done ? (
-          <Text style={s.successText}>Password updated! Signing you in…</Text>
+          <Text style={s.successText}>{t('passwordUpdated', lang)}</Text>
         ) : (
           <>
-            <Text style={s.label}>New password</Text>
+            <Text style={s.label}>{t('newPassword', lang)}</Text>
             <TextInput
               style={s.input}
               value={password}
               onChangeText={setPassword}
-              placeholder="At least 8 characters"
+              placeholder={t('atLeast8Chars', lang)}
               placeholderTextColor={colors.textSecondary}
               secureTextEntry
             />
 
-            <Text style={s.label}>Confirm password</Text>
+            <Text style={s.label}>{t('confirmPassword', lang)}</Text>
             <TextInput
               style={s.input}
               value={confirm}
               onChangeText={setConfirm}
-              placeholder="Repeat password"
+              placeholder={t('repeatPassword', lang)}
               placeholderTextColor={colors.textSecondary}
               secureTextEntry
             />
@@ -68,7 +76,7 @@ export default function ResetPasswordScreen({ onDone }) {
             >
               {loading
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={s.btnText}>Update password</Text>
+                : <Text style={s.btnText}>{t('updatePassword', lang)}</Text>
               }
             </TouchableOpacity>
           </>
@@ -81,6 +89,7 @@ export default function ResetPasswordScreen({ onDone }) {
 const s = StyleSheet.create({
   safe:        { flex: 1, backgroundColor: colors.bg },
   container:   { flex: 1, justifyContent: 'center', paddingHorizontal: 28 },
+  cancelBtn:   { position: 'absolute', top: 16, right: 0, padding: 8 },
   title:       { fontSize: 26, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
   sub:         { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 22, marginBottom: 32 },
   label:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },

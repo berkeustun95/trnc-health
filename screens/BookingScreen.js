@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ScrollView, TextInput } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ScrollView, TextInput, KeyboardAvoidingView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { Feather, Ionicons } from '@expo/vector-icons'
@@ -18,41 +18,56 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
   const [questions, setQuestions] = useState([])
+  const [questionsLoading, setQuestionsLoading] = useState(true)
   const [newQ, setNewQ] = useState('')
+  const [qError, setQError] = useState(null)
   const [submittingQ, setSubmittingQ] = useState(false)
   const [reviews, setReviews] = useState([])
+  const [reviewsLoading, setReviewsLoading] = useState(true)
 
   useEffect(() => { loadQuestions(); loadReviews() }, [])
 
   async function loadReviews() {
-    const { data } = await supabase
-      .from('reviews')
-      .select('id, rating, comment, created_at')
-      .eq('facility_id', facility.id)
-      .order('created_at', { ascending: false })
-      .limit(5)
-    if (data) setReviews(data)
+    setReviewsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('id, rating, comment, created_at')
+        .eq('facility_id', facility.id)
+        .order('created_at', { ascending: false })
+        .limit(5)
+      if (!error && data) setReviews(data)
+    } finally {
+      setReviewsLoading(false)
+    }
   }
 
   async function loadQuestions() {
-    const { data } = await supabase
-      .from('questions')
-      .select('id, body, created_at, answers(id, body, created_at)')
-      .eq('facility_id', facility.id)
-      .order('created_at', { ascending: false })
-    if (data) setQuestions(data)
+    setQuestionsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('questions')
+        .select('id, body, created_at, answers(id, body, created_at)')
+        .eq('facility_id', facility.id)
+        .order('created_at', { ascending: false })
+      if (!error && data) setQuestions(data)
+    } finally {
+      setQuestionsLoading(false)
+    }
   }
 
   async function submitQuestion() {
     const body = newQ.trim()
     if (!body) return
     setSubmittingQ(true)
+    setQError(null)
     const { error } = await supabase.from('questions').insert({
       facility_id: facility.id,
       customer_id: session.user.id,
       body,
     })
     if (!error) { setNewQ(''); await loadQuestions() }
+    else setQError(t('questionSubmitError', lang))
     setSubmittingQ(false)
   }
 
@@ -92,9 +107,11 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <TouchableOpacity onPress={onBack} style={styles.backRow}>
           <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
@@ -120,7 +137,9 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
           ) : null}
         </View>
 
-        {reviews.length > 0 && (() => {
+        {reviewsLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginBottom: 20 }} />
+        ) : reviews.length > 0 && (() => {
           const avg = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
           return (
             <>
@@ -210,7 +229,11 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
           </TouchableOpacity>
         </View>
 
-        {questions.length === 0 ? (
+        {qError && <Text style={styles.error}>{qError}</Text>}
+
+        {questionsLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
+        ) : questions.length === 0 ? (
           <Text style={styles.noQText}>{t('noQuestions', lang)}</Text>
         ) : (
           questions.map(q => (
@@ -228,6 +251,7 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
           ))
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
