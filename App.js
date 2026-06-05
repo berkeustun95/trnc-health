@@ -764,7 +764,7 @@ const styles = StyleSheet.create({
   searchInput:      { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, padding: 0 },
   filterRow:        { marginBottom: 12, flexGrow: 0 },
   filterContent:    { gap: 8, paddingRight: 4, alignItems: 'center' },
-  filterChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.cardBg, alignSelf: 'flex-start' },
+  filterChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: '#C8D3DC', backgroundColor: colors.cardBg, alignSelf: 'flex-start', ...shadow },
   filterChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   filterChipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textTransform: 'capitalize' },
   filterChipOpen:   { borderColor: colors.success, backgroundColor: colors.successLight },
