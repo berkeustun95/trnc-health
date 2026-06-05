@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ScrollView, TextInput, KeyboardAvoidingView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ScrollView, TextInput, KeyboardAvoidingView, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { Feather, Ionicons } from '@expo/vector-icons'
@@ -134,6 +134,12 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
               <Feather name="clock" size={13} color={colors.textSecondary} />
               <Text style={styles.facilityHours}>{facility.opening_hours}</Text>
             </View>
+          ) : null}
+          {facility.website ? (
+            <TouchableOpacity style={styles.infoRow} onPress={() => Linking.openURL(facility.website)}>
+              <Feather name="globe" size={13} color={colors.primary} />
+              <Text style={[styles.facilityHours, { color: colors.primary }]}>{t('visitWebsite', lang)}</Text>
+            </TouchableOpacity>
           ) : null}
         </View>
 

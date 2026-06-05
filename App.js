@@ -506,6 +506,15 @@ export default function App() {
                 <Text style={styles.actionBtnText}>{t('getDirections', lang)}</Text>
               </TouchableOpacity>
             ) : null}
+            {unclaimedFacility.website ? (
+              <TouchableOpacity
+                style={[styles.actionBtn, { flex: 1 }]}
+                onPress={() => Linking.openURL(unclaimedFacility.website)}
+              >
+                <Feather name="globe" size={16} color={colors.primary} />
+                <Text style={styles.actionBtnText}>{t('visitWebsite', lang)}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
       </SafeAreaView>
