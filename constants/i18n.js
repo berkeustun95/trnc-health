@@ -107,6 +107,12 @@ const translations = {
     // Profile
     privacyPolicy: 'Privacy Policy',
     termsOfService: 'Terms of Service',
+    // Unclaimed facility sheet
+    notOnAda: 'Not yet on ADA',
+    notOnAdaDesc: 'This facility hasn\'t joined ADA yet. You can still reach them directly.',
+    // Claim pending screen
+    claimPending: 'Claim Under Review',
+    claimPendingSub: 'We\'re verifying your ownership of {name}. You\'ll be notified within 24 hours.',
     // Provider status screens
     pendingVerification: 'Pending Verification',
     pendingVerificationSub: "We're reviewing your application. You'll be notified within 24 hours.",

@@ -88,6 +88,8 @@ export default function App() {
   const [notifications, setNotifications] = useState([])
   const [showNotifs, setShowNotifs] = useState(false)
   const [providerFacility, setProviderFacility] = useState(undefined)
+  const [pendingClaim, setPendingClaim] = useState(undefined)
+  const [unclaimedFacility, setUnclaimedFacility] = useState(null)
   const [favorites, setFavorites] = useState(new Set())
   const [openOnly, setOpenOnly] = useState(false)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
@@ -154,11 +156,22 @@ export default function App() {
       .eq('provider_id', session?.user.id)
       .maybeSingle()
     setProviderFacility(fac ?? null)
+    if (!fac) {
+      const { data: claim } = await supabase
+        .from('claim_requests')
+        .select('id, requested_tier, facilities(name, type)')
+        .eq('requester_id', session?.user.id)
+        .eq('status', 'pending')
+        .maybeSingle()
+      setPendingClaim(claim ?? null)
+    } else {
+      setPendingClaim(null)
+    }
   }
 
   useEffect(() => {
     if (!session) {
-      setProfile(null); setLatestResult(null); setNotifications([]); setProviderFacility(undefined); return
+      setProfile(null); setLatestResult(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); return
     }
     supabase.from('profiles').select('role, preferred_language').eq('id', session.user.id).single()
       .then(async ({ data }) => {
@@ -170,6 +183,17 @@ export default function App() {
             .eq('provider_id', session.user.id)
             .maybeSingle()
           setProviderFacility(fac ?? null)
+          if (!fac) {
+            const { data: claim } = await supabase
+              .from('claim_requests')
+              .select('id, requested_tier, facilities(name, type)')
+              .eq('requester_id', session.user.id)
+              .eq('status', 'pending')
+              .maybeSingle()
+            setPendingClaim(claim ?? null)
+          } else {
+            setPendingClaim(null)
+          }
         }
       })
     fetchLatestResult(session.user.id)
@@ -320,8 +344,25 @@ export default function App() {
   } else if (profile.role === 'admin') {
     content = <AdminScreen session={session} />
   } else if (profile.role === 'provider') {
-    if (providerFacility === undefined) {
+    if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
       content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+    } else if (providerFacility === null && pendingClaim) {
+      content = (
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <View style={styles.center}>
+            <Text style={{ fontSize: 48, marginBottom: 20 }}>⏳</Text>
+            <Text style={styles.wordmark}>{t('claimPending', lang)}</Text>
+            <Text style={[styles.subText, { marginTop: 12, marginBottom: 24 }]}>
+              {t('claimPendingSub', lang).replace('{name}', pendingClaim.facilities?.name ?? 'your facility')}
+            </Text>
+            <Text style={styles.memberIdLabel}>{t('membershipId', lang)}</Text>
+            <Text style={styles.memberIdValue}>{session.user.id.replace(/-/g, '').slice(0, 12).toUpperCase()}</Text>
+            <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 32 }}>
+              <Text style={styles.signOutLink}>{t('signOut', lang)}</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      )
     } else if (providerFacility === null) {
       content = <ProviderOnboardingScreen session={session} onDone={loadProviderFacility} />
     } else if (providerFacility.status === 'pending') {
@@ -406,6 +447,69 @@ export default function App() {
     />
   } else if (showDutyList) {
     content = <DutyListScreen onBack={() => setShowDutyList(false)} lang={lang} />
+  } else if (unclaimedFacility) {
+    content = (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backPill} onPress={() => setUnclaimedFacility(null)}>
+            <Ionicons name="chevron-back" size={18} color={colors.textPrimary} />
+            <Text style={styles.backPillText}>{t('back', lang)}</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.unclaimedWrap}>
+          <View style={styles.unclaimedIconWrap}>
+            <Text style={styles.unclaimedEmoji}>{TYPE_ICONS[unclaimedFacility.type] ?? '🏥'}</Text>
+          </View>
+          <Text style={styles.unclaimedName}>{unclaimedFacility.name}</Text>
+          <View style={styles.unclaimedBadgeRow}>
+            <View style={[styles.typeBadge, { backgroundColor: (typeColors[unclaimedFacility.type] || typeColors.clinic).bg }]}>
+              <Text style={[styles.typeBadgeText, { color: (typeColors[unclaimedFacility.type] || typeColors.clinic).text }]}>
+                {t(unclaimedFacility.type, lang)}
+              </Text>
+            </View>
+            <View style={styles.notOnAdaBadge}>
+              <Text style={styles.notOnAdaBadgeText}>{t('notOnAda', lang)}</Text>
+            </View>
+          </View>
+          {unclaimedFacility.address ? (
+            <View style={styles.unclaimedRow}>
+              <Feather name="map-pin" size={14} color={colors.textSecondary} />
+              <Text style={styles.unclaimedRowText}>{unclaimedFacility.address}</Text>
+            </View>
+          ) : null}
+          {unclaimedFacility.phone ? (
+            <View style={styles.unclaimedRow}>
+              <Feather name="phone" size={14} color={colors.textSecondary} />
+              <Text style={styles.unclaimedRowText}>{unclaimedFacility.phone}</Text>
+            </View>
+          ) : null}
+          <View style={styles.unclaimedNotice}>
+            <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
+            <Text style={styles.unclaimedNoticeText}>{t('notOnAdaDesc', lang)}</Text>
+          </View>
+          <View style={styles.unclaimedActions}>
+            {unclaimedFacility.phone ? (
+              <TouchableOpacity
+                style={[styles.actionBtn, { flex: 1 }]}
+                onPress={() => Linking.openURL(`tel:${unclaimedFacility.phone.replace(/\s+/g, '')}`)}
+              >
+                <Feather name="phone" size={16} color={colors.primary} />
+                <Text style={styles.actionBtnText}>{t('call', lang)}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {unclaimedFacility.latitude != null && unclaimedFacility.longitude != null ? (
+              <TouchableOpacity
+                style={[styles.actionBtn, { flex: 1 }]}
+                onPress={() => Linking.openURL(`https://maps.google.com/?q=${unclaimedFacility.latitude},${unclaimedFacility.longitude}`)}
+              >
+                <Feather name="navigation" size={16} color={colors.primary} />
+                <Text style={styles.actionBtnText}>{t('getDirections', lang)}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      </SafeAreaView>
+    )
   } else if (selectedFacility) {
     content = <BookingScreen facility={selectedFacility} session={session} lang={lang} onBack={() => setSelectedFacility(null)} />
   } else {
@@ -554,8 +658,8 @@ export default function App() {
                   return (
                     <TouchableOpacity
                       activeOpacity={0.75}
-                      style={[styles.card, isDuty && styles.dutyCard]}
-                      onPress={() => setSelectedFacility(item)}
+                      style={[styles.card, isDuty && styles.dutyCard, !item.provider_id && styles.cardUnclaimed]}
+                      onPress={() => item.provider_id ? setSelectedFacility(item) : setUnclaimedFacility(item)}
                     >
                       {isDuty && (
                         <View style={styles.dutyCardBadge}>
@@ -582,11 +686,17 @@ export default function App() {
                             <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
                               <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
                             </View>
-                            {isOpen != null && (
-                              <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
-                                <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
-                                  {isOpen ? t('open', lang) : t('closed', lang)}
-                                </Text>
+                            {item.provider_id ? (
+                              isOpen != null && (
+                                <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
+                                  <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
+                                    {isOpen ? t('open', lang) : t('closed', lang)}
+                                  </Text>
+                                </View>
+                              )
+                            ) : (
+                              <View style={styles.notOnAdaBadge}>
+                                <Text style={styles.notOnAdaBadgeText}>{t('notOnAda', lang)}</Text>
                               </View>
                             )}
                           </View>
@@ -688,6 +798,24 @@ const styles = StyleSheet.create({
   addressText:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 4 },
   ratingRow:        { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   ratingText:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  cardUnclaimed:    { opacity: 0.75 },
+  notOnAdaBadge:    { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.border },
+  notOnAdaBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  // Unclaimed facility screen
+  backPill:         { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  backPillText:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  unclaimedWrap:    { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
+  unclaimedIconWrap:{ width: 72, height: 72, borderRadius: 22, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
+  unclaimedEmoji:   { fontSize: 36 },
+  unclaimedName:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
+  unclaimedBadgeRow:{ flexDirection: 'row', gap: 8, marginBottom: 20 },
+  unclaimedRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  unclaimedRowText: { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  unclaimedNotice:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginTop: 12, marginBottom: 24 },
+  unclaimedNoticeText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20 },
+  unclaimedActions: { flexDirection: 'row', gap: 12 },
+  actionBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14 },
+  actionBtnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
   dutyBanner:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accentLight, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.accent + '30' },
   dutyBannerLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   dutyBannerIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.accent + '20', justifyContent: 'center', alignItems: 'center' },

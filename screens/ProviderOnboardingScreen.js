@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator
+  ScrollView, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 
@@ -12,33 +13,61 @@ const TYPE_ICONS  = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentis
 const TYPE_LABELS = { pharmacy: 'Pharmacy', clinic: 'Clinic', hospital: 'Hospital', dentist: 'Dentist' }
 
 export default function ProviderOnboardingScreen({ session, onDone }) {
-  const [step, setStep]   = useState(1)
-  const [form, setForm]   = useState({
+  const [step, setStep]   = useState(1) // 1 | 2 | '2b' | 3
+  const [mode, setMode]   = useState(null) // 'claim' | 'new'
+  const [unclaimedFacilities, setUnclaimedFacilities] = useState([])
+  const [loadingFacilities, setLoadingFacilities]     = useState(false)
+  const [searchText, setSearchText]       = useState('')
+  const [selectedFacility, setSelectedFacility] = useState(null)
+  const [form, setForm] = useState({
     name: '', type: 'clinic', address: '', phone: '', opening_hours: '', membership_tier: 'basic',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState(null)
 
+  useEffect(() => {
+    if (step !== 2) return
+    setLoadingFacilities(true)
+    supabase.from('facilities').select('id, name, type, address').is('provider_id', null).order('name')
+      .then(({ data }) => { setUnclaimedFacilities(data ?? []); setLoadingFacilities(false) })
+  }, [step])
+
   const set = key => val => setForm(f => ({ ...f, [key]: val }))
 
+  const filtered = unclaimedFacilities.filter(f => {
+    if (!searchText.trim()) return true
+    const q = searchText.trim().toLowerCase()
+    return f.name.toLowerCase().includes(q) || (f.address && f.address.toLowerCase().includes(q))
+  })
+
   async function submit() {
-    if (!form.name.trim()) { setError('Facility name is required.'); return }
     setSaving(true)
     setError(null)
-    const { error: err } = await supabase.from('facilities').insert({
-      name:           form.name.trim(),
-      type:           form.type,
-      address:        form.address.trim() || null,
-      phone:          form.phone.trim() || null,
-      opening_hours:  form.opening_hours.trim() || null,
-      membership_tier: form.membership_tier,
-      status:         'pending',
-      provider_id:    session.user.id,
-      is_public:      false,
-      verified:       false,
-    })
-    setSaving(false)
-    if (err) { setError(err.message); return }
+    if (mode === 'claim') {
+      const { error: err } = await supabase.from('claim_requests').insert({
+        facility_id:    selectedFacility.id,
+        requester_id:   session.user.id,
+        requested_tier: form.membership_tier,
+      })
+      setSaving(false)
+      if (err) { setError(err.message); return }
+    } else {
+      if (!form.name.trim()) { setError('Facility name is required.'); setSaving(false); return }
+      const { error: err } = await supabase.from('facilities').insert({
+        name:            form.name.trim(),
+        type:            form.type,
+        address:         form.address.trim() || null,
+        phone:           form.phone.trim() || null,
+        opening_hours:   form.opening_hours.trim() || null,
+        membership_tier: form.membership_tier,
+        status:          'pending',
+        provider_id:     session.user.id,
+        is_public:       false,
+        verified:        false,
+      })
+      setSaving(false)
+      if (err) { setError(err.message); return }
+    }
     onDone()
   }
 
@@ -75,17 +104,94 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
     )
   }
 
-  // ── Step 2: Facility details ───────────────────────────────────────────────
+  // ── Step 2: Find existing facility ────────────────────────────────────────
   if (step === 2) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <View style={s.stepHeader}>
+          <TouchableOpacity onPress={() => setStep(1)}>
+            <Text style={s.backBtnText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={s.stepLabelRight}>Step 1 of 2</Text>
+        </View>
+
+        <View style={s.searchHeaderWrap}>
+          <Text style={s.formTitle}>Is your facility listed?</Text>
+          <Text style={s.formSub}>Search to see if it's already in our directory.</Text>
+          <View style={s.searchBar}>
+            <Ionicons name="search-outline" size={16} color={colors.textSecondary} />
+            <TextInput
+              style={s.searchInput}
+              value={searchText}
+              onChangeText={setSearchText}
+              placeholder="Search by name or address…"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchText('')}>
+                <Ionicons name="close" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {loadingFacilities ? (
+          <View style={s.loadingWrap}><ActivityIndicator color={colors.primary} /></View>
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={f => f.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={s.facilityList}
+            ListEmptyComponent={
+              <Text style={s.emptyText}>
+                {searchText.trim() ? 'No facilities match your search.' : 'No unclaimed facilities yet.'}
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <View style={s.facilityRow}>
+                <View style={s.facilityRowLeft}>
+                  <Text style={s.facilityRowIcon}>{TYPE_ICONS[item.type] ?? '🏥'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.facilityRowName} numberOfLines={1}>{item.name}</Text>
+                    {item.address ? <Text style={s.facilityRowAddr} numberOfLines={1}>{item.address}</Text> : null}
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={s.claimBtn}
+                  onPress={() => { setSelectedFacility(item); setMode('claim'); setStep(3) }}
+                >
+                  <Text style={s.claimBtnText}>This is mine</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            ListFooterComponent={
+              <TouchableOpacity
+                style={s.notListedBtn}
+                onPress={() => { setMode('new'); setStep('2b') }}
+              >
+                <Text style={s.notListedText}>My facility isn't listed yet →</Text>
+              </TouchableOpacity>
+            }
+          />
+        )}
+      </SafeAreaView>
+    )
+  }
+
+  // ── Step 2b: New facility form ─────────────────────────────────────────────
+  if (step === '2b') {
     return (
       <SafeAreaView style={s.safe} edges={['top']}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={s.formWrap} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <View style={s.formHeader}>
-              <Text style={s.stepLabel}>Step 1 of 2</Text>
-              <Text style={s.formTitle}>Your facility</Text>
-              <Text style={s.formSub}>Tell patients about your practice.</Text>
-            </View>
+            <TouchableOpacity style={s.backBtn} onPress={() => setStep(2)}>
+              <Text style={s.backBtnText}>← Back</Text>
+            </TouchableOpacity>
+            <Text style={s.stepLabel}>Step 1 of 2</Text>
+            <Text style={s.formTitle}>Your facility</Text>
+            <Text style={s.formSub}>Tell patients about your practice.</Text>
 
             <Text style={s.fieldLabel}>FACILITY NAME *</Text>
             <TextInput
@@ -153,16 +259,32 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
   }
 
   // ── Step 3: Tier selection ─────────────────────────────────────────────────
+  const facilityType = selectedFacility?.type ?? form.type
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={s.formWrap} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity style={s.backBtn} onPress={() => setStep(2)}>
+        <TouchableOpacity style={s.backBtn} onPress={() => setStep(mode === 'claim' ? 2 : '2b')}>
           <Text style={s.backBtnText}>← Back</Text>
         </TouchableOpacity>
 
         <Text style={s.stepLabel}>Step 2 of 2</Text>
         <Text style={s.formTitle}>Choose your plan</Text>
-        <Text style={s.formSub}>Both plans include a 5-day free trial. No payment until you're verified and live.</Text>
+
+        {selectedFacility && (
+          <View style={s.claimingBadge}>
+            <Text style={s.claimingIcon}>{TYPE_ICONS[selectedFacility.type] ?? '🏥'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.claimingLabel}>CLAIMING</Text>
+              <Text style={s.claimingName} numberOfLines={1}>{selectedFacility.name}</Text>
+            </View>
+          </View>
+        )}
+
+        <Text style={s.formSub}>
+          {mode === 'claim'
+            ? 'Your claim will be verified within 24 hours before going live.'
+            : 'Both plans include a 5-day free trial. No payment until you\'re verified and live.'}
+        </Text>
 
         <TouchableOpacity
           style={[s.tierCard, form.membership_tier === 'basic' && s.tierCardSelected]}
@@ -198,7 +320,7 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
           {[
             'Everything in Basic',
             'Featured in search results',
-            form.type === 'pharmacy' ? 'Supplement quiz reviews 💊' : 'Priority listing',
+            facilityType === 'pharmacy' ? 'Supplement quiz reviews 💊' : 'Priority listing',
             'Advanced analytics',
           ].map(f => (
             <View key={f} style={s.tierFeatureRow}>
@@ -213,12 +335,16 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
         <TouchableOpacity style={[s.primaryBtn, saving && s.primaryBtnDisabled]} onPress={submit} disabled={saving}>
           {saving
             ? <ActivityIndicator color="#fff" />
-            : <Text style={s.primaryBtnText}>Submit for review</Text>
+            : <Text style={s.primaryBtnText}>
+                {mode === 'claim' ? 'Submit claim' : 'Submit for review'}
+              </Text>
           }
         </TouchableOpacity>
 
         <Text style={s.disclaimer}>
-          Your listing will be reviewed within 24 hours. You'll get full dashboard access once approved.
+          {mode === 'claim'
+            ? 'We\'ll verify your ownership and activate your account within 24 hours.'
+            : 'Your listing will be reviewed within 24 hours. You\'ll get full dashboard access once approved.'}
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -238,22 +364,45 @@ const s = StyleSheet.create({
   featureIcon:        { fontSize: 22, width: 32, textAlign: 'center' },
   featureText:        { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
 
-  // Form
+  // Step 2 — search
+  stepHeader:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
+  stepLabelRight:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 1 },
+  searchHeaderWrap:   { paddingHorizontal: 20, paddingBottom: 12 },
+  searchBar:          { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginTop: 12, gap: 10, borderWidth: 1, borderColor: colors.border },
+  searchInput:        { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, padding: 0 },
+  loadingWrap:        { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  facilityList:       { paddingHorizontal: 16, paddingBottom: 32 },
+  facilityRow:        { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginBottom: 8, gap: 10, ...shadow },
+  facilityRowLeft:    { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  facilityRowIcon:    { fontSize: 24 },
+  facilityRowName:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 2 },
+  facilityRowAddr:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  claimBtn:           { backgroundColor: colors.primaryLight, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12 },
+  claimBtnText:       { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
+  notListedBtn:       { marginTop: 20, alignItems: 'center', paddingVertical: 16 },
+  notListedText:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
+  emptyText:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 40 },
+
+  // Form (step 2b)
   formWrap:           { paddingHorizontal: 20, paddingBottom: 48, paddingTop: 16 },
   formHeader:         { marginBottom: 24 },
   stepLabel:          { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
   formTitle:          { fontSize: 26, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8 },
-  formSub:            { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20 },
+  formSub:            { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20, marginBottom: 20 },
   fieldLabel:         { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: 8, marginTop: 18 },
   input:              { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, fontSize: 15, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary },
-
-  // Type picker
   typeGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
   typeCard:           { flex: 1, minWidth: '45%', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, alignItems: 'center', backgroundColor: colors.surface },
   typeCardActive:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   typeCardIcon:       { fontSize: 26, marginBottom: 6 },
   typeCardLabel:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   typeCardLabelActive:{ fontFamily: 'Inter_700Bold', color: colors.primary },
+
+  // Claiming badge (step 3)
+  claimingBadge:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.primary + '30' },
+  claimingIcon:       { fontSize: 28 },
+  claimingLabel:      { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.5, marginBottom: 2 },
+  claimingName:       { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
 
   // Tier cards
   tierCard:           { borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 18, marginBottom: 14, backgroundColor: colors.cardBg, ...shadow },

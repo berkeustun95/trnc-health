@@ -9,8 +9,9 @@ import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
+const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'admin']
-const TABS = ['Dashboard', 'Facilities', 'Duty', 'Providers', 'Users', 'Bookings']
+const TABS = ['Dashboard', 'Facilities', 'Duty', 'Providers', 'Claims', 'Users', 'Bookings']
 
 // ─── Shared ────────────────────────────────────────────────────────────────
 
@@ -369,6 +370,89 @@ function DutyTab() {
   )
 }
 
+// ─── Claims Tab ─────────────────────────────────────────────────────────────
+
+function ClaimsTab() {
+  const [claims, setClaims] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('claim_requests')
+      .select('id, requester_id, requested_tier, created_at, facilities(id, name, type)')
+      .eq('status', 'pending')
+      .order('created_at')
+    setClaims(data ?? [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(claim) {
+    const trialEnd = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
+    const { error: err } = await supabase.from('facilities').update({
+      provider_id:     claim.requester_id,
+      status:          'trial',
+      membership_tier: claim.requested_tier,
+      trial_ends_at:   trialEnd,
+      is_public:       true,
+      verified:        true,
+    }).eq('id', claim.facilities.id)
+    if (err) { Alert.alert('Error', err.message); return }
+    await supabase.from('claim_requests').update({ status: 'approved' }).eq('id', claim.id)
+    load()
+  }
+
+  async function reject(claim) {
+    await supabase.from('claim_requests').update({ status: 'rejected' }).eq('id', claim.id)
+    load()
+  }
+
+  if (loading) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+
+  return (
+    <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
+      <Text style={s.sectionTitle}>Pending claims ({claims.length})</Text>
+      {claims.length === 0
+        ? <SectionEmpty text="No pending claim requests." />
+        : claims.map(c => (
+          <View key={c.id} style={s.card}>
+            <Text style={s.cardTitle} numberOfLines={1}>
+              {TYPE_ICONS[c.facilities?.type] ?? '🏥'} {c.facilities?.name ?? '—'}
+            </Text>
+            <Text style={s.cardSub}>{c.facilities?.type} · {c.requested_tier === 'pro' ? 'Pro' : 'Basic'}</Text>
+            <Text style={[s.cardSub, { marginTop: 2, fontSize: 10 }]} numberOfLines={1}>
+              Requester ID: {c.requester_id.replace(/-/g, '').slice(0, 12).toUpperCase()}
+            </Text>
+            <Text style={[s.cardSub, { fontSize: 10, marginTop: 2 }]}>
+              {new Date(c.created_at).toLocaleDateString()}
+            </Text>
+            <View style={[s.cardRow, { marginTop: 10, gap: 8 }]}>
+              <TouchableOpacity
+                style={[s.ghostBtn, { backgroundColor: colors.successLight, flex: 1 }]}
+                onPress={() => Alert.alert(
+                  'Approve claim',
+                  `Assign ${c.facilities?.name ?? 'this facility'} to this provider with a 5-day trial?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Approve', onPress: () => approve(c) },
+                  ]
+                )}
+              >
+                <Text style={[s.ghostBtnText, { color: colors.success }]}>Approve (5-day trial)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.dangerGhostBtn} onPress={() => reject(c)}>
+                <Text style={s.dangerGhostText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))
+      }
+    </ScrollView>
+  )
+}
+
 // ─── Providers Tab ──────────────────────────────────────────────────────────
 
 function ProvidersTab() {
@@ -657,6 +741,7 @@ export default function AdminScreen({ session }) {
           {tab === 'Facilities' && <FacilitiesTab />}
           {tab === 'Duty'       && <DutyTab />}
           {tab === 'Providers'  && <ProvidersTab />}
+          {tab === 'Claims'     && <ClaimsTab />}
           {tab === 'Users'      && <UsersTab />}
           {tab === 'Bookings'   && <BookingsTab />}
         </View>
