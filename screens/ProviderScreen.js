@@ -23,7 +23,7 @@ async function recordNotification(userId, title, body) {
   } catch { /* non-critical */ }
 }
 
-export default function ProviderScreen({ session, lang = 'English', facility, trialDaysLeft }) {
+export default function ProviderScreen({ session, lang = 'English', facility, trialDaysLeft, onFacilityUpdated }) {
   const isPharmacy   = facility.type === 'pharmacy'
   const showQuizTabs = isPharmacy && (facility.membership_tier === 'pro' || facility.is_quiz_partner)
 
@@ -41,6 +41,11 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [loadingArchive, setLoadingArchive] = useState(false)
   const [activeArchive, setActiveArchive] = useState(null)
   const [stats, setStats] = useState(null)
+  const [editPhone, setEditPhone] = useState(facility.phone ?? '')
+  const [editAddress, setEditAddress] = useState(facility.address ?? '')
+  const [editHours, setEditHours] = useState(facility.opening_hours ?? '')
+  const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -147,6 +152,20 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         await recordNotification(customerId, title, body)
       }
       setAppointments(prev => prev.filter(a => a.id !== id))
+    }
+  }
+
+  async function saveListing() {
+    setSaving(true)
+    const { error } = await supabase
+      .from('facilities')
+      .update({ phone: editPhone.trim() || null, address: editAddress.trim() || null, opening_hours: editHours.trim() || null })
+      .eq('id', facility.id)
+    setSaving(false)
+    if (!error) {
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 2000)
+      if (onFacilityUpdated) onFacilityUpdated()
     }
   }
 
@@ -264,9 +283,57 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           >
             <Text style={[styles.tabText, tab === 'stats' && styles.tabTextActive]}>{t('tabStats', lang)}</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, tab === 'profile' && styles.tabBtnActive]}
+            onPress={() => setTab('profile')}
+          >
+            <Text style={[styles.tabText, tab === 'profile' && styles.tabTextActive]}>{t('tabProfile', lang)}</Text>
+          </TouchableOpacity>
         </View>
 
-        {tab === 'archive' ? (
+        {tab === 'profile' ? (
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
+            <View style={styles.card}>
+              <Text style={styles.fieldLabel}>{t('phone', lang)}</Text>
+              <TextInput
+                style={styles.fieldInput}
+                value={editPhone}
+                onChangeText={setEditPhone}
+                placeholder="(0392) 000 00 00"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="phone-pad"
+              />
+              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>{t('labelAddress', lang)}</Text>
+              <TextInput
+                style={[styles.fieldInput, { minHeight: 64 }]}
+                value={editAddress}
+                onChangeText={setEditAddress}
+                placeholder="Street, district, city"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+              />
+              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>{t('labelHours', lang)}</Text>
+              <TextInput
+                style={styles.fieldInput}
+                value={editHours}
+                onChangeText={setEditHours}
+                placeholder={t('hoursHint', lang)}
+                placeholderTextColor={colors.textSecondary}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={[styles.saveBtn, (saving || saveSuccess) && { opacity: 0.7 }]}
+                onPress={saveListing}
+                disabled={saving || saveSuccess}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={styles.saveBtnText}>{saveSuccess ? t('saved', lang) : t('save', lang)}</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        ) : tab === 'archive' ? (
           loadingArchive ? (
             <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
           ) : archivedReviews.length === 0 ? (
@@ -531,6 +598,10 @@ const styles = StyleSheet.create({
   statTile:       { flex: 1, borderRadius: 12, padding: 16, alignItems: 'center', justifyContent: 'center', minHeight: 80 },
   statNum:        { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   statLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'center' },
+  fieldLabel:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  fieldInput:     { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface },
+  saveBtn:        { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  saveBtnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
   empty:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   emptyIconWrap:  { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
   emptyTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },

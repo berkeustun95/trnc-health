@@ -152,7 +152,7 @@ export default function App() {
   async function loadProviderFacility() {
     const { data: fac } = await supabase
       .from('facilities')
-      .select('id, name, type, status, membership_tier, trial_ends_at, is_quiz_partner')
+      .select('id, name, type, status, membership_tier, trial_ends_at, is_quiz_partner, phone, address, opening_hours')
       .eq('provider_id', session?.user.id)
       .maybeSingle()
     setProviderFacility(fac ?? null)
@@ -179,7 +179,7 @@ export default function App() {
         if (data?.role === 'provider') {
           const { data: fac } = await supabase
             .from('facilities')
-            .select('id, name, type, status, membership_tier, trial_ends_at, is_quiz_partner')
+            .select('id, name, type, status, membership_tier, trial_ends_at, is_quiz_partner, phone, address, opening_hours')
             .eq('provider_id', session.user.id)
             .maybeSingle()
           setProviderFacility(fac ?? null)
@@ -420,7 +420,7 @@ export default function App() {
       const trialDaysLeft = providerFacility.status === 'trial' && providerFacility.trial_ends_at
         ? Math.max(0, Math.ceil((new Date(providerFacility.trial_ends_at) - new Date()) / 86400000))
         : null
-      content = <ProviderScreen session={session} lang={lang} facility={providerFacility} trialDaysLeft={trialDaysLeft} />
+      content = <ProviderScreen session={session} lang={lang} facility={providerFacility} trialDaysLeft={trialDaysLeft} onFacilityUpdated={loadProviderFacility} />
     }
   } else if (showLatestResult && latestResult) {
     content = <ResultsScreen
