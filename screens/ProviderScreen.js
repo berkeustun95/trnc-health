@@ -217,9 +217,11 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
             <Image source={require('../assets/ADAicon.png')} style={styles.headerIcon} resizeMode="contain" />
             <View>
               <Text style={styles.facilityTag} numberOfLines={1}>{facility.name}</Text>
-              {facility.membership_tier === 'pro' && (
-                <View style={styles.proBadge}><Text style={styles.proBadgeText}>PRO</Text></View>
-              )}
+              <View style={facility.membership_tier === 'pro' ? styles.proBadge : styles.basicBadge}>
+                <Text style={facility.membership_tier === 'pro' ? styles.proBadgeText : styles.basicBadgeText}>
+                  {facility.membership_tier === 'pro' ? 'PRO' : 'BASIC'}
+                </Text>
+              </View>
             </View>
           </View>
           <TouchableOpacity style={styles.signOutBtn} onPress={() => supabase.auth.signOut()}>
@@ -554,8 +556,10 @@ const styles = StyleSheet.create({
   headerIcon:     { width: 36, height: 36, borderRadius: 8, flexShrink: 0 },
   facilityTagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
   facilityTag:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  proBadge:       { backgroundColor: colors.primary, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  proBadge:       { backgroundColor: colors.primary, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' },
   proBadgeText:   { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.5 },
+  basicBadge:     { backgroundColor: '#F3F4F6', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' },
+  basicBadgeText: { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#6B7280', letterSpacing: 0.5 },
   signOutBtn:     { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.dangerLight },
   signOutText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
   trialBanner:    { backgroundColor: '#FEF3C7', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, marginBottom: 12 },

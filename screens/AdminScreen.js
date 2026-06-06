@@ -501,6 +501,12 @@ function ProvidersTab() {
     load()
   }
 
+  async function toggleTier(facilityId, currentTier) {
+    const newTier = currentTier === 'pro' ? 'basic' : 'pro'
+    await supabase.from('facilities').update({ membership_tier: newTier }).eq('id', facilityId)
+    load()
+  }
+
   if (loading) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
 
   const trialDaysLeft = f => f.trial_ends_at
@@ -561,6 +567,14 @@ function ProvidersTab() {
                     <Text style={s.dangerGhostText}>Suspend</Text>
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  style={[s.ghostBtn, { backgroundColor: f.membership_tier === 'pro' ? '#F3F0FF' : '#FFF8E1' }]}
+                  onPress={() => toggleTier(f.id, f.membership_tier)}
+                >
+                  <Text style={[s.ghostBtnText, { color: f.membership_tier === 'pro' ? '#7C3AED' : '#B45309' }]}>
+                    {f.membership_tier === 'pro' ? 'Downgrade to Basic' : 'Upgrade to Pro'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           )
