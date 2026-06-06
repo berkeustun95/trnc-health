@@ -14,6 +14,7 @@ export default function AuthScreen({ lang = 'English' }) {
   const [role, setRole] = useState('customer')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [signupDone, setSignupDone] = useState(false)
   const [showReset, setShowReset] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
@@ -36,9 +37,10 @@ export default function AuthScreen({ lang = 'English' }) {
     setLoading(true)
     setError(null)
     const { error } = mode === 'signup'
-      ? await supabase.auth.signUp({ email: trimmedEmail, password, options: { data: { role } } })
+      ? await supabase.auth.signUp({ email: trimmedEmail, password, options: { data: { role }, emailRedirectTo: 'ada://' } })
       : await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
     if (error) setError(error.message)
+    else if (mode === 'signup') setSignupDone(true)
     setLoading(false)
   }
 
@@ -52,6 +54,31 @@ export default function AuthScreen({ lang = 'English' }) {
     await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: 'ada://' })
     setResetLoading(false)
     setResetSent(true)
+  }
+
+  if (signupDone) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.container}>
+          <View style={styles.logoArea}>
+            <Image source={require('../assets/Logo.png')} style={styles.logoImg} resizeMode="contain" />
+          </View>
+          <View style={styles.resetSuccessWrap}>
+            <View style={styles.resetSuccessIcon}>
+              <Feather name="mail" size={28} color={colors.primary} />
+            </View>
+            <Text style={styles.resetSuccessTitle}>{t('accountCreated', lang)}</Text>
+            <Text style={styles.resetSuccessSub}>
+              {t('confirmEmailSub', lang)}{'\n'}<Text style={styles.resetEmail}>{email.trim()}</Text>
+            </Text>
+            <Text style={[styles.resetSuccessSub, { marginBottom: 32 }]}>{t('confirmEmailNote', lang)}</Text>
+            <TouchableOpacity style={styles.submit} onPress={() => { setSignupDone(false); setMode('login'); setPassword('') }}>
+              <Text style={styles.submitText}>{t('backToSignIn', lang)}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    )
   }
 
   if (showReset) {
