@@ -1,0 +1,1937 @@
+{
+  "ABBASOĞLU ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "ADAHAN ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "AHMET MISIRLI ECZANESİ": {
+    "lat": 35.1936982,
+    "lng": 33.3215399,
+    "level": "neighbourhood"
+  },
+  "AKDENİZ ECZANESİ": {
+    "lat": 35.1903413,
+    "lng": 33.3666023,
+    "level": "full"
+  },
+  "AKDORA ECZANESİ": {
+    "lat": 35.2143491,
+    "lng": 33.3784008,
+    "level": "neighbourhood"
+  },
+  "ALİ ERSOY ECZANESİ": {
+    "lat": 35.1911454,
+    "lng": 33.3147213,
+    "level": "neighbourhood"
+  },
+  "ALPDOĞAN ECZANESİ": {
+    "lat": 35.1911454,
+    "lng": 33.3147213,
+    "level": "neighbourhood"
+  },
+  "APAYDIN ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "ARASTA ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "ARDA ULUPINAR ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "ARZUM DAVULCU ECZANESİ": {
+    "lat": 35.1885468,
+    "lng": 33.3611666,
+    "level": "neighbourhood"
+  },
+  "ATAER ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "AYŞE BIYIKOĞLU ECZANESİ": {
+    "lat": 35.2031147,
+    "lng": 33.3210321,
+    "level": "full"
+  },
+  "AYŞE KETEN ECZANESİ": {
+    "lat": 35.1794269,
+    "lng": 33.2518214,
+    "level": "full"
+  },
+  "AZİZ GÜZELER ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "BAHAR NURLUÖZ ECZANESİ": {
+    "lat": 35.2236556,
+    "lng": 33.3794849,
+    "level": "full"
+  },
+  "BAHİRE ÖZSU AKDOĞAN ECZANESİ": {
+    "lat": 35.1998672,
+    "lng": 33.3410044,
+    "level": "full"
+  },
+  "BALIN ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "BEHAYİ YILMABAŞAR ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "BERİL ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "BERİLAL ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "BERKE SEMERCİ ECZANESİ": {
+    "lat": 35.2070072,
+    "lng": 33.3457502,
+    "level": "neighbourhood"
+  },
+  "BİLGE TÜRKSEVEN ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "full"
+  },
+  "BİRGÜN ECZANESİ": {
+    "lat": 35.2070072,
+    "lng": 33.3457502,
+    "level": "neighbourhood"
+  },
+  "BUSE AVCI ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "BUSE KARŞILI ECZANESİ": {
+    "lat": 35.2061773,
+    "lng": 33.2997982,
+    "level": "full"
+  },
+  "ÇAĞANSOY ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "ÇAĞIN KORKMAZER ECZANESİ": {
+    "lat": 35.1885468,
+    "lng": 33.3611666,
+    "level": "neighbourhood"
+  },
+  "ÇAĞLAYAN ECZANESİ": {
+    "lat": 35.1831436,
+    "lng": 33.3658033,
+    "level": "full"
+  },
+  "ÇAĞRI CANDANAL ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "CANEŞ ECZANESİ": {
+    "lat": 35.2113211,
+    "lng": 33.3391992,
+    "level": "full"
+  },
+  "CANKAN ECZANESİ": {
+    "lat": 35.1951575,
+    "lng": 33.3471481,
+    "level": "full"
+  },
+  "ÇELER ECZANESİ": {
+    "lat": 35.2094901,
+    "lng": 33.3601932,
+    "level": "full"
+  },
+  "CEMALİYE AĞAOĞLU ECZANESİ": {
+    "lat": 35.2077734,
+    "lng": 33.336576,
+    "level": "neighbourhood"
+  },
+  "CEMİL BEY ECZANESİ": {
+    "lat": 35.1806595,
+    "lng": 33.2533088,
+    "level": "neighbourhood"
+  },
+  "CEMİLE FIRINCIOĞLULARI ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "CEMRE ECZANESİ": {
+    "lat": 35.2019075,
+    "lng": 33.349784,
+    "level": "full"
+  },
+  "CEVHER ECZANESİ": {
+    "lat": 35.1785584,
+    "lng": 33.3521926,
+    "level": "neighbourhood"
+  },
+  "ÇINARLI ECZANESİ": {
+    "lat": 35.2128347,
+    "lng": 33.3748718,
+    "level": "full"
+  },
+  "ÇİSE YILDIRIM ECZANESİ": {
+    "lat": 35.1992948,
+    "lng": 33.347546,
+    "level": "full"
+  },
+  "DAĞMAN ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "DAMLA KARDÜZ ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "DENİZ ÇORBA ECZANESİ": {
+    "lat": 35.2060296,
+    "lng": 33.3165955,
+    "level": "full"
+  },
+  "DEREBOYU ECZANESİ": {
+    "lat": 35.1830733,
+    "lng": 33.3513439,
+    "level": "neighbourhood"
+  },
+  "DİDEM ÖZKAYALI ECZANESİ": {
+    "lat": 35.180011,
+    "lng": 33.3567074,
+    "level": "full"
+  },
+  "DİLAY KILÇIK ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "DİLAY MENEKAY ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "DİLEK ECZANESİ": {
+    "lat": 35.1984395,
+    "lng": 33.3542473,
+    "level": "neighbourhood"
+  },
+  "DİLEM UZCAN ECZANESİ": {
+    "lat": 35.2138298,
+    "lng": 33.2901124,
+    "level": "full"
+  },
+  "DİMAY KAĞCAN ECZANESİ": {
+    "lat": 35.2006489,
+    "lng": 33.3283273,
+    "level": "full"
+  },
+  "EBRU BAŞAY ECZANESİ": {
+    "lat": 35.1785584,
+    "lng": 33.3521926,
+    "level": "neighbourhood"
+  },
+  "EDA ENVER ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "EMEL ATAÇAĞ ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "EMİNE KESKİN ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "ENVER ECZANESİ": {
+    "lat": 35.1779404,
+    "lng": 33.3609118,
+    "level": "full"
+  },
+  "EREN ECZANESİ": {
+    "lat": 35.2070072,
+    "lng": 33.3457502,
+    "level": "neighbourhood"
+  },
+  "ERSAĞ ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "ERTUNGA ECZANESİ": {
+    "lat": 35.1992948,
+    "lng": 33.347546,
+    "level": "full"
+  },
+  "FATMA AŞİNA ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "FATMA TAHSİN ECZANESİ": {
+    "lat": 35.2091164,
+    "lng": 33.3188798,
+    "level": "full"
+  },
+  "FATMA YÜRÜN ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "FERİN ECZANESİ": {
+    "lat": 35.2083526,
+    "lng": 33.305182,
+    "level": "full"
+  },
+  "FİRUZ ERGİL ECZANESİ": {
+    "lat": 35.2070072,
+    "lng": 33.3457502,
+    "level": "neighbourhood"
+  },
+  "FULDEN DONANGİL ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "GALEN ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "GİZEM BEHLÜL ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "GÖNÜL ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "GÖNYELİ ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "GÜLİSTAN ARICI ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "GÜLİZAR ÖZTEKNİK ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "GÜLNUR ECZANESİ": {
+    "lat": 35.1911454,
+    "lng": 33.3147213,
+    "level": "neighbourhood"
+  },
+  "GÜNEY ENGİNOL ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "HALKSEVER ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "HARİKA OTAĞ ECZANESİ": {
+    "lat": 35.2081157,
+    "lng": 33.3090518,
+    "level": "full"
+  },
+  "HAYAT ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "HAZAL REİS ECZANESİ": {
+    "lat": 35.1790633,
+    "lng": 33.3620592,
+    "level": "neighbourhood"
+  },
+  "HÜSEYİN KERİM SAKALLI ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "İMGE ECZANESİ": {
+    "lat": 35.2075098,
+    "lng": 33.335299,
+    "level": "full"
+  },
+  "İNANLI ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "İNCİRLİ ECZANESİ": {
+    "lat": 35.1849854,
+    "lng": 33.3208016,
+    "level": "neighbourhood"
+  },
+  "IŞIK KEREM ECZANESİ": {
+    "lat": 35.1849854,
+    "lng": 33.3208016,
+    "level": "neighbourhood"
+  },
+  "İSMET ECZANESİ": {
+    "lat": 35.1953127,
+    "lng": 33.3470734,
+    "level": "full"
+  },
+  "İZEM ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "KAPTAN CAN ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "KERMİYA ECZANESİ": {
+    "lat": 35.1911454,
+    "lng": 33.3147213,
+    "level": "neighbourhood"
+  },
+  "KEZİBAN TİLKİ ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "KIZILBAŞ ECZANESİ": {
+    "lat": 35.2070072,
+    "lng": 33.3457502,
+    "level": "neighbourhood"
+  },
+  "KUZEY ECZANESİ": {
+    "lat": 35.2077734,
+    "lng": 33.336576,
+    "level": "neighbourhood"
+  },
+  "LA PHARMA ECZANESİ": {
+    "lat": 35.2113587,
+    "lng": 33.3389609,
+    "level": "full"
+  },
+  "LADEN AKBATUR ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "LAİKA GÖKÇEKUŞ ECZANESİ": {
+    "lat": 35.2060296,
+    "lng": 33.3165955,
+    "level": "full"
+  },
+  "LEFKOŞA ECZANESİ": {
+    "lat": 35.1885468,
+    "lng": 33.3611666,
+    "level": "neighbourhood"
+  },
+  "MALEK ECZANESİ": {
+    "lat": 35.201468,
+    "lng": 33.350563,
+    "level": "neighbourhood"
+  },
+  "MERVE BİLLUR ECZANESİ": {
+    "lat": 35.216417,
+    "lng": 33.3058171,
+    "level": "neighbourhood"
+  },
+  "MİEL ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "MOR SAFİR ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "MUSTAFA GÜRMAN ECZANESİ": {
+    "lat": 35.1936982,
+    "lng": 33.3215399,
+    "level": "neighbourhood"
+  },
+  "MUSTAFA PEHLİVAN ECZANESİ": {
+    "lat": 35.1984395,
+    "lng": 33.3542473,
+    "level": "neighbourhood"
+  },
+  "NECATİBEY ECZANESİ": {
+    "lat": 35.1853773,
+    "lng": 33.3610135,
+    "level": "city"
+  },
+  "NECLA EMİN ECZANESİ": {
+    "lat": 35.1875489,
+    "lng": 33.3547705,
+    "level": "full"
+  },
+  "NERGİS ECZANESİ": {
+    "lat": 35.2113587,
+    "lng": 33.3389609,
+    "level": "full"
+  },
+  "NERİMAN KARATAÇ ECZANESİ": {
+    "lat": 35.2143491,
+    "lng": 33.3784008,
+    "level": "neighbourhood"
+  },
+  "NİLCAN YAVUZCAN ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "OBA 2 ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "OBA ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "ORHAN BERKE ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "ORTAKÖY ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "ÖZÇALIŞKAN ECZANESİ": {
+    "lat": 35.2060296,
+    "lng": 33.3165955,
+    "level": "full"
+  },
+  "ÖZERÇAL ECZANESİ": {
+    "lat": 35.2077734,
+    "lng": 33.336576,
+    "level": "neighbourhood"
+  },
+  "ÖZNEM KILINÇKINI ECZANESİ": {
+    "lat": 35.1785584,
+    "lng": 33.3521926,
+    "level": "neighbourhood"
+  },
+  "ÖZYOL ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "PAPATYAM ECZANESİ": {
+    "lat": 35.1897381,
+    "lng": 33.3497209,
+    "level": "neighbourhood"
+  },
+  "PERVİN ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "RANYA ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "SABİHA BULDUK ECZANESİ": {
+    "lat": 35.1885468,
+    "lng": 33.3611666,
+    "level": "neighbourhood"
+  },
+  "SAFİYE ÇAĞANSEL ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "ŞERİFE ADEMOĞULLARI ECZANESİ": {
+    "lat": 35.1885468,
+    "lng": 33.3611666,
+    "level": "neighbourhood"
+  },
+  "SERKAN KERVAN ECZANESİ": {
+    "lat": 35.2143491,
+    "lng": 33.3784008,
+    "level": "neighbourhood"
+  },
+  "SERNA ECZANESİ": {
+    "lat": 35.2060296,
+    "lng": 33.3165955,
+    "level": "full"
+  },
+  "SEROL ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "SERPİN ONAY ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "SESİL ECZANESİ": {
+    "lat": 35.1967372,
+    "lng": 33.3643616,
+    "level": "full"
+  },
+  "SEV ECZANESİ": {
+    "lat": 35.1911454,
+    "lng": 33.3147213,
+    "level": "neighbourhood"
+  },
+  "SEVAL KAYMAK ECZANESİ": {
+    "lat": 35.1984395,
+    "lng": 33.3542473,
+    "level": "neighbourhood"
+  },
+  "SEVCAN ECZANESİ": {
+    "lat": 35.1885468,
+    "lng": 33.3611666,
+    "level": "neighbourhood"
+  },
+  "SEVGİ KARABEKİR ECZANESİ": {
+    "lat": 35.2065324,
+    "lng": 33.3183197,
+    "level": "full"
+  },
+  "SEVGİ KIRBOĞA ECZANESİ": {
+    "lat": 35.1885468,
+    "lng": 33.3611666,
+    "level": "neighbourhood"
+  },
+  "SEYRANTEPE ECZANESİ": {
+    "lat": 35.2143491,
+    "lng": 33.3784008,
+    "level": "neighbourhood"
+  },
+  "SEZER ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "ŞİRİN BOLKAN ECZANESİ": {
+    "lat": 35.2143491,
+    "lng": 33.3784008,
+    "level": "neighbourhood"
+  },
+  "SONUÇ ECZANESİ": {
+    "lat": 35.1885468,
+    "lng": 33.3611666,
+    "level": "neighbourhood"
+  },
+  "SÖZÜÖZ ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "SÜHEYLA AŞAN ECZANESİ": {
+    "lat": 35.2070072,
+    "lng": 33.3457502,
+    "level": "neighbourhood"
+  },
+  "TÖRENAĞA ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "TUĞCAN ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "TULİS ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "TUNA ECZANESİ": {
+    "lat": 35.1885468,
+    "lng": 33.3611666,
+    "level": "neighbourhood"
+  },
+  "TÜRKAN ŞENTİP ECZANESİ": {
+    "lat": 35.2060296,
+    "lng": 33.3165955,
+    "level": "full"
+  },
+  "ÜLKER POZAN ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "UMUT ÖKSÜZ ECZANESİ": {
+    "lat": 35.1968396,
+    "lng": 33.367862,
+    "level": "neighbourhood"
+  },
+  "VAİZ ECZANESİ": {
+    "lat": 35.1885468,
+    "lng": 33.3611666,
+    "level": "neighbourhood"
+  },
+  "YAZMAN ECZANESİ": {
+    "lat": 35.2003174,
+    "lng": 33.3402381,
+    "level": "neighbourhood"
+  },
+  "YELİM ECZANESİ": {
+    "lat": 35.1912448,
+    "lng": 33.3516394,
+    "level": "full"
+  },
+  "YENİKENT ECZANESİ": {
+    "lat": 35.2060296,
+    "lng": 33.3165955,
+    "level": "full"
+  },
+  "YENİŞEHİR ECZANESİ": {
+    "lat": 35.1889917,
+    "lng": 33.3638584,
+    "level": "full"
+  },
+  "YEŞİM ECZANESİ": {
+    "lat": 35.2070072,
+    "lng": 33.3457502,
+    "level": "neighbourhood"
+  },
+  "YONCA HATİPOĞLU ECZANESİ": {
+    "lat": 35.1984395,
+    "lng": 33.3542473,
+    "level": "neighbourhood"
+  },
+  "YUSUF TANDOĞAN ECZANESİ (LEFKOŞA)": {
+    "lat": 35.1785584,
+    "lng": 33.3521926,
+    "level": "neighbourhood"
+  },
+  "ZEHRA ECZANESİ": {
+    "lat": 35.2070072,
+    "lng": 33.3457502,
+    "level": "neighbourhood"
+  },
+  "ACARKAN ECZANESİ": {
+    "lat": 35.3415909,
+    "lng": 33.3199542,
+    "level": "full"
+  },
+  "ADAŞEHİR ECZANESİ": {
+    "lat": 35.3179721,
+    "lng": 33.3855766,
+    "level": "full"
+  },
+  "AHMET ÇAĞER ECZANESİ": {
+    "lat": 35.3394085,
+    "lng": 33.1960746,
+    "level": "neighbourhood"
+  },
+  "ALENBAY ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "ALEV FARUK ECZANESİ": {
+    "lat": 35.2895141,
+    "lng": 33.2793908,
+    "level": "neighbourhood"
+  },
+  "ARDA ÇELİK ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "AŞAR ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "AŞAR KARAOĞLANOĞLU ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "ASRIN ÜMİT ECZANESİ": {
+    "lat": 35.3424212,
+    "lng": 33.2716623,
+    "level": "neighbourhood"
+  },
+  "AYDIN LIFE ALSANCAK ECZANESİ": {
+    "lat": 35.3394085,
+    "lng": 33.1960746,
+    "level": "neighbourhood"
+  },
+  "AYDIN LIFE ECZANESİ": {
+    "lat": 35.3256596,
+    "lng": 33.3344148,
+    "level": "neighbourhood"
+  },
+  "AYHAN ACARKAN ECZANESİ": {
+    "lat": 35.3385205,
+    "lng": 33.2936615,
+    "level": "full"
+  },
+  "AYLAND ECZANESİ": {
+    "lat": 35.3424212,
+    "lng": 33.2716623,
+    "level": "neighbourhood"
+  },
+  "AYŞEN ALTAN ECZANESİ": {
+    "lat": 35.3387318,
+    "lng": 33.1722789,
+    "level": "neighbourhood"
+  },
+  "BARIŞ ECZANESİ": {
+    "lat": 35.3387318,
+    "lng": 33.1722789,
+    "level": "neighbourhood"
+  },
+  "BAŞAK ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "BEDEOĞLU ECZANESİ": {
+    "lat": 35.3213447,
+    "lng": 33.3906576,
+    "level": "neighbourhood"
+  },
+  "BOĞAZ ECZANESİ": {
+    "lat": 35.2895141,
+    "lng": 33.2793908,
+    "level": "neighbourhood"
+  },
+  "BUĞÇE ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "CENGİZ SOLMAZ ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "DAMLA ÖNDER ECZANESİ": {
+    "lat": 35.3125004,
+    "lng": 33.0665723,
+    "level": "full"
+  },
+  "DEFNE ECZANESİ": {
+    "lat": 35.3335723,
+    "lng": 33.2172722,
+    "level": "full"
+  },
+  "DİLARA ÖZHAMİT ECZANESİ": {
+    "lat": 35.3232731,
+    "lng": 33.3209665,
+    "level": "neighbourhood"
+  },
+  "DÜNYA ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "EDA ATAÇAĞ ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "EMİNAĞA ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "ENVER POLİLİ ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "full"
+  },
+  "ERDOĞAN ÖZİKİZ ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "ESAT ÇELEBİ ECZANESİ": {
+    "lat": 35.2687477,
+    "lng": 33.3235946,
+    "level": "neighbourhood"
+  },
+  "FATMA SARAÇ ECZANESİ": {
+    "lat": 35.3394007,
+    "lng": 33.5831724,
+    "level": "neighbourhood"
+  },
+  "GİRNE ECZANESİ": {
+    "lat": 35.336361,
+    "lng": 33.3103842,
+    "level": "full"
+  },
+  "GÜNAY VARIŞ ECZANESİ": {
+    "lat": 35.3326865,
+    "lng": 33.3420667,
+    "level": "neighbourhood"
+  },
+  "GÜNDAL ECZANESİ": {
+    "lat": 35.3318281,
+    "lng": 33.3401011,
+    "level": "full"
+  },
+  "GÜVEN ECZANESİ": {
+    "lat": 35.3232731,
+    "lng": 33.3209665,
+    "level": "neighbourhood"
+  },
+  "İBRAHİM BARDAK ECZANESİ": {
+    "lat": 35.3354384,
+    "lng": 33.3117477,
+    "level": "full"
+  },
+  "İLGEN ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "İPEK YÖNEY ECZANESİ": {
+    "lat": 35.3424212,
+    "lng": 33.2716623,
+    "level": "neighbourhood"
+  },
+  "KANDİL ECZANESİ": {
+    "lat": 35.3424212,
+    "lng": 33.2716623,
+    "level": "neighbourhood"
+  },
+  "KARAOĞLANOĞLU ECZANESİ": {
+    "lat": 35.3484462,
+    "lng": 33.2132664,
+    "level": "full"
+  },
+  "KARPUZOĞLU ECZANESİ": {
+    "lat": 35.3326865,
+    "lng": 33.3420667,
+    "level": "neighbourhood"
+  },
+  "KÜÇÜK ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "MARYAM ECZANESİ": {
+    "lat": 35.3394085,
+    "lng": 33.1960746,
+    "level": "neighbourhood"
+  },
+  "MEHMET GAZİKÖYLÜ ECZANESİ": {
+    "lat": 35.3326865,
+    "lng": 33.3420667,
+    "level": "neighbourhood"
+  },
+  "MEHMET KAMİLOĞLU ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "MELİS UZUN ECZANESİ": {
+    "lat": 35.336361,
+    "lng": 33.3103842,
+    "level": "full"
+  },
+  "MELİSA İŞİMTEKİN ECZANESİ": {
+    "lat": 35.3195514,
+    "lng": 33.3533516,
+    "level": "neighbourhood"
+  },
+  "MELİZ 2 ECZANESİ": {
+    "lat": 35.3396049,
+    "lng": 33.3186667,
+    "level": "full"
+  },
+  "MUCİZEM ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "NAZIM VARIŞ ECZANESİ": {
+    "lat": 35.3394085,
+    "lng": 33.1960746,
+    "level": "neighbourhood"
+  },
+  "NEJLA ERÇAL ECZANESİ": {
+    "lat": 35.3424212,
+    "lng": 33.2716623,
+    "level": "neighbourhood"
+  },
+  "NESRİN HATİPOĞLU ECZANESİ": {
+    "lat": 35.3339552,
+    "lng": 33.3220984,
+    "level": "full"
+  },
+  "NURÇAĞ ECZANESİ": {
+    "lat": 35.3319271,
+    "lng": 33.3204034,
+    "level": "full"
+  },
+  "ÖMRÜM AKI ECZANESİ": {
+    "lat": 35.3394007,
+    "lng": 33.5831724,
+    "level": "neighbourhood"
+  },
+  "ÖMRÜM ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "ÖNAL AKTOLGA ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "ORÇUN ÖZKASAP ECZANESİ": {
+    "lat": 35.3418625,
+    "lng": 33.2760011,
+    "level": "full"
+  },
+  "ÖZENİR ECZANESİ": {
+    "lat": 35.3387318,
+    "lng": 33.1722789,
+    "level": "neighbourhood"
+  },
+  "ÖZGE ÖZÇINAR ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "PINAR KEKLİK ECZANESİ": {
+    "lat": 35.3394085,
+    "lng": 33.1960746,
+    "level": "neighbourhood"
+  },
+  "POSTACIOĞLU ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "RIZKI 2 ECZANESİ": {
+    "lat": 35.3213447,
+    "lng": 33.3906576,
+    "level": "full"
+  },
+  "RIZKI ECZANESİ": {
+    "lat": 35.3213447,
+    "lng": 33.3906576,
+    "level": "neighbourhood"
+  },
+  "SALİM KARABEKİR ECZANESİ": {
+    "lat": 35.3394085,
+    "lng": 33.1960746,
+    "level": "neighbourhood"
+  },
+  "SELİN ESER ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "SERTAÇ ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "SETENAY BENGİSU ECZANESİ": {
+    "lat": 35.3256596,
+    "lng": 33.3344148,
+    "level": "full"
+  },
+  "SEVİN ÇAĞAY ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "SHİMA ECZANESİ": {
+    "lat": 35.3424212,
+    "lng": 33.2716623,
+    "level": "neighbourhood"
+  },
+  "ŞİFALI ECZANESİ": {
+    "lat": 35.3394085,
+    "lng": 33.1960746,
+    "level": "neighbourhood"
+  },
+  "SOYERLER 1 ECZANESİ": {
+    "lat": 35.3362096,
+    "lng": 33.3078679,
+    "level": "full"
+  },
+  "SOYERLER ECZANESİ": {
+    "lat": 35.3394085,
+    "lng": 33.1960746,
+    "level": "neighbourhood"
+  },
+  "ŞULE YILDIZDOĞAN ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "TÖREN 2 ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "TÖREN ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "TÖRENSEL ECZANESİ": {
+    "lat": 35.3213447,
+    "lng": 33.3906576,
+    "level": "neighbourhood"
+  },
+  "TURGAY PARALI ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "VURAL ECZANESİ": {
+    "lat": 35.2687477,
+    "lng": 33.3235946,
+    "level": "neighbourhood"
+  },
+  "YUSUF TANDOĞAN ECZANESİ (GİRNE)": {
+    "lat": 35.3213447,
+    "lng": 33.3906576,
+    "level": "neighbourhood"
+  },
+  "ZEHRA KELEBEK ECZANESİ": {
+    "lat": 35.3387318,
+    "lng": 33.1722789,
+    "level": "neighbourhood"
+  },
+  "ZİYA SENCER ECZANESİ": {
+    "lat": 35.3396291,
+    "lng": 33.3205287,
+    "level": "city"
+  },
+  "ADA ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "ARAS ÖNCÜ ECZANESİ": {
+    "lat": 35.1128721,
+    "lng": 33.92559,
+    "level": "full"
+  },
+  "ARKAN ADIŞANLI ECZANESİ": {
+    "lat": 35.3726129,
+    "lng": 33.7533656,
+    "level": "neighbourhood"
+  },
+  "ASLI EREN ECZANESİ": {
+    "lat": 35.1128276,
+    "lng": 33.9519605,
+    "level": "neighbourhood"
+  },
+  "ASYA TEKBIYIK ECZANESİ": {
+    "lat": 35.1295017,
+    "lng": 33.9290281,
+    "level": "full"
+  },
+  "AYBENK ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "AYŞE EMİROĞLULARI ECZANESİ": {
+    "lat": 35.1961975,
+    "lng": 33.8780416,
+    "level": "neighbourhood"
+  },
+  "AYŞE ÖZBEYCAN ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "AYŞEM ÇİL ECZANESİ": {
+    "lat": 35.1187265,
+    "lng": 33.9356954,
+    "level": "neighbourhood"
+  },
+  "BAHAR ECZANESİ": {
+    "lat": 35.1295017,
+    "lng": 33.9290281,
+    "level": "full"
+  },
+  "BARIŞER ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "full"
+  },
+  "BİLGESU ECZANESİ": {
+    "lat": 35.232151,
+    "lng": 33.8834818,
+    "level": "full"
+  },
+  "BUĞÇE BAYRAM ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "BURCU GÖKALP ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "ÇAĞKAN AKSOY ECZANESİ": {
+    "lat": 35.1187265,
+    "lng": 33.9356954,
+    "level": "neighbourhood"
+  },
+  "ÇAĞLAN ECZANESİ": {
+    "lat": 35.1165179,
+    "lng": 33.9311256,
+    "level": "full"
+  },
+  "CAN İLKTAÇ ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "CEREN ECZANESİ": {
+    "lat": 35.1187265,
+    "lng": 33.9356954,
+    "level": "full"
+  },
+  "ÇİSE SEZEREL ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "ÇİSEM ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "DEMET ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "full"
+  },
+  "ECE ECZANESİ": {
+    "lat": 35.1239895,
+    "lng": 33.9295735,
+    "level": "full"
+  },
+  "EMİR ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "EREL ECZANESİ": {
+    "lat": 35.1525429,
+    "lng": 33.9064181,
+    "level": "full"
+  },
+  "ERGİN ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "full"
+  },
+  "ERTUĞ EMİN ECZANESİ": {
+    "lat": 35.1395344,
+    "lng": 33.9143446,
+    "level": "neighbourhood"
+  },
+  "EYLÜL DALKILINÇ ECZANESİ": {
+    "lat": 35.1199391,
+    "lng": 33.9168912,
+    "level": "neighbourhood"
+  },
+  "FAYDALI ECZANESİ": {
+    "lat": 35.1550084,
+    "lng": 33.9036594,
+    "level": "full"
+  },
+  "FUNDA ERSÖZLÜ ECZANESİ": {
+    "lat": 35.1341882,
+    "lng": 33.9298908,
+    "level": "full"
+  },
+  "GİZEM KARAHASAN ECZANESİ": {
+    "lat": 35.1611026,
+    "lng": 33.8830887,
+    "level": "neighbourhood"
+  },
+  "GİZEMGÜL ECZANESİ": {
+    "lat": 35.1961975,
+    "lng": 33.8780416,
+    "level": "full"
+  },
+  "GÖKCEN İLKTAÇ ECZANESİ": {
+    "lat": 35.1480031,
+    "lng": 33.9093521,
+    "level": "full"
+  },
+  "GÜLFİDAN ECZANESİ": {
+    "lat": 35.1961975,
+    "lng": 33.8780416,
+    "level": "neighbourhood"
+  },
+  "GÜZER ECZANESİ": {
+    "lat": 35.1199391,
+    "lng": 33.9168912,
+    "level": "full"
+  },
+  "HACER BALIKÇI ECZANESİ": {
+    "lat": 35.1239895,
+    "lng": 33.9295735,
+    "level": "full"
+  },
+  "HAKAN ECZANESİ": {
+    "lat": 35.1170826,
+    "lng": 33.9354955,
+    "level": "full"
+  },
+  "HALİL HAMZALAR ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "HALK ECZANESİ": {
+    "lat": 35.1247645,
+    "lng": 33.9417482,
+    "level": "full"
+  },
+  "HALKIN ECZANESİ": {
+    "lat": 35.1314592,
+    "lng": 33.9192006,
+    "level": "full"
+  },
+  "HANDE BESMEL ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "HİÇKORKMAZ ECZANESİ": {
+    "lat": 35.1284351,
+    "lng": 33.9196349,
+    "level": "full"
+  },
+  "İÇTEN ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "İNEM MİMAR ECZANESİ": {
+    "lat": 35.1327895,
+    "lng": 33.9215936,
+    "level": "full"
+  },
+  "KAĞAN KANDEMİR ECZANESİ": {
+    "lat": 35.1284351,
+    "lng": 33.9196349,
+    "level": "neighbourhood"
+  },
+  "KARAKOL ECZANESİ": {
+    "lat": 35.138294,
+    "lng": 33.9255657,
+    "level": "neighbourhood"
+  },
+  "KUNTER GÜVEN ECZANESİ": {
+    "lat": 35.1179692,
+    "lng": 33.9359257,
+    "level": "full"
+  },
+  "LARNAKA YOLU ECZANESİ": {
+    "lat": 35.1128721,
+    "lng": 33.92559,
+    "level": "full"
+  },
+  "LOTUSVİTA ECZANESİ": {
+    "lat": 35.1961975,
+    "lng": 33.8780416,
+    "level": "neighbourhood"
+  },
+  "MEHMET ARTER ECZANESİ": {
+    "lat": 35.1187265,
+    "lng": 33.9356954,
+    "level": "neighbourhood"
+  },
+  "MEHMETALİ BEYAZ ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "MELİKE BARBAROS ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "MELİKE DEMİRSÖZ ECZANESİ": {
+    "lat": 35.1244736,
+    "lng": 33.9323938,
+    "level": "neighbourhood"
+  },
+  "MEVA ECZANESİ": {
+    "lat": 35.1199391,
+    "lng": 33.9168912,
+    "level": "neighbourhood"
+  },
+  "NADİRE GÖKALP ECZANESİ": {
+    "lat": 35.1519171,
+    "lng": 33.906608,
+    "level": "full"
+  },
+  "NASİM ECZANESİ": {
+    "lat": 35.1519171,
+    "lng": 33.906608,
+    "level": "full"
+  },
+  "NİLHAN SOYSAL ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "ODUNCUOĞLU ECZANESİ": {
+    "lat": 35.1200017,
+    "lng": 33.9382266,
+    "level": "full"
+  },
+  "ÖREN ECZANESİ": {
+    "lat": 35.1128276,
+    "lng": 33.9519605,
+    "level": "neighbourhood"
+  },
+  "OSMANKAN ECZANESİ": {
+    "lat": 35.1187265,
+    "lng": 33.9356954,
+    "level": "neighbourhood"
+  },
+  "ÖZAY ECZANESİ": {
+    "lat": 35.1198107,
+    "lng": 33.9364587,
+    "level": "full"
+  },
+  "ÖZGE KALE ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "ÖZNERGİS ECZANESİ": {
+    "lat": 35.1519171,
+    "lng": 33.906608,
+    "level": "full"
+  },
+  "PETEK ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "PHARMATOWN ECZANESİ": {
+    "lat": 35.1961975,
+    "lng": 33.8780416,
+    "level": "neighbourhood"
+  },
+  "RANA YONTAR ECZANESİ": {
+    "lat": 35.1199391,
+    "lng": 33.9168912,
+    "level": "neighbourhood"
+  },
+  "REVİTA ECZANESİ": {
+    "lat": 35.1474433,
+    "lng": 33.8855815,
+    "level": "full"
+  },
+  "REZAN ECZANESİ": {
+    "lat": 35.1519171,
+    "lng": 33.906608,
+    "level": "full"
+  },
+  "SAKARYA ECZANESİ": {
+    "lat": 35.1395344,
+    "lng": 33.9143446,
+    "level": "neighbourhood"
+  },
+  "SEMAHAT ATAYOL ECZANESİ": {
+    "lat": 35.1128276,
+    "lng": 33.9519605,
+    "level": "neighbourhood"
+  },
+  "SERHAT BAYBORA ECZANESİ": {
+    "lat": 35.1576931,
+    "lng": 33.8941323,
+    "level": "full"
+  },
+  "SÜAY SEVİNÇ ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "city"
+  },
+  "SÜMER ECZANESİ": {
+    "lat": 35.1480031,
+    "lng": 33.9093521,
+    "level": "full"
+  },
+  "TANYA SALİMER ECZANESİ": {
+    "lat": 35.1165179,
+    "lng": 33.9311256,
+    "level": "full"
+  },
+  "TURGUT KORHAN ECZANESİ": {
+    "lat": 35.1251034,
+    "lng": 33.9335236,
+    "level": "full"
+  },
+  "ULUÇAY ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "full"
+  },
+  "UMUT ECZANESİ": {
+    "lat": 35.1525429,
+    "lng": 33.9064181,
+    "level": "full"
+  },
+  "UZAY ECZANESİ": {
+    "lat": 35.1295017,
+    "lng": 33.9290281,
+    "level": "full"
+  },
+  "VELİ ATEŞ ECZANESİ": {
+    "lat": 35.1519171,
+    "lng": 33.906608,
+    "level": "full"
+  },
+  "VELİ NURLUÖZ ECZANESİ": {
+    "lat": 35.1395344,
+    "lng": 33.9143446,
+    "level": "full"
+  },
+  "VEZİROĞLU ECZANESİ": {
+    "lat": 35.138294,
+    "lng": 33.9255657,
+    "level": "neighbourhood"
+  },
+  "ZERİN VOLKAN ECZANESİ": {
+    "lat": 35.1205261,
+    "lng": 33.9387919,
+    "level": "full"
+  },
+  "ZEYNEP ECZANESİ": {
+    "lat": 35.1480031,
+    "lng": 33.9093521,
+    "level": "full"
+  },
+  "AKÇAY ECZANESİ": {
+    "lat": 35.1804629,
+    "lng": 33.0270362,
+    "level": "full"
+  },
+  "AŞAR ECZANESİ (GÜZELYURT)": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "AYCAN ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "CAMCIOĞLU ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "DOĞUŞ TÜRKBAYOĞLU ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "EMİNE ŞENTÜRK ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "ERİN ECZANESİ": {
+    "lat": 35.1916339,
+    "lng": 32.9935032,
+    "level": "full"
+  },
+  "GİLANLI ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "GÜLSEN ECZANESİ": {
+    "lat": 35.1938995,
+    "lng": 32.997612,
+    "level": "full"
+  },
+  "İLAYDA GÜLKAN ECZANESİ": {
+    "lat": 35.1685572,
+    "lng": 33.0066204,
+    "level": "neighbourhood"
+  },
+  "İLKİN SADRAZAM ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "İNCİ ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "JENNET BAYLİYEVA ECZANESİ": {
+    "lat": 35.2464189,
+    "lng": 33.0355782,
+    "level": "full"
+  },
+  "MERVE GÜMÜŞOK ECZANESİ": {
+    "lat": 35.1677603,
+    "lng": 33.0091397,
+    "level": "full"
+  },
+  "NİLGÜN ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "PEMBE SADIKOĞLU ECZANESİ": {
+    "lat": 35.1916564,
+    "lng": 32.9936824,
+    "level": "full"
+  },
+  "RESMİYE ESE ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "SEDEF SONAT ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "SERCAN AVCI ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "SEVİL ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "ŞİFA SİPERCİ ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "SÜREYYA ÖZCOŞKUN ECZANESİ": {
+    "lat": 35.1993042,
+    "lng": 32.9928829,
+    "level": "city"
+  },
+  "UYUMSAL ECZANESİ": {
+    "lat": 35.1926757,
+    "lng": 32.9948156,
+    "level": "full"
+  },
+  "ALTINCI ECZANESİ": {
+    "lat": 35.1429608,
+    "lng": 32.8088418,
+    "level": "neighbourhood"
+  },
+  "AYŞE ALTINTUĞ ECZANESİ": {
+    "lat": 35.1429608,
+    "lng": 32.8088418,
+    "level": "neighbourhood"
+  },
+  "DERVİŞ KUTRET ECZANESİ": {
+    "lat": 35.1137814,
+    "lng": 32.8495971,
+    "level": "city"
+  },
+  "DİLAN PUL ECZANESİ": {
+    "lat": 35.1531147,
+    "lng": 32.8844033,
+    "level": "neighbourhood"
+  },
+  "HATİCE SOYER ECZANESİ": {
+    "lat": 35.1318489,
+    "lng": 32.8651117,
+    "level": "full"
+  },
+  "İLKSEN ECZANESİ": {
+    "lat": 35.140713,
+    "lng": 32.8338857,
+    "level": "neighbourhood"
+  },
+  "OSMAN ULUŞAN ECZANESİ": {
+    "lat": 35.1331227,
+    "lng": 32.913372,
+    "level": "neighbourhood"
+  },
+  "SIDIKA UMAR ECZANESİ": {
+    "lat": 35.1724843,
+    "lng": 32.9164496,
+    "level": "neighbourhood"
+  },
+  "ŞİFA BILDIR ECZANESİ": {
+    "lat": 35.1429608,
+    "lng": 32.8088418,
+    "level": "neighbourhood"
+  },
+  "ULUS ECZANESİ": {
+    "lat": 35.1137814,
+    "lng": 32.8495971,
+    "level": "city"
+  },
+  "AVİCENNA ECZANESİ": {
+    "lat": 35.285677,
+    "lng": 33.8930603,
+    "level": "city"
+  },
+  "BUSE ULUÇAY ECZANESİ": {
+    "lat": 35.5343185,
+    "lng": 34.188649,
+    "level": "city"
+  },
+  "ERDEM SURURİ ECZANESİ": {
+    "lat": 35.285677,
+    "lng": 33.8930603,
+    "level": "city"
+  },
+  "ERSU ADAN ECZANESİ": {
+    "lat": 35.2346419,
+    "lng": 33.8723517,
+    "level": "neighbourhood"
+  },
+  "GÖKBERK ALP YAKAR ECZANESİ": {
+    "lat": 35.285677,
+    "lng": 33.8930603,
+    "level": "city"
+  },
+  "İSKELE ECZANESİ": {
+    "lat": 35.285677,
+    "lng": 33.8930603,
+    "level": "city"
+  },
+  "MEHMET İLBAN ECZANESİ": {
+    "lat": 35.3150319,
+    "lng": 33.9505624,
+    "level": "neighbourhood"
+  },
+  "MEVLÜT KAÇMAZ ECZANESİ": {
+    "lat": 35.285677,
+    "lng": 33.8930603,
+    "level": "city"
+  },
+  "NALAN ECZANESİ": {
+    "lat": 35.2863782,
+    "lng": 33.9125832,
+    "level": "neighbourhood"
+  },
+  "ÖZBİRTAN ECZANESİ": {
+    "lat": 35.285677,
+    "lng": 33.8930603,
+    "level": "city"
+  },
+  "PERTEV ZEKİ ECZANESİ": {
+    "lat": 35.285677,
+    "lng": 33.8930603,
+    "level": "city"
+  },
+  "SELİN ECZANESİ": {
+    "lat": 35.2832589,
+    "lng": 33.884188,
+    "level": "full"
+  },
+  "SEVİLAY PIRLANTA ECZANESİ": {
+    "lat": 35.285677,
+    "lng": 33.8930603,
+    "level": "city"
+  },
+  "SULTAN TOPEL ECZANESİ": {
+    "lat": 35.285677,
+    "lng": 33.8930603,
+    "level": "city"
+  },
+  "BESİM SEVİNDİK ECZANESİ": {
+    "lat": 35.5343185,
+    "lng": 34.188649,
+    "level": "neighbourhood"
+  },
+  "FATMA KAHYAOĞLU ECZANESİ": {
+    "lat": 35.6046231,
+    "lng": 34.3807815,
+    "level": "neighbourhood"
+  },
+  "KARPAZIN ECZANESİ": {
+    "lat": 35.5343185,
+    "lng": 34.188649,
+    "level": "neighbourhood"
+  },
+  "MELEK İBRAHİM ECZANESİ": {
+    "lat": 35.658742,
+    "lng": 34.5235773,
+    "level": "city"
+  },
+  "OLGUN KAHYAOĞLU ECZANESİ": {
+    "lat": 35.658742,
+    "lng": 34.5235773,
+    "level": "city"
+  },
+  "SAKİNER ECZANESİ": {
+    "lat": 35.5343185,
+    "lng": 34.188649,
+    "level": "full"
+  },
+  "ESER AVCI ECZANESİ": {
+    "lat": 35.2274826,
+    "lng": 33.5134937,
+    "level": "city"
+  },
+  "GÖNÜL GÜRDAĞ ECZANESİ": {
+    "lat": 35.2233822,
+    "lng": 33.4793482,
+    "level": "city"
+  },
+  "GÜLTEN VELİ ECZANESİ": {
+    "lat": 35.2274826,
+    "lng": 33.5134937,
+    "level": "city"
+  },
+  "KEZBAN DOYGUNEL ECZANESİ": {
+    "lat": 35.2605334,
+    "lng": 33.7321988,
+    "level": "city"
+  },
+  "MELİZ ECZANESİ": {
+    "lat": 35.2233822,
+    "lng": 33.4793482,
+    "level": "city"
+  },
+  "ŞEHERLİOĞLU ECZANESİ": {
+    "lat": 35.2063724,
+    "lng": 33.4200196,
+    "level": "city"
+  },
+  "SERDARLI ECZANESİ": {
+    "lat": 35.2545945,
+    "lng": 33.6022318,
+    "level": "city"
+  },
+  "TUFAN ECZANESİ": {
+    "lat": 35.2233822,
+    "lng": 33.4793482,
+    "level": "city"
+  },
+  "YAPRAK POLAT ECZANESİ": {
+    "lat": 35.2063724,
+    "lng": 33.4200196,
+    "level": "city"
+  },
+  "YÜKSEL ECZANESİ": {
+    "lat": 35.2476457,
+    "lng": 33.4806933,
+    "level": "city"
+  },
+  "BUĞRA ECZANESİ": {
+    "lat": 35.1062416,
+    "lng": 33.6822908,
+    "level": "city"
+  },
+  "DOĞUŞ ACARÖZ ECZANESİ": {
+    "lat": 35.1576104,
+    "lng": 33.7005485,
+    "level": "city"
+  },
+  "DÖRTYOL ECZANESİ": {
+    "lat": 35.1755782,
+    "lng": 33.7568549,
+    "level": "city"
+  },
+  "GÜNER BİNBOĞA ECZANESİ": {
+    "lat": 35.1581388,
+    "lng": 33.6090186,
+    "level": "city"
+  },
+  "GÜRSOY ECZANESİ": {
+    "lat": 35.1062416,
+    "lng": 33.6822908,
+    "level": "city"
+  },
+  "HERA AKESEN ECZANESİ": {
+    "lat": 35.0431635,
+    "lng": 33.708323,
+    "level": "city"
+  },
+  "HOCANIN ECZANESİ": {
+    "lat": 35.1337935,
+    "lng": 33.6557314,
+    "level": "city"
+  },
+  "KINAY ECZANESİ": {
+    "lat": 35.105122,
+    "lng": 33.7166764,
+    "level": "city"
+  },
+  "KUDRET ECZANESİ": {
+    "lat": 35.1337935,
+    "lng": 33.6557314,
+    "level": "city"
+  },
+  "MEHMET HOCA ECZANESİ": {
+    "lat": 35.105122,
+    "lng": 33.7166764,
+    "level": "city"
+  },
+  "PHARGAMOS ECZANESİ": {
+    "lat": 35.0431635,
+    "lng": 33.708323,
+    "level": "city"
+  },
+  "SERVET GÖKŞİN ECZANESİ": {
+    "lat": 35.1108692,
+    "lng": 33.5662154,
+    "level": "city"
+  },
+  "VADİLİ ECZANESİ": {
+    "lat": 35.1337935,
+    "lng": 33.6557314,
+    "level": "city"
+  }
+}
