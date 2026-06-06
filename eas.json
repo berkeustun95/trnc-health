@@ -8,11 +8,34 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      }
     },
-    "production": {}
+    "production": {
+      "autoIncrement": true,
+      "ios": {
+        "credentialsSource": "remote"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "credentialsSource": "remote"
+      },
+      "channel": "production"
+    }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "berke.ustun95@gmail.com",
+        "ascAppId": "",
+        "appleTeamId": ""
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal"
+      }
+    }
   }
 }

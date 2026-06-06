@@ -4,9 +4,9 @@ export default {
     slug: 'trnc-health',
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './assets/ADAicon.png',
+    icon: './assets/icon.png',
     splash: {
-      image: './assets/ADAicon.png',
+      image: './assets/splash-icon.png',
       resizeMode: 'contain',
       backgroundColor: '#FFFFFF',
     },
@@ -16,6 +16,12 @@ export default {
       supportsTablet: true,
       bundleIdentifier: 'com.berkeustun95.ada',
       minimumOsVersion: '14.0',
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription:
+          'ADA uses your location to show nearby pharmacies, clinics, and hospitals.',
+        NSLocationAlwaysAndWhenInUseUsageDescription:
+          'ADA uses your location to show nearby pharmacies, clinics, and hospitals.',
+      },
     },
     android: {
       package: 'com.berkeustun95.ada',
@@ -26,10 +32,17 @@ export default {
         },
       },
       adaptiveIcon: {
-        foregroundImage: './assets/ADAicon.png',
-        backgroundColor: '#FFFFFF',
+        foregroundImage: './assets/android-icon-foreground.png',
+        backgroundImage: './assets/android-icon-background.png',
+        monochromeImage: './assets/android-icon-monochrome.png',
       },
       minSdkVersion: 24,
+      permissions: [
+        'android.permission.ACCESS_COARSE_LOCATION',
+        'android.permission.ACCESS_FINE_LOCATION',
+        'android.permission.RECEIVE_BOOT_COMPLETED',
+        'android.permission.VIBRATE',
+      ],
     },
     web: {
       favicon: './assets/favicon.png',
@@ -37,7 +50,22 @@ export default {
     plugins: [
       '@react-native-community/datetimepicker',
       'expo-font',
-      'expo-notifications',
+      [
+        'expo-notifications',
+        {
+          icon: './assets/android-icon-monochrome.png',
+          color: '#ffffff',
+          defaultChannel: 'default',
+          sounds: [],
+        },
+      ],
+      [
+        'expo-location',
+        {
+          locationWhenInUsePermission:
+            'ADA uses your location to show nearby pharmacies, clinics, and hospitals.',
+        },
+      ],
     ],
     extra: {
       eas: {
