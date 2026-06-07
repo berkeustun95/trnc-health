@@ -315,7 +315,7 @@ export default function App() {
     })
     .filter(f => !activeType || f.type === activeType)
     .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)
-    .filter(f => !activeSpecialty || f.specialty === activeSpecialty)
+    .filter(f => !activeSpecialty || (Array.isArray(f.specialty) ? f.specialty.includes(activeSpecialty) : f.specialty === activeSpecialty))
     .filter(f => {
       const q = searchText.trim().toLowerCase()
       if (!q) return true
@@ -619,8 +619,8 @@ export default function App() {
           {(() => {
             const typeToShow = activeType || null
             const specList = typeToShow
-              ? (SPECIALTIES_BY_TYPE[typeToShow] || []).filter(sp => facilities.some(f => f.specialty === sp))
-              : [...new Set(facilities.filter(f => f.specialty).map(f => f.specialty))].sort()
+              ? (SPECIALTIES_BY_TYPE[typeToShow] || []).filter(sp => facilities.some(f => Array.isArray(f.specialty) ? f.specialty.includes(sp) : f.specialty === sp))
+              : [...new Set(facilities.flatMap(f => Array.isArray(f.specialty) ? f.specialty : (f.specialty ? [f.specialty] : [])))].sort()
             if (!specList.length) return null
             return (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
@@ -768,7 +768,7 @@ export default function App() {
                               </View>
                             )}
                           </View>
-                          {item.specialty ? <Text style={styles.specialtyText} numberOfLines={1}>{item.specialty}</Text> : null}
+                          {item.specialty?.length ? <Text style={styles.specialtyText} numberOfLines={1}>{Array.isArray(item.specialty) ? item.specialty.join(' · ') : item.specialty}</Text> : null}
                           {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
                           {facilityRatings[item.id] && (
                             <View style={styles.ratingRow}>

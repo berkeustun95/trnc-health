@@ -139,7 +139,7 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
                 <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(facility.type, lang)}</Text>
               </View>
               <Text style={styles.facilityName}>{facility.name}</Text>
-              {facility.specialty ? <Text style={styles.specialtyLabel}>{facility.specialty}</Text> : null}
+              {facility.specialty?.length ? <Text style={styles.specialtyLabel}>{Array.isArray(facility.specialty) ? facility.specialty.join(' · ') : facility.specialty}</Text> : null}
             </View>
             {facility.logo_url ? (
               <Image source={{ uri: facility.logo_url }} style={styles.facilityLogo} resizeMode="contain" />

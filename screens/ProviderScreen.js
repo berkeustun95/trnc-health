@@ -77,7 +77,9 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [uploadingCover, setUploadingCover] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [imageError, setImageError] = useState(null)
-  const [specialty, setSpecialty] = useState(facility.specialty ?? null)
+  const [specialty, setSpecialty] = useState(
+    Array.isArray(facility.specialty) ? facility.specialty : (facility.specialty ? [facility.specialty] : [])
+  )
 
   useEffect(() => {
     async function load() {
@@ -188,9 +190,9 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   }
 
   async function saveSpecialty(val) {
-    const next = specialty === val ? null : val
+    const next = specialty.includes(val) ? specialty.filter(s => s !== val) : [...specialty, val]
     setSpecialty(next)
-    await supabase.from('facilities').update({ specialty: next }).eq('id', facility.id)
+    await supabase.from('facilities').update({ specialty: next.length ? next : null }).eq('id', facility.id)
     if (onFacilityUpdated) onFacilityUpdated()
   }
 
@@ -223,7 +225,8 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
       await supabase.from('facilities').update({ [field]: url }).eq('id', facility.id)
       if (isCover) setCoverUrl(url); else setLogoUrl(url)
       if (onFacilityUpdated) onFacilityUpdated()
-    } catch {
+    } catch (err) {
+      console.error('Image upload error:', err)
       setImageError('Upload failed. Try again.')
     } finally {
       if (isCover) setUploadingCover(false); else setUploadingLogo(false)
@@ -444,10 +447,10 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                     {SPECIALTIES_BY_TYPE[facility.type].map(sp => (
                       <TouchableOpacity
                         key={sp}
-                        style={[styles.specialtyChip, specialty === sp && styles.specialtyChipActive]}
+                        style={[styles.specialtyChip, specialty.includes(sp) && styles.specialtyChipActive]}
                         onPress={() => saveSpecialty(sp)}
                       >
-                        <Text style={[styles.specialtyChipText, specialty === sp && styles.specialtyChipTextActive]}>
+                        <Text style={[styles.specialtyChipText, specialty.includes(sp) && styles.specialtyChipTextActive]}>
                           {sp}
                         </Text>
                       </TouchableOpacity>
