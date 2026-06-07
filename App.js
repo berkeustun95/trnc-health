@@ -523,7 +523,7 @@ export default function App() {
     content = <BookingScreen facility={selectedFacility} session={session} lang={lang} onBack={() => setSelectedFacility(null)} />
   } else {
     content = (
-      <ImageBackground source={require('./assets/bg.png')} style={{ flex: 1 }} resizeMode="cover">
+      <ImageBackground source={require('./assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
       <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
         <View style={styles.container}>
           <View style={styles.header}>
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
   filterChipOpenText: { color: colors.success, fontFamily: 'Inter_700Bold' },
   filterChipTextActive: { fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   listContent:      { paddingBottom: 32 },
-  card:             { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, ...shadow },
+  card:             { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: '#1A2B33', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
   dutyCard:         { borderWidth: 1.5, borderColor: colors.accent },
   dutyCardBadge:    { backgroundColor: colors.accentLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
   dutyLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -825,7 +825,7 @@ const styles = StyleSheet.create({
   addressText:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 4 },
   ratingRow:        { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   ratingText:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
-  cardUnclaimed:    { opacity: 0.75 },
+  cardUnclaimed:    { opacity: 1 },
   notOnAdaBadge:    { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.border },
   notOnAdaBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   // Unclaimed facility screen

@@ -165,6 +165,7 @@ export default function AuthScreen({ lang = 'English' }) {
             <Image source={require('../assets/logonobg.png')} style={styles.logoImg} resizeMode="contain" />
           </View>
 
+          <View style={styles.formCard}>
           <View style={styles.toggle}>
             {['login', 'signup'].map(m => (
               <TouchableOpacity
@@ -236,6 +237,7 @@ export default function AuthScreen({ lang = 'English' }) {
               : <Text style={styles.submitText}>{mode === 'login' ? t('login', lang) : t('createAccount', lang)}</Text>
             }
           </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -245,6 +247,7 @@ export default function AuthScreen({ lang = 'English' }) {
 
 const styles = StyleSheet.create({
   safe:              { flex: 1, backgroundColor: 'transparent' },
+  formCard:          { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 24, padding: 24, paddingTop: 20 },
   overlay:           { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.55)' },
   kav:               { flex: 1 },
   container:         { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
