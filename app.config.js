@@ -21,6 +21,8 @@ export default {
           'ADA uses your location to show nearby pharmacies, clinics, and hospitals.',
         NSLocationAlwaysAndWhenInUseUsageDescription:
           'ADA uses your location to show nearby pharmacies, clinics, and hospitals.',
+        NSPhotoLibraryUsageDescription:
+          'ADA needs access to your photos to let you set a profile picture.',
       },
     },
     android: {
@@ -42,6 +44,7 @@ export default {
         'android.permission.ACCESS_FINE_LOCATION',
         'android.permission.RECEIVE_BOOT_COMPLETED',
         'android.permission.VIBRATE',
+        'android.permission.READ_MEDIA_IMAGES',
       ],
     },
     web: {
@@ -50,6 +53,12 @@ export default {
     plugins: [
       '@react-native-community/datetimepicker',
       'expo-font',
+      [
+        'expo-image-picker',
+        {
+          photosPermission: 'ADA needs access to your photos to let you set a profile picture.',
+        },
+      ],
       [
         'expo-notifications',
         {

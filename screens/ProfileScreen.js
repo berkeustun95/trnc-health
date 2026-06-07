@@ -1,14 +1,60 @@
 import { useState, useEffect } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Linking
+  View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
+  ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Linking,
+  Modal,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import LegalScreen from './LegalScreen'
+import { PRESET_AVATARS, getPreset } from '../constants/avatars'
+
+function decode(base64) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  const lookup = new Uint8Array(256)
+  for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i
+  lookup['='.charCodeAt(0)] = 0
+  const len = base64.length
+  let bufLen = (len * 3) >> 2
+  if (base64[len - 1] === '=') bufLen--
+  if (base64[len - 2] === '=') bufLen--
+  const buf = new ArrayBuffer(bufLen)
+  const out = new Uint8Array(buf)
+  let p = 0
+  for (let i = 0; i < len; i += 4) {
+    const a = lookup[base64.charCodeAt(i)]
+    const b = lookup[base64.charCodeAt(i + 1)]
+    const c = lookup[base64.charCodeAt(i + 2)]
+    const d = lookup[base64.charCodeAt(i + 3)]
+    out[p++] = (a << 2) | (b >> 4)
+    if (p < bufLen) out[p++] = ((b & 15) << 4) | (c >> 2)
+    if (p < bufLen) out[p++] = ((c & 3) << 6) | d
+  }
+  return buf
+}
+
+function AvatarDisplay({ avatarUrl, initials, size = 72, textSize = 26 }) {
+  const preset = getPreset(avatarUrl)
+  if (preset) {
+    return (
+      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: preset.bg, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ fontSize: textSize * 0.9 }}>{preset.emoji}</Text>
+      </View>
+    )
+  }
+  if (avatarUrl?.startsWith('http')) {
+    return <Image source={{ uri: avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+  }
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ fontSize: textSize, fontFamily: 'Inter_700Bold', color: '#fff' }}>{initials}</Text>
+    </View>
+  )
+}
 
 const LANGUAGES = [
   { key: 'English',  label: 'English'    },
@@ -160,7 +206,7 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
   )
 }
 
-export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
+export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange }) {
   const [profile, setProfile]               = useState(null)
   const [form, setForm]                     = useState({ full_name: '', phone: '', nationality: '', preferred_language: 'English' })
   const [loading, setLoading]               = useState(true)
@@ -176,17 +222,22 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
   const [ratingComment, setRatingComment]   = useState('')
   const [reviewError, setReviewError]       = useState(null)
   const [legalTab, setLegalTab]             = useState(null)
+  const [avatarUrl, setAvatarUrl]           = useState(null)
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false)
+  const [avatarUploading, setAvatarUploading]   = useState(false)
+  const [avatarError, setAvatarError]           = useState(null)
 
   useEffect(() => {
     async function loadProfile() {
       try {
         const { data, error } = await supabase.from('profiles')
-          .select('full_name, phone, nationality, preferred_language, role')
+          .select('full_name, phone, nationality, preferred_language, role, avatar_url')
           .eq('id', session.user.id)
           .single()
         if (error) { setLoadError(true); return }
         if (data) {
           setProfile(data)
+          setAvatarUrl(data.avatar_url ?? null)
           setForm({
             full_name: data.full_name ?? '',
             phone: data.phone ?? '',
@@ -252,6 +303,49 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
       setRatingComment('')
     } else {
       setReviewError(error.message)
+    }
+  }
+
+  async function savePresetAvatar(id) {
+    const val = `preset:${id}`
+    await supabase.from('profiles').update({ avatar_url: val }).eq('id', session.user.id)
+    setAvatarUrl(val)
+    onAvatarChange?.(val)
+    setShowAvatarPicker(false)
+  }
+
+  async function pickAndUploadPhoto() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) { setAvatarError('Photo library permission denied'); return }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.6,
+      base64: true,
+    })
+    if (result.canceled) return
+    const asset = result.assets[0]
+    setAvatarUploading(true)
+    setAvatarError(null)
+    try {
+      const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
+      const path = `${session.user.id}/avatar.${ext}`
+      const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, decode(asset.base64), { contentType, upsert: true })
+      if (uploadError) throw uploadError
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+      const url = `${publicUrl}?t=${Date.now()}`
+      await supabase.from('profiles').update({ avatar_url: url }).eq('id', session.user.id)
+      setAvatarUrl(url)
+      onAvatarChange?.(url)
+      setShowAvatarPicker(false)
+    } catch {
+      setAvatarError('Upload failed. Try again.')
+    } finally {
+      setAvatarUploading(false)
     }
   }
 
@@ -359,14 +453,53 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange }) {
           </View>
 
           <View style={s.avatarSection}>
-            <View style={s.avatar}>
-              <Text style={s.avatarText}>{initials}</Text>
-            </View>
+            <TouchableOpacity style={s.avatarWrap} onPress={() => { setAvatarError(null); setShowAvatarPicker(true) }} activeOpacity={0.8}>
+              <AvatarDisplay avatarUrl={avatarUrl} initials={initials} size={80} textSize={28} />
+              <View style={s.avatarEditBadge}>
+                <Feather name="edit-2" size={11} color="#fff" />
+              </View>
+            </TouchableOpacity>
             <Text style={s.emailText}>{session.user.email}</Text>
             <View style={s.rolePill}>
               <Text style={s.rolePillText}>{profile?.role ?? 'customer'}</Text>
             </View>
           </View>
+
+          <Modal visible={showAvatarPicker} animationType="slide" transparent onRequestClose={() => setShowAvatarPicker(false)}>
+            <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowAvatarPicker(false)} />
+            <View style={s.modalSheet}>
+              <View style={s.modalHandle} />
+              <Text style={s.modalTitle}>Choose avatar</Text>
+
+              <TouchableOpacity style={s.uploadBtn} onPress={pickAndUploadPhoto} disabled={avatarUploading}>
+                {avatarUploading
+                  ? <ActivityIndicator color={colors.primary} />
+                  : <>
+                      <Feather name="camera" size={18} color={colors.primary} />
+                      <Text style={s.uploadBtnText}>Upload photo</Text>
+                    </>
+                }
+              </TouchableOpacity>
+
+              {avatarError ? <Text style={s.avatarErrText}>{avatarError}</Text> : null}
+
+              <Text style={s.modalSub}>Or pick an avatar</Text>
+              <View style={s.presetGrid}>
+                {PRESET_AVATARS.map(av => (
+                  <TouchableOpacity key={av.id} style={[s.presetItem, avatarUrl === `preset:${av.id}` && s.presetItemActive]} onPress={() => savePresetAvatar(av.id)}>
+                    <View style={[s.presetCircle, { backgroundColor: av.bg }]}>
+                      <Text style={s.presetEmoji}>{av.emoji}</Text>
+                    </View>
+                    {avatarUrl === `preset:${av.id}` && (
+                      <View style={s.presetCheck}>
+                        <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </Modal>
 
           <View style={s.memberCard}>
             <View style={s.memberCardTop}>
@@ -503,8 +636,8 @@ const s = StyleSheet.create({
   saveText:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   avatarSection:    { alignItems: 'center', marginBottom: 24 },
-  avatar:           { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  avatarText:       { fontSize: 26, fontFamily: 'Inter_700Bold', color: '#fff' },
+  avatarWrap:       { marginBottom: 12, position: 'relative' },
+  avatarEditBadge:  { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.bg },
   emailText:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 8 },
   rolePill:         { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.primaryLight },
   rolePillText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'capitalize' },
@@ -556,6 +689,22 @@ const s = StyleSheet.create({
   legalDot:         { fontSize: 13, color: colors.textSecondary },
   signOutBtn:       { borderWidth: 1.5, borderColor: colors.danger, borderRadius: 12, padding: 15, alignItems: 'center' },
   signOutText:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.danger },
+
+  // Avatar picker modal
+  modalBackdrop:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  modalSheet:       { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  modalHandle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 20 },
+  modalTitle:       { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 16, textAlign: 'center' },
+  modalSub:         { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 20, marginBottom: 14, textAlign: 'center' },
+  uploadBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 14, padding: 14 },
+  uploadBtnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
+  avatarErrText:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger, textAlign: 'center', marginTop: 8 },
+  presetGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
+  presetItem:       { position: 'relative' },
+  presetItemActive: {},
+  presetCircle:     { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center' },
+  presetEmoji:      { fontSize: 30 },
+  presetCheck:      { position: 'absolute', bottom: -2, right: -2, backgroundColor: colors.bg, borderRadius: 10 },
 
   // Appointment detail view
   detailFacilityCard:  { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4, backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, ...shadow },

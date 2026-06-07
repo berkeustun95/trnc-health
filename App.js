@@ -10,6 +10,7 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from './lib/supabase'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t } from './constants/i18n'
+import { getPreset } from './constants/avatars'
 import AuthScreen from './screens/AuthScreen'
 import BookingScreen from './screens/BookingScreen'
 import ProviderScreen from './screens/ProviderScreen'
@@ -173,7 +174,7 @@ export default function App() {
     if (!session) {
       setProfile(null); setLatestResult(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); return
     }
-    supabase.from('profiles').select('role, preferred_language').eq('id', session.user.id).single()
+    supabase.from('profiles').select('role, preferred_language, avatar_url').eq('id', session.user.id).single()
       .then(async ({ data }) => {
         setProfile(data ?? null)
         if (data?.role === 'provider') {
@@ -436,6 +437,7 @@ export default function App() {
       lang={lang}
       onBack={() => setShowProfile(false)}
       onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
+      onAvatarChange={url => setProfile(prev => ({ ...prev, avatar_url: url }))}
     />
   } else if (showNotifs) {
     content = <NotificationsScreen
@@ -551,9 +553,18 @@ export default function App() {
                 {notifications.some(n => !n.read) && <View style={styles.notifDot} />}
               </TouchableOpacity>
               <TouchableOpacity style={styles.avatarBtn} onPress={() => setShowProfile(true)}>
-                <Text style={styles.avatarBtnText}>
-                  {session.user.email[0].toUpperCase()}
-                </Text>
+                {(() => {
+                  const preset = getPreset(profile?.avatar_url)
+                  if (preset) return (
+                    <View style={[styles.avatarBtn, { backgroundColor: preset.bg, margin: 0 }]}>
+                      <Text style={{ fontSize: 18 }}>{preset.emoji}</Text>
+                    </View>
+                  )
+                  if (profile?.avatar_url?.startsWith('http')) return (
+                    <Image source={{ uri: profile.avatar_url }} style={{ width: 34, height: 34, borderRadius: 17 }} />
+                  )
+                  return <Text style={styles.avatarBtnText}>{session.user.email[0].toUpperCase()}</Text>
+                })()}
               </TouchableOpacity>
             </View>
           </View>
