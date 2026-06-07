@@ -61,7 +61,7 @@ export default function AuthScreen({ lang = 'English' }) {
       <SafeAreaView style={styles.safe}>
         <View style={styles.container}>
           <View style={styles.logoArea}>
-            <Image source={require('../assets/Logo.png')} style={styles.logoImg} resizeMode="contain" />
+            <Image source={require('../assets/adalogo.png')} style={styles.logoImg} resizeMode="contain" />
           </View>
           <View style={styles.resetSuccessWrap}>
             <View style={styles.resetSuccessIcon}>
@@ -87,7 +87,7 @@ export default function AuthScreen({ lang = 'English' }) {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.kav}>
           <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.logoArea}>
-              <Image source={require('../assets/Logo.png')} style={styles.logoImg} resizeMode="contain" />
+              <Image source={require('../assets/adalogo.png')} style={styles.logoImg} resizeMode="contain" />
             </View>
 
             {resetSent ? (
@@ -154,7 +154,7 @@ export default function AuthScreen({ lang = 'English' }) {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.logoArea}>
-            <Image source={require('../assets/Logo.png')} style={styles.logoImg} resizeMode="contain" />
+            <Image source={require('../assets/adalogo.png')} style={styles.logoImg} resizeMode="contain" />
           </View>
 
           <View style={styles.toggle}>

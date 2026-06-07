@@ -1,9 +1,14 @@
-import { useState } from 'react'
-import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import { useState, useRef } from 'react'
+import {
+  View, Text, Image, TouchableOpacity, StyleSheet,
+  FlatList, Dimensions, ScrollView,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Feather, Ionicons } from '@expo/vector-icons'
+import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+
+const { width, height } = Dimensions.get('window')
 
 const LANGUAGES = [
   { key: 'English', label: 'English' },
@@ -17,80 +22,272 @@ const LANGUAGES = [
   { key: 'Persian', label: 'فارسی' },
 ]
 
-const POINTS = ['onboardingP1', 'onboardingP2', 'onboardingP3']
+const FEATURE_SLIDES = [
+  {
+    id: 'find',
+    icon: 'location',
+    iconBg: '#E0F5F4',
+    iconColor: '#0E7C7B',
+    titleKey: 'slide1Title',
+    bodyKey: 'onboardingP1',
+  },
+  {
+    id: 'duty',
+    icon: 'moon',
+    iconBg: '#EAE8F5',
+    iconColor: '#5B5BD6',
+    titleKey: 'slide2Title',
+    bodyKey: 'onboardingP2',
+  },
+  {
+    id: 'book',
+    icon: 'calendar',
+    iconBg: '#E6F5ED',
+    iconColor: '#2E9E5B',
+    titleKey: 'slide3Title',
+    bodyKey: 'onboardingP3',
+  },
+]
+
+function WelcomeSlide({ lang, setLang }) {
+  return (
+    <ScrollView
+      style={{ width }}
+      contentContainerStyle={s.welcomeContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={s.logoWrap}>
+        <Image
+          source={require('../assets/adalogo.png')}
+          style={s.logo}
+          resizeMode="contain"
+        />
+      </View>
+      <Text style={s.tagline}>{t('onboardingTagline', lang)}</Text>
+
+      <View style={s.divider} />
+
+      <Text style={s.langLabel}>{t('chooseLanguage', lang)}</Text>
+      <View style={s.langGrid}>
+        {LANGUAGES.map(({ key, label }) => (
+          <TouchableOpacity
+            key={key}
+            style={[s.langChip, lang === key && s.langChipActive]}
+            onPress={() => setLang(key)}
+            activeOpacity={0.7}
+          >
+            <Text style={[s.langChipText, lang === key && s.langChipTextActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </ScrollView>
+  )
+}
+
+function FeatureSlide({ slide, lang }) {
+  return (
+    <View style={s.featureSlide}>
+      <View style={s.iconArea}>
+        <View style={[s.iconCircle, { backgroundColor: slide.iconBg }]}>
+          <Ionicons name={slide.icon} size={72} color={slide.iconColor} />
+        </View>
+      </View>
+      <View style={s.featureText}>
+        <Text style={s.featureTitle}>{t(slide.titleKey, lang)}</Text>
+        <Text style={s.featureBody}>{t(slide.bodyKey, lang)}</Text>
+      </View>
+    </View>
+  )
+}
 
 export default function OnboardingScreen({ onComplete }) {
   const [lang, setLang] = useState('English')
+  const [index, setIndex] = useState(0)
+  const listRef = useRef(null)
+
+  const SLIDES = [{ id: 'welcome' }, ...FEATURE_SLIDES]
+  const isLast = index === SLIDES.length - 1
+
+  function goTo(i) {
+    listRef.current?.scrollToIndex({ index: i, animated: true })
+    setIndex(i)
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false}>
+      <FlatList
+        ref={listRef}
+        data={SLIDES}
+        keyExtractor={item => item.id}
+        horizontal
+        pagingEnabled
+        scrollEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={e => {
+          const i = Math.round(e.nativeEvent.contentOffset.x / width)
+          setIndex(i)
+        }}
+        renderItem={({ item }) =>
+          item.id === 'welcome'
+            ? <WelcomeSlide lang={lang} setLang={setLang} />
+            : <FeatureSlide slide={item} lang={lang} />
+        }
+      />
 
-        <View style={s.top}>
-          <Image source={require('../assets/Logo.png')} style={s.logoImg} resizeMode="contain" />
-          <Text style={s.tagline}>{t('onboardingTagline', lang)}</Text>
-        </View>
-
-        <View style={s.langSection}>
-          <Text style={s.sectionLabel}>{t('chooseLanguage', lang)}</Text>
-          <View style={s.langGrid}>
-            {LANGUAGES.map(({ key, label }) => (
-              <TouchableOpacity
-                key={key}
-                style={[s.langChip, lang === key && s.langChipActive]}
-                onPress={() => setLang(key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[s.langChipText, lang === key && s.langChipTextActive]}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={s.pointsSection}>
-          {POINTS.map((key, i) => (
-            <View key={i} style={s.pointRow}>
-              <View style={s.checkCircle}>
-                <Feather name="check" size={13} color={colors.success} />
-              </View>
-              <Text style={s.pointText}>{t(key, lang)}</Text>
-            </View>
+      <View style={s.nav}>
+        <View style={s.dots}>
+          {SLIDES.map((_, i) => (
+            <View key={i} style={[s.dot, i === index && s.dotActive]} />
           ))}
         </View>
 
-        <TouchableOpacity style={s.cta} onPress={() => onComplete(lang)} activeOpacity={0.85}>
-          <Text style={s.ctaText}>{t('getStarted', lang)}</Text>
-          <Ionicons name="arrow-forward" size={18} color="#fff" />
-        </TouchableOpacity>
-
-      </ScrollView>
+        <View style={s.navButtons}>
+          {index > 0 && (
+            <TouchableOpacity style={s.backBtn} onPress={() => goTo(index - 1)} activeOpacity={0.7}>
+              <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[s.nextBtn, isLast && s.nextBtnLast]}
+            onPress={() => isLast ? onComplete(lang) : goTo(index + 1)}
+            activeOpacity={0.85}
+          >
+            <Text style={s.nextText}>
+              {isLast ? t('getStarted', lang) : t('next', lang)}
+            </Text>
+            <Ionicons name="arrow-forward" size={17} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </View>
     </SafeAreaView>
   )
 }
 
 const s = StyleSheet.create({
-  safe:              { flex: 1, backgroundColor: colors.bg },
-  container:         { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 40, flexGrow: 1 },
+  safe: { flex: 1, backgroundColor: '#fff' },
 
-  top:               { alignItems: 'center', marginBottom: 40 },
-  logoImg:           { width: 260, height: 100, marginBottom: 12 },
-  tagline:           { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 22, paddingHorizontal: 8 },
+  // Welcome slide
+  welcomeContent: {
+    width,
+    paddingHorizontal: 28,
+    paddingTop: height * 0.06,
+    paddingBottom: 16,
+  },
+  logoWrap:  { alignItems: 'center', marginBottom: 16 },
+  logo:      { width: width * 0.68, height: width * 0.68 },
+  tagline:   {
+    fontSize: 15,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 28,
+    paddingHorizontal: 8,
+  },
+  divider:   { height: 1, backgroundColor: colors.border, marginBottom: 24 },
+  langLabel: {
+    fontSize: 11,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+    marginBottom: 14,
+  },
+  langGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  langChip:        {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: colors.cardBg,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  langChipActive:      { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  langChipText:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  langChipTextActive:  { fontFamily: 'Inter_700Bold', color: colors.primary },
 
-  langSection:       { marginBottom: 36 },
-  sectionLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 14 },
-  langGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  langChip:          { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
-  langChipActive:    { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  langChipText:      { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  langChipTextActive:{ fontFamily: 'Inter_700Bold', color: colors.primary },
+  // Feature slides
+  featureSlide: {
+    width,
+    flex: 1,
+    paddingHorizontal: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+  },
+  iconArea:    { marginBottom: 40, alignItems: 'center' },
+  iconCircle:  {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadow,
+  },
+  featureText:  { alignItems: 'center' },
+  featureTitle: {
+    fontSize: 26,
+    fontFamily: 'Inter_700Bold',
+    color: '#1A3A4A',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+    marginBottom: 14,
+  },
+  featureBody: {
+    fontSize: 16,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    maxWidth: 280,
+  },
 
-  pointsSection:     { marginBottom: 40 },
-  pointRow:          { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16, gap: 12 },
-  checkCircle:       { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.successLight, justifyContent: 'center', alignItems: 'center', marginTop: 1, flexShrink: 0 },
-  pointText:         { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 22 },
+  // Bottom nav
+  nav: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 16,
+  },
+  dot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
+  dotActive: { width: 22, backgroundColor: colors.primary },
 
-  cta:               { backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 17, paddingHorizontal: 24, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-  ctaText:           { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
+  navButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nextBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  nextBtnLast: { backgroundColor: '#1A3A4A' },
+  nextText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
 })

@@ -729,7 +729,7 @@ export default function AdminScreen({ session }) {
       <View style={s.container}>
         <View style={s.header}>
           <View style={s.headerLeft}>
-            <Image source={require('../assets/ADAicon.png')} style={s.headerIcon} resizeMode="contain" />
+            <Image source={require('../assets/adalogo.png')} style={s.headerIcon} resizeMode="contain" />
             <Text style={s.headerLabel}>Admin</Text>
           </View>
           <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>

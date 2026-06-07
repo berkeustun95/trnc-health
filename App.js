@@ -526,7 +526,7 @@ export default function App() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Image source={require('./assets/ADAicon.png')} style={styles.headerIcon} resizeMode="contain" />
+            <Image source={require('./assets/adalogo.png')} style={styles.headerIcon} resizeMode="contain" />
             <View style={styles.headerRight}>
               <View style={styles.viewToggle}>
                 <TouchableOpacity
@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
   wordmark:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
-  headerIcon:       { width: 40, height: 40, borderRadius: 10 },
+  headerIcon:       { width: 44, height: 44, borderRadius: 10 },
   subText:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
   signOutLink:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   memberIdLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },

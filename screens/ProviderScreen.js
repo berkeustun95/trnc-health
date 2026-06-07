@@ -214,7 +214,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Image source={require('../assets/ADAicon.png')} style={styles.headerIcon} resizeMode="contain" />
+            <Image source={require('../assets/adalogo.png')} style={styles.headerIcon} resizeMode="contain" />
             <View>
               <Text style={styles.facilityTag} numberOfLines={1}>{facility.name}</Text>
               <View style={facility.membership_tier === 'pro' ? styles.proBadge : styles.basicBadge}>
