@@ -6,6 +6,7 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import ReviewsScreen from './ReviewsScreen'
 
 export default function BookingScreen({ facility, session, lang, onBack }) {
   const [date, setDate] = useState(() => {
@@ -24,19 +25,24 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
   const [submittingQ, setSubmittingQ] = useState(false)
   const [reviews, setReviews] = useState([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
+  const [reviewTotal, setReviewTotal] = useState(0)
+  const [showAllReviews, setShowAllReviews] = useState(false)
 
   useEffect(() => { loadQuestions(); loadReviews() }, [])
 
   async function loadReviews() {
     setReviewsLoading(true)
     try {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('reviews')
-        .select('id, rating, comment, created_at')
+        .select('id, rating, comment, created_at', { count: 'exact' })
         .eq('facility_id', facility.id)
         .order('created_at', { ascending: false })
         .limit(5)
-      if (!error && data) setReviews(data)
+      if (!error && data) {
+        setReviews(data)
+        setReviewTotal(count ?? 0)
+      }
     } finally {
       setReviewsLoading(false)
     }
@@ -85,6 +91,10 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
   }
 
   const tc = typeColors[facility.type] || typeColors.clinic
+
+  if (showAllReviews) {
+    return <ReviewsScreen facility={facility} lang={lang} onBack={() => setShowAllReviews(false)} />
+  }
 
   if (done) {
     return (
@@ -163,6 +173,12 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
                   {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : null}
                 </View>
               ))}
+              <TouchableOpacity style={styles.seeAllBtn} onPress={() => setShowAllReviews(true)}>
+                <Text style={styles.seeAllText}>
+                  {reviewTotal > 5 ? `See all ${reviewTotal} reviews` : 'See all reviews'}
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+              </TouchableOpacity>
               <View style={styles.divider} />
             </>
           )
@@ -295,6 +311,8 @@ const styles = StyleSheet.create({
   answerLabel:     { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   answerBody:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
   noAnswer:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic' },
+  seeAllBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, marginBottom: 4 },
+  seeAllText:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
   reviewCard:      { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 8, ...shadow },
   reviewTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   reviewStars:     { fontSize: 14, color: '#F5A623', letterSpacing: 1 },
