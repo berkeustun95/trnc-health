@@ -527,22 +527,22 @@ export default function App() {
       <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
         <View style={styles.container}>
           <View style={styles.header}>
+            <View style={styles.viewToggle}>
+              <TouchableOpacity
+                style={[styles.viewBtn, view === 'list' && styles.viewBtnActive]}
+                onPress={() => setView('list')}
+              >
+                <Feather name="list" size={17} color={view === 'list' ? colors.primary : colors.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.viewBtn, view === 'map' && styles.viewBtnActive]}
+                onPress={() => setView('map')}
+              >
+                <Ionicons name="map-outline" size={17} color={view === 'map' ? colors.primary : colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <Image source={require('./assets/logonobg.png')} style={styles.headerIcon} resizeMode="contain" />
             <View style={styles.headerRight}>
-              <View style={styles.viewToggle}>
-                <TouchableOpacity
-                  style={[styles.viewBtn, view === 'list' && styles.viewBtnActive]}
-                  onPress={() => setView('list')}
-                >
-                  <Feather name="list" size={17} color={view === 'list' ? colors.primary : colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.viewBtn, view === 'map' && styles.viewBtnActive]}
-                  onPress={() => setView('map')}
-                >
-                  <Ionicons name="map-outline" size={17} color={view === 'map' ? colors.primary : colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
               <TouchableOpacity style={styles.quizBtn} onPress={() => setShowQuiz(true)}>
                 <Ionicons name="flask-outline" size={18} color={colors.accent} />
               </TouchableOpacity>
@@ -770,9 +770,9 @@ const styles = StyleSheet.create({
   safe:             { flex: 1, backgroundColor: colors.bg },
   container:        { flex: 1, paddingHorizontal: 16 },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
-  header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
+  header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12, position: 'relative' },
   wordmark:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
-  headerIcon:       { width: 72, height: 72 },
+  headerIcon:       { width: 72, height: 72, position: 'absolute', left: '50%', marginLeft: -36 },
   subText:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
   signOutLink:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   memberIdLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
