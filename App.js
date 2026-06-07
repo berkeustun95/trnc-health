@@ -698,6 +698,10 @@ export default function App() {
                       style={[styles.card, isDuty && styles.dutyCard, !item.provider_id && styles.cardUnclaimed]}
                       onPress={() => item.provider_id ? setSelectedFacility(item) : setUnclaimedFacility(item)}
                     >
+                      {item.cover_image_url ? (
+                        <Image source={{ uri: item.cover_image_url }} style={styles.cardCover} resizeMode="cover" />
+                      ) : null}
+                      <View style={styles.cardBody}>
                       {isDuty && (
                         <View style={styles.dutyCardBadge}>
                           <Text style={styles.dutyLabel}>{t('onDuty', lang)}</Text>
@@ -705,7 +709,10 @@ export default function App() {
                       )}
                       <View style={styles.cardMain}>
                         <View style={[styles.typeIcon, { backgroundColor: tc.bg }]}>
-                          <Text style={styles.typeIconText}>{TYPE_ICONS[item.type] ?? '🏥'}</Text>
+                          {item.logo_url
+                            ? <Image source={{ uri: item.logo_url }} style={{ width: 36, height: 36, borderRadius: 8 }} resizeMode="contain" />
+                            : <Text style={styles.typeIconText}>{TYPE_ICONS[item.type] ?? '🏥'}</Text>
+                          }
                         </View>
                         <View style={styles.cardContent}>
                           <View style={styles.cardTop}>
@@ -762,6 +769,7 @@ export default function App() {
                           <Ionicons name="chevron-forward" size={16} color={colors.border} />
                         </View>
                       </View>
+                      </View>
                     </TouchableOpacity>
                   )
                 }}
@@ -809,7 +817,9 @@ const styles = StyleSheet.create({
   filterChipOpenText: { color: colors.success, fontFamily: 'Inter_700Bold' },
   filterChipTextActive: { fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   listContent:      { paddingBottom: 32 },
-  card:             { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: '#1A2B33', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  card:             { backgroundColor: colors.cardBg, borderRadius: 16, overflow: 'hidden', marginBottom: 10, shadowColor: '#1A2B33', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  cardCover:        { width: '100%', height: 120 },
+  cardBody:         { padding: 16 },
   dutyCard:         { borderWidth: 1.5, borderColor: colors.accent },
   dutyCardBadge:    { backgroundColor: colors.accentLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
   dutyLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },

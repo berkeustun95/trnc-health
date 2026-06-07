@@ -2,10 +2,35 @@ import { useState, useEffect } from 'react'
 import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import QuizReviewScreen from './quiz/QuizReviewScreen'
+
+function decode(base64) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  const lookup = new Uint8Array(256)
+  for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i
+  lookup['='.charCodeAt(0)] = 0
+  const len = base64.length
+  let bufLen = (len * 3) >> 2
+  if (base64[len - 1] === '=') bufLen--
+  if (base64[len - 2] === '=') bufLen--
+  const buf = new ArrayBuffer(bufLen)
+  const out = new Uint8Array(buf)
+  let p = 0
+  for (let i = 0; i < len; i += 4) {
+    const a = lookup[base64.charCodeAt(i)]
+    const b = lookup[base64.charCodeAt(i + 1)]
+    const c = lookup[base64.charCodeAt(i + 2)]
+    const d = lookup[base64.charCodeAt(i + 3)]
+    out[p++] = (a << 2) | (b >> 4)
+    if (p < bufLen) out[p++] = ((b & 15) << 4) | (c >> 2)
+    if (p < bufLen) out[p++] = ((c & 3) << 6) | d
+  }
+  return buf
+}
 
 async function sendPushNotification(token, title, body) {
   try {
@@ -46,6 +71,11 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [editHours, setEditHours] = useState(facility.opening_hours ?? '')
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [coverUrl, setCoverUrl] = useState(facility.cover_image_url ?? null)
+  const [logoUrl, setLogoUrl] = useState(facility.logo_url ?? null)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [imageError, setImageError] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -152,6 +182,42 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         await recordNotification(customerId, title, body)
       }
       setAppointments(prev => prev.filter(a => a.id !== id))
+    }
+  }
+
+  async function pickAndUploadImage(type) {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) { setImageError('Photo library permission denied'); return }
+    const isCover = type === 'cover'
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: isCover ? [16, 9] : [1, 1],
+      quality: 0.7,
+      base64: true,
+    })
+    if (result.canceled) return
+    const asset = result.assets[0]
+    if (isCover) setUploadingCover(true); else setUploadingLogo(true)
+    setImageError(null)
+    try {
+      const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
+      const path = `${facility.id}/${type}.${ext}`
+      const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('facility-images')
+        .upload(path, decode(asset.base64), { contentType, upsert: true })
+      if (uploadError) throw uploadError
+      const { data: { publicUrl } } = supabase.storage.from('facility-images').getPublicUrl(path)
+      const url = `${publicUrl}?t=${Date.now()}`
+      const field = isCover ? 'cover_image_url' : 'logo_url'
+      await supabase.from('facilities').update({ [field]: url }).eq('id', facility.id)
+      if (isCover) setCoverUrl(url); else setLogoUrl(url)
+      if (onFacilityUpdated) onFacilityUpdated()
+    } catch {
+      setImageError('Upload failed. Try again.')
+    } finally {
+      if (isCover) setUploadingCover(false); else setUploadingLogo(false)
     }
   }
 
@@ -295,6 +361,44 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
 
         {tab === 'profile' ? (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
+            <View style={styles.card}>
+              <Text style={styles.fieldLabel}>Cover Photo</Text>
+              <TouchableOpacity style={styles.coverUploadArea} onPress={() => pickAndUploadImage('cover')} activeOpacity={0.8}>
+                {coverUrl
+                  ? <Image source={{ uri: coverUrl }} style={styles.coverPreview} resizeMode="cover" />
+                  : <View style={styles.uploadPlaceholder}>
+                      <Feather name="camera" size={22} color={colors.textSecondary} />
+                      <Text style={styles.uploadHint}>Tap to add cover photo</Text>
+                    </View>
+                }
+                {uploadingCover && <ActivityIndicator style={StyleSheet.absoluteFill} color={colors.primary} />}
+                {coverUrl && (
+                  <View style={styles.uploadEditBadge}>
+                    <Feather name="edit-2" size={11} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Logo</Text>
+              <TouchableOpacity style={styles.logoUploadArea} onPress={() => pickAndUploadImage('logo')} activeOpacity={0.8}>
+                {logoUrl
+                  ? <Image source={{ uri: logoUrl }} style={styles.logoPreview} resizeMode="cover" />
+                  : <View style={styles.uploadPlaceholder}>
+                      <Feather name="image" size={18} color={colors.textSecondary} />
+                      <Text style={styles.uploadHint}>Tap to add logo</Text>
+                    </View>
+                }
+                {uploadingLogo && <ActivityIndicator style={StyleSheet.absoluteFill} color={colors.primary} />}
+                {logoUrl && (
+                  <View style={styles.uploadEditBadge}>
+                    <Feather name="edit-2" size={11} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {imageError && <Text style={styles.imageErrorText}>{imageError}</Text>}
+            </View>
+
             <View style={styles.card}>
               <Text style={styles.fieldLabel}>{t('phone', lang)}</Text>
               <TextInput
@@ -606,6 +710,14 @@ const styles = StyleSheet.create({
   fieldInput:     { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface },
   saveBtn:        { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
   saveBtnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+  coverUploadArea:  { height: 140, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  coverPreview:     { width: '100%', height: '100%' },
+  logoUploadArea:   { width: 90, height: 90, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  logoPreview:      { width: '100%', height: '100%' },
+  uploadPlaceholder: { alignItems: 'center', gap: 8 },
+  uploadHint:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  uploadEditBadge:  { position: 'absolute', bottom: 8, right: 8, width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  imageErrorText:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger, marginTop: 8 },
   empty:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   emptyIconWrap:  { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
   emptyTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },

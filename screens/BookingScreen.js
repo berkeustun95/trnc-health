@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ScrollView, TextInput, KeyboardAvoidingView, Linking } from 'react-native'
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ScrollView, TextInput, KeyboardAvoidingView, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { Feather, Ionicons } from '@expo/vector-icons'
@@ -128,11 +128,22 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
           <Text style={styles.backText}>{t('back', lang)}</Text>
         </TouchableOpacity>
 
+        {facility.cover_image_url ? (
+          <Image source={{ uri: facility.cover_image_url }} style={styles.coverHero} resizeMode="cover" />
+        ) : null}
+
         <View style={styles.facilityCard}>
-          <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
-            <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(facility.type, lang)}</Text>
+          <View style={styles.facilityCardTop}>
+            <View style={{ flex: 1 }}>
+              <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
+                <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(facility.type, lang)}</Text>
+              </View>
+              <Text style={styles.facilityName}>{facility.name}</Text>
+            </View>
+            {facility.logo_url ? (
+              <Image source={{ uri: facility.logo_url }} style={styles.facilityLogo} resizeMode="contain" />
+            ) : null}
           </View>
-          <Text style={styles.facilityName}>{facility.name}</Text>
           {facility.address ? (
             <View style={styles.infoRow}>
               <Feather name="map-pin" size={13} color={colors.textSecondary} />
@@ -284,7 +295,10 @@ const styles = StyleSheet.create({
   center:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   backRow:         { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 20 },
   backText:        { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  coverHero:       { width: '100%', height: 180, borderRadius: 16, marginBottom: 12, ...shadow },
   facilityCard:    { backgroundColor: colors.cardBg, borderRadius: 16, padding: 18, marginBottom: 28, ...shadow },
+  facilityCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 4 },
+  facilityLogo:    { width: 52, height: 52, borderRadius: 10, backgroundColor: colors.border, flexShrink: 0 },
   typeBadge:       { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
   typeBadgeText:   { fontSize: 11, fontFamily: 'Inter_700Bold', textTransform: 'capitalize' },
   facilityName:    { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
