@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
+import { View, Text, Image, ImageBackground, TextInput, TouchableOpacity, StyleSheet,
          ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
@@ -58,10 +58,12 @@ export default function AuthScreen({ lang = 'English' }) {
 
   if (signupDone) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
+        <View style={styles.overlay} />
+      <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]}>
         <View style={styles.container}>
           <View style={styles.logoArea}>
-            <Image source={require('../assets/adalogo.png')} style={styles.logoImg} resizeMode="contain" />
+            <Image source={require('../assets/logonobg.png')} style={styles.logoImg} resizeMode="contain" />
           </View>
           <View style={styles.resetSuccessWrap}>
             <View style={styles.resetSuccessIcon}>
@@ -78,16 +80,19 @@ export default function AuthScreen({ lang = 'English' }) {
           </View>
         </View>
       </SafeAreaView>
+      </ImageBackground>
     )
   }
 
   if (showReset) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
+        <View style={styles.overlay} />
+      <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.kav}>
           <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.logoArea}>
-              <Image source={require('../assets/adalogo.png')} style={styles.logoImg} resizeMode="contain" />
+              <Image source={require('../assets/logonobg.png')} style={styles.logoImg} resizeMode="contain" />
             </View>
 
             {resetSent ? (
@@ -139,11 +144,14 @@ export default function AuthScreen({ lang = 'English' }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      </ImageBackground>
     )
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
+      <View style={styles.overlay} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.kav}
@@ -154,7 +162,7 @@ export default function AuthScreen({ lang = 'English' }) {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.logoArea}>
-            <Image source={require('../assets/adalogo.png')} style={styles.logoImg} resizeMode="contain" />
+            <Image source={require('../assets/logonobg.png')} style={styles.logoImg} resizeMode="contain" />
           </View>
 
           <View style={styles.toggle}>
@@ -231,15 +239,17 @@ export default function AuthScreen({ lang = 'English' }) {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    </ImageBackground>
   )
 }
 
 const styles = StyleSheet.create({
-  safe:              { flex: 1, backgroundColor: colors.bg },
+  safe:              { flex: 1, backgroundColor: 'transparent' },
+  overlay:           { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.55)' },
   kav:               { flex: 1 },
   container:         { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
   logoArea:          { alignItems: 'center', marginBottom: 40 },
-  logoImg:           { width: 260, height: 100 },
+  logoImg:           { width: 460, height: 180 },
   toggle:            { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 14, marginBottom: 28, padding: 3 },
   tab:               { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
   tabActive:         { backgroundColor: colors.surface, shadowColor: colors.textPrimary, shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },

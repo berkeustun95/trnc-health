@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking } from 'react-native'
+import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
@@ -523,10 +523,11 @@ export default function App() {
     content = <BookingScreen facility={selectedFacility} session={session} lang={lang} onBack={() => setSelectedFacility(null)} />
   } else {
     content = (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <ImageBackground source={require('./assets/bg.png')} style={{ flex: 1 }} resizeMode="cover">
+      <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Image source={require('./assets/adalogo.png')} style={styles.headerIcon} resizeMode="contain" />
+            <Image source={require('./assets/logonobg.png')} style={styles.headerIcon} resizeMode="contain" />
             <View style={styles.headerRight}>
               <View style={styles.viewToggle}>
                 <TouchableOpacity
@@ -618,6 +619,21 @@ export default function App() {
             </TouchableOpacity>
           )}
 
+          {!latestResult && (
+            <TouchableOpacity style={styles.quizPromoCard} onPress={() => setShowQuiz(true)} activeOpacity={0.8}>
+              <View style={styles.quizPromoLeft}>
+                <View style={styles.quizPromoIconWrap}>
+                  <Ionicons name="flask-outline" size={20} color="#FFFFFF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.quizPromoTitle}>{t('supplementAdvisor', lang)}</Text>
+                  <Text style={styles.quizPromoSub} numberOfLines={2}>{t('supplementAdvisorSub', lang)}</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity style={styles.dutyBanner} onPress={() => setShowDutyList(true)} activeOpacity={0.8}>
             <View style={styles.dutyBannerLeft}>
               <View style={styles.dutyBannerIconWrap}>
@@ -651,6 +667,7 @@ export default function App() {
                 data={listed}
                 keyExtractor={item => item.id}
                 showsVerticalScrollIndicator={false}
+                style={{ flex: 1 }}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={(
                   <View style={styles.emptyWrap}>
@@ -742,6 +759,7 @@ export default function App() {
           )}
         </View>
       </SafeAreaView>
+      </ImageBackground>
     )
   }
 
@@ -754,7 +772,7 @@ const styles = StyleSheet.create({
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
   wordmark:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
-  headerIcon:       { width: 44, height: 44, borderRadius: 10 },
+  headerIcon:       { width: 72, height: 72 },
   subText:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
   signOutLink:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   memberIdLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -774,11 +792,11 @@ const styles = StyleSheet.create({
   filterRow:        { marginBottom: 12, flexGrow: 0 },
   filterContent:    { gap: 8, paddingRight: 4, alignItems: 'center' },
   filterChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: '#C8D3DC', backgroundColor: colors.cardBg, alignSelf: 'flex-start', ...shadow },
-  filterChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  filterChipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textTransform: 'capitalize' },
+  filterChipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+  filterChipText:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#1A2B33' },
   filterChipOpen:   { borderColor: colors.success, backgroundColor: colors.successLight },
   filterChipOpenText: { color: colors.success, fontFamily: 'Inter_700Bold' },
-  filterChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
+  filterChipTextActive: { fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   listContent:      { paddingBottom: 32 },
   card:             { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, ...shadow },
   dutyCard:         { borderWidth: 1.5, borderColor: colors.accent },
@@ -830,6 +848,11 @@ const styles = StyleSheet.create({
   dutyBannerIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.accent + '20', justifyContent: 'center', alignItems: 'center' },
   dutyBannerTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.accent, marginBottom: 2 },
   dutyBannerSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.accent + 'AA' },
+  quizPromoCard:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accent, borderRadius: 16, padding: 14, marginBottom: 12 },
+  quizPromoLeft:     { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  quizPromoIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  quizPromoTitle:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 2 },
+  quizPromoSub:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.85)' },
   resultCard:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primaryLight, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.primary + '25' },
   resultCardLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   resultCardIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.primary + '20', justifyContent: 'center', alignItems: 'center' },
