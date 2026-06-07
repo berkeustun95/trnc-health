@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import QuizReviewScreen from './quiz/QuizReviewScreen'
+import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -76,6 +77,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [uploadingCover, setUploadingCover] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [imageError, setImageError] = useState(null)
+  const [specialty, setSpecialty] = useState(facility.specialty ?? null)
 
   useEffect(() => {
     async function load() {
@@ -183,6 +185,13 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
       }
       setAppointments(prev => prev.filter(a => a.id !== id))
     }
+  }
+
+  async function saveSpecialty(val) {
+    const next = specialty === val ? null : val
+    setSpecialty(next)
+    await supabase.from('facilities').update({ specialty: next }).eq('id', facility.id)
+    if (onFacilityUpdated) onFacilityUpdated()
   }
 
   async function pickAndUploadImage(type) {
@@ -427,6 +436,26 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 placeholderTextColor={colors.textSecondary}
                 autoCapitalize="none"
               />
+
+              {SPECIALTIES_BY_TYPE[facility.type] && (
+                <>
+                  <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Specialty</Text>
+                  <View style={styles.specialtyGrid}>
+                    {SPECIALTIES_BY_TYPE[facility.type].map(sp => (
+                      <TouchableOpacity
+                        key={sp}
+                        style={[styles.specialtyChip, specialty === sp && styles.specialtyChipActive]}
+                        onPress={() => saveSpecialty(sp)}
+                      >
+                        <Text style={[styles.specialtyChipText, specialty === sp && styles.specialtyChipTextActive]}>
+                          {sp}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
               <TouchableOpacity
                 style={[styles.saveBtn, (saving || saveSuccess) && { opacity: 0.7 }]}
                 onPress={saveListing}
@@ -718,6 +747,11 @@ const styles = StyleSheet.create({
   uploadHint:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   uploadEditBadge:  { position: 'absolute', bottom: 8, right: 8, width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   imageErrorText:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger, marginTop: 8 },
+  specialtyGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  specialtyChip:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
+  specialtyChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  specialtyChipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  specialtyChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
   empty:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   emptyIconWrap:  { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
   emptyTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },

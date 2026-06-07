@@ -11,6 +11,7 @@ import { supabase } from './lib/supabase'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t } from './constants/i18n'
 import { getPreset } from './constants/avatars'
+import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import AuthScreen from './screens/AuthScreen'
 import BookingScreen from './screens/BookingScreen'
 import ProviderScreen from './screens/ProviderScreen'
@@ -93,6 +94,7 @@ export default function App() {
   const [unclaimedFacility, setUnclaimedFacility] = useState(null)
   const [favorites, setFavorites] = useState(new Set())
   const [openOnly, setOpenOnly] = useState(false)
+  const [activeSpecialty, setActiveSpecialty] = useState(null)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
@@ -313,6 +315,7 @@ export default function App() {
     })
     .filter(f => !activeType || f.type === activeType)
     .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)
+    .filter(f => !activeSpecialty || f.specialty === activeSpecialty)
     .filter(f => {
       const q = searchText.trim().toLowerCase()
       if (!q) return true
@@ -604,7 +607,7 @@ export default function App() {
               <TouchableOpacity
                 key={type ?? 'all'}
                 style={[styles.filterChip, activeType === type && styles.filterChipActive]}
-                onPress={() => setActiveType(type)}
+                onPress={() => { setActiveType(type); setActiveSpecialty(null) }}
               >
                 <Text style={[styles.filterChipText, activeType === type && styles.filterChipTextActive]}>
                   {type ? t(type, lang) : t('all', lang)}
@@ -612,6 +615,27 @@ export default function App() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+
+          {(() => {
+            const typeToShow = activeType || null
+            const specList = typeToShow
+              ? (SPECIALTIES_BY_TYPE[typeToShow] || []).filter(sp => facilities.some(f => f.specialty === sp))
+              : [...new Set(facilities.filter(f => f.specialty).map(f => f.specialty))].sort()
+            if (!specList.length) return null
+            return (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
+                {specList.map(sp => (
+                  <TouchableOpacity
+                    key={sp}
+                    style={[styles.filterChip, activeSpecialty === sp && styles.filterChipActive]}
+                    onPress={() => setActiveSpecialty(prev => prev === sp ? null : sp)}
+                  >
+                    <Text style={[styles.filterChipText, activeSpecialty === sp && styles.filterChipTextActive]}>{sp}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )
+          })()}
 
           {latestResult && (
             <TouchableOpacity style={styles.resultCard} onPress={() => setShowLatestResult(true)} activeOpacity={0.8}>
@@ -744,6 +768,7 @@ export default function App() {
                               </View>
                             )}
                           </View>
+                          {item.specialty ? <Text style={styles.specialtyText} numberOfLines={1}>{item.specialty}</Text> : null}
                           {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
                           {facilityRatings[item.id] && (
                             <View style={styles.ratingRow}>
@@ -843,6 +868,7 @@ const styles = StyleSheet.create({
   statusText:       { fontSize: 11, fontFamily: 'Inter_700Bold' },
   openText:         { color: colors.success },
   closedText:       { color: colors.danger },
+  specialtyText:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, marginBottom: 3 },
   addressText:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 4 },
   ratingRow:        { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   ratingText:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },

@@ -139,6 +139,7 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
                 <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(facility.type, lang)}</Text>
               </View>
               <Text style={styles.facilityName}>{facility.name}</Text>
+              {facility.specialty ? <Text style={styles.specialtyLabel}>{facility.specialty}</Text> : null}
             </View>
             {facility.logo_url ? (
               <Image source={{ uri: facility.logo_url }} style={styles.facilityLogo} resizeMode="contain" />
@@ -301,7 +302,8 @@ const styles = StyleSheet.create({
   facilityLogo:    { width: 52, height: 52, borderRadius: 10, backgroundColor: colors.border, flexShrink: 0 },
   typeBadge:       { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 10 },
   typeBadgeText:   { fontSize: 11, fontFamily: 'Inter_700Bold', textTransform: 'capitalize' },
-  facilityName:    { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
+  facilityName:    { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
+  specialtyLabel:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, marginBottom: 10 },
   infoRow:         { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   facilityAddress: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
   facilityHours:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
