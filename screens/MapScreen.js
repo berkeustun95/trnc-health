@@ -20,8 +20,9 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
           key={facility.id}
           coordinate={{ latitude: facility.latitude, longitude: facility.longitude }}
           pinColor={facility.id === dutyFacilityId ? colors.accent : (PIN_COLORS[facility.type] ?? colors.primary)}
+          onCalloutPress={() => onSelectFacility(facility)}
         >
-          <Callout onPress={() => onSelectFacility(facility)}>
+          <Callout>
             <View style={styles.callout}>
               <Text style={styles.calloutName}>{facility.name}</Text>
               <Text style={styles.calloutType}>{t(facility.type, lang)}</Text>
