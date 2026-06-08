@@ -264,6 +264,7 @@ export default function App() {
         .from('duty_schedule').select('facility_id').eq('date', today).maybeSingle()
       if (duty) setDutyFacilityId(duty.facility_id)
 
+
       const { data: reviewsData } = await supabase.from('reviews').select('facility_id, rating')
       if (reviewsData?.length) {
         const map = {}

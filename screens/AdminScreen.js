@@ -11,7 +11,20 @@ import { colors, shadow } from '../constants/theme'
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'admin']
-const TABS = ['Dashboard', 'Facilities', 'Duty', 'Providers', 'Claims', 'Users', 'Bookings']
+const TABS = ['Dashboard', 'Facilities', 'Duty', 'Providers', 'Claims', 'Users', 'Bookings', 'Broadcast']
+
+async function sendPushNotification(token, title, body) {
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ to: token, title, body, sound: 'default' }),
+    })
+  } catch {}
+}
+
+async function recordNotification(userId, title, body) {
+  try { await supabase.from('notifications').insert({ user_id: userId, title, body }) } catch {}
+}
 
 // ─── Shared ────────────────────────────────────────────────────────────────
 
@@ -380,10 +393,16 @@ function ClaimsTab() {
     setLoading(true)
     const { data } = await supabase
       .from('claim_requests')
-      .select('id, requester_id, requested_tier, created_at, facilities(id, name, type)')
+      .select('id, requester_id, requested_tier, created_at, registration_number, facilities(id, name, type)')
       .eq('status', 'pending')
       .order('created_at')
-    setClaims(data ?? [])
+    const rows = data ?? []
+    const ids = [...new Set(rows.map(r => r.requester_id).filter(Boolean))]
+    const { data: profilesData } = ids.length
+      ? await supabase.from('profiles').select('id, full_name').in('id', ids)
+      : { data: [] }
+    const pm = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
+    setClaims(rows.map(r => ({ ...r, _profile: pm[r.requester_id] })))
     setLoading(false)
   }, [])
 
@@ -401,11 +420,21 @@ function ClaimsTab() {
     }).eq('id', claim.facilities.id)
     if (err) { Alert.alert('Error', err.message); return }
     await supabase.from('claim_requests').update({ status: 'approved' }).eq('id', claim.id)
+    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', claim.requester_id).maybeSingle()
+    const title = 'Claim approved!'
+    const body = `${claim.facilities?.name ?? 'Your facility'} is now live with a 5-day trial.`
+    if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+    await recordNotification(claim.requester_id, title, body)
     load()
   }
 
   async function reject(claim) {
     await supabase.from('claim_requests').update({ status: 'rejected' }).eq('id', claim.id)
+    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', claim.requester_id).maybeSingle()
+    const title = 'Claim not approved'
+    const body = `Your claim for ${claim.facilities?.name ?? 'the facility'} was not approved. Contact us for details.`
+    if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+    await recordNotification(claim.requester_id, title, body)
     load()
   }
 
@@ -422,9 +451,8 @@ function ClaimsTab() {
               {TYPE_ICONS[c.facilities?.type] ?? '🏥'} {c.facilities?.name ?? '—'}
             </Text>
             <Text style={s.cardSub}>{c.facilities?.type} · {c.requested_tier === 'pro' ? 'Pro' : 'Basic'}</Text>
-            <Text style={[s.cardSub, { marginTop: 2, fontSize: 10 }]} numberOfLines={1}>
-              Requester ID: {c.requester_id.replace(/-/g, '').slice(0, 12).toUpperCase()}
-            </Text>
+            <Text style={[s.cardSub, { marginTop: 4 }]} numberOfLines={1}>{c._profile?.full_name || c.requester_id.slice(0, 8).toUpperCase()}</Text>
+            {c.registration_number ? <Text style={[s.cardSub, { fontSize: 11, marginTop: 2 }]} numberOfLines={1}>Reg: {c.registration_number}</Text> : null}
             <Text style={[s.cardSub, { fontSize: 10, marginTop: 2 }]}>
               {new Date(c.created_at).toLocaleDateString()}
             </Text>
@@ -464,18 +492,25 @@ function ProvidersTab() {
     setLoading(true)
     const { data } = await supabase
       .from('facilities')
-      .select('id, name, type, status, membership_tier, trial_ends_at, verified, provider_id')
+      .select('id, name, type, status, membership_tier, trial_ends_at, verified, provider_id, registration_number')
       .not('provider_id', 'is', null)
       .order('name')
     const rows = data ?? []
-    setPending(rows.filter(f => f.status === 'pending'))
-    setActive(rows.filter(f => f.status !== 'pending'))
+    const ids = [...new Set(rows.map(r => r.provider_id).filter(Boolean))]
+    const { data: profilesData } = ids.length
+      ? await supabase.from('profiles').select('id, full_name').in('id', ids)
+      : { data: [] }
+    const pm = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
+    const enriched = rows.map(r => ({ ...r, _profile: pm[r.provider_id] }))
+    setPending(enriched.filter(f => f.status === 'pending'))
+    setActive(enriched.filter(f => f.status !== 'pending'))
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
 
   async function approve(facilityId) {
+    const facility = [...pending, ...active].find(f => f.id === facilityId)
     const trialEnd = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
     await supabase.from('facilities').update({
       status: 'trial',
@@ -483,21 +518,52 @@ function ProvidersTab() {
       is_public: true,
       verified: true,
     }).eq('id', facilityId)
+    if (facility?.provider_id) {
+      const { data: p } = await supabase.from('profiles').select('push_token').eq('id', facility.provider_id).maybeSingle()
+      const title = 'Application approved!'
+      const body = `${facility.name} is now live with a 5-day trial.`
+      if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+      await recordNotification(facility.provider_id, title, body)
+    }
     load()
   }
 
   async function reject(facilityId) {
+    const facility = [...pending, ...active].find(f => f.id === facilityId)
     await supabase.from('facilities').update({ status: 'suspended' }).eq('id', facilityId)
+    if (facility?.provider_id) {
+      const { data: p } = await supabase.from('profiles').select('push_token').eq('id', facility.provider_id).maybeSingle()
+      const title = 'Application not approved'
+      const body = `Your application for ${facility.name} was not approved. Contact us for details.`
+      if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+      await recordNotification(facility.provider_id, title, body)
+    }
     load()
   }
 
   async function activate(facilityId) {
+    const facility = active.find(f => f.id === facilityId)
     await supabase.from('facilities').update({ status: 'active', trial_ends_at: null }).eq('id', facilityId)
+    if (facility?.provider_id) {
+      const { data: p } = await supabase.from('profiles').select('push_token').eq('id', facility.provider_id).maybeSingle()
+      const title = 'Account activated!'
+      const body = `${facility.name} is now fully active. Thank you!`
+      if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+      await recordNotification(facility.provider_id, title, body)
+    }
     load()
   }
 
   async function suspend(facilityId) {
+    const facility = active.find(f => f.id === facilityId)
     await supabase.from('facilities').update({ status: 'suspended' }).eq('id', facilityId)
+    if (facility?.provider_id) {
+      const { data: p } = await supabase.from('profiles').select('push_token').eq('id', facility.provider_id).maybeSingle()
+      const title = 'Account suspended'
+      const body = `${facility.name} has been suspended. Contact us for details.`
+      if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+      await recordNotification(facility.provider_id, title, body)
+    }
     load()
   }
 
@@ -522,7 +588,8 @@ function ProvidersTab() {
           <View key={f.id} style={s.card}>
             <Text style={s.cardTitle}>{f.name}</Text>
             <Text style={s.cardSub}>{f.type} · {f.membership_tier === 'pro' ? 'Pro' : 'Basic'}</Text>
-            <Text style={[s.cardSub, { marginTop: 2, fontSize: 10 }]} numberOfLines={1}>Provider: {f.provider_id}</Text>
+            <Text style={[s.cardSub, { marginTop: 4 }]} numberOfLines={1}>{f._profile?.full_name || f.provider_id.slice(0, 8).toUpperCase()}</Text>
+            {f.registration_number ? <Text style={[s.cardSub, { fontSize: 11, marginTop: 2 }]} numberOfLines={1}>Reg: {f.registration_number}</Text> : null}
             <View style={[s.cardRow, { marginTop: 10, gap: 8 }]}>
               <TouchableOpacity style={[s.ghostBtn, { backgroundColor: colors.successLight, flex: 1 }]} onPress={() => approve(f.id)}>
                 <Text style={[s.ghostBtnText, { color: colors.success }]}>Approve (5-day trial)</Text>
@@ -719,6 +786,115 @@ function BookingsTab() {
   )
 }
 
+// ─── Broadcast Tab ──────────────────────────────────────────────────────────
+
+function BroadcastTab() {
+  const [title, setTitle]   = useState('')
+  const [body, setBody]     = useState('')
+  const [target, setTarget] = useState('all')
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError]   = useState(null)
+
+  async function send() {
+    if (!title.trim() || !body.trim()) { setError('Title and message are required.'); return }
+    setSending(true)
+    setError(null)
+    setResult(null)
+
+    let query = supabase.from('profiles').select('id, push_token')
+    if (target === 'customers') query = query.eq('role', 'customer')
+    else if (target === 'providers') query = query.eq('role', 'provider')
+
+    const { data: profiles, error: fetchErr } = await query
+    if (fetchErr) { setError(fetchErr.message); setSending(false); return }
+
+    const t = title.trim()
+    const b = body.trim()
+    let pushCount = 0
+
+    for (const p of profiles ?? []) {
+      await recordNotification(p.id, t, b)
+      if (p.push_token) { await sendPushNotification(p.push_token, t, b); pushCount++ }
+    }
+
+    setResult({ total: (profiles ?? []).length, pushCount })
+    setSending(false)
+  }
+
+  return (
+    <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <Text style={s.sectionTitle}>Broadcast notification</Text>
+
+      <Field label="Title">
+        <TextInput
+          style={s.input}
+          value={title}
+          onChangeText={v => { setTitle(v); setResult(null) }}
+          placeholder="e.g. Duty pharmacy update"
+          placeholderTextColor={colors.border}
+          maxLength={100}
+        />
+      </Field>
+
+      <Field label="Message">
+        <TextInput
+          style={[s.input, { minHeight: 90, textAlignVertical: 'top' }]}
+          value={body}
+          onChangeText={v => { setBody(v); setResult(null) }}
+          placeholder="Enter your message…"
+          placeholderTextColor={colors.border}
+          multiline
+          maxLength={300}
+        />
+      </Field>
+
+      <Text style={[s.fieldLabel, { marginBottom: 8 }]}>Send to</Text>
+      <View style={[s.chipRow, { marginBottom: 20 }]}>
+        {[
+          { key: 'all',       label: 'All users'  },
+          { key: 'customers', label: 'Customers'  },
+          { key: 'providers', label: 'Providers'  },
+        ].map(opt => (
+          <TouchableOpacity
+            key={opt.key}
+            style={[s.chip, target === opt.key && s.chipActive]}
+            onPress={() => { setTarget(opt.key); setResult(null) }}
+          >
+            <Text style={[s.chipText, target === opt.key && s.chipTextActive]}>{opt.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {error ? <Text style={s.errorText}>{error}</Text> : null}
+
+      {result ? (
+        <View style={s.broadcastResult}>
+          <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+          <Text style={s.broadcastResultText}>
+            Delivered to {result.total} users · {result.pushCount} push sent
+          </Text>
+        </View>
+      ) : null}
+
+      <TouchableOpacity
+        style={[s.primaryBtn, (!title.trim() || !body.trim() || sending) && s.primaryBtnDisabled]}
+        onPress={send}
+        disabled={!title.trim() || !body.trim() || sending}
+      >
+        {sending
+          ? <ActivityIndicator color="#fff" />
+          : <Text style={s.primaryBtnText}>Send broadcast</Text>
+        }
+      </TouchableOpacity>
+
+      <Text style={s.broadcastNote}>
+        Sends an in-app notification to all matching users, plus a push notification to those with push enabled.
+      </Text>
+    </ScrollView>
+  )
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 export default function AdminScreen({ session }) {
@@ -758,6 +934,7 @@ export default function AdminScreen({ session }) {
           {tab === 'Claims'     && <ClaimsTab />}
           {tab === 'Users'      && <UsersTab />}
           {tab === 'Bookings'   && <BookingsTab />}
+          {tab === 'Broadcast'  && <BroadcastTab />}
         </View>
       </View>
     </SafeAreaView>
@@ -828,6 +1005,10 @@ const s = StyleSheet.create({
   modalCancel:        { fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   modalSave:          { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.primary },
   modalBody:          { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 60 },
+
+  broadcastResult:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.successLight, borderRadius: 10, padding: 12, marginBottom: 16 },
+  broadcastResultText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.success, flex: 1 },
+  broadcastNote:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 12, lineHeight: 18 },
 
   // status pills
   statusPill:         { alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },

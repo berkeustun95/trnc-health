@@ -8,6 +8,15 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 
+async function sendPushNotification(token, title, body) {
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ to: token, title, body, sound: 'default' }),
+    })
+  } catch {}
+}
+
 const TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS  = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const TYPE_LABELS = { pharmacy: 'Pharmacy', clinic: 'Clinic', hospital: 'Hospital', dentist: 'Dentist' }
@@ -20,7 +29,7 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
   const [searchText, setSearchText]       = useState('')
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [form, setForm] = useState({
-    name: '', type: 'clinic', address: '', phone: '', opening_hours: '', membership_tier: 'basic',
+    name: '', type: 'clinic', address: '', phone: '', opening_hours: '', membership_tier: 'basic', registration_number: '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState(null)
@@ -43,31 +52,43 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
   async function submit() {
     setSaving(true)
     setError(null)
+    const facilityName = mode === 'claim' ? selectedFacility?.name : form.name.trim()
     if (mode === 'claim') {
       const { error: err } = await supabase.from('claim_requests').insert({
-        facility_id:    selectedFacility.id,
-        requester_id:   session.user.id,
-        requested_tier: form.membership_tier,
+        facility_id:         selectedFacility.id,
+        requester_id:        session.user.id,
+        requested_tier:      form.membership_tier,
+        registration_number: form.registration_number.trim() || null,
       })
       setSaving(false)
       if (err) { setError(err.message); return }
     } else {
       if (!form.name.trim()) { setError('Facility name is required.'); setSaving(false); return }
       const { error: err } = await supabase.from('facilities').insert({
-        name:            form.name.trim(),
-        type:            form.type,
-        address:         form.address.trim() || null,
-        phone:           form.phone.trim() || null,
-        opening_hours:   form.opening_hours.trim() || null,
-        membership_tier: form.membership_tier,
-        status:          'pending',
-        provider_id:     session.user.id,
-        is_public:       false,
-        verified:        false,
+        name:                form.name.trim(),
+        type:                form.type,
+        address:             form.address.trim() || null,
+        phone:               form.phone.trim() || null,
+        opening_hours:       form.opening_hours.trim() || null,
+        membership_tier:     form.membership_tier,
+        status:              'pending',
+        provider_id:         session.user.id,
+        is_public:           false,
+        verified:            false,
+        registration_number: form.registration_number.trim() || null,
       })
       setSaving(false)
       if (err) { setError(err.message); return }
     }
+    try {
+      const { data: admins } = await supabase.from('profiles').select('id, push_token').eq('role', 'admin')
+      const title = mode === 'claim' ? 'New facility claim' : 'New provider application'
+      const body = `${facilityName || 'A facility'} submitted for review.`
+      for (const admin of admins ?? []) {
+        if (admin.push_token) await sendPushNotification(admin.push_token, title, body)
+        await supabase.from('notifications').insert({ user_id: admin.id, title, body })
+      }
+    } catch {}
     onDone()
   }
 
@@ -245,6 +266,16 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
               placeholderTextColor={colors.border}
             />
 
+            <Text style={s.fieldLabel}>BUSINESS REGISTRATION / LICENSE NO.</Text>
+            <TextInput
+              style={s.input}
+              value={form.registration_number}
+              onChangeText={set('registration_number')}
+              placeholder="e.g. Ministry reg. no."
+              placeholderTextColor={colors.border}
+              autoCapitalize="none"
+            />
+
             <TouchableOpacity
               style={[s.primaryBtn, !form.name.trim() && s.primaryBtnDisabled]}
               onPress={() => { if (form.name.trim()) { setError(null); setStep(3) } }}
@@ -262,7 +293,7 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
   const facilityType = selectedFacility?.type ?? form.type
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={s.formWrap} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={s.formWrap} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <TouchableOpacity style={s.backBtn} onPress={() => setStep(mode === 'claim' ? 2 : '2b')}>
           <Text style={s.backBtnText}>← Back</Text>
         </TouchableOpacity>
@@ -285,6 +316,20 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
             ? 'Your claim will be verified within 24 hours before going live.'
             : 'Both plans include a 5-day free trial. No payment until you\'re verified and live.'}
         </Text>
+
+        {mode === 'claim' && (
+          <>
+            <Text style={s.fieldLabel}>BUSINESS REGISTRATION / LICENSE NO.</Text>
+            <TextInput
+              style={s.input}
+              value={form.registration_number}
+              onChangeText={set('registration_number')}
+              placeholder="e.g. Ministry reg. no."
+              placeholderTextColor={colors.border}
+              autoCapitalize="none"
+            />
+          </>
+        )}
 
         <TouchableOpacity
           style={[s.tierCard, form.membership_tier === 'basic' && s.tierCardSelected]}

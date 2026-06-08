@@ -226,6 +226,9 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [avatarUploading, setAvatarUploading]   = useState(false)
   const [avatarError, setAvatarError]           = useState(null)
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false)
+  const [deleting, setDeleting]                 = useState(false)
+  const [deleteError, setDeleteError]           = useState(null)
 
   useEffect(() => {
     async function loadProfile() {
@@ -368,6 +371,18 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       onLangChange?.(form.preferred_language)
     }
     setSaving(false)
+  }
+
+  async function deleteAccount() {
+    setDeleting(true)
+    setDeleteError(null)
+    const { error } = await supabase.rpc('delete_own_account')
+    if (error) {
+      setDeleteError(error.message)
+      setDeleting(false)
+      return
+    }
+    await supabase.auth.signOut()
   }
 
   const set = key => val => setForm(f => ({ ...f, [key]: val }))
@@ -618,6 +633,33 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
             <Text style={s.signOutText}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={s.deleteAccountBtn} onPress={() => { setDeleteError(null); setDeleteConfirmVisible(true) }}>
+            <Text style={s.deleteAccountText}>{t('deleteAccount', lang)}</Text>
+          </TouchableOpacity>
+
+          <Modal visible={deleteConfirmVisible} animationType="fade" transparent onRequestClose={() => setDeleteConfirmVisible(false)}>
+            <View style={s.deleteModalBackdrop}>
+              <View style={s.deleteModalCard}>
+                <Text style={s.deleteModalTitle}>{t('deleteAccountTitle', lang)}</Text>
+                <Text style={s.deleteModalWarning}>{t('deleteAccountWarning', lang)}</Text>
+                {deleteError ? <Text style={s.deleteModalError}>{deleteError}</Text> : null}
+                <TouchableOpacity
+                  style={[s.deleteModalConfirmBtn, deleting && { opacity: 0.5 }]}
+                  onPress={deleteAccount}
+                  disabled={deleting}
+                >
+                  {deleting
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={s.deleteModalConfirmText}>{t('deleteAccountConfirmBtn', lang)}</Text>
+                  }
+                </TouchableOpacity>
+                <TouchableOpacity style={s.deleteModalCancelBtn} onPress={() => setDeleteConfirmVisible(false)} disabled={deleting}>
+                  <Text style={s.deleteModalCancelText}>{t('cancel', lang)}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -689,6 +731,17 @@ const s = StyleSheet.create({
   legalDot:         { fontSize: 13, color: colors.textSecondary },
   signOutBtn:       { borderWidth: 1.5, borderColor: colors.danger, borderRadius: 12, padding: 15, alignItems: 'center' },
   signOutText:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.danger },
+  deleteAccountBtn: { alignItems: 'center', marginTop: 16, paddingVertical: 12 },
+  deleteAccountText:{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },
+  deleteModalBackdrop:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  deleteModalCard:        { backgroundColor: colors.bg, borderRadius: 20, padding: 24, width: '100%', maxWidth: 360 },
+  deleteModalTitle:       { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 12, textAlign: 'center' },
+  deleteModalWarning:     { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  deleteModalError:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger, textAlign: 'center', marginBottom: 12 },
+  deleteModalConfirmBtn:  { backgroundColor: colors.danger, borderRadius: 12, padding: 15, alignItems: 'center', marginBottom: 10 },
+  deleteModalConfirmText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+  deleteModalCancelBtn:   { alignItems: 'center', padding: 12 },
+  deleteModalCancelText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 
   // Avatar picker modal
   modalBackdrop:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
