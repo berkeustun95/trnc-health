@@ -484,21 +484,21 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowAvatarPicker(false)} />
             <View style={s.modalSheet}>
               <View style={s.modalHandle} />
-              <Text style={s.modalTitle}>Choose avatar</Text>
+              <Text style={s.modalTitle}>{t('chooseAvatar', lang)}</Text>
 
               <TouchableOpacity style={s.uploadBtn} onPress={pickAndUploadPhoto} disabled={avatarUploading}>
                 {avatarUploading
                   ? <ActivityIndicator color={colors.primary} />
                   : <>
                       <Feather name="camera" size={18} color={colors.primary} />
-                      <Text style={s.uploadBtnText}>Upload photo</Text>
+                      <Text style={s.uploadBtnText}>{t('uploadPhoto', lang)}</Text>
                     </>
                 }
               </TouchableOpacity>
 
               {avatarError ? <Text style={s.avatarErrText}>{avatarError}</Text> : null}
 
-              <Text style={s.modalSub}>Or pick an avatar</Text>
+              <Text style={s.modalSub}>{t('orPickAvatar', lang)}</Text>
               <View style={s.presetGrid}>
                 {PRESET_AVATARS.map(av => (
                   <TouchableOpacity key={av.id} style={[s.presetItem, avatarUrl === `preset:${av.id}` && s.presetItemActive]} onPress={() => savePresetAvatar(av.id)}>

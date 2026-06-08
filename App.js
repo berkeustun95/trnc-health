@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking } from 'react-native'
+import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
@@ -25,6 +25,7 @@ import DutyListScreen from './screens/DutyListScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
+import WelcomeScreen from './screens/WelcomeScreen'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -96,8 +97,10 @@ export default function App() {
   const [openOnly, setOpenOnly] = useState(false)
   const [activeSpecialty, setActiveSpecialty] = useState(null)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(true)
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
 
   function toggleFavorite(id) {
     setFavorites(prev => {
@@ -128,6 +131,22 @@ export default function App() {
     const sub = Linking.addEventListener('url', ({ url }) => handleDeepLink(url))
     return () => sub.remove()
   }, [])
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (showPasswordReset) { setShowPasswordReset(false); return true }
+      if (showLatestResult) { setShowLatestResult(false); return true }
+      if (showQuiz) { setShowQuiz(false); return true }
+      if (showProfile) { setShowProfile(false); return true }
+      if (showNotifs) { setShowNotifs(false); return true }
+      if (showDutyList) { setShowDutyList(false); return true }
+      if (unclaimedFacility) { setUnclaimedFacility(null); return true }
+      if (selectedFacility) { setSelectedFacility(null); return true }
+      return false
+    })
+    return () => sub.remove()
+  }, [showPasswordReset, showLatestResult, showQuiz, showProfile, showNotifs, showDutyList, unclaimedFacility, selectedFacility])
 
   useEffect(() => {
     Promise.all([
@@ -250,6 +269,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    setFacilityLoadError(false)
     async function load() {
       const favVal = await AsyncStorage.getItem('ada_favorites')
       if (favVal) setFavorites(new Set(JSON.parse(favVal)))
@@ -294,7 +314,7 @@ export default function App() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [retryCount])
 
   const listed = facilities
     .map(f => ({
@@ -342,6 +362,8 @@ export default function App() {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   } else if (onboarded === false) {
     content = <OnboardingScreen onComplete={completeOnboarding} />
+  } else if (!session && showWelcome) {
+    content = <WelcomeScreen lang={lang} onContinue={() => setShowWelcome(false)} />
   } else if (!session) {
     content = <AuthScreen lang={lang} />
   } else if (loading || !profile) {
@@ -694,7 +716,12 @@ export default function App() {
           ) : (
             <>
               {facilityLoadError && (
-                <Text style={styles.locationNote}>{t('facilityLoadError', lang)}</Text>
+                <View style={styles.errorRow}>
+                  <Text style={styles.locationNote}>{t('facilityLoadError', lang)}</Text>
+                  <TouchableOpacity onPress={() => { setLoading(true); setRetryCount(c => c + 1) }} style={styles.retryBtn}>
+                    <Text style={styles.retryBtnText}>{t('tryAgain', lang)}</Text>
+                  </TouchableOpacity>
+                </View>
               )}
               {locationDenied && (
                 <Text style={styles.locationNote}>{t('enableLocation', lang)}</Text>
@@ -831,7 +858,10 @@ const styles = StyleSheet.create({
   notifDot:         { position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
   avatarBtn:        { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
   avatarBtnText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
-  locationNote:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 10, textAlign: 'center' },
+  errorRow:         { alignItems: 'center', marginBottom: 10 },
+  locationNote:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
+  retryBtn:         { marginTop: 8, paddingHorizontal: 18, paddingVertical: 8, backgroundColor: colors.primary, borderRadius: 10 },
+  retryBtnText:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
   searchBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 10, gap: 10, borderWidth: 1, borderColor: colors.border },
   searchInput:      { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, padding: 0 },
   filterRow:        { marginBottom: 12, flexGrow: 0 },
