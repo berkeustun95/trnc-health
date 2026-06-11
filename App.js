@@ -262,8 +262,13 @@ export default function App() {
   }, [session])
 
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener(() => {
-      setShowNotifs(true)
+    const sub = Notifications.addNotificationResponseReceivedListener(response => {
+      const screen = response.notification.request.content.data?.screen
+      if (screen === 'duty') {
+        setShowDutyList(true)
+      } else {
+        setShowNotifs(true)
+      }
     })
     return () => sub.remove()
   }, [])
@@ -711,6 +716,7 @@ export default function App() {
               dutyFacilityId={dutyFacilityId}
               userLocation={userLocation}
               onSelectFacility={setSelectedFacility}
+              onSelectUnclaimed={setUnclaimedFacility}
               lang={lang}
             />
           ) : (

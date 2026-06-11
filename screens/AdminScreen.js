@@ -13,11 +13,11 @@ const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist
 const ROLES = ['customer', 'provider', 'admin']
 const TABS = ['Dashboard', 'Facilities', 'Duty', 'Providers', 'Claims', 'Users', 'Bookings', 'Broadcast']
 
-async function sendPushNotification(token, title, body) {
+async function sendPushNotification(token, title, body, data = {}) {
   try {
     await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ to: token, title, body, sound: 'default' }),
+      body: JSON.stringify({ to: token, title, body, sound: 'default', data }),
     })
   } catch {}
 }
@@ -307,10 +307,16 @@ function DutyTab() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [upcoming, setUpcoming] = useState([])
+  const [notifying, setNotifying] = useState(false)
+  const [notified, setNotified] = useState(false)
+  const [pharmacySearch, setPharmacySearch] = useState('')
 
   useEffect(() => {
     supabase.from('facilities').select('id, name').eq('type', 'pharmacy').order('name')
-      .then(({ data }) => setPharmacies(data ?? []))
+      .then(({ data }) => {
+        const unique = [...new Map((data ?? []).map(p => [p.id, p])).values()]
+        setPharmacies(unique)
+      })
 
     supabase.from('duty_schedule').select('date, facility_id, facilities(name)').gte('date', new Date().toISOString().slice(0, 10)).order('date').limit(10)
       .then(({ data }) => setUpcoming(data ?? []))
@@ -334,6 +340,21 @@ function DutyTab() {
     }
   }
 
+  async function notifyDuty() {
+    if (!selectedId) return
+    setNotifying(true)
+    const pharmacyName = pharmacies.find(p => p.id === selectedId)?.name ?? 'Duty pharmacy'
+    const title = '💊 Duty Pharmacy Tonight'
+    const { data: customers } = await supabase.from('profiles').select('id, push_token').eq('role', 'customer')
+    for (const c of customers ?? []) {
+      await recordNotification(c.id, title, pharmacyName)
+      if (c.push_token) await sendPushNotification(c.push_token, title, pharmacyName, { screen: 'duty' })
+    }
+    setNotifying(false)
+    setNotified(true)
+    setTimeout(() => setNotified(false), 3000)
+  }
+
   async function removeDuty(d) {
     await supabase.from('duty_schedule').delete().eq('date', d)
     const { data } = await supabase.from('duty_schedule').select('date, facility_id, facilities(name)').gte('date', new Date().toISOString().slice(0, 10)).order('date').limit(10)
@@ -349,7 +370,13 @@ function DutyTab() {
       </Field>
 
       <Text style={[s.fieldLabel, { marginBottom: 8 }]}>Select pharmacy</Text>
-      {pharmacies.map(p => (
+      <TextInput
+        style={[s.input, { marginBottom: 10 }]}
+        value={pharmacySearch}
+        onChangeText={setPharmacySearch}
+        placeholder="Search pharmacies…"
+      />
+      {pharmacies.filter(p => p.name.toLowerCase().includes(pharmacySearch.toLowerCase())).map(p => (
         <TouchableOpacity key={p.id} style={[s.card, selectedId === p.id && s.cardSelected]} onPress={() => setSelectedId(p.id)}>
           <Text style={[s.cardTitle, selectedId === p.id && { color: colors.primary }]}>{p.name}</Text>
         </TouchableOpacity>
@@ -361,6 +388,14 @@ function DutyTab() {
         disabled={!selectedId || saving}
       >
         <Text style={s.primaryBtnText}>{saved ? 'Saved!' : saving ? 'Saving…' : 'Save duty schedule'}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[s.ghostBtn, { marginTop: 10, paddingVertical: 12, alignItems: 'center' }, (!selectedId || notifying) && s.primaryBtnDisabled]}
+        onPress={notifyDuty}
+        disabled={!selectedId || notifying}
+      >
+        <Text style={s.ghostBtnText}>{notified ? 'Notified!' : notifying ? 'Sending…' : 'Notify users about tonight\'s duty'}</Text>
       </TouchableOpacity>
 
       {upcoming.length > 0 && (

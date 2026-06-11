@@ -1,12 +1,11 @@
-import { StyleSheet, View, Text } from 'react-native'
-import MapView, { Marker, Callout } from 'react-native-maps'
+import { StyleSheet } from 'react-native'
+import MapView, { Marker } from 'react-native-maps'
 import { colors } from '../constants/theme'
-import { t } from '../constants/i18n'
 
 const LEFKOSA = { latitude: 35.1856, longitude: 33.3823, latitudeDelta: 0.08, longitudeDelta: 0.08 }
 const PIN_COLORS = { pharmacy: '#7C3AED', clinic: '#0E7C7B', hospital: '#D1495B', dentist: '#2E9E5B' }
 
-export default function MapScreen({ facilities, dutyFacilityId, userLocation, onSelectFacility, lang = 'English' }) {
+export default function MapScreen({ facilities, dutyFacilityId, userLocation, onSelectFacility, onSelectUnclaimed, lang = 'English' }) {
   const initialRegion = userLocation
     ? { latitude: userLocation.latitude, longitude: userLocation.longitude, latitudeDelta: 0.08, longitudeDelta: 0.08 }
     : LEFKOSA
@@ -20,16 +19,10 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
           key={facility.id}
           coordinate={{ latitude: facility.latitude, longitude: facility.longitude }}
           pinColor={facility.id === dutyFacilityId ? colors.accent : (PIN_COLORS[facility.type] ?? colors.primary)}
-          onCalloutPress={() => onSelectFacility(facility)}
-        >
-          <Callout>
-            <View style={styles.callout}>
-              <Text style={styles.calloutName}>{facility.name}</Text>
-              <Text style={styles.calloutType}>{t(facility.type, lang)}</Text>
-              <Text style={styles.calloutAction}>{t('requestAppointment', lang)}</Text>
-            </View>
-          </Callout>
-        </Marker>
+          tracksViewChanges={false}
+          title={facility.name}
+          onPress={() => facility.provider_id ? onSelectFacility(facility) : onSelectUnclaimed(facility)}
+        />
       ))}
     </MapView>
   )
@@ -37,8 +30,4 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
 
 const styles = StyleSheet.create({
   map:           { flex: 1 },
-  callout:       { width: 180, padding: 4 },
-  calloutName:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 2 },
-  calloutType:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textTransform: 'capitalize', marginBottom: 6 },
-  calloutAction: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.accent },
 })
