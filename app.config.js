@@ -11,6 +11,12 @@ export default {
       backgroundColor: '#FFFFFF',
     },
     scheme: 'ada',
+    updates: {
+      url: 'https://u.expo.dev/704d192a-1a80-41f8-ab98-cb3c8f078d7c',
+    },
+    runtimeVersion: {
+      policy: 'appVersion',
+    },
     userInterfaceStyle: 'light',
     ios: {
       supportsTablet: true,
