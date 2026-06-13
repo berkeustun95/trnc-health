@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler } from 'react-native'
+import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
@@ -101,6 +101,46 @@ export default function App() {
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+  const [showMenu, setShowMenu] = useState(false)
+  const menuAnim = useRef(new Animated.Value(260)).current
+
+  function openMenu() {
+    setShowMenu(true)
+    Animated.timing(menuAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start()
+  }
+  function closeMenu() {
+    Animated.timing(menuAnim, { toValue: 260, duration: 200, useNativeDriver: true }).start(() => setShowMenu(false))
+  }
+  function shareApp() {
+    Share.share({
+      message: 'Find pharmacies, clinics, hospitals and dentists in North Cyprus with ADA.',
+      url: 'https://play.google.com/store/apps/details?id=com.berkeustun95.ada',
+    })
+  }
+  function rateApp() {
+    const url = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/app/id'
+      : 'market://details?id=com.berkeustun95.ada'
+    Linking.openURL(url).catch(() =>
+      Linking.openURL('https://play.google.com/store/apps/details?id=com.berkeustun95.ada')
+    )
+  }
+  function showEmergencyNumbers() {
+    Alert.alert(
+      'Emergency Numbers',
+      'Tap a number to call',
+      [
+        { text: 'Police — 155', onPress: () => Linking.openURL('tel:155') },
+        { text: 'Ambulance — 112', onPress: () => Linking.openURL('tel:112') },
+        { text: 'Fire — 199', onPress: () => Linking.openURL('tel:199') },
+        { text: 'Coast Guard — 158', onPress: () => Linking.openURL('tel:158') },
+        { text: 'Close', style: 'cancel' },
+      ]
+    )
+  }
+  function showAbout() {
+    Alert.alert('ADA', 'Version 1.0.0\n\nHealth facility directory for North Cyprus (TRNC).', [{ text: 'OK' }])
+  }
 
   function toggleFavorite(id) {
     setFavorites(prev => {
@@ -135,6 +175,7 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS !== 'android') return
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (showMenu) { closeMenu(); return true }
       if (showPasswordReset) { setShowPasswordReset(false); return true }
       if (showLatestResult) { setShowLatestResult(false); return true }
       if (showQuiz) { setShowQuiz(false); return true }
@@ -146,7 +187,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showPasswordReset, showLatestResult, showQuiz, showProfile, showNotifs, showDutyList, unclaimedFacility, selectedFacility])
+  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, showProfile, showNotifs, showDutyList, unclaimedFacility, selectedFacility])
 
   useEffect(() => {
     Promise.all([
@@ -558,6 +599,7 @@ export default function App() {
     content = (
       <ImageBackground source={require('./assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
       <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
+        <View style={{ flex: 1 }}>
         <View style={styles.container}>
           <View style={styles.header}>
             <View style={styles.viewToggle}>
@@ -576,26 +618,12 @@ export default function App() {
             </View>
             <Image source={require('./assets/logonobg.png')} style={styles.headerIcon} resizeMode="contain" />
             <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.quizBtn} onPress={() => setShowQuiz(true)}>
-                <Ionicons name="flask-outline" size={18} color={colors.accent} />
-              </TouchableOpacity>
               <TouchableOpacity style={styles.notifBtn} onPress={() => setShowNotifs(true)}>
                 <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
                 {notifications.some(n => !n.read) && <View style={styles.notifDot} />}
               </TouchableOpacity>
-              <TouchableOpacity style={styles.avatarBtn} onPress={() => setShowProfile(true)}>
-                {(() => {
-                  const preset = getPreset(profile?.avatar_url)
-                  if (preset) return (
-                    <View style={[styles.avatarBtn, { backgroundColor: preset.bg, margin: 0 }]}>
-                      <Text style={{ fontSize: 18 }}>{preset.emoji}</Text>
-                    </View>
-                  )
-                  if (profile?.avatar_url?.startsWith('http')) return (
-                    <Image source={{ uri: profile.avatar_url }} style={{ width: 34, height: 34, borderRadius: 17 }} />
-                  )
-                  return <Text style={styles.avatarBtnText}>{session.user.email[0].toUpperCase()}</Text>
-                })()}
+              <TouchableOpacity style={styles.hamburgerBtn} onPress={openMenu}>
+                <Feather name="menu" size={20} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -836,6 +864,85 @@ export default function App() {
             </>
           )}
         </View>
+
+          {showMenu && (
+            <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />
+          )}
+          <Animated.View style={[styles.menuDrawer, { transform: [{ translateX: menuAnim }] }]}>
+            <View style={styles.menuUserRow}>
+              {(() => {
+                const preset = getPreset(profile?.avatar_url)
+                if (preset) return (
+                  <View style={[styles.menuAvatar, { backgroundColor: preset.bg }]}>
+                    <Text style={{ fontSize: 22 }}>{preset.emoji}</Text>
+                  </View>
+                )
+                if (profile?.avatar_url?.startsWith('http')) return (
+                  <Image source={{ uri: profile.avatar_url }} style={styles.menuAvatar} />
+                )
+                return (
+                  <View style={[styles.menuAvatar, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.menuAvatarText}>{session.user.email[0].toUpperCase()}</Text>
+                  </View>
+                )
+              })()}
+              <Text style={styles.menuEmail} numberOfLines={1}>{session.user.email}</Text>
+            </View>
+
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+              <View style={styles.menuDivider} />
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowProfile(true) }}>
+                <Ionicons name="person-outline" size={20} color={colors.textPrimary} />
+                <Text style={styles.menuItemText}>{t('profile', lang)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowProfile(true) }}>
+                <Ionicons name="globe-outline" size={20} color={colors.textPrimary} />
+                <Text style={styles.menuItemText}>Language</Text>
+              </TouchableOpacity>
+
+              <View style={styles.menuDivider} />
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowQuiz(true) }}>
+                <Ionicons name="flask-outline" size={20} color={colors.accent} />
+                <Text style={styles.menuItemText}>{t('supplementAdvisor', lang)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); showEmergencyNumbers() }}>
+                <Ionicons name="call-outline" size={20} color={colors.danger} />
+                <Text style={styles.menuItemText}>Emergency Numbers</Text>
+              </TouchableOpacity>
+              <View style={[styles.menuItem, { opacity: 0.4 }]}>
+                <Ionicons name="home-outline" size={20} color={colors.textPrimary} />
+                <Text style={styles.menuItemText}>Accommodations</Text>
+                <View style={styles.soonBadge}><Text style={styles.soonBadgeText}>Soon</Text></View>
+              </View>
+              <View style={[styles.menuItem, { opacity: 0.4 }]}>
+                <Ionicons name="car-outline" size={20} color={colors.textPrimary} />
+                <Text style={styles.menuItemText}>Transportation</Text>
+                <View style={styles.soonBadge}><Text style={styles.soonBadgeText}>Soon</Text></View>
+              </View>
+
+              <View style={styles.menuDivider} />
+              <TouchableOpacity style={styles.menuItem} onPress={rateApp}>
+                <Ionicons name="star-outline" size={20} color={colors.textPrimary} />
+                <Text style={styles.menuItemText}>Rate the App</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={shareApp}>
+                <Feather name="share-2" size={20} color={colors.textPrimary} />
+                <Text style={styles.menuItemText}>Share the App</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={showAbout}>
+                <Ionicons name="information-circle-outline" size={20} color={colors.textPrimary} />
+                <Text style={styles.menuItemText}>About</Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <View style={styles.menuDivider} />
+            <TouchableOpacity style={[styles.menuItem, { paddingBottom: 24 }]} onPress={() => supabase.auth.signOut()}>
+              <Feather name="log-out" size={20} color={colors.danger} />
+              <Text style={[styles.menuItemText, { color: colors.danger }]}>{t('signOut', lang)}</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+        </View>
       </SafeAreaView>
       </ImageBackground>
     )
@@ -859,11 +966,8 @@ const styles = StyleSheet.create({
   viewToggle:       { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, gap: 2 },
   viewBtn:          { width: 32, height: 32, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
   viewBtnActive:    { backgroundColor: colors.surface },
-  quizBtn:          { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.accentLight, justifyContent: 'center', alignItems: 'center' },
   notifBtn:         { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
   notifDot:         { position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
-  avatarBtn:        { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
-  avatarBtnText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   errorRow:         { alignItems: 'center', marginBottom: 10 },
   locationNote:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
   retryBtn:         { marginTop: 8, paddingHorizontal: 18, paddingVertical: 8, backgroundColor: colors.primary, borderRadius: 10 },
@@ -912,7 +1016,6 @@ const styles = StyleSheet.create({
   cardUnclaimed:    { opacity: 1 },
   notOnAdaBadge:    { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.border },
   notOnAdaBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
-  // Unclaimed facility screen
   backPill:         { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backPillText:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   unclaimedWrap:    { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
@@ -946,4 +1049,16 @@ const styles = StyleSheet.create({
   emptyIcon:        { fontSize: 48, marginBottom: 16 },
   emptyTitle:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
   emptyBody:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 21 },
+  hamburgerBtn:     { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
+  menuBackdrop:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 10 },
+  menuDrawer:       { position: 'absolute', top: 0, right: 0, bottom: 0, width: 260, backgroundColor: colors.bg, zIndex: 11, paddingTop: 28, paddingHorizontal: 20, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: -4, height: 0 }, elevation: 20 },
+  menuUserRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
+  menuAvatar:       { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  menuAvatarText:   { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#fff' },
+  menuEmail:        { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  menuDivider:      { height: 1, backgroundColor: colors.border, marginVertical: 8 },
+  menuItem:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 13 },
+  menuItemText:     { flex: 1, fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  soonBadge:        { backgroundColor: colors.border, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  soonBadgeText:    { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 })
