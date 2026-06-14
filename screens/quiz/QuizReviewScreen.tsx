@@ -22,6 +22,7 @@ type GeneratedResult = {
 
 export type Submission = {
   id: string
+  customer_id?: string
   answers: Record<string, any>
   generated_result: GeneratedResult
   final_result?: GeneratedResult | null
@@ -100,6 +101,9 @@ export default function QuizReviewScreen({
             <Text style={s.backText}>← Back</Text>
           </TouchableOpacity>
           <Text style={s.title}>{readOnly ? 'Approved Review' : 'Quiz Review'}</Text>
+          {submission.customer_id && (
+            <Text style={s.memberId}>#{submission.customer_id.replace(/-/g, '').slice(0, 12).toUpperCase()}</Text>
+          )}
           <Text style={s.meta}>
             {new Date(submission.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
           </Text>
@@ -229,7 +233,8 @@ const s = StyleSheet.create({
   backBtn:       { marginBottom: 8 },
   backText:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
   title:         { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  meta:          { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 4 },
+  memberId:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5, marginTop: 4 },
+  meta:          { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
   tabs:          { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, marginBottom: 16 },
   tab:           { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: 'center' },
   tabActive:     { backgroundColor: colors.surface, ...shadow },

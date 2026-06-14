@@ -128,11 +128,133 @@ const BLANK = {
   languages: '', is_public: true, verified: false, provider_id: '',
 }
 
+function FacilityActivityModal({ facility, visible, onClose }) {
+  const [data, setData] = useState(null)
+  const [loadingActivity, setLoadingActivity] = useState(false)
+
+  useEffect(() => {
+    if (!visible || !facility) return
+    let cancelled = false
+    setData(null)
+    setLoadingActivity(true)
+    async function load() {
+      const [
+        { count: pending },
+        { count: total },
+        { data: reviewRows },
+        { data: recent },
+        providerRes,
+      ] = await Promise.all([
+        supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('facility_id', facility.id).eq('status', 'pending'),
+        supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('facility_id', facility.id),
+        supabase.from('reviews').select('rating').eq('facility_id', facility.id),
+        supabase.from('appointments').select('id, status, requested_time').eq('facility_id', facility.id).order('requested_time', { ascending: false }).limit(4),
+        facility.provider_id
+          ? supabase.from('profiles').select('full_name').eq('id', facility.provider_id).single()
+          : Promise.resolve({ data: null }),
+      ])
+      if (cancelled) return
+      const avgRating = reviewRows?.length
+        ? (reviewRows.reduce((sum, r) => sum + r.rating, 0) / reviewRows.length).toFixed(1)
+        : null
+      setData({ pending: pending ?? 0, total: total ?? 0, avgRating, reviewCount: reviewRows?.length ?? 0, recent: recent ?? [], providerName: providerRes.data?.full_name ?? null })
+      setLoadingActivity(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [visible, facility])
+
+  if (!facility) return null
+
+  function statusColor(status) {
+    if (status === 'confirmed') return colors.success
+    if (status === 'pending') return colors.accent
+    if (status === 'completed') return colors.primary
+    return colors.textSecondary
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <View style={s.modalHeader}>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="chevron-down" size={24} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <Text style={s.modalTitle} numberOfLines={1}>{facility.name}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={[s.modalBody, { paddingTop: 16 }]} showsVerticalScrollIndicator={false}>
+          <View style={[s.cardRow, { gap: 10, marginBottom: 20 }]}>
+            <Text style={{ fontSize: 28 }}>{TYPE_ICONS[facility.type] ?? '🏥'}</Text>
+            <View>
+              <Text style={[s.cardSub, { textTransform: 'capitalize' }]}>{facility.type}</Text>
+              <View style={[s.cardRow, { gap: 6, marginTop: 4 }]}>
+                {facility.verified
+                  ? <View style={s.pillGreen}><Text style={s.pillText}>Verified</Text></View>
+                  : <View style={s.pillOrange}><Text style={s.pillText}>Unverified</Text></View>
+                }
+                {!facility.provider_id && <View style={s.pillGrey}><Text style={s.pillText}>Unclaimed</Text></View>}
+              </View>
+            </View>
+          </View>
+
+          {loadingActivity
+            ? <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+            : data && (
+              <>
+                <Text style={[s.sectionTitle, { marginBottom: 10 }]}>Activity</Text>
+                <View style={[s.statsGrid, { marginBottom: 20 }]}>
+                  <StatCard label="Pending" value={data.pending} color={data.pending > 0 ? colors.accent : undefined} />
+                  <StatCard label="Total bookings" value={data.total} />
+                  <StatCard label="Avg rating" value={data.avgRating ? `⭐ ${data.avgRating}` : '—'} />
+                  <StatCard label="Reviews" value={data.reviewCount} />
+                </View>
+
+                {data.providerName && (
+                  <>
+                    <Text style={[s.sectionTitle, { marginBottom: 8 }]}>Provider</Text>
+                    <View style={[s.card, { marginBottom: 20 }]}>
+                      <Text style={s.cardTitle}>{data.providerName}</Text>
+                      <Text style={s.cardSub}>{facility.verified ? 'Verified provider' : 'Pending verification'}</Text>
+                    </View>
+                  </>
+                )}
+
+                {data.recent.length > 0 && (
+                  <>
+                    <Text style={[s.sectionTitle, { marginBottom: 8 }]}>Recent bookings</Text>
+                    {data.recent.map(appt => (
+                      <View key={appt.id} style={[s.card, { marginBottom: 8 }]}>
+                        <View style={[s.cardRow, { justifyContent: 'space-between' }]}>
+                          <Text style={s.cardSub}>
+                            {new Date(appt.requested_time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </Text>
+                          <Text style={{ fontSize: 12, fontFamily: 'Inter_700Bold', color: statusColor(appt.status), textTransform: 'capitalize' }}>
+                            {appt.status}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                {data.total === 0 && <Text style={s.empty}>No bookings yet.</Text>}
+              </>
+            )
+          }
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  )
+}
+
 function FacilitiesTab() {
   const [facilities, setFacilities] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [activityFacility, setActivityFacility] = useState(null)
   const [form, setForm] = useState(BLANK)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -222,7 +344,7 @@ function FacilitiesTab() {
         renderItem={({ item }) => (
           <View style={s.card}>
             <View style={s.cardRow}>
-              <View style={{ flex: 1 }}>
+              <TouchableOpacity style={{ flex: 1 }} onPress={() => setActivityFacility(item)} activeOpacity={0.7}>
                 <Text style={s.cardTitle} numberOfLines={1}>{item.name}</Text>
                 <Text style={s.cardSub}>{item.type} · {item.address}</Text>
                 <View style={[s.cardRow, { marginTop: 6, gap: 6 }]}>
@@ -230,7 +352,7 @@ function FacilitiesTab() {
                   {item.is_public && <View style={s.pillBlue}><Text style={s.pillText}>Public</Text></View>}
                   {!item.verified && <View style={s.pillOrange}><Text style={s.pillText}>Unverified</Text></View>}
                 </View>
-              </View>
+              </TouchableOpacity>
               <View style={s.rowActions}>
                 <TouchableOpacity style={s.ghostBtn} onPress={() => openEdit(item)}>
                   <Text style={s.ghostBtnText}>Edit</Text>
@@ -243,6 +365,8 @@ function FacilitiesTab() {
           </View>
         )}
       />
+
+      <FacilityActivityModal facility={activityFacility} visible={!!activityFacility} onClose={() => setActivityFacility(null)} />
 
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
