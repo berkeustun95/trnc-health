@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { ReviewSkeleton } from '../components/Skeleton'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -86,7 +87,9 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack }) {
       </View>
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        <View style={s.list}>
+          {[0, 1, 2, 3].map(i => <ReviewSkeleton key={i} />)}
+        </View>
       ) : (
         <FlatList
           data={reviews}

@@ -27,6 +27,7 @@ import OnboardingScreen from './screens/OnboardingScreen'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
+import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -507,7 +508,26 @@ export default function App() {
   } else if (!session) {
     content = <AuthScreen lang={lang} />
   } else if (loading || !profile) {
-    content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+    content = (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Skeleton width={72} height={32} borderRadius={10} />
+            <Skeleton width={40} height={40} borderRadius={20} />
+            <Skeleton width={64} height={32} borderRadius={10} />
+          </View>
+          <Skeleton width="100%" height={44} borderRadius={12} style={{ marginBottom: 10 }} />
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+            <Skeleton width={72} height={30} borderRadius={20} />
+            <Skeleton width={80} height={30} borderRadius={20} />
+            <Skeleton width={64} height={30} borderRadius={20} />
+          </View>
+          <View style={{ flex: 1 }}>
+            {[0, 1, 2, 3, 4].map(i => <FacilityCardSkeleton key={i} />)}
+          </View>
+        </View>
+      </SafeAreaView>
+    )
   } else if (profile.role === 'admin') {
     content = <AdminScreen session={session} />
   } else if (profile.role === 'provider') {

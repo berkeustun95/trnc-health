@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native'
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
+import { ReviewSkeleton } from '../components/Skeleton'
 
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
@@ -170,7 +171,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
             <View style={s.section}>
               <Text style={s.sectionLabel}>{t('tabReviews', lang)}</Text>
               {reviewsLoading ? (
-                <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
+                <>{[0, 1].map(i => <ReviewSkeleton key={i} />)}</>
               ) : reviews.length === 0 ? (
                 <Text style={s.noReviews}>{t('noReviews', lang)}</Text>
               ) : (

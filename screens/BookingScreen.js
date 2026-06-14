@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
+import { ReviewSkeleton, SlotGridSkeleton } from '../components/Skeleton'
 
 const SLOT_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const SLOT_DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -247,7 +248,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
         </View>
 
         {reviewsLoading ? (
-          <ActivityIndicator size="small" color={colors.primary} style={{ marginBottom: 20 }} />
+          <>{[0, 1].map(i => <ReviewSkeleton key={i} />)}</>
         ) : reviews.length > 0 && (() => {
           const avg = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
           return (
@@ -309,7 +310,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
                     <>
                       <Text style={styles.sectionLabel}>{t('selectTime', lang)}</Text>
                       {loadingSlots ? (
-                        <ActivityIndicator color={colors.primary} style={{ marginBottom: 16 }} />
+                        <SlotGridSkeleton />
                       ) : slots.length === 0 ? (
                         <Text style={styles.noSlots}>Closed this day</Text>
                       ) : (
