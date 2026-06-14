@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native'
 import MapView, { Marker } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, typeColors, shadow } from '../constants/theme'
@@ -8,15 +8,19 @@ import { t } from '../constants/i18n'
 const LEFKOSA    = { latitude: 35.1856, longitude: 33.3823, latitudeDelta: 0.08, longitudeDelta: 0.08 }
 const PIN_COLORS = { pharmacy: '#7C3AED', clinic: '#0E7C7B', hospital: '#D1495B', dentist: '#2E9E5B' }
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
+const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 
 export default function MapScreen({ facilities, dutyFacilityId, userLocation, onSelectFacility, onSelectUnclaimed, lang = 'en' }) {
   const [selectedPin, setSelectedPin] = useState(null)
+  const [filterType, setFilterType]   = useState(null)
 
   const initialRegion = userLocation
     ? { latitude: userLocation.latitude, longitude: userLocation.longitude, latitudeDelta: 0.08, longitudeDelta: 0.08 }
     : LEFKOSA
 
-  const mapped = facilities.filter(f => f.latitude != null && f.longitude != null)
+  const mapped = facilities
+    .filter(f => f.latitude != null && f.longitude != null)
+    .filter(f => filterType == null || f.type === filterType)
 
   const tc = selectedPin ? (typeColors[selectedPin.type] ?? typeColors.clinic) : null
 
@@ -29,6 +33,11 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
     } else {
       onSelectUnclaimed(facility)
     }
+  }
+
+  function setFilter(type) {
+    setFilterType(prev => prev === type ? null : type)
+    setSelectedPin(null)
   }
 
   return (
@@ -49,6 +58,32 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
           />
         ))}
       </MapView>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={s.filterBar}
+        contentContainerStyle={s.filterBarContent}
+        pointerEvents="box-none"
+      >
+        {FACILITY_TYPES.map(type => {
+          const active = filterType === type
+          const tc = typeColors[type] ?? typeColors.clinic
+          return (
+            <TouchableOpacity
+              key={type}
+              style={[s.filterChip, active && { backgroundColor: tc.bg, borderColor: tc.text }]}
+              onPress={() => setFilter(type)}
+              activeOpacity={0.8}
+            >
+              <Text style={s.filterChipEmoji}>{TYPE_ICONS[type]}</Text>
+              <Text style={[s.filterChipText, active && { color: tc.text }]}>
+                {t(type, lang)}
+              </Text>
+            </TouchableOpacity>
+          )
+        })}
+      </ScrollView>
 
       {selectedPin && (
         <View style={s.card}>
@@ -89,6 +124,11 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
 const s = StyleSheet.create({
   container:    { flex: 1 },
   map:          { flex: 1 },
+  filterBar:        { position: 'absolute', top: 12, left: 0, right: 0, zIndex: 10 },
+  filterBarContent: { paddingHorizontal: 12, gap: 8, flexDirection: 'row' },
+  filterChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1.5, borderColor: 'transparent', ...shadow },
+  filterChipEmoji:  { fontSize: 14 },
+  filterChipText:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'capitalize' },
   card:         { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: colors.cardBg, borderRadius: 20, padding: 16, ...shadow },
   cardRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   logo:         { width: 52, height: 52, borderRadius: 14, flexShrink: 0 },

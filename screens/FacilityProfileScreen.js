@@ -12,21 +12,25 @@ const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist
 export default function FacilityProfileScreen({ facility, lang, isFavorite, onToggleFavorite, onBook, onBack }) {
   const [reviews, setReviews]           = useState([])
   const [reviewTotal, setReviewTotal]   = useState(0)
+  const [reviewAvg, setReviewAvg]       = useState(null)
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [showAllReviews, setShowAllReviews] = useState(false)
 
   useEffect(() => {
-    supabase
-      .from('reviews')
-      .select('id, rating, comment, created_at', { count: 'exact' })
-      .eq('facility_id', facility.id)
-      .order('created_at', { ascending: false })
-      .limit(3)
-      .then(({ data, count }) => {
-        if (data) setReviews(data)
-        setReviewTotal(count ?? 0)
-        setReviewsLoading(false)
-      })
+    async function loadReviews() {
+      const [{ data, count }, { data: allRatings }] = await Promise.all([
+        supabase.from('reviews').select('id, rating, comment, created_at', { count: 'exact' })
+          .eq('facility_id', facility.id).order('created_at', { ascending: false }).limit(3),
+        supabase.from('reviews').select('rating').eq('facility_id', facility.id),
+      ])
+      if (data) setReviews(data)
+      setReviewTotal(count ?? 0)
+      if (allRatings?.length) {
+        setReviewAvg((allRatings.reduce((s, r) => s + r.rating, 0) / allRatings.length).toFixed(1))
+      }
+      setReviewsLoading(false)
+    }
+    loadReviews()
   }, [facility.id])
 
   if (showAllReviews) {
@@ -35,10 +39,11 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
 
   const tc         = typeColors[facility.type] || typeColors.clinic
   const isPharmacy = facility.type === 'pharmacy'
-  const languages  = Array.isArray(facility.languages) ? facility.languages : []
-  const avg        = reviews.length
-    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
-    : null
+  const languages  = Array.isArray(facility.languages)
+    ? facility.languages
+    : typeof facility.languages === 'string' && facility.languages
+      ? facility.languages.split(',').map(l => l.trim()).filter(Boolean)
+      : []
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -170,11 +175,11 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                 <Text style={s.noReviews}>{t('noReviews', lang)}</Text>
               ) : (
                 <>
-                  {avg && (
+                  {reviewAvg && (
                     <View style={s.avgRow}>
-                      <Text style={s.avgNum}>{avg}</Text>
+                      <Text style={s.avgNum}>{reviewAvg}</Text>
                       <View>
-                        <Text style={s.avgStars}>{'★'.repeat(Math.round(parseFloat(avg)))}{'☆'.repeat(5 - Math.round(parseFloat(avg)))}</Text>
+                        <Text style={s.avgStars}>{'★'.repeat(Math.round(parseFloat(reviewAvg)))}{'☆'.repeat(5 - Math.round(parseFloat(reviewAvg)))}</Text>
                         <Text style={s.reviewCount}>{reviewTotal} {reviewTotal === 1 ? 'review' : 'reviews'}</Text>
                       </View>
                     </View>
