@@ -3,10 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter'
-import { Feather, Ionicons } from '@expo/vector-icons'
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { supabase } from './lib/supabase'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t } from './constants/i18n'
@@ -37,7 +38,18 @@ Notifications.setNotificationHandler({
   }),
 })
 
-const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
+const TYPE_ICON_MAP = {
+  pharmacy: { lib: 'ion', name: 'medkit' },
+  clinic:   { lib: 'ion', name: 'medical' },
+  hospital: { lib: 'ion', name: 'business' },
+  dentist:  { lib: 'mci', name: 'tooth' },
+}
+
+function TypeSVGIcon({ type, size, color }) {
+  const cfg = TYPE_ICON_MAP[type] || TYPE_ICON_MAP.clinic
+  if (cfg.lib === 'mci') return <MaterialCommunityIcons name={cfg.name} size={size} color={color} />
+  return <Ionicons name={cfg.name} size={size} color={color} />
+}
 
 const LANGUAGES = [
   { key: 'English', label: 'English' },
@@ -88,6 +100,46 @@ function isAvailableToday(availability) {
   return !!(day && !day.closed)
 }
 
+const TAB_ITEMS = [
+  { key: 'home',       iconOff: 'home-outline',   iconOn: 'home',    label: 'Home' },
+  { key: 'map',        iconOff: 'map-outline',     iconOn: 'map',     label: 'Map' },
+  { key: 'favourites', iconOff: 'heart-outline',   iconOn: 'heart',   label: 'Saved' },
+  { key: 'profile',    iconOff: 'person-outline',  iconOn: 'person',  label: 'Profile' },
+]
+
+function BottomTabBar({ activeTab, onTabPress }) {
+  const insets = useSafeAreaInsets()
+  return (
+    <View style={[tabBar.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      {TAB_ITEMS.map(tab => {
+        const active = activeTab === tab.key
+        return (
+          <TouchableOpacity
+            key={tab.key}
+            style={tabBar.btn}
+            onPress={() => onTabPress(tab.key)}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={active ? tab.iconOn : tab.iconOff}
+              size={24}
+              color={active ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[tabBar.label, active && tabBar.labelActive]}>{tab.label}</Text>
+          </TouchableOpacity>
+        )
+      })}
+    </View>
+  )
+}
+
+const tabBar = StyleSheet.create({
+  bar:        { flexDirection: 'row', backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
+  btn:        { flex: 1, alignItems: 'center', gap: 3 },
+  label:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  labelActive:{ fontFamily: 'Inter_700Bold', color: colors.primary },
+})
+
 export default function App() {
   const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_700Bold })
   const [session, setSession] = useState(undefined)
@@ -99,8 +151,7 @@ export default function App() {
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [bookingFacility, setBookingFacility] = useState(null)
   const [profile, setProfile] = useState(null)
-  const [view, setView] = useState('list')
-  const [showProfile, setShowProfile] = useState(false)
+  const [activeTab, setActiveTab] = useState('home')
   const [showQuiz, setShowQuiz] = useState(false)
   const [latestResult, setLatestResult] = useState(null)
   const [showLatestResult, setShowLatestResult] = useState(false)
@@ -119,7 +170,7 @@ export default function App() {
   const [openOnly, setOpenOnly] = useState(false)
   const [showAll, setShowAll] = useState(false)
   const [langFilter, setLangFilter] = useState(false)
-  const [showFavourites, setShowFavourites] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [historyResult, setHistoryResult] = useState(null)
   const [activeSpecialty, setActiveSpecialty] = useState(null)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
@@ -182,6 +233,7 @@ export default function App() {
   }
 
   function toggleFavorite(id) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     setFavorites(prev => {
       const next = new Set(prev)
       if (next.has(id)) { next.delete(id) } else { next.add(id) }
@@ -219,18 +271,17 @@ export default function App() {
       if (showLatestResult) { setShowLatestResult(false); return true }
       if (showQuiz) { setShowQuiz(false); return true }
       if (historyResult) { setHistoryResult(null); return true }
-      if (showProfile) { setShowProfile(false); return true }
       if (showNotifs) { setShowNotifs(false); return true }
       if (showDutyList) { setShowDutyList(false); return true }
-      if (showFavourites) { setShowFavourites(false); return true }
       if (showQuizHistory) { setShowQuizHistory(false); return true }
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
       if (bookingFacility) { setBookingFacility(null); return true }
       if (selectedFacility) { setSelectedFacility(null); setBookingFacility(null); return true }
+      if (activeTab !== 'home') { setActiveTab('home'); return true }
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showProfile, showNotifs, showDutyList, showFavourites, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility])
+  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab])
 
   useEffect(() => {
     Promise.all([
@@ -397,7 +448,7 @@ export default function App() {
       if (screen === 'duty') {
         setShowDutyList(true)
       } else if (screen === 'profile') {
-        setShowProfile(true)
+        setActiveTab('profile')
       } else {
         setShowNotifs(true)
       }
@@ -630,14 +681,6 @@ export default function App() {
       onBack={() => setHistoryResult(null)}
       readOnly
     />
-  } else if (showProfile) {
-    content = <ProfileScreen
-      session={session}
-      lang={lang}
-      onBack={() => setShowProfile(false)}
-      onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
-      onAvatarChange={url => setProfile(prev => ({ ...prev, avatar_url: url }))}
-    />
   } else if (showNotifs) {
     content = <NotificationsScreen
       notifications={notifications}
@@ -697,75 +740,6 @@ export default function App() {
         )}
       </SafeAreaView>
     )
-  } else if (showFavourites) {
-    const favList = facilities.filter(f => favorites.has(f.id))
-    content = (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={[styles.header, { paddingBottom: 16 }]}>
-          <TouchableOpacity style={styles.backPill} onPress={() => setShowFavourites(false)}>
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-            <Text style={styles.backPillText}>{t('back', lang)}</Text>
-          </TouchableOpacity>
-          <Text style={styles.favScreenTitle}>{t('favourites', lang)}</Text>
-          <View style={{ width: 60 }} />
-        </View>
-        {favList.length === 0 ? (
-          <View style={styles.emptyWrap}>
-            <Ionicons name="heart" size={48} color={colors.border} style={{ marginBottom: 16 }} />
-            <Text style={styles.emptyTitle}>{t('noFavourites', lang)}</Text>
-            <Text style={styles.emptyBody}>Tap the ❤️ on any facility to save it here for quick access</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={favList}
-            keyExtractor={f => f.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-            renderItem={({ item }) => {
-              const tc = typeColors[item.type] || typeColors.clinic
-              const isOpen = parseIsOpen(item.opening_hours)
-              return (
-                <TouchableOpacity
-                  activeOpacity={0.75}
-                  style={styles.card}
-                  onPress={() => { setShowFavourites(false); setSelectedFacility(item) }}
-                >
-                  <View style={styles.cardBody}>
-                    <View style={styles.cardMain}>
-                      <View style={[styles.typeIcon, { backgroundColor: tc.bg }]}>
-                        {item.logo_url
-                          ? <Image source={{ uri: item.logo_url }} style={{ width: 36, height: 36, borderRadius: 8 }} resizeMode="contain" />
-                          : <Text style={styles.typeIconText}>{TYPE_ICONS[item.type] ?? '🏥'}</Text>
-                        }
-                      </View>
-                      <View style={styles.cardContent}>
-                        <View style={styles.cardNameRow}>
-                          <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
-                          {item.verified && <Ionicons name="checkmark-circle" size={15} color={colors.primary} />}
-                        </View>
-                        <View style={styles.badgeRow}>
-                          <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
-                            <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
-                          </View>
-                          {isOpen != null && (
-                            <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
-                              <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
-                                {isOpen ? t('open', lang) : t('closed', lang)}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                        {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
-                      </View>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              )
-            }}
-          />
-        )}
-      </SafeAreaView>
-    )
   } else if (unclaimedFacility) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -777,7 +751,7 @@ export default function App() {
         </View>
         <View style={styles.unclaimedWrap}>
           <View style={styles.unclaimedIconWrap}>
-            <Text style={styles.unclaimedEmoji}>{TYPE_ICONS[unclaimedFacility.type] ?? '🏥'}</Text>
+            <TypeSVGIcon type={unclaimedFacility.type} size={36} color={colors.primary} />
           </View>
           <Text style={styles.unclaimedName}>{unclaimedFacility.name}</Text>
           <View style={styles.unclaimedBadgeRow}>
@@ -850,37 +824,28 @@ export default function App() {
       onBack={() => setSelectedFacility(null)}
     />
   } else {
+    const favList = facilities.filter(f => favorites.has(f.id))
     content = (
-      <ImageBackground source={require('./assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
-      <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
-        <View style={{ flex: 1 }}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <View style={styles.viewToggle}>
-              <TouchableOpacity
-                style={[styles.viewBtn, view === 'list' && styles.viewBtnActive]}
-                onPress={() => setView('list')}
-              >
-                <Feather name="list" size={17} color={view === 'list' ? colors.primary : colors.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.viewBtn, view === 'map' && styles.viewBtnActive]}
-                onPress={() => setView('map')}
-              >
-                <Ionicons name="map-outline" size={17} color={view === 'map' ? colors.primary : colors.textSecondary} />
-              </TouchableOpacity>
+      <View style={{ flex: 1 }}>
+
+        {activeTab === 'home' && (
+          <ImageBackground source={require('./assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
+          <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <View style={styles.headerLogoWrap} pointerEvents="none">
+                <Image source={require('./assets/logonobg.png')} style={styles.headerIcon} resizeMode="contain" />
+              </View>
+              <View style={styles.headerRight}>
+                <TouchableOpacity style={styles.notifBtn} onPress={() => setShowNotifs(true)}>
+                  <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
+                  {notifications.some(n => !n.read) && <View style={styles.notifDot} />}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.hamburgerBtn} onPress={openMenu}>
+                  <Feather name="menu" size={20} color={colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
             </View>
-            <Image source={require('./assets/logonobg.png')} style={styles.headerIcon} resizeMode="contain" />
-            <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.notifBtn} onPress={() => setShowNotifs(true)}>
-                <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
-                {notifications.some(n => !n.read) && <View style={styles.notifDot} />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.hamburgerBtn} onPress={openMenu}>
-                <Feather name="menu" size={20} color={colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
-          </View>
 
           <View style={styles.searchBar}>
             <Feather name="search" size={16} color={colors.textSecondary} />
@@ -900,55 +865,94 @@ export default function App() {
             )}
           </View>
 
-          <View style={styles.filterToggles}>
+          <View style={styles.filterBar}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBarContent}>
+              <TouchableOpacity
+                style={[styles.toggleChip, openOnly && styles.toggleChipOpen]}
+                onPress={() => setOpenOnly(v => !v)}
+              >
+                <Feather name="clock" size={12} color={openOnly ? colors.success : colors.textSecondary} />
+                <Text style={[styles.toggleChipText, openOnly && { color: colors.success }]}>{t('open', lang)}</Text>
+              </TouchableOpacity>
+              {activeType && (
+                <TouchableOpacity style={styles.activeFilterPill} onPress={() => { setActiveType(null); setActiveSpecialty(null) }}>
+                  <TypeSVGIcon type={activeType} size={11} color={colors.primary} />
+                  <Text style={styles.activeFilterPillText}>{t(activeType, lang)}</Text>
+                  <Feather name="x" size={10} color={colors.primary} />
+                </TouchableOpacity>
+              )}
+              {activeSpecialty && (
+                <TouchableOpacity style={styles.activeFilterPill} onPress={() => setActiveSpecialty(null)}>
+                  <Text style={styles.activeFilterPillText}>{activeSpecialty}</Text>
+                  <Feather name="x" size={10} color={colors.primary} />
+                </TouchableOpacity>
+              )}
+              {showAll && (
+                <TouchableOpacity style={styles.activeFilterPill} onPress={() => setShowAll(false)}>
+                  <Ionicons name="eye" size={11} color={colors.primary} />
+                  <Text style={styles.activeFilterPillText}>{t('adaOnly', lang)}</Text>
+                  <Feather name="x" size={10} color={colors.primary} />
+                </TouchableOpacity>
+              )}
+              {langFilter && (
+                <TouchableOpacity style={styles.activeFilterPill} onPress={() => setLangFilter(false)}>
+                  <Ionicons name="language-outline" size={11} color={colors.primary} />
+                  <Text style={styles.activeFilterPillText}>{t('myLang', lang)}</Text>
+                  <Feather name="x" size={10} color={colors.primary} />
+                </TouchableOpacity>
+              )}
+            </ScrollView>
             <TouchableOpacity
-              style={[styles.toggleChip, openOnly && styles.toggleChipOpen]}
-              onPress={() => setOpenOnly(v => !v)}
+              style={[styles.filterToggleBtn, showFilters && styles.filterToggleBtnActive]}
+              onPress={() => setShowFilters(v => !v)}
             >
-              <Feather name="clock" size={12} color={openOnly ? colors.success : colors.textSecondary} />
-              <Text style={[styles.toggleChipText, openOnly && { color: colors.success }]}>{t('open', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleChip, showAll && styles.toggleChipShowAll]}
-              onPress={() => setShowAll(v => !v)}
-            >
-              <Ionicons name={showAll ? 'eye' : 'eye-outline'} size={12} color={showAll ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.toggleChipText, showAll && { color: colors.primary }]}>{showAll ? t('adaOnly', lang) : t('showAll', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleChip, langFilter && styles.toggleChipLang]}
-              onPress={() => setLangFilter(v => !v)}
-            >
-              <Ionicons name="language-outline" size={12} color={langFilter ? colors.accent : colors.textSecondary} />
-              <Text style={[styles.toggleChipText, langFilter && { color: colors.accent }]}>{t('myLang', lang)}</Text>
+              <Feather name="sliders" size={14} color={showFilters ? colors.primary : colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.typeRow}
-            contentContainerStyle={styles.typeRowContent}
-          >
-            {[null, 'pharmacy', 'clinic', 'hospital', 'dentist'].map(type => (
+          {showFilters && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.typeRow}
+              contentContainerStyle={styles.typeRowContent}
+            >
+              {[null, 'pharmacy', 'clinic', 'hospital', 'dentist'].map(type => (
+                <TouchableOpacity
+                  key={type ?? 'all'}
+                  style={[styles.typeChip, activeType === type && styles.typeChipActive]}
+                  onPress={() => { setActiveType(type); setActiveSpecialty(null) }}
+                >
+                  {type
+                    ? <TypeSVGIcon type={type} size={14} color={activeType === type ? '#fff' : colors.textSecondary} />
+                    : <Ionicons name="apps-outline" size={14} color={activeType === type ? '#fff' : colors.textSecondary} />
+                  }
+                  <Text style={[styles.typeChipText, activeType === type && styles.typeChipTextActive]}>
+                    {type ? t(type, lang) : t('all', lang)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <View style={styles.chipDivider} />
               <TouchableOpacity
-                key={type ?? 'all'}
-                style={[styles.typeChip, activeType === type && styles.typeChipActive]}
-                onPress={() => { setActiveType(type); setActiveSpecialty(null) }}
+                style={[styles.toggleChip, showAll && styles.toggleChipShowAll]}
+                onPress={() => setShowAll(v => !v)}
               >
-                <Text style={styles.typeChipEmoji}>{type ? TYPE_ICONS[type] : '🏠'}</Text>
-                <Text style={[styles.typeChipText, activeType === type && styles.typeChipTextActive]}>
-                  {type ? t(type, lang) : t('all', lang)}
-                </Text>
+                <Ionicons name={showAll ? 'eye' : 'eye-outline'} size={12} color={showAll ? colors.primary : colors.textSecondary} />
+                <Text style={[styles.toggleChipText, showAll && { color: colors.primary }]}>{showAll ? t('adaOnly', lang) : t('showAll', lang)}</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+              <TouchableOpacity
+                style={[styles.toggleChip, langFilter && styles.toggleChipLang]}
+                onPress={() => setLangFilter(v => !v)}
+              >
+                <Ionicons name="language-outline" size={12} color={langFilter ? colors.accent : colors.textSecondary} />
+                <Text style={[styles.toggleChipText, langFilter && { color: colors.accent }]}>{t('myLang', lang)}</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
 
           {(() => {
-            const typeToShow = activeType || null
-            const specList = typeToShow
-              ? (SPECIALTIES_BY_TYPE[typeToShow] || []).filter(sp => facilities.some(f => Array.isArray(f.specialty) ? f.specialty.includes(sp) : f.specialty === sp))
-              : [...new Set(facilities.flatMap(f => Array.isArray(f.specialty) ? f.specialty : (f.specialty ? [f.specialty] : [])))].sort()
+            if (!activeType) return null
+            const specList = (SPECIALTIES_BY_TYPE[activeType] || []).filter(sp => facilities.some(f => Array.isArray(f.specialty) ? f.specialty.includes(sp) : f.specialty === sp))
             if (!specList.length) return null
             return (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
@@ -1010,7 +1014,141 @@ export default function App() {
             <Ionicons name="chevron-forward" size={18} color={colors.accent} />
           </TouchableOpacity>
 
-          {view === 'map' ? (
+          {facilityLoadError && (
+              <View style={styles.errorRow}>
+                <Text style={styles.locationNote}>{t('facilityLoadError', lang)}</Text>
+                <TouchableOpacity onPress={() => { setLoading(true); setRetryCount(c => c + 1) }} style={styles.retryBtn}>
+                  <Text style={styles.retryBtnText}>{t('tryAgain', lang)}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {locationDenied && (
+              <Text style={styles.locationNote}>{t('enableLocation', lang)}</Text>
+            )}
+            <FlatList
+              data={listed}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={(
+                <View style={styles.emptyWrap}>
+                  {searchText || activeType || activeSpecialty ? (
+                    <>
+                      <Ionicons name="search-outline" size={44} color={colors.border} style={{ marginBottom: 16 }} />
+                      <Text style={styles.emptyTitle}>No results found</Text>
+                      <Text style={styles.emptyBody}>Try removing a filter or adjusting your search</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.emptyIcon}>🏥</Text>
+                      <Text style={styles.emptyTitle}>{t('noFacilitiesTitle', lang)}</Text>
+                      <Text style={styles.emptyBody}>{t('noFacilitiesBody', lang)}</Text>
+                    </>
+                  )}
+                </View>
+              )}
+              renderItem={({ item }) => {
+                const isOpen = parseIsOpen(item.opening_hours)
+                const tc = typeColors[item.type] || typeColors.clinic
+                const isDuty = item.id === dutyFacilityId
+                const isFav = favorites.has(item.id)
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    style={[styles.card, isDuty && styles.dutyCard, !item.provider_id && styles.cardUnclaimed]}
+                    onPress={() => item.provider_id ? setSelectedFacility(item) : setUnclaimedFacility(item)}
+                  >
+                    {item.cover_image_url ? (
+                      <Image source={{ uri: item.cover_image_url }} style={styles.cardCover} resizeMode="cover" />
+                    ) : null}
+                    <View style={styles.cardBody}>
+                    {isDuty && (
+                      <View style={styles.dutyCardBadge}>
+                        <Text style={styles.dutyLabel}>{t('onDuty', lang)}</Text>
+                      </View>
+                    )}
+                    <View style={styles.cardMain}>
+                      <View style={[styles.typeIcon, { backgroundColor: tc.bg }]}>
+                        {item.logo_url
+                          ? <Image source={{ uri: item.logo_url }} style={{ width: 36, height: 36, borderRadius: 8 }} resizeMode="contain" />
+                          : <TypeSVGIcon type={item.type} size={22} color={tc.text} />
+                        }
+                      </View>
+                      <View style={styles.cardContent}>
+                        <View style={styles.cardTop}>
+                          <View style={styles.cardNameRow}>
+                            <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
+                            {item.verified && (
+                              <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
+                            )}
+                          </View>
+                          {item._dist != null && (
+                            <Text style={styles.distanceText}>{item._dist.toFixed(1)} km</Text>
+                          )}
+                        </View>
+                        <View style={styles.badgeRow}>
+                          <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
+                            <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
+                          </View>
+                          {item.provider_id ? (
+                            isOpen != null && (
+                              <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
+                                <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
+                                  {isOpen ? t('open', lang) : t('closed', lang)}
+                                </Text>
+                              </View>
+                            )
+                          ) : (
+                            <View style={styles.notOnAdaBadge}>
+                              <Text style={styles.notOnAdaBadgeText}>{t('notOnAda', lang)}</Text>
+                            </View>
+                          )}
+                          {isAvailableToday(item.availability) && (
+                            <View style={styles.bookableBadge}>
+                              <Feather name="calendar" size={10} color={colors.primary} />
+                              <Text style={styles.bookableBadgeText}>Bookable</Text>
+                            </View>
+                          )}
+                        </View>
+                        {item.specialty?.length ? <Text style={styles.specialtyText} numberOfLines={1}>{Array.isArray(item.specialty) ? item.specialty.join(' · ') : item.specialty}</Text> : null}
+                        {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
+                        {facilityRatings[item.id] && (
+                          <View style={styles.ratingRow}>
+                            <Ionicons name="star" size={11} color="#F5A623" />
+                            <Text style={styles.ratingText}> {facilityRatings[item.id].avg} ({facilityRatings[item.id].count})</Text>
+                          </View>
+                        )}
+                        {item.phone ? (
+                          <TouchableOpacity
+                            style={styles.callPill}
+                            onPress={() => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`)}
+                            activeOpacity={0.7}
+                          >
+                            <Feather name="phone" size={11} color={colors.accent} />
+                            <Text style={styles.callPillText}>{item.phone}</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                      <View style={styles.cardActions}>
+                        <TouchableOpacity onPress={() => toggleFavorite(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? colors.danger : colors.border} />
+                        </TouchableOpacity>
+                        <Ionicons name="chevron-forward" size={16} color={colors.border} />
+                      </View>
+                    </View>
+                    </View>
+                  </TouchableOpacity>
+                )
+              }}
+            />
+          </View>
+          </SafeAreaView>
+          </ImageBackground>
+        )}
+
+        {activeTab === 'map' && (
+          <SafeAreaView style={styles.safe} edges={['top']}>
             <MapScreen
               facilities={facilities}
               dutyFacilityId={dutyFacilityId}
@@ -1019,237 +1157,172 @@ export default function App() {
               onSelectUnclaimed={setUnclaimedFacility}
               lang={lang}
             />
-          ) : (
-            <>
-              {facilityLoadError && (
-                <View style={styles.errorRow}>
-                  <Text style={styles.locationNote}>{t('facilityLoadError', lang)}</Text>
-                  <TouchableOpacity onPress={() => { setLoading(true); setRetryCount(c => c + 1) }} style={styles.retryBtn}>
-                    <Text style={styles.retryBtnText}>{t('tryAgain', lang)}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              {locationDenied && (
-                <Text style={styles.locationNote}>{t('enableLocation', lang)}</Text>
-              )}
+          </SafeAreaView>
+        )}
+
+        {activeTab === 'favourites' && (
+          <SafeAreaView style={styles.safe} edges={['top']}>
+            <View style={[styles.header, { paddingHorizontal: 16, paddingBottom: 16 }]}>
+              <Text style={styles.favScreenTitle}>{t('favourites', lang)}</Text>
+            </View>
+            {favList.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Ionicons name="heart" size={48} color={colors.border} style={{ marginBottom: 16 }} />
+                <Text style={styles.emptyTitle}>{t('noFavourites', lang)}</Text>
+                <Text style={styles.emptyBody}>Tap the ❤️ on any facility to save it here for quick access</Text>
+              </View>
+            ) : (
               <FlatList
-                data={listed}
-                keyExtractor={item => item.id}
+                data={favList}
+                keyExtractor={f => f.id}
                 showsVerticalScrollIndicator={false}
-                style={{ flex: 1 }}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={(
-                  <View style={styles.emptyWrap}>
-                    {searchText || activeType || activeSpecialty ? (
-                      <>
-                        <Ionicons name="search-outline" size={44} color={colors.border} style={{ marginBottom: 16 }} />
-                        <Text style={styles.emptyTitle}>No results found</Text>
-                        <Text style={styles.emptyBody}>Try removing a filter or adjusting your search</Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.emptyIcon}>🏥</Text>
-                        <Text style={styles.emptyTitle}>{t('noFacilitiesTitle', lang)}</Text>
-                        <Text style={styles.emptyBody}>{t('noFacilitiesBody', lang)}</Text>
-                      </>
-                    )}
-                  </View>
-                )}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
                 renderItem={({ item }) => {
-                  const isOpen = parseIsOpen(item.opening_hours)
                   const tc = typeColors[item.type] || typeColors.clinic
-                  const isDuty = item.id === dutyFacilityId
-                  const isFav = favorites.has(item.id)
+                  const isOpen = parseIsOpen(item.opening_hours)
                   return (
                     <TouchableOpacity
                       activeOpacity={0.75}
-                      style={[styles.card, isDuty && styles.dutyCard, !item.provider_id && styles.cardUnclaimed]}
-                      onPress={() => item.provider_id ? setSelectedFacility(item) : setUnclaimedFacility(item)}
+                      style={styles.card}
+                      onPress={() => setSelectedFacility(item)}
                     >
-                      {item.cover_image_url ? (
-                        <Image source={{ uri: item.cover_image_url }} style={styles.cardCover} resizeMode="cover" />
-                      ) : null}
                       <View style={styles.cardBody}>
-                      {isDuty && (
-                        <View style={styles.dutyCardBadge}>
-                          <Text style={styles.dutyLabel}>{t('onDuty', lang)}</Text>
-                        </View>
-                      )}
-                      <View style={styles.cardMain}>
-                        <View style={[styles.typeIcon, { backgroundColor: tc.bg }]}>
-                          {item.logo_url
-                            ? <Image source={{ uri: item.logo_url }} style={{ width: 36, height: 36, borderRadius: 8 }} resizeMode="contain" />
-                            : <Text style={styles.typeIconText}>{TYPE_ICONS[item.type] ?? '🏥'}</Text>
-                          }
-                        </View>
-                        <View style={styles.cardContent}>
-                          <View style={styles.cardTop}>
+                        <View style={styles.cardMain}>
+                          <View style={[styles.typeIcon, { backgroundColor: tc.bg }]}>
+                            {item.logo_url
+                              ? <Image source={{ uri: item.logo_url }} style={{ width: 36, height: 36, borderRadius: 8 }} resizeMode="contain" />
+                              : <TypeSVGIcon type={item.type} size={22} color={tc.text} />
+                            }
+                          </View>
+                          <View style={styles.cardContent}>
                             <View style={styles.cardNameRow}>
                               <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
-                              {item.verified && (
-                                <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
-                              )}
+                              {item.verified && <Ionicons name="checkmark-circle" size={15} color={colors.primary} />}
                             </View>
-                            {item._dist != null && (
-                              <Text style={styles.distanceText}>{item._dist.toFixed(1)} km</Text>
-                            )}
-                          </View>
-                          <View style={styles.badgeRow}>
-                            <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
-                              <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
-                            </View>
-                            {item.provider_id ? (
-                              isOpen != null && (
+                            <View style={styles.badgeRow}>
+                              <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
+                                <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
+                              </View>
+                              {isOpen != null && (
                                 <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
                                   <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
                                     {isOpen ? t('open', lang) : t('closed', lang)}
                                   </Text>
                                 </View>
-                              )
-                            ) : (
-                              <View style={styles.notOnAdaBadge}>
-                                <Text style={styles.notOnAdaBadgeText}>{t('notOnAda', lang)}</Text>
-                              </View>
-                            )}
-                            {isAvailableToday(item.availability) && (
-                              <View style={styles.bookableBadge}>
-                                <Text style={styles.bookableBadgeText}>📅 Bookable</Text>
-                              </View>
-                            )}
-                          </View>
-                          {item.specialty?.length ? <Text style={styles.specialtyText} numberOfLines={1}>{Array.isArray(item.specialty) ? item.specialty.join(' · ') : item.specialty}</Text> : null}
-                          {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
-                          {facilityRatings[item.id] && (
-                            <View style={styles.ratingRow}>
-                              <Ionicons name="star" size={11} color="#F5A623" />
-                              <Text style={styles.ratingText}> {facilityRatings[item.id].avg} ({facilityRatings[item.id].count})</Text>
+                              )}
                             </View>
-                          )}
-                          {item.phone ? (
-                            <TouchableOpacity
-                              style={styles.callPill}
-                              onPress={() => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`)}
-                              activeOpacity={0.7}
-                            >
-                              <Feather name="phone" size={11} color={colors.accent} />
-                              <Text style={styles.callPillText}>{item.phone}</Text>
-                            </TouchableOpacity>
-                          ) : null}
+                            {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
+                          </View>
                         </View>
-                        <View style={styles.cardActions}>
-                          <TouchableOpacity onPress={() => toggleFavorite(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                            <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? colors.danger : colors.border} />
-                          </TouchableOpacity>
-                          <Ionicons name="chevron-forward" size={16} color={colors.border} />
-                        </View>
-                      </View>
                       </View>
                     </TouchableOpacity>
                   )
                 }}
               />
-            </>
-          )}
-        </View>
+            )}
+          </SafeAreaView>
+        )}
 
-          {showMenu && (
-            <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />
-          )}
-          <Animated.View style={[styles.menuDrawer, { transform: [{ translateX: menuAnim }] }]}>
-            <View style={styles.menuUserRow}>
-              {(() => {
-                const preset = getPreset(profile?.avatar_url)
-                if (preset) return (
-                  <View style={[styles.menuAvatar, { backgroundColor: preset.bg }]}>
-                    <Text style={{ fontSize: 22 }}>{preset.emoji}</Text>
-                  </View>
-                )
-                if (profile?.avatar_url?.startsWith('http')) return (
-                  <Image source={{ uri: profile.avatar_url }} style={styles.menuAvatar} />
-                )
-                return (
-                  <View style={[styles.menuAvatar, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.menuAvatarText}>{session.user.email[0].toUpperCase()}</Text>
-                  </View>
-                )
-              })()}
-              <Text style={styles.menuEmail} numberOfLines={1}>{session.user.email}</Text>
-              <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name="close" size={22} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
+        {activeTab === 'profile' && (
+          <ProfileScreen
+            session={session}
+            lang={lang}
+            onBack={() => setActiveTab('home')}
+            onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
+            onAvatarChange={url => setProfile(prev => ({ ...prev, avatar_url: url }))}
+          />
+        )}
 
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-              <View style={styles.menuDivider} />
-              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowFavourites(true) }}>
-                <Ionicons name="heart-outline" size={20} color={colors.textPrimary} />
-                <Text style={styles.menuItemText}>{t('favourites', lang)}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowProfile(true) }}>
-                <Ionicons name="person-outline" size={20} color={colors.textPrimary} />
-                <Text style={styles.menuItemText}>{t('profile', lang)}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowLangModal(true) }}>
-                <Ionicons name="globe-outline" size={20} color={colors.textPrimary} />
-                <Text style={styles.menuItemText}>{t('menuLanguage', lang)}</Text>
-              </TouchableOpacity>
+        <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} />
 
-              <View style={styles.menuDivider} />
-              <TouchableOpacity style={styles.menuItem} onPress={() => setShowQuizSubmenu(v => !v)}>
-                <Ionicons name="flask-outline" size={20} color={colors.accent} />
-                <Text style={styles.menuItemText}>{t('supplementQuiz', lang)}</Text>
-                <Ionicons name={showQuizSubmenu ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
-              {showQuizSubmenu && (
-                <>
-                  <TouchableOpacity style={styles.menuSubItem} onPress={() => { closeMenu(); setShowQuiz(true) }}>
-                    <Ionicons name="add-circle-outline" size={17} color={colors.accent} />
-                    <Text style={styles.menuSubItemText}>{t('newQuiz', lang)}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.menuSubItem} onPress={() => { closeMenu(); loadQuizHistory(); setShowQuizHistory(true) }}>
-                    <Ionicons name="time-outline" size={17} color={colors.accent} />
-                    <Text style={styles.menuSubItemText}>{t('pastPlans', lang)}</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); showEmergencyNumbers() }}>
-                <Ionicons name="call-outline" size={20} color={colors.danger} />
-                <Text style={styles.menuItemText}>{t('menuEmergency', lang)}</Text>
-              </TouchableOpacity>
-              <View style={[styles.menuItem, { opacity: 0.4 }]}>
-                <Ionicons name="home-outline" size={20} color={colors.textPrimary} />
-                <Text style={styles.menuItemText}>{t('menuAccommodations', lang)}</Text>
-                <View style={styles.soonBadge}><Text style={styles.soonBadgeText}>{t('comingSoon', lang)}</Text></View>
-              </View>
-              <View style={[styles.menuItem, { opacity: 0.4 }]}>
-                <Ionicons name="car-outline" size={20} color={colors.textPrimary} />
-                <Text style={styles.menuItemText}>{t('menuTransportation', lang)}</Text>
-                <View style={styles.soonBadge}><Text style={styles.soonBadgeText}>{t('comingSoon', lang)}</Text></View>
-              </View>
+        {showMenu && (
+          <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />
+        )}
+        <Animated.View style={[styles.menuDrawer, { transform: [{ translateX: menuAnim }] }]}>
+          <View style={styles.menuUserRow}>
+            {(() => {
+              const preset = getPreset(profile?.avatar_url)
+              if (preset) return (
+                <View style={[styles.menuAvatar, { backgroundColor: preset.bg }]}>
+                  <Text style={{ fontSize: 22 }}>{preset.emoji}</Text>
+                </View>
+              )
+              if (profile?.avatar_url?.startsWith('http')) return (
+                <Image source={{ uri: profile.avatar_url }} style={styles.menuAvatar} />
+              )
+              return (
+                <View style={[styles.menuAvatar, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.menuAvatarText}>{session.user.email[0].toUpperCase()}</Text>
+                </View>
+              )
+            })()}
+            <Text style={styles.menuEmail} numberOfLines={1}>{session.user.email}</Text>
+            <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
-              <View style={styles.menuDivider} />
-              <TouchableOpacity style={styles.menuItem} onPress={rateApp}>
-                <Ionicons name="star-outline" size={20} color={colors.textPrimary} />
-                <Text style={styles.menuItemText}>{t('menuRateApp', lang)}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.menuItem} onPress={shareApp}>
-                <Feather name="share-2" size={20} color={colors.textPrimary} />
-                <Text style={styles.menuItemText}>{t('menuShareApp', lang)}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.menuItem} onPress={showAbout}>
-                <Ionicons name="information-circle-outline" size={20} color={colors.textPrimary} />
-                <Text style={styles.menuItemText}>{t('menuAbout', lang)}</Text>
-              </TouchableOpacity>
-            </ScrollView>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowLangModal(true) }}>
+              <Ionicons name="globe-outline" size={20} color={colors.textPrimary} />
+              <Text style={styles.menuItemText}>{t('menuLanguage', lang)}</Text>
+            </TouchableOpacity>
 
             <View style={styles.menuDivider} />
-            <TouchableOpacity style={[styles.menuItem, { paddingBottom: 24 }]} onPress={() => supabase.auth.signOut()}>
-              <Feather name="log-out" size={20} color={colors.danger} />
-              <Text style={[styles.menuItemText, { color: colors.danger }]}>{t('signOut', lang)}</Text>
+            <TouchableOpacity style={styles.menuItem} onPress={() => setShowQuizSubmenu(v => !v)}>
+              <Ionicons name="flask-outline" size={20} color={colors.accent} />
+              <Text style={styles.menuItemText}>{t('supplementQuiz', lang)}</Text>
+              <Ionicons name={showQuizSubmenu ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
             </TouchableOpacity>
-          </Animated.View>
+            {showQuizSubmenu && (
+              <>
+                <TouchableOpacity style={styles.menuSubItem} onPress={() => { closeMenu(); setShowQuiz(true) }}>
+                  <Ionicons name="add-circle-outline" size={17} color={colors.accent} />
+                  <Text style={styles.menuSubItemText}>{t('newQuiz', lang)}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuSubItem} onPress={() => { closeMenu(); loadQuizHistory(); setShowQuizHistory(true) }}>
+                  <Ionicons name="time-outline" size={17} color={colors.accent} />
+                  <Text style={styles.menuSubItemText}>{t('pastPlans', lang)}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); showEmergencyNumbers() }}>
+              <Ionicons name="call-outline" size={20} color={colors.danger} />
+              <Text style={styles.menuItemText}>{t('menuEmergency', lang)}</Text>
+            </TouchableOpacity>
+            <View style={[styles.menuItem, { opacity: 0.4 }]}>
+              <Ionicons name="home-outline" size={20} color={colors.textPrimary} />
+              <Text style={styles.menuItemText}>{t('menuAccommodations', lang)}</Text>
+              <View style={styles.soonBadge}><Text style={styles.soonBadgeText}>{t('comingSoon', lang)}</Text></View>
+            </View>
+            <View style={[styles.menuItem, { opacity: 0.4 }]}>
+              <Ionicons name="car-outline" size={20} color={colors.textPrimary} />
+              <Text style={styles.menuItemText}>{t('menuTransportation', lang)}</Text>
+              <View style={styles.soonBadge}><Text style={styles.soonBadgeText}>{t('comingSoon', lang)}</Text></View>
+            </View>
 
-        </View>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity style={styles.menuItem} onPress={rateApp}>
+              <Ionicons name="star-outline" size={20} color={colors.textPrimary} />
+              <Text style={styles.menuItemText}>{t('menuRateApp', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={shareApp}>
+              <Feather name="share-2" size={20} color={colors.textPrimary} />
+              <Text style={styles.menuItemText}>{t('menuShareApp', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={showAbout}>
+              <Ionicons name="information-circle-outline" size={20} color={colors.textPrimary} />
+              <Text style={styles.menuItemText}>{t('menuAbout', lang)}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          <View style={styles.menuDivider} />
+          <TouchableOpacity style={[styles.menuItem, { paddingBottom: 24 }]} onPress={() => supabase.auth.signOut()}>
+            <Feather name="log-out" size={20} color={colors.danger} />
+            <Text style={[styles.menuItemText, { color: colors.danger }]}>{t('signOut', lang)}</Text>
+          </TouchableOpacity>
+        </Animated.View>
 
         <Modal visible={showLangModal} transparent animationType="fade" onRequestClose={() => setShowLangModal(false)}>
           <TouchableOpacity style={styles.emergencyBackdrop} activeOpacity={1} onPress={() => setShowLangModal(false)}>
@@ -1302,8 +1375,7 @@ export default function App() {
           </TouchableOpacity>
         </Modal>
 
-      </SafeAreaView>
-      </ImageBackground>
+      </View>
     )
   }
 
@@ -1314,9 +1386,10 @@ const styles = StyleSheet.create({
   safe:             { flex: 1, backgroundColor: colors.bg },
   container:        { flex: 1, paddingHorizontal: 16 },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
-  header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12, position: 'relative' },
+  header:           { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', paddingTop: 16, paddingBottom: 12, position: 'relative' },
+  headerLogoWrap:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },
   wordmark:         { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
-  headerIcon:       { width: 72, height: 72, position: 'absolute', left: '50%', marginLeft: -36 },
+  headerIcon:       { width: 110, height: 54 },
   subText:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
   signOutLink:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   memberIdLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -1333,14 +1406,21 @@ const styles = StyleSheet.create({
   retryBtnText:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
   searchBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 10, gap: 10, borderWidth: 1, borderColor: colors.border },
   searchInput:      { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, padding: 0 },
+  filterBar:        { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  filterBarContent: { gap: 6, alignItems: 'center', paddingRight: 8 },
+  activeFilterPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  activeFilterPillText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
+  filterToggleBtn:  { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginLeft: 6, flexShrink: 0 },
+  filterToggleBtnActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   filterToggles:    { flexDirection: 'row', gap: 8, marginBottom: 8 },
   toggleChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.cardBg },
   toggleChipText:   { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   toggleChipOpen:   { borderColor: colors.success, backgroundColor: colors.successLight },
   toggleChipShowAll:{ borderColor: colors.primary, backgroundColor: colors.primaryLight },
   toggleChipLang:   { borderColor: colors.accent, backgroundColor: colors.accentLight },
-  typeRow:          { flexGrow: 0, marginBottom: 12 },
-  typeRowContent:   { gap: 6, paddingRight: 4 },
+  typeRow:          { flexGrow: 0, marginBottom: 10 },
+  typeRowContent:   { gap: 6, paddingRight: 4, alignItems: 'center' },
+  chipDivider:      { width: 1, height: 22, backgroundColor: colors.border, marginHorizontal: 2, alignSelf: 'center' },
   typeChip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.cardBg },
   typeChipActive:   { borderColor: colors.primary, backgroundColor: colors.primary },
   typeChipEmoji:    { fontSize: 13 },
@@ -1388,7 +1468,7 @@ const styles = StyleSheet.create({
   cardUnclaimed:    { opacity: 1 },
   notOnAdaBadge:    { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.border },
   notOnAdaBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
-  bookableBadge:    { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.primaryLight },
+  bookableBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.primaryLight },
   bookableBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
   backPill:         { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backPillText:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },

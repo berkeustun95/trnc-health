@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking, Switch } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
@@ -220,6 +221,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   async function updateStatus(id, status, customerId) {
     const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
     if (!error) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
       const { data: profile } = await supabase
         .from('profiles').select('push_token, preferred_language').eq('id', customerId).maybeSingle()
       if (profile) {

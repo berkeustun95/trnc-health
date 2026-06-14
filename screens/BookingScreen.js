@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ScrollView, TextInput, KeyboardAvoidingView, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import DateTimePicker from '@react-native-community/datetimepicker'
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import { Feather, Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { supabase } from '../lib/supabase'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -147,8 +148,29 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
       requested_time: requestedTime,
     })
     if (error) setError(error.message)
-    else setDone(true)
+    else { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setDone(true) }
     setLoading(false)
+  }
+
+  function openAndroidDateTimePicker() {
+    DateTimePickerAndroid.open({
+      value: date,
+      mode: 'date',
+      minimumDate: new Date(),
+      onChange: (_, selectedDate) => {
+        if (!selectedDate) return
+        DateTimePickerAndroid.open({
+          value: selectedDate,
+          mode: 'time',
+          onChange: (_, selectedTime) => {
+            if (!selectedTime) return
+            const combined = new Date(selectedDate)
+            combined.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0)
+            setDate(combined)
+          },
+        })
+      },
+    })
   }
 
   const tc = typeColors[facility.type] || typeColors.clinic
@@ -364,23 +386,23 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
             })() : (
               <>
                 <Text style={styles.sectionLabel}>{t('requestedTime', lang)}</Text>
-                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
+                <TouchableOpacity
+                  style={styles.dateBtn}
+                  onPress={Platform.OS === 'ios' ? () => setShowPicker(true) : openAndroidDateTimePicker}
+                >
                   <Text style={styles.dateBtnText}>
                     {date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                   </Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
 
-                {showPicker && (
+                {showPicker && Platform.OS === 'ios' && (
                   <DateTimePicker
                     value={date}
                     mode="datetime"
-                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                    display="inline"
                     minimumDate={new Date()}
-                    onChange={(_, selected) => {
-                      if (Platform.OS !== 'ios') setShowPicker(false)
-                      if (selected) setDate(selected)
-                    }}
+                    onChange={(_, selected) => { if (selected) setDate(selected) }}
                   />
                 )}
 
