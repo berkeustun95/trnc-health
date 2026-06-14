@@ -8,6 +8,10 @@ import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton } from '../components/Skeleton'
 
+const SCHED_KEYS   = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+const SCHED_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const TODAY_KEY    = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
 export default function FacilityProfileScreen({ facility, lang, isFavorite, onToggleFavorite, onBook, onBack }) {
@@ -167,6 +171,35 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
               ) : null}
             </View>
 
+            {/* Schedule */}
+            {facility.availability?.schedule && (
+              <View style={s.section}>
+                <Text style={s.sectionLabel}>Schedule</Text>
+                <View style={s.scheduleCard}>
+                  {SCHED_KEYS.map((key, i) => {
+                    const day = facility.availability.schedule[key]
+                    const isToday = key === TODAY_KEY[new Date().getDay()]
+                    return (
+                      <View key={key} style={[s.scheduleRow, isToday && s.scheduleRowToday, i === SCHED_KEYS.length - 1 && { borderBottomWidth: 0 }]}>
+                        <Text style={[s.scheduleDay, isToday && s.scheduleDayToday]}>{SCHED_LABELS[i]}</Text>
+                        {day?.closed
+                          ? <Text style={s.scheduleClosed}>Closed</Text>
+                          : <Text style={[s.scheduleHours, isToday && s.scheduleHoursToday]}>{day?.open ?? '09:00'} – {day?.close ?? '17:00'}</Text>
+                        }
+                        {isToday && <Text style={s.todayLabel}>Today</Text>}
+                      </View>
+                    )
+                  })}
+                  {facility.availability.slot_duration && (
+                    <View style={s.slotDurationRow}>
+                      <Feather name="clock" size={12} color={colors.textSecondary} />
+                      <Text style={s.slotDurationText}>{facility.availability.slot_duration}-min appointment slots</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
             {/* Reviews */}
             <View style={s.section}>
               <Text style={s.sectionLabel}>{t('tabReviews', lang)}</Text>
@@ -260,6 +293,17 @@ const s = StyleSheet.create({
   reviewComment:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },
   seeAllBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12 },
   seeAllText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
+  scheduleCard:      { backgroundColor: colors.cardBg, borderRadius: 14, overflow: 'hidden', ...shadow },
+  scheduleRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  scheduleRowToday:  { backgroundColor: colors.primaryLight },
+  scheduleDay:       { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, width: 36 },
+  scheduleDayToday:  { color: colors.primary },
+  scheduleClosed:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
+  scheduleHours:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, flex: 1 },
+  scheduleHoursToday:{ fontFamily: 'Inter_700Bold', color: colors.primary },
+  todayLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary, backgroundColor: colors.primaryLight, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden' },
+  slotDurationRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10 },
+  slotDurationText:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   noReviewsWrap:     { alignItems: 'center', paddingVertical: 20 },
   noReviewsTitle:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6, textAlign: 'center' },
   noReviewsSub:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },
