@@ -49,6 +49,13 @@ async function recordNotification(userId, title, body) {
   } catch { /* non-critical */ }
 }
 
+const STATUS_COLORS = {
+  pending:   { bg: '#FFF0EB', text: '#FF8552' },
+  confirmed: { bg: '#E6F4F4', text: '#0E7C7B' },
+  completed: { bg: '#E6F5ED', text: '#2E9E5B' },
+  cancelled: { bg: '#FAEAEC', text: '#D1495B' },
+}
+
 const AVAIL_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 const AVAIL_DAY_LABELS = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }
 const SLOT_DURATIONS = [15, 30, 45, 60]
@@ -116,7 +123,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
       if (!isPharmacy) {
         const { data, error } = await supabase
           .from('appointments')
-          .select('id, requested_time, customer_id')
+          .select('id, requested_time, customer_id, profiles(full_name)')
           .eq('facility_id', facility.id)
           .eq('status', 'pending')
           .order('requested_time')
@@ -124,7 +131,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
 
         const { data: past } = await supabase
           .from('appointments')
-          .select('id, requested_time, customer_id')
+          .select('id, requested_time, customer_id, profiles(full_name)')
           .eq('facility_id', facility.id)
           .eq('status', 'confirmed')
           .lt('requested_time', new Date().toISOString())
@@ -836,55 +843,89 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
-              {appointments.map(item => (
-                <View key={item.id} style={styles.card}>
-                  <Text style={styles.timeLabel}>{t('requestedTime', lang)}</Text>
-                  <Text style={styles.timeValue}>
-                    {new Date(item.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                  </Text>
-                  <View style={styles.actions}>
-                    <TouchableOpacity style={styles.confirmBtn} onPress={() => updateStatus(item.id, 'confirmed', item.customer_id)}>
-                      <Text style={styles.confirmText}>{t('confirm', lang)}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.declineBtn} onPress={() => updateStatus(item.id, 'cancelled', item.customer_id)}>
-                      <Text style={styles.declineText}>{t('decline', lang)}</Text>
-                    </TouchableOpacity>
+              {appointments.map(item => {
+                const sc = STATUS_COLORS.pending
+                const dt = new Date(item.requested_time)
+                return (
+                  <View key={item.id} style={styles.card}>
+                    <View style={styles.apptCardHead}>
+                      <View>
+                        <Text style={styles.apptDate}>{dt.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</Text>
+                        <Text style={styles.apptTime}>{dt.toLocaleTimeString([], { timeStyle: 'short' })}</Text>
+                      </View>
+                      <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
+                        <View style={[styles.statusDot, { backgroundColor: sc.text }]} />
+                        <Text style={[styles.statusPillText, { color: sc.text }]}>Pending</Text>
+                      </View>
+                    </View>
+                    {item.profiles?.full_name && (
+                      <View style={styles.apptPatientRow}>
+                        <Feather name="user" size={12} color={colors.textSecondary} />
+                        <Text style={styles.apptPatientName}>{item.profiles.full_name}</Text>
+                      </View>
+                    )}
+                    <View style={styles.actions}>
+                      <TouchableOpacity style={styles.confirmBtn} onPress={() => updateStatus(item.id, 'confirmed', item.customer_id)}>
+                        <Feather name="check" size={14} color={colors.success} />
+                        <Text style={styles.confirmText}>{t('confirm', lang)}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.declineBtn} onPress={() => updateStatus(item.id, 'cancelled', item.customer_id)}>
+                        <Feather name="x" size={14} color={colors.danger} />
+                        <Text style={styles.declineText}>{t('decline', lang)}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              ))}
+                )
+              })}
               {pastConfirmed.length > 0 && (
                 <>
                   <Text style={styles.noShowSectionLabel}>PAST APPOINTMENTS</Text>
-                  {pastConfirmed.map(item => (
-                    <View key={item.id} style={styles.card}>
-                      <Text style={styles.timeLabel}>{t('requestedTime', lang)}</Text>
-                      <Text style={styles.timeValue}>
-                        {new Date(item.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                      </Text>
-                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                        <TouchableOpacity
-                          style={[styles.completeBtn, completeLoading === item.id && { opacity: 0.6 }]}
-                          onPress={() => markComplete(item.id)}
-                          disabled={completeLoading === item.id || noShowLoading === item.id}
-                        >
-                          {completeLoading === item.id
-                            ? <ActivityIndicator size="small" color={colors.success} />
-                            : <Text style={styles.completeText}>{t('markComplete', lang)}</Text>
-                          }
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.noShowBtn, noShowLoading === item.id && { opacity: 0.6 }]}
-                          onPress={() => markNoShow(item.id, item.customer_id)}
-                          disabled={noShowLoading === item.id || completeLoading === item.id}
-                        >
-                          {noShowLoading === item.id
-                            ? <ActivityIndicator size="small" color={colors.danger} />
-                            : <Text style={styles.noShowText}>{t('noShowBtn', lang)}</Text>
-                          }
-                        </TouchableOpacity>
+                  {pastConfirmed.map(item => {
+                    const sc = STATUS_COLORS.confirmed
+                    const dt = new Date(item.requested_time)
+                    return (
+                      <View key={item.id} style={styles.card}>
+                        <View style={styles.apptCardHead}>
+                          <View>
+                            <Text style={styles.apptDate}>{dt.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</Text>
+                            <Text style={styles.apptTime}>{dt.toLocaleTimeString([], { timeStyle: 'short' })}</Text>
+                          </View>
+                          <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
+                            <View style={[styles.statusDot, { backgroundColor: sc.text }]} />
+                            <Text style={[styles.statusPillText, { color: sc.text }]}>Confirmed</Text>
+                          </View>
+                        </View>
+                        {item.profiles?.full_name && (
+                          <View style={styles.apptPatientRow}>
+                            <Feather name="user" size={12} color={colors.textSecondary} />
+                            <Text style={styles.apptPatientName}>{item.profiles.full_name}</Text>
+                          </View>
+                        )}
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                          <TouchableOpacity
+                            style={[styles.completeBtn, completeLoading === item.id && { opacity: 0.6 }]}
+                            onPress={() => markComplete(item.id)}
+                            disabled={completeLoading === item.id || noShowLoading === item.id}
+                          >
+                            {completeLoading === item.id
+                              ? <ActivityIndicator size="small" color={colors.success} />
+                              : <Text style={styles.completeText}>{t('markComplete', lang)}</Text>
+                            }
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.noShowBtn, noShowLoading === item.id && { opacity: 0.6 }]}
+                            onPress={() => markNoShow(item.id, item.customer_id)}
+                            disabled={noShowLoading === item.id || completeLoading === item.id}
+                          >
+                            {noShowLoading === item.id
+                              ? <ActivityIndicator size="small" color={colors.danger} />
+                              : <Text style={styles.noShowText}>{t('noShowBtn', lang)}</Text>
+                            }
+                          </TouchableOpacity>
+                        </View>
                       </View>
-                    </View>
-                  ))}
+                    )
+                  })}
                 </>
               )}
             </ScrollView>
@@ -961,14 +1002,22 @@ const styles = StyleSheet.create({
   trialText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#92400E', textAlign: 'center' },
   sectionTitle:   { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
   listContent:    { paddingBottom: 32 },
-  card:           { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, ...shadow },
-  timeLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  timeValue:      { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 14 },
-  actions:        { flexDirection: 'row', gap: 10 },
-  confirmBtn:     { flex: 1, backgroundColor: colors.successLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  confirmText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.success },
-  declineBtn:          { flex: 1, backgroundColor: colors.dangerLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  declineText:         { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.danger },
+  card:            { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, ...shadow },
+  apptCardHead:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  apptDate:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 },
+  apptTime:        { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
+  apptPatientRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  apptPatientName: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  statusPill:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  statusDot:       { width: 6, height: 6, borderRadius: 3 },
+  statusPillText:  { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  timeLabel:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
+  timeValue:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 14 },
+  actions:         { flexDirection: 'row', gap: 10 },
+  confirmBtn:      { flex: 1, backgroundColor: colors.successLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  confirmText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.success },
+  declineBtn:      { flex: 1, backgroundColor: colors.dangerLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  declineText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.danger },
   noShowSectionLabel:  { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5, marginTop: 24, marginBottom: 8 },
   completeBtn:         { flex: 1, backgroundColor: colors.successLight ?? '#E8F5E9', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
   completeText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.success },
