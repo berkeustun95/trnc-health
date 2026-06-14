@@ -8,7 +8,7 @@ import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
 
-export default function BookingScreen({ facility, session, lang, onBack }) {
+export default function BookingScreen({ facility, session, lang, blockedUntil, onBack }) {
   const [date, setDate] = useState(() => {
     const d = new Date()
     d.setHours(d.getHours() + 1, 0, 0, 0)
@@ -94,6 +94,27 @@ export default function BookingScreen({ facility, session, lang, onBack }) {
 
   if (showAllReviews) {
     return <ReviewsScreen facility={facility} lang={lang} onBack={() => setShowAllReviews(false)} />
+  }
+
+  const isBlocked = blockedUntil && new Date(blockedUntil) > new Date()
+  if (facility.type !== 'pharmacy' && isBlocked) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.center}>
+          <TouchableOpacity onPress={onBack} style={[styles.backRow, { alignSelf: 'flex-start', marginBottom: 32 }]}>
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Text style={styles.backText}>{t('back', lang)}</Text>
+          </TouchableOpacity>
+          <View style={[styles.successRing, { backgroundColor: '#FDE8EC' }]}>
+            <Feather name="slash" size={32} color={colors.danger} />
+          </View>
+          <Text style={[styles.successTitle, { color: colors.danger }]}>{t('bookingBlocked', lang)}</Text>
+          <Text style={styles.successSub}>
+            {t('bookingBlockedMsg', lang).replace('{date}', new Date(blockedUntil).toLocaleDateString([], { dateStyle: 'medium' }))}
+          </Text>
+        </View>
+      </SafeAreaView>
+    )
   }
 
   if (done) {

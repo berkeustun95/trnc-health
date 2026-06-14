@@ -55,6 +55,8 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
 
   const [tab, setTab] = useState(isPharmacy ? 'qa' : 'requests')
   const [appointments, setAppointments] = useState([])
+  const [pastConfirmed, setPastConfirmed] = useState([])
+  const [noShowLoading, setNoShowLoading] = useState(null)
   const [loading, setLoading] = useState(true)
   const [questions, setQuestions] = useState([])
   const [loadingQ, setLoadingQ] = useState(false)
@@ -70,6 +72,8 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [editPhone, setEditPhone] = useState(facility.phone ?? '')
   const [editAddress, setEditAddress] = useState(facility.address ?? '')
   const [editHours, setEditHours] = useState(facility.opening_hours ?? '')
+  const [editDescription, setEditDescription] = useState(facility.description ?? '')
+  const [editLanguages, setEditLanguages] = useState(Array.isArray(facility.languages) ? facility.languages : [])
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [coverUrl, setCoverUrl] = useState(facility.cover_image_url ?? null)
@@ -91,6 +95,16 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           .eq('status', 'pending')
           .order('requested_time')
         if (!error) setAppointments(data)
+
+        const { data: past } = await supabase
+          .from('appointments')
+          .select('id, requested_time, customer_id')
+          .eq('facility_id', facility.id)
+          .eq('status', 'confirmed')
+          .lt('requested_time', new Date().toISOString())
+          .order('requested_time', { ascending: false })
+          .limit(20)
+        if (past) setPastConfirmed(past)
       }
       setLoading(false)
     }
@@ -123,7 +137,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     setLoadingArchive(true)
     const { data } = await supabase
       .from('quiz_submissions')
-      .select('id, answers, generated_result, final_result, reviewed_at, created_at')
+      .select('id, customer_id, answers, generated_result, final_result, reviewed_at, created_at')
       .eq('assigned_facility_id', facility.id)
       .eq('status', 'approved')
       .order('reviewed_at', { ascending: false })
@@ -189,6 +203,15 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     }
   }
 
+  async function markNoShow(appointmentId, customerId) {
+    setNoShowLoading(appointmentId)
+    const { error } = await supabase.rpc('record_no_show', { p_appointment_id: appointmentId })
+    if (!error) {
+      setPastConfirmed(prev => prev.filter(a => a.id !== appointmentId))
+    }
+    setNoShowLoading(null)
+  }
+
   async function saveSpecialty(val) {
     const next = specialty.includes(val) ? specialty.filter(s => s !== val) : [...specialty, val]
     setSpecialty(next)
@@ -237,7 +260,13 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     setSaving(true)
     const { error } = await supabase
       .from('facilities')
-      .update({ phone: editPhone.trim() || null, address: editAddress.trim() || null, opening_hours: editHours.trim() || null })
+      .update({
+        phone: editPhone.trim() || null,
+        address: editAddress.trim() || null,
+        opening_hours: editHours.trim() || null,
+        description: editDescription.trim() || null,
+        languages: editLanguages.length > 0 ? editLanguages : null,
+      })
       .eq('id', facility.id)
     setSaving(false)
     if (!error) {
@@ -459,6 +488,30 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 </>
               )}
 
+              <Text style={[styles.fieldLabel, { marginTop: 20 }]}>About / Description</Text>
+              <TextInput
+                style={[styles.fieldInput, { minHeight: 80 }]}
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="Brief description visible to customers…"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                textAlignVertical="top"
+              />
+
+              <Text style={[styles.fieldLabel, { marginTop: 20 }]}>{t('languagesSpoken', lang)}</Text>
+              <View style={styles.specialtyGrid}>
+                {['English', 'Turkish', 'Arabic', 'Russian', 'Greek', 'German', 'French', 'Persian'].map(l => (
+                  <TouchableOpacity
+                    key={l}
+                    style={[styles.specialtyChip, editLanguages.includes(l) && styles.specialtyChipActive]}
+                    onPress={() => setEditLanguages(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])}
+                  >
+                    <Text style={[styles.specialtyChipText, editLanguages.includes(l) && styles.specialtyChipTextActive]}>{l}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <TouchableOpacity
                 style={[styles.saveBtn, (saving || saveSuccess) && { opacity: 0.7 }]}
                 onPress={saveListing}
@@ -528,6 +581,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                     </View>
                     <View>
                       <Text style={styles.reviewTitle}>{t('quizReview', lang)}</Text>
+                      <Text style={styles.reviewMemberId}>#{item.customer_id?.replace(/-/g, '').slice(0, 12).toUpperCase()}</Text>
                       <Text style={styles.reviewTime}>{new Date(item.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</Text>
                       <Text style={styles.reviewCount}>{t('supplementsRecommended', lang).replace('{n}', item.generated_result?.stack?.length ?? 0)}</Text>
                     </View>
@@ -607,13 +661,9 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
               <Text style={styles.emptySub}>{t('noPendingRequests', lang)}</Text>
             </View>
           ) : (
-            <FlatList
-              data={appointments}
-              keyExtractor={item => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.listContent}
-              renderItem={({ item }) => (
-                <View style={styles.card}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
+              {appointments.map(item => (
+                <View key={item.id} style={styles.card}>
                   <Text style={styles.timeLabel}>{t('requestedTime', lang)}</Text>
                   <Text style={styles.timeValue}>
                     {new Date(item.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
@@ -627,8 +677,31 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                     </TouchableOpacity>
                   </View>
                 </View>
+              ))}
+              {pastConfirmed.length > 0 && (
+                <>
+                  <Text style={styles.noShowSectionLabel}>PAST — MARK NO-SHOWS</Text>
+                  {pastConfirmed.map(item => (
+                    <View key={item.id} style={styles.card}>
+                      <Text style={styles.timeLabel}>{t('requestedTime', lang)}</Text>
+                      <Text style={styles.timeValue}>
+                        {new Date(item.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.noShowBtn, noShowLoading === item.id && { opacity: 0.6 }]}
+                        onPress={() => markNoShow(item.id, item.customer_id)}
+                        disabled={noShowLoading === item.id}
+                      >
+                        {noShowLoading === item.id
+                          ? <ActivityIndicator size="small" color={colors.danger} />
+                          : <Text style={styles.noShowText}>{t('noShowBtn', lang)}</Text>
+                        }
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </>
               )}
-            />
+            </ScrollView>
           )
         ) : (
           loadingQ ? (
@@ -708,8 +781,11 @@ const styles = StyleSheet.create({
   actions:        { flexDirection: 'row', gap: 10 },
   confirmBtn:     { flex: 1, backgroundColor: colors.successLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   confirmText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.success },
-  declineBtn:     { flex: 1, backgroundColor: colors.dangerLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  declineText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.danger },
+  declineBtn:          { flex: 1, backgroundColor: colors.dangerLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  declineText:         { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.danger },
+  noShowSectionLabel:  { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5, marginTop: 24, marginBottom: 8 },
+  noShowBtn:           { alignSelf: 'flex-start', marginTop: 10, backgroundColor: colors.dangerLight, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, minWidth: 80, alignItems: 'center' },
+  noShowText:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
   tabs:           { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, marginBottom: 16 },
   tabBtn:         { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: 'center' },
   tabBtnActive:   { backgroundColor: colors.surface, ...shadow },
@@ -723,6 +799,7 @@ const styles = StyleSheet.create({
   reviewIcon:     { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
   reviewIconText: { fontSize: 20 },
   reviewTitle:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  reviewMemberId: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5, marginTop: 2 },
   reviewTime:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
   reviewCount:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.primary, marginTop: 2 },
   reviewArrow:    { fontSize: 18, color: colors.primary, fontFamily: 'Inter_700Bold' },

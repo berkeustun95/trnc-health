@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import {
   View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Linking,
-  Modal,
+  Modal, LayoutAnimation, UIManager,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
+import * as Notifications from 'expo-notifications'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -56,17 +57,6 @@ function AvatarDisplay({ avatarUrl, initials, size = 72, textSize = 26 }) {
   )
 }
 
-const LANGUAGES = [
-  { key: 'English',  label: 'English'    },
-  { key: 'Turkish',  label: 'Türkçe'     },
-  { key: 'Arabic',   label: 'العربية'    },
-  { key: 'Russian',  label: 'Русский'    },
-  { key: 'Greek',    label: 'Ελληνικά'  },
-  { key: 'French',   label: 'Français'   },
-  { key: 'Spanish',  label: 'Español'    },
-  { key: 'German',   label: 'Deutsch'    },
-  { key: 'Persian',  label: 'فارسی'      },
-]
 
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const TYPE_COLORS = {
@@ -154,11 +144,21 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
           </Text>
           <Text style={s.bookingRef}>{t('bookingRef', lang)}: {booking.id.slice(0, 8).toUpperCase()}</Text>
 
-          {isPending && (
-            <TouchableOpacity style={[s.cancelBtn, { marginTop: 16 }]} onPress={() => onCancelBooking(booking.id)}>
-              <Text style={s.cancelBtnText}>{t('cancelAppt', lang)}</Text>
-            </TouchableOpacity>
-          )}
+          {(isPending || isConfirmed) && (() => {
+            const canCancel = new Date(booking.requested_time) > new Date(Date.now() + 24 * 60 * 60 * 1000)
+            if (canCancel) return (
+              <TouchableOpacity style={[s.cancelBtn, { marginTop: 16 }]} onPress={() => onCancelBooking(booking.id)}>
+                <Text style={s.cancelBtnText}>{t('cancelAppt', lang)}</Text>
+              </TouchableOpacity>
+            )
+            if (isConfirmed) return (
+              <View style={[s.cancelLateBox, { marginTop: 16 }]}>
+                <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} style={{ marginTop: 1 }} />
+                <Text style={s.cancelLateText}>{t('cancelLate', lang)}</Text>
+              </View>
+            )
+            return null
+          })()}
 
           {isConfirmed && !reviewed && (
             <View style={s.detailReviewSection}>
@@ -229,6 +229,14 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false)
   const [deleting, setDeleting]                 = useState(false)
   const [deleteError, setDeleteError]           = useState(null)
+  const [bookingsOpen, setBookingsOpen]         = useState(false)
+  const [personalOpen, setPersonalOpen]         = useState(false)
+
+  function toggleSection(setter) {
+    if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true)
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
+    setter(v => !v)
+  }
 
   useEffect(() => {
     async function loadProfile() {
@@ -286,6 +294,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     if (!error) {
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b))
       setSelectedBooking(prev => prev?.id === bookingId ? { ...prev, status: 'cancelled' } : prev)
+      Notifications.cancelScheduledNotificationAsync(`appt-reminder-${bookingId}`).catch(() => {})
     }
   }
 
@@ -368,7 +377,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     else {
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
-      onLangChange?.(form.preferred_language)
     }
     setSaving(false)
   }
@@ -386,12 +394,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   }
 
   const set = key => val => setForm(f => ({ ...f, [key]: val }))
-
-  async function selectLang(langKey) {
-    set('preferred_language')(langKey)
-    await supabase.from('profiles').update({ preferred_language: langKey }).eq('id', session.user.id)
-    onLangChange?.(langKey)
-  }
 
   const initials = form.full_name.trim()
     ? form.full_name.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -529,96 +531,91 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             <Text style={s.memberSub}>{t('discountQrSoon', lang)}</Text>
           </View>
 
-          <Text style={s.sectionTitle}>{t('myBookings', lang)}</Text>
-          {bookings.length === 0 ? (
-            <Text style={s.noBookingsText}>{t('noBookings', lang)}</Text>
-          ) : (
-            bookings.map(b => {
-              const isPending   = b.status === 'pending'
-              const isConfirmed = b.status === 'confirmed'
-              const statusLabel = isConfirmed ? t('statusConfirmed', lang)
-                : isPending ? t('statusPending', lang)
-                : t('statusCancelled', lang)
-              const statusStyle     = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : s.pillRed
-              const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : s.pillTextRed
-              return (
-                <TouchableOpacity
-                  key={b.id}
-                  style={s.bookingCard}
-                  activeOpacity={0.75}
-                  onPress={() => { setRatingValue(0); setRatingComment(''); setReviewError(null); setSelectedBooking(b) }}
-                >
-                  <View style={s.bookingTop}>
-                    <Text style={s.bookingFacility} numberOfLines={1}>{b.facilities?.name ?? '—'}</Text>
-                    <View style={statusStyle}>
-                      <Text style={statusTextStyle}>{statusLabel}</Text>
+          <TouchableOpacity style={s.accordionHeader} onPress={() => toggleSection(setBookingsOpen)} activeOpacity={0.7}>
+            <Text style={s.accordionTitle}>{t('myBookings', lang)}</Text>
+            <Ionicons name={bookingsOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+          {bookingsOpen && (
+            bookings.length === 0 ? (
+              <Text style={s.noBookingsText}>{t('noBookings', lang)}</Text>
+            ) : (
+              bookings.map(b => {
+                const isPending   = b.status === 'pending'
+                const isConfirmed = b.status === 'confirmed'
+                const statusLabel = isConfirmed ? t('statusConfirmed', lang)
+                  : isPending ? t('statusPending', lang)
+                  : t('statusCancelled', lang)
+                const statusStyle     = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : s.pillRed
+                const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : s.pillTextRed
+                return (
+                  <TouchableOpacity
+                    key={b.id}
+                    style={s.bookingCard}
+                    activeOpacity={0.75}
+                    onPress={() => { setRatingValue(0); setRatingComment(''); setReviewError(null); setSelectedBooking(b) }}
+                  >
+                    <View style={s.bookingTop}>
+                      <Text style={s.bookingFacility} numberOfLines={1}>{b.facilities?.name ?? '—'}</Text>
+                      <View style={statusStyle}>
+                        <Text style={statusTextStyle}>{statusLabel}</Text>
+                      </View>
                     </View>
-                  </View>
-                  <Text style={s.bookingTime}>
-                    {new Date(b.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                  </Text>
-                  <Text style={s.bookingRef}>{t('bookingRef', lang)}: {b.id.slice(0, 8).toUpperCase()}</Text>
-                  {isConfirmed && reviewedIds.has(b.id) && (
-                    <Text style={s.reviewedBadge}>{t('reviewDone', lang)} ★</Text>
-                  )}
-                </TouchableOpacity>
-              )
-            })
+                    <Text style={s.bookingTime}>
+                      {new Date(b.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                    </Text>
+                    <Text style={s.bookingRef}>{t('bookingRef', lang)}: {b.id.slice(0, 8).toUpperCase()}</Text>
+                    {isConfirmed && reviewedIds.has(b.id) && (
+                      <Text style={s.reviewedBadge}>{t('reviewDone', lang)} ★</Text>
+                    )}
+                  </TouchableOpacity>
+                )
+              })
+            )
           )}
 
-          <Text style={s.sectionTitle}>{t('personalInfo', lang)}</Text>
+          <TouchableOpacity style={s.accordionHeader} onPress={() => toggleSection(setPersonalOpen)} activeOpacity={0.7}>
+            <Text style={s.accordionTitle}>{t('personalInfo', lang)}</Text>
+            <Ionicons name={personalOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+          {personalOpen && (
+            <View>
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>{t('fullName', lang)}</Text>
+                <TextInput
+                  style={s.input}
+                  value={form.full_name}
+                  onChangeText={set('full_name')}
+                  placeholder="Your full name"
+                  placeholderTextColor={colors.border}
+                />
+              </View>
 
-          <View style={s.fieldGroup}>
-            <Text style={s.fieldLabel}>{t('fullName', lang)}</Text>
-            <TextInput
-              style={s.input}
-              value={form.full_name}
-              onChangeText={set('full_name')}
-              placeholder="Your full name"
-              placeholderTextColor={colors.border}
-            />
-          </View>
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>{t('phone', lang)}</Text>
+                <TextInput
+                  style={s.input}
+                  value={form.phone}
+                  onChangeText={set('phone')}
+                  placeholder="+90 555 000 00 00"
+                  placeholderTextColor={colors.border}
+                  keyboardType="phone-pad"
+                />
+              </View>
 
-          <View style={s.fieldGroup}>
-            <Text style={s.fieldLabel}>{t('phone', lang)}</Text>
-            <TextInput
-              style={s.input}
-              value={form.phone}
-              onChangeText={set('phone')}
-              placeholder="+90 555 000 00 00"
-              placeholderTextColor={colors.border}
-              keyboardType="phone-pad"
-            />
-          </View>
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>{t('nationality', lang)}</Text>
+                <TextInput
+                  style={s.input}
+                  value={form.nationality}
+                  onChangeText={set('nationality')}
+                  placeholder="e.g. British, Turkish, Iranian"
+                  placeholderTextColor={colors.border}
+                />
+              </View>
 
-          <View style={s.fieldGroup}>
-            <Text style={s.fieldLabel}>{t('nationality', lang)}</Text>
-            <TextInput
-              style={s.input}
-              value={form.nationality}
-              onChangeText={set('nationality')}
-              placeholder="e.g. British, Turkish, Iranian"
-              placeholderTextColor={colors.border}
-            />
-          </View>
-
-          <Text style={s.sectionTitle}>{t('preferences', lang)}</Text>
-          <Text style={s.fieldLabel}>{t('preferredLanguage', lang)}</Text>
-          <View style={s.langGrid}>
-            {LANGUAGES.map(({ key, label }) => (
-              <TouchableOpacity
-                key={key}
-                style={[s.langChip, form.preferred_language === key && s.langChipActive]}
-                onPress={() => selectLang(key)}
-              >
-                <Text style={[s.langChipText, form.preferred_language === key && s.langChipTextActive]}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {error && <Text style={s.errorText}>{error}</Text>}
+              {error && <Text style={s.errorText}>{error}</Text>}
+            </View>
+          )}
 
           <View style={s.legalRow}>
             <TouchableOpacity onPress={() => setLegalTab('privacy')}>
@@ -693,15 +690,11 @@ const s = StyleSheet.create({
   qrIcon:           { fontSize: 24, color: '#fff' },
 
   sectionTitle:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14, marginTop: 4 },
+  accordionHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4 },
+  accordionTitle:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5 },
   fieldGroup:       { marginBottom: 16 },
   fieldLabel:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
   input:            { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, fontSize: 15, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary },
-
-  langGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 28 },
-  langChip:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
-  langChipActive:   { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  langChipText:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  langChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   noBookingsText:   { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 20, marginTop: 2 },
   bookingCard:      { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
@@ -717,6 +710,8 @@ const s = StyleSheet.create({
   pillTextRed:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.danger },
   cancelBtn:        { alignSelf: 'flex-start', backgroundColor: colors.dangerLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   cancelBtnText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
+  cancelLateBox:    { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: colors.cardBg, borderRadius: 8, padding: 10 },
+  cancelLateText:   { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17 },
   reviewedBadge:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.success, marginTop: 8 },
   starsRow:         { flexDirection: 'row', gap: 8 },
   star:             { fontSize: 28, color: colors.border },
