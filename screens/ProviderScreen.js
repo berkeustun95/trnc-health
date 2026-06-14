@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking } from 'react-native'
+import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking, Switch } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
@@ -49,6 +49,22 @@ async function recordNotification(userId, title, body) {
   } catch { /* non-critical */ }
 }
 
+const AVAIL_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+const AVAIL_DAY_LABELS = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }
+const SLOT_DURATIONS = [15, 30, 45, 60]
+const DEFAULT_AVAIL = {
+  slot_duration: 30,
+  schedule: {
+    mon: { open: '09:00', close: '17:00' },
+    tue: { open: '09:00', close: '17:00' },
+    wed: { open: '09:00', close: '17:00' },
+    thu: { open: '09:00', close: '17:00' },
+    fri: { open: '09:00', close: '17:00' },
+    sat: { closed: true },
+    sun: { closed: true },
+  },
+}
+
 export default function ProviderScreen({ session, lang = 'English', facility, trialDaysLeft, onFacilityUpdated }) {
   const isPharmacy   = facility.type === 'pharmacy'
   const showQuizTabs = isPharmacy && (facility.membership_tier === 'pro' || facility.is_quiz_partner)
@@ -91,6 +107,9 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [specialty, setSpecialty] = useState(
     Array.isArray(facility.specialty) ? facility.specialty : (facility.specialty ? [facility.specialty] : [])
   )
+  const [avail, setAvail]             = useState(facility.availability ?? null)
+  const [savingAvail, setSavingAvail] = useState(false)
+  const [availSuccess, setAvailSuccess] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -236,6 +255,36 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     setSpecialty(next)
     await supabase.from('facilities').update({ specialty: next.length ? next : null }).eq('id', facility.id)
     if (onFacilityUpdated) onFacilityUpdated()
+  }
+
+  async function saveAvailability() {
+    setSavingAvail(true)
+    await supabase.from('facilities').update({ availability: avail }).eq('id', facility.id)
+    setSavingAvail(false)
+    setAvailSuccess(true)
+    setTimeout(() => setAvailSuccess(false), 3000)
+    if (onFacilityUpdated) onFacilityUpdated()
+  }
+
+  function setDayField(day, field, value) {
+    setAvail(prev => ({
+      ...prev,
+      schedule: {
+        ...prev.schedule,
+        [day]: { ...prev.schedule[day], [field]: value },
+      },
+    }))
+  }
+
+  function toggleDay(day) {
+    setAvail(prev => {
+      const cur = prev.schedule[day]
+      if (cur.closed) {
+        return { ...prev, schedule: { ...prev.schedule, [day]: { open: '09:00', close: '17:00' } } }
+      } else {
+        return { ...prev, schedule: { ...prev.schedule, [day]: { closed: true } } }
+      }
+    })
   }
 
   async function pickAndUploadImage(type) {
@@ -544,6 +593,110 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 }
               </TouchableOpacity>
             </View>
+
+            {/* Availability / slot booking */}
+            {!isPharmacy && (
+              <View style={[styles.card, { marginTop: 16 }]}>
+                <View style={styles.availHeader}>
+                  <View>
+                    <Text style={styles.fieldLabel}>Slot booking</Text>
+                    <Text style={styles.availSubLabel}>Customers pick from fixed time slots</Text>
+                  </View>
+                  <Switch
+                    value={!!avail}
+                    onValueChange={v => setAvail(v ? DEFAULT_AVAIL : null)}
+                    trackColor={{ true: colors.primary }}
+                    thumbColor="#fff"
+                  />
+                </View>
+
+                {avail && (
+                  <>
+                    <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Slot duration</Text>
+                    <View style={[styles.specialtyGrid, { marginBottom: 16 }]}>
+                      {SLOT_DURATIONS.map(d => (
+                        <TouchableOpacity
+                          key={d}
+                          style={[styles.specialtyChip, avail.slot_duration === d && styles.specialtyChipActive]}
+                          onPress={() => setAvail(prev => ({ ...prev, slot_duration: d }))}
+                        >
+                          <Text style={[styles.specialtyChipText, avail.slot_duration === d && styles.specialtyChipTextActive]}>
+                            {d} min
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <Text style={styles.fieldLabel}>Schedule</Text>
+                    {AVAIL_DAYS.map(day => {
+                      const dayData = avail.schedule[day] ?? { closed: true }
+                      const isOpen = !dayData.closed
+                      return (
+                        <View key={day} style={styles.availDayRow}>
+                          <Text style={styles.availDayLabel}>{AVAIL_DAY_LABELS[day].slice(0, 3)}</Text>
+                          {isOpen ? (
+                            <View style={styles.availTimeRow}>
+                              <TextInput
+                                style={styles.availTimeInput}
+                                value={dayData.open ?? '09:00'}
+                                onChangeText={v => setDayField(day, 'open', v)}
+                                placeholder="09:00"
+                                placeholderTextColor={colors.textSecondary}
+                                keyboardType="numbers-and-punctuation"
+                                maxLength={5}
+                              />
+                              <Text style={styles.availTimeSep}>–</Text>
+                              <TextInput
+                                style={styles.availTimeInput}
+                                value={dayData.close ?? '17:00'}
+                                onChangeText={v => setDayField(day, 'close', v)}
+                                placeholder="17:00"
+                                placeholderTextColor={colors.textSecondary}
+                                keyboardType="numbers-and-punctuation"
+                                maxLength={5}
+                              />
+                            </View>
+                          ) : (
+                            <Text style={styles.availClosedLabel}>Closed</Text>
+                          )}
+                          <Switch
+                            value={isOpen}
+                            onValueChange={() => toggleDay(day)}
+                            trackColor={{ true: colors.primary }}
+                            thumbColor="#fff"
+                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                          />
+                        </View>
+                      )
+                    })}
+
+                    <TouchableOpacity
+                      style={[styles.saveBtn, { marginTop: 16 }, (savingAvail || availSuccess) && { opacity: 0.7 }]}
+                      onPress={saveAvailability}
+                      disabled={savingAvail || availSuccess}
+                    >
+                      {savingAvail
+                        ? <ActivityIndicator color="#fff" size="small" />
+                        : <Text style={styles.saveBtnText}>{availSuccess ? 'Saved!' : 'Save schedule'}</Text>
+                      }
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {!avail && (
+                  <TouchableOpacity
+                    style={[styles.saveBtn, { marginTop: 12, backgroundColor: colors.danger }, savingAvail && { opacity: 0.7 }]}
+                    onPress={saveAvailability}
+                    disabled={savingAvail}
+                  >
+                    {savingAvail
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Text style={styles.saveBtnText}>{availSuccess ? 'Cleared!' : 'Disable slot booking'}</Text>
+                    }
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </ScrollView>
         ) : tab === 'archive' ? (
           loadingArchive ? (
@@ -867,6 +1020,14 @@ const styles = StyleSheet.create({
   specialtyChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   specialtyChipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   specialtyChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
+  availHeader:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  availSubLabel:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+  availDayRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 10 },
+  availDayLabel:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, width: 34 },
+  availTimeRow:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  availTimeInput:   { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface, width: 72, textAlign: 'center' },
+  availTimeSep:     { fontSize: 14, color: colors.textSecondary, fontFamily: 'Inter_400Regular' },
+  availClosedLabel: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic' },
   empty:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   emptyIconWrap:  { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
   emptyTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },

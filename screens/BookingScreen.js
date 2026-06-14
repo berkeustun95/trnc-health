@@ -8,13 +8,47 @@ import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
 
+const SLOT_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+const SLOT_DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function generateSlots(date, availability, bookedSlots) {
+  if (!availability?.schedule) return []
+  const dayKey = SLOT_DAY_KEYS[date.getDay()]
+  const day = availability.schedule[dayKey]
+  if (!day || day.closed) return []
+  const [openH, openM] = (day.open ?? '09:00').split(':').map(Number)
+  const [closeH, closeM] = (day.close ?? '17:00').split(':').map(Number)
+  const duration = availability.slot_duration ?? 30
+  const slots = []
+  let h = openH, m = openM
+  const now = new Date()
+  while (h < closeH || (h === closeH && m < closeM)) {
+    const label = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    const slotDate = new Date(date)
+    slotDate.setHours(h, m, 0, 0)
+    slots.push({ label, isPast: slotDate <= now, isBooked: bookedSlots.has(label) })
+    m += duration
+    if (m >= 60) { h += Math.floor(m / 60); m = m % 60 }
+  }
+  return slots
+}
+
 export default function BookingScreen({ facility, session, lang, blockedUntil, onBack }) {
+  const hasSlots = !!facility.availability
+
   const [date, setDate] = useState(() => {
     const d = new Date()
     d.setHours(d.getHours() + 1, 0, 0, 0)
     return d
   })
   const [showPicker, setShowPicker] = useState(false)
+
+  // slot picker state (only used when facility.availability is set)
+  const [selectedDate, setSelectedDate]   = useState(null)
+  const [selectedSlot, setSelectedSlot]   = useState(null)
+  const [bookedSlots, setBookedSlots]     = useState(new Set())
+  const [loadingSlots, setLoadingSlots]   = useState(false)
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
@@ -77,13 +111,39 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
     setSubmittingQ(false)
   }
 
+  async function loadBookedSlots(d) {
+    setLoadingSlots(true)
+    const start = new Date(d); start.setHours(0, 0, 0, 0)
+    const end   = new Date(d); end.setHours(23, 59, 59, 999)
+    const { data } = await supabase
+      .from('appointments')
+      .select('requested_time')
+      .eq('facility_id', facility.id)
+      .in('status', ['pending', 'confirmed'])
+      .gte('requested_time', start.toISOString())
+      .lte('requested_time', end.toISOString())
+    const booked = new Set((data ?? []).map(a => {
+      const t = new Date(a.requested_time)
+      return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
+    }))
+    setBookedSlots(booked)
+    setLoadingSlots(false)
+  }
+
   async function submit() {
     setLoading(true)
     setError(null)
+    let requestedTime = date.toISOString()
+    if (hasSlots && selectedDate && selectedSlot) {
+      const [h, m] = selectedSlot.split(':').map(Number)
+      const d = new Date(selectedDate)
+      d.setHours(h, m, 0, 0)
+      requestedTime = d.toISOString()
+    }
     const { error } = await supabase.from('appointments').insert({
       customer_id: session.user.id,
       facility_id: facility.id,
-      requested_time: date.toISOString(),
+      requested_time: requestedTime,
     })
     if (error) setError(error.message)
     else setDone(true)
@@ -219,44 +279,125 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
 
         {facility.type !== 'pharmacy' && (
           <>
-            <Text style={styles.sectionLabel}>{t('requestedTime', lang)}</Text>
-            <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
-              <Text style={styles.dateBtnText}>
-                {date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-              </Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
+            {hasSlots ? (() => {
+              const today = new Date(); today.setHours(0, 0, 0, 0)
+              const dates = Array.from({ length: 14 }, (_, i) => {
+                const d = new Date(today); d.setDate(today.getDate() + i); return d
+              })
+              const slots = selectedDate ? generateSlots(selectedDate, facility.availability, bookedSlots) : []
+              const canBook = selectedDate && selectedSlot
+              return (
+                <>
+                  <Text style={styles.sectionLabel}>{t('selectDate', lang)}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 8 }}>
+                    {dates.map((d, i) => {
+                      const isSelected = selectedDate && d.toDateString() === selectedDate.toDateString()
+                      return (
+                        <TouchableOpacity
+                          key={i}
+                          style={[styles.dateChip, isSelected && styles.dateChipActive]}
+                          onPress={() => { setSelectedDate(d); setSelectedSlot(null); loadBookedSlots(d) }}
+                        >
+                          <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextActive]}>{SLOT_DAY_LABELS[d.getDay()]}</Text>
+                          <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextActive]}>{d.getDate()}</Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </ScrollView>
 
-            {showPicker && (
-              <DateTimePicker
-                value={date}
-                mode="datetime"
-                display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                minimumDate={new Date()}
-                onChange={(_, selected) => {
-                  if (Platform.OS !== 'ios') setShowPicker(false)
-                  if (selected) setDate(selected)
-                }}
-              />
+                  {selectedDate && (
+                    <>
+                      <Text style={styles.sectionLabel}>{t('selectTime', lang)}</Text>
+                      {loadingSlots ? (
+                        <ActivityIndicator color={colors.primary} style={{ marginBottom: 16 }} />
+                      ) : slots.length === 0 ? (
+                        <Text style={styles.noSlots}>Closed this day</Text>
+                      ) : (
+                        <View style={styles.slotGrid}>
+                          {slots.map(slot => {
+                            const isSelected = selectedSlot === slot.label
+                            const unavailable = slot.isPast || slot.isBooked
+                            return (
+                              <TouchableOpacity
+                                key={slot.label}
+                                style={[
+                                  styles.slotChip,
+                                  isSelected && styles.slotChipActive,
+                                  unavailable && styles.slotChipUnavailable,
+                                ]}
+                                onPress={() => !unavailable && setSelectedSlot(slot.label)}
+                                disabled={unavailable}
+                              >
+                                <Text style={[
+                                  styles.slotChipText,
+                                  isSelected && styles.slotChipTextActive,
+                                  unavailable && styles.slotChipTextUnavailable,
+                                ]}>
+                                  {slot.label}
+                                </Text>
+                              </TouchableOpacity>
+                            )
+                          })}
+                        </View>
+                      )}
+                    </>
+                  )}
+
+                  {error && <Text style={styles.error}>{error}</Text>}
+                  <TouchableOpacity
+                    style={[styles.submit, !canBook && { opacity: 0.4 }]}
+                    onPress={submit}
+                    disabled={loading || !canBook}
+                  >
+                    {loading
+                      ? <ActivityIndicator color="#fff" />
+                      : <Text style={styles.submitText}>
+                          {canBook
+                            ? `${t('requestAppointment', lang)} · ${selectedSlot}`
+                            : t('requestAppointment', lang)}
+                        </Text>
+                    }
+                  </TouchableOpacity>
+                </>
+              )
+            })() : (
+              <>
+                <Text style={styles.sectionLabel}>{t('requestedTime', lang)}</Text>
+                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
+                  <Text style={styles.dateBtnText}>
+                    {date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                {showPicker && (
+                  <DateTimePicker
+                    value={date}
+                    mode="datetime"
+                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                    minimumDate={new Date()}
+                    onChange={(_, selected) => {
+                      if (Platform.OS !== 'ios') setShowPicker(false)
+                      if (selected) setDate(selected)
+                    }}
+                  />
+                )}
+
+                {showPicker && Platform.OS === 'ios' && (
+                  <TouchableOpacity style={styles.doneBtn} onPress={() => setShowPicker(false)}>
+                    <Text style={styles.doneBtnText}>{t('done', lang)}</Text>
+                  </TouchableOpacity>
+                )}
+
+                {error && <Text style={styles.error}>{error}</Text>}
+                <TouchableOpacity style={styles.submit} onPress={submit} disabled={loading}>
+                  {loading
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={styles.submitText}>{t('requestAppointment', lang)}</Text>
+                  }
+                </TouchableOpacity>
+              </>
             )}
-
-            {showPicker && Platform.OS === 'ios' && (
-              <TouchableOpacity style={styles.doneBtn} onPress={() => setShowPicker(false)}>
-                <Text style={styles.doneBtnText}>{t('done', lang)}</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-
-        {facility.type !== 'pharmacy' && (
-          <>
-            {error && <Text style={styles.error}>{error}</Text>}
-            <TouchableOpacity style={styles.submit} onPress={submit} disabled={loading}>
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.submitText}>{t('requestAppointment', lang)}</Text>
-              }
-            </TouchableOpacity>
           </>
         )}
 
@@ -355,6 +496,19 @@ const styles = StyleSheet.create({
   reviewStars:     { fontSize: 14, color: '#F5A623', letterSpacing: 1 },
   reviewDate:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   reviewComment:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
+  dateChip:           { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.cardBg, minWidth: 54, ...shadow },
+  dateChipActive:     { backgroundColor: colors.primary },
+  dateChipDay:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.3 },
+  dateChipNum:        { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 2 },
+  dateChipTextActive: { color: '#fff' },
+  slotGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+  slotChip:           { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 12, backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: 'transparent', ...shadow },
+  slotChipActive:     { backgroundColor: colors.primary, borderColor: colors.primary },
+  slotChipUnavailable:{ backgroundColor: colors.surface, opacity: 0.45 },
+  slotChipText:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  slotChipTextActive: { color: '#fff' },
+  slotChipTextUnavailable: { color: colors.textSecondary },
+  noSlots:            { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 20 },
   successRing:     { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.successLight, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   successTitle:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
   successSub:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginBottom: 32, lineHeight: 22 },
