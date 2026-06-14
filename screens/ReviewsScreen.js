@@ -119,7 +119,11 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack }) {
               )}
 
               {reviews.length === 0 && (
-                <Text style={s.empty}>No reviews yet.</Text>
+                <View style={s.emptyWrap}>
+                  <Ionicons name="star-outline" size={40} color={colors.border} style={{ marginBottom: 12 }} />
+                  <Text style={s.emptyTitle}>No reviews yet</Text>
+                  <Text style={s.empty}>Be the first to share your experience after your visit</Text>
+                </View>
               )}
             </View>
           }
@@ -161,5 +165,7 @@ const s = StyleSheet.create({
   reviewDate:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   comment:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 20, marginBottom: 8 },
   verifiedTag:   { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
-  empty:         { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 40 },
+  emptyWrap:     { alignItems: 'center', paddingTop: 40, paddingHorizontal: 32 },
+  emptyTitle:    { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
+  empty:         { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
 })

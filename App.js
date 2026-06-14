@@ -710,9 +710,10 @@ export default function App() {
           <View style={{ width: 60 }} />
         </View>
         {favList.length === 0 ? (
-          <View style={styles.center}>
-            <Ionicons name="heart-outline" size={40} color={colors.border} style={{ marginBottom: 12 }} />
-            <Text style={styles.noFavText}>{t('noFavourites', lang)}</Text>
+          <View style={styles.emptyWrap}>
+            <Ionicons name="heart" size={48} color={colors.border} style={{ marginBottom: 16 }} />
+            <Text style={styles.emptyTitle}>{t('noFavourites', lang)}</Text>
+            <Text style={styles.emptyBody}>Tap the ❤️ on any facility to save it here for quick access</Text>
           </View>
         ) : (
           <FlatList
@@ -1039,9 +1040,19 @@ export default function App() {
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={(
                   <View style={styles.emptyWrap}>
-                    <Text style={styles.emptyIcon}>🏥</Text>
-                    <Text style={styles.emptyTitle}>{t('noFacilitiesTitle', lang)}</Text>
-                    <Text style={styles.emptyBody}>{t('noFacilitiesBody', lang)}</Text>
+                    {searchText || activeType || activeSpecialty ? (
+                      <>
+                        <Ionicons name="search-outline" size={44} color={colors.border} style={{ marginBottom: 16 }} />
+                        <Text style={styles.emptyTitle}>No results found</Text>
+                        <Text style={styles.emptyBody}>Try removing a filter or adjusting your search</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.emptyIcon}>🏥</Text>
+                        <Text style={styles.emptyTitle}>{t('noFacilitiesTitle', lang)}</Text>
+                        <Text style={styles.emptyBody}>{t('noFacilitiesBody', lang)}</Text>
+                      </>
+                    )}
                   </View>
                 )}
                 renderItem={({ item }) => {

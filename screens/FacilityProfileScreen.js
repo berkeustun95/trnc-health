@@ -173,7 +173,11 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
               {reviewsLoading ? (
                 <>{[0, 1].map(i => <ReviewSkeleton key={i} />)}</>
               ) : reviews.length === 0 ? (
-                <Text style={s.noReviews}>{t('noReviews', lang)}</Text>
+                <View style={s.noReviewsWrap}>
+                  <Ionicons name="star-outline" size={40} color={colors.border} style={{ marginBottom: 12 }} />
+                  <Text style={s.noReviewsTitle}>{t('noReviews', lang)}</Text>
+                  <Text style={s.noReviewsSub}>Be the first to review this facility after your visit</Text>
+                </View>
               ) : (
                 <>
                   {reviewAvg && (
@@ -256,7 +260,9 @@ const s = StyleSheet.create({
   reviewComment:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },
   seeAllBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12 },
   seeAllText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
-  noReviews:         { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  noReviewsWrap:     { alignItems: 'center', paddingVertical: 20 },
+  noReviewsTitle:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6, textAlign: 'center' },
+  noReviewsSub:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },
   ctaWrap:           { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingBottom: 28, paddingTop: 12, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
   ctaBtn:            { backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 17, alignItems: 'center', ...shadow },
   ctaText:           { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.2 },
