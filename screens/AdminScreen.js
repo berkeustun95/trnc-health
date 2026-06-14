@@ -11,7 +11,7 @@ import { colors, shadow } from '../constants/theme'
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'admin']
-const TABS = ['Dashboard', 'Facilities', 'Duty', 'Providers', 'Claims', 'Users', 'Bookings', 'Broadcast']
+const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -52,58 +52,70 @@ function SectionEmpty({ text }) {
 
 // ─── Dashboard Tab ──────────────────────────────────────────────────────────
 
-function DashboardTab() {
+function DashboardTab({ onNavigate }) {
   const [stats, setStats] = useState(null)
-  const [recent, setRecent] = useState([])
 
   useEffect(() => {
     async function load() {
       const [
         { count: facilities },
         { count: users },
-        { count: pending },
-        { count: confirmed },
-        { count: cancelled },
-        { data: recentAppts },
+        { count: pendingAppts },
+        { count: pendingClaims },
+        { count: pendingChanges },
+        { count: pendingProviders },
       ] = await Promise.all([
         supabase.from('facilities').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('status', 'confirmed'),
-        supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('status', 'cancelled'),
-        supabase.from('appointments').select('id, requested_time, status, facility_id').order('requested_time', { ascending: false }).limit(5),
+        supabase.from('claim_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('facility_change_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('facilities').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ])
-      setStats({ facilities, users, pending, confirmed, cancelled })
-      setRecent(recentAppts ?? [])
+      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders })
     }
     load()
   }, [])
 
   if (!stats) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
 
+  const urgencies = [
+    stats.pendingChanges  > 0 && { label: 'Profile change requests', count: stats.pendingChanges,  tab: 'Changes',   color: colors.accent },
+    stats.pendingClaims   > 0 && { label: 'Pending facility claims',  count: stats.pendingClaims,   tab: 'Claims',    color: colors.danger },
+    stats.pendingProviders > 0 && { label: 'Providers awaiting approval', count: stats.pendingProviders, tab: 'Providers', color: colors.danger },
+    stats.pendingAppts    > 0 && { label: 'Pending appointments',     count: stats.pendingAppts,    tab: 'Bookings',  color: colors.primary },
+  ].filter(Boolean)
+
   return (
     <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
-      <Text style={s.sectionTitle}>Overview</Text>
       <View style={s.statsGrid}>
         <StatCard label="Facilities" value={stats.facilities} />
         <StatCard label="Users" value={stats.users} />
-        <StatCard label="Pending" value={stats.pending} color={colors.accent} />
-        <StatCard label="Confirmed" value={stats.confirmed} color={colors.success} />
-        <StatCard label="Cancelled" value={stats.cancelled} color={colors.danger} />
+        <StatCard label="Appt. pending" value={stats.pendingAppts} color={stats.pendingAppts > 0 ? colors.accent : undefined} />
       </View>
 
-      <Text style={[s.sectionTitle, { marginTop: 24 }]}>Recent bookings</Text>
-      {recent.length === 0
-        ? <SectionEmpty text="No bookings yet." />
-        : recent.map(a => (
-          <View key={a.id} style={s.card}>
-            <Text style={s.cardSub}>{new Date(a.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
-            <View style={[s.statusPill, a.status === 'confirmed' ? s.pillGreen : a.status === 'cancelled' ? s.pillRed : s.pillOrange]}>
-              <Text style={s.pillText}>{a.status}</Text>
-            </View>
-          </View>
-        ))
-      }
+      {urgencies.length > 0 && (
+        <>
+          <Text style={[s.sectionTitle, { marginTop: 24 }]}>Needs attention</Text>
+          {urgencies.map(u => (
+            <TouchableOpacity key={u.tab} style={s.urgencyCard} onPress={() => onNavigate(u.tab)} activeOpacity={0.75}>
+              <View style={[s.urgencyDot, { backgroundColor: u.color }]} />
+              <Text style={s.urgencyLabel}>{u.label}</Text>
+              <View style={[s.urgencyBadge, { backgroundColor: u.color }]}>
+                <Text style={s.urgencyCount}>{u.count}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ))}
+        </>
+      )}
+
+      {urgencies.length === 0 && (
+        <View style={s.allClearBox}>
+          <Ionicons name="checkmark-circle" size={32} color={colors.success} />
+          <Text style={s.allClearText}>All clear — nothing needs attention.</Text>
+        </View>
+      )}
     </ScrollView>
   )
 }
@@ -311,6 +323,20 @@ function DutyTab() {
   const [notified, setNotified] = useState(false)
   const [pharmacySearch, setPharmacySearch] = useState('')
 
+  const [swapDate, setSwapDate] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
+  const [dutyEntries, setDutyEntries] = useState([])
+  const [loadingEntries, setLoadingEntries] = useState(false)
+  const [swapTarget, setSwapTarget] = useState(null)
+  const [swapModalVisible, setSwapModalVisible] = useState(false)
+  const [swapSearch, setSwapSearch] = useState('')
+  const [swapSelectedPharmacy, setSwapSelectedPharmacy] = useState(null)
+  const [swapPhone, setSwapPhone] = useState('')
+  const [swapping, setSwapping] = useState(false)
+  const [swapDone, setSwapDone] = useState(false)
+
   useEffect(() => {
     supabase.from('facilities').select('id, name').eq('type', 'pharmacy').order('name')
       .then(({ data }) => {
@@ -326,6 +352,20 @@ function DutyTab() {
     supabase.from('duty_schedule').select('facility_id').eq('date', date).maybeSingle()
       .then(({ data }) => setSelectedId(data?.facility_id ?? null))
   }, [date])
+
+  useEffect(() => {
+    async function loadEntries() {
+      setLoadingEntries(true)
+      const { data } = await supabase
+        .from('duty_list')
+        .select('id, name, address, phone, region, open_from, open_until')
+        .eq('duty_date', swapDate)
+        .order('region').order('name')
+      setDutyEntries(data ?? [])
+      setLoadingEntries(false)
+    }
+    loadEntries()
+  }, [swapDate])
 
   async function saveDuty() {
     if (!selectedId) return
@@ -361,60 +401,200 @@ function DutyTab() {
     setUpcoming(data ?? [])
   }
 
+  function openSwap(entry) {
+    setSwapTarget(entry)
+    setSwapSearch('')
+    setSwapSelectedPharmacy(null)
+    setSwapPhone('')
+    setSwapModalVisible(true)
+  }
+
+  async function confirmSwap() {
+    if (!swapSelectedPharmacy || !swapTarget) return
+    setSwapping(true)
+    const { error } = await supabase
+      .from('duty_list')
+      .update({
+        name: swapSelectedPharmacy.name,
+        address: swapSelectedPharmacy.address ?? '',
+        phone: swapPhone.trim() || null,
+      })
+      .eq('id', swapTarget.id)
+    if (!error) {
+      const title = '💊 Duty pharmacy updated'
+      const body = `${swapSelectedPharmacy.name} is now the duty pharmacy for ${swapDate}.`
+      const { data: customers } = await supabase.from('profiles').select('id, push_token').eq('role', 'customer')
+      for (const c of customers ?? []) {
+        await recordNotification(c.id, title, body)
+        if (c.push_token) await sendPushNotification(c.push_token, title, body, { screen: 'duty' })
+      }
+      setSwapModalVisible(false)
+      setSwapDone(true)
+      setTimeout(() => setSwapDone(false), 3000)
+      const { data } = await supabase
+        .from('duty_list')
+        .select('id, name, address, phone, region, open_from, open_until')
+        .eq('duty_date', swapDate)
+        .order('region').order('name')
+      setDutyEntries(data ?? [])
+    }
+    setSwapping(false)
+  }
+
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-      <Text style={s.sectionTitle}>Set duty pharmacy</Text>
+      <Text style={s.sectionTitle}>Swap duty list entry</Text>
 
-      <Field label="Date (YYYY-MM-DD)">
-        <TextInput style={s.input} value={date} onChangeText={setDate} keyboardType="numbers-and-punctuation" />
-      </Field>
+        <Field label="Date (YYYY-MM-DD)">
+          <TextInput style={s.input} value={swapDate} onChangeText={v => { setSwapDate(v); setSwapDone(false) }} keyboardType="numbers-and-punctuation" />
+        </Field>
 
-      <Text style={[s.fieldLabel, { marginBottom: 8 }]}>Select pharmacy</Text>
-      <TextInput
-        style={[s.input, { marginBottom: 10 }]}
-        value={pharmacySearch}
-        onChangeText={setPharmacySearch}
-        placeholder="Search pharmacies…"
-      />
-      {pharmacies.filter(p => p.name.toLowerCase().includes(pharmacySearch.toLowerCase())).map(p => (
-        <TouchableOpacity key={p.id} style={[s.card, selectedId === p.id && s.cardSelected]} onPress={() => setSelectedId(p.id)}>
-          <Text style={[s.cardTitle, selectedId === p.id && { color: colors.primary }]}>{p.name}</Text>
-        </TouchableOpacity>
-      ))}
+        {swapDone && (
+          <View style={s.broadcastResult}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+            <Text style={s.broadcastResultText}>Swap saved successfully!</Text>
+          </View>
+        )}
 
-      <TouchableOpacity
-        style={[s.primaryBtn, { marginTop: 16 }, (!selectedId || saving) && s.primaryBtnDisabled]}
-        onPress={saveDuty}
-        disabled={!selectedId || saving}
-      >
-        <Text style={s.primaryBtnText}>{saved ? 'Saved!' : saving ? 'Saving…' : 'Save duty schedule'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[s.ghostBtn, { marginTop: 10, paddingVertical: 12, alignItems: 'center' }, (!selectedId || notifying) && s.primaryBtnDisabled]}
-        onPress={notifyDuty}
-        disabled={!selectedId || notifying}
-      >
-        <Text style={s.ghostBtnText}>{notified ? 'Notified!' : notifying ? 'Sending…' : 'Notify users about tonight\'s duty'}</Text>
-      </TouchableOpacity>
-
-      {upcoming.length > 0 && (
-        <>
-          <Text style={[s.sectionTitle, { marginTop: 28 }]}>Upcoming duty</Text>
-          {upcoming.map(u => (
-            <View key={u.date} style={[s.card, s.cardRow]}>
+        {loadingEntries
+          ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
+          : dutyEntries.length === 0
+          ? <Text style={s.empty}>No duty entries for this date.</Text>
+          : dutyEntries.map(entry => (
+            <View key={entry.id} style={[s.card, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
               <View style={{ flex: 1 }}>
-                <Text style={s.cardSub}>{u.date}</Text>
-                <Text style={s.cardTitle}>{u.facilities?.name ?? '—'}</Text>
+                <Text style={s.cardTitle} numberOfLines={1}>{entry.name}</Text>
+                {(entry.region || entry.open_from) ? (
+                  <Text style={s.cardSub}>
+                    {[entry.region, entry.open_from && `${entry.open_from}–${entry.open_until}`].filter(Boolean).join(' · ')}
+                  </Text>
+                ) : null}
               </View>
-              <TouchableOpacity style={s.dangerGhostBtn} onPress={() => removeDuty(u.date)}>
-                <Text style={s.dangerGhostText}>Remove</Text>
+              <TouchableOpacity
+                style={[s.ghostBtn, { backgroundColor: colors.accentLight, marginLeft: 8 }]}
+                onPress={() => openSwap(entry)}
+              >
+                <Text style={[s.ghostBtnText, { color: colors.accent }]}>Swap</Text>
               </TouchableOpacity>
             </View>
-          ))}
-        </>
-      )}
-    </ScrollView>
+          ))
+        }
+
+        <View style={s.divider} />
+        <Text style={s.sectionTitle}>Set duty schedule</Text>
+
+        <Field label="Date (YYYY-MM-DD)">
+          <TextInput style={s.input} value={date} onChangeText={setDate} keyboardType="numbers-and-punctuation" />
+        </Field>
+
+        <Text style={[s.fieldLabel, { marginBottom: 8 }]}>Select pharmacy</Text>
+        <TextInput
+          style={[s.input, { marginBottom: 10 }]}
+          value={pharmacySearch}
+          onChangeText={setPharmacySearch}
+          placeholder="Search pharmacies…"
+        />
+        {pharmacies.filter(p => p.name.toLowerCase().includes(pharmacySearch.toLowerCase())).map(p => (
+          <TouchableOpacity key={p.id} style={[s.card, selectedId === p.id && s.cardSelected]} onPress={() => setSelectedId(p.id)}>
+            <Text style={[s.cardTitle, selectedId === p.id && { color: colors.primary }]}>{p.name}</Text>
+          </TouchableOpacity>
+        ))}
+
+        <TouchableOpacity
+          style={[s.primaryBtn, { marginTop: 16 }, (!selectedId || saving) && s.primaryBtnDisabled]}
+          onPress={saveDuty}
+          disabled={!selectedId || saving}
+        >
+          <Text style={s.primaryBtnText}>{saved ? 'Saved!' : saving ? 'Saving…' : 'Save duty schedule'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.ghostBtn, { marginTop: 10, paddingVertical: 12, alignItems: 'center' }, (!selectedId || notifying) && s.primaryBtnDisabled]}
+          onPress={notifyDuty}
+          disabled={!selectedId || notifying}
+        >
+          <Text style={s.ghostBtnText}>{notified ? 'Notified!' : notifying ? 'Sending…' : "Notify users about tonight's duty"}</Text>
+        </TouchableOpacity>
+
+        {upcoming.length > 0 && (
+          <>
+            <Text style={[s.sectionTitle, { marginTop: 28 }]}>Upcoming duty</Text>
+            {upcoming.map(u => (
+              <View key={u.date} style={[s.card, s.cardRow]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.cardSub}>{u.date}</Text>
+                  <Text style={s.cardTitle}>{u.facilities?.name ?? '—'}</Text>
+                </View>
+                <TouchableOpacity style={s.dangerGhostBtn} onPress={() => removeDuty(u.date)}>
+                  <Text style={s.dangerGhostText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </>
+        )}
+      </ScrollView>
+
+      <Modal visible={swapModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+            <View style={s.modalHeader}>
+              <TouchableOpacity onPress={() => setSwapModalVisible(false)}>
+                <Text style={s.modalCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={s.modalTitle}>Replace pharmacy</Text>
+              <TouchableOpacity onPress={confirmSwap} disabled={!swapSelectedPharmacy || swapping}>
+                <Text style={[s.modalSave, (!swapSelectedPharmacy || swapping) && { opacity: 0.35 }]}>
+                  {swapping ? 'Saving…' : 'Confirm'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {swapTarget && (
+              <View style={s.swapFromBanner}>
+                <Text style={s.swapFromLabel}>Replacing</Text>
+                <Text style={s.swapFromName} numberOfLines={1}>{swapTarget.name}</Text>
+              </View>
+            )}
+
+            <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <TextInput
+                style={[s.input, { marginBottom: 10 }]}
+                value={swapSearch}
+                onChangeText={setSwapSearch}
+                placeholder="Search pharmacies…"
+                placeholderTextColor={colors.border}
+              />
+              {pharmacies
+                .filter(p => p.name.toLowerCase().includes(swapSearch.toLowerCase()))
+                .map(p => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[s.card, swapSelectedPharmacy?.id === p.id && s.cardSelected]}
+                    onPress={() => setSwapSelectedPharmacy(p)}
+                  >
+                    <Text style={[s.cardTitle, swapSelectedPharmacy?.id === p.id && { color: colors.primary }]}>{p.name}</Text>
+                    {p.address ? <Text style={s.cardSub} numberOfLines={1}>{p.address}</Text> : null}
+                  </TouchableOpacity>
+                ))
+              }
+              {swapSelectedPharmacy && (
+                <Field label="Phone number (optional)">
+                  <TextInput
+                    style={s.input}
+                    value={swapPhone}
+                    onChangeText={setSwapPhone}
+                    placeholder="e.g. 0548 831 00 00"
+                    placeholderTextColor={colors.border}
+                    keyboardType="phone-pad"
+                  />
+                </Field>
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
   )
 }
 
@@ -821,6 +1001,136 @@ function BookingsTab() {
   )
 }
 
+// ─── Changes Tab ────────────────────────────────────────────────────────────
+
+const CHANGE_FIELD_LABELS = {
+  phone: 'Phone', address: 'Address', opening_hours: 'Opening Hours',
+  description: 'About', languages: 'Languages',
+}
+
+function formatVal(val) {
+  if (val == null || val === '') return '(empty)'
+  if (Array.isArray(val)) return val.join(', ')
+  return String(val)
+}
+
+function DiffRow({ field, current, proposed }) {
+  const cur = current?.[field] ?? null
+  const prop = proposed?.[field] ?? null
+  if (JSON.stringify(cur) === JSON.stringify(prop)) return null
+  return (
+    <View style={s.diffRow}>
+      <Text style={s.diffField}>{CHANGE_FIELD_LABELS[field] ?? field}</Text>
+      <Text style={s.diffCurrent} numberOfLines={2}>{formatVal(cur)}</Text>
+      <Ionicons name="arrow-forward" size={12} color={colors.textSecondary} style={{ marginHorizontal: 4 }} />
+      <Text style={s.diffProposed} numberOfLines={2}>{formatVal(prop)}</Text>
+    </View>
+  )
+}
+
+function ChangesTab() {
+  const [requests, setRequests] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('facility_change_requests')
+      .select('id, facility_id, provider_id, proposed_changes, created_at, facilities(name, phone, address, opening_hours, description, languages)')
+      .eq('status', 'pending')
+      .order('created_at')
+    const rows = data ?? []
+    const ids = [...new Set(rows.map(r => r.provider_id).filter(Boolean))]
+    const { data: profilesData } = ids.length
+      ? await supabase.from('profiles').select('id, full_name').in('id', ids)
+      : { data: [] }
+    const pm = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
+    setRequests(rows.map(r => ({ ...r, _provider: pm[r.provider_id] })))
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(req) {
+    setActionLoading(req.id)
+    const { error } = await supabase
+      .from('facilities')
+      .update(req.proposed_changes)
+      .eq('id', req.facility_id)
+    if (!error) {
+      await supabase.from('facility_change_requests').update({ status: 'approved' }).eq('id', req.id)
+      const { data: p } = await supabase.from('profiles').select('push_token').eq('id', req.provider_id).maybeSingle()
+      const title = 'Changes approved'
+      const body = `Your updates to ${req.facilities?.name ?? 'your facility'} are now live.`
+      if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+      await recordNotification(req.provider_id, title, body)
+      load()
+    }
+    setActionLoading(null)
+  }
+
+  async function reject(req) {
+    setActionLoading(req.id)
+    await supabase.from('facility_change_requests').update({ status: 'rejected' }).eq('id', req.id)
+    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', req.provider_id).maybeSingle()
+    const title = 'Changes not approved'
+    const body = `Your updates to ${req.facilities?.name ?? 'your facility'} were not approved. Contact us for details.`
+    if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+    await recordNotification(req.provider_id, title, body)
+    setActionLoading(null)
+    load()
+  }
+
+  if (loading) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+
+  return (
+    <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
+      <Text style={s.sectionTitle}>Pending changes ({requests.length})</Text>
+      {requests.length === 0
+        ? <SectionEmpty text="No pending change requests." />
+        : requests.map(req => {
+          const facility = req.facilities ?? {}
+          const isLoading = actionLoading === req.id
+          return (
+            <View key={req.id} style={s.card}>
+              <View style={[s.cardRow, { justifyContent: 'space-between', marginBottom: 4 }]}>
+                <Text style={s.cardTitle} numberOfLines={1}>{facility.name ?? '—'}</Text>
+                <Text style={s.cardSub}>{new Date(req.created_at).toLocaleDateString()}</Text>
+              </View>
+              <Text style={[s.cardSub, { marginBottom: 12 }]}>
+                by {req._provider?.full_name || req.provider_id?.slice(0, 8)}
+              </Text>
+              {Object.keys(CHANGE_FIELD_LABELS).map(field => (
+                <DiffRow key={field} field={field} current={facility} proposed={req.proposed_changes} />
+              ))}
+              <View style={[s.cardRow, { marginTop: 14, gap: 8 }]}>
+                <TouchableOpacity
+                  style={[s.ghostBtn, { backgroundColor: colors.successLight, flex: 1 }, isLoading && { opacity: 0.5 }]}
+                  onPress={() => approve(req)}
+                  disabled={isLoading}
+                >
+                  {isLoading
+                    ? <ActivityIndicator size="small" color={colors.success} />
+                    : <Text style={[s.ghostBtnText, { color: colors.success }]}>Approve & go live</Text>
+                  }
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.dangerGhostBtn, isLoading && { opacity: 0.5 }]}
+                  onPress={() => reject(req)}
+                  disabled={isLoading}
+                >
+                  <Text style={s.dangerGhostText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )
+        })
+      }
+    </ScrollView>
+  )
+}
+
 // ─── Broadcast Tab ──────────────────────────────────────────────────────────
 
 function BroadcastTab() {
@@ -934,6 +1244,7 @@ function BroadcastTab() {
 
 export default function AdminScreen({ session }) {
   const [tab, setTab] = useState('Dashboard')
+  const navigateTo = t => setTab(t)
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -962,11 +1273,12 @@ export default function AdminScreen({ session }) {
         </ScrollView>
 
         <View style={{ flex: 1 }}>
-          {tab === 'Dashboard'  && <DashboardTab />}
+          {tab === 'Dashboard'  && <DashboardTab onNavigate={navigateTo} />}
+          {tab === 'Changes'    && <ChangesTab />}
+          {tab === 'Claims'     && <ClaimsTab />}
+          {tab === 'Providers'  && <ProvidersTab />}
           {tab === 'Facilities' && <FacilitiesTab />}
           {tab === 'Duty'       && <DutyTab />}
-          {tab === 'Providers'  && <ProvidersTab />}
-          {tab === 'Claims'     && <ClaimsTab />}
           {tab === 'Users'      && <UsersTab />}
           {tab === 'Bookings'   && <BookingsTab />}
           {tab === 'Broadcast'  && <BroadcastTab />}
@@ -1044,6 +1356,25 @@ const s = StyleSheet.create({
   broadcastResult:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.successLight, borderRadius: 10, padding: 12, marginBottom: 16 },
   broadcastResultText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.success, flex: 1 },
   broadcastNote:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 12, lineHeight: 18 },
+  divider:            { height: 1, backgroundColor: colors.border, marginVertical: 24 },
+  swapFromBanner:     { backgroundColor: colors.accentLight, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  swapFromLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },
+  swapFromName:       { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 2 },
+
+  // urgency cards
+  urgencyCard:        { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginBottom: 8, ...shadow },
+  urgencyDot:         { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  urgencyLabel:       { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  urgencyBadge:       { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, minWidth: 24, alignItems: 'center' },
+  urgencyCount:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#fff' },
+  allClearBox:        { alignItems: 'center', gap: 10, marginTop: 40 },
+  allClearText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+
+  // diff rows
+  diffRow:            { flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap', gap: 4, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.border },
+  diffField:          { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', width: 80, paddingTop: 1, flexShrink: 0 },
+  diffCurrent:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger, flex: 1 },
+  diffProposed:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.success, flex: 1 },
 
   // status pills
   statusPill:         { alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },

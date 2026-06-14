@@ -316,17 +316,31 @@ export default function App() {
         .limit(10)
       if (!data) return
       for (const appt of data) {
-        const reminderTime = new Date(new Date(appt.requested_time).getTime() - 60 * 60 * 1000)
-        if (reminderTime <= now) continue
-        await Notifications.scheduleNotificationAsync({
-          identifier: `appt-reminder-${appt.id}`,
-          content: {
-            title: t('apptReminderTitle', currentLang),
-            body: t('apptReminderBody', currentLang).replace('{name}', appt.facilities?.name ?? ''),
-            data: { screen: 'notifications' },
-          },
-          trigger: { date: reminderTime },
-        })
+        const apptTime = new Date(appt.requested_time)
+        const reminderTime = new Date(apptTime.getTime() - 60 * 60 * 1000)
+        const reviewTime   = new Date(apptTime.getTime() + 60 * 60 * 1000)
+        if (reminderTime > now) {
+          await Notifications.scheduleNotificationAsync({
+            identifier: `appt-reminder-${appt.id}`,
+            content: {
+              title: t('apptReminderTitle', currentLang),
+              body: t('apptReminderBody', currentLang).replace('{name}', appt.facilities?.name ?? ''),
+              data: { screen: 'notifications' },
+            },
+            trigger: { date: reminderTime },
+          })
+        }
+        if (reviewTime > now) {
+          await Notifications.scheduleNotificationAsync({
+            identifier: `appt-review-${appt.id}`,
+            content: {
+              title: t('reviewPromptTitle', currentLang),
+              body: t('reviewPromptBody', currentLang).replace('{name}', appt.facilities?.name ?? ''),
+              data: { screen: 'profile' },
+            },
+            trigger: { date: reviewTime },
+          })
+        }
       }
     } catch (e) {
       if (__DEV__) console.log('Schedule reminders error:', e.message)
@@ -374,6 +388,8 @@ export default function App() {
       const screen = response.notification.request.content.data?.screen
       if (screen === 'duty') {
         setShowDutyList(true)
+      } else if (screen === 'profile') {
+        setShowProfile(true)
       } else {
         setShowNotifs(true)
       }

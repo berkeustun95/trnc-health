@@ -70,13 +70,14 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
   const f           = booking.facilities ?? {}
   const isPending   = booking.status === 'pending'
   const isConfirmed = booking.status === 'confirmed'
+  const isCompleted = booking.status === 'completed'
   const reviewed    = reviewedIds.has(booking.id)
   const review      = reviewsMap.get(booking.id)
   const tc          = TYPE_COLORS[f.type] ?? TYPE_COLORS.clinic
 
-  const statusLabel     = isConfirmed ? t('statusConfirmed', lang) : isPending ? t('statusPending', lang) : t('statusCancelled', lang)
-  const statusPillStyle = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : s.pillRed
-  const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : s.pillTextRed
+  const statusLabel     = isConfirmed ? t('statusConfirmed', lang) : isPending ? t('statusPending', lang) : isCompleted ? t('statusCompleted', lang) : t('statusCancelled', lang)
+  const statusPillStyle = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : isCompleted ? s.pillGreen : s.pillRed
+  const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : isCompleted ? s.pillTextGreen : s.pillTextRed
 
   function openMaps() {
     Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(f.address || f.name || '')}`)
@@ -160,7 +161,7 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
             return null
           })()}
 
-          {isConfirmed && !reviewed && (
+          {(isConfirmed || isCompleted) && !reviewed && (
             <View style={s.detailReviewSection}>
               <Text style={s.detailSectionLabel}>{t('rateVisit', lang)}</Text>
               <View style={s.starsRow}>
@@ -189,7 +190,7 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
             </View>
           )}
 
-          {isConfirmed && reviewed && review && (
+          {(isConfirmed || isCompleted) && reviewed && review && (
             <View style={s.detailReviewSection}>
               <Text style={s.detailSectionLabel}>{t('yourReview', lang)}</Text>
               <View style={s.starsRow}>
@@ -295,6 +296,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b))
       setSelectedBooking(prev => prev?.id === bookingId ? { ...prev, status: 'cancelled' } : prev)
       Notifications.cancelScheduledNotificationAsync(`appt-reminder-${bookingId}`).catch(() => {})
+      Notifications.cancelScheduledNotificationAsync(`appt-review-${bookingId}`).catch(() => {})
     }
   }
 
@@ -542,11 +544,13 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               bookings.map(b => {
                 const isPending   = b.status === 'pending'
                 const isConfirmed = b.status === 'confirmed'
+                const isCompleted = b.status === 'completed'
                 const statusLabel = isConfirmed ? t('statusConfirmed', lang)
                   : isPending ? t('statusPending', lang)
+                  : isCompleted ? t('statusCompleted', lang)
                   : t('statusCancelled', lang)
-                const statusStyle     = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : s.pillRed
-                const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : s.pillTextRed
+                const statusStyle     = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : isCompleted ? s.pillGreen : s.pillRed
+                const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : isCompleted ? s.pillTextGreen : s.pillTextRed
                 return (
                   <TouchableOpacity
                     key={b.id}
@@ -564,7 +568,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                       {new Date(b.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                     </Text>
                     <Text style={s.bookingRef}>{t('bookingRef', lang)}: {b.id.slice(0, 8).toUpperCase()}</Text>
-                    {isConfirmed && reviewedIds.has(b.id) && (
+                    {(isConfirmed || isCompleted) && reviewedIds.has(b.id) && (
                       <Text style={s.reviewedBadge}>{t('reviewDone', lang)} ★</Text>
                     )}
                   </TouchableOpacity>

@@ -57,6 +57,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [appointments, setAppointments] = useState([])
   const [pastConfirmed, setPastConfirmed] = useState([])
   const [noShowLoading, setNoShowLoading] = useState(null)
+  const [completeLoading, setCompleteLoading] = useState(null)
   const [loading, setLoading] = useState(true)
   const [questions, setQuestions] = useState([])
   const [loadingQ, setLoadingQ] = useState(false)
@@ -203,6 +204,18 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     }
   }
 
+  async function markComplete(appointmentId) {
+    setCompleteLoading(appointmentId)
+    const { error } = await supabase
+      .from('appointments')
+      .update({ status: 'completed' })
+      .eq('id', appointmentId)
+    if (!error) {
+      setPastConfirmed(prev => prev.filter(a => a.id !== appointmentId))
+    }
+    setCompleteLoading(null)
+  }
+
   async function markNoShow(appointmentId, customerId) {
     setNoShowLoading(appointmentId)
     const { error } = await supabase.rpc('record_no_show', { p_appointment_id: appointmentId })
@@ -259,20 +272,22 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   async function saveListing() {
     setSaving(true)
     const { error } = await supabase
-      .from('facilities')
-      .update({
-        phone: editPhone.trim() || null,
-        address: editAddress.trim() || null,
-        opening_hours: editHours.trim() || null,
-        description: editDescription.trim() || null,
-        languages: editLanguages.length > 0 ? editLanguages : null,
+      .from('facility_change_requests')
+      .insert({
+        facility_id: facility.id,
+        provider_id: session.user.id,
+        proposed_changes: {
+          phone: editPhone.trim() || null,
+          address: editAddress.trim() || null,
+          opening_hours: editHours.trim() || null,
+          description: editDescription.trim() || null,
+          languages: editLanguages.length > 0 ? editLanguages : null,
+        },
       })
-      .eq('id', facility.id)
     setSaving(false)
     if (!error) {
       setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 2000)
-      if (onFacilityUpdated) onFacilityUpdated()
+      setTimeout(() => setSaveSuccess(false), 3000)
     }
   }
 
@@ -519,7 +534,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
               >
                 {saving
                   ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.saveBtnText}>{saveSuccess ? t('saved', lang) : t('save', lang)}</Text>
+                  : <Text style={styles.saveBtnText}>{saveSuccess ? t('submitted', lang) : t('submitForReview', lang)}</Text>
                 }
               </TouchableOpacity>
             </View>
@@ -680,23 +695,35 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
               ))}
               {pastConfirmed.length > 0 && (
                 <>
-                  <Text style={styles.noShowSectionLabel}>PAST — MARK NO-SHOWS</Text>
+                  <Text style={styles.noShowSectionLabel}>PAST APPOINTMENTS</Text>
                   {pastConfirmed.map(item => (
                     <View key={item.id} style={styles.card}>
                       <Text style={styles.timeLabel}>{t('requestedTime', lang)}</Text>
                       <Text style={styles.timeValue}>
                         {new Date(item.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                       </Text>
-                      <TouchableOpacity
-                        style={[styles.noShowBtn, noShowLoading === item.id && { opacity: 0.6 }]}
-                        onPress={() => markNoShow(item.id, item.customer_id)}
-                        disabled={noShowLoading === item.id}
-                      >
-                        {noShowLoading === item.id
-                          ? <ActivityIndicator size="small" color={colors.danger} />
-                          : <Text style={styles.noShowText}>{t('noShowBtn', lang)}</Text>
-                        }
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                        <TouchableOpacity
+                          style={[styles.completeBtn, completeLoading === item.id && { opacity: 0.6 }]}
+                          onPress={() => markComplete(item.id)}
+                          disabled={completeLoading === item.id || noShowLoading === item.id}
+                        >
+                          {completeLoading === item.id
+                            ? <ActivityIndicator size="small" color={colors.success} />
+                            : <Text style={styles.completeText}>{t('markComplete', lang)}</Text>
+                          }
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.noShowBtn, noShowLoading === item.id && { opacity: 0.6 }]}
+                          onPress={() => markNoShow(item.id, item.customer_id)}
+                          disabled={noShowLoading === item.id || completeLoading === item.id}
+                        >
+                          {noShowLoading === item.id
+                            ? <ActivityIndicator size="small" color={colors.danger} />
+                            : <Text style={styles.noShowText}>{t('noShowBtn', lang)}</Text>
+                          }
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   ))}
                 </>
@@ -784,7 +811,9 @@ const styles = StyleSheet.create({
   declineBtn:          { flex: 1, backgroundColor: colors.dangerLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   declineText:         { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.danger },
   noShowSectionLabel:  { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5, marginTop: 24, marginBottom: 8 },
-  noShowBtn:           { alignSelf: 'flex-start', marginTop: 10, backgroundColor: colors.dangerLight, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, minWidth: 80, alignItems: 'center' },
+  completeBtn:         { flex: 1, backgroundColor: colors.successLight ?? '#E8F5E9', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
+  completeText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.success },
+  noShowBtn:           { flex: 1, backgroundColor: colors.dangerLight, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
   noShowText:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
   tabs:           { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, marginBottom: 16 },
   tabBtn:         { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: 'center' },
