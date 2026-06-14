@@ -74,7 +74,13 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [editAddress, setEditAddress] = useState(facility.address ?? '')
   const [editHours, setEditHours] = useState(facility.opening_hours ?? '')
   const [editDescription, setEditDescription] = useState(facility.description ?? '')
-  const [editLanguages, setEditLanguages] = useState(Array.isArray(facility.languages) ? facility.languages : [])
+  const [editLanguages, setEditLanguages] = useState(
+    Array.isArray(facility.languages)
+      ? facility.languages
+      : typeof facility.languages === 'string' && facility.languages
+        ? facility.languages.split(',').map(l => l.trim()).filter(Boolean)
+        : []
+  )
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [coverUrl, setCoverUrl] = useState(facility.cover_image_url ?? null)
@@ -281,7 +287,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           address: editAddress.trim() || null,
           opening_hours: editHours.trim() || null,
           description: editDescription.trim() || null,
-          languages: editLanguages.length > 0 ? editLanguages : null,
+          languages: editLanguages.length > 0 ? editLanguages.join(', ') : null,
         },
       })
     setSaving(false)
