@@ -81,6 +81,13 @@ function parseIsOpen(hours) {
   return nowMins >= toMins(startTime) && nowMins < toMins(endTime)
 }
 
+const AVAIL_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+function isAvailableToday(availability) {
+  if (!availability?.schedule) return false
+  const day = availability.schedule[AVAIL_DAY_KEYS[new Date().getDay()]]
+  return !!(day && !day.closed)
+}
+
 export default function App() {
   const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_700Bold })
   const [session, setSession] = useState(undefined)
@@ -1093,6 +1100,11 @@ export default function App() {
                                 <Text style={styles.notOnAdaBadgeText}>{t('notOnAda', lang)}</Text>
                               </View>
                             )}
+                            {isAvailableToday(item.availability) && (
+                              <View style={styles.bookableBadge}>
+                                <Text style={styles.bookableBadgeText}>📅 Bookable</Text>
+                              </View>
+                            )}
                           </View>
                           {item.specialty?.length ? <Text style={styles.specialtyText} numberOfLines={1}>{Array.isArray(item.specialty) ? item.specialty.join(' · ') : item.specialty}</Text> : null}
                           {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
@@ -1349,7 +1361,7 @@ const styles = StyleSheet.create({
   cardTop:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
   facilityName:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1 },
   distanceText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
-  badgeRow:         { flexDirection: 'row', gap: 6, marginBottom: 6 },
+  badgeRow:         { flexDirection: 'row', gap: 6, marginBottom: 6, flexWrap: 'wrap' },
   typeBadge:        { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   typeBadgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', textTransform: 'capitalize' },
   statusBadge:      { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
@@ -1365,6 +1377,8 @@ const styles = StyleSheet.create({
   cardUnclaimed:    { opacity: 1 },
   notOnAdaBadge:    { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.border },
   notOnAdaBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  bookableBadge:    { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.primaryLight },
+  bookableBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
   backPill:         { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backPillText:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   unclaimedWrap:    { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
