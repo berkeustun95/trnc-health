@@ -215,6 +215,7 @@ export default function App() {
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
   const [weatherData, setWeatherData] = useState(null)
+  const [weatherExpanded, setWeatherExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showQuizSubmenu, setShowQuizSubmenu] = useState(false)
   const [showQuizHistory, setShowQuizHistory] = useState(false)
@@ -1054,47 +1055,53 @@ export default function App() {
             const uv    = uvLevel(cur.uv_index)
             const days  = (daily?.time ?? []).slice(0, 4)
             return (
-              <View style={styles.weatherCard}>
-                <View style={styles.weatherTop}>
-                  <View style={styles.weatherMain}>
-                    <Text style={styles.weatherEmoji}>{weatherIcon(cur.weather_code)}</Text>
-                    <View>
-                      <Text style={styles.weatherTemp}>{Math.round(cur.temperature_2m)}°C</Text>
-                      <Text style={styles.weatherDesc}>{weatherDesc(cur.weather_code)}</Text>
+              <TouchableOpacity
+                style={styles.weatherCard}
+                onPress={() => setWeatherExpanded(v => !v)}
+                activeOpacity={0.85}
+              >
+                <View style={styles.weatherRow}>
+                  <Text style={styles.weatherEmoji}>{weatherIcon(cur.weather_code)}</Text>
+                  <Text style={styles.weatherTemp}>{Math.round(cur.temperature_2m)}°C</Text>
+                  <Text style={styles.weatherDescInline} numberOfLines={1}>{weatherDesc(cur.weather_code)}</Text>
+                  <View style={{ flex: 1 }} />
+                  {uv && (
+                    <View style={[styles.uvBadge, { backgroundColor: uv.color }]}>
+                      <Text style={styles.uvBadgeText}>UV {Math.round(cur.uv_index)}</Text>
                     </View>
-                  </View>
-                  <View style={styles.weatherStats}>
-                    <Text style={styles.weatherStat}>💧 {cur.relative_humidity_2m}%</Text>
-                    <Text style={styles.weatherStat}>💨 {Math.round(cur.wind_speed_10m)} km/h</Text>
-                    <Text style={styles.weatherStat}>Feels {Math.round(cur.apparent_temperature)}°</Text>
-                  </View>
+                  )}
+                  <Feather name={weatherExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
                 </View>
 
-                {uv && (
-                  <View style={styles.weatherUvRow}>
-                    <View style={[styles.uvBadge, { backgroundColor: uv.color }]}>
-                      <Text style={styles.uvBadgeText}>UV {Math.round(cur.uv_index)} · {t(uv.key, lang)}</Text>
+                {weatherExpanded && (
+                  <>
+                    <View style={styles.weatherExpandStats}>
+                      <Text style={styles.weatherStat}>💧 {cur.relative_humidity_2m}%</Text>
+                      <Text style={styles.weatherStat}>💨 {Math.round(cur.wind_speed_10m)} km/h</Text>
+                      <Text style={styles.weatherStat}>Feels {Math.round(cur.apparent_temperature)}°C</Text>
+                      {uv && <Text style={styles.weatherStat}>{t(uv.key, lang)}</Text>}
                     </View>
-                    {uv.warn && <Text style={styles.uvWarnText}>{t('uvSunscreen', lang)}</Text>}
-                  </View>
+                    {uv?.warn && (
+                      <Text style={styles.uvWarnText}>🧴 {t('uvSunscreen', lang)}</Text>
+                    )}
+                    {days.length > 0 && (
+                      <View style={styles.forecastRow}>
+                        {days.map((date, i) => {
+                          const label = i === 0 ? 'Today' : new Date(date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' })
+                          return (
+                            <View key={date} style={styles.forecastDay}>
+                              <Text style={styles.forecastLabel}>{label}</Text>
+                              <Text style={styles.forecastIcon}>{weatherIcon(daily.weather_code[i])}</Text>
+                              <Text style={styles.forecastMax}>{Math.round(daily.temperature_2m_max[i])}°</Text>
+                              <Text style={styles.forecastMin}>{Math.round(daily.temperature_2m_min[i])}°</Text>
+                            </View>
+                          )
+                        })}
+                      </View>
+                    )}
+                  </>
                 )}
-
-                {days.length > 0 && (
-                  <View style={styles.forecastRow}>
-                    {days.map((date, i) => {
-                      const label = i === 0 ? 'Today' : new Date(date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' })
-                      return (
-                        <View key={date} style={styles.forecastDay}>
-                          <Text style={styles.forecastLabel}>{label}</Text>
-                          <Text style={styles.forecastIcon}>{weatherIcon(daily.weather_code[i])}</Text>
-                          <Text style={styles.forecastMax}>{Math.round(daily.temperature_2m_max[i])}°</Text>
-                          <Text style={styles.forecastMin}>{Math.round(daily.temperature_2m_min[i])}°</Text>
-                        </View>
-                      )
-                    })}
-                  </View>
-                )}
-              </View>
+              </TouchableOpacity>
             )
           })()}
 
@@ -1593,24 +1600,22 @@ const styles = StyleSheet.create({
   dutyBannerIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.accent + '20', justifyContent: 'center', alignItems: 'center' },
   dutyBannerTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.accent, marginBottom: 2 },
   dutyBannerSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.accent + 'AA' },
-  weatherCard:    { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
-  weatherTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  weatherMain:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  weatherEmoji:   { fontSize: 36 },
-  weatherTemp:    { fontSize: 26, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 30 },
-  weatherDesc:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
-  weatherStats:   { alignItems: 'flex-end', gap: 3 },
-  weatherStat:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  weatherUvRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 10 },
-  uvBadge:        { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
-  uvBadgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff' },
-  uvWarnText:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
-  forecastRow:    { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
-  forecastDay:    { flex: 1, alignItems: 'center', gap: 3 },
-  forecastLabel:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
-  forecastIcon:   { fontSize: 18 },
-  forecastMax:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  forecastMin:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  weatherCard:        { backgroundColor: colors.cardBg, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10, ...shadow },
+  weatherRow:         { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  weatherEmoji:       { fontSize: 20 },
+  weatherTemp:        { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  weatherDescInline:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  weatherExpandStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 10 },
+  weatherStat:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  uvBadge:            { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  uvBadgeText:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff' },
+  uvWarnText:         { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, paddingTop: 8 },
+  forecastRow:        { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 10 },
+  forecastDay:        { flex: 1, alignItems: 'center', gap: 3 },
+  forecastLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  forecastIcon:       { fontSize: 16 },
+  forecastMax:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  forecastMin:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   quizPromoCard:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accent, borderRadius: 16, padding: 14, marginBottom: 12 },
   quizPromoLeft:     { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   quizPromoIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
