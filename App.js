@@ -103,6 +103,32 @@ function uvLevel(index) {
   return           { key: 'uvExtreme',  color: '#9333EA', warn: true  }
 }
 
+function weatherIcon(code) {
+  if (code === 0)              return '☀️'
+  if (code <= 2)               return '🌤️'
+  if (code === 3)              return '☁️'
+  if (code <= 48)              return '🌫️'
+  if (code <= 55)              return '🌦️'
+  if (code <= 65)              return '🌧️'
+  if (code <= 75)              return '❄️'
+  if (code <= 82)              return '🌦️'
+  if (code <= 99)              return '⛈️'
+  return '🌡️'
+}
+
+function weatherDesc(code) {
+  if (code === 0)  return 'Clear sky'
+  if (code <= 2)   return 'Partly cloudy'
+  if (code === 3)  return 'Overcast'
+  if (code <= 48)  return 'Foggy'
+  if (code <= 55)  return 'Drizzle'
+  if (code <= 65)  return 'Rainy'
+  if (code <= 75)  return 'Snow'
+  if (code <= 82)  return 'Rain showers'
+  if (code <= 99)  return 'Thunderstorm'
+  return 'Unknown'
+}
+
 const AVAIL_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 function isAvailableToday(availability) {
   if (!availability?.schedule) return false
@@ -188,7 +214,7 @@ export default function App() {
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
-  const [uvIndex, setUvIndex] = useState(null)
+  const [weatherData, setWeatherData] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showQuizSubmenu, setShowQuizSubmenu] = useState(false)
   const [showQuizHistory, setShowQuizHistory] = useState(false)
@@ -517,11 +543,11 @@ export default function App() {
       }
 
       try {
-        const uvRes = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${resolvedCoords.latitude}&longitude=${resolvedCoords.longitude}&current=uv_index&timezone=auto`
+        const weatherRes = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${resolvedCoords.latitude}&longitude=${resolvedCoords.longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,uv_index&daily=temperature_2m_max,temperature_2m_min,weather_code,uv_index_max&timezone=auto&forecast_days=4`
         )
-        const uvData = await uvRes.json()
-        if (uvData?.current?.uv_index != null) setUvIndex(uvData.current.uv_index)
+        const weatherJson = await weatherRes.json()
+        if (weatherJson?.current) setWeatherData(weatherJson)
       } catch {}
 
       setLoading(false)
@@ -1022,23 +1048,52 @@ export default function App() {
             <Ionicons name="chevron-forward" size={18} color={colors.accent} />
           </TouchableOpacity>
 
-          {(() => {
-            const uv = uvLevel(uvIndex)
-            if (!uv) return null
+          {weatherData && (() => {
+            const cur   = weatherData.current
+            const daily = weatherData.daily
+            const uv    = uvLevel(cur.uv_index)
+            const days  = (daily?.time ?? []).slice(0, 4)
             return (
-              <View style={[styles.uvBanner, { borderLeftColor: uv.color }]}>
-                <View style={[styles.uvIconWrap, { backgroundColor: uv.color + '22' }]}>
-                  <Feather name="sun" size={16} color={uv.color} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.uvLabel}>{t('uvIndex', lang)}</Text>
-                    <View style={[styles.uvBadge, { backgroundColor: uv.color }]}>
-                      <Text style={styles.uvBadgeText}>{Math.round(uvIndex)} · {t(uv.key, lang)}</Text>
+              <View style={styles.weatherCard}>
+                <View style={styles.weatherTop}>
+                  <View style={styles.weatherMain}>
+                    <Text style={styles.weatherEmoji}>{weatherIcon(cur.weather_code)}</Text>
+                    <View>
+                      <Text style={styles.weatherTemp}>{Math.round(cur.temperature_2m)}°C</Text>
+                      <Text style={styles.weatherDesc}>{weatherDesc(cur.weather_code)}</Text>
                     </View>
                   </View>
-                  {uv.warn && <Text style={styles.uvWarnText}>{t('uvSunscreen', lang)}</Text>}
+                  <View style={styles.weatherStats}>
+                    <Text style={styles.weatherStat}>💧 {cur.relative_humidity_2m}%</Text>
+                    <Text style={styles.weatherStat}>💨 {Math.round(cur.wind_speed_10m)} km/h</Text>
+                    <Text style={styles.weatherStat}>Feels {Math.round(cur.apparent_temperature)}°</Text>
+                  </View>
                 </View>
+
+                {uv && (
+                  <View style={styles.weatherUvRow}>
+                    <View style={[styles.uvBadge, { backgroundColor: uv.color }]}>
+                      <Text style={styles.uvBadgeText}>UV {Math.round(cur.uv_index)} · {t(uv.key, lang)}</Text>
+                    </View>
+                    {uv.warn && <Text style={styles.uvWarnText}>{t('uvSunscreen', lang)}</Text>}
+                  </View>
+                )}
+
+                {days.length > 0 && (
+                  <View style={styles.forecastRow}>
+                    {days.map((date, i) => {
+                      const label = i === 0 ? 'Today' : new Date(date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' })
+                      return (
+                        <View key={date} style={styles.forecastDay}>
+                          <Text style={styles.forecastLabel}>{label}</Text>
+                          <Text style={styles.forecastIcon}>{weatherIcon(daily.weather_code[i])}</Text>
+                          <Text style={styles.forecastMax}>{Math.round(daily.temperature_2m_max[i])}°</Text>
+                          <Text style={styles.forecastMin}>{Math.round(daily.temperature_2m_min[i])}°</Text>
+                        </View>
+                      )
+                    })}
+                  </View>
+                )}
               </View>
             )
           })()}
@@ -1538,12 +1593,24 @@ const styles = StyleSheet.create({
   dutyBannerIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.accent + '20', justifyContent: 'center', alignItems: 'center' },
   dutyBannerTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.accent, marginBottom: 2 },
   dutyBannerSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.accent + 'AA' },
-  uvBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardBg, borderRadius: 12, padding: 10, marginBottom: 10, borderLeftWidth: 3, ...shadow },
-  uvIconWrap:   { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  uvLabel:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  uvBadge:      { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  uvBadgeText:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff' },
-  uvWarnText:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+  weatherCard:    { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
+  weatherTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  weatherMain:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  weatherEmoji:   { fontSize: 36 },
+  weatherTemp:    { fontSize: 26, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 30 },
+  weatherDesc:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+  weatherStats:   { alignItems: 'flex-end', gap: 3 },
+  weatherStat:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  weatherUvRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 10 },
+  uvBadge:        { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  uvBadgeText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff' },
+  uvWarnText:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
+  forecastRow:    { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  forecastDay:    { flex: 1, alignItems: 'center', gap: 3 },
+  forecastLabel:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  forecastIcon:   { fontSize: 18 },
+  forecastMax:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  forecastMin:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   quizPromoCard:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accent, borderRadius: 16, padding: 14, marginBottom: 12 },
   quizPromoLeft:     { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   quizPromoIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
