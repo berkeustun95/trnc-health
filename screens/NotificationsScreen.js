@@ -13,7 +13,7 @@ function timeAgo(isoString) {
   return `${Math.floor(hrs / 24)}d`
 }
 
-export default function NotificationsScreen({ notifications, loading, lang, onBack, onMarkAllRead }) {
+export default function NotificationsScreen({ notifications, loading, lang, onBack, onMarkAllRead, onNotifPress }) {
   const unreadCount = notifications.filter(n => !n.read).length
 
   return (
@@ -50,18 +50,28 @@ export default function NotificationsScreen({ notifications, loading, lang, onBa
           keyExtractor={item => item.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.list}
-          renderItem={({ item }) => (
-            <View style={[s.card, !item.read && s.cardUnread]}>
-              {!item.read && <View style={s.unreadDot} />}
-              <View style={s.cardBody}>
-                <View style={s.cardTop}>
-                  <Text style={s.cardTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={s.cardTime}>{timeAgo(item.created_at)}</Text>
+          renderItem={({ item }) => {
+            const isDuty = item.title?.toLowerCase().includes('duty')
+            return (
+              <TouchableOpacity
+                style={[s.card, !item.read && s.cardUnread]}
+                activeOpacity={isDuty ? 0.7 : 1}
+                onPress={() => isDuty && onNotifPress?.(item)}
+              >
+                {!item.read && <View style={s.unreadDot} />}
+                <View style={s.cardBody}>
+                  <View style={s.cardTop}>
+                    <Text style={s.cardTitle} numberOfLines={1}>{item.title}</Text>
+                    <Text style={s.cardTime}>{timeAgo(item.created_at)}</Text>
+                  </View>
+                  <Text style={s.cardBodyText}>{item.body}</Text>
+                  {isDuty && (
+                    <Text style={s.tapHint}>Tap to view duty pharmacies →</Text>
+                  )}
                 </View>
-                <Text style={s.cardBodyText}>{item.body}</Text>
-              </View>
-            </View>
-          )}
+              </TouchableOpacity>
+            )
+          }}
         />
       )}
     </SafeAreaView>
@@ -87,4 +97,5 @@ const s = StyleSheet.create({
   cardTitle:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, marginRight: 8 },
   cardTime:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   cardBodyText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18 },
+  tapHint:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary, marginTop: 6 },
 })

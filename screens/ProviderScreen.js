@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
+import * as Location from 'expo-location'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -34,12 +35,12 @@ function decode(base64) {
   return buf
 }
 
-async function sendPushNotification(token, title, body) {
+async function sendPushNotification(token, title, body, data = {}) {
   try {
     await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ to: token, title, body, sound: 'default' }),
+      body: JSON.stringify({ to: token, title, body, sound: 'default', data }),
     })
   } catch { /* non-critical */ }
 }
@@ -118,6 +119,9 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [avail, setAvail]             = useState(facility.availability ?? null)
   const [savingAvail, setSavingAvail] = useState(false)
   const [availSuccess, setAvailSuccess] = useState(false)
+  const [facilityLat, setFacilityLat]   = useState(facility.latitude ?? null)
+  const [facilityLng, setFacilityLng]   = useState(facility.longitude ?? null)
+  const [settingLocation, setSettingLocation] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -231,7 +235,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         const body = confirmed
           ? t('notifApptConfirmedBody', cLang).replace('{name}', facility.name)
           : t('notifApptDeclinedBody', cLang).replace('{name}', facility.name)
-        if (profile.push_token) await sendPushNotification(profile.push_token, title, body)
+        if (profile.push_token) await sendPushNotification(profile.push_token, title, body, { screen: 'profile' })
         await recordNotification(customerId, title, body)
       }
       setAppointments(prev => prev.filter(a => a.id !== id))
@@ -333,6 +337,26 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     }
   }
 
+  async function setFacilityLocation() {
+    setSettingLocation(true)
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== 'granted') { setSettingLocation(false); return }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+      const { latitude, longitude } = loc.coords
+      const { error } = await supabase
+        .from('facilities')
+        .update({ latitude, longitude })
+        .eq('id', facility.id)
+      if (!error) {
+        setFacilityLat(latitude)
+        setFacilityLng(longitude)
+        if (onFacilityUpdated) onFacilityUpdated()
+      }
+    } catch {}
+    setSettingLocation(false)
+  }
+
   async function saveListing() {
     setSaving(true)
     const { error } = await supabase
@@ -368,7 +392,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
               const cLang = customerProfile.preferred_language || 'English'
               const title = t('notifQuizTitle', cLang)
               const body = t('notifQuizBody', cLang).replace('{name}', facility.name)
-              if (customerProfile.push_token) await sendPushNotification(customerProfile.push_token, title, body)
+              if (customerProfile.push_token) await sendPushNotification(customerProfile.push_token, title, body, { screen: 'profile' })
               await recordNotification(customerId, title, body)
             }
           }
@@ -601,6 +625,35 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                   : <Text style={styles.saveBtnText}>{saveSuccess ? t('submitted', lang) : t('submitForReview', lang)}</Text>
                 }
               </TouchableOpacity>
+            </View>
+
+            <View style={[styles.card, { marginTop: 16 }]}>
+              <Text style={styles.fieldLabel}>Map Location</Text>
+              {facilityLat != null && facilityLng != null ? (
+                <View style={styles.locationSetRow}>
+                  <Feather name="map-pin" size={14} color={colors.success} />
+                  <Text style={styles.locationSetText}>{facilityLat.toFixed(5)}, {facilityLng.toFixed(5)}</Text>
+                </View>
+              ) : (
+                <Text style={styles.locationNotSet}>Not set — your facility won't appear on the map.</Text>
+              )}
+              <TouchableOpacity
+                style={[styles.locationBtn, settingLocation && { opacity: 0.6 }]}
+                onPress={setFacilityLocation}
+                disabled={settingLocation}
+                activeOpacity={0.8}
+              >
+                {settingLocation
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <>
+                      <Feather name="crosshair" size={14} color="#fff" />
+                      <Text style={styles.locationBtnText}>
+                        {facilityLat != null ? 'Update location' : 'Use current location'}
+                      </Text>
+                    </>
+                }
+              </TouchableOpacity>
+              <Text style={styles.locationHint}>Be at your facility when you tap this.</Text>
             </View>
 
             {/* Availability / slot booking */}
@@ -842,6 +895,15 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
               <View style={styles.emptyIconWrap}><Feather name="check-circle" size={28} color={colors.success} /></View>
               <Text style={styles.emptyTitle}>{t('allClear', lang)}</Text>
               <Text style={styles.emptySub}>{t('noPendingRequests', lang)}</Text>
+              {pastConfirmed.length === 0 && (
+                <View style={styles.emptyTipBox}>
+                  <Ionicons name="information-circle-outline" size={16} color={colors.primary} style={{ marginTop: 1 }} />
+                  <Text style={styles.emptyTipText}>{t('completeProfileTip', lang)}</Text>
+                  <TouchableOpacity onPress={() => setTab('profile')} style={styles.emptyTipBtn}>
+                    <Text style={styles.emptyTipBtnText}>{t('goToProfile', lang)}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
@@ -1058,6 +1120,12 @@ const styles = StyleSheet.create({
   fieldInput:     { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface },
   saveBtn:        { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
   saveBtnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+  locationSetRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, marginTop: 4 },
+  locationSetText:{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.success },
+  locationNotSet: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 12, marginTop: 4 },
+  locationBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 13, marginTop: 4 },
+  locationBtnText:{ fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+  locationHint:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 8, textAlign: 'center' },
   coverUploadArea:  { height: 140, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', position: 'relative' },
   coverPreview:     { width: '100%', height: '100%' },
   logoUploadArea:   { width: 90, height: 90, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', position: 'relative' },
@@ -1082,5 +1150,9 @@ const styles = StyleSheet.create({
   empty:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   emptyIconWrap:  { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
   emptyTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
-  emptySub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  emptySub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 12 },
+  emptyTipBox:    { backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14, flexDirection: 'column', alignItems: 'flex-start', gap: 8, width: '100%' },
+  emptyTipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },
+  emptyTipBtn:    { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16, alignSelf: 'flex-start' },
+  emptyTipBtnText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
 })

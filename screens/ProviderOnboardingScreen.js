@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import * as Location from 'expo-location'
 import { colors, shadow } from '../constants/theme'
 
 async function sendPushNotification(token, title, body) {
@@ -30,9 +31,11 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [form, setForm] = useState({
     name: '', type: 'clinic', address: '', phone: '', opening_hours: '', membership_tier: 'basic', registration_number: '',
+    latitude: null, longitude: null,
   })
-  const [saving, setSaving] = useState(false)
-  const [error, setError]   = useState(null)
+  const [saving, setSaving]               = useState(false)
+  const [error, setError]                 = useState(null)
+  const [settingLocation, setSettingLocation] = useState(false)
 
   useEffect(() => {
     if (step !== 2) return
@@ -49,6 +52,17 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
     return f.name.toLowerCase().includes(q) || (f.address && f.address.toLowerCase().includes(q))
   })
 
+  async function getLocation() {
+    setSettingLocation(true)
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== 'granted') { setSettingLocation(false); return }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+      setForm(f => ({ ...f, latitude: loc.coords.latitude, longitude: loc.coords.longitude }))
+    } catch {}
+    setSettingLocation(false)
+  }
+
   async function submit() {
     setSaving(true)
     setError(null)
@@ -62,6 +76,11 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
       })
       setSaving(false)
       if (err) { setError(err.message); return }
+      if (form.latitude != null && form.longitude != null) {
+        await supabase.from('facilities')
+          .update({ latitude: form.latitude, longitude: form.longitude })
+          .eq('id', selectedFacility.id)
+      }
     } else {
       if (!form.name.trim()) { setError('Facility name is required.'); setSaving(false); return }
       const { error: err } = await supabase.from('facilities').insert({
@@ -76,6 +95,8 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
         is_public:           false,
         verified:            false,
         registration_number: form.registration_number.trim() || null,
+        latitude:            form.latitude,
+        longitude:           form.longitude,
       })
       setSaving(false)
       if (err) { setError(err.message); return }
@@ -247,6 +268,22 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
               placeholderTextColor={colors.border}
             />
 
+            <Text style={s.fieldLabel}>MAP LOCATION</Text>
+            {form.latitude != null
+              ? <Text style={s.locationSet}>📍 {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}</Text>
+              : <Text style={s.locationMissing}>Not set — you can also do this later from your dashboard.</Text>
+            }
+            <TouchableOpacity
+              style={[s.locationBtn, settingLocation && { opacity: 0.6 }]}
+              onPress={getLocation}
+              disabled={settingLocation}
+              activeOpacity={0.8}
+            >
+              <Text style={s.locationBtnText}>
+                {settingLocation ? 'Getting location…' : form.latitude != null ? '📍 Update location' : '📍 Use current location'}
+              </Text>
+            </TouchableOpacity>
+
             <Text style={s.fieldLabel}>PHONE</Text>
             <TextInput
               style={s.input}
@@ -328,6 +365,21 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
               placeholderTextColor={colors.border}
               autoCapitalize="none"
             />
+            <Text style={[s.fieldLabel, { marginTop: 18 }]}>MAP LOCATION</Text>
+            {form.latitude != null
+              ? <Text style={s.locationSet}>📍 {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}</Text>
+              : <Text style={s.locationMissing}>Not set — you can also do this later from your dashboard.</Text>
+            }
+            <TouchableOpacity
+              style={[s.locationBtn, settingLocation && { opacity: 0.6 }]}
+              onPress={getLocation}
+              disabled={settingLocation}
+              activeOpacity={0.8}
+            >
+              <Text style={s.locationBtnText}>
+                {settingLocation ? 'Getting location…' : form.latitude != null ? '📍 Update location' : '📍 Use current location'}
+              </Text>
+            </TouchableOpacity>
           </>
         )}
 
@@ -442,6 +494,10 @@ const s = StyleSheet.create({
   typeCardIcon:       { fontSize: 26, marginBottom: 6 },
   typeCardLabel:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   typeCardLabelActive:{ fontFamily: 'Inter_700Bold', color: colors.primary },
+  locationSet:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.success, marginBottom: 10, marginTop: 4 },
+  locationMissing:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 10, marginTop: 4 },
+  locationBtn:        { backgroundColor: colors.primaryLight, borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginBottom: 4 },
+  locationBtnText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // Claiming badge (step 3)
   claimingBadge:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.primary + '30' },

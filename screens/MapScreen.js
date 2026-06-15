@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native'
 import MapView, { Marker } from 'react-native-maps'
-import { Ionicons } from '@expo/vector-icons'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -9,10 +9,29 @@ const LEFKOSA    = { latitude: 35.1856, longitude: 33.3823, latitudeDelta: 0.08,
 const PIN_COLORS = { pharmacy: '#7C3AED', clinic: '#0E7C7B', hospital: '#D1495B', dentist: '#2E9E5B' }
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
+const DAY_INDEX = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 }
+
+function parseIsOpen(hours) {
+  if (!hours) return null
+  if (hours.trim() === '24/7') return true
+  const match = hours.match(/^([A-Z][a-z]+)-([A-Z][a-z]+)\s+(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/)
+  if (!match) return null
+  const [, startDay, endDay, startTime, endTime] = match
+  const dayStart = DAY_INDEX[startDay]
+  const dayEnd   = DAY_INDEX[endDay]
+  if (dayStart == null || dayEnd == null || dayStart > dayEnd) return null
+  const now = new Date()
+  const day = now.getDay()
+  if (day < dayStart || day > dayEnd) return false
+  const toMins = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m }
+  const nowMins = now.getHours() * 60 + now.getMinutes()
+  return nowMins >= toMins(startTime) && nowMins < toMins(endTime)
+}
 
 export default function MapScreen({ facilities, dutyFacilityId, userLocation, onSelectFacility, onSelectUnclaimed, lang = 'en' }) {
   const [selectedPin, setSelectedPin] = useState(null)
   const [filterType, setFilterType]   = useState(null)
+  const [openOnly, setOpenOnly]       = useState(false)
 
   const initialRegion = userLocation
     ? { latitude: userLocation.latitude, longitude: userLocation.longitude, latitudeDelta: 0.08, longitudeDelta: 0.08 }
@@ -21,6 +40,7 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
   const mapped = facilities
     .filter(f => f.latitude != null && f.longitude != null)
     .filter(f => filterType == null || f.type === filterType)
+    .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)
 
   const tc = selectedPin ? (typeColors[selectedPin.type] ?? typeColors.clinic) : null
 
@@ -66,6 +86,16 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
         contentContainerStyle={s.filterBarContent}
         pointerEvents="box-none"
       >
+        <TouchableOpacity
+          style={[s.filterChip, openOnly && { backgroundColor: colors.successLight, borderColor: colors.success }]}
+          onPress={() => { setOpenOnly(v => !v); setSelectedPin(null) }}
+          activeOpacity={0.8}
+        >
+          <Feather name="clock" size={13} color={openOnly ? colors.success : colors.textSecondary} />
+          <Text style={[s.filterChipText, openOnly && { color: colors.success }]}>
+            {t('openNow', lang)}
+          </Text>
+        </TouchableOpacity>
         {FACILITY_TYPES.map(type => {
           const active = filterType === type
           const tc = typeColors[type] ?? typeColors.clinic
@@ -126,7 +156,7 @@ const s = StyleSheet.create({
   map:          { flex: 1 },
   filterBar:        { position: 'absolute', top: 12, left: 0, right: 0, zIndex: 10 },
   filterBarContent: { paddingHorizontal: 12, gap: 8, flexDirection: 'row' },
-  filterChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1.5, borderColor: 'transparent', ...shadow },
+  filterChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1.5, borderColor: colors.border, ...shadow },
   filterChipEmoji:  { fontSize: 14 },
   filterChipText:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'capitalize' },
   card:         { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: colors.cardBg, borderRadius: 20, padding: 16, ...shadow },

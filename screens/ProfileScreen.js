@@ -267,7 +267,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         .select('id, requested_time, status, facility_id, facilities(name, address, phone, type, opening_hours)')
         .eq('customer_id', session.user.id)
         .order('requested_time', { ascending: false })
-        .limit(10)
+        .limit(20)
       if (data) setBookings(data)
     }
 
@@ -537,45 +537,66 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             <Text style={s.accordionTitle}>{t('myBookings', lang)}</Text>
             <Ionicons name={bookingsOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
           </TouchableOpacity>
-          {bookingsOpen && (
-            bookings.length === 0 ? (
-              <Text style={s.noBookingsText}>{t('noBookings', lang)}</Text>
-            ) : (
-              bookings.map(b => {
-                const isPending   = b.status === 'pending'
-                const isConfirmed = b.status === 'confirmed'
-                const isCompleted = b.status === 'completed'
-                const statusLabel = isConfirmed ? t('statusConfirmed', lang)
-                  : isPending ? t('statusPending', lang)
-                  : isCompleted ? t('statusCompleted', lang)
-                  : t('statusCancelled', lang)
-                const statusStyle     = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : isCompleted ? s.pillGreen : s.pillRed
-                const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : isCompleted ? s.pillTextGreen : s.pillTextRed
-                return (
-                  <TouchableOpacity
-                    key={b.id}
-                    style={s.bookingCard}
-                    activeOpacity={0.75}
-                    onPress={() => { setRatingValue(0); setRatingComment(''); setReviewError(null); setSelectedBooking(b) }}
-                  >
-                    <View style={s.bookingTop}>
-                      <Text style={s.bookingFacility} numberOfLines={1}>{b.facilities?.name ?? '—'}</Text>
-                      <View style={statusStyle}>
-                        <Text style={statusTextStyle}>{statusLabel}</Text>
-                      </View>
+          {bookingsOpen && (() => {
+            const now = new Date()
+            const upcoming = bookings.filter(b =>
+              (b.status === 'pending' || b.status === 'confirmed') && new Date(b.requested_time) > now
+            ).sort((a, b) => new Date(a.requested_time) - new Date(b.requested_time))
+            const past = bookings.filter(b =>
+              b.status === 'completed' || b.status === 'cancelled' || new Date(b.requested_time) <= now
+            ).sort((a, b) => new Date(b.requested_time) - new Date(a.requested_time))
+
+            function BookingCard({ b }) {
+              const isPending   = b.status === 'pending'
+              const isConfirmed = b.status === 'confirmed'
+              const isCompleted = b.status === 'completed'
+              const statusLabel = isConfirmed ? t('statusConfirmed', lang)
+                : isPending ? t('statusPending', lang)
+                : isCompleted ? t('statusCompleted', lang)
+                : t('statusCancelled', lang)
+              const statusStyle     = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : isCompleted ? s.pillGreen : s.pillRed
+              const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : isCompleted ? s.pillTextGreen : s.pillTextRed
+              return (
+                <TouchableOpacity
+                  style={s.bookingCard}
+                  activeOpacity={0.75}
+                  onPress={() => { setRatingValue(0); setRatingComment(''); setReviewError(null); setSelectedBooking(b) }}
+                >
+                  <View style={s.bookingTop}>
+                    <Text style={s.bookingFacility} numberOfLines={1}>{b.facilities?.name ?? '—'}</Text>
+                    <View style={statusStyle}>
+                      <Text style={statusTextStyle}>{statusLabel}</Text>
                     </View>
-                    <Text style={s.bookingTime}>
-                      {new Date(b.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                    </Text>
-                    <Text style={s.bookingRef}>{t('bookingRef', lang)}: {b.id.slice(0, 8).toUpperCase()}</Text>
-                    {(isConfirmed || isCompleted) && reviewedIds.has(b.id) && (
-                      <Text style={s.reviewedBadge}>{t('reviewDone', lang)} ★</Text>
-                    )}
-                  </TouchableOpacity>
-                )
-              })
+                  </View>
+                  <Text style={s.bookingTime}>
+                    {new Date(b.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                  </Text>
+                  <Text style={s.bookingRef}>{t('bookingRef', lang)}: {b.id.slice(0, 8).toUpperCase()}</Text>
+                  {(isConfirmed || isCompleted) && reviewedIds.has(b.id) && (
+                    <Text style={s.reviewedBadge}>{t('reviewDone', lang)} ★</Text>
+                  )}
+                </TouchableOpacity>
+              )
+            }
+
+            if (bookings.length === 0) {
+              return <Text style={s.noBookingsText}>{t('noBookings', lang)}</Text>
+            }
+            return (
+              <View>
+                <Text style={s.bookingSectionLabel}>{t('upcoming', lang)}</Text>
+                {upcoming.length === 0
+                  ? <Text style={s.noBookingsText}>{t('noUpcomingAppt', lang)}</Text>
+                  : upcoming.map(b => <BookingCard key={b.id} b={b} />)
+                }
+                <Text style={[s.bookingSectionLabel, { marginTop: 16 }]}>{t('pastAppt', lang)}</Text>
+                {past.length === 0
+                  ? <Text style={s.noBookingsText}>{t('noPastAppt', lang)}</Text>
+                  : past.map(b => <BookingCard key={b.id} b={b} />)
+                }
+              </View>
             )
-          )}
+          })()}
 
           <TouchableOpacity style={s.accordionHeader} onPress={() => toggleSection(setPersonalOpen)} activeOpacity={0.7}>
             <Text style={s.accordionTitle}>{t('personalInfo', lang)}</Text>
@@ -700,7 +721,8 @@ const s = StyleSheet.create({
   fieldLabel:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
   input:            { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, fontSize: 15, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary },
 
-  noBookingsText:   { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 20, marginTop: 2 },
+  noBookingsText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 12, marginTop: 2 },
+  bookingSectionLabel:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
   bookingCard:      { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
   bookingTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 },
   bookingFacility:  { flex: 1, fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },

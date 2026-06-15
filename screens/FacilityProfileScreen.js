@@ -53,7 +53,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: isPharmacy ? 40 : 108 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: isPharmacy ? 40 : (!facility.availability && facility.phone ? 160 : 108) }}>
 
           {/* Nav bar */}
           <View style={s.navBar}>
@@ -247,8 +247,20 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
         {!isPharmacy && (
           <View style={s.ctaWrap}>
             <TouchableOpacity style={s.ctaBtn} onPress={onBook} activeOpacity={0.85}>
-              <Text style={s.ctaText}>{t('requestAppointment', lang)}</Text>
+              <Text style={s.ctaText}>
+                {facility.availability ? t('requestAppointment', lang) : t('requestAppointment', lang)}
+              </Text>
             </TouchableOpacity>
+            {!facility.availability && facility.phone ? (
+              <TouchableOpacity
+                style={s.ctaSecondary}
+                onPress={() => Linking.openURL(`tel:${facility.phone}`)}
+                activeOpacity={0.8}
+              >
+                <Feather name="phone" size={15} color={colors.primary} />
+                <Text style={s.ctaSecondaryText}>{t('callToBook', lang)}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         )}
       </View>
@@ -307,7 +319,9 @@ const s = StyleSheet.create({
   noReviewsWrap:     { alignItems: 'center', paddingVertical: 20 },
   noReviewsTitle:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6, textAlign: 'center' },
   noReviewsSub:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },
-  ctaWrap:           { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingBottom: 28, paddingTop: 12, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
+  ctaWrap:           { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingBottom: 28, paddingTop: 12, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border, gap: 10 },
   ctaBtn:            { backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 17, alignItems: 'center', ...shadow },
   ctaText:           { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.2 },
+  ctaSecondary:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 16, paddingVertical: 14 },
+  ctaSecondaryText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
 })

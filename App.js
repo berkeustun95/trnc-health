@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal } from 'react-native'
+import { BlurView } from 'expo-blur'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -93,6 +94,15 @@ function parseIsOpen(hours) {
   return nowMins >= toMins(startTime) && nowMins < toMins(endTime)
 }
 
+function uvLevel(index) {
+  if (index == null) return null
+  if (index < 3)  return { key: 'uvLow',      color: '#22C55E', warn: false }
+  if (index < 6)  return { key: 'uvModerate',  color: '#EAB308', warn: false }
+  if (index < 8)  return { key: 'uvHigh',      color: '#F97316', warn: true  }
+  if (index < 11) return { key: 'uvVeryHigh',  color: '#EF4444', warn: true  }
+  return           { key: 'uvExtreme',  color: '#9333EA', warn: true  }
+}
+
 const AVAIL_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 function isAvailableToday(availability) {
   if (!availability?.schedule) return false
@@ -178,6 +188,7 @@ export default function App() {
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+  const [uvIndex, setUvIndex] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showQuizSubmenu, setShowQuizSubmenu] = useState(false)
   const [showQuizHistory, setShowQuizHistory] = useState(false)
@@ -444,11 +455,14 @@ export default function App() {
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
-      const screen = response.notification.request.content.data?.screen
+      const data   = response.notification.request.content.data ?? {}
+      const screen = data.screen
       if (screen === 'duty') {
         setShowDutyList(true)
       } else if (screen === 'profile') {
         setActiveTab('profile')
+      } else if (screen === 'notifications') {
+        setShowNotifs(true)
       } else {
         setShowNotifs(true)
       }
@@ -488,6 +502,7 @@ export default function App() {
         setFacilityRatings(ratings)
       }
 
+      let resolvedCoords = { latitude: 35.1856, longitude: 33.3823 }
       try {
         const { status } = await Location.requestForegroundPermissionsAsync()
         if (status !== 'granted') {
@@ -495,10 +510,20 @@ export default function App() {
         } else {
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
           setUserLocation(loc.coords)
+          resolvedCoords = loc.coords
         }
       } catch {
         setLocationDenied(true)
       }
+
+      try {
+        const uvRes = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${resolvedCoords.latitude}&longitude=${resolvedCoords.longitude}&current=uv_index&timezone=auto`
+        )
+        const uvData = await uvRes.json()
+        if (uvData?.current?.uv_index != null) setUvIndex(uvData.current.uv_index)
+      } catch {}
+
       setLoading(false)
     }
     load()
@@ -524,7 +549,7 @@ export default function App() {
       if (b._dist == null) return -1
       return a._dist - b._dist
     })
-    .filter(f => showAll || !!f.provider_id)
+    .filter(f => searchText.trim() || showAll || !!f.provider_id)
     .filter(f => !activeType || f.type === activeType)
     .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)
     .filter(f => !activeSpecialty || (Array.isArray(f.specialty) ? f.specialty.includes(activeSpecialty) : f.specialty === activeSpecialty))
@@ -688,6 +713,12 @@ export default function App() {
       lang={lang}
       onBack={() => { setShowNotifs(false); supabase.from('notifications').update({ read: true }).eq('user_id', session.user.id).then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))) }}
       onMarkAllRead={markAllNotifsRead}
+      onNotifPress={(item) => {
+        if (item.title?.toLowerCase().includes('duty')) {
+          setShowNotifs(false)
+          setShowDutyList(true)
+        }
+      }}
     />
   } else if (showDutyList) {
     content = <DutyListScreen onBack={() => setShowDutyList(false)} lang={lang} />
@@ -809,6 +840,15 @@ export default function App() {
               </TouchableOpacity>
             ) : null}
           </View>
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={() => Linking.openURL(
+              `mailto:berke.ustun95@gmail.com?subject=${encodeURIComponent(`ADA – Correction: ${unclaimedFacility.name}`)}&body=${encodeURIComponent(`Hi,\n\nI'd like to suggest a correction for: ${unclaimedFacility.name}\n\n`)}`
+            )}
+          >
+            <Feather name="flag" size={13} color={colors.textSecondary} />
+            <Text style={styles.reportBtnText}>{t('reportProblem', lang)}</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     )
@@ -969,38 +1009,6 @@ export default function App() {
             )
           })()}
 
-          {latestResult && (
-            <TouchableOpacity style={styles.resultCard} onPress={() => setShowLatestResult(true)} activeOpacity={0.8}>
-              <View style={styles.resultCardLeft}>
-                <View style={styles.resultCardIconWrap}>
-                  <Ionicons name="flask-outline" size={20} color={colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.resultCardTitle}>{t('supplementPlanTitle', lang)}</Text>
-                  <Text style={styles.resultCardSub} numberOfLines={1}>
-                    {t('approvedBy', lang)} {latestResult.facilities?.name}{latestResult.reviewed_at ? ` · ${new Date(latestResult.reviewed_at).toLocaleDateString()}` : ''}
-                  </Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-            </TouchableOpacity>
-          )}
-
-          {!latestResult && (
-            <TouchableOpacity style={styles.quizPromoCard} onPress={() => setShowQuiz(true)} activeOpacity={0.8}>
-              <View style={styles.quizPromoLeft}>
-                <View style={styles.quizPromoIconWrap}>
-                  <Ionicons name="flask-outline" size={20} color="#FFFFFF" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.quizPromoTitle}>{t('supplementAdvisor', lang)}</Text>
-                  <Text style={styles.quizPromoSub} numberOfLines={2}>{t('supplementAdvisorSub', lang)}</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
-
           <TouchableOpacity style={styles.dutyBanner} onPress={() => setShowDutyList(true)} activeOpacity={0.8}>
             <View style={styles.dutyBannerLeft}>
               <View style={styles.dutyBannerIconWrap}>
@@ -1013,6 +1021,27 @@ export default function App() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.accent} />
           </TouchableOpacity>
+
+          {(() => {
+            const uv = uvLevel(uvIndex)
+            if (!uv) return null
+            return (
+              <View style={[styles.uvBanner, { borderLeftColor: uv.color }]}>
+                <View style={[styles.uvIconWrap, { backgroundColor: uv.color + '22' }]}>
+                  <Feather name="sun" size={16} color={uv.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.uvLabel}>{t('uvIndex', lang)}</Text>
+                    <View style={[styles.uvBadge, { backgroundColor: uv.color }]}>
+                      <Text style={styles.uvBadgeText}>{Math.round(uvIndex)} · {t(uv.key, lang)}</Text>
+                    </View>
+                  </View>
+                  {uv.warn && <Text style={styles.uvWarnText}>{t('uvSunscreen', lang)}</Text>}
+                </View>
+              </View>
+            )
+          })()}
 
           {facilityLoadError && (
               <View style={styles.errorRow}>
@@ -1033,19 +1062,22 @@ export default function App() {
               contentContainerStyle={styles.listContent}
               ListEmptyComponent={(
                 <View style={styles.emptyWrap}>
-                  {searchText || activeType || activeSpecialty ? (
-                    <>
-                      <Ionicons name="search-outline" size={44} color={colors.border} style={{ marginBottom: 16 }} />
-                      <Text style={styles.emptyTitle}>No results found</Text>
-                      <Text style={styles.emptyBody}>Try removing a filter or adjusting your search</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.emptyIcon}>🏥</Text>
-                      <Text style={styles.emptyTitle}>{t('noFacilitiesTitle', lang)}</Text>
-                      <Text style={styles.emptyBody}>{t('noFacilitiesBody', lang)}</Text>
-                    </>
-                  )}
+                  <View style={styles.emptyBlurBubble}>
+                    <BlurView intensity={85} tint="light" style={StyleSheet.absoluteFill} />
+                    {searchText || activeType || activeSpecialty ? (
+                      <>
+                        <Ionicons name="search-outline" size={44} color={colors.border} style={{ marginBottom: 16 }} />
+                        <Text style={styles.emptyTitle}>{t('noResultsTitle', lang)}</Text>
+                        <Text style={styles.emptyBody}>{t('noResultsBody', lang)}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.emptyIcon}>🏥</Text>
+                        <Text style={styles.emptyTitle}>{t('noFacilitiesTitle', lang)}</Text>
+                        <Text style={styles.emptyBody}>{t('noFacilitiesBody', lang)}</Text>
+                      </>
+                    )}
+                  </View>
                 </View>
               )}
               renderItem={({ item }) => {
@@ -1180,6 +1212,10 @@ export default function App() {
                 renderItem={({ item }) => {
                   const tc = typeColors[item.type] || typeColors.clinic
                   const isOpen = parseIsOpen(item.opening_hours)
+                  const dist = userLocation && item.latitude != null && item.longitude != null
+                    ? haversineKm(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude)
+                    : null
+                  const rating = facilityRatings[item.id]
                   return (
                     <TouchableOpacity
                       activeOpacity={0.75}
@@ -1195,9 +1231,14 @@ export default function App() {
                             }
                           </View>
                           <View style={styles.cardContent}>
-                            <View style={styles.cardNameRow}>
-                              <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
-                              {item.verified && <Ionicons name="checkmark-circle" size={15} color={colors.primary} />}
+                            <View style={styles.cardTop}>
+                              <View style={styles.cardNameRow}>
+                                <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
+                                {item.verified && <Ionicons name="checkmark-circle" size={15} color={colors.primary} />}
+                              </View>
+                              {dist != null && (
+                                <Text style={styles.distanceText}>{dist.toFixed(1)} km</Text>
+                              )}
                             </View>
                             <View style={styles.badgeRow}>
                               <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
@@ -1212,6 +1253,12 @@ export default function App() {
                               )}
                             </View>
                             {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
+                            {rating && (
+                              <View style={styles.ratingRow}>
+                                <Ionicons name="star" size={11} color="#F5A623" />
+                                <Text style={styles.ratingText}> {rating.avg} ({rating.count})</Text>
+                              </View>
+                            )}
                           </View>
                         </View>
                       </View>
@@ -1482,6 +1529,8 @@ const styles = StyleSheet.create({
   unclaimedNotice:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginTop: 12, marginBottom: 24 },
   unclaimedNoticeText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20 },
   unclaimedActions: { flexDirection: 'row', gap: 12 },
+  reportBtn:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20, alignSelf: 'center' },
+  reportBtnText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },
   actionBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14 },
   actionBtnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
   dutyBanner:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accentLight, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.accent + '30' },
@@ -1489,6 +1538,12 @@ const styles = StyleSheet.create({
   dutyBannerIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.accent + '20', justifyContent: 'center', alignItems: 'center' },
   dutyBannerTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.accent, marginBottom: 2 },
   dutyBannerSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.accent + 'AA' },
+  uvBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardBg, borderRadius: 12, padding: 10, marginBottom: 10, borderLeftWidth: 3, ...shadow },
+  uvIconWrap:   { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  uvLabel:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  uvBadge:      { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  uvBadgeText:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff' },
+  uvWarnText:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
   quizPromoCard:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accent, borderRadius: 16, padding: 14, marginBottom: 12 },
   quizPromoLeft:     { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   quizPromoIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
@@ -1500,6 +1555,7 @@ const styles = StyleSheet.create({
   resultCardTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary, marginBottom: 2 },
   resultCardSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.primary + 'AA' },
   emptyWrap:        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 32 },
+  emptyBlurBubble:  { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 28, borderRadius: 24, overflow: 'hidden', position: 'relative' },
   emptyIcon:        { fontSize: 48, marginBottom: 16 },
   emptyTitle:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
   emptyBody:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 21 },
