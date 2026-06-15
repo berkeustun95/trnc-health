@@ -914,6 +914,62 @@ export default function App() {
               </View>
             </View>
 
+          {weatherData && (() => {
+            const cur   = weatherData.current
+            const daily = weatherData.daily
+            const uv    = uvLevel(cur.uv_index)
+            const days  = (daily?.time ?? []).slice(0, 4)
+            return (
+              <TouchableOpacity
+                style={styles.weatherCard}
+                onPress={() => setWeatherExpanded(v => !v)}
+                activeOpacity={0.85}
+              >
+                <View style={styles.weatherRow}>
+                  <Text style={styles.weatherEmoji}>{weatherIcon(cur.weather_code)}</Text>
+                  <Text style={styles.weatherTemp}>{Math.round(cur.temperature_2m)}°C</Text>
+                  <Text style={styles.weatherDescInline} numberOfLines={1}>{weatherDesc(cur.weather_code)}</Text>
+                  <View style={{ flex: 1 }} />
+                  {uv && (
+                    <View style={[styles.uvBadge, { backgroundColor: uv.color }]}>
+                      <Text style={styles.uvBadgeText}>UV {Math.round(cur.uv_index)}</Text>
+                    </View>
+                  )}
+                  <Feather name={weatherExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
+                </View>
+
+                {weatherExpanded && (
+                  <>
+                    <View style={styles.weatherExpandStats}>
+                      <Text style={styles.weatherStat}>💧 {cur.relative_humidity_2m}%</Text>
+                      <Text style={styles.weatherStat}>💨 {Math.round(cur.wind_speed_10m)} km/h</Text>
+                      <Text style={styles.weatherStat}>Feels {Math.round(cur.apparent_temperature)}°C</Text>
+                      {uv && <Text style={styles.weatherStat}>{t(uv.key, lang)}</Text>}
+                    </View>
+                    {uv?.warn && (
+                      <Text style={styles.uvWarnText}>🧴 {t('uvSunscreen', lang)}</Text>
+                    )}
+                    {days.length > 0 && (
+                      <View style={styles.forecastRow}>
+                        {days.map((date, i) => {
+                          const label = i === 0 ? 'Today' : new Date(date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' })
+                          return (
+                            <View key={date} style={styles.forecastDay}>
+                              <Text style={styles.forecastLabel}>{label}</Text>
+                              <Text style={styles.forecastIcon}>{weatherIcon(daily.weather_code[i])}</Text>
+                              <Text style={styles.forecastMax}>{Math.round(daily.temperature_2m_max[i])}°</Text>
+                              <Text style={styles.forecastMin}>{Math.round(daily.temperature_2m_min[i])}°</Text>
+                            </View>
+                          )
+                        })}
+                      </View>
+                    )}
+                  </>
+                )}
+              </TouchableOpacity>
+            )
+          })()}
+
           <View style={styles.searchBar}>
             <Feather name="search" size={16} color={colors.textSecondary} />
             <TextInput
@@ -1048,62 +1104,6 @@ export default function App() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.accent} />
           </TouchableOpacity>
-
-          {weatherData && (() => {
-            const cur   = weatherData.current
-            const daily = weatherData.daily
-            const uv    = uvLevel(cur.uv_index)
-            const days  = (daily?.time ?? []).slice(0, 4)
-            return (
-              <TouchableOpacity
-                style={styles.weatherCard}
-                onPress={() => setWeatherExpanded(v => !v)}
-                activeOpacity={0.85}
-              >
-                <View style={styles.weatherRow}>
-                  <Text style={styles.weatherEmoji}>{weatherIcon(cur.weather_code)}</Text>
-                  <Text style={styles.weatherTemp}>{Math.round(cur.temperature_2m)}°C</Text>
-                  <Text style={styles.weatherDescInline} numberOfLines={1}>{weatherDesc(cur.weather_code)}</Text>
-                  <View style={{ flex: 1 }} />
-                  {uv && (
-                    <View style={[styles.uvBadge, { backgroundColor: uv.color }]}>
-                      <Text style={styles.uvBadgeText}>UV {Math.round(cur.uv_index)}</Text>
-                    </View>
-                  )}
-                  <Feather name={weatherExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
-                </View>
-
-                {weatherExpanded && (
-                  <>
-                    <View style={styles.weatherExpandStats}>
-                      <Text style={styles.weatherStat}>💧 {cur.relative_humidity_2m}%</Text>
-                      <Text style={styles.weatherStat}>💨 {Math.round(cur.wind_speed_10m)} km/h</Text>
-                      <Text style={styles.weatherStat}>Feels {Math.round(cur.apparent_temperature)}°C</Text>
-                      {uv && <Text style={styles.weatherStat}>{t(uv.key, lang)}</Text>}
-                    </View>
-                    {uv?.warn && (
-                      <Text style={styles.uvWarnText}>🧴 {t('uvSunscreen', lang)}</Text>
-                    )}
-                    {days.length > 0 && (
-                      <View style={styles.forecastRow}>
-                        {days.map((date, i) => {
-                          const label = i === 0 ? 'Today' : new Date(date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' })
-                          return (
-                            <View key={date} style={styles.forecastDay}>
-                              <Text style={styles.forecastLabel}>{label}</Text>
-                              <Text style={styles.forecastIcon}>{weatherIcon(daily.weather_code[i])}</Text>
-                              <Text style={styles.forecastMax}>{Math.round(daily.temperature_2m_max[i])}°</Text>
-                              <Text style={styles.forecastMin}>{Math.round(daily.temperature_2m_min[i])}°</Text>
-                            </View>
-                          )
-                        })}
-                      </View>
-                    )}
-                  </>
-                )}
-              </TouchableOpacity>
-            )
-          })()}
 
           {facilityLoadError && (
               <View style={styles.errorRow}>
