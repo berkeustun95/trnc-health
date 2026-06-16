@@ -372,23 +372,7 @@ export default function App() {
       .then(async ({ data }) => {
         setProfile(data ?? null)
         if (data?.role === 'provider') {
-          const { data: fac } = await supabase
-            .from('facilities')
-            .select('id, name, type, status, membership_tier, trial_ends_at, is_quiz_partner, phone, address, opening_hours')
-            .eq('provider_id', session.user.id)
-            .maybeSingle()
-          setProviderFacility(fac ?? null)
-          if (!fac) {
-            const { data: claim } = await supabase
-              .from('claim_requests')
-              .select('id, requested_tier, facilities(name, type)')
-              .eq('requester_id', session.user.id)
-              .eq('status', 'pending')
-              .maybeSingle()
-            setPendingClaim(claim ?? null)
-          } else {
-            setPendingClaim(null)
-          }
+          loadProviderFacility()
         } else if (!data?.role || data?.role === 'customer') {
           scheduleAppointmentReminders(session.user.id, data?.preferred_language ?? 'en')
         }
@@ -514,7 +498,9 @@ export default function App() {
       if (duty) setDutyFacilityId(duty.facility_id)
 
 
-      const { data: reviewsData } = await supabase.from('reviews').select('facility_id, rating')
+      // TODO: replace with a computed avg_rating + review_count column on facilities
+      // once review volume grows, to avoid fetching every row on startup.
+      const { data: reviewsData } = await supabase.from('reviews').select('facility_id, rating').limit(2000)
       if (reviewsData?.length) {
         const map = {}
         for (const r of reviewsData) {

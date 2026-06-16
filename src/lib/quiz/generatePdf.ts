@@ -1,3 +1,6 @@
+// ⚠️ WEB-ONLY — jsPDF, html2canvas, and document.fonts are browser APIs.
+// This file cannot be called from React Native. It is intended for a future web
+// build of the quiz. Do not wire it up inside the Expo app.
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import type { QuizResult } from "@/lib/quiz/engine";
@@ -74,6 +77,12 @@ export async function generatePdf(element: HTMLElement, result: QuizResult, curr
   pdf.setFont("helvetica", "bold");
   setRGB(pdf, WHITE);
   pdf.text("Your Shopping List", MARGIN, 26);
+
+  const dateStr = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  pdf.setFontSize(8);
+  pdf.setFont("helvetica", "normal");
+  setRGB(pdf, { r: 180, g: 240, b: 200 });
+  pdf.text(`Generated ${dateStr}`, PAGE_W - MARGIN - pdf.getTextWidth(`Generated ${dateStr}`), 26);
 
   let y = 50;
 

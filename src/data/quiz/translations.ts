@@ -1,4 +1,4 @@
-export type Lang = "tr" | "en";
+export type Lang = "tr" | "en" | "ar" | "ru" | "el" | "fr" | "es" | "de" | "fa";
 
 // ── Question translations ─────────────────────────────────────────────────
 export interface QuestionTranslation {
@@ -10,6 +10,13 @@ export interface QuestionTranslation {
 
 // ── UI translations ───────────────────────────────────────────────────────
 export interface QuizUIStrings {
+  awaiting: {
+    title: string;
+    subtitle: (pharmacyName: string) => string;
+    timerLabel: string;
+    infoText: string;
+    cancelBtn: string;
+  };
   landing: {
     badge: string;
     titleLine1: string;
@@ -66,6 +73,8 @@ export interface QuizUIStrings {
     viewProduct: string;
     evidenceLabel: string;
     perMonth: string;
+    back: string;
+    backToApp: string;
   };
   loading: {
     title: string;
@@ -199,6 +208,13 @@ export interface QuizTranslations {
 // ─────────────────────────────────────────────────────────────────────────────
 const tr: QuizTranslations = {
   ui: {
+    awaiting: {
+      title: 'İnceleme Bekleniyor',
+      subtitle: (name) => `${name} takviye sonuçlarınızı inceliyor.`,
+      timerLabel: 'İNCELEME KAPANIYOR',
+      infoText: 'Lisanslı bir eczacı yanıtlarınızı kontrol ediyor ve nihai sonuçları görmeden önce takviye planınızı düzenleyebilir.',
+      cancelBtn: 'Farklı bir eczacı seç',
+    },
     landing: {
       badge: "Eczacı Tasarımı Quiz",
       titleLine1: "Gerçekten Hangi Takviyelere",
@@ -265,6 +281,8 @@ const tr: QuizTranslations = {
       viewProduct: "Bu Ürünü Satın Al →",
       evidenceLabel: "Kanıt",
       perMonth: "/ay",
+      back: "← Geri",
+      backToApp: "← Uygulamaya Dön",
     },
     loading: {
       title: "Programın Hazırlanıyor",
@@ -881,6 +899,13 @@ const tr: QuizTranslations = {
 // ─────────────────────────────────────────────────────────────────────────────
 const en: QuizTranslations = {
   ui: {
+    awaiting: {
+      title: 'Awaiting review',
+      subtitle: (name) => `${name} is reviewing your supplement results.`,
+      timerLabel: 'REVIEW CLOSES IN',
+      infoText: 'A licensed pharmacist is checking your answers and may adjust your supplement plan before you see the final results.',
+      cancelBtn: 'Choose a different pharmacist',
+    },
     landing: {
       badge: "Pharmacist-Designed Quiz",
       titleLine1: "What Supplements",
@@ -947,6 +972,8 @@ const en: QuizTranslations = {
       viewProduct: "Shop this product →",
       evidenceLabel: "Evidence",
       perMonth: "/mo",
+      back: "← Back",
+      backToApp: "← Back to app",
     },
     loading: {
       title: "Designing Your Stack",
@@ -1505,7 +1532,15 @@ const en: QuizTranslations = {
   },
 };
 
-export const translations: Record<Lang, QuizTranslations> = { tr, en };
+import { ar } from './translations.ar'
+import { ru } from './translations.ru'
+import { el } from './translations.el'
+import { fr } from './translations.fr'
+import { es } from './translations.es'
+import { de } from './translations.de'
+import { fa } from './translations.fa'
+
+export const translations: Record<Lang, QuizTranslations> = { tr, en, ar, ru, el, fr, es, de, fa };
 
 export function getT(lang: Lang): QuizTranslations {
   return translations[lang];

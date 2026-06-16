@@ -16,11 +16,12 @@ interface ReviewState {
   submissionId: string | null
   timeoutAt: Date | null
   finalResult: any | null
+  reviewedAt: string | null
 }
 
 interface ReviewStore extends ReviewState {
-  submitForReview: (answers: Record<string, any>, generatedResult: any, facility: ReviewFacility) => Promise<void>
-  onApproved: (finalResult: any) => void
+  submitForReview: (answers: Record<string, any>, generatedResult: any, facility: ReviewFacility) => Promise<boolean>
+  onApproved: (finalResult: any, reviewedAt?: string | null) => void
   handleTimeout: () => Promise<void>
   reset: () => void
 }
@@ -31,6 +32,7 @@ const initial: ReviewState = {
   submissionId: null,
   timeoutAt: null,
   finalResult: null,
+  reviewedAt: null,
 }
 
 export const useReviewStore = create<ReviewStore>((set, get) => ({
@@ -39,7 +41,7 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
   submitForReview: async (answers, generatedResult, facility) => {
     const timeoutAt = calculateTimeoutAt()
     const { data: authData } = await supabase.auth.getUser()
-    if (!authData.user) return
+    if (!authData.user) return false
 
     const { data, error } = await supabase
       .from('quiz_submissions')
@@ -53,13 +55,14 @@ export const useReviewStore = create<ReviewStore>((set, get) => ({
       .select('id')
       .single()
 
-    if (error || !data) return
+    if (error || !data) return false
 
     set({ phase: 'awaiting', selectedFacility: facility, submissionId: data.id, timeoutAt })
+    return true
   },
 
-  onApproved: (finalResult) => {
-    set({ phase: 'complete', finalResult })
+  onApproved: (finalResult, reviewedAt) => {
+    set({ phase: 'complete', finalResult, reviewedAt: reviewedAt ?? new Date().toISOString() })
   },
 
   handleTimeout: async () => {

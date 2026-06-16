@@ -1,8 +1,10 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, FlatList } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useState } from 'react'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { useQuizStore } from '@/lib/quiz/store'
 import { getT } from '@/data/quiz/translations'
+import type { Lang } from '@/data/quiz/translations'
 import { colors, shadow } from '../../constants/theme'
 
 const STAT_ICONS: Array<{ name: string; lib: 'Ionicons' | 'Feather' }> = [
@@ -17,6 +19,18 @@ const FEATURE_ICONS: Array<{ name: string; lib: 'Ionicons' | 'Feather' }> = [
   { name: 'notifications-outline', lib: 'Ionicons' },
 ]
 
+const LANGUAGES: Array<{ code: Lang; label: string; flag: string }> = [
+  { code: 'en', label: 'English',    flag: '🇬🇧' },
+  { code: 'tr', label: 'Türkçe',     flag: '🇹🇷' },
+  { code: 'ar', label: 'العربية',    flag: '🇸🇦' },
+  { code: 'ru', label: 'Русский',    flag: '🇷🇺' },
+  { code: 'el', label: 'Ελληνικά',   flag: '🇬🇷' },
+  { code: 'fr', label: 'Français',   flag: '🇫🇷' },
+  { code: 'es', label: 'Español',    flag: '🇪🇸' },
+  { code: 'de', label: 'Deutsch',    flag: '🇩🇪' },
+  { code: 'fa', label: 'فارسی',      flag: '🇮🇷' },
+]
+
 function StatIcon({ icon }: { icon: typeof STAT_ICONS[0] }) {
   if (icon.lib === 'Ionicons') return <Ionicons name={icon.name as any} size={24} color={colors.primary} />
   return <Feather name={icon.name as any} size={24} color={colors.primary} />
@@ -28,18 +42,32 @@ function FeatureIcon({ icon }: { icon: typeof FEATURE_ICONS[0] }) {
 }
 
 export default function LandingScreen({ onClose }: { onClose?: () => void }) {
-  const startQuiz = useQuizStore(s => s.startQuiz)
-  const lang = useQuizStore(s => s.language)
-  const ui = getT(lang).ui.landing
+  const startQuiz   = useQuizStore(s => s.startQuiz)
+  const lang        = useQuizStore(s => s.language)
+  const setLanguage = useQuizStore(s => s.setLanguage)
+  const ui          = getT(lang).ui.landing
+  const [showLangPicker, setShowLangPicker] = useState(false)
+
+  const currentLang = LANGUAGES.find(l => l.code === lang) ?? LANGUAGES[0]
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false}>
-        {onClose && (
-          <TouchableOpacity style={s.closeBtn} onPress={onClose}>
-            <Feather name="x" size={20} color={colors.textSecondary} />
+
+        {/* Header row: language picker left, close right */}
+        <View style={s.headerRow}>
+          <TouchableOpacity style={s.langBtn} onPress={() => setShowLangPicker(true)}>
+            <Text style={s.langFlag}>{currentLang.flag}</Text>
+            <Text style={s.langCode}>{currentLang.code.toUpperCase()}</Text>
+            <Feather name="chevron-down" size={12} color={colors.textSecondary} />
           </TouchableOpacity>
-        )}
+          {onClose && (
+            <TouchableOpacity style={s.closeBtn} onPress={onClose}>
+              <Feather name="x" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
         <View style={s.badge}>
           <Text style={s.badgeText}>{ui.badge}</Text>
         </View>
@@ -98,13 +126,46 @@ export default function LandingScreen({ onClose }: { onClose?: () => void }) {
           <Text style={s.ctaText}>{ui.startCTA}</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Language picker modal */}
+      <Modal visible={showLangPicker} transparent animationType="fade" onRequestClose={() => setShowLangPicker(false)}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowLangPicker(false)}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Quiz language</Text>
+            <FlatList
+              data={LANGUAGES}
+              keyExtractor={item => item.code}
+              scrollEnabled={false}
+              renderItem={({ item }) => {
+                const active = item.code === lang
+                return (
+                  <TouchableOpacity
+                    style={[s.langRow, active && s.langRowActive]}
+                    onPress={() => { setLanguage(item.code); setShowLangPicker(false) }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.langRowFlag}>{item.flag}</Text>
+                    <Text style={[s.langRowLabel, active && s.langRowLabelActive]}>{item.label}</Text>
+                    {active && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                )
+              }}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   )
 }
 
 const s = StyleSheet.create({
   safe:             { flex: 1, backgroundColor: colors.bg },
-  container:        { paddingHorizontal: 20, paddingBottom: 48, paddingTop: 24 },
+  container:        { paddingHorizontal: 20, paddingBottom: 48, paddingTop: 16 },
+  headerRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  langBtn:          { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.cardBg, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, ...shadow },
+  langFlag:         { fontSize: 16 },
+  langCode:         { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  closeBtn:         { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', ...shadow },
   badge:            { alignSelf: 'flex-start', backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, marginBottom: 18 },
   badgeText:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.3 },
   title:            { fontSize: 32, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 38, letterSpacing: -0.5 },
@@ -127,5 +188,13 @@ const s = StyleSheet.create({
   featureTitle:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
   featureDesc:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18 },
   readyCTA:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginTop: 24, marginBottom: 12 },
-  closeBtn:         { alignSelf: 'flex-end', width: 36, height: 36, borderRadius: 18, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 8, ...shadow },
+  // Modal
+  modalOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  modalCard:        { backgroundColor: colors.cardBg, borderRadius: 20, padding: 20, width: '100%', ...shadow },
+  modalTitle:       { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 16, textAlign: 'center' },
+  langRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 12 },
+  langRowActive:    { backgroundColor: colors.primaryLight },
+  langRowFlag:      { fontSize: 22 },
+  langRowLabel:     { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  langRowLabelActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 })

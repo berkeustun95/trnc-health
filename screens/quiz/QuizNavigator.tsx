@@ -12,6 +12,13 @@ import type { Lang } from '@/data/quiz/translations'
 const LANG_MAP: Record<string, Lang> = {
   Turkish: 'tr',
   English: 'en',
+  Arabic:  'ar',
+  Russian: 'ru',
+  Greek:   'el',
+  French:  'fr',
+  Spanish: 'es',
+  German:  'de',
+  Persian: 'fa',
 }
 
 export default function QuizNavigator({ onClose, profileLang }: { onClose?: () => void; profileLang?: string }) {
@@ -19,15 +26,16 @@ export default function QuizNavigator({ onClose, profileLang }: { onClose?: () =
   const setLanguage = useQuizStore(s => s.setLanguage)
   const reviewPhase = useReviewStore(s => s.phase)
   const finalResult = useReviewStore(s => s.finalResult)
+  const reviewedAt  = useReviewStore(s => s.reviewedAt)
 
   useEffect(() => {
-    setLanguage(LANG_MAP[profileLang ?? ''] ?? 'tr')
+    setLanguage(LANG_MAP[profileLang ?? ''] ?? 'en')
   }, [profileLang])
 
   if (quizPhase === 'results') {
     if (!reviewPhase)               return <PharmacistPickerScreen />
     if (reviewPhase === 'awaiting') return <AwaitingReviewScreen onClose={onClose} />
-    if (reviewPhase === 'complete') return <ResultsScreen result={finalResult} onClose={onClose} />
+    if (reviewPhase === 'complete') return <ResultsScreen result={finalResult} reviewedAt={reviewedAt} onClose={onClose} />
   }
 
   switch (quizPhase) {

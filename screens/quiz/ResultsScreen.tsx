@@ -98,7 +98,7 @@ function InteractionCard({ item }: { item: Interaction }) {
   )
 }
 
-export default function ResultsScreen({ onClose, result: resultProp, onBack, readOnly }: { onClose?: () => void; result?: QuizResult | null; onBack?: () => void; readOnly?: boolean }) {
+export default function ResultsScreen({ onClose, result: resultProp, onBack, readOnly, reviewedAt }: { onClose?: () => void; result?: QuizResult | null; onBack?: () => void; readOnly?: boolean; reviewedAt?: string | null }) {
   const storeResult = useQuizStore(s => s.result)
   const language    = useQuizStore(s => s.language)
   const resetQuiz   = useQuizStore(s => s.resetQuiz)
@@ -115,12 +115,17 @@ export default function ResultsScreen({ onClose, result: resultProp, onBack, rea
       <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false}>
         {onBack && (
           <TouchableOpacity style={s.backBtn} onPress={onBack}>
-            <Text style={s.backText}>← Back</Text>
+            <Text style={s.backText}>{ui.back}</Text>
           </TouchableOpacity>
         )}
         <View style={s.badge}>
           <Text style={s.badgeText}>{ui.badge}</Text>
         </View>
+        {reviewedAt && (
+          <Text style={s.reviewedAt}>
+            {new Date(reviewedAt).toLocaleDateString(language === 'tr' ? 'tr-TR' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </Text>
+        )}
         <Text style={s.title}>{ui.title}</Text>
         <Text style={s.summary}>{result.summary}</Text>
 
@@ -171,7 +176,7 @@ export default function ResultsScreen({ onClose, result: resultProp, onBack, rea
             style={[s.retakeBtn, { marginTop: 10, borderColor: colors.border }]}
             onPress={() => { resetQuiz(); resetReview(); onClose() }}
           >
-            <Text style={[s.retakeText, { color: colors.textSecondary }]}>← Back to app</Text>
+            <Text style={[s.retakeText, { color: colors.textSecondary }]}>{ui.backToApp}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -184,6 +189,7 @@ const s = StyleSheet.create({
   container:        { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 48 },
   badge:            { alignSelf: 'flex-start', backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, marginBottom: 12 },
   badgeText:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.3 },
+  reviewedAt:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 8, marginTop: 4 },
   title:            { fontSize: 26, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 12 },
   summary:          { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 22, marginBottom: 28, backgroundColor: colors.cardBg, borderRadius: 12, padding: 14 },
   sectionTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 12, marginTop: 24 },

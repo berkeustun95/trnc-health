@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -54,8 +54,9 @@ export default function PharmacistPickerScreen() {
       avg_response_mins: item.pharmacist_scores?.avg_response_mins ?? 0,
       total_reviews:     item.pharmacist_scores?.total_reviews ?? 0,
     }
-    await submitForReview(answers, result, facility)
+    const ok = await submitForReview(answers, result, facility)
     setSubmitting(null)
+    if (!ok) Alert.alert('Submission failed', 'Could not send your results to the pharmacist. Please check your connection and try again.')
   }
 
   return (

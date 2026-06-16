@@ -3,6 +3,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useReviewStore } from './reviewStore'
+import { useQuizStore } from '@/lib/quiz/store'
+import { getT } from '@/data/quiz/translations'
 import { colors } from '../../constants/theme'
 
 export default function AwaitingReviewScreen({ onClose }: { onClose?: () => void }) {
@@ -11,6 +13,8 @@ export default function AwaitingReviewScreen({ onClose }: { onClose?: () => void
   const timeoutAt        = useReviewStore(s => s.timeoutAt)
   const onApproved       = useReviewStore(s => s.onApproved)
   const handleTimeout    = useReviewStore(s => s.handleTimeout)
+  const language         = useQuizStore(s => s.language)
+  const ui               = getT(language).ui.awaiting
 
   const [timeLeft, setTimeLeft] = useState('')
   const pulseAnim = useRef(new Animated.Value(1)).current
@@ -44,12 +48,12 @@ export default function AwaitingReviewScreen({ onClose }: { onClose?: () => void
     if (!submissionId) return
     supabase
       .from('quiz_submissions')
-      .select('status, final_result')
+      .select('status, final_result, reviewed_at')
       .eq('id', submissionId)
       .single()
       .then(({ data }) => {
         if (!data) return
-        if (data.status === 'approved')   onApproved(data.final_result)
+        if (data.status === 'approved')   onApproved(data.final_result, data.reviewed_at)
         else if (data.status === 'timed_out') handleTimeout()
       })
   }, [submissionId])
@@ -63,7 +67,7 @@ export default function AwaitingReviewScreen({ onClose }: { onClose?: () => void
         { event: 'UPDATE', schema: 'public', table: 'quiz_submissions', filter: `id=eq.${submissionId}` },
         (payload) => {
           if (payload.new.status === 'approved') {
-            onApproved(payload.new.final_result)
+            onApproved(payload.new.final_result, payload.new.reviewed_at)
           }
         }
       )
@@ -85,25 +89,20 @@ export default function AwaitingReviewScreen({ onClose }: { onClose?: () => void
         )}
         <Animated.Text style={[s.emoji, { transform: [{ scale: pulseAnim }] }]}>💊</Animated.Text>
 
-        <Text style={s.title}>Awaiting review</Text>
-        <Text style={s.subtitle}>
-          <Text style={s.pharmacyName}>{selectedFacility?.name}</Text>
-          {' '}is reviewing your supplement results.
-        </Text>
+        <Text style={s.title}>{ui.title}</Text>
+        <Text style={s.subtitle}>{ui.subtitle(selectedFacility?.name ?? '')}</Text>
 
         <View style={s.timerCard}>
-          <Text style={s.timerLabel}>REVIEW CLOSES IN</Text>
+          <Text style={s.timerLabel}>{ui.timerLabel}</Text>
           <Text style={s.timerValue}>{timeLeft}</Text>
         </View>
 
         <View style={s.infoCard}>
-          <Text style={s.infoText}>
-            A licensed pharmacist is checking your answers and may adjust your supplement plan before you see the final results.
-          </Text>
+          <Text style={s.infoText}>{ui.infoText}</Text>
         </View>
 
         <TouchableOpacity style={s.cancelBtn} onPress={handleTimeout}>
-          <Text style={s.cancelText}>Choose a different pharmacist</Text>
+          <Text style={s.cancelText}>{ui.cancelBtn}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
