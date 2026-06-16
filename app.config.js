@@ -2,7 +2,7 @@ export default {
   expo: {
     name: 'ADA',
     slug: 'trnc-health',
-    version: '1.0.0',
+    version: '1.1.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
     splash: {
