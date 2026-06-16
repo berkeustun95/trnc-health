@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal } from 'react-native'
+import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal, Dimensions } from 'react-native'
 import { BlurView } from 'expo-blur'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
@@ -26,6 +26,7 @@ import QuizNavigator from './screens/quiz/QuizNavigator'
 import ResultsScreen from './screens/quiz/ResultsScreen'
 import DutyListScreen from './screens/DutyListScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
+import TutorialCoachMarks from './screens/TutorialCoachMarks'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
@@ -143,7 +144,7 @@ const TAB_ITEMS = [
   { key: 'profile',    iconOff: 'person-outline',  iconOn: 'person',  label: 'Profile' },
 ]
 
-function BottomTabBar({ activeTab, onTabPress }) {
+function BottomTabBar({ activeTab, onTabPress, mapTabRef }) {
   const insets = useSafeAreaInsets()
   return (
     <View style={[tabBar.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -152,6 +153,7 @@ function BottomTabBar({ activeTab, onTabPress }) {
         return (
           <TouchableOpacity
             key={tab.key}
+            ref={tab.key === 'map' ? mapTabRef : undefined}
             style={tabBar.btn}
             onPress={() => onTabPress(tab.key)}
             activeOpacity={0.7}
@@ -223,7 +225,17 @@ export default function App() {
   const [quizHistoryLoading, setQuizHistoryLoading] = useState(false)
   const [showEmergencyModal, setShowEmergencyModal] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
-  const [showTutorial, setShowTutorial] = useState(false)
+  const [showCoachMarks, setShowCoachMarks] = useState(false)
+  const [coachSteps, setCoachSteps]         = useState([])
+  const hamburgerRef       = useRef(null)
+  const searchRef          = useRef(null)
+  const filterBarRef       = useRef(null)
+  const dutyBannerRef      = useRef(null)
+  const mapTabRef          = useRef(null)
+  const menuLangRef        = useRef(null)
+  const menuQuizRef        = useRef(null)
+  const menuEmergencyRef   = useRef(null)
+  const menuTutorialItemRef = useRef(null)
   const menuAnim = useRef(new Animated.Value(260)).current
 
   function openMenu() {
@@ -233,6 +245,66 @@ export default function App() {
   function closeMenu() {
     Animated.timing(menuAnim, { toValue: 260, duration: 200, useNativeDriver: true }).start(() => { setShowMenu(false); setShowQuizSubmenu(false) })
   }
+
+  function measureRef(ref) {
+    return new Promise(resolve => {
+      if (!ref?.current) { resolve(null); return }
+      ref.current.measureInWindow((x, y, w, h) => {
+        resolve(w > 0 && h > 0 ? { x, y, w, h } : null)
+      })
+    })
+  }
+
+  async function startCoachMarks() {
+    await new Promise(r => setTimeout(r, 800))
+
+    // Measure main UI elements
+    const [menu, search, filters, duty, map] = await Promise.all([
+      measureRef(hamburgerRef),
+      measureRef(searchRef),
+      measureRef(filterBarRef),
+      measureRef(dutyBannerRef),
+      measureRef(mapTabRef),
+    ])
+
+    // Briefly open menu to measure individual items, then close
+    openMenu()
+    await new Promise(r => setTimeout(r, 300))
+    const [mLang, mQuiz, mEmergency, mTutorial] = await Promise.all([
+      measureRef(menuLangRef),
+      measureRef(menuQuizRef),
+      measureRef(menuEmergencyRef),
+      measureRef(menuTutorialItemRef),
+    ])
+    closeMenu()
+    await new Promise(r => setTimeout(r, 250))
+
+    const steps = []
+    if (menu)       steps.push({ ...menu,       title: t('coachMenuTitle', lang),         body: t('coachMenuBody', lang),         isMenuTrigger: true })
+    if (mLang)      steps.push({ ...mLang,      title: t('coachLangTitle', lang),          body: t('coachLangBody', lang),          isMenuContent: true })
+    if (mQuiz)      steps.push({ ...mQuiz,      title: t('coachQuizTitle', lang),          body: t('coachQuizBody', lang),          isMenuContent: true })
+    if (mEmergency) steps.push({ ...mEmergency, title: t('coachEmergencyTitle', lang),     body: t('coachEmergencyBody', lang),     isMenuContent: true })
+    if (mTutorial)  steps.push({ ...mTutorial,  title: t('coachTutorialItemTitle', lang),  body: t('coachTutorialItemBody', lang),  isMenuContent: true, isLastMenuContent: true })
+    if (search)     steps.push({ ...search,     title: t('coachSearchTitle', lang),        body: t('coachSearchBody', lang) })
+    if (filters)    steps.push({ ...filters,    title: t('coachFiltersTitle', lang),       body: t('coachFiltersBody', lang) })
+    if (duty)       steps.push({ ...duty,       title: t('coachDutyTitle', lang),          body: t('coachDutyBody', lang) })
+    if (map)        steps.push({ ...map,        title: t('coachMapTitle', lang),           body: t('coachMapBody', lang) })
+    if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
+  }
+
+  async function handleCoachNext(fromStep) {
+    if (coachSteps[fromStep]?.isMenuTrigger) {
+      openMenu()
+      await new Promise(r => setTimeout(r, 280))
+    }
+    if (coachSteps[fromStep]?.isLastMenuContent) closeMenu()
+  }
+
+  function handleCoachFinish() {
+    closeMenu()
+    setShowCoachMarks(false)
+  }
+
   async function loadQuizHistory() {
     setQuizHistoryLoading(true)
     const { data } = await supabase
@@ -382,8 +454,8 @@ export default function App() {
           loadProviderFacility()
         } else if (!data?.role || data?.role === 'customer') {
           scheduleAppointmentReminders(session.user.id, data?.preferred_language ?? 'en')
-          AsyncStorage.getItem('@trnc_tutorial_shown').then(shown => {
-            if (!shown) { setShowTutorial(true); AsyncStorage.setItem('@trnc_tutorial_shown', 'true') }
+          AsyncStorage.getItem('@trnc_coach_v1').then(shown => {
+            if (!shown) { AsyncStorage.setItem('@trnc_coach_v1', 'true'); startCoachMarks() }
           })
         }
       })
@@ -876,8 +948,6 @@ export default function App() {
         </View>
       </SafeAreaView>
     )
-  } else if (showTutorial) {
-    content = <OnboardingScreen onComplete={() => setShowTutorial(false)} />
   } else if (bookingFacility) {
     content = <BookingScreen facility={bookingFacility} session={session} lang={lang} blockedUntil={profile?.blocked_until} onBack={() => setBookingFacility(null)} />
   } else if (selectedFacility) {
@@ -907,7 +977,7 @@ export default function App() {
                   <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
                   {notifications.some(n => !n.read) && <View style={styles.notifDot} />}
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.hamburgerBtn} onPress={openMenu}>
+                <TouchableOpacity ref={hamburgerRef} style={styles.hamburgerBtn} onPress={openMenu}>
                   <Feather name="menu" size={20} color={colors.textPrimary} />
                 </TouchableOpacity>
               </View>
@@ -969,7 +1039,7 @@ export default function App() {
             )
           })()}
 
-          <View style={styles.searchBar}>
+          <View ref={searchRef} style={styles.searchBar}>
             <Feather name="search" size={16} color={colors.textSecondary} />
             <TextInput
               style={styles.searchInput}
@@ -987,7 +1057,7 @@ export default function App() {
             )}
           </View>
 
-          <View style={styles.filterBar}>
+          <View ref={filterBarRef} style={styles.filterBar}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBarContent}>
               <TouchableOpacity
                 style={[styles.toggleChip, openOnly && styles.toggleChipOpen]}
@@ -1091,7 +1161,7 @@ export default function App() {
             )
           })()}
 
-          <TouchableOpacity style={styles.dutyBanner} onPress={() => setShowDutyList(true)} activeOpacity={0.8}>
+          <TouchableOpacity ref={dutyBannerRef} style={styles.dutyBanner} onPress={() => setShowDutyList(true)} activeOpacity={0.8}>
             <View style={styles.dutyBannerLeft}>
               <View style={styles.dutyBannerIconWrap}>
                 <Ionicons name="medical-outline" size={20} color={colors.accent} />
@@ -1365,7 +1435,7 @@ export default function App() {
           />
         )}
 
-        <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} />
+        <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} mapTabRef={mapTabRef} />
 
         {showMenu && (
           <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />
@@ -1397,13 +1467,13 @@ export default function App() {
 
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowLangModal(true) }}>
+            <TouchableOpacity ref={menuLangRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowLangModal(true) }}>
               <Ionicons name="globe-outline" size={20} color={colors.textPrimary} />
               <Text style={styles.menuItemText}>{t('menuLanguage', lang)}</Text>
             </TouchableOpacity>
 
             <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuItem} onPress={() => setShowQuizSubmenu(v => !v)}>
+            <TouchableOpacity ref={menuQuizRef} style={styles.menuItem} onPress={() => setShowQuizSubmenu(v => !v)}>
               <Ionicons name="flask-outline" size={20} color={colors.accent} />
               <Text style={styles.menuItemText}>{t('supplementQuiz', lang)}</Text>
               <Ionicons name={showQuizSubmenu ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
@@ -1420,7 +1490,7 @@ export default function App() {
                 </TouchableOpacity>
               </>
             )}
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); showEmergencyNumbers() }}>
+            <TouchableOpacity ref={menuEmergencyRef} style={styles.menuItem} onPress={() => { closeMenu(); showEmergencyNumbers() }}>
               <Ionicons name="call-outline" size={20} color={colors.danger} />
               <Text style={styles.menuItemText}>{t('menuEmergency', lang)}</Text>
             </TouchableOpacity>
@@ -1451,7 +1521,7 @@ export default function App() {
           </ScrollView>
 
           <View style={styles.menuDivider} />
-          <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowTutorial(true) }}>
+          <TouchableOpacity ref={menuTutorialItemRef} style={styles.menuItem} onPress={() => { closeMenu(); startCoachMarks() }}>
             <Ionicons name="compass-outline" size={20} color={colors.textPrimary} />
             <Text style={styles.menuItemText}>{t('menuTutorial', lang)}</Text>
           </TouchableOpacity>
@@ -1512,6 +1582,13 @@ export default function App() {
             </View>
           </TouchableOpacity>
         </Modal>
+
+        <TutorialCoachMarks
+          steps={coachSteps}
+          visible={showCoachMarks}
+          onNext={handleCoachNext}
+          onFinish={handleCoachFinish}
+        />
 
       </View>
     )
