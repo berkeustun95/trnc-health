@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, Text, Image, ScrollView, FlatList, TouchableOpacity, Modal, StyleSheet, Linking, Dimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -7,7 +7,9 @@ import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton } from '../components/Skeleton'
+import { formatHoursDisplay } from '../components/HoursPicker'
 
+const SW = Dimensions.get('window').width
 const SCHED_KEYS   = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 const SCHED_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const TODAY_KEY    = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
@@ -20,6 +22,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
   const [reviewAvg, setReviewAvg]       = useState(null)
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [showAllReviews, setShowAllReviews] = useState(false)
+  const [lightbox, setLightbox]             = useState(null) // url string
 
   useEffect(() => {
     async function loadReviews() {
@@ -99,6 +102,24 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
               </View>
             </View>
 
+            {/* Photo gallery */}
+            {Array.isArray(facility.photos) && facility.photos.length > 0 && (
+              <View style={s.photoSection}>
+                <FlatList
+                  data={facility.photos}
+                  keyExtractor={(_, i) => String(i)}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8 }}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity onPress={() => setLightbox(item)} activeOpacity={0.85}>
+                      <Image source={{ uri: item }} style={s.photoThumb} resizeMode="cover" />
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            )}
+
             {/* Languages */}
             {languages.length > 0 && (
               <View style={s.section}>
@@ -154,7 +175,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                   <View style={[s.contactIcon, { backgroundColor: colors.primaryLight }]}>
                     <Feather name="clock" size={15} color={colors.primary} />
                   </View>
-                  <Text style={[s.contactText, { flex: 1 }]}>{facility.opening_hours}</Text>
+                  <Text style={[s.contactText, { flex: 1 }]}>{formatHoursDisplay(facility.opening_hours)}</Text>
                 </View>
               ) : null}
               {facility.website ? (
@@ -243,6 +264,18 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
           </View>
         </ScrollView>
 
+        {/* Photo lightbox */}
+        <Modal visible={!!lightbox} transparent animationType="fade">
+          <TouchableOpacity style={s.lightboxBg} onPress={() => setLightbox(null)} activeOpacity={1}>
+            <TouchableOpacity style={s.lightboxClose} onPress={() => setLightbox(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={22} color="#fff" />
+            </TouchableOpacity>
+            {lightbox && (
+              <Image source={{ uri: lightbox }} style={s.lightboxImg} resizeMode="contain" />
+            )}
+          </TouchableOpacity>
+        </Modal>
+
         {/* Sticky Book CTA */}
         {!isPharmacy && (
           <View style={s.ctaWrap}>
@@ -316,6 +349,11 @@ const s = StyleSheet.create({
   todayLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary, backgroundColor: colors.primaryLight, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden' },
   slotDurationRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10 },
   slotDurationText:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  photoSection:      { marginBottom: 20 },
+  photoThumb:        { width: 140, height: 105, borderRadius: 12, backgroundColor: colors.border },
+  lightboxBg:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' },
+  lightboxClose:     { position: 'absolute', top: 52, right: 20, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  lightboxImg:       { width: SW, height: SW * 0.75 },
   noReviewsWrap:     { alignItems: 'center', paddingVertical: 20 },
   noReviewsTitle:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6, textAlign: 'center' },
   noReviewsSub:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },

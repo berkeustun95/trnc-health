@@ -6,8 +6,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
-import * as Location from 'expo-location'
 import { colors, shadow } from '../constants/theme'
+import HoursPicker from '../components/HoursPicker'
+import MapPinPicker from '../components/MapPinPicker'
 
 async function sendPushNotification(token, title, body) {
   try {
@@ -35,7 +36,7 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
   })
   const [saving, setSaving]               = useState(false)
   const [error, setError]                 = useState(null)
-  const [settingLocation, setSettingLocation] = useState(false)
+  const [showMapPicker, setShowMapPicker] = useState(false)
 
   useEffect(() => {
     if (step !== 2) return
@@ -51,17 +52,6 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
     const q = searchText.trim().toLowerCase()
     return f.name.toLowerCase().includes(q) || (f.address && f.address.toLowerCase().includes(q))
   })
-
-  async function getLocation() {
-    setSettingLocation(true)
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync()
-      if (status !== 'granted') { setSettingLocation(false); return }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
-      setForm(f => ({ ...f, latitude: loc.coords.latitude, longitude: loc.coords.longitude }))
-    } catch {}
-    setSettingLocation(false)
-  }
 
   async function submit() {
     setSaving(true)
@@ -271,18 +261,24 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
             <Text style={s.fieldLabel}>MAP LOCATION</Text>
             {form.latitude != null
               ? <Text style={s.locationSet}>📍 {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}</Text>
-              : <Text style={s.locationMissing}>Not set — you can also do this later from your dashboard.</Text>
+              : <Text style={s.locationMissing}>Not set — your facility won't appear on the map.</Text>
             }
             <TouchableOpacity
-              style={[s.locationBtn, settingLocation && { opacity: 0.6 }]}
-              onPress={getLocation}
-              disabled={settingLocation}
+              style={s.locationBtn}
+              onPress={() => setShowMapPicker(true)}
               activeOpacity={0.8}
             >
               <Text style={s.locationBtnText}>
-                {settingLocation ? 'Getting location…' : form.latitude != null ? '📍 Update location' : '📍 Use current location'}
+                {form.latitude != null ? '📍 Update pin' : '📍 Pin on map'}
               </Text>
             </TouchableOpacity>
+            <MapPinPicker
+              visible={showMapPicker}
+              initialLat={form.latitude}
+              initialLng={form.longitude}
+              onConfirm={(lat, lng) => { setForm(f => ({ ...f, latitude: lat, longitude: lng })); setShowMapPicker(false) }}
+              onCancel={() => setShowMapPicker(false)}
+            />
 
             <Text style={s.fieldLabel}>PHONE</Text>
             <TextInput
@@ -295,13 +291,7 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
             />
 
             <Text style={s.fieldLabel}>OPENING HOURS</Text>
-            <TextInput
-              style={s.input}
-              value={form.opening_hours}
-              onChangeText={set('opening_hours')}
-              placeholder="Mon–Fri 08:00–18:00"
-              placeholderTextColor={colors.border}
-            />
+            <HoursPicker value={form.opening_hours} onChange={set('opening_hours')} />
 
             <Text style={s.fieldLabel}>BUSINESS REGISTRATION / LICENSE NO.</Text>
             <TextInput
@@ -368,18 +358,24 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
             <Text style={[s.fieldLabel, { marginTop: 18 }]}>MAP LOCATION</Text>
             {form.latitude != null
               ? <Text style={s.locationSet}>📍 {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}</Text>
-              : <Text style={s.locationMissing}>Not set — you can also do this later from your dashboard.</Text>
+              : <Text style={s.locationMissing}>Not set — your facility won't appear on the map.</Text>
             }
             <TouchableOpacity
-              style={[s.locationBtn, settingLocation && { opacity: 0.6 }]}
-              onPress={getLocation}
-              disabled={settingLocation}
+              style={s.locationBtn}
+              onPress={() => setShowMapPicker(true)}
               activeOpacity={0.8}
             >
               <Text style={s.locationBtnText}>
-                {settingLocation ? 'Getting location…' : form.latitude != null ? '📍 Update location' : '📍 Use current location'}
+                {form.latitude != null ? '📍 Update pin' : '📍 Pin on map'}
               </Text>
             </TouchableOpacity>
+            <MapPinPicker
+              visible={showMapPicker}
+              initialLat={form.latitude}
+              initialLng={form.longitude}
+              onConfirm={(lat, lng) => { setForm(f => ({ ...f, latitude: lat, longitude: lng })); setShowMapPicker(false) }}
+              onCancel={() => setShowMapPicker(false)}
+            />
           </>
         )}
 

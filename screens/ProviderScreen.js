@@ -4,10 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
-import * as Location from 'expo-location'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import HoursPicker from '../components/HoursPicker'
+import MapPinPicker from '../components/MapPinPicker'
 import QuizReviewScreen from './quiz/QuizReviewScreen'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 
@@ -113,6 +114,8 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [uploadingCover, setUploadingCover] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [imageError, setImageError] = useState(null)
+  const [photos, setPhotos]               = useState(Array.isArray(facility.photos) ? facility.photos : [])
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [specialty, setSpecialty] = useState(
     Array.isArray(facility.specialty) ? facility.specialty : (facility.specialty ? [facility.specialty] : [])
   )
@@ -121,7 +124,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [availSuccess, setAvailSuccess] = useState(false)
   const [facilityLat, setFacilityLat]   = useState(facility.latitude ?? null)
   const [facilityLng, setFacilityLng]   = useState(facility.longitude ?? null)
-  const [settingLocation, setSettingLocation] = useState(false)
+  const [showMapPicker, setShowMapPicker] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -337,24 +340,59 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     }
   }
 
-  async function setFacilityLocation() {
-    setSettingLocation(true)
+  async function addPhoto() {
+    if (photos.length >= 8) return
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) { setImageError('Photo library permission denied'); return }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+      base64: true,
+    })
+    if (result.canceled) return
+    const asset = result.assets[0]
+    setUploadingPhoto(true)
+    setImageError(null)
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync()
-      if (status !== 'granted') { setSettingLocation(false); return }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
-      const { latitude, longitude } = loc.coords
-      const { error } = await supabase
-        .from('facilities')
-        .update({ latitude, longitude })
-        .eq('id', facility.id)
-      if (!error) {
-        setFacilityLat(latitude)
-        setFacilityLng(longitude)
-        if (onFacilityUpdated) onFacilityUpdated()
-      }
-    } catch {}
-    setSettingLocation(false)
+      const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
+      const path = `${facility.id}/photos/${Date.now()}.${ext}`
+      const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('facility-images')
+        .upload(path, decode(asset.base64), { contentType })
+      if (upErr) throw upErr
+      const { data: { publicUrl } } = supabase.storage.from('facility-images').getPublicUrl(path)
+      const next = [...photos, publicUrl]
+      await supabase.from('facilities').update({ photos: next }).eq('id', facility.id)
+      setPhotos(next)
+      if (onFacilityUpdated) onFacilityUpdated()
+    } catch {
+      setImageError('Upload failed. Try again.')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  async function removePhoto(url) {
+    const next = photos.filter(p => p !== url)
+    await supabase.from('facilities').update({ photos: next }).eq('id', facility.id)
+    setPhotos(next)
+    if (onFacilityUpdated) onFacilityUpdated()
+  }
+
+  async function confirmFacilityLocation(lat, lng) {
+    const { error } = await supabase
+      .from('facilities')
+      .update({ latitude: lat, longitude: lng })
+      .eq('id', facility.id)
+    if (!error) {
+      setFacilityLat(lat)
+      setFacilityLng(lng)
+      if (onFacilityUpdated) onFacilityUpdated()
+    }
+    setShowMapPicker(false)
   }
 
   async function saveListing() {
@@ -540,6 +578,32 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 )}
               </TouchableOpacity>
 
+              <View style={styles.photosHeader}>
+                <Text style={[styles.fieldLabel, { marginTop: 16, marginBottom: 0 }]}>PHOTOS</Text>
+                <Text style={styles.photoCount}>{photos.length}/8</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoScroll} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                {photos.map((url, i) => (
+                  <View key={i} style={styles.photoThumb}>
+                    <Image source={{ uri: url }} style={styles.photoThumbImg} resizeMode="cover" />
+                    <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => removePhoto(url)} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
+                      <Feather name="x" size={11} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                {photos.length < 8 && (
+                  <TouchableOpacity style={styles.photoAddThumb} onPress={addPhoto} disabled={uploadingPhoto} activeOpacity={0.8}>
+                    {uploadingPhoto
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : <>
+                          <Feather name="plus" size={20} color={colors.primary} />
+                          <Text style={styles.photoAddText}>Add</Text>
+                        </>
+                    }
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+
               {imageError && <Text style={styles.imageErrorText}>{imageError}</Text>}
             </View>
 
@@ -563,14 +627,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 multiline
               />
               <Text style={[styles.fieldLabel, { marginTop: 16 }]}>{t('labelHours', lang)}</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={editHours}
-                onChangeText={setEditHours}
-                placeholder={t('hoursHint', lang)}
-                placeholderTextColor={colors.textSecondary}
-                autoCapitalize="none"
-              />
+              <HoursPicker value={editHours} onChange={setEditHours} />
 
               {SPECIALTIES_BY_TYPE[facility.type] && (
                 <>
@@ -638,22 +695,22 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 <Text style={styles.locationNotSet}>Not set — your facility won't appear on the map.</Text>
               )}
               <TouchableOpacity
-                style={[styles.locationBtn, settingLocation && { opacity: 0.6 }]}
-                onPress={setFacilityLocation}
-                disabled={settingLocation}
+                style={styles.locationBtn}
+                onPress={() => setShowMapPicker(true)}
                 activeOpacity={0.8}
               >
-                {settingLocation
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <>
-                      <Feather name="crosshair" size={14} color="#fff" />
-                      <Text style={styles.locationBtnText}>
-                        {facilityLat != null ? 'Update location' : 'Use current location'}
-                      </Text>
-                    </>
-                }
+                <Feather name="map-pin" size={14} color="#fff" />
+                <Text style={styles.locationBtnText}>
+                  {facilityLat != null ? 'Update pin' : 'Pin on map'}
+                </Text>
               </TouchableOpacity>
-              <Text style={styles.locationHint}>Be at your facility when you tap this.</Text>
+              <MapPinPicker
+                visible={showMapPicker}
+                initialLat={facilityLat}
+                initialLng={facilityLng}
+                onConfirm={confirmFacilityLocation}
+                onCancel={() => setShowMapPicker(false)}
+              />
             </View>
 
             {/* Availability / slot booking */}
@@ -1134,6 +1191,14 @@ const styles = StyleSheet.create({
   uploadHint:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   uploadEditBadge:  { position: 'absolute', bottom: 8, right: 8, width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   imageErrorText:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger, marginTop: 8 },
+  photosHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
+  photoCount:       { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  photoScroll:      { marginTop: 10 },
+  photoThumb:       { width: 90, height: 68, borderRadius: 10, overflow: 'hidden', position: 'relative' },
+  photoThumbImg:    { width: '100%', height: '100%' },
+  photoRemoveBtn:   { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
+  photoAddThumb:    { width: 90, height: 68, borderRadius: 10, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 3 },
+  photoAddText:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
   specialtyGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   specialtyChip:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
   specialtyChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
