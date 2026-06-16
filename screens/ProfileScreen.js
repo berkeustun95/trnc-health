@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Linking,
+  ScrollView, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, Linking,
   Modal, LayoutAnimation, UIManager,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -13,6 +13,35 @@ import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import LegalScreen from './LegalScreen'
 import { PRESET_AVATARS, getPreset } from '../constants/avatars'
+
+const COUNTRY_CODES = [
+  { code: '+90',  label: 'Turkey' },
+  { code: '+357', label: 'Cyprus' },
+  { code: '+44',  label: 'United Kingdom' },
+  { code: '+1',   label: 'USA / Canada' },
+  { code: '+49',  label: 'Germany' },
+  { code: '+33',  label: 'France' },
+  { code: '+31',  label: 'Netherlands' },
+  { code: '+46',  label: 'Sweden' },
+  { code: '+39',  label: 'Italy' },
+  { code: '+34',  label: 'Spain' },
+  { code: '+30',  label: 'Greece' },
+  { code: '+7',   label: 'Russia' },
+  { code: '+98',  label: 'Iran' },
+  { code: '+966', label: 'Saudi Arabia' },
+  { code: '+971', label: 'UAE' },
+  { code: '+962', label: 'Jordan' },
+  { code: '+970', label: 'Palestine' },
+  { code: '+964', label: 'Iraq' },
+  { code: '+963', label: 'Syria' },
+  { code: '+961', label: 'Lebanon' },
+  { code: '+20',  label: 'Egypt' },
+  { code: '+91',  label: 'India' },
+  { code: '+86',  label: 'China' },
+  { code: '+82',  label: 'South Korea' },
+  { code: '+81',  label: 'Japan' },
+  { code: '+61',  label: 'Australia' },
+]
 
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -231,6 +260,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [deleting, setDeleting]                 = useState(false)
   const [deleteError, setDeleteError]           = useState(null)
   const [bookingsOpen, setBookingsOpen]         = useState(false)
+  const [selectedCC, setSelectedCC]             = useState('+90')
+  const [showCCPicker, setShowCCPicker]         = useState(false)
   const [personalOpen, setPersonalOpen]         = useState(false)
 
   function toggleSection(setter) {
@@ -250,9 +281,12 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         if (data) {
           setProfile(data)
           setAvatarUrl(data.avatar_url ?? null)
+          const stored = data.phone ?? ''
+          const matched = COUNTRY_CODES.find(c => stored.startsWith(c.code))
+          if (matched) setSelectedCC(matched.code)
           setForm({
             full_name: data.full_name ?? '',
-            phone: data.phone ?? '',
+            phone: matched ? stored.slice(matched.code.length).trim() : stored,
             nationality: data.nationality ?? '',
             preferred_language: data.preferred_language ?? 'English',
           })
@@ -370,7 +404,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       .from('profiles')
       .update({
         full_name: form.full_name.trim() || null,
-        phone: form.phone.trim() || null,
+        phone: form.phone.trim() ? (selectedCC + form.phone.trim()) : null,
         nationality: form.nationality.trim() || null,
         preferred_language: form.preferred_language,
       })
@@ -617,14 +651,20 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
               <View style={s.fieldGroup}>
                 <Text style={s.fieldLabel}>{t('phone', lang)}</Text>
-                <TextInput
-                  style={s.input}
-                  value={form.phone}
-                  onChangeText={set('phone')}
-                  placeholder="+90 555 000 00 00"
-                  placeholderTextColor={colors.border}
-                  keyboardType="phone-pad"
-                />
+                <View style={s.phoneRow}>
+                  <TouchableOpacity style={s.ccBtn} onPress={() => setShowCCPicker(true)}>
+                    <Text style={s.ccBtnText}>{selectedCC}</Text>
+                    <Feather name="chevron-down" size={13} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TextInput
+                    style={s.phoneInput}
+                    value={form.phone}
+                    onChangeText={set('phone')}
+                    placeholder="555 000 00 00"
+                    placeholderTextColor={colors.border}
+                    keyboardType="phone-pad"
+                  />
+                </View>
               </View>
 
               <View style={s.fieldGroup}>
@@ -679,6 +719,34 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 <TouchableOpacity style={s.deleteModalCancelBtn} onPress={() => setDeleteConfirmVisible(false)} disabled={deleting}>
                   <Text style={s.deleteModalCancelText}>{t('cancel', lang)}</Text>
                 </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal visible={showCCPicker} animationType="slide" transparent onRequestClose={() => setShowCCPicker(false)}>
+            <View style={s.ccModalBackdrop}>
+              <View style={s.ccModalCard}>
+                <View style={s.ccModalHeader}>
+                  <Text style={s.ccModalTitle}>Country Code</Text>
+                  <TouchableOpacity onPress={() => setShowCCPicker(false)}>
+                    <Feather name="x" size={20} color={colors.textPrimary} />
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={COUNTRY_CODES}
+                  keyExtractor={item => item.code}
+                  showsVerticalScrollIndicator={false}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[s.ccItem, selectedCC === item.code && s.ccItemActive]}
+                      onPress={() => { setSelectedCC(item.code); setShowCCPicker(false) }}
+                    >
+                      <Text style={[s.ccItemCode, selectedCC === item.code && s.ccItemCodeActive]}>{item.code}</Text>
+                      <Text style={[s.ccItemLabel, selectedCC === item.code && s.ccItemLabelActive]}>{item.label}</Text>
+                      {selectedCC === item.code && <Feather name="check" size={15} color={colors.primary} />}
+                    </TouchableOpacity>
+                  )}
+                />
               </View>
             </View>
           </Modal>
@@ -763,6 +831,22 @@ const s = StyleSheet.create({
   deleteModalConfirmText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
   deleteModalCancelBtn:   { alignItems: 'center', padding: 12 },
   deleteModalCancelText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+
+  // Phone + country code
+  phoneRow:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface, overflow: 'hidden' },
+  ccBtn:            { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 14, borderRightWidth: 1.5, borderRightColor: colors.border },
+  ccBtnText:        { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  phoneInput:       { flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  ccModalBackdrop:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  ccModalCard:      { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: '70%' },
+  ccModalHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  ccModalTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  ccItem:           { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  ccItemActive:     { backgroundColor: colors.primaryLight, marginHorizontal: -4, paddingHorizontal: 4, borderRadius: 8 },
+  ccItemCode:       { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, width: 52 },
+  ccItemCodeActive: { color: colors.primary },
+  ccItemLabel:      { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  ccItemLabelActive:{ color: colors.textPrimary },
 
   // Avatar picker modal
   modalBackdrop:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },

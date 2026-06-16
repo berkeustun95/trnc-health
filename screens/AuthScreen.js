@@ -11,6 +11,7 @@ export default function AuthScreen({ lang = 'English' }) {
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState('customer')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -202,14 +203,19 @@ export default function AuthScreen({ lang = 'English' }) {
                 </TouchableOpacity>
               )}
             </View>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              placeholderTextColor={colors.textSecondary}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
+            <View style={styles.passwordWrap}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="••••••••"
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={styles.eyeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {mode === 'signup' && (
@@ -263,6 +269,9 @@ const styles = StyleSheet.create({
   passwordLabelRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
   forgotLink:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
   input:             { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary },
+  passwordWrap:      { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface },
+  passwordInput:     { flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  eyeBtn:            { paddingHorizontal: 14 },
   roleRow:           { flexDirection: 'row', gap: 10 },
   roleBtn:           { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, alignItems: 'center', backgroundColor: colors.surface },
   roleBtnActive:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },

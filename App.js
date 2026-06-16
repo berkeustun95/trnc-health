@@ -223,6 +223,7 @@ export default function App() {
   const [quizHistoryLoading, setQuizHistoryLoading] = useState(false)
   const [showEmergencyModal, setShowEmergencyModal] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
+  const [showTutorial, setShowTutorial] = useState(false)
   const menuAnim = useRef(new Animated.Value(260)).current
 
   function openMenu() {
@@ -338,6 +339,12 @@ export default function App() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
   }
 
+  async function markNotifRead(item) {
+    if (item.read) return
+    await supabase.from('notifications').update({ read: true }).eq('id', item.id)
+    setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n))
+  }
+
   async function completeOnboarding(selectedLang) {
     await AsyncStorage.multiSet([['@trnc_onboarded', 'true'], ['@trnc_lang', selectedLang]])
     setPendingLang(selectedLang)
@@ -375,6 +382,9 @@ export default function App() {
           loadProviderFacility()
         } else if (!data?.role || data?.role === 'customer') {
           scheduleAppointmentReminders(session.user.id, data?.preferred_language ?? 'en')
+          AsyncStorage.getItem('@trnc_tutorial_shown').then(shown => {
+            if (!shown) { setShowTutorial(true); AsyncStorage.setItem('@trnc_tutorial_shown', 'true') }
+          })
         }
       })
     fetchLatestResult(session.user.id)
@@ -726,6 +736,7 @@ export default function App() {
       lang={lang}
       onBack={() => { setShowNotifs(false); supabase.from('notifications').update({ read: true }).eq('user_id', session.user.id).then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))) }}
       onMarkAllRead={markAllNotifsRead}
+      onMarkRead={markNotifRead}
       onNotifPress={(item) => {
         if (item.title?.toLowerCase().includes('duty')) {
           setShowNotifs(false)
@@ -865,6 +876,8 @@ export default function App() {
         </View>
       </SafeAreaView>
     )
+  } else if (showTutorial) {
+    content = <OnboardingScreen onComplete={() => setShowTutorial(false)} />
   } else if (bookingFacility) {
     content = <BookingScreen facility={bookingFacility} session={session} lang={lang} blockedUntil={profile?.blocked_until} onBack={() => setBookingFacility(null)} />
   } else if (selectedFacility) {
@@ -1037,7 +1050,7 @@ export default function App() {
                     : <Ionicons name="apps-outline" size={14} color={activeType === type ? '#fff' : colors.textSecondary} />
                   }
                   <Text style={[styles.typeChipText, activeType === type && styles.typeChipTextActive]}>
-                    {type ? t(type, lang) : t('all', lang)}
+                    {type ? t({ pharmacy: 'pharmacies', clinic: 'clinics', hospital: 'hospitals', dentist: 'dentists' }[type] || type, lang) : t('all', lang)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -1159,9 +1172,6 @@ export default function App() {
                         <View style={styles.cardTop}>
                           <View style={styles.cardNameRow}>
                             <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
-                            {item.verified && (
-                              <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
-                            )}
                           </View>
                           {item._dist != null && (
                             <Text style={styles.distanceText}>{item._dist.toFixed(1)} km</Text>
@@ -1171,6 +1181,12 @@ export default function App() {
                           <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
                             <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
                           </View>
+                          {item.verified && (
+                            <View style={styles.verifiedBadge}>
+                              <Ionicons name="shield-checkmark" size={10} color="#fff" />
+                              <Text style={styles.verifiedBadgeText}>{t('verified', lang)}</Text>
+                            </View>
+                          )}
                           {item.provider_id ? (
                             isOpen != null && (
                               <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
@@ -1207,6 +1223,22 @@ export default function App() {
                           >
                             <Feather name="phone" size={11} color={colors.accent} />
                             <Text style={styles.callPillText}>{item.phone}</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                        {isDuty ? (
+                          <TouchableOpacity
+                            style={styles.directionsPill}
+                            onPress={() => Linking.openURL(
+                              item.latitude != null
+                                ? `https://maps.google.com/?q=${item.latitude},${item.longitude}`
+                                : item.address
+                                  ? `https://maps.google.com/?q=${encodeURIComponent(item.address)}`
+                                  : `https://maps.google.com/?q=${encodeURIComponent(item.name)}`
+                            )}
+                            activeOpacity={0.7}
+                          >
+                            <Feather name="navigation" size={11} color={colors.primary} />
+                            <Text style={styles.directionsPillText}>{t('getDirections', lang)}</Text>
                           </TouchableOpacity>
                         ) : null}
                       </View>
@@ -1282,7 +1314,6 @@ export default function App() {
                             <View style={styles.cardTop}>
                               <View style={styles.cardNameRow}>
                                 <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
-                                {item.verified && <Ionicons name="checkmark-circle" size={15} color={colors.primary} />}
                               </View>
                               {dist != null && (
                                 <Text style={styles.distanceText}>{dist.toFixed(1)} km</Text>
@@ -1292,6 +1323,12 @@ export default function App() {
                               <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
                                 <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
                               </View>
+                              {item.verified && (
+                                <View style={styles.verifiedBadge}>
+                                  <Ionicons name="shield-checkmark" size={10} color="#fff" />
+                                  <Text style={styles.verifiedBadgeText}>{t('verified', lang)}</Text>
+                                </View>
+                              )}
                               {isOpen != null && (
                                 <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
                                   <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
@@ -1334,6 +1371,7 @@ export default function App() {
           <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />
         )}
         <Animated.View style={[styles.menuDrawer, { transform: [{ translateX: menuAnim }] }]}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <View style={styles.menuUserRow}>
             {(() => {
               const preset = getPreset(profile?.avatar_url)
@@ -1352,8 +1390,8 @@ export default function App() {
               )
             })()}
             <Text style={styles.menuEmail} numberOfLines={1}>{session.user.email}</Text>
-            <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ flexShrink: 0 }}>
+              <Ionicons name="close" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -1413,10 +1451,15 @@ export default function App() {
           </ScrollView>
 
           <View style={styles.menuDivider} />
+          <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowTutorial(true) }}>
+            <Ionicons name="compass-outline" size={20} color={colors.textPrimary} />
+            <Text style={styles.menuItemText}>{t('menuTutorial', lang)}</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.menuItem, { paddingBottom: 24 }]} onPress={() => supabase.auth.signOut()}>
             <Feather name="log-out" size={20} color={colors.danger} />
             <Text style={[styles.menuItemText, { color: colors.danger }]}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
+          </SafeAreaView>
         </Animated.View>
 
         <Modal visible={showLangModal} transparent animationType="fade" onRequestClose={() => setShowLangModal(false)}>
@@ -1541,6 +1584,8 @@ const styles = StyleSheet.create({
   cardActions:      { flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginLeft: 6, alignSelf: 'stretch', paddingVertical: 2 },
   callPill:         { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, backgroundColor: colors.accentLight, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10, alignSelf: 'flex-start' },
   callPillText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.accent },
+  directionsPill:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, backgroundColor: colors.primaryLight, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10, alignSelf: 'flex-start' },
+  directionsPillText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
   typeIcon:         { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 12, flexShrink: 0 },
   typeIconText:     { fontSize: 22 },
   cardContent:      { flex: 1 },
@@ -1563,6 +1608,8 @@ const styles = StyleSheet.create({
   cardUnclaimed:    { opacity: 1 },
   notOnAdaBadge:    { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.border },
   notOnAdaBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  verifiedBadge:    { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: colors.primary },
+  verifiedBadgeText:{ fontSize: 10, fontFamily: 'Inter_700Bold', color: '#fff' },
   bookableBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.primaryLight },
   bookableBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
   backPill:         { flexDirection: 'row', alignItems: 'center', gap: 2 },
@@ -1619,11 +1666,11 @@ const styles = StyleSheet.create({
   emptyBody:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 21 },
   hamburgerBtn:     { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
   menuBackdrop:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 10 },
-  menuDrawer:       { position: 'absolute', top: 0, right: 0, bottom: 0, width: 260, backgroundColor: colors.bg, zIndex: 11, paddingTop: 28, paddingHorizontal: 20, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: -4, height: 0 }, elevation: 20 },
+  menuDrawer:       { position: 'absolute', top: 0, right: 0, bottom: 0, width: 260, backgroundColor: colors.bg, zIndex: 11, paddingHorizontal: 20, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: -4, height: 0 }, elevation: 20 },
   menuUserRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
   menuAvatar:       { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   menuAvatarText:   { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#fff' },
-  menuEmail:        { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  menuEmail:        { flex: 1, minWidth: 0, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   menuDivider:      { height: 1, backgroundColor: colors.border, marginVertical: 8 },
   menuItem:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 13 },
   menuItemText:     { flex: 1, fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },

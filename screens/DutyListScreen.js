@@ -89,16 +89,28 @@ export default function DutyListScreen({ onBack, lang }) {
                     <Text style={s.addressText} numberOfLines={2}>{item.address}</Text>
                   </View>
                 ) : null}
-                {item.phone ? (
+                <View style={s.cardActions}>
+                  {item.phone ? (
+                    <TouchableOpacity
+                      style={s.callBtn}
+                      onPress={() => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`)}
+                      activeOpacity={0.7}
+                    >
+                      <Feather name="phone" size={13} color={colors.accent} />
+                      <Text style={s.callBtnText}>{item.phone}</Text>
+                    </TouchableOpacity>
+                  ) : null}
                   <TouchableOpacity
-                    style={s.callBtn}
-                    onPress={() => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`)}
+                    style={s.directionsBtn}
+                    onPress={() => Linking.openURL(
+                      `https://maps.google.com/?q=${encodeURIComponent(item.name)}`
+                    )}
                     activeOpacity={0.7}
                   >
-                    <Feather name="phone" size={13} color={colors.accent} />
-                    <Text style={s.callBtnText}>{item.phone}</Text>
+                    <Feather name="navigation" size={13} color={colors.primary} />
+                    <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
                   </TouchableOpacity>
-                ) : null}
+                </View>
               </View>
             )}
           />
@@ -135,6 +147,9 @@ const s = StyleSheet.create({
   hoursText:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
   addressRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 10 },
   addressText:  { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17 },
-  callBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.accentLight, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 12, alignSelf: 'flex-start' },
-  callBtnText:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.accent },
+  cardActions:      { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  callBtn:          { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.accentLight, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 12 },
+  callBtnText:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.accent },
+  directionsBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primaryLight, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 12 },
+  directionsBtnText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
 })

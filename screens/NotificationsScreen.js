@@ -13,7 +13,7 @@ function timeAgo(isoString) {
   return `${Math.floor(hrs / 24)}d`
 }
 
-export default function NotificationsScreen({ notifications, loading, lang, onBack, onMarkAllRead, onNotifPress }) {
+export default function NotificationsScreen({ notifications, loading, lang, onBack, onMarkAllRead, onNotifPress, onMarkRead }) {
   const unreadCount = notifications.filter(n => !n.read).length
 
   return (
@@ -42,7 +42,7 @@ export default function NotificationsScreen({ notifications, loading, lang, onBa
           <View style={s.emptyIconWrap}>
             <Ionicons name="notifications-outline" size={32} color={colors.textSecondary} />
           </View>
-          <Text style={s.emptyText}>{t('noNotifications', lang)}</Text>
+          <Text style={s.emptyText}>{t('noNewNotifications', lang)}</Text>
         </View>
       ) : (
         <FlatList
@@ -55,8 +55,8 @@ export default function NotificationsScreen({ notifications, loading, lang, onBa
             return (
               <TouchableOpacity
                 style={[s.card, !item.read && s.cardUnread]}
-                activeOpacity={isDuty ? 0.7 : 1}
-                onPress={() => isDuty && onNotifPress?.(item)}
+                activeOpacity={0.75}
+                onPress={() => { onMarkRead?.(item); if (isDuty) onNotifPress?.(item) }}
               >
                 {!item.read && <View style={s.unreadDot} />}
                 <View style={s.cardBody}>
