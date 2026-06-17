@@ -31,6 +31,7 @@ import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
+import * as Updates from 'expo-updates'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -249,16 +250,16 @@ export default function App() {
   function measureRef(ref) {
     return new Promise(resolve => {
       if (!ref?.current) { resolve(null); return }
-      ref.current.measureInWindow((x, y, w, h) => {
-        resolve(w > 0 && h > 0 ? { x, y, w, h } : null)
+      ref.current.measure((_x, _y, w, h, pageX, pageY) => {
+        resolve(w > 0 && h > 0 ? { x: pageX, y: pageY, w, h } : null)
       })
     })
   }
 
   async function startCoachMarks() {
-    await new Promise(r => setTimeout(r, 800))
+    await new Promise(r => setTimeout(r, 400))
 
-    // Measure main UI elements
+    // Measure main-screen elements while home content is fully visible
     const [menu, search, filters, duty, map] = await Promise.all([
       measureRef(hamburgerRef),
       measureRef(searchRef),
@@ -352,6 +353,14 @@ export default function App() {
       return next
     })
   }
+
+  useEffect(() => {
+    if (!__DEV__) {
+      Updates.checkForUpdateAsync().then(({ isAvailable }) => {
+        if (isAvailable) Updates.fetchUpdateAsync().then(() => Updates.reloadAsync())
+      }).catch(() => {})
+    }
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))

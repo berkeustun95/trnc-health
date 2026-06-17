@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Modal, TouchableOpacity, StyleSheet, Dimensions } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, BackHandler } from 'react-native'
 import { colors } from '../constants/theme'
 
 const { width: SW, height: SH } = Dimensions.get('window')
@@ -11,6 +11,12 @@ export default function TutorialCoachMarks({ steps, visible, onFinish, onNext })
 
   useEffect(() => {
     if (visible) setStep(0)
+  }, [visible])
+
+  useEffect(() => {
+    if (!visible) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true)
+    return () => sub.remove()
   }, [visible])
 
   if (!visible || !steps.length) return null
@@ -38,7 +44,7 @@ export default function TutorialCoachMarks({ steps, visible, onFinish, onNext })
   }
 
   return (
-    <Modal visible transparent animationType="fade">
+    <View style={[StyleSheet.absoluteFill, { elevation: 9999, zIndex: 9999 }]} onStartShouldSetResponder={() => true}>
       {/* Four dark rectangles create the spotlight cutout */}
       <View style={[s.dark, { top: 0, left: 0, right: 0, height: hy }]} />
       <View style={[s.dark, { top: hy + hh, left: 0, right: 0, bottom: 0 }]} />
@@ -74,13 +80,13 @@ export default function TutorialCoachMarks({ steps, visible, onFinish, onNext })
           </View>
         </View>
       </View>
-    </Modal>
+    </View>
   )
 }
 
 const s = StyleSheet.create({
   dark:    { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.72)' },
-  ring:    { position: 'absolute', borderRadius: 14, borderWidth: 2.5, borderColor: colors.primary },
+  ring:    { position: 'absolute', borderRadius: 14, borderWidth: 2.5, borderColor: colors.primary, backgroundColor: 'transparent' },
   tooltip: {
     position: 'absolute',
     backgroundColor: '#fff',

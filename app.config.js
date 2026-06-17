@@ -13,7 +13,7 @@ export default {
     scheme: 'ada',
     updates: {
       url: 'https://u.expo.dev/704d192a-1a80-41f8-ab98-cb3c8f078d7c',
-      checkAutomatically: process.env.EAS_BUILD ? 'ON_LOAD' : 'NEVER',
+      checkAutomatically: 'ON_LOAD',
     },
     runtimeVersion: {
       policy: 'appVersion',

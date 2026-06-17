@@ -22,6 +22,21 @@ We are pinned to Expo SDK 54 to match the Expo Go app on the test phone.
 - `npx expo start -c` — start dev server with cleared cache
 - `npx expo install <pkg>` — add a package at SDK-54-compatible version
 
+## Release & Update Flow
+**JS-only fix** (UI, logic, styles, bug fixes — anything in .js files):
+```bash
+eas update --channel production --message "description"
+```
+Users get it on next launch. No Play Store involved.
+
+**New native build required** only when changing: `app.config.js`, native dependencies, permissions, icons, SDK version.
+```bash
+eas build --platform android --profile production
+# then submit new AAB to Play Store closed testing track
+```
+
+**Never use** `process.env.EAS_BUILD` conditionals in `app.config.js` — it caused `checkAutomatically: 'NEVER'` to bake into a production build, breaking OTA entirely. Always hardcode `'ON_LOAD'`.
+
 ## How I want you to work
 - Make MINIMAL changes. Do not refactor unrelated code.
 - Make the changes according to the prompt then say its done and explain shortly. so dont ask to proceed everytime
