@@ -24,6 +24,11 @@ import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import QuizNavigator from './screens/quiz/QuizNavigator'
 import ResultsScreen from './screens/quiz/ResultsScreen'
+
+const QUIZ_LANG_MAP = {
+  Turkish: 'tr', English: 'en', Arabic: 'ar', Russian: 'ru',
+  Greek: 'el', French: 'fr', Spanish: 'es', German: 'de', Persian: 'fa',
+}
 import DutyListScreen from './screens/DutyListScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import TutorialCoachMarks from './screens/TutorialCoachMarks'
@@ -366,6 +371,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') setShowMenu(false)
       if (event === 'PASSWORD_RECOVERY') setShowPasswordReset(true)
     })
     return () => subscription.unsubscribe()
@@ -375,7 +381,15 @@ export default function App() {
     async function handleDeepLink(url) {
       if (!url?.startsWith('ada://')) return
       try {
-        await supabase.auth.exchangeCodeForSession(url)
+        const params = new URL(url.replace('ada://', 'https://x/')).searchParams
+        const tokenHash = params.get('token_hash')
+        const type      = params.get('type')
+        const code      = params.get('code')
+        if (tokenHash && type) {
+          await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+        } else if (code) {
+          await supabase.auth.exchangeCodeForSession(url)
+        }
       } catch {}
     }
     Linking.getInitialURL().then(url => { if (url) handleDeepLink(url) })
@@ -420,6 +434,11 @@ export default function App() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
   }
 
+  async function clearAllNotifs() {
+    await supabase.from('notifications').delete().eq('user_id', session.user.id)
+    setNotifications([])
+  }
+
   async function markNotifRead(item) {
     if (item.read) return
     await supabase.from('notifications').update({ read: true }).eq('id', item.id)
@@ -453,6 +472,7 @@ export default function App() {
   }
 
   useEffect(() => {
+    setShowMenu(false)
     if (!session) {
       setProfile(null); setLatestResult(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); return
     }
@@ -809,6 +829,7 @@ export default function App() {
       result={historyResult}
       onBack={() => setHistoryResult(null)}
       readOnly
+      langOverride={QUIZ_LANG_MAP[lang] ?? 'en'}
     />
   } else if (showNotifs) {
     content = <NotificationsScreen
@@ -817,6 +838,7 @@ export default function App() {
       lang={lang}
       onBack={() => { setShowNotifs(false); supabase.from('notifications').update({ read: true }).eq('user_id', session.user.id).then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))) }}
       onMarkAllRead={markAllNotifsRead}
+      onClearAll={clearAllNotifs}
       onMarkRead={markNotifRead}
       onNotifPress={(item) => {
         if (item.title?.toLowerCase().includes('duty')) {
@@ -830,7 +852,7 @@ export default function App() {
   } else if (showQuizHistory) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={[styles.header, { paddingBottom: 16 }]}>
+        <View style={[styles.header, { paddingBottom: 16, justifyContent: 'space-between' }]}>
           <TouchableOpacity style={styles.backPill} onPress={() => setShowQuizHistory(false)}>
             <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
             <Text style={styles.backPillText}>{t('back', lang)}</Text>

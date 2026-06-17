@@ -66,18 +66,20 @@ export default function AuthScreen({ lang = 'English' }) {
           <View style={styles.logoArea}>
             <Image source={require('../assets/logonobg.png')} style={styles.logoImg} resizeMode="contain" />
           </View>
-          <View style={styles.resetSuccessWrap}>
-            <View style={styles.resetSuccessIcon}>
-              <Feather name="mail" size={28} color={colors.primary} />
+          <View style={styles.formCard}>
+            <View style={styles.resetSuccessWrap}>
+              <View style={styles.resetSuccessIcon}>
+                <Feather name="mail" size={28} color={colors.primary} />
+              </View>
+              <Text style={styles.resetSuccessTitle}>{t('accountCreated', lang)}</Text>
+              <Text style={styles.resetSuccessSub}>
+                {t('confirmEmailSub', lang)}{'\n'}<Text style={styles.resetEmail}>{email.trim()}</Text>
+              </Text>
+              <Text style={[styles.resetSuccessSub, { marginBottom: 32 }]}>{t('confirmEmailNote', lang)}</Text>
+              <TouchableOpacity style={styles.submit} onPress={() => { setSignupDone(false); setMode('login'); setPassword('') }}>
+                <Text style={styles.submitText}>{t('backToSignIn', lang)}</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.resetSuccessTitle}>{t('accountCreated', lang)}</Text>
-            <Text style={styles.resetSuccessSub}>
-              {t('confirmEmailSub', lang)}{'\n'}<Text style={styles.resetEmail}>{email.trim()}</Text>
-            </Text>
-            <Text style={[styles.resetSuccessSub, { marginBottom: 32 }]}>{t('confirmEmailNote', lang)}</Text>
-            <TouchableOpacity style={styles.submit} onPress={() => { setSignupDone(false); setMode('login'); setPassword('') }}>
-              <Text style={styles.submitText}>{t('backToSignIn', lang)}</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </SafeAreaView>
@@ -273,7 +275,7 @@ const styles = StyleSheet.create({
   passwordInput:     { flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   eyeBtn:            { paddingHorizontal: 14 },
   roleRow:           { flexDirection: 'row', gap: 10 },
-  roleBtn:           { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, alignItems: 'center', backgroundColor: colors.surface },
+  roleBtn:           { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   roleBtnActive:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   roleBtnText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   roleBtnTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },

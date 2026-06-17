@@ -40,7 +40,7 @@ export default function QuizNavigator({ onClose, profileLang }: { onClose?: () =
 
   switch (quizPhase) {
     case 'landing': return <LandingScreen onClose={onClose} />
-    case 'quiz':    return <QuizScreen />
+    case 'quiz':    return <QuizScreen onClose={onClose} />
     case 'loading': return <LoadingScreen />
     default:        return null
   }

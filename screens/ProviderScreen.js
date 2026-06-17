@@ -1063,7 +1063,14 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                   <Text style={styles.emptySub}>{t('questionsFromCustomers', lang)}</Text>
                 </View>
               ) : (
-                questions.map(q => (
+                <>
+                  {questions.every(q => q.answers?.length > 0) && (
+                    <View style={styles.noNewQBanner}>
+                      <Ionicons name="checkmark-circle-outline" size={18} color={colors.textSecondary} />
+                      <Text style={styles.noNewQText}>{t('noNewQuestions', lang)}</Text>
+                    </View>
+                  )}
+                  {questions.map(q => (
                   <View key={q.id} style={styles.card}>
                     <Text style={styles.qBody}>{q.body}</Text>
                     {q.answers && q.answers.length > 0 ? (
@@ -1094,7 +1101,8 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                       </View>
                     )}
                   </View>
-                ))
+                ))}
+                </>
               )}
             </ScrollView>
           )
@@ -1213,6 +1221,8 @@ const styles = StyleSheet.create({
   availTimeSep:     { fontSize: 14, color: colors.textSecondary, fontFamily: 'Inter_400Regular' },
   availClosedLabel: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic' },
   empty:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
+  noNewQBanner:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.cardBg, borderRadius: 12, padding: 12, marginBottom: 12 },
+  noNewQText:     { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   emptyIconWrap:  { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
   emptyTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
   emptySub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 12 },

@@ -37,6 +37,12 @@ eas build --platform android --profile production
 
 **Never use** `process.env.EAS_BUILD` conditionals in `app.config.js` — it caused `checkAutomatically: 'NEVER'` to bake into a production build, breaking OTA entirely. Always hardcode `'ON_LOAD'`.
 
+**OTA only reaches the production build.** A preview APK (`eas build --profile preview`) does not have `channel: "production"` baked in and will never receive OTA updates. Always test OTA on the Play Store install, not a sideloaded APK.
+
+**EAS environment variables:** Use `eas env:create` (not `eas secret:create` — deprecated). `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is set for the production environment. Changes to env vars require a new native build to take effect.
+
+**facility_change_requests.proposed_changes:** The `languages` field is stored as a comma-separated string (e.g. `"English, Turkish"`). When approving and writing to `facilities.languages` (which is `text[]`), split it first: `changes.languages.split(',').map(l => l.trim())`.
+
 ## How I want you to work
 - Make MINIMAL changes. Do not refactor unrelated code.
 - Make the changes according to the prompt then say its done and explain shortly. so dont ask to proceed everytime
@@ -56,6 +62,10 @@ eas build --platform android --profile production
 - Functional React components with hooks.
 - Keep components small; one screen per file.
 - Facility types are limited to: pharmacy, clinic, hospital, dentist.
+
+## Android Gotchas
+- Views with `borderRadius` + `borderWidth` on Android may render an opaque background unless `backgroundColor: 'transparent'` is set explicitly.
+- Never cache element positions in `onLayout` for later use — layout can shift (e.g. async data loading) and the cached value goes stale. Always measure with `measureRef()` at the moment you need the position.
 
 ## Don't
 - Don't add analytics, tracking, or third-party SDKs without asking.

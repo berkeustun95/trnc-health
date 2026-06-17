@@ -13,7 +13,7 @@ function timeAgo(isoString) {
   return `${Math.floor(hrs / 24)}d`
 }
 
-export default function NotificationsScreen({ notifications, loading, lang, onBack, onMarkAllRead, onNotifPress, onMarkRead }) {
+export default function NotificationsScreen({ notifications, loading, lang, onBack, onMarkAllRead, onClearAll, onNotifPress, onMarkRead }) {
   const unreadCount = notifications.filter(n => !n.read).length
 
   return (
@@ -24,10 +24,16 @@ export default function NotificationsScreen({ notifications, loading, lang, onBa
           <Text style={s.backText}>{t('back', lang)}</Text>
         </TouchableOpacity>
         <Text style={s.title}>{t('notifications', lang)}</Text>
-        {unreadCount > 0 ? (
-          <TouchableOpacity onPress={onMarkAllRead}>
-            <Text style={s.markRead}>{t('markAllRead', lang)}</Text>
-          </TouchableOpacity>
+        {notifications.length > 0 ? (
+          unreadCount > 0 ? (
+            <TouchableOpacity onPress={onMarkAllRead} style={s.actionBtn}>
+              <Text style={s.markRead}>{t('markAllRead', lang)}</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={onClearAll} style={s.actionBtn}>
+              <Text style={s.clearAll}>{t('clearAll', lang)}</Text>
+            </TouchableOpacity>
+          )
         ) : (
           <View style={{ width: 80 }} />
         )}
@@ -84,7 +90,9 @@ const s = StyleSheet.create({
   title:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   backBtn:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backText:    { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  markRead:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, textAlign: 'right', width: 80 },
+  actionBtn:   { width: 80, alignItems: 'flex-end' },
+  markRead:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, textAlign: 'right' },
+  clearAll:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger, textAlign: 'right' },
   empty:       { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 80, gap: 12 },
   emptyIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', ...shadow },
   emptyText:   { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary },

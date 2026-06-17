@@ -1178,19 +1178,26 @@ function ChangesTab() {
 
   async function approve(req) {
     setActionLoading(req.id)
+    const changes = { ...req.proposed_changes }
+    if (typeof changes.languages === 'string') {
+      changes.languages = changes.languages.split(',').map(l => l.trim()).filter(Boolean)
+    }
     const { error } = await supabase
       .from('facilities')
-      .update(req.proposed_changes)
+      .update(changes)
       .eq('id', req.facility_id)
-    if (!error) {
-      await supabase.from('facility_change_requests').update({ status: 'approved' }).eq('id', req.id)
-      const { data: p } = await supabase.from('profiles').select('push_token').eq('id', req.provider_id).maybeSingle()
-      const title = 'Changes approved'
-      const body = `Your updates to ${req.facilities?.name ?? 'your facility'} are now live.`
-      if (p?.push_token) await sendPushNotification(p.push_token, title, body)
-      await recordNotification(req.provider_id, title, body)
-      load()
+    if (error) {
+      setActionLoading(null)
+      Alert.alert('Approval failed', error.message)
+      return
     }
+    await supabase.from('facility_change_requests').update({ status: 'approved' }).eq('id', req.id)
+    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', req.provider_id).maybeSingle()
+    const title = 'Changes approved'
+    const body = `Your updates to ${req.facilities?.name ?? 'your facility'} are now live.`
+    if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+    await recordNotification(req.provider_id, title, body)
+    load()
     setActionLoading(null)
   }
 

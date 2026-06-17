@@ -3,8 +3,13 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuizStore } from '@/lib/quiz/store'
 import { useReviewStore } from './reviewStore'
 import { getT } from '@/data/quiz/translations'
+import type { SupplementTranslation } from '@/data/quiz/translations'
 import type { RecommendedSupplement, TimingSlot, QuizResult } from '@/lib/quiz/engine'
 import type { Interaction } from '@/data/quiz/interactions'
+
+const EMOJI_SLOT_KEY: Record<string, 'morning' | 'midMorning' | 'lunch' | 'evening' | 'anytime'> = {
+  '🌅': 'morning', '☀️': 'midMorning', '🍽️': 'lunch', '🌙': 'evening', '⏰': 'anytime',
+}
 import { colors, shadow } from '../../constants/theme'
 
 const PRIORITY_COLORS = {
@@ -19,7 +24,7 @@ const SEVERITY_COLORS = {
   low:      { bg: colors.primaryLight, text: colors.primary },
 }
 
-function SupplementCard({ item, ui }: { item: RecommendedSupplement; ui: ReturnType<typeof getT>['ui']['results'] }) {
+function SupplementCard({ item, ui, tSupp }: { item: RecommendedSupplement; ui: ReturnType<typeof getT>['ui']['results']; tSupp?: SupplementTranslation }) {
   const pc = PRIORITY_COLORS[item.priority]
   const s = item.supplement
 
@@ -38,11 +43,11 @@ function SupplementCard({ item, ui }: { item: RecommendedSupplement; ui: ReturnT
       <View style={card.details}>
         <View style={card.detail}>
           <Text style={card.detailLabel}>{ui.dose}</Text>
-          <Text style={card.detailValue}>{item.doseAdjustment ?? s.standardDose}</Text>
+          <Text style={card.detailValue}>{item.doseAdjustment ?? tSupp?.standardDose ?? s.standardDose}</Text>
         </View>
         <View style={card.detail}>
           <Text style={card.detailLabel}>{ui.timing}</Text>
-          <Text style={card.detailValue}>{s.timing}</Text>
+          <Text style={card.detailValue}>{tSupp?.timing ?? s.timing}</Text>
         </View>
         <View style={card.detail}>
           <Text style={card.detailLabel}>{ui.withFood}</Text>
@@ -52,23 +57,25 @@ function SupplementCard({ item, ui }: { item: RecommendedSupplement; ui: ReturnT
         </View>
         <View style={card.detail}>
           <Text style={card.detailLabel}>{ui.bestForm}</Text>
-          <Text style={card.detailValue}>{s.bestForm}</Text>
+          <Text style={card.detailValue}>{tSupp?.bestForm ?? s.bestForm}</Text>
         </View>
       </View>
       <View style={card.tip}>
         <Text style={card.tipLabel}>{ui.pharmacistTip}</Text>
-        <Text style={card.tipText}>{s.pharmacistNote}</Text>
+        <Text style={card.tipText}>{tSupp?.pharmacistNote ?? s.pharmacistNote}</Text>
       </View>
     </View>
   )
 }
 
-function TimingCard({ slot }: { slot: TimingSlot }) {
+function TimingCard({ slot, timingSlots }: { slot: TimingSlot; timingSlots?: ReturnType<typeof getT>['engine']['timingSlots'] }) {
+  const slotKey = EMOJI_SLOT_KEY[slot.emoji]
+  const displayTime = (slotKey && timingSlots?.[slotKey]) ? timingSlots[slotKey] : slot.time
   return (
     <View style={timing.root}>
       <View style={timing.header}>
         <Text style={timing.emoji}>{slot.emoji}</Text>
-        <Text style={timing.time}>{slot.time}</Text>
+        <Text style={timing.time}>{displayTime}</Text>
       </View>
       {slot.supplements.map((item, i) => (
         <View key={i} style={timing.row}>
@@ -98,13 +105,14 @@ function InteractionCard({ item }: { item: Interaction }) {
   )
 }
 
-export default function ResultsScreen({ onClose, result: resultProp, onBack, readOnly, reviewedAt }: { onClose?: () => void; result?: QuizResult | null; onBack?: () => void; readOnly?: boolean; reviewedAt?: string | null }) {
-  const storeResult = useQuizStore(s => s.result)
-  const language    = useQuizStore(s => s.language)
-  const resetQuiz   = useQuizStore(s => s.resetQuiz)
-  const resetReview = useReviewStore(s => s.reset)
-  const ui          = getT(language).ui.results
-  const result      = resultProp ?? storeResult
+export default function ResultsScreen({ onClose, result: resultProp, onBack, readOnly, reviewedAt, langOverride }: { onClose?: () => void; result?: QuizResult | null; onBack?: () => void; readOnly?: boolean; reviewedAt?: string | null; langOverride?: import('@/data/quiz/translations').Lang }) {
+  const storeResult   = useQuizStore(s => s.result)
+  const storeLanguage = useQuizStore(s => s.language)
+  const language      = langOverride ?? storeLanguage
+  const resetQuiz     = useQuizStore(s => s.resetQuiz)
+  const resetReview   = useReviewStore(s => s.reset)
+  const ui            = getT(language).ui.results
+  const result        = resultProp ?? storeResult
 
   if (!result) return null
 
@@ -134,7 +142,7 @@ export default function ResultsScreen({ onClose, result: resultProp, onBack, rea
           const group = result.stack.filter(item => item.priority === priority)
           if (!group.length) return null
           return group.map(item => (
-            <SupplementCard key={item.supplement.id} item={item} ui={ui} />
+            <SupplementCard key={item.supplement.id} item={item} ui={ui} tSupp={getT(language).supplements[item.supplement.id]} />
           ))
         })}
 
@@ -145,7 +153,7 @@ export default function ResultsScreen({ onClose, result: resultProp, onBack, rea
               <Text style={s.scheduleNoteText}>{ui.scheduleNote}</Text>
             </View>
             {result.timingSchedule.map((slot, i) => (
-              <TimingCard key={i} slot={slot} />
+              <TimingCard key={i} slot={slot} timingSlots={getT(language).engine.timingSlots} />
             ))}
           </>
         )}

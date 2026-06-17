@@ -239,6 +239,8 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
 export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange }) {
   const [profile, setProfile]               = useState(null)
   const [form, setForm]                     = useState({ full_name: '', phone: '', nationality: '', preferred_language: 'English' })
+  const [savedForm, setSavedForm]           = useState(null)
+  const [savedCC, setSavedCC]               = useState('+90')
   const [loading, setLoading]               = useState(true)
   const [loadError, setLoadError]           = useState(false)
   const [saving, setSaving]                 = useState(false)
@@ -284,12 +286,16 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           const stored = data.phone ?? ''
           const matched = COUNTRY_CODES.find(c => stored.startsWith(c.code))
           if (matched) setSelectedCC(matched.code)
-          setForm({
+          const initialCC = matched?.code ?? '+90'
+          setSavedCC(initialCC)
+          const initialForm = {
             full_name: data.full_name ?? '',
             phone: matched ? stored.slice(matched.code.length).trim() : stored,
             nationality: data.nationality ?? '',
             preferred_language: data.preferred_language ?? 'English',
-          })
+          }
+          setForm(initialForm)
+          setSavedForm(initialForm)
         }
       } finally {
         setLoading(false)
@@ -412,6 +418,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     if (err) setError(err.message)
     else {
       setSaved(true)
+      setSavedForm({ ...form })
+      setSavedCC(selectedCC)
       setTimeout(() => setSaved(false), 2000)
     }
     setSaving(false)
@@ -430,6 +438,14 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   }
 
   const set = key => val => setForm(f => ({ ...f, [key]: val }))
+
+  const hasChanges = savedForm != null && (
+    form.full_name !== savedForm.full_name ||
+    form.phone !== savedForm.phone ||
+    form.nationality !== savedForm.nationality ||
+    form.preferred_language !== savedForm.preferred_language ||
+    selectedCC !== savedCC
+  )
 
   const initials = form.full_name.trim()
     ? form.full_name.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -498,7 +514,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               <Text style={s.backText}>{t('back', lang)}</Text>
             </TouchableOpacity>
             <Text style={s.title}>{t('profile', lang)}</Text>
-            <TouchableOpacity onPress={save} disabled={saving}>
+            <TouchableOpacity
+              onPress={save}
+              disabled={saving || !hasChanges}
+              style={(!hasChanges && !saving) && { opacity: 0.35 }}
+            >
               <Text style={[s.saveText, saving && { opacity: 0.4 }]}>
                 {saved ? t('saved', lang) : saving ? t('saving', lang) : t('save', lang)}
               </Text>

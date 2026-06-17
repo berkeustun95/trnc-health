@@ -1,11 +1,12 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Feather } from '@expo/vector-icons'
 import { useQuizStore } from '@/lib/quiz/store'
 import { getT } from '@/data/quiz/translations'
 import { colors, shadow } from '../../constants/theme'
 
-export default function QuizScreen() {
-  const { answers, language, nextStep, prevStep, setAnswer, toggleMultiAnswer, getProgress, canProceed, getCurrentQuestion } = useQuizStore()
+export default function QuizScreen({ onClose }: { onClose?: () => void }) {
+  const { answers, language, nextStep, prevStep, setAnswer, toggleMultiAnswer, getProgress, canProceed, getCurrentQuestion, resetQuiz } = useQuizStore()
   const question = getCurrentQuestion()
   const progress = getProgress()
   const ui = getT(language).ui.quiz
@@ -43,11 +44,29 @@ export default function QuizScreen() {
     return acc
   }, [])
 
+  function confirmClose() {
+    Alert.alert(
+      'Quit quiz?',
+      'Your progress will be lost.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Quit', style: 'destructive', onPress: () => { resetQuiz(); onClose?.() } },
+      ]
+    )
+  }
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.container}>
-        <View style={s.progressBar}>
-          <View style={[s.progressFill, { width: `${progress}%` }]} />
+        <View style={s.topRow}>
+          <View style={s.progressBar}>
+            <View style={[s.progressFill, { width: `${progress}%` }]} />
+          </View>
+          {onClose && (
+            <TouchableOpacity onPress={confirmClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={s.closeBtn}>
+              <Feather name="x" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={s.sectionRow}>
@@ -119,7 +138,9 @@ export default function QuizScreen() {
 const s = StyleSheet.create({
   safe:             { flex: 1, backgroundColor: colors.bg },
   container:        { flex: 1, paddingHorizontal: 16 },
-  progressBar:      { height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 12, marginBottom: 16, overflow: 'hidden' },
+  topRow:           { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, marginBottom: 16 },
+  closeBtn:         { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  progressBar:      { flex: 1, height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
   progressFill:     { height: '100%', backgroundColor: colors.primary, borderRadius: 2 },
   sectionRow:       { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   sectionEmoji:     { fontSize: 16 },
