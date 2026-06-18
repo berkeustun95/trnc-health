@@ -81,6 +81,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
 
   const [tab, setTab] = useState(isPharmacy ? 'qa' : 'requests')
   const [appointments, setAppointments] = useState([])
+  const [upcomingConfirmed, setUpcomingConfirmed] = useState([])
   const [pastConfirmed, setPastConfirmed] = useState([])
   const [noShowLoading, setNoShowLoading] = useState(null)
   const [completeLoading, setCompleteLoading] = useState(null)
@@ -131,21 +132,58 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
       if (!isPharmacy) {
         const { data, error } = await supabase
           .from('appointments')
-          .select('id, requested_time, customer_id, profiles(full_name)')
+          .select('id, requested_time, customer_id')
           .eq('facility_id', facility.id)
           .eq('status', 'pending')
           .order('requested_time')
-        if (!error) setAppointments(data)
+        if (!error && data) {
+          const customerIds = [...new Set(data.map(a => a.customer_id).filter(Boolean))]
+          let nameMap = {}
+          if (customerIds.length) {
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, full_name')
+              .in('id', customerIds)
+            if (profiles) profiles.forEach(p => { nameMap[p.id] = p.full_name })
+          }
+          setAppointments(data.map(a => ({ ...a, customer_name: nameMap[a.customer_id] ?? null })))
+        }
 
         const { data: past } = await supabase
           .from('appointments')
-          .select('id, requested_time, customer_id, profiles(full_name)')
+          .select('id, requested_time, customer_id')
           .eq('facility_id', facility.id)
           .eq('status', 'confirmed')
           .lt('requested_time', new Date().toISOString())
           .order('requested_time', { ascending: false })
           .limit(20)
-        if (past) setPastConfirmed(past)
+        if (past) {
+          const pastIds = [...new Set(past.map(a => a.customer_id).filter(Boolean))]
+          let pastNameMap = {}
+          if (pastIds.length) {
+            const { data: pastProfiles } = await supabase.from('profiles').select('id, full_name').in('id', pastIds)
+            if (pastProfiles) pastProfiles.forEach(p => { pastNameMap[p.id] = p.full_name })
+          }
+          setPastConfirmed(past.map(a => ({ ...a, customer_name: pastNameMap[a.customer_id] ?? null })))
+        }
+
+        const { data: upcoming } = await supabase
+          .from('appointments')
+          .select('id, requested_time, customer_id')
+          .eq('facility_id', facility.id)
+          .eq('status', 'confirmed')
+          .gte('requested_time', new Date().toISOString())
+          .order('requested_time', { ascending: true })
+          .limit(20)
+        if (upcoming) {
+          const upIds = [...new Set(upcoming.map(a => a.customer_id).filter(Boolean))]
+          let upNameMap = {}
+          if (upIds.length) {
+            const { data: upProfiles } = await supabase.from('profiles').select('id, full_name').in('id', upIds)
+            if (upProfiles) upProfiles.forEach(p => { upNameMap[p.id] = p.full_name })
+          }
+          setUpcomingConfirmed(upcoming.map(a => ({ ...a, customer_name: upNameMap[a.customer_id] ?? null })))
+        }
       }
       setLoading(false)
     }
@@ -241,7 +279,14 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         if (profile.push_token) await sendPushNotification(profile.push_token, title, body, { screen: 'profile' })
         await recordNotification(customerId, title, body)
       }
+      const confirmed = status === 'confirmed'
+      const movedAppt = appointments.find(a => a.id === id)
       setAppointments(prev => prev.filter(a => a.id !== id))
+      if (confirmed && movedAppt) {
+        const dt = new Date(movedAppt.requested_time)
+        if (dt >= new Date()) setUpcomingConfirmed(prev => [...prev, { ...movedAppt }].sort((a, b) => new Date(a.requested_time) - new Date(b.requested_time)))
+        else setPastConfirmed(prev => [{ ...movedAppt }, ...prev])
+      }
     }
   }
 
@@ -625,6 +670,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 placeholder="Street, district, city"
                 placeholderTextColor={colors.textSecondary}
                 multiline
+                maxLength={200}
               />
               <Text style={[styles.fieldLabel, { marginTop: 16 }]}>{t('labelHours', lang)}</Text>
               <HoursPicker value={editHours} onChange={setEditHours} />
@@ -648,15 +694,19 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 </>
               )}
 
-              <Text style={[styles.fieldLabel, { marginTop: 20 }]}>About / Description</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 20, marginBottom: 0 }}>
+                <Text style={styles.fieldLabel}>About / Description</Text>
+                <Text style={{ fontSize: 11, fontFamily: 'Inter_400Regular', color: editDescription.length > 450 ? colors.danger : colors.textSecondary }}>{editDescription.length}/500</Text>
+              </View>
               <TextInput
                 style={[styles.fieldInput, { minHeight: 80 }]}
                 value={editDescription}
-                onChangeText={setEditDescription}
+                onChangeText={v => setEditDescription(v.slice(0, 500))}
                 placeholder="Brief description visible to customers…"
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 textAlignVertical="top"
+                maxLength={500}
               />
 
               <Text style={[styles.fieldLabel, { marginTop: 20 }]}>{t('languagesSpoken', lang)}</Text>
@@ -893,10 +943,11 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 <>
                   <Text style={styles.sectionTitle}>{t('statAppointments', lang)}</Text>
                   <View style={styles.statRow}>
-                    <View style={[styles.statTile, { backgroundColor: colors.accentLight }]}>
+                    <TouchableOpacity style={[styles.statTile, { backgroundColor: colors.accentLight }]} onPress={() => setTab('requests')} activeOpacity={0.7}>
                       <Text style={[styles.statNum, { color: colors.accent }]}>{stats.appt.pending}</Text>
                       <Text style={styles.statLabel}>{t('statusPending', lang)}</Text>
-                    </View>
+                      {stats.appt.pending > 0 && <Text style={{ fontSize: 9, fontFamily: 'Inter_700Bold', color: colors.accent, marginTop: 2 }}>TAP TO VIEW</Text>}
+                    </TouchableOpacity>
                     <View style={[styles.statTile, { backgroundColor: colors.successLight }]}>
                       <Text style={[styles.statNum, { color: colors.success }]}>{stats.appt.confirmed}</Text>
                       <Text style={styles.statLabel}>{t('statusConfirmed', lang)}</Text>
@@ -947,23 +998,22 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
             </ScrollView>
           )
         ) : tab === 'requests' ? (
-          appointments.length === 0 ? (
+          appointments.length === 0 && upcomingConfirmed.length === 0 && pastConfirmed.length === 0 ? (
             <View style={styles.empty}>
               <View style={styles.emptyIconWrap}><Feather name="check-circle" size={28} color={colors.success} /></View>
               <Text style={styles.emptyTitle}>{t('allClear', lang)}</Text>
               <Text style={styles.emptySub}>{t('noPendingRequests', lang)}</Text>
-              {pastConfirmed.length === 0 && (
-                <View style={styles.emptyTipBox}>
-                  <Ionicons name="information-circle-outline" size={16} color={colors.primary} style={{ marginTop: 1 }} />
-                  <Text style={styles.emptyTipText}>{t('completeProfileTip', lang)}</Text>
-                  <TouchableOpacity onPress={() => setTab('profile')} style={styles.emptyTipBtn}>
-                    <Text style={styles.emptyTipBtnText}>{t('goToProfile', lang)}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+              <View style={styles.emptyTipBox}>
+                <Ionicons name="information-circle-outline" size={16} color={colors.primary} style={{ marginTop: 1 }} />
+                <Text style={styles.emptyTipText}>{t('completeProfileTip', lang)}</Text>
+                <TouchableOpacity onPress={() => setTab('profile')} style={styles.emptyTipBtn}>
+                  <Text style={styles.emptyTipBtnText}>{t('goToProfile', lang)}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
+              {appointments.length > 0 && <Text style={styles.noShowSectionLabel}>PENDING REQUESTS</Text>}
               {appointments.map(item => {
                 const sc = STATUS_COLORS.pending
                 const dt = new Date(item.requested_time)
@@ -979,10 +1029,10 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                         <Text style={[styles.statusPillText, { color: sc.text }]}>Pending</Text>
                       </View>
                     </View>
-                    {item.profiles?.full_name && (
+                    {item.customer_name && (
                       <View style={styles.apptPatientRow}>
                         <Feather name="user" size={12} color={colors.textSecondary} />
-                        <Text style={styles.apptPatientName}>{item.profiles.full_name}</Text>
+                        <Text style={styles.apptPatientName}>{item.customer_name}</Text>
                       </View>
                     )}
                     <View style={styles.actions}>
@@ -998,6 +1048,35 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                   </View>
                 )
               })}
+              {upcomingConfirmed.length > 0 && (
+                <>
+                  <Text style={styles.noShowSectionLabel}>UPCOMING CONFIRMED</Text>
+                  {upcomingConfirmed.map(item => {
+                    const sc = STATUS_COLORS.confirmed
+                    const dt = new Date(item.requested_time)
+                    return (
+                      <View key={item.id} style={styles.card}>
+                        <View style={styles.apptCardHead}>
+                          <View>
+                            <Text style={styles.apptDate}>{dt.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</Text>
+                            <Text style={styles.apptTime}>{dt.toLocaleTimeString([], { timeStyle: 'short' })}</Text>
+                          </View>
+                          <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
+                            <View style={[styles.statusDot, { backgroundColor: sc.text }]} />
+                            <Text style={[styles.statusPillText, { color: sc.text }]}>Confirmed</Text>
+                          </View>
+                        </View>
+                        {item.customer_name && (
+                          <View style={styles.apptPatientRow}>
+                            <Feather name="user" size={12} color={colors.textSecondary} />
+                            <Text style={styles.apptPatientName}>{item.customer_name}</Text>
+                          </View>
+                        )}
+                      </View>
+                    )
+                  })}
+                </>
+              )}
               {pastConfirmed.length > 0 && (
                 <>
                   <Text style={styles.noShowSectionLabel}>PAST APPOINTMENTS</Text>
@@ -1016,10 +1095,10 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                             <Text style={[styles.statusPillText, { color: sc.text }]}>Confirmed</Text>
                           </View>
                         </View>
-                        {item.profiles?.full_name && (
+                        {item.customer_name && (
                           <View style={styles.apptPatientRow}>
                             <Feather name="user" size={12} color={colors.textSecondary} />
-                            <Text style={styles.apptPatientName}>{item.profiles.full_name}</Text>
+                            <Text style={styles.apptPatientName}>{item.customer_name}</Text>
                           </View>
                         )}
                         <View style={{ flexDirection: 'row', gap: 10 }}>

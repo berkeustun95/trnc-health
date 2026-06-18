@@ -10,6 +10,25 @@ import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton, SlotGridSkeleton } from '../components/Skeleton'
 
+async function notifyProvider(facility, title, body) {
+  if (!facility.provider_id) return
+  try {
+    const { data: prov } = await supabase
+      .from('profiles')
+      .select('push_token')
+      .eq('id', facility.provider_id)
+      .maybeSingle()
+    if (prov?.push_token) {
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ to: prov.push_token, title, body, sound: 'default' }),
+      })
+    }
+    await supabase.from('notifications').insert({ user_id: facility.provider_id, title, body })
+  } catch {}
+}
+
 const SLOT_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const SLOT_DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -108,8 +127,11 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
       customer_id: session.user.id,
       body,
     })
-    if (!error) { setNewQ(''); await loadQuestions() }
-    else setQError(t('questionSubmitError', lang))
+    if (!error) {
+      setNewQ('')
+      await loadQuestions()
+      notifyProvider(facility, 'New Question', `${facility.name} received a new question from a customer.`)
+    } else setQError(t('questionSubmitError', lang))
     setSubmittingQ(false)
   }
 
@@ -148,7 +170,11 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
       requested_time: requestedTime,
     })
     if (error) setError(error.message)
-    else { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setDone(true) }
+    else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      setDone(true)
+      notifyProvider(facility, 'New Appointment Request', `${facility.name} has a new appointment request.`)
+    }
     setLoading(false)
   }
 
@@ -156,12 +182,14 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
     DateTimePickerAndroid.open({
       value: date,
       mode: 'date',
+      display: 'spinner',
       minimumDate: new Date(),
       onChange: (_, selectedDate) => {
         if (!selectedDate) return
         DateTimePickerAndroid.open({
           value: selectedDate,
           mode: 'time',
+          display: 'spinner',
           onChange: (_, selectedTime) => {
             if (!selectedTime) return
             const combined = new Date(selectedDate)
@@ -255,7 +283,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
               <Text style={styles.facilityAddress}>{facility.address}</Text>
             </View>
           ) : null}
-          {facility.opening_hours ? (
+          {facility.opening_hours && !facility.opening_hours.trim().startsWith('{') ? (
             <View style={styles.infoRow}>
               <Feather name="clock" size={13} color={colors.textSecondary} />
               <Text style={styles.facilityHours}>{facility.opening_hours}</Text>
@@ -400,7 +428,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
                   <DateTimePicker
                     value={date}
                     mode="datetime"
-                    display="inline"
+                    display="spinner"
                     minimumDate={new Date()}
                     onChange={(_, selected) => { if (selected) setDate(selected) }}
                   />
@@ -435,6 +463,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
             placeholder={t('askPlaceholder', lang)}
             placeholderTextColor={colors.textSecondary}
             multiline
+            maxLength={300}
           />
           <TouchableOpacity
             style={[styles.askBtn, (!newQ.trim() || submittingQ) && { opacity: 0.4 }]}

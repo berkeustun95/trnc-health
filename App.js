@@ -243,6 +243,7 @@ export default function App() {
   const menuEmergencyRef   = useRef(null)
   const menuTutorialItemRef = useRef(null)
   const menuAnim = useRef(new Animated.Value(260)).current
+  const menuStepCountRef = useRef(0)
 
   function openMenu() {
     setShowMenu(true)
@@ -263,9 +264,9 @@ export default function App() {
 
   async function startCoachMarks() {
     await new Promise(r => setTimeout(r, 400))
+    menuStepCountRef.current = 0
 
-    // Measure main-screen elements while home content is fully visible
-    const [menu, search, filters, duty, map] = await Promise.all([
+    const [menuBtn, search, filters, duty, map] = await Promise.all([
       measureRef(hamburgerRef),
       measureRef(searchRef),
       measureRef(filterBarRef),
@@ -273,42 +274,43 @@ export default function App() {
       measureRef(mapTabRef),
     ])
 
-    // Briefly open menu to measure individual items, then close
-    openMenu()
-    await new Promise(r => setTimeout(r, 300))
-    const [mLang, mQuiz, mEmergency, mTutorial] = await Promise.all([
-      measureRef(menuLangRef),
-      measureRef(menuQuizRef),
-      measureRef(menuEmergencyRef),
-      measureRef(menuTutorialItemRef),
-    ])
-    closeMenu()
-    await new Promise(r => setTimeout(r, 250))
-
     const steps = []
-    if (menu)       steps.push({ ...menu,       title: t('coachMenuTitle', lang),         body: t('coachMenuBody', lang),         isMenuTrigger: true })
-    if (mLang)      steps.push({ ...mLang,      title: t('coachLangTitle', lang),          body: t('coachLangBody', lang),          isMenuContent: true })
-    if (mQuiz)      steps.push({ ...mQuiz,      title: t('coachQuizTitle', lang),          body: t('coachQuizBody', lang),          isMenuContent: true })
-    if (mEmergency) steps.push({ ...mEmergency, title: t('coachEmergencyTitle', lang),     body: t('coachEmergencyBody', lang),     isMenuContent: true })
-    if (mTutorial)  steps.push({ ...mTutorial,  title: t('coachTutorialItemTitle', lang),  body: t('coachTutorialItemBody', lang),  isMenuContent: true, isLastMenuContent: true })
-    if (search)     steps.push({ ...search,     title: t('coachSearchTitle', lang),        body: t('coachSearchBody', lang) })
-    if (filters)    steps.push({ ...filters,    title: t('coachFiltersTitle', lang),       body: t('coachFiltersBody', lang) })
-    if (duty)       steps.push({ ...duty,       title: t('coachDutyTitle', lang),          body: t('coachDutyBody', lang) })
-    if (map)        steps.push({ ...map,        title: t('coachMapTitle', lang),           body: t('coachMapBody', lang) })
+    if (menuBtn) steps.push({ ...menuBtn, title: t('coachMenuTitle', lang), body: t('coachMenuBody', lang) })
+    if (search)  steps.push({ ...search,  title: t('coachSearchTitle', lang),  body: t('coachSearchBody', lang) })
+    if (filters) steps.push({ ...filters, title: t('coachFiltersTitle', lang), body: t('coachFiltersBody', lang) })
+    if (duty)    steps.push({ ...duty,    title: t('coachDutyTitle', lang),    body: t('coachDutyBody', lang) })
+    if (map)     steps.push({ ...map,     title: t('coachMapTitle', lang),     body: t('coachMapBody', lang) })
     if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
   }
 
   async function handleCoachNext(fromStep) {
-    if (coachSteps[fromStep]?.isMenuTrigger) {
+    if (fromStep === 0) {
+      // Hamburger step done — open menu and inject in-menu steps before advancing
       openMenu()
-      await new Promise(r => setTimeout(r, 280))
+      await new Promise(r => setTimeout(r, 350))
+      const [langItem, quizItem, emergencyItem] = await Promise.all([
+        measureRef(menuLangRef),
+        measureRef(menuQuizRef),
+        measureRef(menuEmergencyRef),
+      ])
+      const menuItems = []
+      if (langItem)      menuItems.push({ ...langItem,      title: t('coachLangTitle', lang),      body: t('coachLangBody', lang) })
+      if (quizItem)      menuItems.push({ ...quizItem,      title: t('coachQuizTitle', lang),      body: t('coachQuizBody', lang) })
+      if (emergencyItem) menuItems.push({ ...emergencyItem, title: t('coachEmergencyTitle', lang), body: t('coachEmergencyBody', lang) })
+      menuStepCountRef.current = menuItems.length
+      if (menuItems.length > 0) {
+        setCoachSteps(prev => [prev[0], ...menuItems, ...prev.slice(1)])
+      }
+    } else if (menuStepCountRef.current > 0 && fromStep === menuStepCountRef.current) {
+      // Last in-menu step done — close menu before showing screen steps
+      closeMenu()
+      await new Promise(r => setTimeout(r, 250))
     }
-    if (coachSteps[fromStep]?.isLastMenuContent) closeMenu()
   }
 
   function handleCoachFinish() {
-    closeMenu()
     setShowCoachMarks(false)
+    closeMenu()
   }
 
   async function loadQuizHistory() {
@@ -381,14 +383,23 @@ export default function App() {
     async function handleDeepLink(url) {
       if (!url?.startsWith('ada://')) return
       try {
-        const params = new URL(url.replace('ada://', 'https://x/')).searchParams
-        const tokenHash = params.get('token_hash')
-        const type      = params.get('type')
-        const code      = params.get('code')
-        if (tokenHash && type) {
+        const parsed     = new URL(url.replace('ada://', 'https://x/'))
+        const qp         = parsed.searchParams
+        const hp         = new URLSearchParams(parsed.hash.replace(/^#/, ''))
+        const tokenHash  = qp.get('token_hash')  || hp.get('token_hash')
+        const type       = qp.get('type')         || hp.get('type')
+        const code       = qp.get('code')         || hp.get('code')
+        const accessToken  = qp.get('access_token')  || hp.get('access_token')
+        const refreshToken = qp.get('refresh_token') || hp.get('refresh_token')
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          if (type === 'recovery') setShowPasswordReset(true)
+        } else if (tokenHash && type) {
           await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+          if (type === 'recovery') setShowPasswordReset(true)
         } else if (code) {
           await supabase.auth.exchangeCodeForSession(url)
+          if (url.includes('recovery')) setShowPasswordReset(true)
         }
       } catch {}
     }
@@ -454,7 +465,7 @@ export default function App() {
   async function loadProviderFacility() {
     const { data: fac } = await supabase
       .from('facilities')
-      .select('id, name, type, status, membership_tier, trial_ends_at, is_quiz_partner, phone, address, opening_hours')
+      .select('id, name, type, status, membership_tier, trial_ends_at, is_quiz_partner, phone, address, opening_hours, cover_image_url, logo_url, availability, description, languages, specialty, latitude, longitude, photos')
       .eq('provider_id', session?.user.id)
       .maybeSingle()
     setProviderFacility(fac ?? null)
@@ -473,6 +484,7 @@ export default function App() {
 
   useEffect(() => {
     setShowMenu(false)
+    setShowNotifs(false)
     if (!session) {
       setProfile(null); setLatestResult(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); return
     }
@@ -584,8 +596,6 @@ export default function App() {
       } else if (screen === 'profile') {
         setActiveTab('profile')
       } else if (screen === 'notifications') {
-        setShowNotifs(true)
-      } else {
         setShowNotifs(true)
       }
     })
