@@ -12,6 +12,8 @@ export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   async function submit() {
     if (password.length < 8) {
@@ -48,24 +50,34 @@ export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
         ) : (
           <>
             <Text style={s.label}>{t('newPassword', lang)}</Text>
-            <TextInput
-              style={s.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder={t('atLeast8Chars', lang)}
-              placeholderTextColor={colors.textSecondary}
-              secureTextEntry
-            />
+            <View style={s.passwordWrap}>
+              <TextInput
+                style={s.passwordInput}
+                value={password}
+                onChangeText={setPassword}
+                placeholder={t('atLeast8Chars', lang)}
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry={!showPassword}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={s.eyeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
 
             <Text style={s.label}>{t('confirmPassword', lang)}</Text>
-            <TextInput
-              style={s.input}
-              value={confirm}
-              onChangeText={setConfirm}
-              placeholder={t('repeatPassword', lang)}
-              placeholderTextColor={colors.textSecondary}
-              secureTextEntry
-            />
+            <View style={s.passwordWrap}>
+              <TextInput
+                style={s.passwordInput}
+                value={confirm}
+                onChangeText={setConfirm}
+                placeholder={t('repeatPassword', lang)}
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry={!showConfirm}
+              />
+              <TouchableOpacity onPress={() => setShowConfirm(v => !v)} style={s.eyeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Feather name={showConfirm ? 'eye-off' : 'eye'} size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
 
             {error && <Text style={s.error}>{error}</Text>}
 
@@ -92,8 +104,10 @@ const s = StyleSheet.create({
   cancelBtn:   { position: 'absolute', top: 16, right: 0, padding: 8 },
   title:       { fontSize: 26, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
   sub:         { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 22, marginBottom: 32 },
-  label:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
-  input:       { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary, marginBottom: 18 },
+  label:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
+  passwordWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface, marginBottom: 18 },
+  passwordInput:{ flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  eyeBtn:       { paddingHorizontal: 14 },
   error:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger, marginBottom: 12, textAlign: 'center' },
   btn:         { backgroundColor: colors.primary, borderRadius: 14, padding: 17, alignItems: 'center' },
   btnText:     { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.2 },

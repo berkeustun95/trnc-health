@@ -7,6 +7,7 @@ import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter'
+import { PlayfairDisplay_400Regular, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display'
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { supabase } from './lib/supabase'
@@ -185,7 +186,7 @@ const tabBar = StyleSheet.create({
 })
 
 export default function App() {
-  const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_700Bold })
+  const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_700Bold, PlayfairDisplay_400Regular, PlayfairDisplay_700Bold })
   const [session, setSession] = useState(undefined)
   const [facilities, setFacilities] = useState([])
   const [loading, setLoading] = useState(true)

@@ -99,20 +99,22 @@ export default function AuthScreen({ lang = 'English' }) {
             </View>
 
             {resetSent ? (
-              <View style={styles.resetSuccessWrap}>
-                <View style={styles.resetSuccessIcon}>
-                  <Feather name="mail" size={28} color={colors.primary} />
+              <View style={styles.formCard}>
+                <View style={styles.resetSuccessWrap}>
+                  <View style={styles.resetSuccessIcon}>
+                    <Feather name="mail" size={28} color={colors.primary} />
+                  </View>
+                  <Text style={styles.resetSuccessTitle}>{t('checkEmail', lang)}</Text>
+                  <Text style={styles.resetSuccessSub}>
+                    {t('resetEmailSentSub', lang)}{'\n'}<Text style={styles.resetEmail}>{email.trim()}</Text>
+                  </Text>
+                  <TouchableOpacity style={styles.submit} onPress={() => { setShowReset(false); setResetSent(false) }}>
+                    <Text style={styles.submitText}>{t('backToSignIn', lang)}</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.resetSuccessTitle}>{t('checkEmail', lang)}</Text>
-                <Text style={styles.resetSuccessSub}>
-                  {t('resetEmailSentSub', lang)}{'\n'}<Text style={styles.resetEmail}>{email.trim()}</Text>
-                </Text>
-                <TouchableOpacity style={styles.submit} onPress={() => { setShowReset(false); setResetSent(false) }}>
-                  <Text style={styles.submitText}>{t('backToSignIn', lang)}</Text>
-                </TouchableOpacity>
               </View>
             ) : (
-              <>
+              <View style={styles.formCard}>
                 <TouchableOpacity style={styles.backLink} onPress={() => { setShowReset(false); setError(null) }}>
                   <Feather name="arrow-left" size={16} color={colors.textSecondary} />
                   <Text style={styles.backLinkText}>{t('backToSignIn', lang)}</Text>
@@ -142,7 +144,7 @@ export default function AuthScreen({ lang = 'English' }) {
                     : <Text style={styles.submitText}>{t('sendResetLink', lang)}</Text>
                   }
                 </TouchableOpacity>
-              </>
+              </View>
             )}
           </ScrollView>
         </KeyboardAvoidingView>
