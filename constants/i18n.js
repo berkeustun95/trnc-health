@@ -272,7 +272,7 @@ const translations = {
     noResultsTitle: 'Sonuç bulunamadı', noResultsBody: 'Bir filtreyi kaldırmayı veya aramanızı değiştirmeyi deneyin',
     facilityLoadError: 'Tesisler yüklenemedi. Bağlantınızı kontrol edin.',
     tryAgain: 'Tekrar Dene', chooseAvatar: 'Avatar Seç', uploadPhoto: 'Fotoğraf Yükle', orPickAvatar: 'Ya da avatar seç',
-    getStarted: 'Başla', welcomeTagline: 'Kuzey Kıbrıs\'ta sağlık rehberiniz',
+    getStarted: 'Başla', welcomeTagline: 'Kuzey Kıbrıs\'taki Sağlık Rehberiniz',
     profileLoadError: 'Profiliniz yüklenemedi. Lütfen geri dönüp tekrar deneyin.',
     questionSubmitError: 'Sorunuz gönderilemedi. Lütfen tekrar deneyin.',
     enterEmailAndPassword: 'Lütfen e-posta adresinizi ve şifrenizi girin.',
