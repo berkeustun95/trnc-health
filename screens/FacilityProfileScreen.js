@@ -284,16 +284,6 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                 {facility.availability ? t('requestAppointment', lang) : t('requestAppointment', lang)}
               </Text>
             </TouchableOpacity>
-            {!facility.availability && facility.phone ? (
-              <TouchableOpacity
-                style={s.ctaSecondary}
-                onPress={() => Linking.openURL(`tel:${facility.phone}`)}
-                activeOpacity={0.8}
-              >
-                <Feather name="phone" size={15} color={colors.primary} />
-                <Text style={s.ctaSecondaryText}>{t('callToBook', lang)}</Text>
-              </TouchableOpacity>
-            ) : null}
           </View>
         )}
       </View>

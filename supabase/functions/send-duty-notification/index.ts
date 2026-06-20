@@ -52,6 +52,8 @@ serve(async () => {
   // Send Expo push notifications to users with a token
   const tokens = profiles.map(p => p.push_token).filter(Boolean) as string[]
 
+  const pushErrors: string[] = []
+
   if (tokens.length > 0) {
     const messages = tokens.map(token => ({
       to: token,
@@ -59,6 +61,7 @@ serve(async () => {
       body,
       data: { type: 'duty', date: today },
       sound: 'default',
+      channelId: 'default',
     }))
 
     // Expo push API accepts max 100 messages per request
@@ -74,7 +77,16 @@ serve(async () => {
       })
 
       if (!res.ok) {
-        console.error('Expo push batch failed:', await res.text())
+        const errText = await res.text()
+        console.error('Expo push batch failed:', errText)
+        pushErrors.push(errText)
+      } else {
+        const json = await res.json()
+        const batchErrors = (json.data ?? [])
+          .filter((r: any) => r.status === 'error')
+          .map((r: any) => `${r.details?.error ?? 'unknown'}: ${r.message ?? ''}`)
+        if (batchErrors.length) console.error('Expo push errors:', batchErrors)
+        pushErrors.push(...batchErrors)
       }
     }
   }
@@ -86,6 +98,7 @@ serve(async () => {
       pharmacies: duties.map(d => d.name),
       notified: profiles.length,
       pushed: tokens.length,
+      pushErrors: pushErrors.length ? pushErrors : undefined,
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } }
   )
