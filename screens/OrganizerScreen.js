@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, Image, ScrollView,
-  TextInput, ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform,
+  TextInput, ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
