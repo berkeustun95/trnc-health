@@ -374,7 +374,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') setShowMenu(false)
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { menuAnim.setValue(260); setShowMenu(false) }
       if (event === 'PASSWORD_RECOVERY') setShowPasswordReset(true)
     })
     return () => subscription.unsubscribe()
@@ -484,6 +484,7 @@ export default function App() {
   }
 
   useEffect(() => {
+    menuAnim.setValue(260)
     setShowMenu(false)
     setShowNotifs(false)
     if (!session) {
@@ -1482,6 +1483,7 @@ export default function App() {
         {showMenu && (
           <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />
         )}
+        {showMenu && (
         <Animated.View style={[styles.menuDrawer, { transform: [{ translateX: menuAnim }] }]}>
           <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <View style={styles.menuUserRow}>
@@ -1573,6 +1575,7 @@ export default function App() {
           </TouchableOpacity>
           </SafeAreaView>
         </Animated.View>
+        )}
 
         <Modal visible={showLangModal} transparent animationType="fade" onRequestClose={() => setShowLangModal(false)}>
           <TouchableOpacity style={styles.emergencyBackdrop} activeOpacity={1} onPress={() => setShowLangModal(false)}>
