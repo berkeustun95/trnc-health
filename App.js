@@ -1669,13 +1669,18 @@ export default function App() {
                   { name: 'Beyarmudu',                 phone: '03923799401' },
                   { name: 'Tatlısu',                   phone: '03923892026' },
                 ].map(({ name, phone }) => (
-                  <TouchableOpacity key={name} style={styles.emergencyRow} onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }}>
+                  <View key={name} style={styles.emergencyRow}>
                     <View style={styles.emergencyIconWrap}>
                       <Ionicons name="business-outline" size={18} color={colors.textSecondary} />
                     </View>
                     <Text style={[styles.emergencyLabel, { flex: 1 }]}>{name}</Text>
-                    <Ionicons name="call" size={18} color={colors.primary} />
-                  </TouchableOpacity>
+                    <TouchableOpacity onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' Belediyesi Kuzey Kıbrıs')}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
+                      <Ionicons name="map-outline" size={18} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="call" size={18} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
                 ))}
               </ScrollView>
             </View>
