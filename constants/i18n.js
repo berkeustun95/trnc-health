@@ -181,6 +181,7 @@ const translations = {
     reviewCountLabel: '{n} reviews',
     seeAllReviews: 'See all {n} reviews',
     closedDay: 'Closed this day',
+    menuMunicipalities: 'Municipalities',
   },
   tr: {
     list: 'Liste', map: 'Harita', all: 'Tümü',
@@ -352,6 +353,7 @@ const translations = {
     reviewCountLabel: '{n} değerlendirme',
     seeAllReviews: 'Tüm {n} değerlendirmeyi gör',
     closedDay: 'Bu gün kapalı',
+    menuMunicipalities: 'Belediyeler',
   },
   ar: {
     list: 'قائمة', map: 'خريطة', all: 'الكل',
@@ -501,6 +503,7 @@ const translations = {
     reviewCountLabel: '{n} تقييم',
     seeAllReviews: 'عرض جميع {n} تقييمات',
     closedDay: 'مغلق هذا اليوم',
+    menuMunicipalities: 'البلديات',
   },
   ru: {
     list: 'Список', map: 'Карта', all: 'Все',
@@ -650,6 +653,7 @@ const translations = {
     reviewCountLabel: '{n} отзывов',
     seeAllReviews: 'Все {n} отзывов',
     closedDay: 'Закрыто в этот день',
+    menuMunicipalities: 'Муниципалитеты',
   },
   el: {
     list: 'Λίστα', map: 'Χάρτης', all: 'Όλα',
@@ -799,6 +803,7 @@ const translations = {
     reviewCountLabel: '{n} αξιολογήσεις',
     seeAllReviews: 'Όλες οι {n} αξιολογήσεις',
     closedDay: 'Κλειστό αυτή τη μέρα',
+    menuMunicipalities: 'Δήμοι',
   },
   fr: {
     list: 'Liste', map: 'Carte', all: 'Tout',
@@ -948,6 +953,7 @@ const translations = {
     reviewCountLabel: '{n} avis',
     seeAllReviews: 'Voir les {n} avis',
     closedDay: 'Fermé ce jour',
+    menuMunicipalities: 'Municipalités',
   },
   es: {
     list: 'Lista', map: 'Mapa', all: 'Todo',
@@ -1097,6 +1103,7 @@ const translations = {
     reviewCountLabel: '{n} reseñas',
     seeAllReviews: 'Ver las {n} reseñas',
     closedDay: 'Cerrado este día',
+    menuMunicipalities: 'Municipios',
   },
   de: {
     list: 'Liste', map: 'Karte', all: 'Alle',
@@ -1246,6 +1253,7 @@ const translations = {
     reviewCountLabel: '{n} Bewertungen',
     seeAllReviews: 'Alle {n} Bewertungen ansehen',
     closedDay: 'An diesem Tag geschlossen',
+    menuMunicipalities: 'Gemeinden',
   },
   fa: {
     list: 'لیست', map: 'نقشه', all: 'همه',
@@ -1395,6 +1403,7 @@ const translations = {
     reviewCountLabel: '{n} نظر',
     seeAllReviews: 'مشاهده همه {n} نظر',
     closedDay: 'در این روز تعطیل است',
+    menuMunicipalities: 'شهرداری‌ها',
   },
 }
 

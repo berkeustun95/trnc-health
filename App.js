@@ -231,6 +231,7 @@ export default function App() {
   const [quizHistory, setQuizHistory] = useState([])
   const [quizHistoryLoading, setQuizHistoryLoading] = useState(false)
   const [showEmergencyModal, setShowEmergencyModal] = useState(false)
+  const [showMunicipalModal, setShowMunicipalModal] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   const [showCoachMarks, setShowCoachMarks] = useState(false)
   const [coachSteps, setCoachSteps]         = useState([])
@@ -1543,6 +1544,10 @@ export default function App() {
               <Ionicons name="call-outline" size={20} color={colors.danger} />
               <Text style={styles.menuItemText}>{t('menuEmergency', lang)}</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowMunicipalModal(true) }}>
+              <Ionicons name="business-outline" size={20} color={colors.textPrimary} />
+              <Text style={styles.menuItemText}>{t('menuMunicipalities', lang)}</Text>
+            </TouchableOpacity>
             <View style={[styles.menuItem, { opacity: 0.4 }]}>
               <Ionicons name="home-outline" size={20} color={colors.textPrimary} />
               <Text style={styles.menuItemText}>{t('menuAccommodations', lang)}</Text>
@@ -1629,6 +1634,50 @@ export default function App() {
                   <Ionicons name="call" size={18} color={colors.danger} />
                 </TouchableOpacity>
               ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        <Modal visible={showMunicipalModal} transparent animationType="fade" onRequestClose={() => setShowMunicipalModal(false)}>
+          <TouchableOpacity style={styles.emergencyBackdrop} activeOpacity={1} onPress={() => setShowMunicipalModal(false)}>
+            <View style={[styles.emergencySheet, { maxHeight: Dimensions.get('window').height * 0.75 }]} onStartShouldSetResponder={() => true}>
+              <View style={styles.emergencyHeader}>
+                <Text style={styles.emergencyTitle}>{t('menuMunicipalities', lang)}</Text>
+                <TouchableOpacity onPress={() => setShowMunicipalModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Ionicons name="close" size={22} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.emergencySubtitle}>Kıbrıs Türk Belediyeler Birliği</Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {[
+                  { name: 'Lefkoşa',                  phone: '03922285221' },
+                  { name: 'Gazimağusa',                phone: '03923665332' },
+                  { name: 'Girne',                     phone: '03928152118' },
+                  { name: 'Gönyeli-Alayköy',           phone: '03922231901' },
+                  { name: 'Lapta-Alsancak-Çamlıbel',  phone: '03928228623' },
+                  { name: 'Güzelyurt',                 phone: '03927142813' },
+                  { name: 'Değirmenlik-Akıncılar',     phone: '03922323322' },
+                  { name: 'Dikmen',                    phone: '03922372863' },
+                  { name: 'Lefke',                     phone: '03927287347' },
+                  { name: 'Mesarya',                   phone: '03923777459' },
+                  { name: 'Çatalköy-Esentepe',         phone: '03928244068' },
+                  { name: 'İskele',                    phone: '03923712521' },
+                  { name: 'Erenköy-Karpaz',            phone: '03923744350' },
+                  { name: 'Yeni Boğaziçi',             phone: '03923788145' },
+                  { name: 'Geçitkale-Serdarlı',        phone: '03923733147' },
+                  { name: 'Mehmetçik-Büyükkonuk',      phone: '03923755090' },
+                  { name: 'Beyarmudu',                 phone: '03923799401' },
+                  { name: 'Tatlısu',                   phone: '03923892026' },
+                ].map(({ name, phone }) => (
+                  <TouchableOpacity key={name} style={styles.emergencyRow} onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }}>
+                    <View style={styles.emergencyIconWrap}>
+                      <Ionicons name="business-outline" size={18} color={colors.textSecondary} />
+                    </View>
+                    <Text style={[styles.emergencyLabel, { flex: 1 }]}>{name}</Text>
+                    <Ionicons name="call" size={18} color={colors.primary} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           </TouchableOpacity>
         </Modal>
