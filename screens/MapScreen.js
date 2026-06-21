@@ -84,7 +84,6 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
         showsHorizontalScrollIndicator={false}
         style={s.filterBar}
         contentContainerStyle={s.filterBarContent}
-        pointerEvents="box-none"
       >
         <TouchableOpacity
           style={[s.filterChip, openOnly && { backgroundColor: colors.successLight, borderColor: colors.success }]}
