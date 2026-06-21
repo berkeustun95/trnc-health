@@ -1639,8 +1639,9 @@ export default function App() {
         </Modal>
 
         <Modal visible={showMunicipalModal} transparent animationType="fade" onRequestClose={() => setShowMunicipalModal(false)}>
-          <TouchableOpacity style={styles.emergencyBackdrop} activeOpacity={1} onPress={() => setShowMunicipalModal(false)}>
-            <View style={[styles.emergencySheet, { maxHeight: Dimensions.get('window').height * 0.75 }]} onStartShouldSetResponder={() => true}>
+          <View style={styles.emergencyBackdrop}>
+            <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowMunicipalModal(false)} />
+            <View style={[styles.emergencySheet, { maxHeight: Dimensions.get('window').height * 0.75 }]}>
               <View style={styles.emergencyHeader}>
                 <Text style={styles.emergencyTitle}>{t('menuMunicipalities', lang)}</Text>
                 <TouchableOpacity onPress={() => setShowMunicipalModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -1648,9 +1649,9 @@ export default function App() {
                 </TouchableOpacity>
               </View>
               <Text style={styles.emergencySubtitle}>Kıbrıs Türk Belediyeler Birliği</Text>
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
                 {[
-                  { name: 'Lefkoşa',                  phone: '03922285221', mapQuery: '35.1900566,33.3637376' },
+                  { name: 'Lefkoşa',                  phone: '03922285221', mapQuery: 'Lefkoşa Türk Belediyesi Atatürk Caddesi 90 Yenişehir Lefkoşa KKTC' },
                   { name: 'Gazimağusa',                phone: '03923665332', mapQuery: 'Gazimağusa Belediyesi Fazıl Polatpaşa Bulvarı Gazimağusa KKTC' },
                   { name: 'Girne',                     phone: '03928152118', mapQuery: 'Girne Belediyesi Ecevit Caddesi 68 Girne KKTC' },
                   { name: 'Gönyeli-Alayköy',           phone: '03922231901', mapQuery: 'Gönyeli Belediyesi Belediye Bulvarı 30 Yenikent Gönyeli KKTC' },
@@ -1684,7 +1685,7 @@ export default function App() {
                 ))}
               </ScrollView>
             </View>
-          </TouchableOpacity>
+          </View>
         </Modal>
 
         <TutorialCoachMarks
