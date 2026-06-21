@@ -319,7 +319,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
               ))}
               <TouchableOpacity style={styles.seeAllBtn} onPress={() => setShowAllReviews(true)}>
                 <Text style={styles.seeAllText}>
-                  {reviewTotal > 5 ? `See all ${reviewTotal} reviews` : 'See all reviews'}
+                  {t('seeAllReviews', lang).replace('{n}', reviewTotal)}
                 </Text>
                 <Ionicons name="chevron-forward" size={14} color={colors.primary} />
               </TouchableOpacity>
@@ -362,7 +362,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
                       {loadingSlots ? (
                         <SlotGridSkeleton />
                       ) : slots.length === 0 ? (
-                        <Text style={styles.noSlots}>Closed this day</Text>
+                        <Text style={styles.noSlots}>{t('closedDay', lang)}</Text>
                       ) : (
                         <View style={styles.slotGrid}>
                           {slots.map(slot => {

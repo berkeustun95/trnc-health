@@ -148,7 +148,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
             {/* Credentials */}
             {credentials.length > 0 && (
               <View style={s.section}>
-                <Text style={s.sectionLabel}>Qualifications</Text>
+                <Text style={s.sectionLabel}>{t('qualificationsLabel', lang)}</Text>
                 {credentials.map(cred => (
                   <View key={cred.id} style={s.credRow}>
                     <Text style={s.credIcon}>{cred.cred_type === 'diploma' ? '🎓' : '📜'}</Text>
@@ -222,7 +222,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
             {/* Schedule */}
             {facility.availability?.schedule && (
               <View style={s.section}>
-                <Text style={s.sectionLabel}>Schedule</Text>
+                <Text style={s.sectionLabel}>{t('scheduleLabel', lang)}</Text>
                 <View style={s.scheduleCard}>
                   {SCHED_KEYS.map((key, i) => {
                     const day = facility.availability.schedule[key]
@@ -231,17 +231,17 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                       <View key={key} style={[s.scheduleRow, isToday && s.scheduleRowToday, i === SCHED_KEYS.length - 1 && { borderBottomWidth: 0 }]}>
                         <Text style={[s.scheduleDay, isToday && s.scheduleDayToday]}>{SCHED_LABELS[i]}</Text>
                         {day?.closed
-                          ? <Text style={s.scheduleClosed}>Closed</Text>
+                          ? <Text style={s.scheduleClosed}>{t('closed', lang)}</Text>
                           : <Text style={[s.scheduleHours, isToday && s.scheduleHoursToday]}>{day?.open ?? '09:00'} – {day?.close ?? '17:00'}</Text>
                         }
-                        {isToday && <Text style={s.todayLabel}>Today</Text>}
+                        {isToday && <Text style={s.todayLabel}>{t('todayLabel', lang)}</Text>}
                       </View>
                     )
                   })}
                   {facility.availability.slot_duration && (
                     <View style={s.slotDurationRow}>
                       <Feather name="clock" size={12} color={colors.textSecondary} />
-                      <Text style={s.slotDurationText}>{facility.availability.slot_duration}-min appointment slots</Text>
+                      <Text style={s.slotDurationText}>{t('minSlotLabel', lang).replace('{n}', facility.availability.slot_duration)}</Text>
                     </View>
                   )}
                 </View>
@@ -257,7 +257,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                 <View style={s.noReviewsWrap}>
                   <Ionicons name="star-outline" size={40} color={colors.border} style={{ marginBottom: 12 }} />
                   <Text style={s.noReviewsTitle}>{t('noReviews', lang)}</Text>
-                  <Text style={s.noReviewsSub}>Be the first to review this facility after your visit</Text>
+                  <Text style={s.noReviewsSub}>{t('firstReviewPrompt', lang)}</Text>
                 </View>
               ) : (
                 <>
@@ -266,7 +266,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                       <Text style={s.avgNum}>{reviewAvg}</Text>
                       <View>
                         <Text style={s.avgStars}>{'★'.repeat(Math.round(parseFloat(reviewAvg)))}{'☆'.repeat(5 - Math.round(parseFloat(reviewAvg)))}</Text>
-                        <Text style={s.reviewCount}>{reviewTotal} {reviewTotal === 1 ? 'review' : 'reviews'}</Text>
+                        <Text style={s.reviewCount}>{t('reviewCountLabel', lang).replace('{n}', reviewTotal)}</Text>
                       </View>
                     </View>
                   )}
@@ -281,7 +281,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                   ))}
                   {reviewTotal > 3 && (
                     <TouchableOpacity style={s.seeAllBtn} onPress={() => setShowAllReviews(true)}>
-                      <Text style={s.seeAllText}>See all {reviewTotal} reviews</Text>
+                      <Text style={s.seeAllText}>{t('seeAllReviews', lang).replace('{n}', reviewTotal)}</Text>
                       <Ionicons name="chevron-forward" size={14} color={colors.primary} />
                     </TouchableOpacity>
                   )}

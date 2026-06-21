@@ -1246,7 +1246,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                       </View>
                       <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
                         <View style={[styles.statusDot, { backgroundColor: sc.text }]} />
-                        <Text style={[styles.statusPillText, { color: sc.text }]}>Pending</Text>
+                        <Text style={[styles.statusPillText, { color: sc.text }]}>{t('statusPending', lang)}</Text>
                       </View>
                     </View>
                     {item.customer_name && (
@@ -1283,7 +1283,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                           </View>
                           <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
                             <View style={[styles.statusDot, { backgroundColor: sc.text }]} />
-                            <Text style={[styles.statusPillText, { color: sc.text }]}>Confirmed</Text>
+                            <Text style={[styles.statusPillText, { color: sc.text }]}>{t('statusConfirmed', lang)}</Text>
                           </View>
                         </View>
                         {item.customer_name && (
@@ -1312,7 +1312,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                           </View>
                           <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
                             <View style={[styles.statusDot, { backgroundColor: sc.text }]} />
-                            <Text style={[styles.statusPillText, { color: sc.text }]}>Confirmed</Text>
+                            <Text style={[styles.statusPillText, { color: sc.text }]}>{t('statusConfirmed', lang)}</Text>
                           </View>
                         </View>
                         {item.customer_name && (
