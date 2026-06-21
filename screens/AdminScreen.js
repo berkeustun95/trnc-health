@@ -10,8 +10,8 @@ import { colors, shadow } from '../constants/theme'
 
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
-const ROLES = ['customer', 'provider', 'admin']
-const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast']
+const ROLES = ['customer', 'provider', 'organizer', 'admin']
+const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -100,6 +100,7 @@ function DashboardTab({ onNavigate }) {
         { count: pendingProviders },
         { count: pendingCredentials },
         { count: pendingDocs },
+        { count: pendingEvents },
       ] = await Promise.all([
         supabase.from('facilities').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -109,8 +110,9 @@ function DashboardTab({ onNavigate }) {
         supabase.from('facilities').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('provider_credentials').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('provider_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ])
-      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs })
+      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents })
     }
     load()
   }, [])
@@ -124,6 +126,7 @@ function DashboardTab({ onNavigate }) {
     stats.pendingCredentials > 0 && { label: 'Credentials awaiting review',  count: stats.pendingCredentials, tab: 'Credentials', color: '#7C3AED' },
     (stats.pendingDocs ?? 0) > 0 && { label: 'ID documents to verify',       count: stats.pendingDocs,        tab: 'Claims',      color: colors.accent },
     stats.pendingAppts       > 0 && { label: 'Pending appointments',          count: stats.pendingAppts,       tab: 'Bookings',    color: colors.primary },
+    (stats.pendingEvents ?? 0) > 0 && { label: 'Events awaiting approval',   count: stats.pendingEvents,      tab: 'Events',      color: colors.primary },
   ].filter(Boolean)
 
   return (
@@ -1602,6 +1605,124 @@ function BroadcastTab() {
   )
 }
 
+// ─── Events Tab ─────────────────────────────────────────────────────────────
+
+function EventsTab() {
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('pending')
+  const [rejectTarget, setRejectTarget] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    let query = supabase
+      .from('events')
+      .select('id, title, organizer_name, start_date, status, rejection_reason, organizer_id, profiles(full_name)')
+      .order('created_at', { ascending: false })
+    if (filter !== 'all') query = query.eq('status', filter)
+    const { data } = await query
+    setEvents(data ?? [])
+    setLoading(false)
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(id) {
+    await supabase.from('events').update({ status: 'approved', rejection_reason: null }).eq('id', id)
+    load()
+  }
+
+  async function reject(id, reason) {
+    await supabase.from('events').update({ status: 'rejected', rejection_reason: reason || 'Does not meet guidelines.' }).eq('id', id)
+    setRejectTarget(null)
+    load()
+  }
+
+  async function deleteEvent(id) {
+    Alert.alert('Delete event?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('events').delete().eq('id', id); load() } },
+    ])
+  }
+
+  function statusColor(status) {
+    if (status === 'approved') return colors.success
+    if (status === 'rejected') return colors.danger
+    if (status === 'pending')  return '#C2410C'
+    return colors.textSecondary
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={[s.chipRow, { marginBottom: 12 }]}>
+        {['pending', 'approved', 'rejected', 'all'].map(f => (
+          <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
+            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading
+        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        : (
+          <FlatList
+            data={events}
+            keyExtractor={e => e.id}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text={`No ${filter} events.`} />}
+            renderItem={({ item }) => (
+              <View style={s.card}>
+                <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
+                    <Text style={s.cardSub}>{item.organizer_name || item.profiles?.full_name || 'Unknown organiser'}</Text>
+                    {item.start_date && (
+                      <Text style={[s.cardSub, { marginTop: 2 }]}>
+                        {new Date(item.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={[s.pillGrey, { backgroundColor: statusColor(item.status) + '20', marginLeft: 8 }]}>
+                    <Text style={[s.pillText, { color: statusColor(item.status) }]}>{item.status}</Text>
+                  </View>
+                </View>
+
+                {item.status === 'rejected' && item.rejection_reason ? (
+                  <Text style={[s.cardSub, { color: colors.danger, marginTop: 6 }]}>Reason: {item.rejection_reason}</Text>
+                ) : null}
+
+                <View style={[s.rowActions, { marginTop: 10, marginLeft: 0 }]}>
+                  {item.status !== 'approved' && (
+                    <TouchableOpacity style={s.ghostBtn} onPress={() => approve(item.id)}>
+                      <Text style={s.ghostBtnText}>Approve</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.status !== 'rejected' && (
+                    <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget(item)}>
+                      <Text style={s.dangerGhostText}>Reject</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={s.dangerGhostBtn} onPress={() => deleteEvent(item.id)}>
+                    <Text style={s.dangerGhostText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          />
+        )
+      }
+
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget?.title}
+        onConfirm={reason => reject(rejectTarget.id, reason)}
+        onCancel={() => setRejectTarget(null)}
+      />
+    </View>
+  )
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 export default function AdminScreen({ session }) {
@@ -1645,6 +1766,7 @@ export default function AdminScreen({ session }) {
           {tab === 'Users'       && <UsersTab />}
           {tab === 'Bookings'    && <BookingsTab />}
           {tab === 'Broadcast'   && <BroadcastTab />}
+          {tab === 'Events'      && <EventsTab />}
         </View>
       </View>
     </SafeAreaView>

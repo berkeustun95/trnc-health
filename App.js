@@ -31,6 +31,8 @@ const QUIZ_LANG_MAP = {
   Greek: 'el', French: 'fr', Spanish: 'es', German: 'de', Persian: 'fa',
 }
 import DutyListScreen from './screens/DutyListScreen'
+import EventsScreen from './screens/EventsScreen'
+import OrganizerScreen from './screens/OrganizerScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import TutorialCoachMarks from './screens/TutorialCoachMarks'
 import NotificationsScreen from './screens/NotificationsScreen'
@@ -232,6 +234,7 @@ export default function App() {
   const [quizHistoryLoading, setQuizHistoryLoading] = useState(false)
   const [showEmergencyModal, setShowEmergencyModal] = useState(false)
   const [showMunicipalModal, setShowMunicipalModal] = useState(false)
+  const [showEvents, setShowEvents] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   const [showCoachMarks, setShowCoachMarks] = useState(false)
   const [coachSteps, setCoachSteps]         = useState([])
@@ -420,6 +423,7 @@ export default function App() {
       if (historyResult) { setHistoryResult(null); return true }
       if (showNotifs) { setShowNotifs(false); return true }
       if (showDutyList) { setShowDutyList(false); return true }
+      if (showEvents) { setShowEvents(false); return true }
       if (showQuizHistory) { setShowQuizHistory(false); return true }
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
       if (bookingFacility) { setBookingFacility(null); return true }
@@ -428,7 +432,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab])
+  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab])
 
   useEffect(() => {
     Promise.all([
@@ -834,6 +838,8 @@ export default function App() {
         : null
       content = <ProviderScreen session={session} lang={lang} facility={providerFacility} trialDaysLeft={trialDaysLeft} onFacilityUpdated={() => { loadProviderFacility(); reloadFacilities() }} />
     }
+  } else if (profile.role === 'organizer') {
+    content = <OrganizerScreen session={session} lang={lang} />
   } else if (showLatestResult && latestResult) {
     content = <ResultsScreen
       result={latestResult.final_result}
@@ -867,6 +873,8 @@ export default function App() {
     />
   } else if (showDutyList) {
     content = <DutyListScreen onBack={() => setShowDutyList(false)} lang={lang} />
+  } else if (showEvents) {
+    content = <EventsScreen lang={lang} onBack={() => setShowEvents(false)} />
   } else if (showQuizHistory) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -1547,6 +1555,10 @@ export default function App() {
             <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowMunicipalModal(true) }}>
               <Ionicons name="business-outline" size={20} color={colors.textPrimary} />
               <Text style={styles.menuItemText}>{t('menuMunicipalities', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowEvents(true) }}>
+              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+              <Text style={styles.menuItemText}>{t('menuEvents', lang)}</Text>
             </TouchableOpacity>
             <View style={[styles.menuItem, { opacity: 0.4 }]}>
               <Ionicons name="home-outline" size={20} color={colors.textPrimary} />
