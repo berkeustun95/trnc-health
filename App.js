@@ -1651,7 +1651,7 @@ export default function App() {
               <Text style={styles.emergencySubtitle}>Kıbrıs Türk Belediyeler Birliği</Text>
               <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
                 {[
-                  { name: 'Lefkoşa',                  phone: '03922285221', mapQuery: 'Lefkoşa Türk Belediyesi Atatürk Caddesi 90 Yenişehir Lefkoşa KKTC' },
+                  { name: 'Lefkoşa',                  phone: '03922285221', mapQuery: 'Lefkoşa Türk Belediyesi' },
                   { name: 'Gazimağusa',                phone: '03923665332', mapQuery: 'Gazimağusa Belediyesi Fazıl Polatpaşa Bulvarı Gazimağusa KKTC' },
                   { name: 'Girne',                     phone: '03928152118', mapQuery: 'Girne Belediyesi Ecevit Caddesi 68 Girne KKTC' },
                   { name: 'Gönyeli-Alayköy',           phone: '03922231901', mapQuery: 'Gönyeli Belediyesi Belediye Bulvarı 30 Yenikent Gönyeli KKTC' },
