@@ -1650,31 +1650,31 @@ export default function App() {
               <Text style={styles.emergencySubtitle}>Kıbrıs Türk Belediyeler Birliği</Text>
               <ScrollView showsVerticalScrollIndicator={false}>
                 {[
-                  { name: 'Lefkoşa',                  phone: '03922285221' },
-                  { name: 'Gazimağusa',                phone: '03923665332' },
-                  { name: 'Girne',                     phone: '03928152118' },
-                  { name: 'Gönyeli-Alayköy',           phone: '03922231901' },
-                  { name: 'Lapta-Alsancak-Çamlıbel',  phone: '03928228623' },
-                  { name: 'Güzelyurt',                 phone: '03927142813' },
-                  { name: 'Değirmenlik-Akıncılar',     phone: '03922323322' },
-                  { name: 'Dikmen',                    phone: '03922372863' },
-                  { name: 'Lefke',                     phone: '03927287347' },
-                  { name: 'Mesarya',                   phone: '03923777459' },
-                  { name: 'Çatalköy-Esentepe',         phone: '03928244068' },
-                  { name: 'İskele',                    phone: '03923712521' },
-                  { name: 'Erenköy-Karpaz',            phone: '03923744350' },
-                  { name: 'Yeni Boğaziçi',             phone: '03923788145' },
-                  { name: 'Geçitkale-Serdarlı',        phone: '03923733147' },
-                  { name: 'Mehmetçik-Büyükkonuk',      phone: '03923755090' },
-                  { name: 'Beyarmudu',                 phone: '03923799401' },
-                  { name: 'Tatlısu',                   phone: '03923892026' },
-                ].map(({ name, phone }) => (
+                  { name: 'Lefkoşa',                  phone: '03922285221', mapQuery: '35.1900566,33.3637376' },
+                  { name: 'Gazimağusa',                phone: '03923665332', mapQuery: 'Gazimağusa Belediyesi Fazıl Polatpaşa Bulvarı Gazimağusa KKTC' },
+                  { name: 'Girne',                     phone: '03928152118', mapQuery: 'Girne Belediyesi Ecevit Caddesi 68 Girne KKTC' },
+                  { name: 'Gönyeli-Alayköy',           phone: '03922231901', mapQuery: 'Gönyeli Belediyesi Belediye Bulvarı 30 Yenikent Gönyeli KKTC' },
+                  { name: 'Lapta-Alsancak-Çamlıbel',  phone: '03928228623', mapQuery: 'Lapta Belediyesi Lapta Girne KKTC' },
+                  { name: 'Güzelyurt',                 phone: '03927142813', mapQuery: 'Güzelyurt Belediyesi Alemdar Sokak 14 Güzelyurt KKTC' },
+                  { name: 'Değirmenlik-Akıncılar',     phone: '03922323322', mapQuery: 'Değirmenlik Belediyesi Başpınar Yolu Sokak 27 Değirmenlik KKTC' },
+                  { name: 'Dikmen',                    phone: '03922372863', mapQuery: 'Dikmen Belediyesi 20 Temmuz Caddesi Dikmen Girne KKTC' },
+                  { name: 'Lefke',                     phone: '03927287347', mapQuery: 'Lefke Belediyesi Tahir Efendi Sokak 1 Lefke KKTC' },
+                  { name: 'Mesarya',                   phone: '03923777459', mapQuery: 'Mesarya Belediyesi KKTC' },
+                  { name: 'Çatalköy-Esentepe',         phone: '03928244068', mapQuery: 'Çatalköy Belediyesi Mücahit Sokak 10 Çatalköy Girne KKTC' },
+                  { name: 'İskele',                    phone: '03923712521', mapQuery: 'İskele Belediyesi Bozdağ Sokak 4 İskele KKTC' },
+                  { name: 'Erenköy-Karpaz',            phone: '03923744350', mapQuery: 'Yeni Erenköy Belediyesi İstiklal Caddesi Yeni Erenköy İskele KKTC' },
+                  { name: 'Yeni Boğaziçi',             phone: '03923788145', mapQuery: 'Yeniboğaziçi Belediyesi İstiklal Caddesi Yeniboğaziçi Gazimağusa KKTC' },
+                  { name: 'Geçitkale-Serdarlı',        phone: '03923733147', mapQuery: 'Geçitkale Belediyesi Ecevit Caddesi 70 Geçitkale Gazimağusa KKTC' },
+                  { name: 'Mehmetçik-Büyükkonuk',      phone: '03923755090', mapQuery: 'Mehmetçik Belediyesi Atatürk Meydanı 3 Mehmetçik İskele KKTC' },
+                  { name: 'Beyarmudu',                 phone: '03923799401', mapQuery: 'Beyarmudu Belediyesi Hüseyin Kafa Caddesi 68 Beyarmudu Gazimağusa KKTC' },
+                  { name: 'Tatlısu',                   phone: '03923892026', mapQuery: 'Tatlısu Belediyesi Cumhuriyet Sokak 9 Tatlısu Gazimağusa KKTC' },
+                ].map(({ name, phone, mapQuery }) => (
                   <View key={name} style={styles.emergencyRow}>
                     <View style={styles.emergencyIconWrap}>
                       <Ionicons name="business-outline" size={18} color={colors.textSecondary} />
                     </View>
                     <Text style={[styles.emergencyLabel, { flex: 1 }]}>{name}</Text>
-                    <TouchableOpacity onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' Belediyesi Kuzey Kıbrıs')}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
+                    <TouchableOpacity onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
                       <Ionicons name="map-outline" size={18} color={colors.textSecondary} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
