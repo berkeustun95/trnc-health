@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
-  Modal, TextInput, Switch, ScrollView, Alert, KeyboardAvoidingView, Platform
+  Modal, TextInput, Switch, ScrollView, Alert, KeyboardAvoidingView, Platform, Linking
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
@@ -11,7 +11,7 @@ import { colors, shadow } from '../constants/theme'
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'admin']
-const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast']
+const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -50,6 +50,40 @@ function SectionEmpty({ text }) {
   return <Text style={s.empty}>{text}</Text>
 }
 
+function RejectModal({ visible, entityName, onConfirm, onCancel }) {
+  const [reason, setReason] = useState('')
+  function handleConfirm() { onConfirm(reason.trim()); setReason('') }
+  function handleCancel()  { onCancel(); setReason('') }
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleCancel}>
+      <TouchableOpacity style={s.rejectOverlay} activeOpacity={1} onPress={handleCancel}>
+        <TouchableOpacity style={s.rejectSheet} activeOpacity={1}>
+          <Text style={s.rejectTitle}>Reject{entityName ? ` "${entityName}"` : ''}?</Text>
+          <Text style={s.rejectSub}>Add a reason so the provider knows what to fix.</Text>
+          <TextInput
+            style={s.rejectInput}
+            value={reason}
+            onChangeText={setReason}
+            placeholder="e.g. Could not verify registration number"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            maxLength={300}
+            textAlignVertical="top"
+          />
+          <View style={s.rejectBtnRow}>
+            <TouchableOpacity style={s.rejectCancelBtn} onPress={handleCancel}>
+              <Text style={s.rejectCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.rejectConfirmBtn} onPress={handleConfirm}>
+              <Text style={s.rejectConfirmText}>Reject</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  )
+}
+
 // ─── Dashboard Tab ──────────────────────────────────────────────────────────
 
 function DashboardTab({ onNavigate }) {
@@ -64,6 +98,8 @@ function DashboardTab({ onNavigate }) {
         { count: pendingClaims },
         { count: pendingChanges },
         { count: pendingProviders },
+        { count: pendingCredentials },
+        { count: pendingDocs },
       ] = await Promise.all([
         supabase.from('facilities').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -71,8 +107,10 @@ function DashboardTab({ onNavigate }) {
         supabase.from('claim_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('facility_change_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('facilities').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('provider_credentials').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('provider_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ])
-      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders })
+      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs })
     }
     load()
   }, [])
@@ -80,10 +118,12 @@ function DashboardTab({ onNavigate }) {
   if (!stats) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
 
   const urgencies = [
-    stats.pendingChanges  > 0 && { label: 'Profile change requests', count: stats.pendingChanges,  tab: 'Changes',   color: colors.accent },
-    stats.pendingClaims   > 0 && { label: 'Pending facility claims',  count: stats.pendingClaims,   tab: 'Claims',    color: colors.danger },
-    stats.pendingProviders > 0 && { label: 'Providers awaiting approval', count: stats.pendingProviders, tab: 'Providers', color: colors.danger },
-    stats.pendingAppts    > 0 && { label: 'Pending appointments',     count: stats.pendingAppts,    tab: 'Bookings',  color: colors.primary },
+    stats.pendingChanges     > 0 && { label: 'Profile change requests',     count: stats.pendingChanges,     tab: 'Changes',     color: colors.accent },
+    stats.pendingClaims      > 0 && { label: 'Pending facility claims',      count: stats.pendingClaims,      tab: 'Claims',      color: colors.danger },
+    stats.pendingProviders   > 0 && { label: 'Providers awaiting approval',  count: stats.pendingProviders,   tab: 'Providers',   color: colors.danger },
+    stats.pendingCredentials > 0 && { label: 'Credentials awaiting review',  count: stats.pendingCredentials, tab: 'Credentials', color: '#7C3AED' },
+    (stats.pendingDocs ?? 0) > 0 && { label: 'ID documents to verify',       count: stats.pendingDocs,        tab: 'Claims',      color: colors.accent },
+    stats.pendingAppts       > 0 && { label: 'Pending appointments',          count: stats.pendingAppts,       tab: 'Bookings',    color: colors.primary },
   ].filter(Boolean)
 
   return (
@@ -727,6 +767,7 @@ function DutyTab() {
 function ClaimsTab() {
   const [claims, setClaims] = useState([])
   const [loading, setLoading] = useState(true)
+  const [rejectTarget, setRejectTarget] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -736,12 +777,21 @@ function ClaimsTab() {
       .eq('status', 'pending')
       .order('created_at')
     const rows = data ?? []
-    const ids = [...new Set(rows.map(r => r.requester_id).filter(Boolean))]
-    const { data: profilesData } = ids.length
-      ? await supabase.from('profiles').select('id, full_name').in('id', ids)
-      : { data: [] }
-    const pm = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
-    setClaims(rows.map(r => ({ ...r, _profile: pm[r.requester_id] })))
+    const providerIds = [...new Set(rows.map(r => r.requester_id).filter(Boolean))]
+    const facilityIds = [...new Set(rows.map(r => r.facilities?.id).filter(Boolean))]
+
+    const [{ data: profilesData }, { data: docsData }] = await Promise.all([
+      providerIds.length ? supabase.from('profiles').select('id, full_name').in('id', providerIds) : { data: [] },
+      facilityIds.length ? supabase.from('provider_documents').select('id, facility_id, doc_type, document_url, status').in('facility_id', facilityIds) : { data: [] },
+    ])
+
+    const pm  = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
+    const dm  = (docsData ?? []).reduce((acc, d) => {
+      if (!acc[d.facility_id]) acc[d.facility_id] = []
+      acc[d.facility_id].push(d)
+      return acc
+    }, {})
+    setClaims(rows.map(r => ({ ...r, _profile: pm[r.requester_id], _docs: dm[r.facilities?.id] ?? [] })))
     setLoading(false)
   }, [])
 
@@ -758,7 +808,10 @@ function ClaimsTab() {
       verified:        true,
     }).eq('id', claim.facilities.id)
     if (err) { Alert.alert('Error', err.message); return }
-    await supabase.from('claim_requests').update({ status: 'approved' }).eq('id', claim.id)
+    await Promise.all([
+      supabase.from('claim_requests').update({ status: 'approved' }).eq('id', claim.id),
+      supabase.from('provider_documents').update({ status: 'approved' }).eq('facility_id', claim.facilities.id),
+    ])
     const { data: p } = await supabase.from('profiles').select('push_token').eq('id', claim.requester_id).maybeSingle()
     const title = 'Claim approved!'
     const body = `${claim.facilities?.name ?? 'Your facility'} is now live with a 5-day trial.`
@@ -767,15 +820,19 @@ function ClaimsTab() {
     load()
   }
 
-  async function reject(claim) {
-    await supabase.from('claim_requests').update({ status: 'rejected' }).eq('id', claim.id)
+  async function reject(claim, reason) {
+    await supabase.from('claim_requests').update({ status: 'rejected', rejection_reason: reason || null }).eq('id', claim.id)
     const { data: p } = await supabase.from('profiles').select('push_token').eq('id', claim.requester_id).maybeSingle()
     const title = 'Claim not approved'
-    const body = `Your claim for ${claim.facilities?.name ?? 'the facility'} was not approved. Contact us for details.`
+    const body = reason
+      ? `Your claim for ${claim.facilities?.name ?? 'the facility'} was not approved: ${reason}`
+      : `Your claim for ${claim.facilities?.name ?? 'the facility'} was not approved. Contact us for details.`
     if (p?.push_token) await sendPushNotification(p.push_token, title, body)
     await recordNotification(claim.requester_id, title, body)
     load()
   }
+
+  const DOC_LABELS = { medical_license: 'Medical License', registration_cert: 'Registration Cert', business_license: 'Business License', national_id: 'National ID' }
 
   if (loading) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
 
@@ -795,6 +852,20 @@ function ClaimsTab() {
             <Text style={[s.cardSub, { fontSize: 10, marginTop: 2 }]}>
               {new Date(c.created_at).toLocaleDateString()}
             </Text>
+
+            {c._docs.length > 0 && (
+              <View style={s.docsSection}>
+                <Text style={s.docsSectionLabel}>ID DOCUMENTS ({c._docs.length})</Text>
+                {c._docs.map(doc => (
+                  <TouchableOpacity key={doc.id} style={s.docRow} onPress={() => Linking.openURL(doc.document_url)}>
+                    <Feather name="file-text" size={13} color={colors.primary} />
+                    <Text style={s.docRowText}>{DOC_LABELS[doc.doc_type] ?? doc.doc_type}</Text>
+                    <Feather name="external-link" size={12} color={colors.primary} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             <View style={[s.cardRow, { marginTop: 10, gap: 8 }]}>
               <TouchableOpacity
                 style={[s.ghostBtn, { backgroundColor: colors.successLight, flex: 1 }]}
@@ -809,13 +880,19 @@ function ClaimsTab() {
               >
                 <Text style={[s.ghostBtnText, { color: colors.success }]}>Approve (5-day trial)</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.dangerGhostBtn} onPress={() => reject(c)}>
+              <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget(c)}>
                 <Text style={s.dangerGhostText}>Reject</Text>
               </TouchableOpacity>
             </View>
           </View>
         ))
       }
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget?.facilities?.name}
+        onConfirm={reason => { reject(rejectTarget, reason); setRejectTarget(null) }}
+        onCancel={() => setRejectTarget(null)}
+      />
     </ScrollView>
   )
 }
@@ -823,9 +900,10 @@ function ClaimsTab() {
 // ─── Providers Tab ──────────────────────────────────────────────────────────
 
 function ProvidersTab() {
-  const [pending,  setPending]  = useState([])
-  const [active,   setActive]   = useState([])
-  const [loading,  setLoading]  = useState(true)
+  const [pending,      setPending]      = useState([])
+  const [active,       setActive]       = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [rejectTarget, setRejectTarget] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -835,12 +913,17 @@ function ProvidersTab() {
       .not('provider_id', 'is', null)
       .order('name')
     const rows = data ?? []
-    const ids = [...new Set(rows.map(r => r.provider_id).filter(Boolean))]
-    const { data: profilesData } = ids.length
-      ? await supabase.from('profiles').select('id, full_name').in('id', ids)
-      : { data: [] }
+    const ids        = [...new Set(rows.map(r => r.provider_id).filter(Boolean))]
+    const facilityIds = [...new Set(rows.map(r => r.id).filter(Boolean))]
+
+    const [{ data: profilesData }, { data: docsData }] = await Promise.all([
+      ids.length        ? supabase.from('profiles').select('id, full_name').in('id', ids) : { data: [] },
+      facilityIds.length ? supabase.from('provider_documents').select('id, facility_id, doc_type, document_url').in('facility_id', facilityIds) : { data: [] },
+    ])
+
     const pm = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
-    const enriched = rows.map(r => ({ ...r, _profile: pm[r.provider_id] }))
+    const dm = (docsData ?? []).reduce((acc, d) => { if (!acc[d.facility_id]) acc[d.facility_id] = []; acc[d.facility_id].push(d); return acc }, {})
+    const enriched = rows.map(r => ({ ...r, _profile: pm[r.provider_id], _docs: dm[r.id] ?? [] }))
     setPending(enriched.filter(f => f.status === 'pending'))
     setActive(enriched.filter(f => f.status !== 'pending'))
     setLoading(false)
@@ -867,13 +950,15 @@ function ProvidersTab() {
     load()
   }
 
-  async function reject(facilityId) {
+  async function reject(facilityId, reason) {
     const facility = [...pending, ...active].find(f => f.id === facilityId)
     await supabase.from('facilities').update({ status: 'suspended' }).eq('id', facilityId)
     if (facility?.provider_id) {
       const { data: p } = await supabase.from('profiles').select('push_token').eq('id', facility.provider_id).maybeSingle()
       const title = 'Application not approved'
-      const body = `Your application for ${facility.name} was not approved. Contact us for details.`
+      const body = reason
+        ? `Your application for ${facility.name} was not approved: ${reason}`
+        : `Your application for ${facility.name} was not approved. Contact us for details.`
       if (p?.push_token) await sendPushNotification(p.push_token, title, body)
       await recordNotification(facility.provider_id, title, body)
     }
@@ -929,17 +1014,38 @@ function ProvidersTab() {
             <Text style={s.cardSub}>{f.type} · {f.membership_tier === 'pro' ? 'Pro' : 'Basic'}</Text>
             <Text style={[s.cardSub, { marginTop: 4 }]} numberOfLines={1}>{f._profile?.full_name || f.provider_id.slice(0, 8).toUpperCase()}</Text>
             {f.registration_number ? <Text style={[s.cardSub, { fontSize: 11, marginTop: 2 }]} numberOfLines={1}>Reg: {f.registration_number}</Text> : null}
+
+            {f._docs.length > 0 && (
+              <View style={s.docsSection}>
+                <Text style={s.docsSectionLabel}>ID DOCUMENTS ({f._docs.length})</Text>
+                {f._docs.map(doc => (
+                  <TouchableOpacity key={doc.id} style={s.docRow} onPress={() => Linking.openURL(doc.document_url)}>
+                    <Feather name="file-text" size={13} color={colors.primary} />
+                    <Text style={s.docRowText}>{{ medical_license: 'Medical License', registration_cert: 'Registration Cert', business_license: 'Business License', national_id: 'National ID' }[doc.doc_type] ?? doc.doc_type}</Text>
+                    <Feather name="external-link" size={12} color={colors.primary} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             <View style={[s.cardRow, { marginTop: 10, gap: 8 }]}>
               <TouchableOpacity style={[s.ghostBtn, { backgroundColor: colors.successLight, flex: 1 }]} onPress={() => approve(f.id)}>
                 <Text style={[s.ghostBtnText, { color: colors.success }]}>Approve (5-day trial)</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.dangerGhostBtn]} onPress={() => reject(f.id)}>
+              <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget(f)}>
                 <Text style={s.dangerGhostText}>Reject</Text>
               </TouchableOpacity>
             </View>
           </View>
         ))
       }
+
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget?.name}
+        onConfirm={reason => { reject(rejectTarget.id, reason); setRejectTarget(null) }}
+        onCancel={() => setRejectTarget(null)}
+      />
 
       <Text style={[s.sectionTitle, { marginTop: 24 }]}>Active providers ({active.length})</Text>
       {active.length === 0
@@ -1156,6 +1262,7 @@ function ChangesTab() {
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
+  const [rejectTarget, setRejectTarget] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1201,12 +1308,14 @@ function ChangesTab() {
     setActionLoading(null)
   }
 
-  async function reject(req) {
+  async function reject(req, reason) {
     setActionLoading(req.id)
-    await supabase.from('facility_change_requests').update({ status: 'rejected' }).eq('id', req.id)
+    await supabase.from('facility_change_requests').update({ status: 'rejected', rejection_reason: reason || null }).eq('id', req.id)
     const { data: p } = await supabase.from('profiles').select('push_token').eq('id', req.provider_id).maybeSingle()
     const title = 'Changes not approved'
-    const body = `Your updates to ${req.facilities?.name ?? 'your facility'} were not approved. Contact us for details.`
+    const body = reason
+      ? `Your updates to ${req.facilities?.name ?? 'your facility'} were not approved: ${reason}`
+      : `Your updates to ${req.facilities?.name ?? 'your facility'} were not approved. Contact us for details.`
     if (p?.push_token) await sendPushNotification(p.push_token, title, body)
     await recordNotification(req.provider_id, title, body)
     setActionLoading(null)
@@ -1248,7 +1357,7 @@ function ChangesTab() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[s.dangerGhostBtn, isLoading && { opacity: 0.5 }]}
-                  onPress={() => reject(req)}
+                  onPress={() => setRejectTarget(req)}
                   disabled={isLoading}
                 >
                   <Text style={s.dangerGhostText}>Reject</Text>
@@ -1258,6 +1367,128 @@ function ChangesTab() {
           )
         })
       }
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget?.facilities?.name}
+        onConfirm={reason => { reject(rejectTarget, reason); setRejectTarget(null) }}
+        onCancel={() => setRejectTarget(null)}
+      />
+    </ScrollView>
+  )
+}
+
+// ─── Credentials Tab ─────────────────────────────────────────────────────────
+
+const CRED_LABELS = { diploma: '🎓 Diploma', certificate: '📜 Certificate' }
+const DOC_TYPE_LABELS = { medical_license: 'Medical License', registration_cert: 'Registration Cert', business_license: 'Business License', national_id: 'National ID' }
+
+function CredentialsTab() {
+  const [credentials, setCredentials]   = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [actionLoading, setActionLoading] = useState(null)
+  const [rejectTarget, setRejectTarget] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('provider_credentials')
+      .select('id, facility_id, provider_id, cred_type, title, institution, year, document_url, created_at, facilities(name, type)')
+      .eq('status', 'pending')
+      .order('created_at')
+    const rows = data ?? []
+    const ids = [...new Set(rows.map(r => r.provider_id).filter(Boolean))]
+    const { data: profilesData } = ids.length
+      ? await supabase.from('profiles').select('id, full_name').in('id', ids)
+      : { data: [] }
+    const pm = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
+    setCredentials(rows.map(r => ({ ...r, _provider: pm[r.provider_id] })))
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(cred) {
+    setActionLoading(cred.id)
+    await supabase.from('provider_credentials').update({ status: 'approved' }).eq('id', cred.id)
+    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', cred.provider_id).maybeSingle()
+    const title = 'Credential approved'
+    const body = `Your ${cred.cred_type} "${cred.title}" is now visible on your profile.`
+    if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+    await recordNotification(cred.provider_id, title, body)
+    setActionLoading(null)
+    load()
+  }
+
+  async function reject(cred, reason) {
+    setActionLoading(cred.id)
+    await supabase.from('provider_credentials').update({ status: 'rejected', rejection_reason: reason || null }).eq('id', cred.id)
+    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', cred.provider_id).maybeSingle()
+    const title = 'Credential not approved'
+    const body = reason
+      ? `Your ${cred.cred_type} "${cred.title}" was not approved: ${reason}`
+      : `Your ${cred.cred_type} "${cred.title}" was not approved. Contact us for details.`
+    if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+    await recordNotification(cred.provider_id, title, body)
+    setActionLoading(null)
+    load()
+  }
+
+  if (loading) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+
+  return (
+    <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
+      <Text style={s.sectionTitle}>Pending credentials ({credentials.length})</Text>
+      {credentials.length === 0
+        ? <SectionEmpty text="No pending credentials." />
+        : credentials.map(cred => {
+          const isLoading = actionLoading === cred.id
+          return (
+            <View key={cred.id} style={s.card}>
+              <View style={[s.cardRow, { justifyContent: 'space-between', marginBottom: 2 }]}>
+                <Text style={s.cardTitle} numberOfLines={1}>{CRED_LABELS[cred.cred_type] ?? cred.cred_type} — {cred.title}</Text>
+              </View>
+              <Text style={s.cardSub}>{cred.institution}{cred.year ? ` · ${cred.year}` : ''}</Text>
+              <Text style={[s.cardSub, { marginTop: 2 }]}>{TYPE_ICONS[cred.facilities?.type] ?? '🏥'} {cred.facilities?.name ?? '—'}</Text>
+              <Text style={[s.cardSub, { marginTop: 2 }]}>Provider: {cred._provider?.full_name ?? cred.provider_id?.slice(0, 8)}</Text>
+              <Text style={[s.cardSub, { fontSize: 10, marginTop: 2 }]}>{new Date(cred.created_at).toLocaleDateString()}</Text>
+
+              {cred.document_url ? (
+                <TouchableOpacity style={[s.docRow, { marginTop: 8 }]} onPress={() => Linking.openURL(cred.document_url)}>
+                  <Feather name="file-text" size={13} color={colors.primary} />
+                  <Text style={s.docRowText}>View document</Text>
+                  <Feather name="external-link" size={12} color={colors.primary} />
+                </TouchableOpacity>
+              ) : null}
+
+              <View style={[s.cardRow, { marginTop: 12, gap: 8 }]}>
+                <TouchableOpacity
+                  style={[s.ghostBtn, { backgroundColor: colors.successLight, flex: 1 }, isLoading && { opacity: 0.5 }]}
+                  onPress={() => approve(cred)}
+                  disabled={isLoading}
+                >
+                  {isLoading
+                    ? <ActivityIndicator size="small" color={colors.success} />
+                    : <Text style={[s.ghostBtnText, { color: colors.success }]}>Approve</Text>
+                  }
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.dangerGhostBtn, isLoading && { opacity: 0.5 }]}
+                  onPress={() => setRejectTarget(cred)}
+                  disabled={isLoading}
+                >
+                  <Text style={s.dangerGhostText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )
+        })
+      }
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget?.title}
+        onConfirm={reason => { reject(rejectTarget, reason); setRejectTarget(null) }}
+        onCancel={() => setRejectTarget(null)}
+      />
     </ScrollView>
   )
 }
@@ -1404,15 +1635,16 @@ export default function AdminScreen({ session }) {
         </ScrollView>
 
         <View style={{ flex: 1 }}>
-          {tab === 'Dashboard'  && <DashboardTab onNavigate={navigateTo} />}
-          {tab === 'Changes'    && <ChangesTab />}
-          {tab === 'Claims'     && <ClaimsTab />}
-          {tab === 'Providers'  && <ProvidersTab />}
-          {tab === 'Facilities' && <FacilitiesTab />}
-          {tab === 'Duty'       && <DutyTab />}
-          {tab === 'Users'      && <UsersTab />}
-          {tab === 'Bookings'   && <BookingsTab />}
-          {tab === 'Broadcast'  && <BroadcastTab />}
+          {tab === 'Dashboard'   && <DashboardTab onNavigate={navigateTo} />}
+          {tab === 'Changes'     && <ChangesTab />}
+          {tab === 'Claims'      && <ClaimsTab />}
+          {tab === 'Providers'   && <ProvidersTab />}
+          {tab === 'Credentials' && <CredentialsTab />}
+          {tab === 'Facilities'  && <FacilitiesTab />}
+          {tab === 'Duty'        && <DutyTab />}
+          {tab === 'Users'       && <UsersTab />}
+          {tab === 'Bookings'    && <BookingsTab />}
+          {tab === 'Broadcast'   && <BroadcastTab />}
         </View>
       </View>
     </SafeAreaView>
@@ -1500,6 +1732,24 @@ const s = StyleSheet.create({
   urgencyCount:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#fff' },
   allClearBox:        { alignItems: 'center', gap: 10, marginTop: 40 },
   allClearText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+
+  // reject modal
+  rejectOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  rejectSheet:        { backgroundColor: colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 },
+  rejectTitle:        { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
+  rejectSub:          { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 14 },
+  rejectInput:        { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, fontSize: 14, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary, minHeight: 88, marginBottom: 16 },
+  rejectBtnRow:       { flexDirection: 'row', gap: 10 },
+  rejectCancelBtn:    { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' },
+  rejectCancelText:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  rejectConfirmBtn:   { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: colors.danger, alignItems: 'center' },
+  rejectConfirmText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+
+  // document rows
+  docsSection:        { marginTop: 10, backgroundColor: colors.primaryLight, borderRadius: 10, padding: 10, gap: 6 },
+  docsSectionLabel:   { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.5, marginBottom: 2 },
+  docRow:             { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  docRowText:         { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.primary },
 
   // diff rows
   diffRow:            { flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap', gap: 4, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.border },

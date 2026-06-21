@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking, Switch } from 'react-native'
+import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking, Switch, Modal } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
@@ -127,6 +127,15 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [facilityLng, setFacilityLng]   = useState(facility.longitude ?? null)
   const [showMapPicker, setShowMapPicker] = useState(false)
 
+  const [credentials, setCredentials]         = useState([])
+  const [credModalVisible, setCredModalVisible] = useState(false)
+  const [newCred, setNewCred]                 = useState({ cred_type: 'diploma', title: '', institution: '', year: '' })
+  const [savingCred, setSavingCred]           = useState(false)
+  const [credImageUri, setCredImageUri]       = useState(null)
+  const [credImageBase64, setCredImageBase64] = useState(null)
+  const [uploadingCredDoc, setUploadingCredDoc] = useState(false)
+  const [submissionHistory, setSubmissionHistory] = useState([])
+
   useEffect(() => {
     async function load() {
       if (!isPharmacy) {
@@ -190,6 +199,8 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     load()
     loadQuestions()
     loadStats()
+    loadCredentials()
+    loadSubmissionHistory()
     if (showQuizTabs) { loadQuizReviews(); loadArchivedReviews() }
   }, [])
 
@@ -462,6 +473,77 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     }
   }
 
+  async function loadCredentials() {
+    const { data } = await supabase
+      .from('provider_credentials')
+      .select('id, cred_type, title, institution, year, status, rejection_reason, document_url, created_at')
+      .eq('facility_id', facility.id)
+      .order('created_at', { ascending: false })
+    setCredentials(data ?? [])
+  }
+
+  async function loadSubmissionHistory() {
+    const { data } = await supabase
+      .from('facility_change_requests')
+      .select('id, proposed_changes, status, rejection_reason, created_at')
+      .eq('facility_id', facility.id)
+      .neq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(10)
+    setSubmissionHistory(data ?? [])
+  }
+
+  async function pickCredDoc() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) return
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+      base64: true,
+    })
+    if (result.canceled) return
+    setCredImageUri(result.assets[0].uri)
+    setCredImageBase64(result.assets[0].base64)
+  }
+
+  async function saveCred() {
+    if (!newCred.title.trim() || !newCred.institution.trim()) return
+    setSavingCred(true)
+    let document_url = null
+    if (credImageBase64) {
+      setUploadingCredDoc(true)
+      try {
+        const ext = (credImageUri?.split('.').pop() || 'jpg').toLowerCase()
+        const path = `${session.user.id}/${Date.now()}.${ext}`
+        const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('provider-credentials')
+          .upload(path, decode(credImageBase64), { contentType })
+        if (!upErr) {
+          const { data: { publicUrl } } = supabase.storage.from('provider-credentials').getPublicUrl(path)
+          document_url = publicUrl
+        }
+      } catch {}
+      setUploadingCredDoc(false)
+    }
+    await supabase.from('provider_credentials').insert({
+      facility_id:  facility.id,
+      provider_id:  session.user.id,
+      cred_type:    newCred.cred_type,
+      title:        newCred.title.trim(),
+      institution:  newCred.institution.trim(),
+      year:         newCred.year ? parseInt(newCred.year, 10) : null,
+      document_url,
+    })
+    setNewCred({ cred_type: 'diploma', title: '', institution: '', year: '' })
+    setCredImageUri(null)
+    setCredImageBase64(null)
+    setCredModalVisible(false)
+    setSavingCred(false)
+    loadCredentials()
+  }
+
   if (activeReview) {
     return (
       <QuizReviewScreen
@@ -587,6 +669,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         </View>
 
         {tab === 'profile' ? (
+          <>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
             <View style={styles.card}>
               <Text style={styles.fieldLabel}>Cover Photo</Text>
@@ -866,7 +949,144 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 )}
               </View>
             )}
+
+            {/* ── Credentials ──────────────────────────────────── */}
+            <View style={[styles.card, { marginTop: 16 }]}>
+              <View style={styles.credHeader}>
+                <Text style={styles.fieldLabel}>CREDENTIALS & QUALIFICATIONS</Text>
+                <TouchableOpacity style={styles.credAddBtn} onPress={() => setCredModalVisible(true)}>
+                  <Feather name="plus" size={14} color={colors.primary} />
+                  <Text style={styles.credAddBtnText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+              {credentials.length === 0 ? (
+                <Text style={styles.credEmptyText}>No credentials yet. Add diplomas or certificates to build patient trust.</Text>
+              ) : credentials.map(cred => {
+                const statusColor = cred.status === 'approved' ? colors.success : cred.status === 'rejected' ? colors.danger : colors.accent
+                const statusLabel = cred.status === 'approved' ? 'Approved' : cred.status === 'rejected' ? 'Rejected' : 'Pending review'
+                return (
+                  <View key={cred.id} style={styles.credRow}>
+                    <Text style={styles.credIcon}>{cred.cred_type === 'diploma' ? '🎓' : '📜'}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.credTitle}>{cred.title}</Text>
+                      <Text style={styles.credSub}>{cred.institution}{cred.year ? ` · ${cred.year}` : ''}</Text>
+                      <View style={[styles.credStatusPill, { backgroundColor: statusColor + '20' }]}>
+                        <Text style={[styles.credStatusText, { color: statusColor }]}>{statusLabel}</Text>
+                      </View>
+                      {cred.status === 'rejected' && cred.rejection_reason ? (
+                        <Text style={styles.credRejectionReason}>Reason: {cred.rejection_reason}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                )
+              })}
+            </View>
+
+            {/* ── Submission history ───────────────────────────── */}
+            {submissionHistory.length > 0 && (
+              <View style={[styles.card, { marginTop: 16, marginBottom: 8 }]}>
+                <Text style={styles.fieldLabel}>RECENT SUBMISSIONS</Text>
+                {submissionHistory.map(req => {
+                  const isApproved = req.status === 'approved'
+                  const color = isApproved ? colors.success : colors.danger
+                  const fields = Object.keys(req.proposed_changes ?? {}).filter(k => req.proposed_changes[k] != null)
+                  return (
+                    <View key={req.id} style={styles.historyRow}>
+                      <View style={[styles.historyDot, { backgroundColor: color }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.historyStatus}>{isApproved ? 'Approved' : 'Rejected'} · {new Date(req.created_at).toLocaleDateString()}</Text>
+                        <Text style={styles.historyFields} numberOfLines={1}>{fields.join(', ')}</Text>
+                        {!isApproved && req.rejection_reason ? (
+                          <Text style={styles.historyReason}>"{req.rejection_reason}"</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  )
+                })}
+              </View>
+            )}
+
           </ScrollView>
+
+          {/* ── Add credential modal ─────────────────────────── */}
+          <Modal visible={credModalVisible} animationType="slide" transparent onRequestClose={() => setCredModalVisible(false)}>
+            <View style={styles.credModalOverlay}>
+              <View style={styles.credModalSheet}>
+                <View style={styles.credModalHeader}>
+                  <Text style={styles.credModalTitle}>Add Credential</Text>
+                  <TouchableOpacity onPress={() => setCredModalVisible(false)}>
+                    <Feather name="x" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                  <Text style={styles.fieldLabel}>TYPE</Text>
+                  <View style={styles.credTypeRow}>
+                    {[['diploma', '🎓 Diploma'], ['certificate', '📜 Certificate']].map(([val, label]) => (
+                      <TouchableOpacity
+                        key={val}
+                        style={[styles.credTypeChip, newCred.cred_type === val && styles.credTypeChipActive]}
+                        onPress={() => setNewCred(p => ({ ...p, cred_type: val }))}
+                      >
+                        <Text style={[styles.credTypeChipText, newCred.cred_type === val && styles.credTypeChipTextActive]}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <Text style={[styles.fieldLabel, { marginTop: 14 }]}>TITLE *</Text>
+                  <TextInput
+                    style={styles.fieldInput}
+                    value={newCred.title}
+                    onChangeText={v => setNewCred(p => ({ ...p, title: v }))}
+                    placeholder={newCred.cred_type === 'diploma' ? 'e.g. BSc Physiotherapy' : 'e.g. Nish Technique Certificate'}
+                    placeholderTextColor={colors.textSecondary}
+                    maxLength={120}
+                  />
+                  <Text style={[styles.fieldLabel, { marginTop: 14 }]}>INSTITUTION *</Text>
+                  <TextInput
+                    style={styles.fieldInput}
+                    value={newCred.institution}
+                    onChangeText={v => setNewCred(p => ({ ...p, institution: v }))}
+                    placeholder="e.g. Istanbul University"
+                    placeholderTextColor={colors.textSecondary}
+                    maxLength={120}
+                  />
+                  <Text style={[styles.fieldLabel, { marginTop: 14 }]}>YEAR</Text>
+                  <TextInput
+                    style={styles.fieldInput}
+                    value={newCred.year}
+                    onChangeText={v => setNewCred(p => ({ ...p, year: v.replace(/\D/g, '').slice(0, 4) }))}
+                    placeholder="e.g. 2018"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                  />
+                  <Text style={[styles.fieldLabel, { marginTop: 14 }]}>DOCUMENT (optional)</Text>
+                  <TouchableOpacity style={styles.credDocBtn} onPress={pickCredDoc} activeOpacity={0.8}>
+                    {credImageUri
+                      ? <Text style={[styles.credDocBtnText, { color: colors.success }]}>Photo selected — tap to change</Text>
+                      : <>
+                          <Feather name="upload" size={15} color={colors.primary} />
+                          <Text style={styles.credDocBtnText}>Upload photo of diploma / certificate</Text>
+                        </>
+                    }
+                    {uploadingCredDoc && <ActivityIndicator size="small" color={colors.primary} />}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.saveBtn, { marginTop: 20 }, (!newCred.title.trim() || !newCred.institution.trim() || savingCred) && { opacity: 0.5 }]}
+                    onPress={saveCred}
+                    disabled={!newCred.title.trim() || !newCred.institution.trim() || savingCred}
+                  >
+                    {savingCred
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Text style={styles.saveBtnText}>Submit for review</Text>
+                    }
+                  </TouchableOpacity>
+                  <Text style={styles.credModalDisclaimer}>Admin will review and approve your credential before it's visible to patients.</Text>
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+          </>
+
         ) : tab === 'archive' ? (
           loadingArchive ? (
             <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
@@ -1309,4 +1529,38 @@ const styles = StyleSheet.create({
   emptyTipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },
   emptyTipBtn:    { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16, alignSelf: 'flex-start' },
   emptyTipBtnText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
+
+  // credentials
+  credHeader:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  credAddBtn:           { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  credAddBtnText:       { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
+  credEmptyText:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18 },
+  credRow:              { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  credIcon:             { fontSize: 22, marginTop: 2 },
+  credTitle:            { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 2 },
+  credSub:              { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 4 },
+  credStatusPill:       { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  credStatusText:       { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  credRejectionReason:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.danger, marginTop: 3, fontStyle: 'italic' },
+
+  // submission history
+  historyRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
+  historyDot:     { width: 8, height: 8, borderRadius: 4, marginTop: 5, flexShrink: 0 },
+  historyStatus:  { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 2 },
+  historyFields:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  historyReason:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.danger, marginTop: 2, fontStyle: 'italic' },
+
+  // credential add modal
+  credModalOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  credModalSheet:       { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40, maxHeight: '90%' },
+  credModalHeader:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  credModalTitle:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  credTypeRow:          { flexDirection: 'row', gap: 10 },
+  credTypeChip:         { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: colors.surface },
+  credTypeChipActive:   { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  credTypeChipText:     { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  credTypeChipTextActive:{ fontFamily: 'Inter_700Bold', color: colors.primary },
+  credDocBtn:           { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, borderStyle: 'dashed', paddingVertical: 14, paddingHorizontal: 16, backgroundColor: colors.primaryLight },
+  credDocBtnText:       { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.primary },
+  credModalDisclaimer:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 12, lineHeight: 17 },
 })

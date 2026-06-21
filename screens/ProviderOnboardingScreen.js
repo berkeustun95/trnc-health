@@ -1,14 +1,37 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator
+  ScrollView, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Image
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons, Feather } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import HoursPicker from '../components/HoursPicker'
 import MapPinPicker from '../components/MapPinPicker'
+
+function decode(base64) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  const lookup = new Uint8Array(256)
+  for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i
+  lookup['='.charCodeAt(0)] = 0
+  const len = base64.length
+  let bufLen = (len * 3) >> 2
+  if (base64[len - 1] === '=') bufLen--
+  if (base64[len - 2] === '=') bufLen--
+  const buf = new ArrayBuffer(bufLen)
+  const out = new Uint8Array(buf)
+  let p = 0
+  for (let i = 0; i < len; i += 4) {
+    const a = lookup[base64.charCodeAt(i)], b = lookup[base64.charCodeAt(i + 1)]
+    const c = lookup[base64.charCodeAt(i + 2)], d = lookup[base64.charCodeAt(i + 3)]
+    out[p++] = (a << 2) | (b >> 4)
+    if (p < bufLen) out[p++] = ((b & 15) << 4) | (c >> 2)
+    if (p < bufLen) out[p++] = ((c & 3) << 6) | d
+  }
+  return buf
+}
 
 async function sendPushNotification(token, title, body) {
   try {
@@ -37,6 +60,8 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
   const [saving, setSaving]               = useState(false)
   const [error, setError]                 = useState(null)
   const [showMapPicker, setShowMapPicker] = useState(false)
+  const [documents, setDocuments]         = useState([]) // [{ doc_type, uri, base64 }]
+  const [uploadingDocs, setUploadingDocs] = useState(false)
 
   useEffect(() => {
     if (step !== 2) return
@@ -53,6 +78,47 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
     return f.name.toLowerCase().includes(q) || (f.address && f.address.toLowerCase().includes(q))
   })
 
+  async function pickDocument(docType) {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) return
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+      base64: true,
+    })
+    if (result.canceled) return
+    setDocuments(prev => {
+      const filtered = prev.filter(d => d.doc_type !== docType)
+      return [...filtered, { doc_type: docType, uri: result.assets[0].uri, base64: result.assets[0].base64 }]
+    })
+  }
+
+  async function uploadDocuments(facilityId) {
+    if (documents.length === 0) return
+    setUploadingDocs(true)
+    for (const doc of documents) {
+      try {
+        const ext = (doc.uri.split('.').pop() || 'jpg').toLowerCase()
+        const path = `${session.user.id}/${facilityId}/${doc.doc_type}.${ext}`
+        const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('provider-documents')
+          .upload(path, decode(doc.base64), { contentType, upsert: true })
+        if (!upErr) {
+          const { data: { publicUrl } } = supabase.storage.from('provider-documents').getPublicUrl(path)
+          await supabase.from('provider_documents').insert({
+            facility_id:  facilityId,
+            provider_id:  session.user.id,
+            doc_type:     doc.doc_type,
+            document_url: publicUrl,
+          })
+        }
+      } catch {}
+    }
+    setUploadingDocs(false)
+  }
+
   async function submit() {
     setSaving(true)
     setError(null)
@@ -64,16 +130,16 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
         requested_tier:      form.membership_tier,
         registration_number: form.registration_number.trim() || null,
       })
-      setSaving(false)
-      if (err) { setError(err.message); return }
+      if (err) { setError(err.message); setSaving(false); return }
       if (form.latitude != null && form.longitude != null) {
         await supabase.from('facilities')
           .update({ latitude: form.latitude, longitude: form.longitude })
           .eq('id', selectedFacility.id)
       }
+      await uploadDocuments(selectedFacility.id)
     } else {
       if (!form.name.trim()) { setError('Facility name is required.'); setSaving(false); return }
-      const { error: err } = await supabase.from('facilities').insert({
+      const { data: newFacility, error: err } = await supabase.from('facilities').insert({
         name:                form.name.trim(),
         type:                form.type,
         address:             form.address.trim() || null,
@@ -87,10 +153,11 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
         registration_number: form.registration_number.trim() || null,
         latitude:            form.latitude,
         longitude:           form.longitude,
-      })
-      setSaving(false)
-      if (err) { setError(err.message); return }
+      }).select('id').single()
+      if (err) { setError(err.message); setSaving(false); return }
+      if (newFacility?.id) await uploadDocuments(newFacility.id)
     }
+    setSaving(false)
     try {
       const { data: admins } = await supabase.from('profiles').select('id, push_token').eq('role', 'admin')
       const title = mode === 'claim' ? 'New facility claim' : 'New provider application'
@@ -379,6 +446,28 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
           </>
         )}
 
+        {/* ── Verification documents ──────────────────────── */}
+        <Text style={[s.fieldLabel, { marginTop: 24 }]}>VERIFICATION DOCUMENTS</Text>
+        <Text style={s.docsNote}>Upload at least one document to help us verify your identity faster. All files are reviewed privately by our team.</Text>
+        {[
+          { key: 'medical_license',   label: 'Medical License / Practice Certificate' },
+          { key: 'registration_cert', label: 'Chamber / Ministry Registration' },
+          { key: 'business_license',  label: 'Business License' },
+          { key: 'national_id',       label: 'National ID / Passport' },
+        ].map(({ key, label }) => {
+          const attached = documents.find(d => d.doc_type === key)
+          return (
+            <TouchableOpacity key={key} style={[s.docUploadRow, attached && s.docUploadRowDone]} onPress={() => pickDocument(key)} activeOpacity={0.8}>
+              {attached
+                ? <Image source={{ uri: attached.uri }} style={s.docThumb} />
+                : <View style={s.docThumbPlaceholder}><Feather name="upload" size={14} color={colors.primary} /></View>
+              }
+              <Text style={[s.docUploadLabel, attached && { color: colors.success }]} numberOfLines={1}>{label}</Text>
+              {attached && <Feather name="check-circle" size={16} color={colors.success} />}
+            </TouchableOpacity>
+          )
+        })}
+
         <TouchableOpacity
           style={[s.tierCard, form.membership_tier === 'basic' && s.tierCardSelected]}
           onPress={() => set('membership_tier')('basic')}
@@ -425,8 +514,8 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
 
         {error ? <Text style={s.errorText}>{error}</Text> : null}
 
-        <TouchableOpacity style={[s.primaryBtn, saving && s.primaryBtnDisabled]} onPress={submit} disabled={saving}>
-          {saving
+        <TouchableOpacity style={[s.primaryBtn, (saving || uploadingDocs) && s.primaryBtnDisabled]} onPress={submit} disabled={saving || uploadingDocs}>
+          {(saving || uploadingDocs)
             ? <ActivityIndicator color="#fff" />
             : <Text style={s.primaryBtnText}>
                 {mode === 'claim' ? 'Submit claim' : 'Submit for review'}
@@ -525,4 +614,11 @@ const s = StyleSheet.create({
   errorText:          { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger, marginTop: 8 },
   signOutText:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary, marginTop: 16, textAlign: 'center' },
   disclaimer:         { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 16, lineHeight: 18 },
+
+  docsNote:           { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, marginBottom: 10, marginTop: 4 },
+  docUploadRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, padding: 12, marginBottom: 8 },
+  docUploadRowDone:   { borderColor: colors.success, backgroundColor: '#F0FDF4' },
+  docThumb:           { width: 36, height: 36, borderRadius: 8 },
+  docThumbPlaceholder:{ width: 36, height: 36, borderRadius: 8, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  docUploadLabel:     { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
 })

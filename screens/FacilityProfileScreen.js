@@ -22,14 +22,24 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
   const [reviewAvg, setReviewAvg]       = useState(null)
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [showAllReviews, setShowAllReviews] = useState(false)
-  const [lightbox, setLightbox]             = useState(null) // url string
+  const [lightbox, setLightbox]             = useState(null)
+  const [credentials, setCredentials]       = useState([])
 
   useEffect(() => {
-    async function loadReviews() {
-      const [{ data, count }, { data: allRatings }] = await Promise.all([
+    async function loadData() {
+      const [
+        { data, count },
+        { data: allRatings },
+        { data: creds },
+      ] = await Promise.all([
         supabase.from('reviews').select('id, rating, comment, created_at', { count: 'exact' })
           .eq('facility_id', facility.id).order('created_at', { ascending: false }).limit(3),
         supabase.from('reviews').select('rating').eq('facility_id', facility.id),
+        supabase.from('provider_credentials')
+          .select('id, cred_type, title, institution, year')
+          .eq('facility_id', facility.id)
+          .eq('status', 'approved')
+          .order('year', { ascending: false }),
       ])
       if (data) setReviews(data)
       setReviewTotal(count ?? 0)
@@ -37,8 +47,9 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
         setReviewAvg((allRatings.reduce((s, r) => s + r.rating, 0) / allRatings.length).toFixed(1))
       }
       setReviewsLoading(false)
+      setCredentials(creds ?? [])
     }
-    loadReviews()
+    loadData()
   }, [facility.id])
 
   if (showAllReviews) {
@@ -131,6 +142,22 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                     </View>
                   ))}
                 </View>
+              </View>
+            )}
+
+            {/* Credentials */}
+            {credentials.length > 0 && (
+              <View style={s.section}>
+                <Text style={s.sectionLabel}>Qualifications</Text>
+                {credentials.map(cred => (
+                  <View key={cred.id} style={s.credRow}>
+                    <Text style={s.credIcon}>{cred.cred_type === 'diploma' ? '🎓' : '📜'}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.credTitle}>{cred.title}</Text>
+                      <Text style={s.credSub}>{cred.institution}{cred.year ? ` · ${cred.year}` : ''}</Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             )}
 
@@ -313,6 +340,10 @@ const s = StyleSheet.create({
   chip:              { backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   chipText:          { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.primary },
   description:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 22 },
+  credRow:           { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+  credIcon:          { fontSize: 20, marginTop: 1 },
+  credTitle:         { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 2 },
+  credSub:           { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   contactRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   contactIcon:       { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   contactText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
