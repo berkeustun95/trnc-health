@@ -463,6 +463,11 @@ export default function App() {
     setOnboarded(true)
   }
 
+  async function reloadFacilities() {
+    const { data } = await supabase.from('facilities').select('*').order('name')
+    if (data) setFacilities(data)
+  }
+
   async function loadProviderFacility() {
     const { data: fac } = await supabase
       .from('facilities')
@@ -826,7 +831,7 @@ export default function App() {
       const trialDaysLeft = providerFacility.status === 'trial' && providerFacility.trial_ends_at
         ? Math.max(0, Math.ceil((new Date(providerFacility.trial_ends_at) - new Date()) / 86400000))
         : null
-      content = <ProviderScreen session={session} lang={lang} facility={providerFacility} trialDaysLeft={trialDaysLeft} onFacilityUpdated={loadProviderFacility} />
+      content = <ProviderScreen session={session} lang={lang} facility={providerFacility} trialDaysLeft={trialDaysLeft} onFacilityUpdated={() => { loadProviderFacility(); reloadFacilities() }} />
     }
   } else if (showLatestResult && latestResult) {
     content = <ResultsScreen

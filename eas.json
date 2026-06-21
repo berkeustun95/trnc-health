@@ -34,6 +34,11 @@
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",
         "track": "internal"
+      },
+      "ios": {
+        "appleId": "getadaapp@gmail.com",
+        "ascAppId": "PLACEHOLDER_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "PLACEHOLDER_APPLE_TEAM_ID"
       }
     }
   }
