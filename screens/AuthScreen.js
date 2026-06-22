@@ -227,14 +227,17 @@ export default function AuthScreen({ lang = 'English' }) {
           {mode === 'signup' && (
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>{t('iAmA', lang)}</Text>
-              <View style={styles.roleRow}>
+              <View style={styles.roleStack}>
                 {[['customer', t('roleCustomer', lang)], ['provider', t('roleProvider', lang)], ['organizer', t('roleOrganizer', lang)]].map(([r, label]) => (
                   <TouchableOpacity
                     key={r}
-                    style={[styles.roleBtn, role === r && styles.roleBtnActive]}
+                    style={[styles.roleOption, role === r && styles.roleOptionActive]}
                     onPress={() => setRole(r)}
                   >
-                    <Text style={[styles.roleBtnText, role === r && styles.roleBtnTextActive]}>{label}</Text>
+                    <View style={[styles.radioCircle, role === r && styles.radioCircleActive]}>
+                      {role === r && <View style={styles.radioInner} />}
+                    </View>
+                    <Text style={[styles.roleOptionText, role === r && styles.roleOptionTextActive]}>{label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -294,13 +297,19 @@ const styles = StyleSheet.create({
   passwordWrap:      { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface },
   passwordInput:     { flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   eyeBtn:            { paddingHorizontal: 14 },
-  roleRow:           { flexDirection: 'row', gap: 8 },
-  roleBtn:           { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  facilityGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  facilityBtn:       { width: '47%', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  roleBtnActive:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  roleBtnText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  roleBtnTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
+  roleStack:            { gap: 8 },
+  roleOption:           { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, backgroundColor: colors.surface },
+  roleOptionActive:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  radioCircle:          { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  radioCircleActive:    { borderColor: colors.primary },
+  radioInner:           { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
+  roleOptionText:       { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  roleOptionTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
+  facilityGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  facilityBtn:          { width: '47%', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  roleBtnActive:        { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  roleBtnText:          { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
+  roleBtnTextActive:    { fontFamily: 'Inter_700Bold', color: colors.primary },
   error:             { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 12, textAlign: 'center' },
   submit:            { backgroundColor: colors.primary, borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 4 },
   submitText:        { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.2 },
