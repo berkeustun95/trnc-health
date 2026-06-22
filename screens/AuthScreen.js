@@ -13,6 +13,7 @@ export default function AuthScreen({ lang = 'English' }) {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState('customer')
+  const [facilityType, setFacilityType] = useState('pharmacy')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [signupDone, setSignupDone] = useState(false)
@@ -37,8 +38,9 @@ export default function AuthScreen({ lang = 'English' }) {
     }
     setLoading(true)
     setError(null)
+    const signupMeta = role === 'provider' ? { role, facilityType } : { role }
     const { error } = mode === 'signup'
-      ? await supabase.auth.signUp({ email: trimmedEmail, password, options: { data: { role }, emailRedirectTo: 'ada://' } })
+      ? await supabase.auth.signUp({ email: trimmedEmail, password, options: { data: signupMeta, emailRedirectTo: 'ada://' } })
       : await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
     if (error) setError(error.message)
     else if (mode === 'signup') setSignupDone(true)
@@ -226,7 +228,7 @@ export default function AuthScreen({ lang = 'English' }) {
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>{t('iAmA', lang)}</Text>
               <View style={styles.roleRow}>
-                {[['customer', t('rolePatient', lang)], ['provider', t('roleProvider', lang)]].map(([r, label]) => (
+                {[['customer', t('roleCustomer', lang)], ['provider', t('roleProvider', lang)], ['organizer', t('roleOrganizer', lang)]].map(([r, label]) => (
                   <TouchableOpacity
                     key={r}
                     style={[styles.roleBtn, role === r && styles.roleBtnActive]}
@@ -236,6 +238,22 @@ export default function AuthScreen({ lang = 'English' }) {
                   </TouchableOpacity>
                 ))}
               </View>
+              {role === 'provider' && (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>{t('selectFacilityType', lang)}</Text>
+                  <View style={styles.facilityGrid}>
+                    {[['pharmacy', t('facilityPharmacy', lang)], ['clinic', t('facilityClinic', lang)], ['hospital', t('facilityHospital', lang)], ['dentist', t('facilityDentist', lang)]].map(([ft, label]) => (
+                      <TouchableOpacity
+                        key={ft}
+                        style={[styles.facilityBtn, facilityType === ft && styles.roleBtnActive]}
+                        onPress={() => setFacilityType(ft)}
+                      >
+                        <Text style={[styles.roleBtnText, facilityType === ft && styles.roleBtnTextActive]}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
             </View>
           )}
 
@@ -276,8 +294,10 @@ const styles = StyleSheet.create({
   passwordWrap:      { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface },
   passwordInput:     { flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   eyeBtn:            { paddingHorizontal: 14 },
-  roleRow:           { flexDirection: 'row', gap: 10 },
-  roleBtn:           { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  roleRow:           { flexDirection: 'row', gap: 8 },
+  roleBtn:           { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  facilityGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  facilityBtn:       { width: '47%', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   roleBtnActive:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   roleBtnText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   roleBtnTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
