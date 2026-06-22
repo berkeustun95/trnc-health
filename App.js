@@ -234,6 +234,7 @@ export default function App() {
   const [quizHistoryLoading, setQuizHistoryLoading] = useState(false)
   const [showEmergencyModal, setShowEmergencyModal] = useState(false)
   const [showMunicipalModal, setShowMunicipalModal] = useState(false)
+  const [expandedMuni, setExpandedMuni] = useState(null)
   const [showEvents, setShowEvents] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   const [showCoachMarks, setShowCoachMarks] = useState(false)
@@ -1681,20 +1682,40 @@ export default function App() {
                   { name: 'Mehmetçik-Büyükkonuk',      phone: '03923755090', mapQuery: 'Mehmetçik Belediyesi Atatürk Meydanı 3 Mehmetçik İskele KKTC' },
                   { name: 'Beyarmudu',                 phone: '03923799401', mapQuery: 'Beyarmudu Belediyesi Hüseyin Kafa Caddesi 68 Beyarmudu Gazimağusa KKTC' },
                   { name: 'Tatlısu',                   phone: '03923892026', mapQuery: 'Tatlısu Belediyesi Cumhuriyet Sokak 9 Tatlısu Gazimağusa KKTC' },
-                ].map(({ name, phone, mapQuery }) => (
-                  <View key={name} style={styles.emergencyRow}>
-                    <View style={styles.emergencyIconWrap}>
-                      <Ionicons name="business-outline" size={18} color={colors.textSecondary} />
+                ].map(({ name, phone, mapQuery }) => {
+                  const isExpanded = expandedMuni === name
+                  return (
+                    <View key={name}>
+                      <View style={styles.emergencyRow}>
+                        <View style={styles.emergencyIconWrap}>
+                          <Ionicons name="business-outline" size={18} color={colors.textSecondary} />
+                        </View>
+                        <TouchableOpacity style={{ flex: 1 }} onPress={() => setExpandedMuni(isExpanded ? null : name)}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Text style={[styles.emergencyLabel, { flex: 0 }]}>{name}</Text>
+                            <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={13} color={colors.textSecondary} />
+                          </View>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
+                          <Ionicons name="map-outline" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Ionicons name="call" size={18} color={colors.primary} />
+                        </TouchableOpacity>
+                      </View>
+                      {isExpanded && (
+                        <View style={styles.muniHoursBubble}>
+                          <Ionicons name="time-outline" size={13} color={colors.primary} style={{ marginTop: 1 }} />
+                          <View>
+                            <Text style={styles.muniHoursText}>Mon – Wed, Fri{'  '}08:00 – 15:30</Text>
+                            <Text style={styles.muniHoursText}>Thu{'  '}08:00 – 12:30 / 13:00 – 17:30</Text>
+                            <Text style={styles.muniHoursText}>Sat – Sun{'  '}Closed</Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
-                    <Text style={[styles.emergencyLabel, { flex: 1 }]}>{name}</Text>
-                    <TouchableOpacity onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
-                      <Ionicons name="map-outline" size={18} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="call" size={18} color={colors.primary} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
+                  )
+                })}
               </ScrollView>
             </View>
           </View>
@@ -1888,4 +1909,6 @@ const styles = StyleSheet.create({
   emergencyIconWrap:  { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(220,38,38,0.1)', justifyContent: 'center', alignItems: 'center' },
   emergencyLabel:     { flex: 1, fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   emergencyNumber:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginRight: 4 },
+  muniHoursBubble:    { flexDirection: 'row', alignItems: 'flex-start', gap: 7, backgroundColor: colors.primaryLight, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 6, marginLeft: 46 },
+  muniHoursText:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.primary, lineHeight: 19 },
 })
