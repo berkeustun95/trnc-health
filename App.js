@@ -735,7 +735,7 @@ export default function App() {
   } else if (!session && showWelcome) {
     content = <WelcomeScreen lang={lang} onContinue={() => setShowWelcome(false)} />
   } else if (!session) {
-    content = <AuthScreen lang={lang} />
+    content = <AuthScreen lang={lang} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l) }} />
   } else if (loading || !profile) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>

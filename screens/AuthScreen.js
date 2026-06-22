@@ -7,7 +7,14 @@ import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
-export default function AuthScreen({ lang = 'English' }) {
+const LANGUAGES = [
+  { key: 'English', code: 'EN' }, { key: 'Turkish', code: 'TR' }, { key: 'Arabic', code: 'AR' },
+  { key: 'Russian', code: 'RU' }, { key: 'Greek',   code: 'EL' }, { key: 'French',  code: 'FR' },
+  { key: 'Spanish', code: 'ES' }, { key: 'German',  code: 'DE' }, { key: 'Persian', code: 'FA' },
+]
+
+export default function AuthScreen({ lang: initialLang = 'English', onLangChange }) {
+  const [lang, setLang] = useState(initialLang)
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,6 +27,8 @@ export default function AuthScreen({ lang = 'English' }) {
   const [showReset, setShowReset] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
+
+  function changeLang(l) { setLang(l); onLangChange?.(l) }
 
   async function submit() {
     const trimmedEmail = email.trim().toLowerCase()
@@ -146,6 +155,13 @@ export default function AuthScreen({ lang = 'English' }) {
                     : <Text style={styles.submitText}>{t('sendResetLink', lang)}</Text>
                   }
                 </TouchableOpacity>
+                <View style={styles.langRow}>
+                  {LANGUAGES.map(({ key, code }) => (
+                    <TouchableOpacity key={key} onPress={() => changeLang(key)} style={[styles.langChip, lang === key && styles.langChipActive]}>
+                      <Text style={[styles.langChipText, lang === key && styles.langChipTextActive]}>{code}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             )}
           </ScrollView>
@@ -268,6 +284,14 @@ export default function AuthScreen({ lang = 'English' }) {
               : <Text style={styles.submitText}>{mode === 'login' ? t('login', lang) : t('createAccount', lang)}</Text>
             }
           </TouchableOpacity>
+
+          <View style={styles.langRow}>
+            {LANGUAGES.map(({ key, code }) => (
+              <TouchableOpacity key={key} onPress={() => changeLang(key)} style={[styles.langChip, lang === key && styles.langChipActive]}>
+                <Text style={[styles.langChipText, lang === key && styles.langChipTextActive]}>{code}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -313,6 +337,11 @@ const styles = StyleSheet.create({
   error:             { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 12, textAlign: 'center' },
   submit:            { backgroundColor: colors.primary, borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 4 },
   submitText:        { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.2 },
+  langRow:           { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border },
+  langChip:          { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, backgroundColor: 'transparent' },
+  langChipActive:    { backgroundColor: colors.primaryLight },
+  langChipText:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5 },
+  langChipTextActive:{ color: colors.primary },
 
   // Reset flow
   backLink:           { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 28 },
