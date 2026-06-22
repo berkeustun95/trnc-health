@@ -865,11 +865,9 @@ export default function App() {
       onMarkAllRead={markAllNotifsRead}
       onClearAll={clearAllNotifs}
       onMarkRead={markNotifRead}
-      onNotifPress={(item) => {
-        if (item.title?.toLowerCase().includes('duty')) {
-          setShowNotifs(false)
-          setShowDutyList(true)
-        }
+      onNotifPress={() => {
+        setShowNotifs(false)
+        setShowDutyList(true)
       }}
     />
   } else if (showDutyList) {
