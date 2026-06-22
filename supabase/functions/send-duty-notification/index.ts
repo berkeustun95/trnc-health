@@ -95,7 +95,7 @@ serve(async () => {
         to: p.push_token,
         title: getDutyTitle(lang),
         body: getDutyBody(lang, duties),
-        data: { type: 'duty', date: today },
+        data: { screen: 'duty', date: today },
         sound: 'default',
         channelId: 'default',
       }
