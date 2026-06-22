@@ -271,7 +271,7 @@ const translations = {
     commentOptional: 'Yorum ekle (isteğe bağlı)…',
     login: 'Giriş yap', signup: 'Kayıt ol', createAccount: 'Hesap oluştur',
     email: 'E-posta', password: 'Şifre',
-    iAmA: 'Ben bir', roleCustomer: 'Kullanıcı', roleProvider: 'Sağlık Profesyoneli', roleOrganizer: 'Etkinlik Yöneticisi',
+    iAmA: 'Hesap türü', roleCustomer: 'Kullanıcı', roleProvider: 'Sağlık Profesyoneli', roleOrganizer: 'Etkinlik Yöneticisi',
     facilityPharmacy: 'Eczane', facilityClinic: 'Klinik', facilityHospital: 'Hastane', facilityDentist: 'Diş Kliniği',
     selectFacilityType: 'Tesis türü',
     notifApptConfirmedTitle: 'Randevu onaylandı',
