@@ -10,14 +10,17 @@ import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton, SlotGridSkeleton } from '../components/Skeleton'
 
-async function notifyProvider(facility, title, body) {
+async function notifyProvider(facility, titleKey, bodyKey) {
   if (!facility.provider_id) return
   try {
     const { data: prov } = await supabase
       .from('profiles')
-      .select('push_token')
+      .select('push_token, preferred_language')
       .eq('id', facility.provider_id)
       .maybeSingle()
+    const lang = prov?.preferred_language || 'English'
+    const title = t(titleKey, lang)
+    const body = t(bodyKey, lang).replace('{name}', facility.name)
     if (prov?.push_token) {
       await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
@@ -130,7 +133,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
     if (!error) {
       setNewQ('')
       await loadQuestions()
-      notifyProvider(facility, 'New Question', `${facility.name} received a new question from a customer.`)
+      notifyProvider(facility, 'notifNewQuestionTitle', 'notifNewQuestionBody')
     } else setQError(t('questionSubmitError', lang))
     setSubmittingQ(false)
   }
@@ -173,7 +176,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
     else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setDone(true)
-      notifyProvider(facility, 'New Appointment Request', `${facility.name} has a new appointment request.`)
+      notifyProvider(facility, 'notifNewApptTitle', 'notifNewApptBody')
     }
     setLoading(false)
   }

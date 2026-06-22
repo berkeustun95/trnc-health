@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
+import { t } from '../constants/i18n'
 
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
@@ -551,9 +552,10 @@ function DutyTab() {
     if (!selectedId) return
     setNotifying(true)
     const pharmacyName = pharmacies.find(p => p.id === selectedId)?.name ?? 'Duty pharmacy'
-    const title = '💊 Duty Pharmacy Tonight'
-    const { data: customers } = await supabase.from('profiles').select('id, push_token').eq('role', 'customer')
+    const { data: customers } = await supabase.from('profiles').select('id, push_token, preferred_language').eq('role', 'customer')
     for (const c of customers ?? []) {
+      const lang = c.preferred_language || 'English'
+      const title = t('notifDutyTitle', lang)
       await recordNotification(c.id, title, pharmacyName)
       if (c.push_token) await sendPushNotification(c.push_token, title, pharmacyName, { screen: 'duty' })
     }
@@ -588,10 +590,11 @@ function DutyTab() {
       })
       .eq('id', swapTarget.id)
     if (!error) {
-      const title = '💊 Duty pharmacy updated'
-      const body = `${swapSelectedPharmacy.name} is now the duty pharmacy for ${swapDate}.`
-      const { data: customers } = await supabase.from('profiles').select('id, push_token').eq('role', 'customer')
+      const { data: customers } = await supabase.from('profiles').select('id, push_token, preferred_language').eq('role', 'customer')
       for (const c of customers ?? []) {
+        const lang = c.preferred_language || 'English'
+        const title = t('notifDutySwapTitle', lang)
+        const body = t('notifDutySwapBody', lang).replace('{name}', swapSelectedPharmacy.name).replace('{date}', swapDate)
         await recordNotification(c.id, title, body)
         if (c.push_token) await sendPushNotification(c.push_token, title, body, { screen: 'duty' })
       }
@@ -815,9 +818,11 @@ function ClaimsTab() {
       supabase.from('claim_requests').update({ status: 'approved' }).eq('id', claim.id),
       supabase.from('provider_documents').update({ status: 'approved' }).eq('facility_id', claim.facilities.id),
     ])
-    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', claim.requester_id).maybeSingle()
-    const title = 'Claim approved!'
-    const body = `${claim.facilities?.name ?? 'Your facility'} is now live with a 5-day trial.`
+    const { data: p } = await supabase.from('profiles').select('push_token, preferred_language').eq('id', claim.requester_id).maybeSingle()
+    const lang = p?.preferred_language || 'English'
+    const facilityName = claim.facilities?.name ?? 'Your facility'
+    const title = t('notifClaimApprovedTitle', lang)
+    const body = t('notifClaimApprovedBody', lang).replace('{name}', facilityName)
     if (p?.push_token) await sendPushNotification(p.push_token, title, body)
     await recordNotification(claim.requester_id, title, body)
     load()
@@ -825,11 +830,13 @@ function ClaimsTab() {
 
   async function reject(claim, reason) {
     await supabase.from('claim_requests').update({ status: 'rejected', rejection_reason: reason || null }).eq('id', claim.id)
-    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', claim.requester_id).maybeSingle()
-    const title = 'Claim not approved'
+    const { data: p } = await supabase.from('profiles').select('push_token, preferred_language').eq('id', claim.requester_id).maybeSingle()
+    const lang = p?.preferred_language || 'English'
+    const facilityName = claim.facilities?.name ?? 'the facility'
+    const title = t('notifClaimRejectedTitle', lang)
     const body = reason
-      ? `Your claim for ${claim.facilities?.name ?? 'the facility'} was not approved: ${reason}`
-      : `Your claim for ${claim.facilities?.name ?? 'the facility'} was not approved. Contact us for details.`
+      ? t('notifClaimRejectedBodyReason', lang).replace('{name}', facilityName).replace('{reason}', reason)
+      : t('notifClaimRejectedBody', lang).replace('{name}', facilityName)
     if (p?.push_token) await sendPushNotification(p.push_token, title, body)
     await recordNotification(claim.requester_id, title, body)
     load()
@@ -944,9 +951,10 @@ function ProvidersTab() {
       verified: true,
     }).eq('id', facilityId)
     if (facility?.provider_id) {
-      const { data: p } = await supabase.from('profiles').select('push_token').eq('id', facility.provider_id).maybeSingle()
-      const title = 'Application approved!'
-      const body = `${facility.name} is now live with a 5-day trial.`
+      const { data: p } = await supabase.from('profiles').select('push_token, preferred_language').eq('id', facility.provider_id).maybeSingle()
+      const lang = p?.preferred_language || 'English'
+      const title = t('notifAppApprovedTitle', lang)
+      const body = t('notifAppApprovedBody', lang).replace('{name}', facility.name)
       if (p?.push_token) await sendPushNotification(p.push_token, title, body)
       await recordNotification(facility.provider_id, title, body)
     }
@@ -957,11 +965,12 @@ function ProvidersTab() {
     const facility = [...pending, ...active].find(f => f.id === facilityId)
     await supabase.from('facilities').update({ status: 'suspended' }).eq('id', facilityId)
     if (facility?.provider_id) {
-      const { data: p } = await supabase.from('profiles').select('push_token').eq('id', facility.provider_id).maybeSingle()
-      const title = 'Application not approved'
+      const { data: p } = await supabase.from('profiles').select('push_token, preferred_language').eq('id', facility.provider_id).maybeSingle()
+      const lang = p?.preferred_language || 'English'
+      const title = t('notifAppRejectedTitle', lang)
       const body = reason
-        ? `Your application for ${facility.name} was not approved: ${reason}`
-        : `Your application for ${facility.name} was not approved. Contact us for details.`
+        ? t('notifAppRejectedBodyReason', lang).replace('{name}', facility.name).replace('{reason}', reason)
+        : t('notifAppRejectedBody', lang).replace('{name}', facility.name)
       if (p?.push_token) await sendPushNotification(p.push_token, title, body)
       await recordNotification(facility.provider_id, title, body)
     }
@@ -972,9 +981,10 @@ function ProvidersTab() {
     const facility = active.find(f => f.id === facilityId)
     await supabase.from('facilities').update({ status: 'active', trial_ends_at: null }).eq('id', facilityId)
     if (facility?.provider_id) {
-      const { data: p } = await supabase.from('profiles').select('push_token').eq('id', facility.provider_id).maybeSingle()
-      const title = 'Account activated!'
-      const body = `${facility.name} is now fully active. Thank you!`
+      const { data: p } = await supabase.from('profiles').select('push_token, preferred_language').eq('id', facility.provider_id).maybeSingle()
+      const lang = p?.preferred_language || 'English'
+      const title = t('notifActivatedTitle', lang)
+      const body = t('notifActivatedBody', lang).replace('{name}', facility.name)
       if (p?.push_token) await sendPushNotification(p.push_token, title, body)
       await recordNotification(facility.provider_id, title, body)
     }
@@ -985,9 +995,10 @@ function ProvidersTab() {
     const facility = active.find(f => f.id === facilityId)
     await supabase.from('facilities').update({ status: 'suspended' }).eq('id', facilityId)
     if (facility?.provider_id) {
-      const { data: p } = await supabase.from('profiles').select('push_token').eq('id', facility.provider_id).maybeSingle()
-      const title = 'Account suspended'
-      const body = `${facility.name} has been suspended. Contact us for details.`
+      const { data: p } = await supabase.from('profiles').select('push_token, preferred_language').eq('id', facility.provider_id).maybeSingle()
+      const lang = p?.preferred_language || 'English'
+      const title = t('notifSuspendedTitle', lang)
+      const body = t('notifSuspendedBody', lang).replace('{name}', facility.name)
       if (p?.push_token) await sendPushNotification(p.push_token, title, body)
       await recordNotification(facility.provider_id, title, body)
     }
