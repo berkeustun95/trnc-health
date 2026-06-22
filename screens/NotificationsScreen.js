@@ -57,7 +57,8 @@ export default function NotificationsScreen({ notifications, loading, lang, onBa
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.list}
           renderItem={({ item }) => {
-            const isDuty = item.title?.toLowerCase().includes('duty')
+            const title = item.title ?? ''
+            const isDuty = ['duty', 'nöbetçi', 'مناوبة', 'дежурн', 'εφημερεύ', 'garde', 'guardia', 'notdienst', 'نوبتی'].some(kw => title.toLowerCase().includes(kw))
             return (
               <TouchableOpacity
                 style={[s.card, !item.read && s.cardUnread]}
@@ -72,7 +73,7 @@ export default function NotificationsScreen({ notifications, loading, lang, onBa
                   </View>
                   <Text style={s.cardBodyText}>{item.body}</Text>
                   {isDuty && (
-                    <Text style={s.tapHint}>Tap to view duty pharmacies →</Text>
+                    <Text style={s.tapHint}>{t('tapViewDuty', lang)}</Text>
                   )}
                 </View>
               </TouchableOpacity>
