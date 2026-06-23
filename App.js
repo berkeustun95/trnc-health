@@ -38,6 +38,12 @@ import PropertyDetailScreen from './screens/PropertyDetailScreen'
 import EstateAgentOnboardingScreen from './screens/EstateAgentOnboardingScreen'
 import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
+import PetsHomeScreen from './screens/pets/PetsHomeScreen'
+import BringingPetScreen from './screens/pets/BringingPetScreen'
+import TimelineCalculatorScreen from './screens/pets/TimelineCalculatorScreen'
+import VetDirectoryScreen from './screens/pets/VetDirectoryScreen'
+import TravelWithPetScreen from './screens/pets/TravelWithPetScreen'
+import OwningPetScreen from './screens/pets/OwningPetScreen'
 import TutorialCoachMarks from './screens/TutorialCoachMarks'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
@@ -241,6 +247,8 @@ export default function App() {
   const [expandedMuni, setExpandedMuni] = useState(null)
   const [showEvents, setShowEvents] = useState(false)
   const [showAccommodation, setShowAccommodation] = useState(false)
+  const [showPets, setShowPets] = useState(false)
+  const [petsSubScreen, setPetsSubScreen] = useState(null)
   const [openedProperty, setOpenedProperty] = useState(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
@@ -439,11 +447,13 @@ export default function App() {
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
       if (bookingFacility) { setBookingFacility(null); return true }
       if (selectedFacility) { setSelectedFacility(null); setBookingFacility(null); return true }
+      if (petsSubScreen) { setPetsSubScreen(null); return true }
+      if (showPets) { setShowPets(false); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding])
+  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen])
 
   useEffect(() => {
     Promise.all([
@@ -913,6 +923,38 @@ export default function App() {
         onOpenProperty={prop => setOpenedProperty(prop)}
       />
     )
+  } else if (showPets) {
+    if (petsSubScreen === 'bringing') {
+      content = <BringingPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
+    } else if (petsSubScreen === 'timeline') {
+      content = <TimelineCalculatorScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
+    } else if (petsSubScreen === 'vetdirectory') {
+      content = (
+        <VetDirectoryScreen
+          lang={lang}
+          onBack={() => setPetsSubScreen(null)}
+          onOpenVet={fac => setSelectedFacility(fac)}
+        />
+      )
+    } else if (petsSubScreen === 'travel') {
+      content = <TravelWithPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
+    } else if (petsSubScreen === 'owning') {
+      content = (
+        <OwningPetScreen
+          lang={lang}
+          onBack={() => setPetsSubScreen(null)}
+          onNavigate={dest => setPetsSubScreen(dest)}
+        />
+      )
+    } else {
+      content = (
+        <PetsHomeScreen
+          lang={lang}
+          onBack={() => setShowPets(false)}
+          onNavigate={dest => setPetsSubScreen(dest)}
+        />
+      )
+    }
   } else if (showQuizHistory) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -1601,6 +1643,10 @@ export default function App() {
             <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowAccommodation(true) }}>
               <Ionicons name="home-outline" size={20} color={colors.textPrimary} />
               <Text style={styles.menuItemText}>{t('menuAccommodations', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowPets(true) }}>
+              <Ionicons name="paw-outline" size={20} color={colors.primary} />
+              <Text style={styles.menuItemText}>{t('menuPets', lang)}</Text>
             </TouchableOpacity>
             <View style={[styles.menuItem, { opacity: 0.4 }]}>
               <Ionicons name="car-outline" size={20} color={colors.textPrimary} />

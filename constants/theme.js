@@ -20,6 +20,7 @@ export const typeColors = {
   clinic:   { bg: '#E6F4F4', text: '#0E7C7B' },
   hospital: { bg: '#FAEAEC', text: '#D1495B' },
   dentist:  { bg: '#E6F5ED', text: '#2E9E5B' },
+  vet:      { bg: '#FEF3C7', text: '#D97706' },
 }
 
 export const shadow = {

@@ -36,4 +36,15 @@ export const SPECIALTIES_BY_TYPE = {
     'Dental Implants',
     'Periodontics',
   ],
+  vet: [
+    'Small Animals',
+    'Large Animals',
+    'Exotic Animals',
+    'Surgery',
+    'Dentistry',
+    'Dermatology',
+    'Ophthalmology',
+    'Oncology',
+    'Emergency & Critical Care',
+  ],
 }
