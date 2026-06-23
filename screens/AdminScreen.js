@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
-  Modal, TextInput, Switch, ScrollView, Alert, KeyboardAvoidingView, Platform, Linking
+  Modal, TextInput, Switch, ScrollView, Alert, KeyboardAvoidingView, Platform, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
@@ -12,7 +12,7 @@ import { t } from '../constants/i18n'
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events']
+const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -102,6 +102,8 @@ function DashboardTab({ onNavigate }) {
         { count: pendingCredentials },
         { count: pendingDocs },
         { count: pendingEvents },
+        { count: pendingProperties },
+        { count: pendingAgents },
       ] = await Promise.all([
         supabase.from('facilities').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -112,8 +114,10 @@ function DashboardTab({ onNavigate }) {
         supabase.from('provider_credentials').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('provider_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('estate_agents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ])
-      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents })
+      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents })
     }
     load()
   }, [])
@@ -126,8 +130,10 @@ function DashboardTab({ onNavigate }) {
     stats.pendingProviders   > 0 && { label: 'Providers awaiting approval',  count: stats.pendingProviders,   tab: 'Providers',   color: colors.danger },
     stats.pendingCredentials > 0 && { label: 'Credentials awaiting review',  count: stats.pendingCredentials, tab: 'Credentials', color: '#7C3AED' },
     (stats.pendingDocs ?? 0) > 0 && { label: 'ID documents to verify',       count: stats.pendingDocs,        tab: 'Claims',      color: colors.accent },
-    stats.pendingAppts       > 0 && { label: 'Pending appointments',          count: stats.pendingAppts,       tab: 'Bookings',    color: colors.primary },
-    (stats.pendingEvents ?? 0) > 0 && { label: 'Events awaiting approval',   count: stats.pendingEvents,      tab: 'Events',      color: colors.primary },
+    stats.pendingAppts           > 0 && { label: 'Pending appointments',          count: stats.pendingAppts,           tab: 'Bookings',    color: colors.primary },
+    (stats.pendingEvents ?? 0)   > 0 && { label: 'Events awaiting approval',      count: stats.pendingEvents,          tab: 'Events',      color: colors.primary },
+    (stats.pendingProperties ?? 0) > 0 && { label: 'Property listings to review', count: stats.pendingProperties,      tab: 'Properties',  color: colors.primary },
+    (stats.pendingAgents ?? 0)   > 0 && { label: 'Agent applications pending',    count: stats.pendingAgents,          tab: 'Agents',      color: '#7C3AED' },
   ].filter(Boolean)
 
   return (
@@ -1734,6 +1740,230 @@ function EventsTab() {
   )
 }
 
+// ─── Properties Tab ─────────────────────────────────────────────────────────
+
+function PropertiesTab() {
+  const [properties, setProperties] = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [filter, setFilter]         = useState('pending')
+  const [rejectTarget, setRejectTarget] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('properties')
+      .select('*, estate_agents(full_name, phone)')
+      .eq('status', filter)
+      .order('created_at', { ascending: false })
+    setProperties(data || [])
+    setLoading(false)
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(id) {
+    await supabase.from('properties').update({ status: 'active', rejection_reason: null }).eq('id', id)
+    load()
+  }
+
+  async function reject(id, reason) {
+    await supabase.from('properties').update({ status: 'rejected', rejection_reason: reason }).eq('id', id)
+    setRejectTarget(null)
+    load()
+  }
+
+  const CURRENCIES = { GBP: '£', TRY: '₺', EUR: '€' }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={s.chipRow}>
+        {['pending', 'active', 'rejected', 'archived'].map(f => (
+          <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
+            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {loading
+        ? <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+        : (
+          <FlatList
+            data={properties}
+            keyExtractor={i => i.id}
+            contentContainerStyle={s.listContent}
+            ListEmptyComponent={<SectionEmpty text={`No ${filter} listings.`} />}
+            renderItem={({ item }) => {
+              const sym = CURRENCIES[item.currency] || item.currency
+              return (
+                <View style={s.card}>
+                  <Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
+                  <Text style={s.cardSub}>{item.property_type} · {item.intent} · {sym}{Number(item.price).toLocaleString()}</Text>
+                  <Text style={s.cardSub}>Agent: {item.estate_agents?.full_name || '—'} · {item.district}</Text>
+                  {item.rejection_reason && <Text style={[s.cardSub, { color: colors.danger }]}>Reason: {item.rejection_reason}</Text>}
+                  {filter === 'pending' && (
+                    <View style={s.rowActions}>
+                      <TouchableOpacity style={s.ghostBtn} onPress={() => approve(item.id)}>
+                        <Text style={s.ghostBtnText}>Approve</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget(item)}>
+                        <Text style={s.dangerGhostText}>Reject</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )
+            }}
+          />
+        )
+      }
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget?.title}
+        onConfirm={reason => reject(rejectTarget.id, reason)}
+        onCancel={() => setRejectTarget(null)}
+      />
+    </View>
+  )
+}
+
+// ─── Agents Tab ──────────────────────────────────────────────────────────────
+
+function AgentsTab() {
+  const [agents, setAgents]       = useState([])
+  const [agencies, setAgencies]   = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [view, setView]           = useState('agents')  // 'agents' | 'agencies'
+  const [filter, setFilter]       = useState('pending')
+  const [rejectTarget, setRejectTarget] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [{ data: ag }, { data: acy }] = await Promise.all([
+      supabase.from('estate_agents').select('*, profiles(push_token)').eq('status', filter).order('created_at', { ascending: false }),
+      supabase.from('estate_agencies').select('*').eq('status', filter).order('created_at', { ascending: false }),
+    ])
+    setAgents(ag || [])
+    setAgencies(acy || [])
+    setLoading(false)
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  async function approveAgent(id, userId) {
+    await supabase.from('estate_agents').update({ status: 'active', rejection_reason: null }).eq('id', id)
+    await supabase.from('profiles').update({ role: 'estate_agent' }).eq('id', userId)
+    load()
+  }
+
+  async function rejectAgent(id, reason) {
+    await supabase.from('estate_agents').update({ status: 'rejected', rejection_reason: reason }).eq('id', id)
+    setRejectTarget(null)
+    load()
+  }
+
+  async function approveAgency(id) {
+    await supabase.from('estate_agencies').update({ status: 'active', rejection_reason: null }).eq('id', id)
+    load()
+  }
+
+  async function rejectAgency(id, reason) {
+    await supabase.from('estate_agencies').update({ status: 'rejected', rejection_reason: reason }).eq('id', id)
+    setRejectTarget(null)
+    load()
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* View toggle */}
+      <View style={[s.chipRow, { marginBottom: 8 }]}>
+        <TouchableOpacity style={[s.chip, view === 'agents' && s.chipActive]} onPress={() => setView('agents')}>
+          <Text style={[s.chipText, view === 'agents' && s.chipTextActive]}>Agents</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.chip, view === 'agencies' && s.chipActive]} onPress={() => setView('agencies')}>
+          <Text style={[s.chipText, view === 'agencies' && s.chipTextActive]}>Agencies</Text>
+        </TouchableOpacity>
+      </View>
+      {/* Status filter */}
+      <View style={[s.chipRow, { marginBottom: 12 }]}>
+        {['pending', 'active', 'rejected'].map(f => (
+          <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
+            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading
+        ? <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+        : view === 'agents'
+          ? (
+            <FlatList
+              data={agents}
+              keyExtractor={i => i.id}
+              contentContainerStyle={s.listContent}
+              ListEmptyComponent={<SectionEmpty text={`No ${filter} agents.`} />}
+              renderItem={({ item }) => (
+                <View style={s.card}>
+                  <Text style={s.cardTitle}>{item.full_name}</Text>
+                  <Text style={s.cardSub}>{item.phone}{item.email ? ` · ${item.email}` : ''}</Text>
+                  {item.id_document_url && (
+                    <TouchableOpacity onPress={() => Linking.openURL(item.id_document_url)}>
+                      <Text style={[s.cardSub, { color: colors.primary }]}>View ID document</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.rejection_reason && <Text style={[s.cardSub, { color: colors.danger }]}>Reason: {item.rejection_reason}</Text>}
+                  {filter === 'pending' && (
+                    <View style={s.rowActions}>
+                      <TouchableOpacity style={s.ghostBtn} onPress={() => approveAgent(item.id, item.user_id)}>
+                        <Text style={s.ghostBtnText}>Approve</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget({ ...item, _type: 'agent' })}>
+                        <Text style={s.dangerGhostText}>Reject</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+            />
+          )
+          : (
+            <FlatList
+              data={agencies}
+              keyExtractor={i => i.id}
+              contentContainerStyle={s.listContent}
+              ListEmptyComponent={<SectionEmpty text={`No ${filter} agencies.`} />}
+              renderItem={({ item }) => (
+                <View style={s.card}>
+                  <Text style={s.cardTitle}>{item.name}</Text>
+                  <Text style={s.cardSub}>{item.address}</Text>
+                  <Text style={s.cardSub}>{item.phone}{item.email ? ` · ${item.email}` : ''}</Text>
+                  {item.rejection_reason && <Text style={[s.cardSub, { color: colors.danger }]}>Reason: {item.rejection_reason}</Text>}
+                  {filter === 'pending' && (
+                    <View style={s.rowActions}>
+                      <TouchableOpacity style={s.ghostBtn} onPress={() => approveAgency(item.id)}>
+                        <Text style={s.ghostBtnText}>Approve</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget({ ...item, _type: 'agency' })}>
+                        <Text style={s.dangerGhostText}>Reject</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+            />
+          )
+      }
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget?.full_name || rejectTarget?.name}
+        onConfirm={reason => rejectTarget?._type === 'agency'
+          ? rejectAgency(rejectTarget.id, reason)
+          : rejectAgent(rejectTarget.id, reason)
+        }
+        onCancel={() => setRejectTarget(null)}
+      />
+    </View>
+  )
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 export default function AdminScreen({ session }) {
@@ -1778,6 +2008,8 @@ export default function AdminScreen({ session }) {
           {tab === 'Bookings'    && <BookingsTab />}
           {tab === 'Broadcast'   && <BroadcastTab />}
           {tab === 'Events'      && <EventsTab />}
+          {tab === 'Properties'  && <PropertiesTab />}
+          {tab === 'Agents'      && <AgentsTab />}
         </View>
       </View>
     </SafeAreaView>

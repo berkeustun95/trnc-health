@@ -33,6 +33,10 @@ const QUIZ_LANG_MAP = {
 import DutyListScreen from './screens/DutyListScreen'
 import EventsScreen from './screens/EventsScreen'
 import OrganizerScreen from './screens/OrganizerScreen'
+import AccommodationScreen from './screens/AccommodationScreen'
+import PropertyDetailScreen from './screens/PropertyDetailScreen'
+import EstateAgentOnboardingScreen from './screens/EstateAgentOnboardingScreen'
+import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import TutorialCoachMarks from './screens/TutorialCoachMarks'
 import NotificationsScreen from './screens/NotificationsScreen'
@@ -236,6 +240,9 @@ export default function App() {
   const [showMunicipalModal, setShowMunicipalModal] = useState(false)
   const [expandedMuni, setExpandedMuni] = useState(null)
   const [showEvents, setShowEvents] = useState(false)
+  const [showAccommodation, setShowAccommodation] = useState(false)
+  const [openedProperty, setOpenedProperty] = useState(null)
+  const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   const [showCoachMarks, setShowCoachMarks] = useState(false)
   const [coachSteps, setCoachSteps]         = useState([])
@@ -425,6 +432,9 @@ export default function App() {
       if (showNotifs) { setShowNotifs(false); return true }
       if (showDutyList) { setShowDutyList(false); return true }
       if (showEvents) { setShowEvents(false); return true }
+      if (openedProperty) { setOpenedProperty(null); return true }
+      if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
+      if (showAccommodation) { setShowAccommodation(false); return true }
       if (showQuizHistory) { setShowQuizHistory(false); return true }
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
       if (bookingFacility) { setBookingFacility(null); return true }
@@ -433,7 +443,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab])
+  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding])
 
   useEffect(() => {
     Promise.all([
@@ -839,6 +849,8 @@ export default function App() {
         : null
       content = <ProviderScreen session={session} lang={lang} facility={providerFacility} trialDaysLeft={trialDaysLeft} onFacilityUpdated={() => { loadProviderFacility(); reloadFacilities() }} />
     }
+  } else if (profile.role === 'estate_agent') {
+    content = <EstateAgentDashboardScreen session={session} lang={lang} />
   } else if (profile.role === 'organizer') {
     content = <OrganizerScreen session={session} lang={lang} />
   } else if (showLatestResult && latestResult) {
@@ -874,6 +886,34 @@ export default function App() {
     content = <DutyListScreen onBack={() => setShowDutyList(false)} lang={lang} />
   } else if (showEvents) {
     content = <EventsScreen lang={lang} onBack={() => setShowEvents(false)} />
+  } else if (showAgentOnboarding) {
+    content = (
+      <EstateAgentOnboardingScreen
+        session={session}
+        lang={lang}
+        onClose={() => setShowAgentOnboarding(false)}
+        onSubmitted={() => setShowAgentOnboarding(false)}
+      />
+    )
+  } else if (openedProperty) {
+    content = (
+      <PropertyDetailScreen
+        property={openedProperty}
+        lang={lang}
+        onClose={() => setOpenedProperty(null)}
+      />
+    )
+  } else if (showAccommodation) {
+    content = (
+      <AccommodationScreen
+        lang={lang}
+        session={session}
+        onClose={() => setShowAccommodation(false)}
+        onBecomeAgent={() => { setShowAccommodation(false); setShowAgentOnboarding(true) }}
+        onOpenProperty={prop => setOpenedProperty(prop)}
+      />
+    )
+  }
   } else if (showQuizHistory) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -1559,11 +1599,10 @@ export default function App() {
               <Ionicons name="calendar-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuEvents', lang)}</Text>
             </TouchableOpacity>
-            <View style={[styles.menuItem, { opacity: 0.4 }]}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowAccommodation(true) }}>
               <Ionicons name="home-outline" size={20} color={colors.textPrimary} />
               <Text style={styles.menuItemText}>{t('menuAccommodations', lang)}</Text>
-              <View style={styles.soonBadge}><Text style={styles.soonBadgeText}>{t('comingSoon', lang)}</Text></View>
-            </View>
+            </TouchableOpacity>
             <View style={[styles.menuItem, { opacity: 0.4 }]}>
               <Ionicons name="car-outline" size={20} color={colors.textPrimary} />
               <Text style={styles.menuItemText}>{t('menuTransportation', lang)}</Text>
