@@ -200,6 +200,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
   const [sort, setSort]               = useState('newest')
   const [priceMin, setPriceMin]       = useState('')
   const [priceMax, setPriceMax]       = useState('')
+  const [filterCurrency, setFilterCurrency] = useState(null)
   const [showDistrictModal, setShowDistrictModal] = useState(false)
   const [showTypeModal, setShowTypeModal]         = useState(false)
   const [showAgencyModal, setShowAgencyModal]     = useState(false)
@@ -217,6 +218,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
     if (district)          q = q.eq('district', district)
     if (propType)          q = q.eq('property_type', propType)
     if (agencyId)          q = q.eq('agency_id', agencyId)
+    if (filterCurrency)    q = q.eq('currency', filterCurrency)
     if (priceMin !== '')   q = q.gte('price', Number(priceMin))
     if (priceMax !== '')   q = q.lte('price', Number(priceMax))
 
@@ -233,7 +235,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
       })))
     }
     setLoading(false)
-  }, [intent, district, propType, agencyId, sort, priceMin, priceMax])
+  }, [intent, district, propType, agencyId, sort, priceMin, priceMax, filterCurrency])
 
   const fetchAgencies = useCallback(async () => {
     const { data } = await supabase.from('estate_agencies').select('id, name').eq('status', 'active')
@@ -243,7 +245,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
   useEffect(() => { fetchProperties() }, [fetchProperties])
   useEffect(() => { fetchAgencies() }, [fetchAgencies])
 
-  const activeFilters = [district, propType, agencyId, priceMin || priceMax].filter(Boolean).length
+  const activeFilters = [district, propType, agencyId, filterCurrency, priceMin || priceMax].filter(Boolean).length
 
   function sortLabel(s) {
     if (s === 'newest')     return t('accomSortNewest', lang)
@@ -293,8 +295,10 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
           onPress={() => setShowAgencyModal(true)}
         />
         <FilterPill
-          label={(priceMin || priceMax) ? t('accomFilterPrice', lang) : t('accomFilterPrice', lang)}
-          active={!!(priceMin || priceMax)}
+          label={(priceMin || priceMax || filterCurrency)
+            ? `${filterCurrency || ''}${priceMin ? ` >${priceMin}` : ''}${priceMax ? ` <${priceMax}` : ''}`.trim() || t('accomFilterPrice', lang)
+            : t('accomFilterPrice', lang)}
+          active={!!(priceMin || priceMax || filterCurrency)}
           onPress={() => setShowPriceModal(true)}
         />
         <FilterPill
@@ -305,7 +309,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
         {activeFilters > 0 && (
           <TouchableOpacity style={cs.clearPill} onPress={() => {
             setDistrict(null); setPropType(null); setAgencyId(null)
-            setPriceMin(''); setPriceMax(''); setSort('newest')
+            setPriceMin(''); setPriceMax(''); setFilterCurrency(null); setSort('newest')
           }}>
             <Feather name="x" size={14} color={colors.danger} />
             <Text style={cs.clearPillText}>Clear</Text>
@@ -397,6 +401,20 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
         <Pressable style={cs.overlay} onPress={() => setShowPriceModal(false)}>
           <Pressable style={cs.sheet}>
             <Text style={cs.sheetTitle}>{t('accomFilterPriceRange', lang)}</Text>
+            {/* Currency selector */}
+            <View style={cs.currencyChips}>
+              {['GBP', 'TRY', 'EUR'].map(c => (
+                <TouchableOpacity
+                  key={c}
+                  style={[cs.currencyChip, filterCurrency === c && cs.currencyChipActive]}
+                  onPress={() => setFilterCurrency(filterCurrency === c ? null : c)}
+                >
+                  <Text style={[cs.currencyChipText, filterCurrency === c && cs.currencyChipTextActive]}>
+                    {CURRENCIES[c]} {c}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <View style={cs.priceRow}>
               <TextInput
                 style={[cs.input, { flex: 1 }]}
@@ -528,6 +546,11 @@ const cs = StyleSheet.create({
   sheetOptionText:     { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   sheetOptionTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
+  currencyChips:       { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  currencyChip:        { flex: 1, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center' },
+  currencyChipActive:  { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  currencyChipText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  currencyChipTextActive: { color: colors.primary },
   priceRow:            { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   priceDash:           { fontSize: 18, color: colors.textSecondary },
   input:               { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 12, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface },
