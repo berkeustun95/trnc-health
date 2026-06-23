@@ -88,7 +88,7 @@ export default function EstateAgentDashboardScreen({ session, lang }) {
     setLoading(true)
     const { data: agent } = await supabase
       .from('estate_agents')
-      .select('id, full_name, status, rejection_reason, agency_id')
+      .select('id, full_name, status, rejection_reason, agency_id, subscription_expires_at')
       .eq('user_id', session.user.id)
       .maybeSingle()
     setAgentRecord(agent)
@@ -222,6 +222,32 @@ export default function EstateAgentDashboardScreen({ session, lang }) {
         </TouchableOpacity>
       </View>
 
+      {/* Subscription banner */}
+      {(() => {
+        const exp = agentRecord.subscription_expires_at ? new Date(agentRecord.subscription_expires_at) : null
+        const now = new Date()
+        const dateStr = exp ? exp.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null
+        let bg, textColor, icon, msg
+        if (!exp || exp < now) {
+          bg = '#FEE2E2'; textColor = '#DC2626'; icon = '⚠️'
+          msg = 'Subscription expired — your listings are hidden from visitors. Contact admin to renew.'
+        } else {
+          const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24))
+          if (daysLeft <= 7) {
+            bg = '#FEF3C7'; textColor = '#D97706'; icon = '⏰'
+            msg = `Subscription expires soon — ${dateStr} (${daysLeft} days left)`
+          } else {
+            bg = '#D1FAE5'; textColor = '#059669'; icon = '✓'
+            msg = `Subscription active until ${dateStr}`
+          }
+        }
+        return (
+          <View style={[ds.subBanner, { backgroundColor: bg }]}>
+            <Text style={[ds.subBannerText, { color: textColor }]}>{icon}  {msg}</Text>
+          </View>
+        )
+      })()}
+
       {/* Stats row */}
       <View style={ds.statsRow}>
         {[
@@ -279,6 +305,8 @@ const ds = StyleSheet.create({
   addBtn:          { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: colors.primary },
   addBtnText:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
 
+  subBanner:       { marginHorizontal: 16, marginBottom: 12, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  subBannerText:   { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
   statsRow:        { flexDirection: 'row', paddingHorizontal: 16, gap: 10, marginBottom: 16 },
   statCard:        { flex: 1, backgroundColor: colors.cardBg, borderRadius: 12, padding: 12, alignItems: 'center', ...shadow },
   statCount:       { fontSize: 24, fontFamily: 'Inter_700Bold' },

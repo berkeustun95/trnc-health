@@ -85,6 +85,61 @@ function RejectModal({ visible, entityName, onConfirm, onCancel }) {
   )
 }
 
+function SubscribeModal({ visible, agentName, isExtend, onConfirm, onCancel }) {
+  const [days, setDays] = useState(30)
+  const OPTIONS = [30, 90, 180, 365]
+  function handleConfirm() { onConfirm(days) }
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <TouchableOpacity style={s.rejectOverlay} activeOpacity={1} onPress={onCancel}>
+        <TouchableOpacity style={s.rejectSheet} activeOpacity={1}>
+          <Text style={s.rejectTitle}>{isExtend ? 'Extend Subscription' : 'Approve & Subscribe'}</Text>
+          <Text style={s.rejectSub}>{agentName ? `Agent: ${agentName}` : ''}</Text>
+          <Text style={[s.rejectSub, { marginTop: 12, marginBottom: 8, fontFamily: 'Inter_700Bold', color: colors.textPrimary }]}>
+            Subscription duration
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+            {OPTIONS.map(d => (
+              <TouchableOpacity
+                key={d}
+                onPress={() => setDays(d)}
+                style={[
+                  s.chip,
+                  days === d && s.chipActive,
+                  { paddingHorizontal: 16, paddingVertical: 9 },
+                ]}
+              >
+                <Text style={[s.chipText, days === d && s.chipTextActive]}>
+                  {d === 365 ? '1 year' : `${d} days`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={s.rejectBtnRow}>
+            <TouchableOpacity style={s.rejectCancelBtn} onPress={onCancel}>
+              <Text style={s.rejectCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.rejectConfirmBtn} onPress={handleConfirm}>
+              <Text style={s.rejectConfirmText}>{isExtend ? 'Extend' : 'Approve'}</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  )
+}
+
+function fmtExpiry(expiresAt) {
+  if (!expiresAt) return { label: 'No subscription', color: colors.danger }
+  const exp = new Date(expiresAt)
+  const now = new Date()
+  const dateStr = exp.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  if (exp < now) return { label: `Expired ${dateStr}`, color: colors.danger }
+  const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24))
+  if (daysLeft <= 7) return { label: `Expires ${dateStr} (${daysLeft}d)`, color: colors.accent }
+  return { label: `Active until ${dateStr}`, color: colors.success }
+}
+
 // ─── Dashboard Tab ──────────────────────────────────────────────────────────
 
 function DashboardTab({ onNavigate }) {
@@ -1833,7 +1888,8 @@ function AgentsTab() {
   const [loading, setLoading]     = useState(true)
   const [view, setView]           = useState('agents')  // 'agents' | 'agencies'
   const [filter, setFilter]       = useState('pending')
-  const [rejectTarget, setRejectTarget] = useState(null)
+  const [rejectTarget, setRejectTarget]       = useState(null)
+  const [subscribeTarget, setSubscribeTarget] = useState(null)  // { id, userId, isExtend, name, currentExpiry }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1848,9 +1904,19 @@ function AgentsTab() {
 
   useEffect(() => { load() }, [load])
 
-  async function approveAgent(id, userId) {
-    await supabase.from('estate_agents').update({ status: 'active', rejection_reason: null }).eq('id', id)
+  async function approveAgentWithSub(id, userId, days) {
+    const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+    await supabase.from('estate_agents').update({ status: 'active', rejection_reason: null, subscription_expires_at: expiresAt }).eq('id', id)
     await supabase.from('profiles').update({ role: 'estate_agent' }).eq('id', userId)
+    setSubscribeTarget(null)
+    load()
+  }
+
+  async function extendSubscription(id, days, currentExpiry) {
+    const base = currentExpiry && new Date(currentExpiry) > new Date() ? new Date(currentExpiry) : new Date()
+    const expiresAt = new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString()
+    await supabase.from('estate_agents').update({ subscription_expires_at: expiresAt }).eq('id', id)
+    setSubscribeTarget(null)
     load()
   }
 
@@ -1900,28 +1966,41 @@ function AgentsTab() {
               keyExtractor={i => i.id}
               contentContainerStyle={s.listContent}
               ListEmptyComponent={<SectionEmpty text={`No ${filter} agents.`} />}
-              renderItem={({ item }) => (
-                <View style={s.card}>
-                  <Text style={s.cardTitle}>{item.full_name}</Text>
-                  <Text style={s.cardSub}>{item.phone}{item.email ? ` · ${item.email}` : ''}</Text>
-                  {item.id_document_url && (
-                    <TouchableOpacity onPress={() => Linking.openURL(item.id_document_url)}>
-                      <Text style={[s.cardSub, { color: colors.primary }]}>View ID document</Text>
-                    </TouchableOpacity>
-                  )}
-                  {item.rejection_reason && <Text style={[s.cardSub, { color: colors.danger }]}>Reason: {item.rejection_reason}</Text>}
-                  {filter === 'pending' && (
+              renderItem={({ item }) => {
+                const { label: subLabel, color: subColor } = fmtExpiry(item.subscription_expires_at)
+                return (
+                  <View style={s.card}>
+                    <Text style={s.cardTitle}>{item.full_name}</Text>
+                    <Text style={s.cardSub}>{item.phone}{item.email ? ` · ${item.email}` : ''}</Text>
+                    {item.id_document_url && (
+                      <TouchableOpacity onPress={() => Linking.openURL(item.id_document_url)}>
+                        <Text style={[s.cardSub, { color: colors.primary }]}>View ID document</Text>
+                      </TouchableOpacity>
+                    )}
+                    {item.rejection_reason && <Text style={[s.cardSub, { color: colors.danger }]}>Reason: {item.rejection_reason}</Text>}
+                    {filter === 'active' && (
+                      <Text style={[s.cardSub, { color: subColor, marginTop: 2 }]}>{subLabel}</Text>
+                    )}
                     <View style={s.rowActions}>
-                      <TouchableOpacity style={s.ghostBtn} onPress={() => approveAgent(item.id, item.user_id)}>
-                        <Text style={s.ghostBtnText}>Approve</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget({ ...item, _type: 'agent' })}>
-                        <Text style={s.dangerGhostText}>Reject</Text>
-                      </TouchableOpacity>
+                      {filter === 'pending' && (
+                        <TouchableOpacity style={s.ghostBtn} onPress={() => setSubscribeTarget({ id: item.id, userId: item.user_id, isExtend: false, name: item.full_name })}>
+                          <Text style={s.ghostBtnText}>Approve</Text>
+                        </TouchableOpacity>
+                      )}
+                      {filter === 'active' && (
+                        <TouchableOpacity style={s.ghostBtn} onPress={() => setSubscribeTarget({ id: item.id, userId: item.user_id, isExtend: true, name: item.full_name, currentExpiry: item.subscription_expires_at })}>
+                          <Text style={s.ghostBtnText}>Extend</Text>
+                        </TouchableOpacity>
+                      )}
+                      {filter === 'pending' && (
+                        <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget({ ...item, _type: 'agent' })}>
+                          <Text style={s.dangerGhostText}>Reject</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                  )}
-                </View>
-              )}
+                  </View>
+                )
+              }}
             />
           )
           : (
@@ -1959,6 +2038,16 @@ function AgentsTab() {
           : rejectAgent(rejectTarget.id, reason)
         }
         onCancel={() => setRejectTarget(null)}
+      />
+      <SubscribeModal
+        visible={!!subscribeTarget}
+        agentName={subscribeTarget?.name}
+        isExtend={subscribeTarget?.isExtend}
+        onConfirm={days => subscribeTarget?.isExtend
+          ? extendSubscription(subscribeTarget.id, days, subscribeTarget.currentExpiry)
+          : approveAgentWithSub(subscribeTarget.id, subscribeTarget.userId, days)
+        }
+        onCancel={() => setSubscribeTarget(null)}
       />
     </View>
   )
