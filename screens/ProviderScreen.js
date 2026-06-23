@@ -48,7 +48,7 @@ async function sendPushNotification(token, title, body, data = {}) {
 
 async function recordNotification(userId, title, body) {
   try {
-    await supabase.from('notifications').insert({ user_id: userId, title, body })
+    await supabase.rpc('insert_notification', { p_user_id: userId, p_title: title, p_body: body })
   } catch { /* non-critical */ }
 }
 
@@ -298,6 +298,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         if (dt >= new Date()) setUpcomingConfirmed(prev => [...prev, { ...movedAppt }].sort((a, b) => new Date(a.requested_time) - new Date(b.requested_time)))
         else setPastConfirmed(prev => [{ ...movedAppt }, ...prev])
       }
+      loadStats()
     }
   }
 
@@ -390,7 +391,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
       if (onFacilityUpdated) onFacilityUpdated()
     } catch (err) {
       console.error('Image upload error:', err)
-      setImageError('Upload failed. Try again.')
+      setImageError(t('uploadFailed', lang))
     } finally {
       if (isCover) setUploadingCover(false); else setUploadingLogo(false)
     }
@@ -425,7 +426,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
       setPhotos(next)
       if (onFacilityUpdated) onFacilityUpdated()
     } catch {
-      setImageError('Upload failed. Try again.')
+      setImageError(t('uploadFailed', lang))
     } finally {
       setUploadingPhoto(false)
     }
@@ -622,7 +623,14 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
               style={[styles.tabBtn, tab === 'requests' && styles.tabBtnActive]}
               onPress={() => setTab('requests')}
             >
-              <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>{t('tabRequests', lang)}</Text>
+              <View style={styles.tabWithBadge}>
+                <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>{t('tabRequests', lang)}</Text>
+                {appointments.length > 0 && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{appointments.length}</Text>
+                  </View>
+                )}
+              </View>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -672,13 +680,13 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           <>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
             <View style={styles.card}>
-              <Text style={styles.fieldLabel}>Cover Photo</Text>
+              <Text style={styles.fieldLabel}>{t('coverPhoto', lang)}</Text>
               <TouchableOpacity style={styles.coverUploadArea} onPress={() => pickAndUploadImage('cover')} activeOpacity={0.8}>
                 {coverUrl
                   ? <Image source={{ uri: coverUrl }} style={styles.coverPreview} resizeMode="cover" />
                   : <View style={styles.uploadPlaceholder}>
                       <Feather name="camera" size={22} color={colors.textSecondary} />
-                      <Text style={styles.uploadHint}>Tap to add cover photo</Text>
+                      <Text style={styles.uploadHint}>{t('tapToAddCover', lang)}</Text>
                     </View>
                 }
                 {uploadingCover && <ActivityIndicator style={StyleSheet.absoluteFill} color={colors.primary} />}
@@ -689,13 +697,13 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 )}
               </TouchableOpacity>
 
-              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Logo</Text>
+              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>{t('logoLabel', lang)}</Text>
               <TouchableOpacity style={styles.logoUploadArea} onPress={() => pickAndUploadImage('logo')} activeOpacity={0.8}>
                 {logoUrl
                   ? <Image source={{ uri: logoUrl }} style={styles.logoPreview} resizeMode="cover" />
                   : <View style={styles.uploadPlaceholder}>
                       <Feather name="image" size={18} color={colors.textSecondary} />
-                      <Text style={styles.uploadHint}>Tap to add logo</Text>
+                      <Text style={styles.uploadHint}>{t('tapToAddLogo', lang)}</Text>
                     </View>
                 }
                 {uploadingLogo && <ActivityIndicator style={StyleSheet.absoluteFill} color={colors.primary} />}
@@ -1166,7 +1174,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                     <TouchableOpacity style={[styles.statTile, { backgroundColor: colors.accentLight }]} onPress={() => setTab('requests')} activeOpacity={0.7}>
                       <Text style={[styles.statNum, { color: colors.accent }]}>{stats.appt.pending}</Text>
                       <Text style={styles.statLabel}>{t('statusPending', lang)}</Text>
-                      {stats.appt.pending > 0 && <Text style={{ fontSize: 9, fontFamily: 'Inter_700Bold', color: colors.accent, marginTop: 2 }}>TAP TO VIEW</Text>}
+                      {stats.appt.pending > 0 && <Text style={{ fontSize: 9, fontFamily: 'Inter_700Bold', color: colors.accent, marginTop: 2 }}>{t('tapToView', lang)}</Text>}
                     </TouchableOpacity>
                     <View style={[styles.statTile, { backgroundColor: colors.successLight }]}>
                       <Text style={[styles.statNum, { color: colors.success }]}>{stats.appt.confirmed}</Text>

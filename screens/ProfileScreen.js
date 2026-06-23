@@ -11,8 +11,24 @@ import * as Notifications from 'expo-notifications'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { getNatLabel } from '../constants/nationalityTranslations'
 import LegalScreen from './LegalScreen'
 import { PRESET_AVATARS, getPreset } from '../constants/avatars'
+
+const NATIONALITIES = [
+  'Afghanistan', 'Albania', 'Algeria', 'Argentina', 'Armenia', 'Australia', 'Austria',
+  'Azerbaijan', 'Bahrain', 'Bangladesh', 'Belarus', 'Belgium', 'Bosnia & Herzegovina',
+  'Brazil', 'Bulgaria', 'Canada', 'China', 'Croatia', 'Cuba', 'Czech Republic',
+  'Denmark', 'Egypt', 'Finland', 'France', 'Georgia', 'Germany', 'Ghana', 'Greece',
+  'Hungary', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
+  'Jordan', 'Kazakhstan', 'Kenya', 'Kuwait', 'Lebanon', 'Libya', 'Malaysia', 'Malta',
+  'Mexico', 'Morocco', 'Netherlands', 'Nigeria', 'Norway', 'Pakistan', 'Palestine',
+  'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Saudi Arabia',
+  'Serbia', 'Singapore', 'South Africa', 'South Korea', 'Spain', 'Sri Lanka', 'Sweden',
+  'Switzerland', 'Syria', 'Thailand', 'Tunisia', 'Turkey', 'Northern Cyprus', 'Ukraine',
+  'United Arab Emirates', 'United Kingdom', 'United States', 'Uzbekistan', 'Venezuela',
+  'Vietnam', 'Yemen', 'Zimbabwe',
+]
 
 const COUNTRY_CODES = [
   { code: '+90',  label: 'Turkey' },
@@ -264,6 +280,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [bookingsOpen, setBookingsOpen]         = useState(false)
   const [selectedCC, setSelectedCC]             = useState('+90')
   const [showCCPicker, setShowCCPicker]         = useState(false)
+  const [showNatPicker, setShowNatPicker]       = useState(false)
   const [personalOpen, setPersonalOpen]         = useState(false)
 
   function toggleSection(setter) {
@@ -689,13 +706,12 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
               <View style={s.fieldGroup}>
                 <Text style={s.fieldLabel}>{t('nationality', lang)}</Text>
-                <TextInput
-                  style={s.input}
-                  value={form.nationality}
-                  onChangeText={set('nationality')}
-                  placeholder="e.g. British, Turkish, Iranian"
-                  placeholderTextColor={colors.border}
-                />
+                <TouchableOpacity style={s.pickerBtn} onPress={() => setShowNatPicker(true)} activeOpacity={0.7}>
+                  <Text style={[s.pickerBtnText, !form.nationality && s.pickerBtnPlaceholder]}>
+                    {form.nationality ? getNatLabel(form.nationality, lang) : t('selectNationality', lang)}
+                  </Text>
+                  <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
 
               {error && <Text style={s.errorText}>{error}</Text>}
@@ -770,6 +786,33 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               </View>
             </View>
           </Modal>
+
+          <Modal visible={showNatPicker} animationType="slide" transparent onRequestClose={() => setShowNatPicker(false)}>
+            <View style={s.ccModalBackdrop}>
+              <View style={s.ccModalCard}>
+                <View style={s.ccModalHeader}>
+                  <Text style={s.ccModalTitle}>{t('nationality', lang)}</Text>
+                  <TouchableOpacity onPress={() => setShowNatPicker(false)}>
+                    <Feather name="x" size={20} color={colors.textPrimary} />
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={NATIONALITIES}
+                  keyExtractor={item => item}
+                  showsVerticalScrollIndicator={false}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[s.ccItem, form.nationality === item && s.ccItemActive]}
+                      onPress={() => { set('nationality')(item); setShowNatPicker(false) }}
+                    >
+                      <Text style={[s.ccItemLabel, form.nationality === item && s.ccItemLabelActive]}>{getNatLabel(item, lang)}</Text>
+                      {form.nationality === item && <Feather name="check" size={15} color={colors.primary} />}
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            </View>
+          </Modal>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -808,6 +851,9 @@ const s = StyleSheet.create({
   fieldGroup:       { marginBottom: 16 },
   fieldLabel:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
   input:            { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, fontSize: 15, fontFamily: 'Inter_400Regular', backgroundColor: colors.surface, color: colors.textPrimary },
+  pickerBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 13, backgroundColor: colors.surface },
+  pickerBtnText:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  pickerBtnPlaceholder: { color: colors.border },
 
   noBookingsText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 12, marginTop: 2 },
   bookingSectionLabel:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },

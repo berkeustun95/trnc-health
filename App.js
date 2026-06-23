@@ -157,13 +157,13 @@ function isAvailableToday(availability) {
 }
 
 const TAB_ITEMS = [
-  { key: 'home',       iconOff: 'home-outline',   iconOn: 'home',    label: 'Home' },
-  { key: 'map',        iconOff: 'map-outline',     iconOn: 'map',     label: 'Map' },
-  { key: 'favourites', iconOff: 'heart-outline',   iconOn: 'heart',   label: 'Saved' },
-  { key: 'profile',    iconOff: 'person-outline',  iconOn: 'person',  label: 'Profile' },
+  { key: 'home',       iconOff: 'home-outline',   iconOn: 'home',    labelKey: 'tabHome' },
+  { key: 'map',        iconOff: 'map-outline',     iconOn: 'map',     labelKey: 'map' },
+  { key: 'favourites', iconOff: 'heart-outline',   iconOn: 'heart',   labelKey: 'tabSaved' },
+  { key: 'profile',    iconOff: 'person-outline',  iconOn: 'person',  labelKey: 'tabProfile' },
 ]
 
-function BottomTabBar({ activeTab, onTabPress, mapTabRef }) {
+function BottomTabBar({ activeTab, onTabPress, mapTabRef, lang }) {
   const insets = useSafeAreaInsets()
   return (
     <View style={[tabBar.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -182,7 +182,7 @@ function BottomTabBar({ activeTab, onTabPress, mapTabRef }) {
               size={24}
               color={active ? colors.primary : colors.textSecondary}
             />
-            <Text style={[tabBar.label, active && tabBar.labelActive]}>{tab.label}</Text>
+            <Text style={[tabBar.label, active && tabBar.labelActive]}>{t(tab.labelKey, lang)}</Text>
           </TouchableOpacity>
         )
       })}
@@ -265,6 +265,7 @@ export default function App() {
   const menuTutorialItemRef = useRef(null)
   const menuAnim = useRef(new Animated.Value(260)).current
   const menuStepCountRef = useRef(0)
+  const sessionRef = useRef(null)
 
   function openMenu() {
     setShowMenu(true)
@@ -284,6 +285,8 @@ export default function App() {
   }
 
   async function startCoachMarks() {
+    setActiveTab('home')
+    setShowNotifs(false)
     await new Promise(r => setTimeout(r, 400))
     menuStepCountRef.current = 0
 
@@ -515,6 +518,7 @@ export default function App() {
   }
 
   useEffect(() => {
+    sessionRef.current = session
     menuAnim.setValue(260)
     setShowMenu(false)
     setShowNotifs(false)
@@ -622,6 +626,7 @@ export default function App() {
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
+      if (!sessionRef.current) return
       const data   = response.notification.request.content.data ?? {}
       const screen = data.screen
       if (screen === 'duty') {
@@ -1149,7 +1154,7 @@ export default function App() {
                     <View style={styles.weatherExpandStats}>
                       <Text style={styles.weatherStat}>💧 {cur.relative_humidity_2m}%</Text>
                       <Text style={styles.weatherStat}>💨 {Math.round(cur.wind_speed_10m)} km/h</Text>
-                      <Text style={styles.weatherStat}>Feels {Math.round(cur.apparent_temperature)}°C</Text>
+                      <Text style={styles.weatherStat}>{t('feelsLike', lang)} {Math.round(cur.apparent_temperature)}°C</Text>
                       {uv && <Text style={styles.weatherStat}>{t(uv.key, lang)}</Text>}
                     </View>
                     {uv?.warn && (
@@ -1158,7 +1163,9 @@ export default function App() {
                     {days.length > 0 && (
                       <View style={styles.forecastRow}>
                         {days.map((date, i) => {
-                          const label = i === 0 ? 'Today' : new Date(date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' })
+                          const LANG_LOCALE = { English: 'en', Turkish: 'tr', Arabic: 'ar', Russian: 'ru', Greek: 'el', French: 'fr', Spanish: 'es', German: 'de', Persian: 'fa' }
+                          const locale = LANG_LOCALE[lang] || 'en'
+                          const label = i === 0 ? t('todayLabel', lang) : new Date(date + 'T12:00:00').toLocaleDateString(locale, { weekday: 'short' })
                           return (
                             <View key={date} style={styles.forecastDay}>
                               <Text style={styles.forecastLabel}>{label}</Text>
@@ -1212,14 +1219,13 @@ export default function App() {
               )}
               {activeSpecialty && (
                 <TouchableOpacity style={styles.activeFilterPill} onPress={() => setActiveSpecialty(null)}>
-                  <Text style={styles.activeFilterPillText}>{activeSpecialty}</Text>
+                  <Text style={styles.activeFilterPillText}>{t(activeSpecialty, lang)}</Text>
                   <Feather name="x" size={10} color={colors.primary} />
                 </TouchableOpacity>
               )}
               {showAll && (
                 <TouchableOpacity style={styles.activeFilterPill} onPress={() => setShowAll(false)}>
-                  <Ionicons name="eye" size={11} color={colors.primary} />
-                  <Text style={styles.activeFilterPillText}>{t('adaOnly', lang)}</Text>
+                  <Text style={styles.activeFilterPillText}>{t('allFacilities', lang)}</Text>
                   <Feather name="x" size={10} color={colors.primary} />
                 </TouchableOpacity>
               )}
@@ -1231,6 +1237,12 @@ export default function App() {
                 </TouchableOpacity>
               )}
             </ScrollView>
+            {!showAll && !searchText.trim() && facilities.some(f => !f.provider_id && (!activeType || f.type === activeType)) && (
+              <TouchableOpacity style={styles.hiddenFacHint} onPress={() => setShowAll(true)} activeOpacity={0.75}>
+                <Ionicons name="eye-off-outline" size={11} color={colors.textSecondary} />
+                <Text style={styles.hiddenFacHintText} numberOfLines={1}>{t('hiddenFacilitiesHint', lang)}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[styles.filterToggleBtn, showFilters && styles.filterToggleBtnActive]}
               onPress={() => setShowFilters(v => !v)}
@@ -1291,7 +1303,7 @@ export default function App() {
                     style={[styles.filterChip, activeSpecialty === sp && styles.filterChipActive]}
                     onPress={() => setActiveSpecialty(prev => prev === sp ? null : sp)}
                   >
-                    <Text style={[styles.filterChipText, activeSpecialty === sp && styles.filterChipTextActive]}>{sp}</Text>
+                    <Text style={[styles.filterChipText, activeSpecialty === sp && styles.filterChipTextActive]}>{t(sp, lang)}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -1414,7 +1426,7 @@ export default function App() {
                             </View>
                           )}
                         </View>
-                        {item.specialty?.length ? <Text style={styles.specialtyText} numberOfLines={1}>{Array.isArray(item.specialty) ? item.specialty.join(' · ') : item.specialty}</Text> : null}
+                        {item.specialty?.length ? <Text style={styles.specialtyText} numberOfLines={1}>{Array.isArray(item.specialty) ? item.specialty.map(s => t(s, lang)).join(' · ') : t(item.specialty, lang)}</Text> : null}
                         {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
                         {facilityRatings[item.id] && (
                           <View style={styles.ratingRow}>
@@ -1572,7 +1584,7 @@ export default function App() {
           />
         )}
 
-        <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} mapTabRef={mapTabRef} />
+        <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} mapTabRef={mapTabRef} lang={lang} />
 
         {showMenu && (
           <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />
@@ -1837,6 +1849,8 @@ const styles = StyleSheet.create({
   notifDot:         { position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
   errorRow:         { alignItems: 'center', marginBottom: 10 },
   locationNote:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
+  hiddenFacHint:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, marginHorizontal: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.05)', flexShrink: 1, maxWidth: 180 },
+  hiddenFacHintText: { fontSize: 10, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flexShrink: 1 },
   retryBtn:         { marginTop: 8, paddingHorizontal: 18, paddingVertical: 8, backgroundColor: colors.primary, borderRadius: 10 },
   retryBtnText:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
   searchBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 10, gap: 10, borderWidth: 1, borderColor: colors.border },

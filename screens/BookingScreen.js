@@ -28,7 +28,7 @@ async function notifyProvider(facility, titleKey, bodyKey) {
         body: JSON.stringify({ to: prov.push_token, title, body, sound: 'default' }),
       })
     }
-    await supabase.from('notifications').insert({ user_id: facility.provider_id, title, body })
+    await supabase.rpc('insert_notification', { p_user_id: facility.provider_id, p_title: title, p_body: body })
   } catch {}
 }
 
