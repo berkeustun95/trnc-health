@@ -913,7 +913,6 @@ export default function App() {
         onOpenProperty={prop => setOpenedProperty(prop)}
       />
     )
-  }
   } else if (showQuizHistory) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
