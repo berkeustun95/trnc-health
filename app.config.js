@@ -30,6 +30,9 @@ export default {
           'ADA uses your location to show nearby pharmacies, clinics, and hospitals.',
         NSPhotoLibraryUsageDescription:
           'ADA needs access to your photos to let you set a profile picture.',
+        ITSAppUsesNonExemptEncryption: false,
+        CFBundleDisplayName: 'ADA - North Cyprus Assistant',
+        CFBundleName: 'ADANorthCyprus',
       },
     },
     android: {
