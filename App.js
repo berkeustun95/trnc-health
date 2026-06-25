@@ -266,6 +266,7 @@ export default function App() {
   const menuAnim = useRef(new Animated.Value(260)).current
   const menuStepCountRef = useRef(0)
   const sessionRef = useRef(null)
+  const handledColdStartRef = useRef(false)
 
   function openMenu() {
     setShowMenu(true)
@@ -640,6 +641,17 @@ export default function App() {
     return () => sub.remove()
   }, [])
 
+  // Handle cold-start notification tap (app killed → tapped → opened)
+  useEffect(() => {
+    if (!session || handledColdStartRef.current) return
+    handledColdStartRef.current = true
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (!response) return
+      const screen = response.notification.request.content.data?.screen
+      if (screen === 'duty') setShowDutyList(true)
+    })
+  }, [session])
+
   useEffect(() => {
     setFacilityLoadError(false)
     async function load() {
@@ -898,7 +910,7 @@ export default function App() {
       }}
     />
   } else if (showDutyList) {
-    content = <DutyListScreen onBack={() => setShowDutyList(false)} lang={lang} />
+    content = <DutyListScreen onBack={() => setShowDutyList(false)} lang={lang} userLocation={userLocation} locationDenied={locationDenied} />
   } else if (showEvents) {
     content = <EventsScreen lang={lang} onBack={() => setShowEvents(false)} />
   } else if (showAgentOnboarding) {
