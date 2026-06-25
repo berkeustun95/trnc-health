@@ -38,6 +38,7 @@ import PropertyDetailScreen from './screens/PropertyDetailScreen'
 import EstateAgentOnboardingScreen from './screens/EstateAgentOnboardingScreen'
 import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
+import HomeServicesScreen from './screens/HomeServicesScreen'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
 import BringingPetScreen from './screens/pets/BringingPetScreen'
 import TimelineCalculatorScreen from './screens/pets/TimelineCalculatorScreen'
@@ -248,6 +249,7 @@ export default function App() {
   const [showEvents, setShowEvents] = useState(false)
   const [showAccommodation, setShowAccommodation] = useState(false)
   const [showPets, setShowPets] = useState(false)
+  const [showHomeServices, setShowHomeServices] = useState(false)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
   const [openedProperty, setOpenedProperty] = useState(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
@@ -453,11 +455,12 @@ export default function App() {
       if (selectedFacility) { setSelectedFacility(null); setBookingFacility(null); return true }
       if (petsSubScreen) { setPetsSubScreen(null); return true }
       if (showPets) { setShowPets(false); return true }
+      if (showHomeServices) { setShowHomeServices(false); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen])
+  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices])
 
   useEffect(() => {
     Promise.all([
@@ -940,6 +943,8 @@ export default function App() {
         onOpenProperty={prop => setOpenedProperty(prop)}
       />
     )
+  } else if (showHomeServices) {
+    content = <HomeServicesScreen lang={lang} session={session} onBack={() => setShowHomeServices(false)} />
   } else if (showPets) {
     if (petsSubScreen === 'bringing') {
       content = <BringingPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
@@ -1671,6 +1676,10 @@ export default function App() {
             <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowPets(true) }}>
               <Ionicons name="paw-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuPets', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowHomeServices(true) }}>
+              <Ionicons name="hammer-outline" size={20} color={colors.primary} />
+              <Text style={styles.menuItemText}>{t('menuHomeServices', lang)}</Text>
             </TouchableOpacity>
             <View style={[styles.menuItem, { opacity: 0.4 }]}>
               <Ionicons name="car-outline" size={20} color={colors.textPrimary} />

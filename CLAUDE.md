@@ -71,3 +71,13 @@ eas build --platform android --profile production
 - Don't add analytics, tracking, or third-party SDKs without asking.
 - Don't generate large files of placeholder/sample code — ask what's real.
 - Don't mark a provider `verified: true` in code; verification is a manual step I do.
+
+## Dev journal summaries
+
+When I ask for a summary for the dev journal, follow this format:
+- Headline + type (OTA / native / hotfix / refactor)
+- "What changed" grouped by feature/area
+- "Why" — 1-2 sentences if not self-evident
+- "Watch out for" — gotchas, deferred TODOs, things future-me needs to remember
+- **When more than one reasonable approach existed for a decision, include an options table with tradeoffs — not just the choice.**
+- "→ architecture.md updates needed" if structural (new tables, screens, conventions)
