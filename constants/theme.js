@@ -23,6 +23,11 @@ export const typeColors = {
   vet:      { bg: '#FEF3C7', text: '#D97706' },
 }
 
+export const placeColors = {
+  beach:    { bg: '#E0F2FE', text: '#0369A1' },
+  landmark: { bg: '#FEF9C3', text: '#A16207' },
+}
+
 export const shadow = {
   shadowColor:   '#1A2B33',
   shadowOpacity: 0.07,

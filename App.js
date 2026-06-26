@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { Component, useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal, Dimensions } from 'react-native'
 import { BlurView } from 'expo-blur'
@@ -39,6 +39,8 @@ import EstateAgentOnboardingScreen from './screens/EstateAgentOnboardingScreen'
 import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import HomeServicesScreen from './screens/HomeServicesScreen'
+import BeachesLandmarksScreen from './screens/BeachesLandmarksScreen'
+import PlaceProfileScreen from './screens/PlaceProfileScreen'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
 import BringingPetScreen from './screens/pets/BringingPetScreen'
 import TimelineCalculatorScreen from './screens/pets/TimelineCalculatorScreen'
@@ -198,6 +200,25 @@ const tabBar = StyleSheet.create({
   labelActive:{ fontFamily: 'Inter_700Bold', color: colors.primary },
 })
 
+class BLErrorBoundary extends Component {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, padding: 24, backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginBottom: 8 }}>Something went wrong</Text>
+          <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 24 }}>Please go back and try again.</Text>
+          <TouchableOpacity onPress={() => this.setState({ hasError: false })} style={{ padding: 14, backgroundColor: '#0E7C7B', borderRadius: 12 }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export default function App() {
   const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_700Bold, PlayfairDisplay_400Regular, PlayfairDisplay_700Bold })
   const [session, setSession] = useState(undefined)
@@ -250,6 +271,8 @@ export default function App() {
   const [showAccommodation, setShowAccommodation] = useState(false)
   const [showPets, setShowPets] = useState(false)
   const [showHomeServices, setShowHomeServices] = useState(false)
+  const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
+  const [selectedPlace,        setSelectedPlace]        = useState(null)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
   const [openedProperty, setOpenedProperty] = useState(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
@@ -456,11 +479,13 @@ export default function App() {
       if (petsSubScreen) { setPetsSubScreen(null); return true }
       if (showPets) { setShowPets(false); return true }
       if (showHomeServices) { setShowHomeServices(false); return true }
+      if (selectedPlace)        { setSelectedPlace(null); return true }
+      if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices])
+  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showBeachesLandmarks, selectedPlace])
 
   useEffect(() => {
     Promise.all([
@@ -945,6 +970,14 @@ export default function App() {
     )
   } else if (showHomeServices) {
     content = <HomeServicesScreen lang={lang} session={session} onBack={() => setShowHomeServices(false)} />
+  } else if (selectedPlace) {
+    content = <PlaceProfileScreen place={selectedPlace} lang={lang} onBack={() => setSelectedPlace(null)} />
+  } else if (showBeachesLandmarks) {
+    content = (
+      <BLErrorBoundary>
+        <BeachesLandmarksScreen lang={lang} onBack={() => setShowBeachesLandmarks(false)} userLocation={userLocation} onSelectPlace={setSelectedPlace} session={session} />
+      </BLErrorBoundary>
+    )
   } else if (showPets) {
     if (petsSubScreen === 'bringing') {
       content = <BringingPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
@@ -1680,6 +1713,10 @@ export default function App() {
             <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowHomeServices(true) }}>
               <Ionicons name="hammer-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuHomeServices', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowBeachesLandmarks(true) }}>
+              <Ionicons name="umbrella-outline" size={20} color={colors.primary} />
+              <Text style={styles.menuItemText}>{t('menuBeachesLandmarks', lang)}</Text>
             </TouchableOpacity>
             <View style={[styles.menuItem, { opacity: 0.4 }]}>
               <Ionicons name="car-outline" size={20} color={colors.textPrimary} />

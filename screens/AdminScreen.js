@@ -6,13 +6,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
-import { colors, shadow } from '../constants/theme'
+import { colors, placeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices']
+const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Places']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -160,6 +160,8 @@ function DashboardTab({ onNavigate }) {
         { count: pendingProperties },
         { count: pendingAgents },
         { count: pendingHomeServices },
+        { count: pendingBeaches },
+        { count: pendingLandmarks },
       ] = await Promise.all([
         supabase.from('facilities').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -173,8 +175,11 @@ function DashboardTab({ onNavigate }) {
         supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('estate_agents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('home_services').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('beaches').select('*',   { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('landmarks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ])
-      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices })
+      const pendingPlaces = (pendingBeaches ?? 0) + (pendingLandmarks ?? 0)
+      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingPlaces })
     }
     load()
   }, [])
@@ -192,6 +197,7 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingProperties ?? 0) > 0 && { label: 'Property listings to review', count: stats.pendingProperties,      tab: 'Properties',  color: colors.primary },
     (stats.pendingAgents ?? 0)      > 0 && { label: 'Agent applications pending',       count: stats.pendingAgents,         tab: 'Agents',       color: '#7C3AED' },
     (stats.pendingHomeServices ?? 0) > 0 && { label: 'Home service providers pending',  count: stats.pendingHomeServices,   tab: 'HomeServices', color: colors.primary },
+    (stats.pendingPlaces ?? 0)       > 0 && { label: 'Beaches & landmarks to review',   count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
   ].filter(Boolean)
 
   return (
@@ -2185,6 +2191,147 @@ function HomeServicesTab() {
   )
 }
 
+// ─── Places Tab ─────────────────────────────────────────────────────────────
+
+function PlacesTab() {
+  const [places,       setPlaces]       = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [filter,       setFilter]       = useState('pending')
+  const [rejectTarget, setRejectTarget] = useState(null)
+
+  const CATEGORY_LABELS = {
+    castle_fortress: 'Castle & Fortress', ancient_ruins: 'Ancient Ruins',
+    museum: 'Museum', religious_site: 'Religious Site',
+    monument: 'Monument', nature_scenic: 'Nature & Scenic',
+  }
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const fetchTable = async (table, tag) => {
+      let q = supabase.from(table).select('id, name, district, status, rejection_reason, submitted_by, photo_urls, category, access_type, blue_flag').order('created_at', { ascending: false })
+      if (filter !== 'all') q = q.eq('status', filter)
+      const { data } = await q
+      return (data ?? []).map(r => ({ ...r, _type: tag }))
+    }
+    const [beaches, landmarks] = await Promise.all([
+      fetchTable('beaches',   'beach'),
+      fetchTable('landmarks', 'landmark'),
+    ])
+    const n = p => (typeof p.name === 'object' ? (p.name.en ?? p.name.tr ?? '') : (p.name ?? ''))
+    setPlaces([...beaches, ...landmarks].sort((a, b) => n(a).localeCompare(n(b))))
+    setLoading(false)
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(item) {
+    const table = item._type === 'beach' ? 'beaches' : 'landmarks'
+    await supabase.from(table).update({ status: 'active', rejection_reason: null }).eq('id', item.id)
+    load()
+  }
+
+  async function reject(item, reason) {
+    const table = item._type === 'beach' ? 'beaches' : 'landmarks'
+    await supabase.from(table).update({ status: 'rejected', rejection_reason: reason || 'Does not meet our guidelines.' }).eq('id', item.id)
+    setRejectTarget(null)
+    load()
+  }
+
+  async function deletePlace(item) {
+    const table = item._type === 'beach' ? 'beaches' : 'landmarks'
+    const nameStr = typeof item.name === 'object' ? (item.name.en ?? item.name.tr ?? '') : item.name
+    Alert.alert('Delete place?', `"${nameStr}" will be permanently removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from(table).delete().eq('id', item.id); load() } },
+    ])
+  }
+
+  function statusColor(status) {
+    if (status === 'active')   return colors.success
+    if (status === 'rejected') return colors.danger
+    if (status === 'pending')  return '#C2410C'
+    return colors.textSecondary
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={[s.chipRow, { marginBottom: 12 }]}>
+        {['pending', 'active', 'rejected', 'all'].map(f => (
+          <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
+            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading
+        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        : (
+          <FlatList
+            data={places}
+            keyExtractor={p => `${p._type}-${p.id}`}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text={`No ${filter} places.`} />}
+            renderItem={({ item }) => {
+              const isBeach = item._type === 'beach'
+              const pc = isBeach ? placeColors.beach : placeColors.landmark
+              return (
+                <View style={s.card}>
+                  <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <View style={[s.pillGrey, { backgroundColor: pc.bg }]}>
+                          <Text style={[s.pillText, { color: pc.text }]}>{isBeach ? 'Beach' : 'Landmark'}</Text>
+                        </View>
+                      </View>
+                      <Text style={s.cardTitle} numberOfLines={1}>{(() => { const n = item.name; if (!n) return ''; if (typeof n !== 'object') return String(n); const r = n.en ?? n.tr ?? Object.values(n)[0]; return typeof r === 'object' ? (r.en ?? r.tr ?? '') : String(r ?? '') })()}</Text>
+                      <Text style={s.cardSub}>{item.district}{isBeach && item.access_type ? ` · ${item.access_type}` : ''}{!isBeach && item.category ? ` · ${CATEGORY_LABELS[item.category] ?? item.category}` : ''}</Text>
+                      <Text style={s.cardSub}>
+                        {item.submitted_by ? `User: ${item.submitted_by.slice(0, 8)}…` : 'Admin-seeded'}
+                        {item.photo_urls?.length > 0 ? ` · ${item.photo_urls.length} photo${item.photo_urls.length > 1 ? 's' : ''}` : ' · No photos'}
+                      </Text>
+                    </View>
+                    <View style={[s.pillGrey, { backgroundColor: statusColor(item.status) + '20', marginLeft: 8 }]}>
+                      <Text style={[s.pillText, { color: statusColor(item.status) }]}>{item.status}</Text>
+                    </View>
+                  </View>
+
+                  {item.status === 'rejected' && item.rejection_reason && (
+                    <Text style={[s.cardSub, { color: colors.danger, marginTop: 6 }]}>Reason: {item.rejection_reason}</Text>
+                  )}
+
+                  <View style={[s.rowActions, { marginTop: 10, marginLeft: 0 }]}>
+                    {item.status !== 'active' && (
+                      <TouchableOpacity style={s.ghostBtn} onPress={() => approve(item)}>
+                        <Text style={s.ghostBtnText}>Approve</Text>
+                      </TouchableOpacity>
+                    )}
+                    {item.status !== 'rejected' && (
+                      <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget(item)}>
+                        <Text style={s.dangerGhostText}>Reject</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={s.dangerGhostBtn} onPress={() => deletePlace(item)}>
+                      <Text style={s.dangerGhostText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )
+            }}
+          />
+        )
+      }
+
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget?.name}
+        onConfirm={reason => reject(rejectTarget, reason)}
+        onCancel={() => setRejectTarget(null)}
+      />
+    </View>
+  )
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 export default function AdminScreen({ session }) {
@@ -2232,6 +2379,7 @@ export default function AdminScreen({ session }) {
           {tab === 'Properties'    && <PropertiesTab />}
           {tab === 'Agents'        && <AgentsTab />}
           {tab === 'HomeServices'  && <HomeServicesTab />}
+          {tab === 'Places'        && <PlacesTab />}
         </View>
       </View>
     </SafeAreaView>
