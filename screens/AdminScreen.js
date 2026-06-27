@@ -12,7 +12,7 @@ import { t } from '../constants/i18n'
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Places']
+const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'BusRoutes', 'Places']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -160,6 +160,7 @@ function DashboardTab({ onNavigate }) {
         { count: pendingProperties },
         { count: pendingAgents },
         { count: pendingHomeServices },
+        { count: pendingTransport },
         { count: pendingBeaches },
         { count: pendingLandmarks },
       ] = await Promise.all([
@@ -175,11 +176,12 @@ function DashboardTab({ onNavigate }) {
         supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('estate_agents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('home_services').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('transport_providers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('beaches').select('*',   { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('landmarks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ])
       const pendingPlaces = (pendingBeaches ?? 0) + (pendingLandmarks ?? 0)
-      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingPlaces })
+      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingPlaces })
     }
     load()
   }, [])
@@ -197,6 +199,7 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingProperties ?? 0) > 0 && { label: 'Property listings to review', count: stats.pendingProperties,      tab: 'Properties',  color: colors.primary },
     (stats.pendingAgents ?? 0)      > 0 && { label: 'Agent applications pending',       count: stats.pendingAgents,         tab: 'Agents',       color: '#7C3AED' },
     (stats.pendingHomeServices ?? 0) > 0 && { label: 'Home service providers pending',  count: stats.pendingHomeServices,   tab: 'HomeServices', color: colors.primary },
+    (stats.pendingTransport ?? 0)    > 0 && { label: 'Transport providers pending',      count: stats.pendingTransport,       tab: 'Transport',    color: colors.primary },
     (stats.pendingPlaces ?? 0)       > 0 && { label: 'Beaches & landmarks to review',   count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
   ].filter(Boolean)
 
@@ -2191,6 +2194,316 @@ function HomeServicesTab() {
   )
 }
 
+// ─── Transport Tab ────────────────────────────────────────────────────────────
+
+function TransportTab() {
+  const [providers,    setProviders]    = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [filter,       setFilter]       = useState('pending')
+  const [rejectTarget, setRejectTarget] = useState(null)
+
+  const TYPE_LABELS  = { taxi: 'Taxi', car_rental: 'Car Rental', airport_transfer: 'Airport Transfer' }
+  const AIRPORT_LABELS = { ercan: 'Ercan', larnaca: 'Larnaca', both: 'Both' }
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    let query = supabase
+      .from('transport_providers')
+      .select('id, name, phone, type, airport, district, status, rejection_reason, owner_id, verified')
+      .order('created_at', { ascending: false })
+    if (filter !== 'all') query = query.eq('status', filter)
+    const { data } = await query
+    setProviders(data ?? [])
+    setLoading(false)
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(item) {
+    await supabase.from('transport_providers').update({ status: 'active', rejection_reason: null }).eq('id', item.id)
+    // No role change for transport providers (decision: no provider dashboard in v1)
+    load()
+  }
+
+  async function reject(id, reason) {
+    await supabase.from('transport_providers').update({ status: 'rejected', rejection_reason: reason || 'Does not meet our guidelines.' }).eq('id', id)
+    setRejectTarget(null)
+    load()
+  }
+
+  async function deleteProvider(id) {
+    Alert.alert('Delete listing?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('transport_providers').delete().eq('id', id); load() } },
+    ])
+  }
+
+  function statusColor(status) {
+    if (status === 'active')   return colors.success
+    if (status === 'rejected') return colors.danger
+    if (status === 'pending')  return '#C2410C'
+    return colors.textSecondary
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={[s.chipRow, { marginBottom: 12 }]}>
+        {['pending', 'active', 'rejected', 'all'].map(f => (
+          <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
+            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading
+        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        : (
+          <FlatList
+            data={providers}
+            keyExtractor={p => p.id}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text={`No ${filter} transport providers.`} />}
+            renderItem={({ item }) => (
+              <View style={s.card}>
+                <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.cardTitle} numberOfLines={1}>{item.name}</Text>
+                    <Text style={s.cardSub}>{TYPE_LABELS[item.type] || item.type} · {item.district} · {item.phone}</Text>
+                    {item.type === 'airport_transfer' && item.airport && (
+                      <Text style={s.cardSub}>Airport: {AIRPORT_LABELS[item.airport] || item.airport}</Text>
+                    )}
+                    {item.owner_id
+                      ? <Text style={[s.cardSub, { color: colors.textSecondary }]}>Self-registered</Text>
+                      : <Text style={[s.cardSub, { color: colors.textSecondary }]}>Admin-seeded</Text>
+                    }
+                  </View>
+                  <View style={[s.pillGrey, { backgroundColor: statusColor(item.status) + '20', marginLeft: 8 }]}>
+                    <Text style={[s.pillText, { color: statusColor(item.status) }]}>{item.status}</Text>
+                  </View>
+                </View>
+
+                {item.status === 'rejected' && item.rejection_reason && (
+                  <Text style={[s.cardSub, { color: colors.danger, marginTop: 6 }]}>Reason: {item.rejection_reason}</Text>
+                )}
+
+                <View style={[s.rowActions, { marginTop: 10, marginLeft: 0 }]}>
+                  {item.status !== 'active' && (
+                    <TouchableOpacity style={s.ghostBtn} onPress={() => approve(item)}>
+                      <Text style={s.ghostBtnText}>Approve</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.status !== 'rejected' && (
+                    <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget(item)}>
+                      <Text style={s.dangerGhostText}>Reject</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={s.dangerGhostBtn} onPress={() => deleteProvider(item.id)}>
+                    <Text style={s.dangerGhostText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          />
+        )
+      }
+
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget?.name}
+        onConfirm={reason => reject(rejectTarget.id, reason)}
+        onCancel={() => setRejectTarget(null)}
+      />
+    </View>
+  )
+}
+
+// ─── Bus Routes Tab ───────────────────────────────────────────────────────────
+
+const DISTRICTS_ADMIN = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
+const DISTRICT_LABELS_ADMIN = {
+  nicosia: 'Nicosia', kyrenia: 'Kyrenia', famagusta: 'Famagusta',
+  morphou: 'Morphou', iskele: 'İskele', lefke: 'Lefke', karpaz: 'Karpaz',
+}
+
+function BusRoutesTab() {
+  const EMPTY_FORM = { origin_district: null, destination_district: null, terminal: '', frequency: '', fare_note: '', route_note: '' }
+
+  const [routes,      setRoutes]      = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [editTarget,  setEditTarget]  = useState(null)   // null=list, {}=new, {id,...}=edit
+  const [form,        setForm]        = useState(EMPTY_FORM)
+  const [saving,      setSaving]      = useState(false)
+  const [formError,   setFormError]   = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('bus_routes').select('*').order('origin_district').order('destination_district')
+    setRoutes(data ?? [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  function startNew() {
+    setForm(EMPTY_FORM)
+    setFormError(null)
+    setEditTarget({})
+  }
+
+  function startEdit(item) {
+    setForm({
+      origin_district:      item.origin_district,
+      destination_district: item.destination_district,
+      terminal:   item.terminal   ?? '',
+      frequency:  item.frequency  ?? '',
+      fare_note:  item.fare_note  ?? '',
+      route_note: item.route_note ?? '',
+    })
+    setFormError(null)
+    setEditTarget(item)
+  }
+
+  async function saveRoute() {
+    setFormError(null)
+    if (!form.origin_district)      { setFormError('Origin district is required.'); return }
+    if (!form.destination_district) { setFormError('Destination district is required.'); return }
+
+    setSaving(true)
+    const payload = {
+      origin_district:      form.origin_district,
+      destination_district: form.destination_district,
+      terminal:   form.terminal.trim()   || null,
+      frequency:  form.frequency.trim()  || null,
+      fare_note:  form.fare_note.trim()  || null,
+      route_note: form.route_note.trim() || null,
+    }
+
+    const { error } = editTarget?.id
+      ? await supabase.from('bus_routes').update(payload).eq('id', editTarget.id)
+      : await supabase.from('bus_routes').insert(payload)
+
+    setSaving(false)
+    if (error) { setFormError(error.message); return }
+    setEditTarget(null)
+    load()
+  }
+
+  async function deleteRoute(id) {
+    Alert.alert('Delete route?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('bus_routes').delete().eq('id', id); load() } },
+    ])
+  }
+
+  // ── Form view ──────────────────────────────────────────────────────────────
+
+  if (editTarget !== null) {
+    return (
+      <ScrollView contentContainerStyle={s.listContent} keyboardShouldPersistTaps="handled">
+        <Text style={[s.cardTitle, { marginBottom: 16 }]}>{editTarget.id ? 'Edit Route' : 'New Route'}</Text>
+
+        <Text style={s.fieldLabel}>Origin district *</Text>
+        <View style={[s.chipRow, { marginBottom: 16 }]}>
+          {DISTRICTS_ADMIN.map(d => (
+            <TouchableOpacity
+              key={d}
+              style={[s.chip, form.origin_district === d && s.chipActive]}
+              onPress={() => setForm(f => ({ ...f, origin_district: d }))}
+            >
+              <Text style={[s.chipText, form.origin_district === d && s.chipTextActive]}>{DISTRICT_LABELS_ADMIN[d]}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={s.fieldLabel}>Destination district *</Text>
+        <View style={[s.chipRow, { marginBottom: 16 }]}>
+          {DISTRICTS_ADMIN.map(d => (
+            <TouchableOpacity
+              key={d}
+              style={[s.chip, form.destination_district === d && s.chipActive]}
+              onPress={() => setForm(f => ({ ...f, destination_district: d }))}
+            >
+              <Text style={[s.chipText, form.destination_district === d && s.chipTextActive]}>{DISTRICT_LABELS_ADMIN[d]}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {[
+          { key: 'terminal',   label: 'Terminal / Pickup point',     placeholder: 'e.g. Lefkoşa Terminal, Bay 4' },
+          { key: 'frequency',  label: 'Frequency',                   placeholder: 'e.g. Every 30 min, 07:00–22:00' },
+          { key: 'fare_note',  label: 'Fare note',                   placeholder: 'e.g. ~40 TL' },
+          { key: 'route_note', label: 'Notes (via points, context)', placeholder: 'e.g. Also serves Ercan Airport' },
+        ].map(field => (
+          <View key={field.key} style={{ marginBottom: 16 }}>
+            <Text style={s.fieldLabel}>{field.label}</Text>
+            <TextInput
+              style={[s.rejectInput, { minHeight: 40 }]}
+              value={form[field.key]}
+              onChangeText={v => setForm(f => ({ ...f, [field.key]: v }))}
+              placeholder={field.placeholder}
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+        ))}
+
+        {!!formError && <Text style={[s.fieldLabel, { color: colors.danger, marginBottom: 12 }]}>{formError}</Text>}
+
+        <View style={s.rejectBtnRow}>
+          <TouchableOpacity style={s.rejectCancelBtn} onPress={() => setEditTarget(null)}>
+            <Text style={s.rejectCancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.rejectConfirmBtn, saving && { opacity: 0.6 }]} onPress={saveRoute} disabled={saving}>
+            <Text style={s.rejectConfirmText}>{saving ? 'Saving…' : 'Save'}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    )
+  }
+
+  // ── List view ──────────────────────────────────────────────────────────────
+
+  return (
+    <View style={{ flex: 1 }}>
+      <TouchableOpacity style={[s.ghostBtn, { alignSelf: 'flex-start', marginBottom: 8 }]} onPress={startNew}>
+        <Text style={s.ghostBtnText}>+ Add Route</Text>
+      </TouchableOpacity>
+
+      {loading
+        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        : (
+          <FlatList
+            data={routes}
+            keyExtractor={r => r.id}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text="No bus routes yet." />}
+            renderItem={({ item }) => (
+              <View style={s.card}>
+                <Text style={s.cardTitle}>
+                  {DISTRICT_LABELS_ADMIN[item.origin_district]} → {DISTRICT_LABELS_ADMIN[item.destination_district]}
+                </Text>
+                {!!item.terminal  && <Text style={s.cardSub}>Terminal: {item.terminal}</Text>}
+                {!!item.frequency && <Text style={s.cardSub}>Frequency: {item.frequency}</Text>}
+                {!!item.fare_note && <Text style={s.cardSub}>Fare: {item.fare_note}</Text>}
+                {!!item.route_note && <Text style={s.cardSub}>Note: {item.route_note}</Text>}
+                <View style={[s.rowActions, { marginTop: 10, marginLeft: 0 }]}>
+                  <TouchableOpacity style={s.ghostBtn} onPress={() => startEdit(item)}>
+                    <Text style={s.ghostBtnText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.dangerGhostBtn} onPress={() => deleteRoute(item.id)}>
+                    <Text style={s.dangerGhostText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          />
+        )
+      }
+    </View>
+  )
+}
+
 // ─── Places Tab ─────────────────────────────────────────────────────────────
 
 function PlacesTab() {
@@ -2379,6 +2692,8 @@ export default function AdminScreen({ session }) {
           {tab === 'Properties'    && <PropertiesTab />}
           {tab === 'Agents'        && <AgentsTab />}
           {tab === 'HomeServices'  && <HomeServicesTab />}
+          {tab === 'Transport'     && <TransportTab />}
+          {tab === 'BusRoutes'     && <BusRoutesTab />}
           {tab === 'Places'        && <PlacesTab />}
         </View>
       </View>

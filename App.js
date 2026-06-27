@@ -40,6 +40,7 @@ import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import HomeServicesScreen from './screens/HomeServicesScreen'
 import BeachesLandmarksScreen from './screens/BeachesLandmarksScreen'
+import TransportScreen from './screens/TransportScreen'
 import PlaceProfileScreen from './screens/PlaceProfileScreen'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
 import BringingPetScreen from './screens/pets/BringingPetScreen'
@@ -272,6 +273,7 @@ export default function App() {
   const [showPets, setShowPets] = useState(false)
   const [showHomeServices, setShowHomeServices] = useState(false)
   const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
+  const [showTransport, setShowTransport] = useState(false)
   const [selectedPlace,        setSelectedPlace]        = useState(null)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
   const [openedProperty, setOpenedProperty] = useState(null)
@@ -479,13 +481,14 @@ export default function App() {
       if (petsSubScreen) { setPetsSubScreen(null); return true }
       if (showPets) { setShowPets(false); return true }
       if (showHomeServices) { setShowHomeServices(false); return true }
+      if (showTransport) { setShowTransport(false); return true }
       if (selectedPlace)        { setSelectedPlace(null); return true }
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showBeachesLandmarks, selectedPlace])
+  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showTransport, showBeachesLandmarks, selectedPlace])
 
   useEffect(() => {
     Promise.all([
@@ -970,6 +973,8 @@ export default function App() {
     )
   } else if (showHomeServices) {
     content = <HomeServicesScreen lang={lang} session={session} onBack={() => setShowHomeServices(false)} />
+  } else if (showTransport) {
+    content = <TransportScreen lang={lang} session={session} onBack={() => setShowTransport(false)} />
   } else if (selectedPlace) {
     content = <PlaceProfileScreen place={selectedPlace} lang={lang} onBack={() => setSelectedPlace(null)} />
   } else if (showBeachesLandmarks) {
@@ -1718,11 +1723,10 @@ export default function App() {
               <Ionicons name="umbrella-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuBeachesLandmarks', lang)}</Text>
             </TouchableOpacity>
-            <View style={[styles.menuItem, { opacity: 0.4 }]}>
-              <Ionicons name="car-outline" size={20} color={colors.textPrimary} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowTransport(true) }}>
+              <Ionicons name="car-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuTransportation', lang)}</Text>
-              <View style={styles.soonBadge}><Text style={styles.soonBadgeText}>{t('comingSoon', lang)}</Text></View>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.menuDivider} />
             <TouchableOpacity style={styles.menuItem} onPress={rateApp}>
