@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, BackHandler } from 'react-native'
 import { colors } from '../constants/theme'
+import { t } from '../constants/i18n'
 
 const { width: SW, height: SH } = Dimensions.get('window')
 const PAD = 10
 
-export default function TutorialCoachMarks({ steps, visible, onFinish, onNext }) {
+export default function TutorialCoachMarks({ steps, visible, onFinish, onNext, lang }) {
   const [step, setStep]       = useState(0)
   const [blocked, setBlocked] = useState(false)
 
@@ -20,6 +21,7 @@ export default function TutorialCoachMarks({ steps, visible, onFinish, onNext })
   }, [visible])
 
   if (!visible || !steps.length) return null
+  if (step >= steps.length) return null
 
   const cur = steps[step]
   const { x, y, w, h, title, body } = cur
@@ -72,10 +74,10 @@ export default function TutorialCoachMarks({ steps, visible, onFinish, onNext })
           </View>
           <View style={s.btns}>
             <TouchableOpacity onPress={onFinish} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={s.skip}>Skip</Text>
+              <Text style={s.skip}>{t('coachSkip', lang)}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.nextBtn} onPress={advance} disabled={blocked}>
-              <Text style={s.nextText}>{step === steps.length - 1 ? 'Done' : 'Next'}</Text>
+              <Text style={s.nextText}>{step === steps.length - 1 ? t('coachDone', lang) : t('coachNext', lang)}</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -286,10 +286,17 @@ export default function App() {
   const filterBarRef       = useRef(null)
   const dutyBannerRef      = useRef(null)
   const mapTabRef          = useRef(null)
-  const menuLangRef        = useRef(null)
-  const menuQuizRef        = useRef(null)
-  const menuEmergencyRef   = useRef(null)
-  const menuTutorialItemRef = useRef(null)
+  const menuLangRef           = useRef(null)
+  const menuQuizRef           = useRef(null)
+  const menuEmergencyRef      = useRef(null)
+  const menuMunicipalitiesRef = useRef(null)
+  const menuEventsRef         = useRef(null)
+  const menuAccommodationRef  = useRef(null)
+  const menuPetsRef           = useRef(null)
+  const menuHomeServicesRef   = useRef(null)
+  const menuBeachesRef        = useRef(null)
+  const menuTransportRef      = useRef(null)
+  const menuTutorialItemRef   = useRef(null)
   const menuAnim = useRef(new Animated.Value(260)).current
   const menuStepCountRef = useRef(0)
   const sessionRef = useRef(null)
@@ -340,15 +347,31 @@ export default function App() {
       // Hamburger step done — open menu and inject in-menu steps before advancing
       openMenu()
       await new Promise(r => setTimeout(r, 350))
-      const [langItem, quizItem, emergencyItem] = await Promise.all([
+      const [langItem, quizItem, emergencyItem, municipalitiesItem, eventsItem, accommodationItem, petsItem, homeServicesItem, beachesItem, transportItem, tutorialItem] = await Promise.all([
         measureRef(menuLangRef),
         measureRef(menuQuizRef),
         measureRef(menuEmergencyRef),
+        measureRef(menuMunicipalitiesRef),
+        measureRef(menuEventsRef),
+        measureRef(menuAccommodationRef),
+        measureRef(menuPetsRef),
+        measureRef(menuHomeServicesRef),
+        measureRef(menuBeachesRef),
+        measureRef(menuTransportRef),
+        measureRef(menuTutorialItemRef),
       ])
       const menuItems = []
-      if (langItem)      menuItems.push({ ...langItem,      title: t('coachLangTitle', lang),      body: t('coachLangBody', lang) })
-      if (quizItem)      menuItems.push({ ...quizItem,      title: t('coachQuizTitle', lang),      body: t('coachQuizBody', lang) })
-      if (emergencyItem) menuItems.push({ ...emergencyItem, title: t('coachEmergencyTitle', lang), body: t('coachEmergencyBody', lang) })
+      if (langItem)           menuItems.push({ ...langItem,           title: t('coachLangTitle', lang),              body: t('coachLangBody', lang) })
+      if (quizItem)           menuItems.push({ ...quizItem,           title: t('coachQuizTitle', lang),              body: t('coachQuizBody', lang) })
+      if (emergencyItem)      menuItems.push({ ...emergencyItem,      title: t('coachEmergencyTitle', lang),         body: t('coachEmergencyBody', lang) })
+      if (municipalitiesItem) menuItems.push({ ...municipalitiesItem, title: t('coachMunicipalitiesTitle', lang),    body: t('coachMunicipalitiesBody', lang) })
+      if (eventsItem)         menuItems.push({ ...eventsItem,         title: t('coachEventsTitle', lang),            body: t('coachEventsBody', lang) })
+      if (accommodationItem)  menuItems.push({ ...accommodationItem,  title: t('coachAccommodationTitle', lang),     body: t('coachAccommodationBody', lang) })
+      if (petsItem)           menuItems.push({ ...petsItem,           title: t('coachPetsTitle', lang),              body: t('coachPetsBody', lang) })
+      if (homeServicesItem)   menuItems.push({ ...homeServicesItem,   title: t('coachHomeServicesTitle', lang),      body: t('coachHomeServicesBody', lang) })
+      if (beachesItem)        menuItems.push({ ...beachesItem,        title: t('coachBeachesTitle', lang),           body: t('coachBeachesBody', lang) })
+      if (transportItem)      menuItems.push({ ...transportItem,      title: t('coachTransportTitle', lang),         body: t('coachTransportBody', lang) })
+      if (tutorialItem)       menuItems.push({ ...tutorialItem,       title: t('coachTutorialItemTitle', lang),      body: t('coachTutorialItemBody', lang) })
       menuStepCountRef.current = menuItems.length
       if (menuItems.length > 0) {
         setCoachSteps(prev => [prev[0], ...menuItems, ...prev.slice(1)])
@@ -564,8 +587,8 @@ export default function App() {
           loadProviderFacility()
         } else if (!data?.role || data?.role === 'customer') {
           scheduleAppointmentReminders(session.user.id, data?.preferred_language ?? 'en')
-          AsyncStorage.getItem('@trnc_coach_v1').then(shown => {
-            if (!shown) { AsyncStorage.setItem('@trnc_coach_v1', 'true'); startCoachMarks() }
+          AsyncStorage.getItem('@trnc_coach_v2').then(shown => {
+            if (!shown) { AsyncStorage.setItem('@trnc_coach_v2', 'true'); startCoachMarks() }
           })
         }
       })
@@ -1699,31 +1722,31 @@ export default function App() {
               <Ionicons name="call-outline" size={20} color={colors.danger} />
               <Text style={styles.menuItemText}>{t('menuEmergency', lang)}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowMunicipalModal(true) }}>
+            <TouchableOpacity ref={menuMunicipalitiesRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowMunicipalModal(true) }}>
               <Ionicons name="business-outline" size={20} color={colors.textPrimary} />
               <Text style={styles.menuItemText}>{t('menuMunicipalities', lang)}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowEvents(true) }}>
+            <TouchableOpacity ref={menuEventsRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowEvents(true) }}>
               <Ionicons name="calendar-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuEvents', lang)}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowAccommodation(true) }}>
+            <TouchableOpacity ref={menuAccommodationRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowAccommodation(true) }}>
               <Ionicons name="home-outline" size={20} color={colors.textPrimary} />
               <Text style={styles.menuItemText}>{t('menuAccommodations', lang)}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowPets(true) }}>
+            <TouchableOpacity ref={menuPetsRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowPets(true) }}>
               <Ionicons name="paw-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuPets', lang)}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowHomeServices(true) }}>
+            <TouchableOpacity ref={menuHomeServicesRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowHomeServices(true) }}>
               <Ionicons name="hammer-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuHomeServices', lang)}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowBeachesLandmarks(true) }}>
+            <TouchableOpacity ref={menuBeachesRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowBeachesLandmarks(true) }}>
               <Ionicons name="umbrella-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuBeachesLandmarks', lang)}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowTransport(true) }}>
+            <TouchableOpacity ref={menuTransportRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowTransport(true) }}>
               <Ionicons name="car-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuTransportation', lang)}</Text>
             </TouchableOpacity>
@@ -1882,6 +1905,7 @@ export default function App() {
           visible={showCoachMarks}
           onNext={handleCoachNext}
           onFinish={handleCoachFinish}
+          lang={lang}
         />
 
       </View>
