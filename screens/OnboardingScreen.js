@@ -24,8 +24,8 @@ const LANGUAGES = [
 
 const FEATURE_SLIDES = [
   {
-    id: 'find',
-    icon: 'location',
+    id: 'explore',
+    icon: 'compass',
     iconBg: '#E0F5F4',
     iconColor: '#0E7C7B',
     titleKey: 'slide1Title',
@@ -40,12 +40,20 @@ const FEATURE_SLIDES = [
     bodyKey: 'onboardingP2',
   },
   {
-    id: 'book',
-    icon: 'calendar',
-    iconBg: '#E6F5ED',
-    iconColor: '#2E9E5B',
+    id: 'health',
+    icon: 'medical',
+    iconBg: '#FAEAEC',
+    iconColor: '#D1495B',
     titleKey: 'slide3Title',
     bodyKey: 'onboardingP3',
+  },
+  {
+    id: 'services',
+    icon: 'home',
+    iconBg: '#FFF0EB',
+    iconColor: '#FF8552',
+    titleKey: 'slide4Title',
+    bodyKey: 'onboardingP4',
   },
 ]
 

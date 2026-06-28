@@ -1,6 +1,6 @@
 import { Component, useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View, Text, Image, ImageBackground, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal, Dimensions } from 'react-native'
+import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal, Dimensions } from 'react-native'
 import { BlurView } from 'expo-blur'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
@@ -52,6 +52,8 @@ import TutorialCoachMarks from './screens/TutorialCoachMarks'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
+import HomeScreen from './screens/HomeScreen'
+import { haversineKm, parseIsOpen } from './utils/facilityUtils'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import * as Updates from 'expo-updates'
 
@@ -87,78 +89,6 @@ const LANGUAGES = [
   { key: 'German',  label: 'Deutsch' },
   { key: 'Persian', label: 'فارسی' },
 ]
-
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLon = (lon2 - lon1) * Math.PI / 180
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-const DAY_INDEX = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 }
-
-function parseIsOpen(hours) {
-  if (!hours) return null
-  if (hours.trim() === '24/7') return true
-  const match = hours.match(/^([A-Z][a-z]+)-([A-Z][a-z]+)\s+(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/)
-  if (!match) return null
-  const [, startDay, endDay, startTime, endTime] = match
-  const dayStart = DAY_INDEX[startDay]
-  const dayEnd = DAY_INDEX[endDay]
-  if (dayStart == null || dayEnd == null || dayStart > dayEnd) return null
-  const now = new Date()
-  const day = now.getDay()
-  if (day < dayStart || day > dayEnd) return false
-  const toMins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
-  const nowMins = now.getHours() * 60 + now.getMinutes()
-  return nowMins >= toMins(startTime) && nowMins < toMins(endTime)
-}
-
-function uvLevel(index) {
-  if (index == null) return null
-  if (index < 3)  return { key: 'uvLow',      color: '#22C55E', warn: false }
-  if (index < 6)  return { key: 'uvModerate',  color: '#EAB308', warn: false }
-  if (index < 8)  return { key: 'uvHigh',      color: '#F97316', warn: true  }
-  if (index < 11) return { key: 'uvVeryHigh',  color: '#EF4444', warn: true  }
-  return           { key: 'uvExtreme',  color: '#9333EA', warn: true  }
-}
-
-function weatherIcon(code) {
-  if (code === 0)              return '☀️'
-  if (code <= 2)               return '🌤️'
-  if (code === 3)              return '☁️'
-  if (code <= 48)              return '🌫️'
-  if (code <= 55)              return '🌦️'
-  if (code <= 65)              return '🌧️'
-  if (code <= 75)              return '❄️'
-  if (code <= 82)              return '🌦️'
-  if (code <= 99)              return '⛈️'
-  return '🌡️'
-}
-
-function weatherDesc(code) {
-  if (code === 0)  return 'Clear sky'
-  if (code <= 2)   return 'Partly cloudy'
-  if (code === 3)  return 'Overcast'
-  if (code <= 48)  return 'Foggy'
-  if (code <= 55)  return 'Drizzle'
-  if (code <= 65)  return 'Rainy'
-  if (code <= 75)  return 'Snow'
-  if (code <= 82)  return 'Rain showers'
-  if (code <= 99)  return 'Thunderstorm'
-  return 'Unknown'
-}
-
-const AVAIL_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-function isAvailableToday(availability) {
-  if (!availability?.schedule) return false
-  const day = availability.schedule[AVAIL_DAY_KEYS[new Date().getDay()]]
-  return !!(day && !day.closed)
-}
 
 const TAB_ITEMS = [
   { key: 'home',       iconOff: 'home-outline',   iconOn: 'home',    labelKey: 'tabHome' },
@@ -235,8 +165,6 @@ export default function App() {
   const [showQuiz, setShowQuiz] = useState(false)
   const [latestResult, setLatestResult] = useState(null)
   const [showLatestResult, setShowLatestResult] = useState(false)
-  const [searchText, setSearchText] = useState('')
-  const [activeType, setActiveType] = useState(null)
   const [showDutyList, setShowDutyList] = useState(false)
   const [onboarded, setOnboarded] = useState(null)
   const [pendingLang, setPendingLang] = useState('English')
@@ -247,19 +175,13 @@ export default function App() {
   const [pendingClaim, setPendingClaim] = useState(undefined)
   const [unclaimedFacility, setUnclaimedFacility] = useState(null)
   const [favorites, setFavorites] = useState(new Set())
-  const [openOnly, setOpenOnly] = useState(false)
-  const [showAll, setShowAll] = useState(false)
-  const [langFilter, setLangFilter] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
   const [historyResult, setHistoryResult] = useState(null)
-  const [activeSpecialty, setActiveSpecialty] = useState(null)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true)
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
   const [weatherData, setWeatherData] = useState(null)
-  const [weatherExpanded, setWeatherExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showQuizSubmenu, setShowQuizSubmenu] = useState(false)
   const [showQuizHistory, setShowQuizHistory] = useState(false)
@@ -325,10 +247,9 @@ export default function App() {
     await new Promise(r => setTimeout(r, 400))
     menuStepCountRef.current = 0
 
-    const [menuBtn, search, filters, duty, map] = await Promise.all([
+    const [menuBtn, search, duty, map] = await Promise.all([
       measureRef(hamburgerRef),
       measureRef(searchRef),
-      measureRef(filterBarRef),
       measureRef(dutyBannerRef),
       measureRef(mapTabRef),
     ])
@@ -336,7 +257,6 @@ export default function App() {
     const steps = []
     if (menuBtn) steps.push({ ...menuBtn, title: t('coachMenuTitle', lang), body: t('coachMenuBody', lang) })
     if (search)  steps.push({ ...search,  title: t('coachSearchTitle', lang),  body: t('coachSearchBody', lang) })
-    if (filters) steps.push({ ...filters, title: t('coachFiltersTitle', lang), body: t('coachFiltersBody', lang) })
     if (duty)    steps.push({ ...duty,    title: t('coachDutyTitle', lang),    body: t('coachDutyBody', lang) })
     if (map)     steps.push({ ...map,     title: t('coachMapTitle', lang),     body: t('coachMapBody', lang) })
     if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
@@ -769,45 +689,6 @@ export default function App() {
 
 
 
-  const listed = facilities
-    .map(f => ({
-      ...f,
-      _dist: userLocation && f.latitude != null && f.longitude != null
-        ? haversineKm(userLocation.latitude, userLocation.longitude, f.latitude, f.longitude)
-        : null,
-    }))
-    .sort((a, b) => {
-      if (a.id === dutyFacilityId) return -1
-      if (b.id === dutyFacilityId) return 1
-      const aFav = favorites.has(a.id), bFav = favorites.has(b.id)
-      if (aFav && !bFav) return -1
-      if (!aFav && bFav) return 1
-      if (a._dist == null && b._dist == null) return 0
-      if (a._dist == null) return 1
-      if (b._dist == null) return -1
-      return a._dist - b._dist
-    })
-    .filter(f => searchText.trim() || showAll || !!f.provider_id)
-    .filter(f => !activeType || f.type === activeType)
-    .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)
-    .filter(f => !activeSpecialty || (Array.isArray(f.specialty) ? f.specialty.includes(activeSpecialty) : f.specialty === activeSpecialty))
-    .filter(f => {
-      if (!langFilter) return true
-      const CODE_TO_NAME = { en: 'english', tr: 'turkish', ar: 'arabic', ru: 'russian', el: 'greek', fr: 'french', es: 'spanish', de: 'german', fa: 'persian' }
-      const raw = profile?.preferred_language || pendingLang || ''
-      const target = (CODE_TO_NAME[raw] || raw).toLowerCase()
-      if (!target) return true
-      return Array.isArray(f.languages) && f.languages.some(l => l.toLowerCase() === target)
-    })
-    .filter(f => {
-      const q = searchText.trim().toLowerCase()
-      if (!q) return true
-      return (
-        f.name.toLowerCase().includes(q) ||
-        (f.address && f.address.toLowerCase().includes(q))
-      )
-    })
-
   const lang = profile?.preferred_language || pendingLang
 
   if (showPasswordReset) {
@@ -1185,376 +1066,41 @@ export default function App() {
       <View style={{ flex: 1 }}>
 
         {activeTab === 'home' && (
-          <ImageBackground source={require('./assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
-          <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
-          <View style={styles.container}>
-            <View style={styles.header}>
-              <View style={styles.headerLogoWrap} pointerEvents="none">
-                <Image source={require('./assets/logonobg.png')} style={styles.headerIcon} resizeMode="contain" />
-              </View>
-              <View style={styles.headerRight}>
-                <TouchableOpacity style={styles.notifBtn} onPress={() => setShowNotifs(true)}>
-                  <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
-                  {notifications.some(n => !n.read) && <View style={styles.notifDot} />}
-                </TouchableOpacity>
-                <TouchableOpacity ref={hamburgerRef} style={styles.hamburgerBtn} onPress={openMenu}>
-                  <Feather name="menu" size={20} color={colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
-            </View>
+          <HomeScreen
+            lang={lang}
+            facilities={facilities}
+            dutyFacilityId={dutyFacilityId}
+            userLocation={userLocation}
+            facilityRatings={facilityRatings}
+            favorites={favorites}
+            notifications={notifications}
+            facilityLoadError={facilityLoadError}
+            locationDenied={locationDenied}
+            weatherData={weatherData}
+            hamburgerRef={hamburgerRef}
+            searchRef={searchRef}
 
-          {weatherData && (() => {
-            const cur   = weatherData.current
-            const daily = weatherData.daily
-            const uv    = uvLevel(cur.uv_index)
-            const days  = (daily?.time ?? []).slice(0, 4)
-            return (
-              <TouchableOpacity
-                style={styles.weatherCard}
-                onPress={() => setWeatherExpanded(v => !v)}
-                activeOpacity={0.85}
-              >
-                <View style={styles.weatherRow}>
-                  <Text style={styles.weatherEmoji}>{weatherIcon(cur.weather_code)}</Text>
-                  <Text style={styles.weatherTemp}>{Math.round(cur.temperature_2m)}°C</Text>
-                  <Text style={styles.weatherDescInline} numberOfLines={1}>{weatherDesc(cur.weather_code)}</Text>
-                  <View style={{ flex: 1 }} />
-                  {uv && (
-                    <View style={[styles.uvBadge, { backgroundColor: uv.color }]}>
-                      <Text style={styles.uvBadgeText}>UV {Math.round(cur.uv_index)}</Text>
-                    </View>
-                  )}
-                  <Feather name={weatherExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
-                </View>
-
-                {weatherExpanded && (
-                  <>
-                    <View style={styles.weatherExpandStats}>
-                      <Text style={styles.weatherStat}>💧 {cur.relative_humidity_2m}%</Text>
-                      <Text style={styles.weatherStat}>💨 {Math.round(cur.wind_speed_10m)} km/h</Text>
-                      <Text style={styles.weatherStat}>{t('feelsLike', lang)} {Math.round(cur.apparent_temperature)}°C</Text>
-                      {uv && <Text style={styles.weatherStat}>{t(uv.key, lang)}</Text>}
-                    </View>
-                    {uv?.warn && (
-                      <Text style={styles.uvWarnText}>🧴 {t('uvSunscreen', lang)}</Text>
-                    )}
-                    {days.length > 0 && (
-                      <View style={styles.forecastRow}>
-                        {days.map((date, i) => {
-                          const LANG_LOCALE = { English: 'en', Turkish: 'tr', Arabic: 'ar', Russian: 'ru', Greek: 'el', French: 'fr', Spanish: 'es', German: 'de', Persian: 'fa' }
-                          const locale = LANG_LOCALE[lang] || 'en'
-                          const label = i === 0 ? t('todayLabel', lang) : new Date(date + 'T12:00:00').toLocaleDateString(locale, { weekday: 'short' })
-                          return (
-                            <View key={date} style={styles.forecastDay}>
-                              <Text style={styles.forecastLabel}>{label}</Text>
-                              <Text style={styles.forecastIcon}>{weatherIcon(daily.weather_code[i])}</Text>
-                              <Text style={styles.forecastMax}>{Math.round(daily.temperature_2m_max[i])}°</Text>
-                              <Text style={styles.forecastMin}>{Math.round(daily.temperature_2m_min[i])}°</Text>
-                            </View>
-                          )
-                        })}
-                      </View>
-                    )}
-                  </>
-                )}
-              </TouchableOpacity>
-            )
-          })()}
-
-          <View ref={searchRef} style={styles.searchBar}>
-            <Feather name="search" size={16} color={colors.textSecondary} />
-            <TextInput
-              style={styles.searchInput}
-              value={searchText}
-              onChangeText={setSearchText}
-              placeholder={t('searchPlaceholder', lang)}
-              placeholderTextColor={colors.textSecondary}
-              returnKeyType="search"
-              clearButtonMode="while-editing"
-            />
-            {searchText.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchText('')}>
-                <Feather name="x" size={15} color={colors.textSecondary} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View ref={filterBarRef} style={styles.filterBar}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBarContent}>
-              <TouchableOpacity
-                style={[styles.toggleChip, openOnly && styles.toggleChipOpen]}
-                onPress={() => setOpenOnly(v => !v)}
-              >
-                <Feather name="clock" size={12} color={openOnly ? colors.success : colors.textSecondary} />
-                <Text style={[styles.toggleChipText, openOnly && { color: colors.success }]}>{t('open', lang)}</Text>
-              </TouchableOpacity>
-              {activeType && (
-                <TouchableOpacity style={styles.activeFilterPill} onPress={() => { setActiveType(null); setActiveSpecialty(null) }}>
-                  <TypeSVGIcon type={activeType} size={11} color={colors.primary} />
-                  <Text style={styles.activeFilterPillText}>{t(activeType, lang)}</Text>
-                  <Feather name="x" size={10} color={colors.primary} />
-                </TouchableOpacity>
-              )}
-              {activeSpecialty && (
-                <TouchableOpacity style={styles.activeFilterPill} onPress={() => setActiveSpecialty(null)}>
-                  <Text style={styles.activeFilterPillText}>{t(activeSpecialty, lang)}</Text>
-                  <Feather name="x" size={10} color={colors.primary} />
-                </TouchableOpacity>
-              )}
-              {showAll && (
-                <TouchableOpacity style={styles.activeFilterPill} onPress={() => setShowAll(false)}>
-                  <Text style={styles.activeFilterPillText}>{t('allFacilities', lang)}</Text>
-                  <Feather name="x" size={10} color={colors.primary} />
-                </TouchableOpacity>
-              )}
-              {langFilter && (
-                <TouchableOpacity style={styles.activeFilterPill} onPress={() => setLangFilter(false)}>
-                  <Ionicons name="language-outline" size={11} color={colors.primary} />
-                  <Text style={styles.activeFilterPillText}>{t('myLang', lang)}</Text>
-                  <Feather name="x" size={10} color={colors.primary} />
-                </TouchableOpacity>
-              )}
-            </ScrollView>
-            {!showAll && !searchText.trim() && facilities.some(f => !f.provider_id && (!activeType || f.type === activeType)) && (
-              <TouchableOpacity style={styles.hiddenFacHint} onPress={() => setShowAll(true)} activeOpacity={0.75}>
-                <Ionicons name="eye-off-outline" size={11} color={colors.textSecondary} />
-                <Text style={styles.hiddenFacHintText} numberOfLines={1}>{t('hiddenFacilitiesHint', lang)}</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[styles.filterToggleBtn, showFilters && styles.filterToggleBtnActive]}
-              onPress={() => setShowFilters(v => !v)}
-            >
-              <Feather name="sliders" size={14} color={showFilters ? colors.primary : colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {showFilters && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.typeRow}
-              contentContainerStyle={styles.typeRowContent}
-            >
-              {[null, 'pharmacy', 'clinic', 'hospital', 'dentist'].map(type => (
-                <TouchableOpacity
-                  key={type ?? 'all'}
-                  style={[styles.typeChip, activeType === type && styles.typeChipActive]}
-                  onPress={() => { setActiveType(type); setActiveSpecialty(null) }}
-                >
-                  {type
-                    ? <TypeSVGIcon type={type} size={14} color={activeType === type ? '#fff' : colors.textSecondary} />
-                    : <Ionicons name="apps-outline" size={14} color={activeType === type ? '#fff' : colors.textSecondary} />
-                  }
-                  <Text style={[styles.typeChipText, activeType === type && styles.typeChipTextActive]}>
-                    {type ? t({ pharmacy: 'pharmacies', clinic: 'clinics', hospital: 'hospitals', dentist: 'dentists' }[type] || type, lang) : t('all', lang)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              <View style={styles.chipDivider} />
-              <TouchableOpacity
-                style={[styles.toggleChip, showAll && styles.toggleChipShowAll]}
-                onPress={() => setShowAll(v => !v)}
-              >
-                <Ionicons name={showAll ? 'eye' : 'eye-outline'} size={12} color={showAll ? colors.primary : colors.textSecondary} />
-                <Text style={[styles.toggleChipText, showAll && { color: colors.primary }]}>{showAll ? t('adaOnly', lang) : t('showAll', lang)}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toggleChip, langFilter && styles.toggleChipLang]}
-                onPress={() => setLangFilter(v => !v)}
-              >
-                <Ionicons name="language-outline" size={12} color={langFilter ? colors.accent : colors.textSecondary} />
-                <Text style={[styles.toggleChipText, langFilter && { color: colors.accent }]}>{t('myLang', lang)}</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          )}
-
-          {(() => {
-            if (!activeType) return null
-            const specList = (SPECIALTIES_BY_TYPE[activeType] || []).filter(sp => facilities.some(f => Array.isArray(f.specialty) ? f.specialty.includes(sp) : f.specialty === sp))
-            if (!specList.length) return null
-            return (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
-                {specList.map(sp => (
-                  <TouchableOpacity
-                    key={sp}
-                    style={[styles.filterChip, activeSpecialty === sp && styles.filterChipActive]}
-                    onPress={() => setActiveSpecialty(prev => prev === sp ? null : sp)}
-                  >
-                    <Text style={[styles.filterChipText, activeSpecialty === sp && styles.filterChipTextActive]}>{t(sp, lang)}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )
-          })()}
-
-          <TouchableOpacity ref={dutyBannerRef} style={styles.dutyBanner} onPress={() => setShowDutyList(true)} activeOpacity={0.8}>
-            <View style={styles.dutyBannerLeft}>
-              <View style={styles.dutyBannerIconWrap}>
-                <Ionicons name="medical-outline" size={20} color={colors.accent} />
-              </View>
-              <View>
-                <Text style={styles.dutyBannerTitle}>{t('tonightDuty', lang)}</Text>
-                <Text style={styles.dutyBannerSub}>{t('allRegions', lang)}</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.accent} />
-          </TouchableOpacity>
-
-          {facilityLoadError && (
-              <View style={styles.errorRow}>
-                <Text style={styles.locationNote}>{t('facilityLoadError', lang)}</Text>
-                <TouchableOpacity onPress={() => { setLoading(true); setRetryCount(c => c + 1) }} style={styles.retryBtn}>
-                  <Text style={styles.retryBtnText}>{t('tryAgain', lang)}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            {locationDenied && (
-              <Text style={styles.locationNote}>{t('enableLocation', lang)}</Text>
-            )}
-            <FlatList
-              data={listed}
-              keyExtractor={item => item.id}
-              showsVerticalScrollIndicator={false}
-              style={{ flex: 1 }}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={(
-                <View style={styles.emptyWrap}>
-                  <View style={styles.emptyBlurBubble}>
-                    <BlurView intensity={85} tint="light" style={StyleSheet.absoluteFill} />
-                    {searchText || activeType || activeSpecialty ? (
-                      <>
-                        <Ionicons name="search-outline" size={44} color={colors.border} style={{ marginBottom: 16 }} />
-                        <Text style={styles.emptyTitle}>{t('noResultsTitle', lang)}</Text>
-                        <Text style={styles.emptyBody}>{t('noResultsBody', lang)}</Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.emptyIcon}>🏥</Text>
-                        <Text style={styles.emptyTitle}>{t('noFacilitiesTitle', lang)}</Text>
-                        <Text style={styles.emptyBody}>{t('noFacilitiesBody', lang)}</Text>
-                      </>
-                    )}
-                  </View>
-                </View>
-              )}
-              renderItem={({ item }) => {
-                const isOpen = parseIsOpen(item.opening_hours)
-                const tc = typeColors[item.type] || typeColors.clinic
-                const isDuty = item.id === dutyFacilityId
-                const isFav = favorites.has(item.id)
-                return (
-                  <TouchableOpacity
-                    activeOpacity={0.75}
-                    style={[styles.card, isDuty && styles.dutyCard, !item.provider_id && styles.cardUnclaimed]}
-                    onPress={() => item.provider_id ? setSelectedFacility(item) : setUnclaimedFacility(item)}
-                  >
-                    {item.cover_image_url ? (
-                      <Image source={{ uri: item.cover_image_url }} style={styles.cardCover} resizeMode="cover" />
-                    ) : null}
-                    <View style={styles.cardBody}>
-                    {isDuty && (
-                      <View style={styles.dutyCardBadge}>
-                        <Text style={styles.dutyLabel}>{t('onDuty', lang)}</Text>
-                      </View>
-                    )}
-                    <View style={styles.cardMain}>
-                      <View style={[styles.typeIcon, { backgroundColor: tc.bg }]}>
-                        {item.logo_url
-                          ? <Image source={{ uri: item.logo_url }} style={{ width: 36, height: 36, borderRadius: 8 }} resizeMode="contain" />
-                          : <TypeSVGIcon type={item.type} size={22} color={tc.text} />
-                        }
-                      </View>
-                      <View style={styles.cardContent}>
-                        <View style={styles.cardTop}>
-                          <View style={styles.cardNameRow}>
-                            <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
-                          </View>
-                          {item._dist != null && (
-                            <Text style={styles.distanceText}>{item._dist.toFixed(1)} km</Text>
-                          )}
-                        </View>
-                        <View style={styles.badgeRow}>
-                          <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
-                            <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
-                          </View>
-                          {item.verified && (
-                            <View style={styles.verifiedBadge}>
-                              <Ionicons name="shield-checkmark" size={10} color="#fff" />
-                              <Text style={styles.verifiedBadgeText}>{t('verified', lang)}</Text>
-                            </View>
-                          )}
-                          {item.provider_id ? (
-                            isOpen != null && (
-                              <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
-                                <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
-                                  {isOpen ? t('open', lang) : t('closed', lang)}
-                                </Text>
-                              </View>
-                            )
-                          ) : (
-                            <View style={styles.notOnAdaBadge}>
-                              <Text style={styles.notOnAdaBadgeText}>{t('notOnAda', lang)}</Text>
-                            </View>
-                          )}
-                          {isAvailableToday(item.availability) && (
-                            <View style={styles.bookableBadge}>
-                              <Feather name="calendar" size={10} color={colors.primary} />
-                              <Text style={styles.bookableBadgeText}>Bookable</Text>
-                            </View>
-                          )}
-                        </View>
-                        {item.specialty?.length ? <Text style={styles.specialtyText} numberOfLines={1}>{Array.isArray(item.specialty) ? item.specialty.map(s => t(s, lang)).join(' · ') : t(item.specialty, lang)}</Text> : null}
-                        {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
-                        {facilityRatings[item.id] && (
-                          <View style={styles.ratingRow}>
-                            <Ionicons name="star" size={11} color="#F5A623" />
-                            <Text style={styles.ratingText}> {facilityRatings[item.id].avg} ({facilityRatings[item.id].count})</Text>
-                          </View>
-                        )}
-                        {item.phone ? (
-                          <TouchableOpacity
-                            style={styles.callPill}
-                            onPress={() => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`)}
-                            activeOpacity={0.7}
-                          >
-                            <Feather name="phone" size={11} color={colors.accent} />
-                            <Text style={styles.callPillText}>{item.phone}</Text>
-                          </TouchableOpacity>
-                        ) : null}
-                        {isDuty ? (
-                          <TouchableOpacity
-                            style={styles.directionsPill}
-                            onPress={() => Linking.openURL(
-                              item.latitude != null
-                                ? `https://maps.google.com/?q=${item.latitude},${item.longitude}`
-                                : item.address
-                                  ? `https://maps.google.com/?q=${encodeURIComponent(item.address)}`
-                                  : `https://maps.google.com/?q=${encodeURIComponent(item.name)}`
-                            )}
-                            activeOpacity={0.7}
-                          >
-                            <Feather name="navigation" size={11} color={colors.primary} />
-                            <Text style={styles.directionsPillText}>{t('getDirections', lang)}</Text>
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-                      <View style={styles.cardActions}>
-                        <TouchableOpacity onPress={() => toggleFavorite(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                          <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? colors.danger : colors.border} />
-                        </TouchableOpacity>
-                        <Ionicons name="chevron-forward" size={16} color={colors.border} />
-                      </View>
-                    </View>
-                    </View>
-                  </TouchableOpacity>
-                )
-              }}
-            />
-          </View>
-          </SafeAreaView>
-          </ImageBackground>
+            dutyBannerRef={dutyBannerRef}
+            onOpenMenu={openMenu}
+            onShowNotifs={() => setShowNotifs(true)}
+            onShowDutyList={() => setShowDutyList(true)}
+            onSelectFacility={setSelectedFacility}
+            onUnclaimedFacility={setUnclaimedFacility}
+            onToggleFavorite={toggleFavorite}
+            onRetry={() => { setLoading(true); setRetryCount(c => c + 1) }}
+            onShowEvents={() => setShowEvents(true)}
+            onShowAccommodation={() => setShowAccommodation(true)}
+            onShowPets={() => setShowPets(true)}
+            onShowHomeServices={() => setShowHomeServices(true)}
+            onShowBeachesLandmarks={() => setShowBeachesLandmarks(true)}
+            onShowTransport={() => setShowTransport(true)}
+            onShowEmergency={() => setShowEmergencyModal(true)}
+            onShowMunicipal={() => setShowMunicipalModal(true)}
+            onShowQuiz={() => setShowQuiz(true)}
+            onSelectPlace={setSelectedPlace}
+          />
         )}
+
 
         {activeTab === 'map' && (
           <SafeAreaView style={styles.safe} edges={['top']}>
