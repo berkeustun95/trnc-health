@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import PageBackground from '../components/PageBackground'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -257,6 +258,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
 
   return (
     <SafeAreaView style={cs.safe} edges={['top']}>
+      <PageBackground topic="accommodation" />
       {/* Header */}
       <View style={cs.header}>
         <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>

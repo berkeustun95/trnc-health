@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import PageBackground from '../components/PageBackground'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
@@ -374,6 +375,7 @@ export default function HomeScreen({
 
     return (
       <View style={{ flex: 1 }}>
+        <PageBackground topic="medical_facilities" />
         <View style={s.searchBar}>
           <Feather name="search" size={16} color={colors.textSecondary} />
           <TextInput

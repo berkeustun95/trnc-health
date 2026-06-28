@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import PageBackground from '../components/PageBackground'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -210,6 +211,7 @@ export default function EventsScreen({ lang, onBack }) {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <PageBackground topic="events" />
       <View style={s.header}>
         <TouchableOpacity style={s.backPill} onPress={onBack}>
           <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />

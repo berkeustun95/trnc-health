@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import PageBackground from '../components/PageBackground'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import TransportProfileScreen from './TransportProfileScreen'
@@ -185,6 +186,7 @@ export default function TransportScreen({ lang, session, onBack }) {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <PageBackground topic="transportation" />
       <View style={s.header}>
         <TouchableOpacity style={s.backPill} onPress={handleBack}>
           <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />

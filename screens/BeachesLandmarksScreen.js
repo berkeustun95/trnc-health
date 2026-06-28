@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import MapView, { Marker } from 'react-native-maps'
 import { supabase } from '../lib/supabase'
 import PlaceSubmitScreen from './PlaceSubmitScreen'
+import PageBackground from '../components/PageBackground'
 import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 
@@ -261,6 +262,7 @@ export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, us
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <PageBackground topic="beaches_landmarks" />
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity style={s.backPill} onPress={onBack}>

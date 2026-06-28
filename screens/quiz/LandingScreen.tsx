@@ -5,6 +5,7 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { useQuizStore } from '@/lib/quiz/store'
 import { getT } from '@/data/quiz/translations'
 import type { Lang } from '@/data/quiz/translations'
+import PageBackground from '../../components/PageBackground'
 import { colors, shadow } from '../../constants/theme'
 
 const STAT_ICONS: Array<{ name: string; lib: 'Ionicons' | 'Feather' }> = [
@@ -52,6 +53,7 @@ export default function LandingScreen({ onClose }: { onClose?: () => void }) {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <PageBackground topic="quiz" />
       <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false}>
 
         {/* Header row: language picker left, close right */}

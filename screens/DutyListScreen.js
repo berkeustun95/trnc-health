@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, S
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import PageBackground from '../components/PageBackground'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -134,6 +135,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <PageBackground topic="duty_pharmacy" />
       <View style={s.container}>
         <View style={s.header}>
           <TouchableOpacity onPress={onBack} style={s.backBtn}>
