@@ -314,7 +314,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
             setPriceMin(''); setPriceMax(''); setFilterCurrency(null); setSort('newest')
           }}>
             <Feather name="x" size={14} color={colors.danger} />
-            <Text style={cs.clearPillText}>Clear</Text>
+            <Text style={cs.clearPillText}>{t('accomClear', lang)}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -420,7 +420,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
             <View style={cs.priceRow}>
               <TextInput
                 style={[cs.input, { flex: 1 }]}
-                placeholder="Min"
+                placeholder={t('accomMin', lang)}
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="numeric"
                 value={priceMin}
@@ -429,7 +429,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
               <Text style={cs.priceDash}>–</Text>
               <TextInput
                 style={[cs.input, { flex: 1 }]}
-                placeholder="Max"
+                placeholder={t('accomMax', lang)}
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="numeric"
                 value={priceMax}
@@ -437,7 +437,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
               />
             </View>
             <TouchableOpacity style={cs.applyBtn} onPress={() => setShowPriceModal(false)}>
-              <Text style={cs.applyBtnText}>Apply</Text>
+              <Text style={cs.applyBtnText}>{t('accomApply', lang)}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

@@ -375,7 +375,6 @@ export default function HomeScreen({
 
     return (
       <View style={{ flex: 1 }}>
-        <PageBackground topic="medical_facilities" />
         <View style={s.searchBar}>
           <Feather name="search" size={16} color={colors.textSecondary} />
           <TextInput
