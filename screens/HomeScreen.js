@@ -309,12 +309,25 @@ export default function HomeScreen({
         {renderSearchResults()}
 
         {!globalQuery.trim() && <>
-          <View style={s.quickRow}>
-            <TouchableOpacity ref={dutyBannerRef} style={s.quickBtn} onPress={onShowDutyList} activeOpacity={0.8}>
-              <View style={[s.quickIcon, { backgroundColor: colors.accentLight }]}>
-                <Ionicons name="medical-outline" size={22} color={colors.accent} />
+          <TouchableOpacity ref={dutyBannerRef} style={s.medicalTile} onPress={onShowDutyList} activeOpacity={0.85}>
+            <View style={s.medicalTileLeft}>
+              <View style={[s.medicalTileIcon, { backgroundColor: colors.accentLight }]}>
+                <Ionicons name="medical-outline" size={26} color={colors.accent} />
               </View>
-              <Text style={s.quickLabel} numberOfLines={2}>{t('tonightDuty', lang)}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.medicalTileTitle}>{t('tonightDuty', lang)}</Text>
+                <Text style={s.medicalTileSub} numberOfLines={1}>{t('hubDutySub', lang)}</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.accent} />
+          </TouchableOpacity>
+
+          <View style={s.quickRow}>
+            <TouchableOpacity style={s.quickBtn} onPress={() => setShowFacilityList(true)} activeOpacity={0.8}>
+              <View style={[s.quickIcon, { backgroundColor: colors.primaryLight }]}>
+                <Ionicons name="medkit-outline" size={22} color={colors.primary} />
+              </View>
+              <Text style={s.quickLabel} numberOfLines={2}>{t('hubMedicalTitle', lang)}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.quickBtn} onPress={onShowEmergency} activeOpacity={0.8}>
@@ -331,19 +344,6 @@ export default function HomeScreen({
               <Text style={s.quickLabel} numberOfLines={2}>{t('menuEvents', lang)}</Text>
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity style={s.medicalTile} onPress={() => setShowFacilityList(true)} activeOpacity={0.85}>
-            <View style={s.medicalTileLeft}>
-              <View style={s.medicalTileIcon}>
-                <Ionicons name="medkit-outline" size={26} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.medicalTileTitle}>{t('hubMedicalTitle', lang)}</Text>
-                <Text style={s.medicalTileSub} numberOfLines={1}>{t('hubMedicalSub', lang)}</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-          </TouchableOpacity>
 
           <View style={s.moduleGrid}>
             {MODULES.map(mod => (
@@ -716,8 +716,8 @@ const s = StyleSheet.create({
   notifBtn:       { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
   notifDot:       { position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
   hamburgerBtn:   { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
-  backPill:       { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  backPillText:   { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  backPill:       { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
+  backPillText:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
 
   // Hub
   hubContent:       { paddingBottom: 32, gap: 12 },
