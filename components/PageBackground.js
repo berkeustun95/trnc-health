@@ -58,6 +58,16 @@ const TOPIC_CONFIG = {
     tint:  '#993556',
     asset: require('../assets/backgrounds/ada-bg-quiz.png'),
   },
+  newcomer_essentials: {
+    wash:  '#EEF2F8',
+    tint:  '#1E3A6E',
+    asset: require('../assets/backgrounds/ada-bg-transportation.png'),
+  },
+  exchange_rates: {
+    wash:  '#F0FAF6',
+    tint:  '#0E6B5A',
+    asset: require('../assets/backgrounds/ada-bg-beaches-landmarks.png'),
+  },
 }
 
 export default function PageBackground({ topic }) {

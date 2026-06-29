@@ -53,6 +53,8 @@ import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import HomeScreen from './screens/HomeScreen'
+import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
+import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import { haversineKm, parseIsOpen } from './utils/facilityUtils'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import * as Updates from 'expo-updates'
@@ -196,6 +198,8 @@ export default function App() {
   const [showHomeServices, setShowHomeServices] = useState(false)
   const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
   const [showTransport, setShowTransport] = useState(false)
+  const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
+  const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [selectedPlace,        setSelectedPlace]        = useState(null)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
   const [openedProperty, setOpenedProperty] = useState(null)
@@ -427,11 +431,13 @@ export default function App() {
       if (showTransport) { setShowTransport(false); return true }
       if (selectedPlace)        { setSelectedPlace(null); return true }
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
+      if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
+      if (showExchangeRates) { setShowExchangeRates(false); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showTransport, showBeachesLandmarks, selectedPlace])
+  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showTransport, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates])
 
   useEffect(() => {
     Promise.all([
@@ -887,6 +893,16 @@ export default function App() {
         <BeachesLandmarksScreen lang={lang} onBack={() => setShowBeachesLandmarks(false)} userLocation={userLocation} onSelectPlace={setSelectedPlace} session={session} />
       </BLErrorBoundary>
     )
+  } else if (showNewcomerEssentials) {
+    content = (
+      <NewcomerEssentialsScreen
+        lang={lang}
+        onBack={() => setShowNewcomerEssentials(false)}
+        onShowExchangeRates={() => { setShowNewcomerEssentials(false); setShowExchangeRates(true) }}
+      />
+    )
+  } else if (showExchangeRates) {
+    content = <ExchangeRatesScreen lang={lang} onBack={() => setShowExchangeRates(false)} />
   } else if (showPets) {
     if (petsSubScreen === 'bringing') {
       content = <BringingPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
@@ -1098,6 +1114,8 @@ export default function App() {
             onShowMunicipal={() => setShowMunicipalModal(true)}
             onShowQuiz={() => setShowQuiz(true)}
             onSelectPlace={setSelectedPlace}
+            onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
+            onShowExchangeRates={() => setShowExchangeRates(true)}
           />
         )}
 

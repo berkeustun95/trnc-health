@@ -39,6 +39,8 @@ const CODE_TO_NAME = {
 }
 
 const MODULES = [
+  { id: 'exchangeRates',      icon: 'trending-up-outline', color: '#0E7C7B', bg: '#E0F5F4', labelKey: 'menuExchangeRates'      },
+  { id: 'newcomerEssentials', icon: 'compass-outline',     color: '#185FA5', bg: '#EEF2F8', labelKey: 'menuNewcomerEssentials' },
   { id: 'events',        icon: 'calendar-outline', color: '#5B5BD6', bg: '#EAE8F5', labelKey: 'menuEvents' },
   { id: 'accommodation', icon: 'home-outline',      color: '#0E7C7B', bg: '#E0F5F4', labelKey: 'menuAccommodations' },
   { id: 'pets',          icon: 'paw-outline',       color: '#D1495B', bg: '#FAEAEC', labelKey: 'menuPets' },
@@ -89,6 +91,8 @@ export default function HomeScreen({
   onShowMunicipal,
   onShowQuiz,
   onSelectPlace,
+  onShowNewcomerEssentials,
+  onShowExchangeRates,
 }) {
   const [showFacilityList, setShowFacilityList] = useState(false)
   const [searchText, setSearchText]             = useState('')
@@ -149,14 +153,16 @@ export default function HomeScreen({
   }
 
   const moduleHandlers = {
-    events:        onShowEvents,
-    accommodation: onShowAccommodation,
-    pets:          onShowPets,
-    homeServices:  onShowHomeServices,
-    beaches:       onShowBeachesLandmarks,
-    transport:     onShowTransport,
-    municipal:     onShowMunicipal,
-    quiz:          onShowQuiz,
+    exchangeRates:      onShowExchangeRates,
+    newcomerEssentials: onShowNewcomerEssentials,
+    events:             onShowEvents,
+    accommodation:      onShowAccommodation,
+    pets:               onShowPets,
+    homeServices:       onShowHomeServices,
+    beaches:            onShowBeachesLandmarks,
+    transport:          onShowTransport,
+    municipal:          onShowMunicipal,
+    quiz:               onShowQuiz,
   }
 
   const listed = facilities
