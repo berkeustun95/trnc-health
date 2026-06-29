@@ -18,6 +18,37 @@ const REGION_CENTERS = {
   'Mesarya':   { latitude: 35.1500, longitude: 33.6000 },
 }
 
+const REGION_TO_BL_KEY = {
+  'Lefkoşa':    'blDistrictNicosia',
+  'Girne':      'blDistrictKyrenia',
+  'Gazimağusa': 'blDistrictFamagusta',
+  'Güzelyurt':  'blDistrictMorphou',
+  'İskele':     'blDistrictIskele',
+  'Lefke':      'blDistrictLefke',
+  'Karpaz':     'blDistrictKarpaz',
+}
+
+// Canonical TRNC district display order for section headers
+const DISTRICT_ORDER = ['Lefkoşa', 'Gazimağusa', 'Girne', 'Güzelyurt', 'İskele', 'Lefke', 'Karpaz', 'Mesarya']
+
+function regionBLKey(region) {
+  if (!region) return null
+  // strip regular and non-breaking spaces
+  const trimmed = region.trim().replace(/ /g, ' ').trim()
+  if (REGION_TO_BL_KEY[trimmed]) return REGION_TO_BL_KEY[trimmed]
+  // case-insensitive fallback (handles GİRNE, LEFKOŞA, etc.)
+  const lowerInput = trimmed.toLocaleLowerCase('tr')
+  for (const [key, val] of Object.entries(REGION_TO_BL_KEY)) {
+    if (key.toLocaleLowerCase('tr') === lowerInput) return val
+  }
+  return null
+}
+
+function regionLabel(region, lang) {
+  const key = regionBLKey(region)
+  return key ? t(key, lang) : (region ?? '')
+}
+
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -42,7 +73,7 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
         <View style={s.metaRow}>
           {showRegionBadge && item.region ? (
             <View style={s.regionInlineBadge}>
-              <Text style={s.regionInlineText}>{item.region}</Text>
+              <Text style={s.regionInlineText}>{regionLabel(item.region, lang)}</Text>
             </View>
           ) : null}
           {item._dist != null ? (
@@ -115,14 +146,16 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
           setPharmacies(withDist)
         } else {
           const map = {}
-          const ordered = [...data].sort((a, b) =>
-            (a.region ?? '').localeCompare(b.region ?? '') || a.name.localeCompare(b.name)
-          )
-          for (const row of ordered) {
+          for (const row of [...data].sort((a, b) => a.name.localeCompare(b.name))) {
             if (!map[row.region]) map[row.region] = []
             map[row.region].push(row)
           }
-          setSections(Object.entries(map).map(([title, data]) => ({ title, data })))
+          const knownSet = new Set(DISTRICT_ORDER)
+          const sorted = [
+            ...DISTRICT_ORDER.filter(d => map[d]).map(d => ({ title: d, data: map[d] })),
+            ...Object.entries(map).filter(([k]) => !knownSet.has(k)).map(([k, v]) => ({ title: k, data: v })),
+          ]
+          setSections(sorted)
         }
       }
       setLoading(false)
@@ -177,7 +210,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
             stickySectionHeadersEnabled={false}
             renderSectionHeader={({ section }) => (
               <View style={s.regionHeader}>
-                <Text style={s.regionName}>{section.title}</Text>
+                <Text style={s.regionName}>{regionLabel(section.title, lang)}</Text>
                 <View style={s.regionBadge}>
                   <Text style={s.regionCount}>{section.data.length}</Text>
                 </View>
