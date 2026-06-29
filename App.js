@@ -1362,12 +1362,16 @@ export default function App() {
                 { label: t('menuAmbulance', lang), number: '112', icon: 'medkit-outline' },
                 { label: t('menuFire', lang), number: '199', icon: 'flame-outline' },
                 { label: t('menuCoastGuard', lang), number: '158', icon: 'boat-outline' },
-              ].map(({ label, number, icon }) => (
+                { label: t('menuCWRI', lang), number: '+905488111190', icon: 'paw-outline', subtitle: t('menuCWRISubtitle', lang) },
+              ].map(({ label, number, icon, subtitle }) => (
                 <TouchableOpacity key={number} style={styles.emergencyRow} onPress={() => { setShowEmergencyModal(false); Linking.openURL(`tel:${number}`) }}>
                   <View style={styles.emergencyIconWrap}>
                     <Ionicons name={icon} size={20} color={colors.danger} />
                   </View>
-                  <Text style={styles.emergencyLabel}>{label}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.emergencyEntryLabel}>{label}</Text>
+                    {subtitle ? <Text style={styles.emergencySubLabel}>{subtitle}</Text> : null}
+                  </View>
                   <Text style={styles.emergencyNumber}>{number}</Text>
                   <Ionicons name="call" size={18} color={colors.danger} />
                 </TouchableOpacity>
@@ -1636,6 +1640,8 @@ const styles = StyleSheet.create({
   emergencyRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderTopWidth: 1, borderTopColor: colors.border },
   emergencyIconWrap:  { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(220,38,38,0.1)', justifyContent: 'center', alignItems: 'center' },
   emergencyLabel:     { flex: 1, fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  emergencyEntryLabel: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  emergencySubLabel:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2, lineHeight: 15 },
   emergencyNumber:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginRight: 4 },
   muniHoursBubble:    { flexDirection: 'row', alignItems: 'flex-start', gap: 7, backgroundColor: colors.primaryLight, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 6, marginLeft: 46 },
   muniHoursText:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.primary, lineHeight: 19 },
