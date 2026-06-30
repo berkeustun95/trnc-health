@@ -27,9 +27,17 @@ export default function PageBackground({ topic, scrimOpacity = SCRIM_OPACITY }) 
       <Image
         source={config.asset}
         resizeMode="cover"
-        style={StyleSheet.absoluteFill}
+        style={s.image}
       />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${scrimOpacity})` }]} />
     </View>
   )
 }
+
+const s = StyleSheet.create({
+  image: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+})
