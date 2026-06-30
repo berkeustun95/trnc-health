@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import PageBackground from '../components/PageBackground'
+import ContentCard from '../components/ContentCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -19,8 +20,9 @@ const CARDS = [
 
 // Seeded June 2026 — flag each field for Berke's sign-off before ship.
 const CROSSINGS = [
-  { id: 'lokmaci',    north: 'Lokmacı',    south: 'Ledra Street',   region: 'Walled city centre, Nicosia',   type: 'pedestrian', hours: 'open24h'  },
-  { id: 'metehan',   north: 'Metehan',    south: 'Ayios Dometios', region: 'Northwestern Nicosia',          type: 'vehicle',    hours: 'open24h'  },
+  { id: 'lokmaci',      north: 'Lokmacı',    south: 'Ledra Street',   region: 'Walled city centre, Nicosia',   type: 'pedestrian', hours: 'open24h' },
+  { id: 'ledrapalace',  north: 'Ledra Palas', south: null,            region: 'UN buffer zone, Old Nicosia',   type: 'pedestrian', hours: 'open24h', noteKey: 'essBordersLedrapalaceNote' },
+  { id: 'metehan',      north: 'Metehan',    south: 'Ayios Dometios', region: 'Northwestern Nicosia',          type: 'vehicle',    hours: 'open24h'  },
   { id: 'beyarmudu', north: 'Beyarmudu',  south: 'Pergamos',       region: 'East of Nicosia',               type: 'vehicle',    hours: 'limited'  },
   { id: 'deryneia',  north: 'Deryneia',   south: null,             region: 'Near Famagusta / east',         type: 'vehicle',    hours: 'limited'  },
   { id: 'bostanci',  north: 'Bostancı',   south: 'Astromeritis',   region: 'Northwestern district',         type: 'vehicle',    hours: 'open24h'  },
@@ -64,23 +66,25 @@ function BulletRow({ iconName, iconColor, text }) {
 function DrivingCard({ lang }) {
   return (
     <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
-      <SectionTitle text={t('essDrivingRulesTitle', lang)} />
-      <BulletRow iconName="alert-circle-outline" iconColor={colors.danger} text={t('essDrivingRule1', lang)} />
-      <BulletRow text={t('essDrivingRule2', lang)} />
-      <BulletRow text={t('essDrivingRule3', lang)} />
-      <BulletRow text={t('essDrivingRule4', lang)} />
-      <BulletRow text={t('essDrivingRule5', lang)} />
+      <ContentCard>
+        <SectionTitle text={t('essDrivingRulesTitle', lang)} />
+        <BulletRow iconName="alert-circle-outline" iconColor={colors.danger} text={t('essDrivingRule1', lang)} />
+        <BulletRow text={t('essDrivingRule2', lang)} />
+        <BulletRow text={t('essDrivingRule3', lang)} />
+        <BulletRow text={t('essDrivingRule4', lang)} />
+        <BulletRow text={t('essDrivingRule5', lang)} />
 
-      <SectionTitle text={t('essDrivingSpeedTitle', lang)} />
-      <BulletRow iconName="speedometer-outline" iconColor={colors.accent} text={t('essDrivingSpeed1', lang)} />
-      <BulletRow iconName="speedometer-outline" iconColor={colors.accent} text={t('essDrivingSpeed2', lang)} />
-      <BulletRow iconName="speedometer-outline" iconColor={colors.accent} text={t('essDrivingSpeed3', lang)} />
-      <BulletRow iconName="wine-outline" iconColor={colors.danger} text={t('essDrivingAlcohol', lang)} />
+        <SectionTitle text={t('essDrivingSpeedTitle', lang)} />
+        <BulletRow iconName="speedometer-outline" iconColor={colors.accent} text={t('essDrivingSpeed1', lang)} />
+        <BulletRow iconName="speedometer-outline" iconColor={colors.accent} text={t('essDrivingSpeed2', lang)} />
+        <BulletRow iconName="speedometer-outline" iconColor={colors.accent} text={t('essDrivingSpeed3', lang)} />
+        <BulletRow iconName="wine-outline" iconColor={colors.danger} text={t('essDrivingAlcohol', lang)} />
 
-      <SectionTitle text={t('essDrivingPlatesTitle', lang)} />
-      <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate1', lang)} />
-      <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate2', lang)} />
-      <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate3', lang)} />
+        <SectionTitle text={t('essDrivingPlatesTitle', lang)} />
+        <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate1', lang)} />
+        <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate2', lang)} />
+        <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate3', lang)} />
+      </ContentCard>
     </ScrollView>
   )
 }
@@ -88,16 +92,18 @@ function DrivingCard({ lang }) {
 function CurrencyCard({ lang, onShowExchangeRates }) {
   return (
     <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
-      <BulletRow iconName="cash-outline" iconColor={colors.primary} text={t('essCurrPrimary', lang)} />
-      <BulletRow text={t('essCurrAccepted', lang)} />
-      <BulletRow iconName="cart-outline" iconColor={colors.accent} text={t('essCurrCash', lang)} />
-      <BulletRow iconName="location-outline" iconColor={colors.textSecondary} text={t('essCurrATM', lang)} />
-      <BulletRow iconName="swap-horizontal-outline" iconColor={colors.textSecondary} text={t('essCurrBureaux', lang)} />
+      <ContentCard>
+        <BulletRow iconName="cash-outline" iconColor={colors.primary} text={t('essCurrPrimary', lang)} />
+        <BulletRow text={t('essCurrAccepted', lang)} />
+        <BulletRow iconName="cart-outline" iconColor={colors.accent} text={t('essCurrCash', lang)} />
+        <BulletRow iconName="location-outline" iconColor={colors.textSecondary} text={t('essCurrATM', lang)} />
+        <BulletRow iconName="swap-horizontal-outline" iconColor={colors.textSecondary} text={t('essCurrBureaux', lang)} />
 
-      <TouchableOpacity style={s.fxButton} onPress={onShowExchangeRates} activeOpacity={0.8}>
-        <Ionicons name="trending-up-outline" size={18} color={colors.surface} />
-        <Text style={s.fxButtonText}>{t('essCurrRatesBtn', lang)}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={s.fxButton} onPress={onShowExchangeRates} activeOpacity={0.8}>
+          <Ionicons name="trending-up-outline" size={18} color={colors.surface} />
+          <Text style={s.fxButtonText}>{t('essCurrRatesBtn', lang)}</Text>
+        </TouchableOpacity>
+      </ContentCard>
     </ScrollView>
   )
 }
@@ -105,17 +111,19 @@ function CurrencyCard({ lang, onShowExchangeRates }) {
 function HolidaysCard({ lang }) {
   return (
     <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
-      <SectionTitle text={t('essHolFixedTitle', lang)} />
-      {FIXED_HOLIDAYS.map(key => (
-        <BulletRow key={key} iconName="flag-outline" iconColor={colors.danger} text={t(key, lang)} />
-      ))}
+      <ContentCard>
+        <SectionTitle text={t('essHolFixedTitle', lang)} />
+        {FIXED_HOLIDAYS.map(key => (
+          <BulletRow key={key} iconName="flag-outline" iconColor={colors.danger} text={t(key, lang)} />
+        ))}
 
-      <SectionTitle text={t('essHolReligiousTitle', lang)} />
-      {RELIGIOUS_HOLIDAYS.map(key => (
-        <BulletRow key={key} iconName="moon-outline" iconColor="#5B5BD6" text={t(key, lang)} />
-      ))}
+        <SectionTitle text={t('essHolReligiousTitle', lang)} />
+        {RELIGIOUS_HOLIDAYS.map(key => (
+          <BulletRow key={key} iconName="moon-outline" iconColor="#5B5BD6" text={t(key, lang)} />
+        ))}
 
-      <Text style={s.yearNote}>{t('essHolYearNote', lang)}</Text>
+        <Text style={s.yearNote}>{t('essHolYearNote', lang)}</Text>
+      </ContentCard>
     </ScrollView>
   )
 }
@@ -123,13 +131,15 @@ function HolidaysCard({ lang }) {
 function PortsCard({ lang }) {
   return (
     <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
-      <SectionTitle text={t('essPortsAirTitle', lang)} />
-      <BulletRow iconName="airplane-outline" iconColor={colors.accent} text={t('essPortsErcan', lang)} />
-      <BulletRow iconName="arrow-forward-outline" iconColor={colors.textSecondary} text={t('essPortsLarnacaNote', lang)} />
+      <ContentCard>
+        <SectionTitle text={t('essPortsAirTitle', lang)} />
+        <BulletRow iconName="airplane-outline" iconColor={colors.accent} text={t('essPortsErcan', lang)} />
+        <BulletRow iconName="arrow-forward-outline" iconColor={colors.textSecondary} text={t('essPortsLarnacaNote', lang)} />
 
-      <SectionTitle text={t('essPortsSeaTitle', lang)} />
-      <BulletRow iconName="boat-outline" iconColor={colors.primary} text={t('essPortsGirne', lang)} />
-      <BulletRow iconName="boat-outline" iconColor={colors.primary} text={t('essPortsGazi', lang)} />
+        <SectionTitle text={t('essPortsSeaTitle', lang)} />
+        <BulletRow iconName="boat-outline" iconColor={colors.primary} text={t('essPortsGirne', lang)} />
+        <BulletRow iconName="boat-outline" iconColor={colors.primary} text={t('essPortsGazi', lang)} />
+      </ContentCard>
     </ScrollView>
   )
 }
@@ -168,22 +178,30 @@ function BordersCard({ lang }) {
                 <Text style={[s.badgeText, { color: colors.textSecondary }]}>{t(hoursKey, lang)}</Text>
               </View>
             </View>
+            {c.noteKey && (
+              <View style={s.crossingNote}>
+                <Ionicons name="information-circle-outline" size={13} color={colors.accent} style={{ marginTop: 1, flexShrink: 0 }} />
+                <Text style={s.crossingNoteText}>{t(c.noteKey, lang)}</Text>
+              </View>
+            )}
           </View>
         )
       })}
 
-      <Text style={s.hoursNote}>{t('essBordersHoursNote', lang)}</Text>
+      <ContentCard style={{ marginTop: 8 }}>
+        <Text style={s.hoursNote}>{t('essBordersHoursNote', lang)}</Text>
 
-      <SectionTitle text={t('essBordersInsTitle', lang)} />
-      <BulletRow iconName="shield-checkmark-outline" iconColor={colors.danger} text={t('essBordersIns1', lang)} />
-      <BulletRow iconName="close-circle-outline"     iconColor={colors.danger} text={t('essBordersIns2', lang)} />
-      <BulletRow iconName="information-circle-outline" iconColor={colors.textSecondary} text={t('essBordersIns3', lang)} />
+        <SectionTitle text={t('essBordersInsTitle', lang)} />
+        <BulletRow iconName="shield-checkmark-outline" iconColor={colors.danger} text={t('essBordersIns1', lang)} />
+        <BulletRow iconName="close-circle-outline"     iconColor={colors.danger} text={t('essBordersIns2', lang)} />
+        <BulletRow iconName="information-circle-outline" iconColor={colors.textSecondary} text={t('essBordersIns3', lang)} />
 
-      <SectionTitle text={t('essBordersDocTitle', lang)} />
-      <BulletRow text={t('essBordersDocEU', lang)} />
-      <BulletRow text={t('essBordersDocStamp', lang)} />
-      <BulletRow text={t('essBordersDocRoC', lang)} />
-      <BulletRow iconName="alert-circle-outline" iconColor={colors.accent} text={t('essBordersDocEntryRoute', lang)} />
+        <SectionTitle text={t('essBordersDocTitle', lang)} />
+        <BulletRow text={t('essBordersDocEU', lang)} />
+        <BulletRow text={t('essBordersDocStamp', lang)} />
+        <BulletRow text={t('essBordersDocRoC', lang)} />
+        <BulletRow iconName="alert-circle-outline" iconColor={colors.accent} text={t('essBordersDocEntryRoute', lang)} />
+      </ContentCard>
     </ScrollView>
   )
 }
@@ -224,7 +242,9 @@ function EmbassiesCard({ lang }) {
 
       <SectionTitle text={t('essEmbOtherTitle', lang)} />
       {OFFICES.map(o => <OfficeRow key={o.id} office={o} />)}
-      <Text style={s.embassyOtherNote}>{t('essEmbOtherNote', lang)}</Text>
+      <ContentCard style={{ marginTop: 4 }}>
+        <Text style={s.embassyOtherNote}>{t('essEmbOtherNote', lang)}</Text>
+      </ContentCard>
 
       <Text style={s.embassyCaveat}>{t('essEmbCaveat', lang)}</Text>
     </ScrollView>
@@ -486,6 +506,19 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     flexWrap: 'wrap',
+  },
+  crossingNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 5,
+    marginTop: 8,
+  },
+  crossingNoteText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 17,
+    fontStyle: 'italic',
   },
   badge: {
     flexDirection: 'row',
