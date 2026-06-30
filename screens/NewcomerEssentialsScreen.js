@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons, Feather } from '@expo/vector-icons'
 import PageBackground from '../components/PageBackground'
 import ContentCard from '../components/ContentCard'
 import { colors, shadow, radius } from '../constants/theme'
@@ -20,13 +20,23 @@ const CARDS = [
 
 // Seeded June 2026 — flag each field for Berke's sign-off before ship.
 const CROSSINGS = [
-  { id: 'lokmaci',      north: 'Lokmacı',    south: 'Ledra Street',   region: 'Walled city centre, Nicosia',   type: 'pedestrian', hours: 'open24h' },
-  { id: 'ledrapalace',  north: 'Ledra Palas', south: null,            region: 'UN buffer zone, Old Nicosia',   type: 'pedestrian', hours: 'open24h', noteKey: 'essBordersLedrapalaceNote' },
-  { id: 'metehan',      north: 'Metehan',    south: 'Ayios Dometios', region: 'Northwestern Nicosia',          type: 'vehicle',    hours: 'open24h'  },
-  { id: 'beyarmudu', north: 'Beyarmudu',  south: 'Pergamos',       region: 'East of Nicosia',               type: 'vehicle',    hours: 'limited'  },
-  { id: 'deryneia',  north: 'Deryneia',   south: null,             region: 'Near Famagusta / east',         type: 'vehicle',    hours: 'limited'  },
-  { id: 'bostanci',  north: 'Bostancı',   south: 'Astromeritis',   region: 'Northwestern district',         type: 'vehicle',    hours: 'open24h'  },
-  { id: 'yesilirmak',north: 'Yeşilırmak', south: 'Kato Pyrgos',    region: 'Western coast',                 type: 'vehicle',    hours: 'limited'  },
+  { id: 'lokmaci',      north: 'Lokmacı',    south: 'Ledra Street',   region: 'Walled city centre, Nicosia',   type: 'pedestrian', hours: 'open24h',  lat: 35.175211,  lng: 33.3614882 },
+  { id: 'ledrapalace',  north: 'Ledra Palas', south: null,            region: 'UN buffer zone, Old Nicosia',   type: 'pedestrian', hours: 'open24h',  lat: 35.1795082, lng: 33.3562422, noteKey: 'essBordersLedrapalaceNote' },
+  { id: 'metehan',      north: 'Metehan',    south: 'Ayios Dometios', region: 'Northwestern Nicosia',          type: 'vehicle',    hours: 'open24h',  lat: 35.1817756, lng: 33.3232731 },
+  { id: 'beyarmudu',    north: 'Beyarmudu',  south: 'Pergamos',       region: 'East of Nicosia',               type: 'vehicle',    hours: 'limited'  },
+  { id: 'deryneia',     north: 'Deryneia',   south: null,             region: 'Near Famagusta / east',         type: 'vehicle',    hours: 'limited',  lat: 35.071544,  lng: 33.9604703 },
+  { id: 'bostanci',     north: 'Bostancı',   south: 'Astromeritis',   region: 'Northwestern district',         type: 'vehicle',    hours: 'open24h',  lat: 35.1461323, lng: 33.035077  },
+  { id: 'yesilirmak',   north: 'Yeşilırmak', south: 'Kato Pyrgos',    region: 'Western coast',                 type: 'vehicle',    hours: 'limited'  },
+]
+
+// Coordinates land in step 2 — buttons render only when lat+lng are present.
+const AIRPORTS = [
+  { id: 'ercan', labelKey: 'essPortsErcan', icon: 'airplane-outline', iconColor: colors.accent, lat: 35.1472558, lng: 33.5037268 },
+]
+
+const PORTS = [
+  { id: 'girne', labelKey: 'essPortsGirne', icon: 'boat-outline', iconColor: colors.primary },
+  { id: 'gazi',  labelKey: 'essPortsGazi',  icon: 'boat-outline', iconColor: colors.primary, lat: 35.1331987, lng: 33.9345815 },
 ]
 
 // Source: TRNC MFA (mfa.gov.ct.tr) — seeded June 2026, flag for Berke's sign-off.
@@ -133,12 +143,45 @@ function PortsCard({ lang }) {
     <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
       <ContentCard>
         <SectionTitle text={t('essPortsAirTitle', lang)} />
-        <BulletRow iconName="airplane-outline" iconColor={colors.accent} text={t('essPortsErcan', lang)} />
+        {AIRPORTS.map(entry => (
+          <View key={entry.id} style={s.portEntry}>
+            <View style={[s.bulletRow, { marginBottom: 0 }]}>
+              <Ionicons name={entry.icon} size={16} color={entry.iconColor} style={s.bulletIcon} />
+              <Text style={s.bulletText}>{t(entry.labelKey, lang)}</Text>
+            </View>
+            {entry.lat != null && entry.lng != null && (
+              <TouchableOpacity
+                style={[s.directionsBtn, { alignSelf: 'flex-start', marginLeft: 24, marginTop: 8 }]}
+                onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${entry.lat},${entry.lng}`)}
+                activeOpacity={0.7}
+              >
+                <Feather name="navigation" size={13} color={colors.primary} />
+                <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
         <BulletRow iconName="arrow-forward-outline" iconColor={colors.textSecondary} text={t('essPortsLarnacaNote', lang)} />
 
         <SectionTitle text={t('essPortsSeaTitle', lang)} />
-        <BulletRow iconName="boat-outline" iconColor={colors.primary} text={t('essPortsGirne', lang)} />
-        <BulletRow iconName="boat-outline" iconColor={colors.primary} text={t('essPortsGazi', lang)} />
+        {PORTS.map(entry => (
+          <View key={entry.id} style={s.portEntry}>
+            <View style={[s.bulletRow, { marginBottom: 0 }]}>
+              <Ionicons name={entry.icon} size={16} color={entry.iconColor} style={s.bulletIcon} />
+              <Text style={s.bulletText}>{t(entry.labelKey, lang)}</Text>
+            </View>
+            {entry.lat != null && entry.lng != null && (
+              <TouchableOpacity
+                style={[s.directionsBtn, { alignSelf: 'flex-start', marginLeft: 24, marginTop: 8 }]}
+                onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${entry.lat},${entry.lng}`)}
+                activeOpacity={0.7}
+              >
+                <Feather name="navigation" size={13} color={colors.primary} />
+                <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
       </ContentCard>
     </ScrollView>
   )
@@ -182,6 +225,18 @@ function BordersCard({ lang }) {
               <View style={s.crossingNote}>
                 <Ionicons name="information-circle-outline" size={13} color={colors.accent} style={{ marginTop: 1, flexShrink: 0 }} />
                 <Text style={s.crossingNoteText}>{t(c.noteKey, lang)}</Text>
+              </View>
+            )}
+            {c.lat != null && c.lng != null && (
+              <View style={s.crossingActions}>
+                <TouchableOpacity
+                  style={s.directionsBtn}
+                  onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`)}
+                  activeOpacity={0.7}
+                >
+                  <Feather name="navigation" size={13} color={colors.primary} />
+                  <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -520,6 +575,10 @@ const s = StyleSheet.create({
     lineHeight: 17,
     fontStyle: 'italic',
   },
+  crossingActions:  { marginTop: 10 },
+  directionsBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primaryLight, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 12 },
+  directionsBtnText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
+  portEntry:        { marginBottom: 12 },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

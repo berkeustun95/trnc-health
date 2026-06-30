@@ -15,11 +15,54 @@
 | `type` | `'pedestrian'` \| `'vehicle'` | ✓ | Controls badge colour and i18n label (`essBordersPedestrian` / `essBordersVehiclePed`) |
 | `hours` | `'open24h'` \| `'limited'` | ✓ | Controls hours badge (`essBordersOpen24h` / `essBordersLimitedHours`) |
 | `noteKey` | string | optional | i18n key for a per-crossing note rendered below the badge row. Use for crossings that need extra context (history, vehicle restrictions, caveats). Must exist in all 9 locales. |
+| `lat` | number | optional | WGS-84 latitude. Direction button renders only when both `lat` and `lng` are present. |
+| `lng` | number | optional | WGS-84 longitude. See `lat`. |
 
 ### noteKey convention
 - Add the key adjacent to `essBordersOpen24h` / `essBordersPedestrian` in every language block of `constants/i18n.js`.
 - Keep the note to 2–4 sentences. Use it for safety-critical info (access restrictions), brief history, or caveats not covered by the standard badges.
 - Currently used by: `ledrapalace` → `essBordersLedrapalaceNote`
+
+### Coordinate convention
+- **Never guess or approximate coordinates** — wrong pin at a militarized crossing is worse than no button.
+- Verify the pin lands on the actual gate/terminal, not the road approach or car park.
+- Beyarmudu and Yeşilırmak: documented Google Maps labeling inaccuracy on the TRNC eastern/western crossings — take extra care when sourcing.
+- Currently buttonless (no coords): `beyarmudu`, `yesilirmak`, `girne` (Yeni Liman unconfirmed).
+
+## NewcomerEssentialsScreen — AIRPORTS / PORTS schema
+
+`AIRPORTS` and `PORTS` are static JS arrays in `screens/NewcomerEssentialsScreen.js`, used by PortsCard.
+
+### Fields
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | string | ✓ | Unique key; used as React key |
+| `labelKey` | string | ✓ | i18n key for the entry's display text |
+| `icon` | string | ✓ | Ionicons icon name |
+| `iconColor` | string | ✓ | Icon colour (use `colors.*` token) |
+| `lat` | number | optional | WGS-84 latitude. Direction button renders only when both present. |
+| `lng` | number | optional | WGS-84 longitude. |
+
+**Larnaca/Paphos** are kept as a combined informational `BulletRow` (`essPortsLarnacaNote`) — no data object, no button. They are secondary context ("fly via the south"), not primary TRNC entry points.
+
+---
+
+## Direction button — canonical location action
+
+The **coordinate-based direction button** is the standard for all static location-bearing content in ADA. Two coexisting variants:
+
+| Variant | Where | Deep link | Source |
+|---------|-------|-----------|--------|
+| Name/address query | Pharmacies (`DutyListScreen`), clinics (`FacilityProfileScreen`) | `https://maps.google.com/?q=${encodeURIComponent(name)}` | Live from Supabase |
+| Coordinate directions | Border crossings, airports, seaports (`NewcomerEssentialsScreen`) | `https://www.google.com/maps/dir/?api=1&destination={lat},{lng}` | Static coords in JS data arrays |
+
+The coordinate variant is preferred for TRNC-side locations where place-name labeling in Google Maps is unreliable. **Never use `?q=name` for border crossings** — it can resolve to the wrong pin.
+
+### Shared UI elements (verbatim across both variants)
+- i18n key: `getDirections` — present in all 9 locales
+- Icon: `<Feather name="navigation" size={13} color={colors.primary} />`
+- Styles: `directionsBtn` / `directionsBtnText` (inlined per screen, not a shared component)
 
 ---
 
