@@ -203,7 +203,9 @@ export default function HomeServicesScreen({ lang, session, onBack }) {
           contentContainerStyle={s.catScroll}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={s.subtitle}>{t('hsSubtitle', lang)}</Text>
+          <View style={s.subtitleCard}>
+            <Text style={s.subtitle}>{t('hsSubtitle', lang)}</Text>
+          </View>
           <View style={s.grid}>
             {CATEGORIES.map(cat => (
               <CategoryTile
@@ -264,8 +266,10 @@ export default function HomeServicesScreen({ lang, session, onBack }) {
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
                   <View style={s.emptyWrap}>
-                    <Ionicons name="search-outline" size={42} color={colors.border} />
-                    <Text style={s.emptyText}>{t('hsNoProviders', lang)}</Text>
+                    <View style={s.emptyCard}>
+                      <Ionicons name="search-outline" size={42} color={colors.border} style={{ marginBottom: 10 }} />
+                      <Text style={s.emptyText}>{t('hsNoProviders', lang)}</Text>
+                    </View>
                   </View>
                 }
                 renderItem={({ item }) => (
@@ -286,8 +290,10 @@ const s = StyleSheet.create({
 
   // Category picker
   catScroll:      { padding: 20, paddingBottom: 40 },
+  subtitleCard:   { backgroundColor: colors.cardBg, borderRadius: 14, paddingHorizontal: 16,
+                    paddingVertical: 12, marginBottom: 20, ...shadow },
   subtitle:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
-                    marginBottom: 20, textAlign: 'center' },
+                    textAlign: 'center' },
   grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   catTile:        { width: '47%', backgroundColor: colors.cardBg, borderRadius: radius.card,
                     padding: 18, alignItems: 'center', gap: 10, ...shadow,
@@ -317,7 +323,9 @@ const s = StyleSheet.create({
 
   // Provider list
   listContent:    { padding: 16, paddingBottom: 40, gap: 12 },
-  emptyWrap:      { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyWrap:      { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
+  emptyCard:      { backgroundColor: colors.cardBg, borderRadius: 16, paddingHorizontal: 24,
+                    paddingVertical: 20, alignItems: 'center', ...shadow },
   emptyText:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                     textAlign: 'center' },
 
