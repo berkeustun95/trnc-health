@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
+import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -125,27 +126,19 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="duty_pharmacy" />
+      <ScreenHeader onBack={onBack} title={t('dutyPharmacies', lang)} subtitle={dateLabel} lang={lang} />
       <View style={s.container}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={onBack} style={s.backBtn}>
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-            <Text style={s.backText}>{t('back', lang)}</Text>
-          </TouchableOpacity>
-          <View style={s.headerCenter}>
-            <Text style={s.title}>{t('dutyPharmacies', lang)}</Text>
-            <Text style={s.dateText}>{dateLabel}</Text>
-          </View>
-          <View style={s.headerRight} />
-        </View>
 
         {loading ? (
           <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
         ) : sections.length === 0 ? (
           <View style={s.center}>
-            <View style={s.emptyIconWrap}>
-              <Ionicons name="medical-outline" size={32} color={colors.textSecondary} />
+            <View style={s.emptyCard}>
+              <View style={s.emptyIconWrap}>
+                <Ionicons name="medical-outline" size={32} color={colors.textSecondary} />
+              </View>
+              <Text style={s.emptyText}>{t('noDutyToday', lang)}</Text>
             </View>
-            <Text style={s.emptyText}>{t('noDutyToday', lang)}</Text>
           </View>
         ) : (
           <SectionList
@@ -176,15 +169,9 @@ const s = StyleSheet.create({
   safe:         { flex: 1, backgroundColor: colors.bg },
   container:    { flex: 1, paddingHorizontal: 16 },
   center:       { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header:       { flexDirection: 'row', alignItems: 'flex-start', paddingTop: 16, paddingBottom: 16 },
-  backBtn:      { flexDirection: 'row', alignItems: 'center', gap: 2, minWidth: 70 },
-  backText:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerRight:  { minWidth: 70 },
-  title:        { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  dateText:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
-  emptyIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 12, ...shadow },
-  emptyText:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 },
+  emptyCard:    { backgroundColor: colors.cardBg, borderRadius: 16, padding: 24, alignItems: 'center', ...shadow },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  emptyText:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
   listContent:  { paddingBottom: 40 },
 
   regionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 },

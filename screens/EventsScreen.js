@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
+import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -212,17 +213,7 @@ export default function EventsScreen({ lang, onBack }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="events" />
-      <View style={s.header}>
-        <TouchableOpacity style={s.backPill} onPress={onBack}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backPillText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={s.headerTitle}>{t('eventsTitle', lang)}</Text>
-          <Text style={s.headerSub}>{t('eventsSubtitle', lang)}</Text>
-        </View>
-        <View style={{ width: 60 }} />
-      </View>
+      <ScreenHeader onBack={onBack} title={t('eventsTitle', lang)} subtitle={t('eventsSubtitle', lang)} lang={lang} />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
@@ -235,8 +226,10 @@ export default function EventsScreen({ lang, onBack }) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           ListEmptyComponent={
             <View style={s.emptyWrap}>
-              <Ionicons name="calendar-outline" size={48} color={colors.border} style={{ marginBottom: 12 }} />
-              <Text style={s.emptyText}>{t('noUpcomingEvents', lang)}</Text>
+              <View style={s.emptyCard}>
+                <Ionicons name="calendar-outline" size={48} color={colors.border} style={{ marginBottom: 12 }} />
+                <Text style={s.emptyText}>{t('noUpcomingEvents', lang)}</Text>
+              </View>
             </View>
           }
           renderItem={({ item }) => (
@@ -251,11 +244,6 @@ export default function EventsScreen({ lang, onBack }) {
 const s = StyleSheet.create({
   safe:               { flex: 1, backgroundColor: colors.bg },
   center:             { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 14 },
-  headerTitle:        { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.3 },
-  headerSub:          { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 1 },
-  backPill:           { flexDirection: 'row', alignItems: 'center', gap: 4, width: 60 },
-  backPillText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   listContent:        { paddingHorizontal: 16, paddingBottom: 40, gap: 16 },
 
   // Card
@@ -291,5 +279,6 @@ const s = StyleSheet.create({
 
   // Empty
   emptyWrap:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
+  emptyCard:          { backgroundColor: colors.cardBg, borderRadius: 16, paddingHorizontal: 24, paddingVertical: 20, alignItems: 'center', ...shadow },
   emptyText:          { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
 })

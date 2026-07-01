@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
+import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import TransportProfileScreen from './TransportProfileScreen'
@@ -187,14 +188,7 @@ export default function TransportScreen({ lang, session, onBack }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="transportation" />
-      <View style={s.header}>
-        <TouchableOpacity style={s.backPill} onPress={handleBack}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backPillText}>{backLabel}</Text>
-        </TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
-        <View style={{ width: 80 }} />
-      </View>
+      <ScreenHeader onBack={handleBack} backLabel={backLabel} title={headerTitle} lang={lang} />
 
       {!selectedType ? (
         <ScrollView contentContainerStyle={s.catScroll} showsVerticalScrollIndicator={false}>
@@ -284,13 +278,6 @@ export default function TransportScreen({ lang, session, onBack }) {
 const s = StyleSheet.create({
   safe:               { flex: 1, backgroundColor: colors.bg },
 
-  header:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                        paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg,
-                        borderBottomWidth: 1, borderBottomColor: colors.border },
-  backPill:           { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 120 },
-  backPillText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  headerTitle:        { flex: 1, textAlign: 'center', fontSize: 17, fontFamily: 'Inter_700Bold',
-                        color: colors.textPrimary },
 
   // Landing
   catScroll:          { padding: 20, paddingBottom: 40 },

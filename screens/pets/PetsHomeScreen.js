@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import PageBackground from '../../components/PageBackground'
+import ScreenHeader from '../../components/ScreenHeader'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 
@@ -51,14 +52,7 @@ export default function PetsHomeScreen({ lang, onBack, onNavigate }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="pets" />
-      <View style={s.header}>
-        <TouchableOpacity style={s.backPill} onPress={onBack}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backPillText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{t('petsTitle', lang)}</Text>
-        <View style={{ width: 60 }} />
-      </View>
+      <ScreenHeader onBack={onBack} title={t('petsTitle', lang)} lang={lang} />
 
       <ScrollView
         style={s.scroll}
@@ -85,10 +79,6 @@ export default function PetsHomeScreen({ lang, onBack, onNavigate }) {
 
 const s = StyleSheet.create({
   safe:          { flex: 1, backgroundColor: colors.bg },
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  backPill:      { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.bg, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12 },
-  backPillText:  { fontSize: 14, color: colors.textPrimary, fontFamily: 'Inter_400Regular' },
-  headerTitle:   { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, textAlign: 'center' },
   scroll:        { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40 },
   heroBadge:     { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 8, marginTop: 8 },

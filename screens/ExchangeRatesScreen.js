@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
 import PageBackground from '../components/PageBackground'
+import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -93,13 +94,7 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="exchange_rates" />
-
-      <View style={s.header}>
-        <TouchableOpacity style={s.backPill} onPress={onBack} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backPillText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader onBack={onBack} lang={lang} />
 
       <View style={s.titleRow}>
         <Text style={s.title}>{t('fxTitle', lang)}</Text>
@@ -168,26 +163,14 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingRight: 10,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-  },
-  backPillText: {
-    fontSize: 15,
-    color: colors.textPrimary,
-    fontWeight: '500',
-  },
   titleRow: {
-    paddingHorizontal: 16,
+    marginHorizontal: 16,
     marginBottom: 20,
+    backgroundColor: colors.cardBg,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    ...shadow,
   },
   title: {
     fontSize: 26,

@@ -9,6 +9,7 @@ import MapView, { Marker } from 'react-native-maps'
 import { supabase } from '../lib/supabase'
 import PlaceSubmitScreen from './PlaceSubmitScreen'
 import PageBackground from '../components/PageBackground'
+import ScreenHeader from '../components/ScreenHeader'
 import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 
@@ -263,25 +264,24 @@ export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, us
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="beaches_landmarks" />
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity style={s.backPill} onPress={onBack}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backPillText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{t('blTitle', lang)}</Text>
-        <TouchableOpacity
-          style={s.viewToggle}
-          onPress={() => setView(v => v === 'list' ? 'map' : 'list')}
-          activeOpacity={0.75}
-        >
-          <Ionicons
-            name={view === 'list' ? 'map-outline' : 'list-outline'}
-            size={20}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        onBack={onBack}
+        title={t('blTitle', lang)}
+        lang={lang}
+        rightElement={
+          <TouchableOpacity
+            style={s.viewToggle}
+            onPress={() => setView(v => v === 'list' ? 'map' : 'list')}
+            activeOpacity={0.75}
+          >
+            <Ionicons
+              name={view === 'list' ? 'map-outline' : 'list-outline'}
+              size={20}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+        }
+      />
 
       {view === 'map' ? (
         <PlacesMapView
@@ -378,13 +378,6 @@ const PHOTO_H = 160
 const s = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: colors.bg },
 
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            paddingHorizontal: 16, paddingVertical: 12,
-            backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  backPill:     { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 70 },
-  backPillText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  headerTitle:  { flex: 1, textAlign: 'center', fontSize: 17, fontFamily: 'Inter_700Bold',
-                  color: colors.textPrimary },
   viewToggle:   { minWidth: 70, alignItems: 'flex-end',
                   padding: 6, borderRadius: radius.sm,
                   backgroundColor: colors.primaryLight },

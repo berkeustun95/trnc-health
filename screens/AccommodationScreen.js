@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
+import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -259,14 +260,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
   return (
     <SafeAreaView style={cs.safe} edges={['top']}>
       <PageBackground topic="accommodation" />
-      {/* Header */}
-      <View style={cs.header}>
-        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={cs.headerTitle}>{t('accomTitle', lang)}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader onBack={onClose} title={t('accomTitle', lang)} lang={lang} />
 
       {/* Intent tabs */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={cs.intentBar} contentContainerStyle={cs.intentBarContent}>
@@ -472,8 +466,6 @@ function PickerModal({ visible, title, options, selected, labelFn, onSelect, onC
 
 const cs = StyleSheet.create({
   safe:                { flex: 1, backgroundColor: colors.bg },
-  header:              { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
-  headerTitle:         { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
 
   intentBar:           { flexGrow: 0 },
   intentBarContent:    { paddingHorizontal: 16, gap: 8, paddingBottom: 10 },

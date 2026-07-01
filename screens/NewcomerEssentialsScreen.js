@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import PageBackground from '../components/PageBackground'
+import ScreenHeader from '../components/ScreenHeader'
 import ContentCard from '../components/ContentCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -336,18 +337,16 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
     return (
       <SafeAreaView style={s.safe} edges={['top']}>
         <PageBackground topic="newcomer_essentials" />
-        <View style={s.header}>
-          <TouchableOpacity style={s.backPill} onPress={() => setActiveCard(null)} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-            <Text style={s.backPillText}>{t('back', lang)}</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={s.cardHeader}>
-          <View style={[s.cardHeaderIcon, { backgroundColor: card.bg }]}>
-            <Ionicons name={card.icon} size={22} color={card.color} />
-          </View>
-          <Text style={s.cardHeaderTitle}>{t(card.labelKey, lang)}</Text>
-        </View>
+        <ScreenHeader
+          onBack={() => setActiveCard(null)}
+          lang={lang}
+          titleIcon={
+            <View style={[s.cardHeaderIcon, { backgroundColor: card.bg }]}>
+              <Ionicons name={card.icon} size={22} color={card.color} />
+            </View>
+          }
+          title={t(card.labelKey, lang)}
+        />
         {renderCardContent(activeCard, lang, onShowExchangeRates)}
       </SafeAreaView>
     )
@@ -356,15 +355,12 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="newcomer_essentials" />
-      <View style={s.header}>
-        <TouchableOpacity style={s.backPill} onPress={onBack} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backPillText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader onBack={onBack} lang={lang} />
       <ScrollView contentContainerStyle={s.hubContent} showsVerticalScrollIndicator={false}>
-        <Text style={s.hubTitle}>{t('essHubTitle', lang)}</Text>
-        <Text style={s.hubSubtitle}>{t('essHubSubtitle', lang)}</Text>
+        <View style={s.hubCard}>
+          <Text style={s.hubTitle}>{t('essHubTitle', lang)}</Text>
+          <Text style={s.hubSubtitle}>{t('essHubSubtitle', lang)}</Text>
+        </View>
         <View style={s.grid}>
           {CARDS.map(c => (
             <TouchableOpacity
@@ -387,22 +383,13 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: {
+  hubCard: {
+    backgroundColor: colors.cardBg,
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingRight: 10,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-  },
-  backPillText: {
-    fontSize: 15,
-    color: colors.textPrimary,
-    fontWeight: '500',
+    paddingVertical: 16,
+    marginBottom: 24,
+    ...shadow,
   },
   hubContent: {
     paddingHorizontal: 16,
@@ -447,25 +434,12 @@ const s = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: 18,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    gap: 12,
-  },
   cardHeaderIcon: {
     width: 40,
     height: 40,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  cardHeaderTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    flex: 1,
   },
   cardScroll: { flex: 1 },
   cardContent: {
