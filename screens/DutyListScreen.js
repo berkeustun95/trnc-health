@@ -174,7 +174,7 @@ const s = StyleSheet.create({
   emptyText:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
   listContent:  { paddingBottom: 40 },
 
-  regionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 },
+  regionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8, backgroundColor: colors.cardBg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   regionName:   { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   regionBadge:  { backgroundColor: colors.border, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
   regionCount:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },

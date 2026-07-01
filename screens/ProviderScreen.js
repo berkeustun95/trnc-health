@@ -135,6 +135,9 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [credImageBase64, setCredImageBase64] = useState(null)
   const [uploadingCredDoc, setUploadingCredDoc] = useState(false)
   const [submissionHistory, setSubmissionHistory] = useState([])
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletingAccount, setDeletingAccount]     = useState(false)
+  const [deleteAccountError, setDeleteAccountError] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -543,6 +546,18 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     setCredModalVisible(false)
     setSavingCred(false)
     loadCredentials()
+  }
+
+  async function deleteAccount() {
+    setDeletingAccount(true)
+    setDeleteAccountError(null)
+    const { error } = await supabase.rpc('delete_own_account')
+    if (error) {
+      setDeleteAccountError(error.message)
+      setDeletingAccount(false)
+      return
+    }
+    await supabase.auth.signOut()
   }
 
   if (activeReview) {
@@ -1013,6 +1028,47 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 })}
               </View>
             )}
+
+            {/* ── Delete account ───────────────────────────────── */}
+            <View style={[styles.card, { marginTop: 16, marginBottom: 8 }]}>
+              <Text style={styles.fieldLabel}>ACCOUNT</Text>
+              {!showDeleteConfirm ? (
+                <TouchableOpacity
+                  style={[styles.saveBtn, { backgroundColor: colors.dangerLight, marginTop: 12 }]}
+                  onPress={() => setShowDeleteConfirm(true)}
+                >
+                  <Text style={[styles.saveBtnText, { color: colors.danger }]}>Delete Account</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 8, marginBottom: 12 }}>
+                    This will permanently delete your account and all associated data. This cannot be undone.
+                  </Text>
+                  {deleteAccountError && (
+                    <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger, marginBottom: 8 }}>{deleteAccountError}</Text>
+                  )}
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.saveBtn, { flex: 1, backgroundColor: colors.surfaceAlt }]}
+                      onPress={() => setShowDeleteConfirm(false)}
+                      disabled={deletingAccount}
+                    >
+                      <Text style={[styles.saveBtnText, { color: colors.text }]}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.saveBtn, { flex: 1, backgroundColor: colors.danger, opacity: deletingAccount ? 0.7 : 1 }]}
+                      onPress={deleteAccount}
+                      disabled={deletingAccount}
+                    >
+                      {deletingAccount
+                        ? <ActivityIndicator color="#fff" size="small" />
+                        : <Text style={styles.saveBtnText}>Confirm Delete</Text>
+                      }
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
 
           </ScrollView>
 

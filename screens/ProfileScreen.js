@@ -421,6 +421,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   }
 
   async function save() {
+    if (form.phone.trim() && !/^\d{4,15}$/.test(form.phone.trim())) {
+      setError('Enter a valid phone number (digits only, 4–15 characters)')
+      return
+    }
     setSaving(true)
     setError(null)
     const { error: err } = await supabase

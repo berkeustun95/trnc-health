@@ -37,6 +37,7 @@ import AccommodationScreen from './screens/AccommodationScreen'
 import PropertyDetailScreen from './screens/PropertyDetailScreen'
 import EstateAgentOnboardingScreen from './screens/EstateAgentOnboardingScreen'
 import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
+import HomeServiceDashboardScreen from './screens/HomeServiceDashboardScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import HomeServicesScreen from './screens/HomeServicesScreen'
 import BeachesLandmarksScreen from './screens/BeachesLandmarksScreen'
@@ -821,6 +822,8 @@ export default function App() {
     content = <EstateAgentDashboardScreen session={session} lang={lang} />
   } else if (profile.role === 'organizer') {
     content = <OrganizerScreen session={session} lang={lang} />
+  } else if (profile.role === 'home_service_provider') {
+    content = <HomeServiceDashboardScreen session={session} lang={lang} />
   } else if (showLatestResult && latestResult) {
     content = <ResultsScreen
       result={latestResult.final_result}
