@@ -324,9 +324,11 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={cs.emptyWrap}>
-                <Ionicons name="home-outline" size={48} color={colors.border} />
-                <Text style={cs.emptyTitle}>{t('accomNoResults', lang)}</Text>
-                <Text style={cs.emptySub}>{t('accomNoResultsSub', lang)}</Text>
+                <View style={cs.emptyCard}>
+                  <Ionicons name="home-outline" size={48} color={colors.border} style={{ marginBottom: 10 }} />
+                  <Text style={cs.emptyTitle}>{t('accomNoResults', lang)}</Text>
+                  <Text style={cs.emptySub}>{t('accomNoResultsSub', lang)}</Text>
+                </View>
               </View>
             }
             ListFooterComponent={
@@ -521,9 +523,10 @@ const cs = StyleSheet.create({
   addressRow:          { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingBottom: 14 },
   addressText:         { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
 
-  emptyWrap:           { alignItems: 'center', paddingTop: 80, gap: 10 },
-  emptyTitle:          { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  emptySub:            { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  emptyWrap:           { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
+  emptyCard:           { backgroundColor: colors.cardBg, borderRadius: 16, paddingHorizontal: 24, paddingVertical: 20, alignItems: 'center', ...shadow },
+  emptyTitle:          { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
+  emptySub:            { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
 
   footer:              { paddingTop: 12, paddingBottom: 20 },
   footerCard:          { backgroundColor: colors.primaryLight, borderRadius: 20, padding: 20, alignItems: 'center', gap: 8 },

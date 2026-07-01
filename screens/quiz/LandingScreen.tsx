@@ -76,17 +76,19 @@ export default function LandingScreen({ onClose }: { onClose?: () => void }) {
 
         <Text style={s.title}>{ui.titleLine1}</Text>
         <Text style={[s.title, s.titleAccent]}>{ui.titleLine2}</Text>
-        <Text style={s.subtitle}>{ui.subtitle}</Text>
+        <View style={s.pitchCard}>
+          <Text style={s.subtitle}>{ui.subtitle}</Text>
 
-        <View style={s.trustRow}>
-          {[ui.trustPharmacist, ui.trustInteraction, ui.trustEvidence].map((item, i) => (
-            <View key={i} style={s.trustItem}>
-              <View style={s.trustCheck}>
-                <Feather name="check" size={11} color={colors.success} />
+          <View style={s.trustRow}>
+            {[ui.trustPharmacist, ui.trustInteraction, ui.trustEvidence].map((item, i) => (
+              <View key={i} style={s.trustItem}>
+                <View style={s.trustCheck}>
+                  <Feather name="check" size={11} color={colors.success} />
+                </View>
+                <Text style={s.trustText}>{item}</Text>
               </View>
-              <Text style={s.trustText}>{item}</Text>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
 
         <TouchableOpacity style={s.ctaBtn} onPress={startQuiz}>
@@ -172,8 +174,9 @@ const s = StyleSheet.create({
   badgeText:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.3 },
   title:            { fontSize: 32, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 38, letterSpacing: -0.5 },
   titleAccent:      { color: colors.primary, marginBottom: 16 },
-  subtitle:         { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 22, marginBottom: 24 },
-  trustRow:         { marginBottom: 28 },
+  pitchCard:        { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 28, ...shadow },
+  subtitle:         { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 22, marginBottom: 16 },
+  trustRow:         { marginBottom: 0 },
   trustItem:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   trustCheck:       { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.successLight, justifyContent: 'center', alignItems: 'center' },
   trustText:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
@@ -183,13 +186,13 @@ const s = StyleSheet.create({
   statsRow:         { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: colors.cardBg, borderRadius: 16, paddingVertical: 18, marginBottom: 32, ...shadow },
   stat:             { alignItems: 'center', gap: 6 },
   statLabel:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textAlign: 'center' },
-  sectionTitle:     { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 16 },
+  sectionTitle:     { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#fff', marginBottom: 16 },
   featureCard:      { flexDirection: 'row', backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, gap: 14, alignItems: 'flex-start', ...shadow },
   featureIconWrap:  { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   featureText:      { flex: 1 },
   featureTitle:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
   featureDesc:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18 },
-  readyCTA:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginTop: 24, marginBottom: 12 },
+  readyCTA:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff', textAlign: 'center', marginTop: 24, marginBottom: 12 },
   // Modal
   modalOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 32 },
   modalCard:        { backgroundColor: colors.cardBg, borderRadius: 20, padding: 20, width: '100%', ...shadow },
