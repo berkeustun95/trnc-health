@@ -343,8 +343,10 @@ export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, us
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
                   <View style={s.emptyWrap}>
-                    <Ionicons name="map-outline" size={44} color={colors.border} />
-                    <Text style={s.emptyText}>{t('blNoPlaces', lang)}</Text>
+                    <View style={s.emptyCard}>
+                      <Ionicons name="map-outline" size={44} color={colors.border} style={{ marginBottom: 10 }} />
+                      <Text style={s.emptyText}>{t('blNoPlaces', lang)}</Text>
+                    </View>
                   </View>
                 }
                 renderItem={({ item }) => (
@@ -401,7 +403,9 @@ const s = StyleSheet.create({
 
   // List
   listContent: { padding: 16, paddingBottom: 40, gap: 16 },
-  emptyWrap:   { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyWrap:   { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
+  emptyCard:   { backgroundColor: colors.cardBg, borderRadius: 16, paddingHorizontal: 24,
+                 paddingVertical: 20, alignItems: 'center', ...shadow },
   emptyText:   { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
 
   // Card

@@ -445,6 +445,8 @@ const s = StyleSheet.create({
   cardContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
+    backgroundColor: colors.bg,
+    minHeight: '100%',
   },
   sectionTitle: {
     fontSize: 12,
