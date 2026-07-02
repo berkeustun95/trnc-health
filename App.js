@@ -40,6 +40,7 @@ import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import HomeServiceDashboardScreen from './screens/HomeServiceDashboardScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import HomeServicesScreen from './screens/HomeServicesScreen'
+import JobPostingsScreen from './screens/JobPostingsScreen'
 import BeachesLandmarksScreen from './screens/BeachesLandmarksScreen'
 import TransportScreen from './screens/TransportScreen'
 import PlaceProfileScreen from './screens/PlaceProfileScreen'
@@ -197,6 +198,7 @@ export default function App() {
   const [showAccommodation, setShowAccommodation] = useState(false)
   const [showPets, setShowPets] = useState(false)
   const [showHomeServices, setShowHomeServices] = useState(false)
+  const [showJobPostings,  setShowJobPostings]  = useState(false)
   const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
   const [showTransport, setShowTransport] = useState(false)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
@@ -221,6 +223,7 @@ export default function App() {
   const menuAccommodationRef  = useRef(null)
   const menuPetsRef           = useRef(null)
   const menuHomeServicesRef   = useRef(null)
+  const menuJobPostingsRef    = useRef(null)
   const menuBeachesRef        = useRef(null)
   const menuTransportRef      = useRef(null)
   const menuTutorialItemRef   = useRef(null)
@@ -272,7 +275,7 @@ export default function App() {
       // Hamburger step done — open menu and inject in-menu steps before advancing
       openMenu()
       await new Promise(r => setTimeout(r, 350))
-      const [langItem, quizItem, emergencyItem, municipalitiesItem, eventsItem, accommodationItem, petsItem, homeServicesItem, beachesItem, transportItem, tutorialItem] = await Promise.all([
+      const [langItem, quizItem, emergencyItem, municipalitiesItem, eventsItem, accommodationItem, petsItem, homeServicesItem, jobPostingsItem, beachesItem, transportItem, tutorialItem] = await Promise.all([
         measureRef(menuLangRef),
         measureRef(menuQuizRef),
         measureRef(menuEmergencyRef),
@@ -281,6 +284,7 @@ export default function App() {
         measureRef(menuAccommodationRef),
         measureRef(menuPetsRef),
         measureRef(menuHomeServicesRef),
+        measureRef(menuJobPostingsRef),
         measureRef(menuBeachesRef),
         measureRef(menuTransportRef),
         measureRef(menuTutorialItemRef),
@@ -294,6 +298,7 @@ export default function App() {
       if (accommodationItem)  menuItems.push({ ...accommodationItem,  title: t('coachAccommodationTitle', lang),     body: t('coachAccommodationBody', lang) })
       if (petsItem)           menuItems.push({ ...petsItem,           title: t('coachPetsTitle', lang),              body: t('coachPetsBody', lang) })
       if (homeServicesItem)   menuItems.push({ ...homeServicesItem,   title: t('coachHomeServicesTitle', lang),      body: t('coachHomeServicesBody', lang) })
+      if (jobPostingsItem)    menuItems.push({ ...jobPostingsItem,    title: t('coachJobPostingsTitle', lang),       body: t('coachJobPostingsBody', lang) })
       if (beachesItem)        menuItems.push({ ...beachesItem,        title: t('coachBeachesTitle', lang),           body: t('coachBeachesBody', lang) })
       if (transportItem)      menuItems.push({ ...transportItem,      title: t('coachTransportTitle', lang),         body: t('coachTransportBody', lang) })
       if (tutorialItem)       menuItems.push({ ...tutorialItem,       title: t('coachTutorialItemTitle', lang),      body: t('coachTutorialItemBody', lang) })
@@ -429,6 +434,7 @@ export default function App() {
       if (petsSubScreen) { setPetsSubScreen(null); return true }
       if (showPets) { setShowPets(false); return true }
       if (showHomeServices) { setShowHomeServices(false); return true }
+      if (showJobPostings)  { setShowJobPostings(false);  return true }
       if (showTransport) { setShowTransport(false); return true }
       if (selectedPlace)        { setSelectedPlace(null); return true }
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
@@ -438,7 +444,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showTransport, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates])
+  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates])
 
   useEffect(() => {
     Promise.all([
@@ -886,6 +892,8 @@ export default function App() {
     )
   } else if (showHomeServices) {
     content = <HomeServicesScreen lang={lang} session={session} onBack={() => setShowHomeServices(false)} />
+  } else if (showJobPostings) {
+    content = <JobPostingsScreen lang={lang} session={session} onBack={() => setShowJobPostings(false)} />
   } else if (showTransport) {
     content = <TransportScreen lang={lang} session={session} onBack={() => setShowTransport(false)} />
   } else if (selectedPlace) {
@@ -1308,6 +1316,10 @@ export default function App() {
             <TouchableOpacity ref={menuHomeServicesRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowHomeServices(true) }}>
               <Ionicons name="hammer-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuHomeServices', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity ref={menuJobPostingsRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowJobPostings(true) }}>
+              <Ionicons name="briefcase-outline" size={20} color={colors.primary} />
+              <Text style={styles.menuItemText}>{t('menuJobPostings', lang)}</Text>
             </TouchableOpacity>
             <TouchableOpacity ref={menuBeachesRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowBeachesLandmarks(true) }}>
               <Ionicons name="umbrella-outline" size={20} color={colors.primary} />
