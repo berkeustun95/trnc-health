@@ -1119,6 +1119,7 @@ export default function App() {
             onShowAccommodation={() => setShowAccommodation(true)}
             onShowPets={() => setShowPets(true)}
             onShowHomeServices={() => setShowHomeServices(true)}
+            onShowJobPostings={() => setShowJobPostings(true)}
             onShowBeachesLandmarks={() => setShowBeachesLandmarks(true)}
             onShowTransport={() => setShowTransport(true)}
             onShowEmergency={() => setShowEmergencyModal(true)}
