@@ -36,7 +36,7 @@ const AIRPORTS = [
 ]
 
 const PORTS = [
-  { id: 'girne', labelKey: 'essPortsGirne', icon: 'boat-outline', iconColor: colors.primary },
+  { id: 'girne', labelKey: 'essPortsGirne', icon: 'boat-outline', iconColor: colors.primary, lat: 35.341627, lng: 33.330752 },
   { id: 'gazi',  labelKey: 'essPortsGazi',  icon: 'boat-outline', iconColor: colors.primary, lat: 35.1331987, lng: 33.9345815 },
 ]
 
