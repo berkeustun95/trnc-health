@@ -116,3 +116,34 @@ These are already white-surface cards; nesting them would create a card-in-card 
 | PortsCard | Full wrap | All port bullet rows |
 | BordersCard | Partial | `hoursNote` + insurance + documents; crossings and `LastReviewedTag` outside |
 | EmbassiesCard | Partial | Only `essEmbOtherNote` body text; title, office blocks, caveat outside |
+
+## Events module
+
+Two coexisting event sources share one `events` table:
+1. **Organizer-submitted** — users with `role: 'organizer'` post via `OrganizerScreen.js`, admin approves (`status`: draft → pending → approved → rejected). `organizer_id` set.
+2. **Admin-curated Gişe Kıbrıs** (Slice 1) — flagship ticketed events seeded via SQL (`supabase/events_gisekibris_migration.sql`), `source = 'manual'`, `organizer_id` NULL, `status = 'approved'`. Funnels traffic to gisekibris.com; becomes the demo for the future commission partnership.
+
+### Schema (extended columns)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `category` | text | `concert` \| `festival` \| `nightlife` \| `other` (default). Legacy rows backfilled to `other` |
+| `ticket_url` | text | gisekibris.com event URL — the Buy Ticket target |
+| `latitude` / `longitude` | numeric | Coordinate-based Maps deep link (`destination={lat},{lng}`) — supersedes legacy `location_url` |
+| `price_from` / `price_text` | numeric / text | `price_text` wins in UI; else `From ₺{price_from}` |
+| `source` | text | `manual` (Slice 1) / `gisekibris_api` (Slice 2). Forward-compat |
+| `external_id` | text | Partial-unique (non-null) — Slice 2 API upsert dedup |
+
+`organizer_id` is now nullable (admin/API events have no organizer user). RLS unchanged: public reads approved+upcoming; only admins (or an event's own organizer) write.
+
+### Screens & helpers
+
+- `EventsScreen.js` — list (category chips All/Concerts/Festivals/Nightlife, client-side filter; `'other'` shows under All only) + `EventDetailScreen` (coord Maps link, price, Buy Ticket CTA).
+- `utils/events.js` — `buildTicketUrl()` / `openTicketUrl()`. **Single injection point** for the outbound handoff. Currently `Linking.openURL` (OTA-safe); upgrade to `WebBrowser.openBrowserAsync` once `expo-web-browser` ships in a native build. Slice 2 commission params inject here only.
+- Expiry: query filters `start_date >= now() - 1 day` (Job Postings pattern). Already registered in the `search_content` RPC and the home-hub `MODULES` tile.
+
+### Pending
+
+- **Slice 2** (blocked on Gişe Kıbrıs API docs): automated API sync + commission/affiliate tracking, replacing manual SQL entry. `source`/`external_id` exist for this.
+- **Follow-up slice**: add a category picker to `OrganizerScreen.js` so new organizer submissions are categorised instead of defaulting to `other`.
+- Multi-language event *content* (title/description are admin data, not i18n keys) is a Slice 2+ question.

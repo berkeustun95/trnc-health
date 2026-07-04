@@ -10,8 +10,28 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { openTicketUrl } from '../utils/events'
 
 const { width: SCREEN_W } = Dimensions.get('window')
+
+// Consumer-grade filters. 'other' (legacy/uncategorised) events live under 'all' only.
+const CATEGORIES = [
+  { key: 'all',       labelKey: 'filterAll' },
+  { key: 'concert',   labelKey: 'filterConcerts' },
+  { key: 'festival',  labelKey: 'filterFestivals' },
+  { key: 'nightlife', labelKey: 'filterNightlife' },
+]
+
+function categoryLabel(category, lang) {
+  const map = { concert: 'catConcert', festival: 'catFestival', nightlife: 'catNightlife', other: 'catOther' }
+  return t(map[category] || 'catOther', lang)
+}
+
+function priceLabel(event, lang) {
+  if (event.price_text) return event.price_text
+  if (event.price_from != null) return `${t('eventPriceFrom', lang)} ₺${event.price_from}`
+  return null
+}
 
 function formatEventDate(start, end, lang) {
   if (!start) return ''
@@ -27,7 +47,7 @@ function formatEventDate(start, end, lang) {
   return `${startStr} – ${e.toLocaleString('en-GB', opts)}`
 }
 
-function EventCard({ event, onPress }) {
+function EventCard({ event, lang, onPress }) {
   const img = event.images?.[0]
   const start = new Date(event.start_date)
   const day = start.toLocaleDateString('en-GB', { day: '2-digit' })
@@ -46,6 +66,11 @@ function EventCard({ event, onPress }) {
           <Text style={s.dateBadgeDay}>{day}</Text>
           <Text style={s.dateBadgeMonth}>{month}</Text>
         </View>
+        {event.category && event.category !== 'other' ? (
+          <View style={s.catBadge}>
+            <Text style={s.catBadgeText}>{categoryLabel(event.category, lang)}</Text>
+          </View>
+        ) : null}
       </View>
       <View style={s.cardBody}>
         <Text style={s.cardTitle} numberOfLines={2}>{event.title}</Text>
@@ -75,7 +100,14 @@ function EventDetailScreen({ event, lang, onBack }) {
   const [imgIndex, setImgIndex] = useState(0)
   const images = event.images ?? []
 
+  const hasCoords = event.latitude != null && event.longitude != null
+  const price = priceLabel(event, lang)
+
   function openMaps() {
+    if (hasCoords) {
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${event.latitude},${event.longitude}`)
+      return
+    }
     if (event.location_url) { Linking.openURL(event.location_url); return }
     if (event.location) Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(event.location)}`)
   }
@@ -162,11 +194,31 @@ function EventDetailScreen({ event, lang, onBack }) {
                 </TouchableOpacity>
               ) : null}
 
+              {price ? (
+                <View style={s.detailRow}>
+                  <View style={s.detailIconWrap}>
+                    <Ionicons name="pricetag-outline" size={18} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.detailRowLabel}>{t('eventPrice', lang)}</Text>
+                    <Text style={s.detailRowValue}>{price}</Text>
+                  </View>
+                </View>
+              ) : null}
+
               {event.description ? (
                 <View style={s.descBlock}>
                   <Text style={s.descTitle}>{t('aboutThisEvent', lang)}</Text>
                   <Text style={s.descText}>{event.description}</Text>
                 </View>
+              ) : null}
+
+              {event.ticket_url ? (
+                <TouchableOpacity style={s.buyBtn} onPress={() => openTicketUrl(event)} activeOpacity={0.85}>
+                  <Ionicons name="ticket-outline" size={18} color="#fff" />
+                  <Text style={s.buyBtnText}>{t('eventBuyTicket', lang)}</Text>
+                  <Feather name="external-link" size={15} color="#fff" />
+                </TouchableOpacity>
               ) : null}
             </View>
           </View>
@@ -185,18 +237,21 @@ export default function EventsScreen({ lang, onBack }) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [category, setCategory] = useState('all')
 
   const load = useCallback(async () => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const { data } = await supabase
       .from('events')
-      .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name')
+      .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, category, ticket_url, latitude, longitude, price_from, price_text')
       .eq('status', 'approved')
       .gte('start_date', cutoff)
       .order('start_date', { ascending: true })
     setEvents(data ?? [])
     setLoading(false)
   }, [])
+
+  const filtered = category === 'all' ? events : events.filter(e => e.category === category)
 
   useEffect(() => { load() }, [load])
 
@@ -219,11 +274,25 @@ export default function EventsScreen({ lang, onBack }) {
         <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
       ) : (
         <FlatList
-          data={events}
+          data={filtered}
           keyExtractor={e => e.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+          ListHeaderComponent={
+            <View style={s.filterRow}>
+              {CATEGORIES.map(c => (
+                <TouchableOpacity
+                  key={c.key}
+                  style={[s.chip, category === c.key && s.chipActive]}
+                  onPress={() => setCategory(c.key)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.chipText, category === c.key && s.chipTextActive]}>{t(c.labelKey, lang)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          }
           ListEmptyComponent={
             <View style={s.emptyWrap}>
               <View style={s.emptyCard}>
@@ -233,7 +302,7 @@ export default function EventsScreen({ lang, onBack }) {
             </View>
           }
           renderItem={({ item }) => (
-            <EventCard event={item} onPress={() => setSelectedEvent(item)} />
+            <EventCard event={item} lang={lang} onPress={() => setSelectedEvent(item)} />
           )}
         />
       )}
@@ -245,6 +314,19 @@ const s = StyleSheet.create({
   safe:               { flex: 1, backgroundColor: colors.bg },
   center:             { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent:        { paddingHorizontal: 16, paddingBottom: 40, gap: 16 },
+
+  // Filter chips
+  filterRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4 },
+  chip:               { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+                        backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
+  chipActive:         { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  chipText:           { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  chipTextActive:     { fontFamily: 'Inter_700Bold', color: colors.primary },
+
+  // Category badge (on card image)
+  catBadge:           { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.55)',
+                        borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4 },
+  catBadgeText:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.3 },
 
   // Card
   card:               { backgroundColor: colors.cardBg, borderRadius: 20, overflow: 'hidden', ...shadow },
@@ -276,6 +358,11 @@ const s = StyleSheet.create({
   descBlock:          { marginTop: 8, padding: 16, backgroundColor: colors.bg, borderRadius: 14 },
   descTitle:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 },
   descText:           { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 22 },
+
+  // Buy Ticket CTA
+  buyBtn:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15, marginTop: 20, ...shadow },
+  buyBtnText:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.2 },
 
   // Empty
   emptyWrap:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
