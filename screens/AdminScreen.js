@@ -2670,7 +2670,10 @@ function JobPostingsTab() {
       .select('id, job_title, employer_name, category, employment_type, district, phone, status, rejection_reason, owner_id, created_at, expires_at')
       .order('created_at', { ascending: false })
     if (filter === 'expired') {
-      query = query.eq('status', 'active').lt('expires_at', new Date().toISOString())
+      // Auto-expire flips active→expired hourly; also catch active rows already
+      // past expiry but not yet swept by the cron.
+      const nowIso = new Date().toISOString()
+      query = query.or(`status.eq.expired,and(status.eq.active,expires_at.lt.${nowIso})`)
     } else if (filter !== 'all') {
       query = query.eq('status', filter)
     }

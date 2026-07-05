@@ -59,6 +59,7 @@ const RESULT_META = {
   landmark:     { icon: 'flag-outline',      color: '#FF8552', bg: '#FFF0EB' },
   homeServices: { icon: 'hammer-outline',    color: '#FF8552', bg: '#FFF0EB' },
   transport:    { icon: 'car-outline',       color: '#5B5BD6', bg: '#EAE8F5' },
+  jobPostings:  { icon: 'briefcase-outline', color: '#0E7C7B', bg: '#E0F5F4' },
 }
 
 export default function HomeScreen({
@@ -141,6 +142,7 @@ export default function HomeScreen({
       case 'events':       onShowEvents(); break
       case 'homeServices': onShowHomeServices(); break
       case 'transport':    onShowTransport(); break
+      case 'jobPostings':  onShowJobPostings(); break
       case 'beach': {
         const { data } = await supabase.from('beaches').select('*').eq('id', result.id).maybeSingle()
         if (data) onSelectPlace({ ...data, _type: 'beach' })
