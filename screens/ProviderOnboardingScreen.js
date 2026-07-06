@@ -502,7 +502,7 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
           {[
             'Everything in Basic',
             'Featured in search results',
-            facilityType === 'pharmacy' ? 'Supplement quiz reviews 💊' : 'Priority listing',
+            'Priority listing',
             'Advanced analytics',
           ].map(f => (
             <View key={f} style={s.tierFeatureRow}>

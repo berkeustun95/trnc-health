@@ -24,13 +24,6 @@ import ProviderOnboardingScreen from './screens/ProviderOnboardingScreen'
 import MapScreen from './screens/MapScreen'
 import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
-import QuizNavigator from './screens/quiz/QuizNavigator'
-import ResultsScreen from './screens/quiz/ResultsScreen'
-
-const QUIZ_LANG_MAP = {
-  Turkish: 'tr', English: 'en', Arabic: 'ar', Russian: 'ru',
-  Greek: 'el', French: 'fr', Spanish: 'es', German: 'de', Persian: 'fa',
-}
 import DutyListScreen from './screens/DutyListScreen'
 import EventsScreen from './screens/EventsScreen'
 import OrganizerScreen from './screens/OrganizerScreen'
@@ -167,9 +160,6 @@ export default function App() {
   const [bookingFacility, setBookingFacility] = useState(null)
   const [profile, setProfile] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
-  const [showQuiz, setShowQuiz] = useState(false)
-  const [latestResult, setLatestResult] = useState(null)
-  const [showLatestResult, setShowLatestResult] = useState(false)
   const [showDutyList, setShowDutyList] = useState(false)
   const [onboarded, setOnboarded] = useState(null)
   const [pendingLang, setPendingLang] = useState('English')
@@ -180,7 +170,6 @@ export default function App() {
   const [pendingClaim, setPendingClaim] = useState(undefined)
   const [unclaimedFacility, setUnclaimedFacility] = useState(null)
   const [favorites, setFavorites] = useState(new Set())
-  const [historyResult, setHistoryResult] = useState(null)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true)
   const [facilityLoadError, setFacilityLoadError] = useState(false)
@@ -188,10 +177,6 @@ export default function App() {
   const [retryCount, setRetryCount] = useState(0)
   const [weatherData, setWeatherData] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
-  const [showQuizSubmenu, setShowQuizSubmenu] = useState(false)
-  const [showQuizHistory, setShowQuizHistory] = useState(false)
-  const [quizHistory, setQuizHistory] = useState([])
-  const [quizHistoryLoading, setQuizHistoryLoading] = useState(false)
   const [showEmergencyModal, setShowEmergencyModal] = useState(false)
   const [showMunicipalModal, setShowMunicipalModal] = useState(false)
   const [expandedMuni, setExpandedMuni] = useState(null)
@@ -217,7 +202,6 @@ export default function App() {
   const dutyBannerRef      = useRef(null)
   const mapTabRef          = useRef(null)
   const menuLangRef           = useRef(null)
-  const menuQuizRef           = useRef(null)
   const menuEmergencyRef      = useRef(null)
   const menuMunicipalitiesRef = useRef(null)
   const menuEventsRef         = useRef(null)
@@ -238,7 +222,7 @@ export default function App() {
     Animated.timing(menuAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start()
   }
   function closeMenu() {
-    Animated.timing(menuAnim, { toValue: 260, duration: 200, useNativeDriver: true }).start(() => { setShowMenu(false); setShowQuizSubmenu(false) })
+    Animated.timing(menuAnim, { toValue: 260, duration: 200, useNativeDriver: true }).start(() => { setShowMenu(false) })
   }
 
   function measureRef(ref) {
@@ -276,9 +260,8 @@ export default function App() {
       // Hamburger step done — open menu and inject in-menu steps before advancing
       openMenu()
       await new Promise(r => setTimeout(r, 350))
-      const [langItem, quizItem, emergencyItem, municipalitiesItem, eventsItem, accommodationItem, petsItem, homeServicesItem, jobPostingsItem, beachesItem, transportItem, tutorialItem] = await Promise.all([
+      const [langItem, emergencyItem, municipalitiesItem, eventsItem, accommodationItem, petsItem, homeServicesItem, jobPostingsItem, beachesItem, transportItem, tutorialItem] = await Promise.all([
         measureRef(menuLangRef),
-        measureRef(menuQuizRef),
         measureRef(menuEmergencyRef),
         measureRef(menuMunicipalitiesRef),
         measureRef(menuEventsRef),
@@ -292,7 +275,6 @@ export default function App() {
       ])
       const menuItems = []
       if (langItem)           menuItems.push({ ...langItem,           title: t('coachLangTitle', lang),              body: t('coachLangBody', lang) })
-      if (quizItem)           menuItems.push({ ...quizItem,           title: t('coachQuizTitle', lang),              body: t('coachQuizBody', lang) })
       if (emergencyItem)      menuItems.push({ ...emergencyItem,      title: t('coachEmergencyTitle', lang),         body: t('coachEmergencyBody', lang) })
       if (municipalitiesItem) menuItems.push({ ...municipalitiesItem, title: t('coachMunicipalitiesTitle', lang),    body: t('coachMunicipalitiesBody', lang) })
       if (eventsItem)         menuItems.push({ ...eventsItem,         title: t('coachEventsTitle', lang),            body: t('coachEventsBody', lang) })
@@ -319,18 +301,6 @@ export default function App() {
     closeMenu()
   }
 
-  async function loadQuizHistory() {
-    setQuizHistoryLoading(true)
-    const { data } = await supabase
-      .from('quiz_submissions')
-      .select('id, final_result, reviewed_at, facilities(name)')
-      .eq('customer_id', session.user.id)
-      .eq('status', 'approved')
-      .order('reviewed_at', { ascending: false })
-      .limit(20)
-    if (data) setQuizHistory(data)
-    setQuizHistoryLoading(false)
-  }
   function shareApp() {
     Share.share({
       message: 'Find pharmacies, clinics, hospitals and dentists in North Cyprus with ADA.',
@@ -419,16 +389,12 @@ export default function App() {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (showMenu) { closeMenu(); return true }
       if (showPasswordReset) { setShowPasswordReset(false); return true }
-      if (showLatestResult) { setShowLatestResult(false); return true }
-      if (showQuiz) { setShowQuiz(false); return true }
-      if (historyResult) { setHistoryResult(null); return true }
       if (showNotifs) { setShowNotifs(false); return true }
       if (showDutyList) { setShowDutyList(false); return true }
       if (showEvents) { setShowEvents(false); return true }
       if (openedProperty) { setOpenedProperty(null); return true }
       if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
       if (showAccommodation) { setShowAccommodation(false); return true }
-      if (showQuizHistory) { setShowQuizHistory(false); return true }
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
       if (bookingFacility) { setBookingFacility(null); return true }
       if (selectedFacility) { setSelectedFacility(null); setBookingFacility(null); return true }
@@ -445,7 +411,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showLatestResult, showQuiz, historyResult, showNotifs, showDutyList, showEvents, showQuizHistory, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates])
 
   useEffect(() => {
     Promise.all([
@@ -489,7 +455,7 @@ export default function App() {
   async function loadProviderFacility() {
     const { data: fac } = await supabase
       .from('facilities')
-      .select('id, name, type, status, membership_tier, trial_ends_at, is_quiz_partner, phone, address, opening_hours, cover_image_url, logo_url, availability, description, languages, specialty, latitude, longitude, photos')
+      .select('id, name, type, status, membership_tier, trial_ends_at, phone, address, opening_hours, cover_image_url, logo_url, availability, description, languages, specialty, latitude, longitude, photos')
       .eq('provider_id', session?.user.id)
       .maybeSingle()
     setProviderFacility(fac ?? null)
@@ -512,7 +478,7 @@ export default function App() {
     setShowMenu(false)
     setShowNotifs(false)
     if (!session) {
-      setProfile(null); setLatestResult(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); return
+      setProfile(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); return
     }
     supabase.from('profiles').select('role, preferred_language, avatar_url, blocked_until').eq('id', session.user.id).single()
       .then(async ({ data }) => {
@@ -526,7 +492,6 @@ export default function App() {
           })
         }
       })
-    fetchLatestResult(session.user.id)
     setNotifsLoading(true)
     supabase.from('notifications').select('id, title, body, read, created_at')
       .eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
@@ -575,18 +540,6 @@ export default function App() {
     } catch (e) {
       if (__DEV__) console.log('Schedule reminders error:', e.message)
     }
-  }
-
-  async function fetchLatestResult(userId) {
-    const { data } = await supabase
-      .from('quiz_submissions')
-      .select('id, final_result, reviewed_at, facilities(name)')
-      .eq('customer_id', userId)
-      .eq('status', 'approved')
-      .order('reviewed_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    setLatestResult(data ?? null)
   }
 
   useEffect(() => {
@@ -831,21 +784,6 @@ export default function App() {
     content = <OrganizerScreen session={session} lang={lang} />
   } else if (profile.role === 'home_service_provider') {
     content = <HomeServiceDashboardScreen session={session} lang={lang} />
-  } else if (showLatestResult && latestResult) {
-    content = <ResultsScreen
-      result={latestResult.final_result}
-      onBack={() => setShowLatestResult(false)}
-      readOnly
-    />
-  } else if (showQuiz) {
-    content = <QuizNavigator onClose={() => { setShowQuiz(false); fetchLatestResult(session.user.id) }} profileLang={lang} />
-  } else if (historyResult) {
-    content = <ResultsScreen
-      result={historyResult}
-      onBack={() => setHistoryResult(null)}
-      readOnly
-      langOverride={QUIZ_LANG_MAP[lang] ?? 'en'}
-    />
   } else if (showNotifs) {
     content = <NotificationsScreen
       notifications={notifications}
@@ -947,55 +885,6 @@ export default function App() {
         />
       )
     }
-  } else if (showQuizHistory) {
-    content = (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={[styles.header, { paddingBottom: 16, justifyContent: 'space-between' }]}>
-          <TouchableOpacity style={styles.backPill} onPress={() => setShowQuizHistory(false)}>
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-            <Text style={styles.backPillText}>{t('back', lang)}</Text>
-          </TouchableOpacity>
-          <Text style={styles.favScreenTitle}>{t('supplementPlans', lang)}</Text>
-          <View style={{ width: 60 }} />
-        </View>
-        {quizHistoryLoading ? (
-          <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
-        ) : quizHistory.length === 0 ? (
-          <View style={styles.center}>
-            <Ionicons name="flask-outline" size={40} color={colors.border} style={{ marginBottom: 12 }} />
-            <Text style={styles.noFavText}>{t('noSupplementPlans', lang)}</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={quizHistory}
-            keyExtractor={item => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.quizHistCard}
-                activeOpacity={0.75}
-                onPress={() => setHistoryResult(item.final_result)}
-              >
-                <View style={styles.quizHistIconWrap}>
-                  <Ionicons name="flask-outline" size={20} color={colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.quizHistPharmacy} numberOfLines={1}>
-                    {item.facilities?.name ?? t('supplementAdvisor', lang)}
-                  </Text>
-                  <Text style={styles.quizHistMeta}>
-                    {item.final_result?.stack?.length ?? 0} {t('supplements', lang)}
-                    {item.reviewed_at ? ` · ${new Date(item.reviewed_at).toLocaleDateString()}` : ''}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
-            )}
-          />
-        )}
-      </SafeAreaView>
-    )
   } else if (unclaimedFacility) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -1125,7 +1014,6 @@ export default function App() {
             onShowTransport={() => setShowTransport(true)}
             onShowEmergency={() => setShowEmergencyModal(true)}
             onShowMunicipal={() => setShowMunicipalModal(true)}
-            onShowQuiz={() => setShowQuiz(true)}
             onSelectPlace={setSelectedPlace}
             onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
             onShowExchangeRates={() => setShowExchangeRates(true)}
@@ -1278,23 +1166,6 @@ export default function App() {
             </TouchableOpacity>
 
             <View style={styles.menuDivider} />
-            <TouchableOpacity ref={menuQuizRef} style={styles.menuItem} onPress={() => setShowQuizSubmenu(v => !v)}>
-              <Ionicons name="flask-outline" size={20} color={colors.accent} />
-              <Text style={styles.menuItemText}>{t('supplementQuiz', lang)}</Text>
-              <Ionicons name={showQuizSubmenu ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
-            </TouchableOpacity>
-            {showQuizSubmenu && (
-              <>
-                <TouchableOpacity style={styles.menuSubItem} onPress={() => { closeMenu(); setShowQuiz(true) }}>
-                  <Ionicons name="add-circle-outline" size={17} color={colors.accent} />
-                  <Text style={styles.menuSubItemText}>{t('newQuiz', lang)}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.menuSubItem} onPress={() => { closeMenu(); loadQuizHistory(); setShowQuizHistory(true) }}>
-                  <Ionicons name="time-outline" size={17} color={colors.accent} />
-                  <Text style={styles.menuSubItemText}>{t('pastPlans', lang)}</Text>
-                </TouchableOpacity>
-              </>
-            )}
             <TouchableOpacity ref={menuEmergencyRef} style={styles.menuItem} onPress={() => { closeMenu(); showEmergencyNumbers() }}>
               <Ionicons name="call-outline" size={20} color={colors.danger} />
               <Text style={styles.menuItemText}>{t('menuEmergency', lang)}</Text>
@@ -1631,16 +1502,6 @@ const styles = StyleSheet.create({
   forecastIcon:       { fontSize: 16 },
   forecastMax:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   forecastMin:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  quizPromoCard:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accent, borderRadius: 16, padding: 14, marginBottom: 12 },
-  quizPromoLeft:     { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  quizPromoIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  quizPromoTitle:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 2 },
-  quizPromoSub:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.85)' },
-  resultCard:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primaryLight, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.primary + '25' },
-  resultCardLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  resultCardIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.primary + '20', justifyContent: 'center', alignItems: 'center' },
-  resultCardTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary, marginBottom: 2 },
-  resultCardSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.primary + 'AA' },
   emptyWrap:        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 32 },
   emptyBlurBubble:  { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 28, borderRadius: 24, overflow: 'hidden', position: 'relative' },
   emptyIcon:        { fontSize: 48, marginBottom: 16 },
@@ -1656,12 +1517,6 @@ const styles = StyleSheet.create({
   menuDivider:      { height: 1, backgroundColor: colors.border, marginVertical: 8 },
   menuItem:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 13 },
   menuItemText:     { flex: 1, fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  menuSubItem:      { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 9, paddingLeft: 34 },
-  menuSubItemText:  { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.accent },
-  quizHistCard:     { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginBottom: 8, ...shadow },
-  quizHistIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  quizHistPharmacy: { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 3 },
-  quizHistMeta:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   soonBadge:        { backgroundColor: colors.border, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
   soonBadgeText:    { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   langRow:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 13, borderTopWidth: 1, borderTopColor: colors.border },

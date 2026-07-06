@@ -49,7 +49,6 @@ const MODULES = [
   { id: 'beaches',       icon: 'umbrella-outline',  color: '#0E7C7B', bg: '#E0F5F4', labelKey: 'menuBeachesLandmarks' },
   { id: 'transport',     icon: 'car-outline',       color: '#5B5BD6', bg: '#EAE8F5', labelKey: 'menuTransportation' },
   { id: 'municipal',     icon: 'business-outline',  color: '#64748B', bg: '#F1F5F9', labelKey: 'menuMunicipalities' },
-  { id: 'quiz',          icon: 'flask-outline',     color: '#D1495B', bg: '#FAEAEC', labelKey: 'supplementQuiz' },
 ]
 
 const RESULT_META = {
@@ -92,7 +91,6 @@ export default function HomeScreen({
   onShowTransport,
   onShowEmergency,
   onShowMunicipal,
-  onShowQuiz,
   onSelectPlace,
   onShowNewcomerEssentials,
   onShowExchangeRates,
@@ -167,7 +165,6 @@ export default function HomeScreen({
     beaches:            onShowBeachesLandmarks,
     transport:          onShowTransport,
     municipal:          onShowMunicipal,
-    quiz:               onShowQuiz,
   }
 
   const listed = facilities

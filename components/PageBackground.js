@@ -13,7 +13,6 @@ const TOPIC_CONFIG = {
   beaches_landmarks:   { asset: require('../assets/backgrounds/ada-bg-beaches-landmarks.png') },
   transportation:      { asset: require('../assets/backgrounds/ada-bg-transportation.png') },
   municipalities:      { asset: require('../assets/backgrounds/ada-bg-municipalities.png') },
-  quiz:                { asset: require('../assets/backgrounds/ada-bg-quiz.png') },
   newcomer_essentials: { asset: require('../assets/backgrounds/ada-bg-transportation.png') },
   exchange_rates:      { asset: require('../assets/backgrounds/ada-bg-exchange-rates.png') },
 }
