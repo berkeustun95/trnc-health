@@ -79,8 +79,6 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
   })
 
   async function pickDocument(docType) {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) return
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,

@@ -54,7 +54,10 @@ export default {
         'android.permission.ACCESS_FINE_LOCATION',
         'android.permission.RECEIVE_BOOT_COMPLETED',
         'android.permission.VIBRATE',
+      ],
+      blockedPermissions: [
         'android.permission.READ_MEDIA_IMAGES',
+        'android.permission.READ_MEDIA_VIDEO',
       ],
     },
     web: {

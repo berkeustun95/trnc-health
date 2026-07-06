@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Image, Switch, Alert,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Image, Switch,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
@@ -125,8 +125,6 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
 
   async function addPhoto() {
     if (photos.length >= 8) return
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) { Alert.alert('Permission required', 'Photo library access is needed.'); return }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true, aspect: [4, 3], quality: 0.8, base64: true,

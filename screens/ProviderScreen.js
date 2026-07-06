@@ -323,8 +323,6 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   }
 
   async function pickAndUploadImage(type) {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) { setImageError('Photo library permission denied'); return }
     const isCover = type === 'cover'
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -361,8 +359,6 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
 
   async function addPhoto() {
     if (photos.length >= 8) return
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) { setImageError('Photo library permission denied'); return }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -457,8 +453,6 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   }
 
   async function pickCredDoc() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) return
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,

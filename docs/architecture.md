@@ -142,8 +142,43 @@ Two coexisting event sources share one `events` table:
 - `utils/events.js` — `buildTicketUrl()` / `openTicketUrl()`. **Single injection point** for the outbound handoff. Currently `Linking.openURL` (OTA-safe); upgrade to `WebBrowser.openBrowserAsync` once `expo-web-browser` ships in a native build. Slice 2 commission params inject here only.
 - Expiry: query filters `start_date >= now() - 1 day` (Job Postings pattern). Already registered in the `search_content` RPC and the home-hub `MODULES` tile.
 
-### Pending
+### Slice 2 — Gişe Kıbrıs API sync (blocked on their API docs)
 
-- **Slice 2** (blocked on Gişe Kıbrıs API docs): automated API sync + commission/affiliate tracking, replacing manual SQL entry. `source`/`external_id` exist for this.
+Automated API sync + commission/affiliate tracking, replacing manual SQL entry. `source` (`gisekibris_api`) and `external_id` (upsert dedup) already exist for this. Design decisions locked:
+
+- **Ranking:** pure date sort (soonest first) across both lanes — no revenue bias. Current query already does this; no featured strip.
+- **Overlap:** when the same event exists in both lanes, prefer the Gişe Kıbrıs (commissioned) row and hide the organizer duplicate. Match on title + date.
+- **Source branding:** subtle "via Gişe Kıbrıs" badge on API-sourced cards + detail — co-brand for the partnership, trust cue on the Buy Ticket step.
+- **Commission:** injected only in `utils/events.js` `openTicketUrl()`.
+- **Extra fields (TBD — pending API schema):** likely price range + availability status; lineup optional. `featured` flag dropped for now (pure date sort has no featured strip to drive).
+
+### Other pending
+
 - **Follow-up slice**: add a category picker to `OrganizerScreen.js` so new organizer submissions are categorised instead of defaulting to `other`.
 - Multi-language event *content* (title/description are admin data, not i18n keys) is a Slice 2+ question.
+
+## Job Postings module
+
+Free, self-post jobs board. Table `job_postings` (see `20260702_job_postings.sql`). Status enum: `pending → active → filled | expired`, plus `rejected`. `expires_at` is NULL until admin approval, then `now()+30d`.
+
+### RLS model (post-lockdown, `20260705_job_postings_rls_lockdown.sql`)
+
+- **SELECT (`jp_select`)**: anyone reads `active` + non-expired rows; a poster reads their own rows at any status; admin reads all.
+- **INSERT (`jp_insert_self`)**: any authed user, `owner_id = auth.uid()`.
+- **UPDATE (`jp_update_self`)**: row-level allows owner or admin; **column immutability is enforced by a `BEFORE UPDATE` trigger** (`jp_guard_owner_update`), not the policy.
+- **DELETE (`jp_delete_admin`)**: admin only.
+
+**RLS gotcha (the reason for the trigger):** an owner UPDATE policy that only checks the row (owner_id = auth.uid()) lets the owner rewrite *any column* — including `status` and `expires_at` — so an owner can self-approve (`status='active'`) and set their own expiry via a direct Supabase API call, bypassing moderation entirely. RLS policies **cannot** compare OLD vs NEW columns, and column GRANTs can't separate owner from admin (both are the `authenticated` role). The only clean fix is a `BEFORE UPDATE` trigger that:
+  - short-circuits `RETURN NEW` for admins;
+  - in **system context** (`auth.uid() IS NULL`, e.g. the auto-expire cron) allows **only** `active → expired`;
+  - for owners, blocks changes to `owner_id`, `expires_at`, `rejection_reason`, and any status change **except** `active → filled` (the in-app "Mark Filled" flow, `JobPostingProfileScreen.js`).
+
+Any future table with an owner-writable moderation column needs the same pattern — column-restrict `status`/`expires_at` in a trigger or moderation is bypassable via the API.
+
+### Auto-expire (`20260705_job_postings_auto_expire.sql`)
+
+`expire_job_postings()` (SECURITY DEFINER) flips `active → expired` where `expires_at < now()`, scheduled **hourly via pg_cron** (`cron.schedule('expire-job-postings', '0 * * * *', …)`). pg_cron is already used in this project (duty notifications). This **complements** the board's read filter (`status='active' AND expires_at > now()`) — it does not replace it; the public board was already correct, this just makes `status='expired'` real so the admin filter and any status-based tooling work.
+
+### Global search
+
+`search_content` RPC (`20260705_search_content_add_jobs.sql`) surfaces jobs as `module='jobPostings'`, filtered to `active` + non-expired (explicit filter, not just RLS, so an owner's own pending/filled rows never leak). `HomeScreen.js` routes that module to the jobs board (matches the events/transport "open the list" pattern, no deep-link).

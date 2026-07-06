@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -41,8 +41,6 @@ async function uploadImage(bucket, path, base64, ext) {
 }
 
 async function pickImage(aspect) {
-  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-  if (!perm.granted) { Alert.alert('Permission required', 'Photo library access is needed.'); return null }
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
     allowsEditing: true, aspect, quality: 0.75, base64: true,

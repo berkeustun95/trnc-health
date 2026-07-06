@@ -386,8 +386,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   }
 
   async function pickAndUploadPhoto() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) { setAvatarError('Photo library permission denied'); return }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
