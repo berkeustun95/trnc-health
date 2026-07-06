@@ -182,3 +182,25 @@ Any future table with an owner-writable moderation column needs the same pattern
 ### Global search
 
 `search_content` RPC (`20260705_search_content_add_jobs.sql`) surfaces jobs as `module='jobPostings'`, filtered to `active` + non-expired (explicit filter, not just RLS, so an owner's own pending/filled rows never leak). `HomeScreen.js` routes that module to the jobs board (matches the events/transport "open the list" pattern, no deep-link).
+
+## Asset gotcha — file extensions MUST match the actual image format
+
+Android's `mergeReleaseResources` runs every bundled drawable through AAPT2, which PNG-crunches anything named `.png`. A file with a `.png` extension that is actually a **JPEG** fails to compile (`AAPT: error: file failed to compile`), and EAS surfaces it only as the generic "Gradle build failed with unknown error" — the real cause is buried in the `Run gradlew` log at `:app:mergeReleaseResources FAILED`.
+
+This has bitten us **twice** on `assets/backgrounds/ada-bg-pets.png` (a JPEG saved with a `.png` name). It's a **coin-flip**: AAPT2 sometimes tolerates the mislabeled file (build passed) and sometimes rejects it (build failed) — identical bytes, identical toolchain. Fixed permanently by renaming to `ada-bg-pets.jpg` and updating the `require` in `PageBackground.js` (React Native / Metro / AAPT all handle `.jpg` fine).
+
+**Rule:** every file under `assets/` must have an extension matching its real format. Before adding or replacing an image, verify with `file --mime-type <path>`. To audit the whole tree in one shot:
+
+```bash
+find assets -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) -print0 \
+  | while IFS= read -r -d '' f; do
+      ext=$(echo "${f##*.}" | tr 'A-Z' 'a-z'); mime=$(file -b --mime-type "$f")
+      case "$mime/$ext" in
+        image/png/png) ;;
+        image/jpeg/jpg|image/jpeg/jpeg) ;;
+        *) echo "MISMATCH: .$ext but $mime  <=  $f" ;;
+      esac
+    done
+```
+
+As of this note, `ada-bg-pets.jpg` is the only photographic-JPEG background; all other `ada-bg-*.png` files are genuine PNGs.

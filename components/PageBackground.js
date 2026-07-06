@@ -8,7 +8,7 @@ const TOPIC_CONFIG = {
   emergency:           { asset: require('../assets/backgrounds/ada-bg-emergency.png') },
   events:              { asset: require('../assets/backgrounds/ada-bg-events.png') },
   accommodation:       { asset: require('../assets/backgrounds/ada-bg-accommodation.png') },
-  pets:                { asset: require('../assets/backgrounds/ada-bg-pets.png') },
+  pets:                { asset: require('../assets/backgrounds/ada-bg-pets.jpg') },
   home_services:       { asset: require('../assets/backgrounds/ada-bg-home-services.png') },
   beaches_landmarks:   { asset: require('../assets/backgrounds/ada-bg-beaches-landmarks.png') },
   transportation:      { asset: require('../assets/backgrounds/ada-bg-transportation.png') },
