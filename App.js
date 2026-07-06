@@ -10,6 +10,7 @@ import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/in
 import { PlayfairDisplay_400Regular, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display'
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import Constants from 'expo-constants'
 import { supabase } from './lib/supabase'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t } from './constants/i18n'
@@ -353,7 +354,7 @@ export default function App() {
     await supabase.from('profiles').update({ preferred_language: langKey }).eq('id', session.user.id)
   }
   function showAbout() {
-    Alert.alert('ADA', 'Version 1.0.0\n\nHealth facility directory for North Cyprus (TRNC).', [{ text: 'OK' }])
+    Alert.alert('ADA', `Version ${Constants.expoConfig?.version ?? '1.1.0'}\n\n${t('aboutDescription', lang)}`, [{ text: 'OK' }])
   }
 
   function toggleFavorite(id) {

@@ -267,8 +267,8 @@ const s = StyleSheet.create({
     gap: 6,
     marginBottom: 16,
   },
-  dot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
-  dotActive: { width: 22, backgroundColor: colors.primary },
+  dot:       { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.border },
+  dotActive: { backgroundColor: colors.primary },
 
   navButtons: {
     flexDirection: 'row',

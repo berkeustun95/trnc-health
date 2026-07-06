@@ -99,7 +99,7 @@ export default function BusRoutesScreen({ lang, onBack }) {
 
       <View style={s.filterSection}>
         <Text style={s.filterLabel}>{t('trBusOrigin', lang)}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.filterRow}>
           <TouchableOpacity
             style={[s.chip, !origin && s.chipActive]}
             onPress={() => setOrigin(null)}
@@ -118,7 +118,7 @@ export default function BusRoutesScreen({ lang, onBack }) {
         </ScrollView>
 
         <Text style={[s.filterLabel, { marginTop: 10 }]}>{t('trBusDestination', lang)}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.filterRow}>
           <TouchableOpacity
             style={[s.chip, !destination && s.chipActive]}
             onPress={() => setDestination(null)}
@@ -175,7 +175,7 @@ const s = StyleSheet.create({
   filterLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
                     textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16,
                     marginBottom: 6 },
-  filterRow:      { paddingHorizontal: 16, gap: 8 },
+  filterRow:      { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
   chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                     backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.border },
   chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },

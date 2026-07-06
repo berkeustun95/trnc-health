@@ -228,6 +228,7 @@ export default function TransportScreen({ lang, session, onBack }) {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0 }}
             contentContainerStyle={s.districtRow}
           >
             <TouchableOpacity
@@ -309,7 +310,7 @@ const s = StyleSheet.create({
   ctaCardSub:         { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   // District filter
-  districtRow:        { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  districtRow:        { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
   chip:               { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                         backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipActive:         { backgroundColor: colors.primaryLight, borderColor: colors.primary },

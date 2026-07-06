@@ -743,9 +743,9 @@ const s = StyleSheet.create({
   medicalTileTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 2 },
   medicalTileSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   moduleGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  moduleCard:       { width: '47.5%', backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, gap: 10, ...shadow },
+  moduleCard:       { width: '47.5%', backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, gap: 10, alignItems: 'center', ...shadow },
   moduleIcon:       { width: 44, height: 44, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
-  moduleLabel:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  moduleLabel:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center' },
 
   // Weather
   weatherCard:        { backgroundColor: colors.cardBg, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, ...shadow },

@@ -313,6 +313,7 @@ export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, us
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0 }}
               contentContainerStyle={s.districtRow}
             >
               <TouchableOpacity
@@ -394,7 +395,7 @@ const s = StyleSheet.create({
   typeChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // District filter
-  districtRow:    { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  districtRow:    { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
   chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                     backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
