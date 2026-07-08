@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
+import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -96,10 +97,12 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
       <PageBackground topic="exchange_rates" />
       <ScreenHeader onBack={onBack} lang={lang} />
 
-      <View style={s.titleRow}>
-        <Text style={s.title}>{t('fxTitle', lang)}</Text>
-        <Text style={s.subtitle}>{t('fxSubtitle', lang)}</Text>
-      </View>
+      <MascotIntroCard
+        module="exchange"
+        title={t('fxTitle', lang)}
+        subtitle={t('fxSubtitle', lang)}
+        style={s.introCard}
+      />
 
       {loading && (
         <View style={s.center}>
@@ -163,24 +166,9 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  titleRow: {
+  introCard: {
     marginHorizontal: 16,
     marginBottom: 20,
-    backgroundColor: colors.cardBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    ...shadow,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
   },
   center: {
     flex: 1,

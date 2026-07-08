@@ -8,6 +8,7 @@ import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
+import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { openTicketUrl } from '../utils/events'
@@ -268,7 +269,7 @@ export default function EventsScreen({ lang, onBack }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="events" />
-      <ScreenHeader onBack={onBack} title={t('eventsTitle', lang)} subtitle={t('eventsSubtitle', lang)} lang={lang} />
+      <ScreenHeader onBack={onBack} title={t('eventsTitle', lang)} lang={lang} />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
@@ -280,17 +281,24 @@ export default function EventsScreen({ lang, onBack }) {
           contentContainerStyle={s.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           ListHeaderComponent={
-            <View style={s.filterRow}>
-              {CATEGORIES.map(c => (
-                <TouchableOpacity
-                  key={c.key}
-                  style={[s.chip, category === c.key && s.chipActive]}
-                  onPress={() => setCategory(c.key)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[s.chipText, category === c.key && s.chipTextActive]}>{t(c.labelKey, lang)}</Text>
-                </TouchableOpacity>
-              ))}
+            <View>
+              <MascotIntroCard
+                module="events"
+                subtitle={t('eventsSubtitle', lang)}
+                style={s.introCard}
+              />
+              <View style={s.filterRow}>
+                {CATEGORIES.map(c => (
+                  <TouchableOpacity
+                    key={c.key}
+                    style={[s.chip, category === c.key && s.chipActive]}
+                    onPress={() => setCategory(c.key)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[s.chipText, category === c.key && s.chipTextActive]}>{t(c.labelKey, lang)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           }
           ListEmptyComponent={
@@ -316,6 +324,7 @@ const s = StyleSheet.create({
   listContent:        { paddingHorizontal: 16, paddingBottom: 40, gap: 16 },
 
   // Filter chips
+  introCard:          { marginBottom: 16 },
   filterRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4 },
   chip:               { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                         backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },

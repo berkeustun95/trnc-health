@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import PageBackground from '../../components/PageBackground'
 import ScreenHeader from '../../components/ScreenHeader'
+import ModuleMascotBadge from '../../components/ModuleMascotBadge'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 
@@ -60,9 +61,7 @@ export default function PetsHomeScreen({ lang, onBack, onNavigate }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={s.heroCard}>
-          <View style={s.heroBadge}>
-            <Ionicons name="paw" size={28} color={colors.primary} />
-          </View>
+          <ModuleMascotBadge module="pets" style={s.heroMascot} />
           <Text style={s.heroText}>{t('petsSubtitle', lang)}</Text>
         </View>
 
@@ -84,7 +83,7 @@ const s = StyleSheet.create({
   scroll:        { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40 },
   heroCard:      { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16, ...shadow },
-  heroBadge:     { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  heroMascot:    { marginBottom: 8 },
   heroText:      { fontSize: 14, color: colors.textSecondary, textAlign: 'center', fontFamily: 'Inter_400Regular', paddingHorizontal: 8, lineHeight: 20 },
   card:          { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 12, ...shadow },
   iconWrap:      { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 14, flexShrink: 0 },

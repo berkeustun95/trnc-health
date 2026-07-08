@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
+import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import HomeServiceProfileScreen from './HomeServiceProfileScreen'
@@ -203,9 +204,11 @@ export default function HomeServicesScreen({ lang, session, onBack }) {
           contentContainerStyle={s.catScroll}
           showsVerticalScrollIndicator={false}
         >
-          <View style={s.subtitleCard}>
-            <Text style={s.subtitle}>{t('hsSubtitle', lang)}</Text>
-          </View>
+          <MascotIntroCard
+            module="house_services"
+            subtitle={t('hsSubtitle', lang)}
+            style={s.introCard}
+          />
           <View style={s.grid}>
             {CATEGORIES.map(cat => (
               <CategoryTile
@@ -291,10 +294,7 @@ const s = StyleSheet.create({
 
   // Category picker
   catScroll:      { padding: 20, paddingBottom: 40 },
-  subtitleCard:   { backgroundColor: colors.cardBg, borderRadius: 14, paddingHorizontal: 16,
-                    paddingVertical: 12, marginBottom: 20, ...shadow },
-  subtitle:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
-                    textAlign: 'center' },
+  introCard:      { marginBottom: 20 },
   grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   catTile:        { width: '47%', backgroundColor: colors.cardBg, borderRadius: radius.card,
                     padding: 18, alignItems: 'center', gap: 10, ...shadow,

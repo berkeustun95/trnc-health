@@ -7,6 +7,7 @@ import { Ionicons, Feather } from '@expo/vector-icons'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import ContentCard from '../components/ContentCard'
+import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -357,10 +358,12 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
       <PageBackground topic="newcomer_essentials" />
       <ScreenHeader onBack={onBack} lang={lang} />
       <ScrollView contentContainerStyle={s.hubContent} showsVerticalScrollIndicator={false}>
-        <View style={s.hubCard}>
-          <Text style={s.hubTitle}>{t('essHubTitle', lang)}</Text>
-          <Text style={s.hubSubtitle}>{t('essHubSubtitle', lang)}</Text>
-        </View>
+        <MascotIntroCard
+          module="welcome_guide"
+          title={t('essHubTitle', lang)}
+          subtitle={t('essHubSubtitle', lang)}
+          style={s.introCard}
+        />
         <View style={s.grid}>
           {CARDS.map(c => (
             <TouchableOpacity
@@ -383,29 +386,12 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  hubCard: {
-    backgroundColor: colors.cardBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+  introCard: {
     marginBottom: 24,
-    ...shadow,
   },
   hubContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
-  },
-  hubTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 6,
-  },
-  hubSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 24,
-    lineHeight: 20,
   },
   grid: {
     flexDirection: 'row',
