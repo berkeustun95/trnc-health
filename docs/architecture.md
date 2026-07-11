@@ -183,6 +183,41 @@ Any future table with an owner-writable moderation column needs the same pattern
 
 `search_content` RPC (`20260705_search_content_add_jobs.sql`) surfaces jobs as `module='jobPostings'`, filtered to `active` + non-expired (explicit filter, not just RLS, so an owner's own pending/filled rows never leak). `HomeScreen.js` routes that module to the jobs board (matches the events/transport "open the list" pattern, no deep-link).
 
+## Ask Oli guide — global overlay mount
+
+`components/OliGuide.js` is a floating mascot button + slide-up "Ask Oli" sheet that routes a user's question to an existing page. It is mounted **exactly once**, at the root return of `App.js`, above the `content` variable:
+
+```jsx
+return (
+  <SafeAreaProvider>
+    {content}
+    {oliVisible && <OliGuide lang={lang} />}
+  </SafeAreaProvider>
+)
+```
+
+This is the canonical pattern for **any app-wide overlay** in ADA: mount at the root next to `content`, never per-screen. `content` is the app's whole navigation state machine (there is **no react-navigation** — navigation is `useState` booleans like `showEvents`, `showDutyList`, `activeTab`), so a single sibling render sits above every screen for free.
+
+### `oliVisible` gate
+Oli shows only in the **customer** app. It is hidden when:
+- not signed in / onboarding / welcome / password-reset / loading (these paths never set a customer `profile`), and
+- `profile.role` is `admin`, `provider`, `estate_agent`, `organizer`, or `home_service_provider` (their dashboards), and
+- `showMenu` (side drawer — a `zIndex` View, not a Modal, so Oli would otherwise cover it) or `showCoachMarks` is open.
+
+RN `Modal`s (emergency / language / municipal) render on the native layer **above** the root overlay, so they need no gate.
+
+### Placement
+`bottom: insets.bottom + 72` clears the `BottomTabBar` on the home tabs; full-screen sub-screens (no tab bar) get the same bottom-right corner at the safe-area edge — consistent across routes.
+
+### Routing seam
+Intent config lives in a **pure-data** module (`constants/oliIntents.js`): each intent is `{ id, keywords, msgKey }` where `id` is both the intent id and the navigation target. `App.js` owns the `oliNavigate(id)` dispatcher, which resets the open module sub-screens then sets the target's state flag (e.g. `pharmacy` → `setShowDutyList(true)`, `clinic` → `setActiveTab('home')`, `emergency` → `setShowEmergencyModal(true)`).
+
+- `normalize(str)` — lowercase + NFD diacritic strip + Turkish `ı/İ/ş/ğ/ç/ö/ü` folding (dotless-ı doesn't decompose under NFD, so it's folded explicitly first). There was **no** pre-existing Turkish normalization util in the repo.
+- `resolveOliQuery(text) → Intent[]` — the single resolver boundary; `[]` ⇒ the no-match fallback. Keyword matching is per-language: keywords ≤4 chars match whole words only (so short tokens like Turkish `iş`→`is` or German `geld` don't fire inside longer words across languages), 5+ char keywords allow prefix matching so Turkish suffixes (`eczaneye`, `doktora`, `otobüse`) still hit. Returns up to 3 intents.
+- **LLM seam:** the future LLM fallback is invoked only where `resolveOliQuery()` returns `[]` — nothing else changes.
+
+Chips carry an intent `id`; tapping one shows that intent's result card (Oli message + "Take me there") rather than navigating immediately, matching the typed-query flow. Chip labels reuse `oliChip*` i18n keys; result messages use `oliMsg*`.
+
 ## Asset gotcha — file extensions MUST match the actual image format
 
 Android's `mergeReleaseResources` runs every bundled drawable through AAPT2, which PNG-crunches anything named `.png`. A file with a `.png` extension that is actually a **JPEG** fails to compile (`AAPT: error: file failed to compile`), and EAS surfaces it only as the generic "Gradle build failed with unknown error" — the real cause is buried in the `Run gradlew` log at `:app:mergeReleaseResources FAILED`.

@@ -53,6 +53,7 @@ import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import { haversineKm, parseIsOpen } from './utils/facilityUtils'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
+import OliGuide from './components/OliGuide'
 import * as Updates from 'expo-updates'
 
 Notifications.setNotificationHandler({
@@ -1368,7 +1369,43 @@ export default function App() {
     )
   }
 
-  return <SafeAreaProvider>{content}</SafeAreaProvider>
+  // Ask Oli routing: map an intent target → the app's navigation state setters.
+  // Close any open module sub-screen first so only the target renders.
+  const oliNavigate = (target) => {
+    setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
+    setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
+    setShowJobPostings(false); setShowBeachesLandmarks(false); setShowTransport(false)
+    setShowNewcomerEssentials(false); setShowExchangeRates(false)
+    setSelectedPlace(null); setShowNotifs(false)
+    switch (target) {
+      case 'pharmacy':      setActiveTab('home'); setShowDutyList(true); break
+      case 'clinic':        setActiveTab('home'); break
+      case 'events':        setShowEvents(true); break
+      case 'homeServices':  setShowHomeServices(true); break
+      case 'jobs':          setShowJobPostings(true); break
+      case 'accommodation': setShowAccommodation(true); break
+      case 'pets':          setShowPets(true); break
+      case 'transport':     setShowTransport(true); break
+      case 'beaches':       setShowBeachesLandmarks(true); break
+      case 'exchange':      setShowExchangeRates(true); break
+      case 'newcomer':      setShowNewcomerEssentials(true); break
+      case 'municipal':     setShowMunicipalModal(true); break
+      case 'emergency':     setShowEmergencyModal(true); break
+    }
+  }
+
+  const oliVisible =
+    !!session && !!profile &&
+    !['admin', 'provider', 'estate_agent', 'organizer', 'home_service_provider'].includes(profile.role) &&
+    !showMenu && !showCoachMarks &&
+    !selectedFacility && !bookingFacility
+
+  return (
+    <SafeAreaProvider>
+      {content}
+      {oliVisible && <OliGuide lang={lang} onNavigate={oliNavigate} />}
+    </SafeAreaProvider>
+  )
 }
 
 const styles = StyleSheet.create({
