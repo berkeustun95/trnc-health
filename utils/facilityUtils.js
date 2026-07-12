@@ -1,6 +1,12 @@
 export const DAY_INDEX = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 }
 const AVAIL_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
+// Coarsen to ~1.1km before any off-device call — the App Privacy label
+// declares Coarse Location, so precise coords must never leave the device.
+export function coarseCoord(n) {
+  return n == null ? null : Math.round(n * 100) / 100
+}
+
 export function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180

@@ -12,7 +12,7 @@ import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
-  haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherDesc, isAvailableToday,
+  haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherDesc, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
 
 const TYPE_ICON_MAP = {
@@ -115,8 +115,8 @@ export default function HomeScreen({
     setIsSearching(true)
     const { data } = await supabase.rpc('search_content', {
       query:    q.trim(),
-      user_lat: userLocation?.latitude  ?? null,
-      user_lon: userLocation?.longitude ?? null,
+      user_lat: coarseCoord(userLocation?.latitude  ?? null),
+      user_lon: coarseCoord(userLocation?.longitude ?? null),
     })
     setGlobalResults(data ?? [])
     setIsSearching(false)

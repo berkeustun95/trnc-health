@@ -51,7 +51,7 @@ import WelcomeScreen from './screens/WelcomeScreen'
 import HomeScreen from './screens/HomeScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
-import { haversineKm, parseIsOpen } from './utils/facilityUtils'
+import { haversineKm, parseIsOpen, coarseCoord } from './utils/facilityUtils'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
 import * as Updates from 'expo-updates'
@@ -643,8 +643,10 @@ export default function App() {
       }
 
       try {
+        const wLat = coarseCoord(resolvedCoords.latitude)
+        const wLon = coarseCoord(resolvedCoords.longitude)
         const weatherRes = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${resolvedCoords.latitude}&longitude=${resolvedCoords.longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,uv_index&daily=temperature_2m_max,temperature_2m_min,weather_code,uv_index_max&timezone=auto&forecast_days=4`
+          `https://api.open-meteo.com/v1/forecast?latitude=${wLat}&longitude=${wLon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,uv_index&daily=temperature_2m_max,temperature_2m_min,weather_code,uv_index_max&timezone=auto&forecast_days=4`
         )
         const weatherJson = await weatherRes.json()
         if (weatherJson?.current) setWeatherData(weatherJson)
