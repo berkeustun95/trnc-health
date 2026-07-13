@@ -20,7 +20,7 @@ export default {
     },
     userInterfaceStyle: 'light',
     ios: {
-      supportsTablet: true,
+      supportsTablet: false,
       bundleIdentifier: 'com.berkeustun95.ada',
       minimumOsVersion: '14.0',
       infoPlist: {
