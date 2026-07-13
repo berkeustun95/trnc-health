@@ -9,6 +9,8 @@ import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton, SlotGridSkeleton } from '../components/Skeleton'
+import ContentReportMenu from '../components/ContentReportMenu'
+import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 
 async function notifyProvider(facility, titleKey, bodyKey) {
   if (!facility.provider_id) return
@@ -125,6 +127,13 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
     if (!body) return
     setSubmittingQ(true)
     setQError(null)
+
+    if (await containsBlockedTerm(body)) {
+      setQError(t('contentBlockedTerm', lang))
+      setSubmittingQ(false)
+      return
+    }
+
     const { error } = await supabase.from('questions').insert({
       facility_id: facility.id,
       customer_id: session.user.id,
@@ -134,7 +143,10 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
       setNewQ('')
       await loadQuestions()
       notifyProvider(facility, 'notifNewQuestionTitle', 'notifNewQuestionBody')
-    } else setQError(t('questionSubmitError', lang))
+    } else {
+      const key = moderationErrorKey(error)
+      setQError(key ? t(key, lang) : t('questionSubmitError', lang))
+    }
     setSubmittingQ(false)
   }
 
@@ -313,9 +325,12 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
                     <Text style={styles.reviewStars}>
                       {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
                     </Text>
-                    <Text style={styles.reviewDate}>
-                      {new Date(r.created_at).toLocaleDateString([], { dateStyle: 'short' })}
-                    </Text>
+                    <View style={styles.reviewTopRight}>
+                      <Text style={styles.reviewDate}>
+                        {new Date(r.created_at).toLocaleDateString([], { dateStyle: 'short' })}
+                      </Text>
+                      <ContentReportMenu contentType="review" contentId={r.id} lang={lang} onBlocked={loadReviews} />
+                    </View>
                   </View>
                   {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : null}
                 </View>
@@ -482,6 +497,8 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
 
         {qError && <Text style={styles.error}>{qError}</Text>}
 
+        <Text style={styles.termsNotice}>{t('termsAgreeContent', lang)}</Text>
+
         {questionsLoading ? (
           <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
         ) : questions.length === 0 ? (
@@ -492,7 +509,10 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
               <Text style={styles.qBody}>{q.body}</Text>
               {q.answers && q.answers.length > 0 ? (
                 <View style={styles.answerBlock}>
-                  <Text style={styles.answerLabel}>{t('providerAnswer', lang)}</Text>
+                  <View style={styles.answerTop}>
+                    <Text style={styles.answerLabel}>{t('providerAnswer', lang)}</Text>
+                    <ContentReportMenu contentType="answer" contentId={q.answers[0].id} lang={lang} />
+                  </View>
                   <Text style={styles.answerBody}>{q.answers[0].body}</Text>
                 </View>
               ) : (
@@ -541,6 +561,8 @@ const styles = StyleSheet.create({
   qCard:           { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
   qBody:           { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginBottom: 10, lineHeight: 20 },
   answerBlock:     { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10 },
+  answerTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  termsNotice:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 16, marginTop: 8 },
   answerLabel:     { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   answerBody:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
   noAnswer:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic' },
@@ -548,6 +570,7 @@ const styles = StyleSheet.create({
   seeAllText:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
   reviewCard:      { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 8, ...shadow },
   reviewTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  reviewTopRight:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
   reviewStars:     { fontSize: 14, color: '#F5A623', letterSpacing: 1 },
   reviewDate:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   reviewComment:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },

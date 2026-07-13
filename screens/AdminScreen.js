@@ -12,7 +12,7 @@ import { t } from '../constants/i18n'
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'BusRoutes', 'Places', 'JobPostings']
+const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'BusRoutes', 'Places', 'JobPostings']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -164,6 +164,7 @@ function DashboardTab({ onNavigate }) {
         { count: pendingBeaches },
         { count: pendingLandmarks },
         { count: pendingJobPostings },
+        { count: pendingReports },
       ] = await Promise.all([
         supabase.from('facilities').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -181,9 +182,10 @@ function DashboardTab({ onNavigate }) {
         supabase.from('beaches').select('*',   { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('landmarks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('job_postings').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('content_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ])
       const pendingPlaces = (pendingBeaches ?? 0) + (pendingLandmarks ?? 0)
-      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingPlaces, pendingJobPostings })
+      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingPlaces, pendingJobPostings, pendingReports })
     }
     load()
   }, [])
@@ -191,6 +193,7 @@ function DashboardTab({ onNavigate }) {
   if (!stats) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
 
   const urgencies = [
+    (stats.pendingReports ?? 0) > 0 && { label: 'Reported content — 24h SLA', count: stats.pendingReports, tab: 'Reports', color: colors.danger },
     stats.pendingChanges     > 0 && { label: 'Profile change requests',     count: stats.pendingChanges,     tab: 'Changes',     color: colors.accent },
     stats.pendingClaims      > 0 && { label: 'Pending facility claims',      count: stats.pendingClaims,      tab: 'Claims',      color: colors.danger },
     stats.pendingProviders   > 0 && { label: 'Providers awaiting approval',  count: stats.pendingProviders,   tab: 'Providers',   color: colors.danger },
@@ -236,6 +239,222 @@ function DashboardTab({ onNavigate }) {
           <Text style={s.allClearText}>All clear — nothing needs attention.</Text>
         </View>
       )}
+    </ScrollView>
+  )
+}
+
+// ─── Reports Tab (UGC moderation — App Store Guideline 1.2) ─────────────────
+// Reports are grouped by the content they point at, so N reports on one review
+// are one triage decision, not N. Oldest first: the queue is SLA-bound (we
+// publish a 24h removal commitment in the Terms).
+
+const REASON_LABELS  = { offensive: 'Offensive', harassment: 'Harassment', spam: 'Spam', false_info: 'False info', other: 'Other' }
+const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers' }
+const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id' }
+const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body' }
+
+function timeAgo(iso) {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
+function ReportsTab({ session }) {
+  const [groups, setGroups] = useState(null)
+  const [busy, setBusy]     = useState(null)
+
+  const load = useCallback(async () => {
+    const { data: reports } = await supabase
+      .from('content_reports')
+      .select('id, content_type, content_id, reason, details, created_at, reporter_id')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+    if (!reports?.length) { setGroups([]); return }
+
+    const reporterIds = [...new Set(reports.map(r => r.reporter_id))]
+    const { data: reporters } = await supabase.from('profiles').select('id, full_name').in('id', reporterIds)
+    const nameById = new Map((reporters ?? []).map(p => [p.id, p.full_name]))
+
+    // content_reports is polymorphic and has no FK, so the content is fetched per
+    // type. It may be missing entirely — delete_own_account hard-deletes a user's
+    // reviews, which leaves their reports dangling.
+    const contentByKey = new Map()
+    for (const type of ['review', 'question', 'answer']) {
+      const ids = [...new Set(reports.filter(r => r.content_type === type).map(r => r.content_id))]
+      if (!ids.length) continue
+      const { data } = await supabase
+        .from(CONTENT_TABLE[type])
+        .select(`id, ${TEXT_COL[type]}, ${AUTHOR_COL[type]}, hidden_at, hidden_reason`)
+        .in('id', ids)
+      for (const row of data ?? []) contentByKey.set(`${type}:${row.id}`, row)
+    }
+
+    const byKey = new Map()
+    for (const r of reports) {
+      const key = `${r.content_type}:${r.content_id}`
+      if (!byKey.has(key)) {
+        byKey.set(key, {
+          key, contentType: r.content_type, contentId: r.content_id,
+          content: contentByKey.get(key) ?? null,
+          reports: [],
+        })
+      }
+      byKey.get(key).reports.push({ ...r, reporterName: nameById.get(r.reporter_id) ?? 'Unknown' })
+    }
+    setGroups([...byKey.values()])
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function resolveReports(g, status) {
+    await supabase.from('content_reports')
+      .update({ status, resolved_at: new Date().toISOString(), resolved_by: session.user.id })
+      .eq('content_type', g.contentType).eq('content_id', g.contentId).eq('status', 'pending')
+  }
+
+  async function notifyAuthor(g, title, body) {
+    const authorId = g.content?.[AUTHOR_COL[g.contentType]]
+    if (!authorId) return
+    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', authorId).maybeSingle()
+    if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+    await recordNotification(authorId, title, body)
+  }
+
+  async function removeContent(g) {
+    setBusy(g.key)
+    await supabase.from(CONTENT_TABLE[g.contentType])
+      .update({ hidden_at: new Date().toISOString(), hidden_reason: 'admin_removed' })
+      .eq('id', g.contentId)
+    await resolveReports(g, 'actioned')
+    await notifyAuthor(g, 'Content removed', `Your ${g.contentType} was removed for violating ADA's content policy.`)
+    setBusy(null); load()
+  }
+
+  async function restoreContent(g) {
+    setBusy(g.key)
+    await supabase.from(CONTENT_TABLE[g.contentType])
+      .update({ hidden_at: null, hidden_reason: null })
+      .eq('id', g.contentId)
+    await resolveReports(g, 'dismissed')
+    setBusy(null); load()
+  }
+
+  async function dismiss(g) {
+    setBusy(g.key)
+    await resolveReports(g, 'dismissed')
+    setBusy(null); load()
+  }
+
+  // Banning also removes the content — the content is why they are being banned,
+  // and leaving it visible while clearing the queue would defeat the 24h promise.
+  async function applyBan(g, authorId, days) {
+    setBusy(g.key)
+    const until = days ? new Date(Date.now() + days * 86400000) : new Date('2999-01-01')
+    await supabase.from('profiles').update({ ugc_banned_until: until.toISOString() }).eq('id', authorId)
+    await supabase.from(CONTENT_TABLE[g.contentType])
+      .update({ hidden_at: new Date().toISOString(), hidden_reason: 'admin_removed' })
+      .eq('id', g.contentId)
+    await resolveReports(g, 'actioned')
+    await notifyAuthor(
+      g,
+      'Posting suspended',
+      days
+        ? `Your ${g.contentType} was removed and you cannot post reviews or questions for ${days} days.`
+        : `Your ${g.contentType} was removed and you can no longer post reviews or questions.`,
+    )
+    setBusy(null); load()
+  }
+
+  function confirmBan(g) {
+    const authorId = g.content?.[AUTHOR_COL[g.contentType]]
+    if (!authorId) { Alert.alert('Cannot ban', 'This content no longer exists, so its author cannot be identified.'); return }
+    Alert.alert(
+      'Remove content & ban author',
+      'Removes this content and blocks the author from posting reviews and questions. Their bookings are not affected.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: '7 days',  onPress: () => applyBan(g, authorId, 7) },
+        { text: '30 days', onPress: () => applyBan(g, authorId, 30) },
+        { text: 'Permanent', style: 'destructive', onPress: () => applyBan(g, authorId, null) },
+      ],
+    )
+  }
+
+  if (!groups) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+  if (!groups.length) return <SectionEmpty text="No pending reports. Nothing to moderate." />
+
+  return (
+    <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
+      <Text style={s.sectionTitle}>{groups.length} item{groups.length !== 1 ? 's' : ''} awaiting review · oldest first</Text>
+
+      {groups.map(g => {
+        const oldest      = g.reports[0]
+        const missing     = !g.content
+        const hidden      = !!g.content?.hidden_at
+        const autoHidden  = g.content?.hidden_reason === 'auto_reports'
+        const text        = g.content?.[TEXT_COL[g.contentType]]
+        const reasonCount = g.reports.reduce((acc, r) => ({ ...acc, [r.reason]: (acc[r.reason] ?? 0) + 1 }), {})
+        const isBusy      = busy === g.key
+
+        return (
+          <View key={g.key} style={s.card}>
+            <View style={s.reportHead}>
+              <View style={s.reportBadge}>
+                <Text style={s.reportBadgeText}>{g.contentType.toUpperCase()}</Text>
+              </View>
+              {hidden && (
+                <View style={[s.reportBadge, { backgroundColor: colors.dangerLight }]}>
+                  <Text style={[s.reportBadgeText, { color: colors.danger }]}>
+                    {autoHidden ? 'AUTO-HIDDEN' : 'HIDDEN'}
+                  </Text>
+                </View>
+              )}
+              <View style={{ flex: 1 }} />
+              <Text style={s.cardSub}>{timeAgo(oldest.created_at)}</Text>
+            </View>
+
+            {missing
+              ? <Text style={s.reportMissing}>Content no longer exists — the author likely deleted their account. Dismiss to clear.</Text>
+              : <Text style={s.reportBody}>{text || <Text style={s.reportMissing}>(rating only, no text)</Text>}</Text>}
+
+            <Text style={s.reportMeta}>
+              {g.reports.length} report{g.reports.length !== 1 ? 's' : ''} ·{' '}
+              {Object.entries(reasonCount).map(([k, n]) => `${REASON_LABELS[k] ?? k}${n > 1 ? ` ×${n}` : ''}`).join(', ')}
+            </Text>
+
+            {g.reports.filter(r => r.details).map(r => (
+              <Text key={r.id} style={s.reportDetail}>“{r.details}” — {r.reporterName}</Text>
+            ))}
+
+            <View style={s.reportActions}>
+              {isBusy ? (
+                <ActivityIndicator color={colors.primary} style={{ paddingVertical: 7 }} />
+              ) : (
+                <>
+                  {!missing && (hidden
+                    ? <TouchableOpacity style={s.ghostBtn} onPress={() => restoreContent(g)}>
+                        <Text style={s.ghostBtnText}>Restore</Text>
+                      </TouchableOpacity>
+                    : <TouchableOpacity style={s.dangerGhostBtn} onPress={() => removeContent(g)}>
+                        <Text style={s.dangerGhostText}>Remove</Text>
+                      </TouchableOpacity>
+                  )}
+                  {!missing && (
+                    <TouchableOpacity style={s.dangerGhostBtn} onPress={() => confirmBan(g)}>
+                      <Text style={s.dangerGhostText}>Ban author</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={s.ghostBtn} onPress={() => dismiss(g)}>
+                    <Text style={s.ghostBtnText}>Dismiss</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        )
+      })}
     </ScrollView>
   )
 }
@@ -2825,6 +3044,7 @@ export default function AdminScreen({ session }) {
 
         <View style={{ flex: 1 }}>
           {tab === 'Dashboard'   && <DashboardTab onNavigate={navigateTo} />}
+          {tab === 'Reports'     && <ReportsTab session={session} />}
           {tab === 'Changes'     && <ChangesTab />}
           {tab === 'Claims'      && <ClaimsTab />}
           {tab === 'Providers'   && <ProvidersTab />}
@@ -2883,6 +3103,15 @@ const s = StyleSheet.create({
   cardRow:            { flexDirection: 'row', alignItems: 'flex-start' },
   cardTitle:          { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 3 },
   cardSub:            { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+
+  reportHead:         { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  reportBadge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.primaryLight },
+  reportBadgeText:    { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.5 },
+  reportBody:         { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 20, marginBottom: 10 },
+  reportMissing:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic', marginBottom: 10 },
+  reportMeta:         { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.danger, marginBottom: 6 },
+  reportDetail:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, marginBottom: 3 },
+  reportActions:      { flexDirection: 'row', gap: 6, marginTop: 12 },
 
   rowActions:         { flexDirection: 'row', gap: 6, marginLeft: 8 },
   ghostBtn:           { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.primaryLight },

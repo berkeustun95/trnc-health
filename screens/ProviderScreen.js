@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking, Switch, Modal } from 'react-native'
+import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking, Switch, Modal, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
@@ -9,6 +9,8 @@ import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import HoursPicker from '../components/HoursPicker'
 import MapPinPicker from '../components/MapPinPicker'
+import ContentReportMenu from '../components/ContentReportMenu'
+import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 
 function decode(base64) {
@@ -224,6 +226,13 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     const body = replyTexts[questionId]?.trim()
     if (!body) return
     setSubmittingReply(questionId)
+
+    if (await containsBlockedTerm(body)) {
+      Alert.alert('', t('contentBlockedTerm', lang))
+      setSubmittingReply(null)
+      return
+    }
+
     const { error } = await supabase.from('answers').insert({
       question_id: questionId,
       provider_id: session.user.id,
@@ -232,6 +241,9 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     if (!error) {
       setReplyTexts(prev => ({ ...prev, [questionId]: '' }))
       await loadQuestions()
+    } else {
+      const key = moderationErrorKey(error)
+      if (key) Alert.alert('', t(key, lang))
     }
     setSubmittingReply(null)
   }
@@ -544,7 +556,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         {trialDaysLeft !== null && trialDaysLeft !== undefined && (
           <TouchableOpacity
             style={styles.trialBanner}
-            onPress={() => Linking.openURL('mailto:berke.ustun95@gmail.com?subject=ADA%20Provider%20Activation')}
+            onPress={() => Linking.openURL('mailto:getadaapp@gmail.com?subject=ADA%20Provider%20Activation')}
             activeOpacity={0.8}
           >
             <Text style={styles.trialText}>
@@ -1247,7 +1259,10 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                   )}
                   {questions.map(q => (
                   <View key={q.id} style={styles.card}>
-                    <Text style={styles.qBody}>{q.body}</Text>
+                    <View style={styles.qTop}>
+                      <Text style={[styles.qBody, { flex: 1 }]}>{q.body}</Text>
+                      <ContentReportMenu contentType="question" contentId={q.id} lang={lang} />
+                    </View>
                     {q.answers && q.answers.length > 0 ? (
                       <View style={styles.answerBlock}>
                         <Text style={styles.answerLabel}>{t('yourAnswer', lang)}</Text>
@@ -1335,6 +1350,7 @@ const styles = StyleSheet.create({
   tabWithBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   tabBadge:       { backgroundColor: colors.danger, borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
   tabBadgeText:   { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#fff' },
+  qTop:           { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   qBody:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginBottom: 12, lineHeight: 20 },
   answerBlock:    { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10 },
   answerLabel:    { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },

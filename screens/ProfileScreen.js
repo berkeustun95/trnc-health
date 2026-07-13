@@ -13,6 +13,7 @@ import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { getNatLabel } from '../constants/nationalityTranslations'
 import LegalScreen from './LegalScreen'
+import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { PRESET_AVATARS, getPreset } from '../constants/avatars'
 
 const NATIONALITIES = [
@@ -111,7 +112,7 @@ const TYPE_COLORS = {
   dentist:  { bg: '#E8F5EE', text: '#2E9E5B' },
 }
 
-function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue, ratingComment, reviewError, onRatingChange, onCommentChange, onSubmitReview, onCancelBooking, onBack }) {
+function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue, ratingComment, reviewError, onRatingChange, onCommentChange, onSubmitReview, onCancelBooking, onOpenTerms, onBack }) {
   const f           = booking.facilities ?? {}
   const isPending   = booking.status === 'pending'
   const isConfirmed = booking.status === 'confirmed'
@@ -232,6 +233,10 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
               >
                 <Text style={s.submitReviewText}>{t('save', lang)}</Text>
               </TouchableOpacity>
+              <Text style={s.termsNotice}>
+                {t('termsAgreeContent', lang)}{' '}
+                <Text style={s.termsNoticeLink} onPress={onOpenTerms}>{t('termsOfService', lang)}</Text>
+              </Text>
             </View>
           )}
 
@@ -270,6 +275,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [ratingComment, setRatingComment]   = useState('')
   const [reviewError, setReviewError]       = useState(null)
   const [legalTab, setLegalTab]             = useState(null)
+  const [blocks, setBlocks]                 = useState([])
   const [avatarUrl, setAvatarUrl]           = useState(null)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [avatarUploading, setAvatarUploading]   = useState(false)
@@ -341,7 +347,24 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     loadProfile()
     loadBookings()
     loadReviews()
+    loadBlocks()
   }, [])
+
+  // Deliberately NO names here. Reviews are anonymous, so showing "you blocked
+  // Ahmet K." would reveal who wrote the review the user blocked from.
+  async function loadBlocks() {
+    const { data } = await supabase.from('blocks')
+      .select('blocked_id, created_at')
+      .order('created_at', { ascending: false })
+    setBlocks(data ?? [])
+  }
+
+  async function unblock(blockedId) {
+    const { error } = await supabase.from('blocks').delete()
+      .eq('blocker_id', session.user.id)
+      .eq('blocked_id', blockedId)
+    if (!error) setBlocks(prev => prev.filter(b => b.blocked_id !== blockedId))
+  }
 
   async function cancelBooking(bookingId) {
     const { error } = await supabase
@@ -360,6 +383,14 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   async function submitReview(booking) {
     if (!ratingValue) return
     setReviewError(null)
+
+    // Pre-check for instant feedback; the DB trigger is the real boundary and is
+    // re-checked below in case the cached term list is stale.
+    if (await containsBlockedTerm(ratingComment)) {
+      setReviewError(t('contentBlockedTerm', lang))
+      return
+    }
+
     const { error } = await supabase.from('reviews').insert({
       customer_id: session.user.id,
       facility_id: booking.facility_id,
@@ -373,7 +404,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       setRatingValue(0)
       setRatingComment('')
     } else {
-      setReviewError(error.message)
+      const key = moderationErrorKey(error)
+      setReviewError(key ? t(key, lang) : error.message)
     }
   }
 
@@ -510,6 +542,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         ratingValue={ratingValue}
         ratingComment={ratingComment}
         reviewError={reviewError}
+        onOpenTerms={() => setLegalTab('terms')}
         onRatingChange={setRatingValue}
         onCommentChange={setRatingComment}
         onSubmitReview={() => submitReview(selectedBooking)}
@@ -720,6 +753,22 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             </View>
           )}
 
+          {blocks.length > 0 && (
+            <View style={s.blockedSection}>
+              <Text style={s.sectionTitle}>{t('blockedReviewers', lang)}</Text>
+              {blocks.map(b => (
+                <View key={b.blocked_id} style={s.blockedRow}>
+                  <Text style={s.blockedLabel}>
+                    {t('blockedOn', lang).replace('{d}', new Date(b.created_at).toLocaleDateString([], { dateStyle: 'medium' }))}
+                  </Text>
+                  <TouchableOpacity style={s.unblockBtn} onPress={() => unblock(b.blocked_id)}>
+                    <Text style={s.unblockText}>{t('unblock', lang)}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
           <View style={s.legalRow}>
             <TouchableOpacity onPress={() => setLegalTab('privacy')}>
               <Text style={s.legalLink}>{t('privacyPolicy', lang)}</Text>
@@ -882,6 +931,13 @@ const s = StyleSheet.create({
   submitReviewBtn:  { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   submitReviewText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   reviewErrorText:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger },
+  termsNotice:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 16, marginTop: 10, textAlign: 'center' },
+  termsNoticeLink:  { fontFamily: 'Inter_700Bold', color: colors.primary, textDecorationLine: 'underline' },
+  blockedSection:   { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, marginTop: 8, marginBottom: 16 },
+  blockedRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
+  blockedLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  unblockBtn:       { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.primaryLight },
+  unblockText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
   errorText:        { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 12 },
   legalRow:         { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 16 },
   legalLink:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },

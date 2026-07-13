@@ -7,6 +7,7 @@ import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton } from '../components/Skeleton'
+import ContentReportMenu from '../components/ContentReportMenu'
 import { formatHoursDisplay } from '../components/HoursPicker'
 
 const SW = Dimensions.get('window').width
@@ -24,6 +25,19 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
   const [showAllReviews, setShowAllReviews] = useState(false)
   const [lightbox, setLightbox]             = useState(null)
   const [credentials, setCredentials]       = useState([])
+
+  const reloadReviews = async () => {
+    const [{ data, count }, { data: allRatings }] = await Promise.all([
+      supabase.from('reviews').select('id, rating, comment, created_at', { count: 'exact' })
+        .eq('facility_id', facility.id).order('created_at', { ascending: false }).limit(3),
+      supabase.from('reviews').select('rating').eq('facility_id', facility.id),
+    ])
+    setReviews(data ?? [])
+    setReviewTotal(count ?? 0)
+    setReviewAvg(allRatings?.length
+      ? (allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length).toFixed(1)
+      : null)
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -274,7 +288,10 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                     <View key={r.id} style={s.reviewCard}>
                       <View style={s.reviewTop}>
                         <Text style={s.stars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</Text>
-                        <Text style={s.reviewDate}>{new Date(r.created_at).toLocaleDateString([], { dateStyle: 'medium' })}</Text>
+                        <View style={s.reviewTopRight}>
+                          <Text style={s.reviewDate}>{new Date(r.created_at).toLocaleDateString([], { dateStyle: 'medium' })}</Text>
+                          <ContentReportMenu contentType="review" contentId={r.id} lang={lang} onBlocked={reloadReviews} />
+                        </View>
                       </View>
                       {r.comment ? <Text style={s.reviewComment}>{r.comment}</Text> : null}
                     </View>
@@ -354,6 +371,7 @@ const s = StyleSheet.create({
   reviewCount:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
   reviewCard:        { backgroundColor: colors.cardBg, borderRadius: 14, padding: 14, marginBottom: 8, ...shadow },
   reviewTop:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  reviewTopRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
   stars:             { fontSize: 14, color: '#F5A623', letterSpacing: 1 },
   reviewDate:        { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   reviewComment:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },

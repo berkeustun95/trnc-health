@@ -960,7 +960,7 @@ export default function App() {
           <TouchableOpacity
             style={styles.reportBtn}
             onPress={() => Linking.openURL(
-              `mailto:berke.ustun95@gmail.com?subject=${encodeURIComponent(`ADA – Correction: ${unclaimedFacility.name}`)}&body=${encodeURIComponent(`Hi,\n\nI'd like to suggest a correction for: ${unclaimedFacility.name}\n\n`)}`
+              `mailto:getadaapp@gmail.com?subject=${encodeURIComponent(`ADA – Correction: ${unclaimedFacility.name}`)}&body=${encodeURIComponent(`Hi,\n\nI'd like to suggest a correction for: ${unclaimedFacility.name}\n\n`)}`
             )}
           >
             <Feather name="flag" size={13} color={colors.textSecondary} />

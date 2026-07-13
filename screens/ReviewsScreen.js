@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { ReviewSkeleton } from '../components/Skeleton'
+import ContentReportMenu from '../components/ContentReportMenu'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -22,7 +23,7 @@ function StarBar({ count, total, star }) {
   )
 }
 
-function ReviewCard({ item }) {
+function ReviewCard({ item, lang, onBlocked }) {
   const date = new Date(item.created_at).toLocaleDateString([], { dateStyle: 'medium' })
   return (
     <View style={s.reviewCard}>
@@ -30,7 +31,10 @@ function ReviewCard({ item }) {
         <Text style={s.stars}>
           {'★'.repeat(item.rating)}{'☆'.repeat(5 - item.rating)}
         </Text>
-        <Text style={s.reviewDate}>{date}</Text>
+        <View style={s.reviewTopRight}>
+          <Text style={s.reviewDate}>{date}</Text>
+          <ContentReportMenu contentType="review" contentId={item.id} lang={lang} onBlocked={onBlocked} />
+        </View>
       </View>
       {item.comment ? <Text style={s.comment}>{item.comment}</Text> : null}
       <Text style={s.verifiedTag}>Verified visit</Text>
@@ -69,6 +73,14 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack }) {
   }, [facility.id])
 
   useEffect(() => { load(0) }, [load])
+
+  // The block is enforced in the reviews SELECT policy, so simply refetching
+  // makes the blocked author's reviews vanish — no client-side filtering.
+  function handleBlocked() {
+    setPage(0)
+    setDone(false)
+    load(0)
+  }
 
   function loadMore() {
     if (loadingMore || done) return
@@ -127,7 +139,7 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack }) {
               )}
             </View>
           }
-          renderItem={({ item }) => <ReviewCard item={item} />}
+          renderItem={({ item }) => <ReviewCard item={item} lang={lang} onBlocked={handleBlocked} />}
           ListFooterComponent={
             loadingMore
               ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
@@ -161,6 +173,7 @@ const s = StyleSheet.create({
   starBarCount:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, width: 22 },
   reviewCard:    { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
   reviewTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  reviewTopRight:{ flexDirection: 'row', alignItems: 'center', gap: 8 },
   stars:         { fontSize: 15, color: '#F5A623', letterSpacing: 1 },
   reviewDate:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   comment:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 20, marginBottom: 8 },
