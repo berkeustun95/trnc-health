@@ -239,3 +239,76 @@ find assets -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) -p
 ```
 
 As of this note, `ada-bg-pets.jpg` is the only photographic-JPEG background; all other `ada-bg-*.png` files are genuine PNGs.
+
+---
+
+## Guest access — anonymous sessions, the account-required gate, and the write veto
+
+Guests enter via **"Continue as guest"** on the entry screen (`WelcomeScreen`, shown after the onboarding carousel). Three durable patterns come out of this; treat them as conventions.
+
+### 1. Guest = Supabase anonymous session (not a no-auth path)
+
+`supabase.auth.signInAnonymously()` creates a **real `auth.users` row** and a real `auth.uid()`. An anonymous user is an **`authenticated`** user. This is the whole reason the model is cheap: every existing RLS policy keeps working untouched, and **nothing is ever granted to the `anon` role**.
+
+Consequences, in both directions:
+
+- **Reads:** a guest satisfies existing `TO authenticated` / `auth.uid()` read policies, so guests read everything by default. That's what we want.
+- **Writes:** a guest *also* satisfies existing write policies (`auth.uid() = owner_id`). **This is the trap.** Without the veto below, a guest could insert job postings, reviews, questions and reports straight through the public API with the anon key. See §3.
+
+**`is_anonymous` is the single source of truth.** Use `isGuest(session)` from `lib/supabase.js` (reads the `is_anonymous` JWT claim). **Never introduce a parallel local "is guest" flag** — the DB veto reads the same claim, so client and server agree by construction.
+
+The `auth.users` trigger inserts `(id, role)` with a coalesce fallback to `'customer'`, so a guest gets a valid `profiles` row with no trigger change. This matters: App.js gates the whole render on `!profile` (skeleton), so a guest **without** a profiles row would hang forever.
+
+### 2. Account-required gate
+
+`App.requireAccount(messageKey)` + `components/AccountRequiredSheet.js` (mounted once, globally, next to `OliGuide`).
+
+```js
+if (requireAccount('gateJobPost')) return   // guest -> sheet opens, action aborts
+setShowPostForm(true)                        // real user -> unchanged
+```
+
+`requireAccount` returns `true` **only** for guests, so signed-in behaviour is untouched at every site. `messageKey` is an i18n key so each site explains what signing up unlocks, rather than one generic string.
+
+Wired at **9 sites**: post a job · home-service / transport / estate-agent onboarding · suggest a place · book an appointment · report/block content · profile tab · notifications. Screens receive it as an `onRequireAccount` prop.
+
+**Gate the button that opens the form, not the submit at the end of it** — a guest should never fill a form and then be told no.
+
+**Never gate a read.** Browsing is open, and so are **favourites** (AsyncStorage, device-local — guests keep them, and they survive the signup handoff).
+
+**Sign-up from the gate discards the anon session and reuses the normal signup path.** Upgrade-in-place (identity linking) was evaluated and **deliberately rejected**: Supabase requires a two-step `updateUser({email})` → email-confirm → `updateUser({password})` flow, and it leaves the upgraded user **role-less** (the trigger reads `role` from metadata at `auth.users` insert, which a guest has none of), so an upgraded guest could never become a provider. It also carries nothing over that isn't already device-local.
+
+### 3. Restrictive-policy write veto — the actual security boundary
+
+`supabase/migrations/20260714_block_anonymous_writes.sql`. **The in-app gate is UI only. This migration is the boundary.**
+
+Implemented as **`AS RESTRICTIVE`** policies, which Postgres **ANDs** with existing permissive policies rather than OR-ing. That means the veto is layered *on top* without reading, editing or dropping a single existing policy — correct by construction, additive, and trivially reversible (`DROP POLICY`; rollback block is in the file).
+
+```sql
+-- INSERT / UPDATE / DELETE only. No restrictive SELECT — guests must keep reading.
+CREATE POLICY no_anon_insert_<t> ON public.<t> AS RESTRICTIVE FOR INSERT TO authenticated
+  WITH CHECK (NOT public.is_anonymous_session());
+```
+
+`public.is_anonymous_session()` → `coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)` (absent claim ⇒ real user ⇒ `false`).
+
+Covers **14 tables**. Real users, providers and admins are unaffected (`is_anonymous = false` ⇒ veto never fires).
+
+**Rules going forward:**
+- **Adding a user-writable table? Add it to this veto.** Otherwise guests can write to it.
+- **Apply the veto BEFORE enabling the Anonymous provider**, or there is an exposure window.
+- The Anonymous toggle lives at the *bottom* of Auth → Sign In/Providers (below the OAuth list) and has a **separate Save button that silently discards on navigate-away**. Ground truth is the API, not the dashboard UI:
+  ```bash
+  curl -s "$EXPO_PUBLIC_SUPABASE_URL/auth/v1/settings" \
+    -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY" | grep anonymous_users
+  ```
+
+### 4. Language before entry
+
+The **entry screen carries a language pill** (native names — `Türkçe`, `العربية` — not 2-letter codes). This is load-bearing, not decoration: **the guest path never visits `AuthScreen`**, which after first launch was the only pre-hub language control (the carousel picker shows once). Without the pill, a returning newcomer in the wrong language had no way out of the first screen.
+
+### Known follow-ups (deferred, both intentional)
+
+- **Device-locale default — needs a native build.** The app **never reads device locale**; `expo-localization` is not a dependency. Default is a hardcoded `'English'` (`App.js` `pendingLang`, `OnboardingScreen` `lang`). `expo-localization` is a native module and **cannot ride an OTA**. The entry-screen language pill is the OTA-safe mitigation, not the fix.
+- **`view_count` → `SECURITY DEFINER` RPC.** `PropertyDetailScreen` increments `properties.view_count` **from the client** — a write on a browse path. The veto now 403s it for guests, so guest views silently stop counting. The RPC fix also closes the fact that this counter is currently client-incrementable and therefore **spoofable by any authenticated user**. Schema change → not an OTA.
+- **Abandoned-guest cleanup** is not built. Anonymous users accumulate in `auth.users`; treat as a monthly-maintenance job.
