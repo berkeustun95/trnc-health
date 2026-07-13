@@ -38,7 +38,7 @@ async function notifyAdmins(contentType) {
   } catch {}
 }
 
-export default function ContentReportMenu({ contentType, contentId, lang = 'English', style, onBlocked }) {
+export default function ContentReportMenu({ contentType, contentId, lang = 'English', style, onBlocked, onRequireAccount }) {
   const [open, setOpen]       = useState(false)
   const [step, setStep]       = useState('menu')   // menu | form | done | blockConfirm | blockDone
   const [reason, setReason]   = useState(null)
@@ -109,7 +109,7 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
   return (
     <>
       <TouchableOpacity
-        onPress={() => setOpen(true)}
+        onPress={() => { if (onRequireAccount?.('gateReport')) return; setOpen(true) }}
         style={[s.trigger, style]}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         accessibilityLabel={t('reportContent', lang)}

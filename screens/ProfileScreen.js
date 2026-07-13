@@ -500,7 +500,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
   const initials = form.full_name.trim()
     ? form.full_name.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-    : session.user.email[0].toUpperCase()
+    : (session.user.email?.[0] ?? t('guestLabel', lang)[0]).toUpperCase()
 
   const memberId = session.user.id.replace(/-/g, '').slice(0, 12).toUpperCase()
 
@@ -584,7 +584,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 <Feather name="edit-2" size={11} color="#fff" />
               </View>
             </TouchableOpacity>
-            <Text style={s.emailText}>{session.user.email}</Text>
+            <Text style={s.emailText}>{session.user.email ?? t('guestLabel', lang)}</Text>
             <View style={s.rolePill}>
               <Text style={s.rolePillText}>{profile?.role ?? 'customer'}</Text>
             </View>

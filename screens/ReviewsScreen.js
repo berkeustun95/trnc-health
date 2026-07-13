@@ -23,7 +23,7 @@ function StarBar({ count, total, star }) {
   )
 }
 
-function ReviewCard({ item, lang, onBlocked }) {
+function ReviewCard({ item, lang, onBlocked, onRequireAccount }) {
   const date = new Date(item.created_at).toLocaleDateString([], { dateStyle: 'medium' })
   return (
     <View style={s.reviewCard}>
@@ -33,7 +33,7 @@ function ReviewCard({ item, lang, onBlocked }) {
         </Text>
         <View style={s.reviewTopRight}>
           <Text style={s.reviewDate}>{date}</Text>
-          <ContentReportMenu contentType="review" contentId={item.id} lang={lang} onBlocked={onBlocked} />
+          <ContentReportMenu contentType="review" contentId={item.id} lang={lang} onBlocked={onBlocked} onRequireAccount={onRequireAccount} />
         </View>
       </View>
       {item.comment ? <Text style={s.comment}>{item.comment}</Text> : null}
@@ -42,7 +42,7 @@ function ReviewCard({ item, lang, onBlocked }) {
   )
 }
 
-export default function ReviewsScreen({ facility, lang = 'English', onBack }) {
+export default function ReviewsScreen({ facility, lang = 'English', onBack, onRequireAccount }) {
   const [reviews, setReviews]     = useState([])
   const [loading, setLoading]     = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -139,7 +139,7 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack }) {
               )}
             </View>
           }
-          renderItem={({ item }) => <ReviewCard item={item} lang={lang} onBlocked={handleBlocked} />}
+          renderItem={({ item }) => <ReviewCard item={item} lang={lang} onBlocked={handleBlocked} onRequireAccount={onRequireAccount} />}
           ListFooterComponent={
             loadingMore
               ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />

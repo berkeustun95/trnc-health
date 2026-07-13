@@ -203,7 +203,7 @@ function PlacesMapView({ places, userLocation, lang, onSelectPlace }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, userLocation, session }) {
+export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount }) {
   const [placeType,   setPlaceType]   = useState('all')
   const [district,    setDistrict]    = useState(null)
   const [places,      setPlaces]      = useState([])
@@ -366,7 +366,7 @@ export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, us
       {!!session && (
         <TouchableOpacity
           style={s.fab}
-          onPress={() => setShowSubmit(true)}
+          onPress={() => { if (onRequireAccount?.('gatePlaceSubmit')) return; setShowSubmit(true) }}
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={26} color="#fff" />

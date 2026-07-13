@@ -123,7 +123,7 @@ function ProviderCard({ item, lang, onPress }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function HomeServicesScreen({ lang, session, onBack }) {
+export default function HomeServicesScreen({ lang, session, onBack, onRequireAccount }) {
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [selectedDistrict, setSelectedDistrict] = useState(null)
   const [selectedProvider, setSelectedProvider] = useState(null)
@@ -220,7 +220,7 @@ export default function HomeServicesScreen({ lang, session, onBack }) {
             ))}
           </View>
 
-          <TouchableOpacity style={s.ctaCard} onPress={() => setShowOnboarding(true)} activeOpacity={0.8}>
+          <TouchableOpacity style={s.ctaCard} onPress={() => { if (onRequireAccount?.('gateHomeService')) return; setShowOnboarding(true) }} activeOpacity={0.8}>
             <View style={s.ctaIconWrap}>
               <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
             </View>

@@ -138,7 +138,7 @@ function JobCard({ item, lang, onPress }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function JobPostingsScreen({ lang, session, onBack }) {
+export default function JobPostingsScreen({ lang, session, onBack, onRequireAccount }) {
   const [selectedCategory,   setSelectedCategory]   = useState(null)
   const [selectedType,       setSelectedType]       = useState(null)
   const [selectedDistrict,   setSelectedDistrict]   = useState(null)
@@ -146,6 +146,8 @@ export default function JobPostingsScreen({ lang, session, onBack }) {
   const [showPostForm,       setShowPostForm]       = useState(false)
   const [jobs,               setJobs]               = useState([])
   const [loading,            setLoading]            = useState(false)
+
+  const openPostForm = () => { if (onRequireAccount?.('gateJobPost')) return; setShowPostForm(true) }
 
   const loadJobs = useCallback(async (category, empType, district) => {
     setLoading(true)
@@ -297,7 +299,7 @@ export default function JobPostingsScreen({ lang, session, onBack }) {
                     <Text style={s.emptyTitle}>{t('jobEmptyTitle', lang)}</Text>
                     <Text style={s.emptySub}>{t('jobEmptySub', lang)}</Text>
                     {!!session && (
-                      <TouchableOpacity style={s.emptyPostBtn} onPress={() => setShowPostForm(true)} activeOpacity={0.8}>
+                      <TouchableOpacity style={s.emptyPostBtn} onPress={openPostForm} activeOpacity={0.8}>
                         <Text style={s.emptyPostBtnText}>{t('jobPostCTA', lang)}</Text>
                       </TouchableOpacity>
                     )}
@@ -340,7 +342,7 @@ export default function JobPostingsScreen({ lang, session, onBack }) {
         </View>
 
         {!!session && (
-          <TouchableOpacity style={s.ctaCard} onPress={() => setShowPostForm(true)} activeOpacity={0.8}>
+          <TouchableOpacity style={s.ctaCard} onPress={openPostForm} activeOpacity={0.8}>
             <View style={s.ctaIconWrap}>
               <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
             </View>

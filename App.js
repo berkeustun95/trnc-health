@@ -11,7 +11,8 @@ import { PlayfairDisplay_400Regular, PlayfairDisplay_700Bold } from '@expo-googl
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
-import { supabase } from './lib/supabase'
+import { supabase, isGuest } from './lib/supabase'
+import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t } from './constants/i18n'
 import { getPreset } from './constants/avatars'
@@ -173,6 +174,8 @@ export default function App() {
   const [favorites, setFavorites] = useState(new Set())
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true)
+  const [authMode, setAuthMode] = useState('login')
+  const [gateKey, setGateKey] = useState(null)
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
@@ -216,6 +219,7 @@ export default function App() {
   const menuAnim = useRef(new Animated.Value(260)).current
   const menuStepCountRef = useRef(0)
   const sessionRef = useRef(null)
+  const toSignUpRef = useRef(false)
   const handledColdStartRef = useRef(false)
 
   function openMenu() {
@@ -319,9 +323,30 @@ export default function App() {
   function showEmergencyNumbers() {
     setShowEmergencyModal(true)
   }
+  // Returns true if the action was gated (caller should stop). Guests only.
+  function requireAccount(messageKey) {
+    if (!isGuest(session)) return false
+    setGateKey(messageKey)
+    return true
+  }
+
+  // We dropped upgrade-in-place, so the guest session is discarded and the user
+  // goes through the normal signup. Favourites live in AsyncStorage and survive.
+  async function gateSignUp() {
+    setGateKey(null)
+    setAuthMode('signup')
+    toSignUpRef.current = true
+    setShowWelcome(false)
+    await supabase.auth.signOut()
+  }
+
   async function selectLang(langKey) {
     setProfile(prev => ({ ...prev, preferred_language: langKey }))
+    setPendingLang(langKey)
     setShowLangModal(false)
+    AsyncStorage.setItem('@trnc_lang', langKey)
+    // Guests have no writable profile row, so the device copy above is their only store.
+    if (isGuest(session)) return
     await supabase.from('profiles').update({ preferred_language: langKey }).eq('id', session.user.id)
   }
   function showAbout() {
@@ -351,6 +376,12 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { menuAnim.setValue(260); setShowMenu(false) }
+      // A normal sign-out returns to the entry screen; a gate-driven one is on its way
+      // to the sign-up form, so don't bounce it back to the entry screen.
+      if (event === 'SIGNED_OUT') {
+        if (toSignUpRef.current) { toSignUpRef.current = false; setShowWelcome(false) }
+        else setShowWelcome(true)
+      }
       if (event === 'PASSWORD_RECOVERY') setShowPasswordReset(true)
     })
     return () => subscription.unsubscribe()
@@ -409,10 +440,11 @@ export default function App() {
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
+      if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome])
 
   useEffect(() => {
     Promise.all([
@@ -544,7 +576,9 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!session) return
+    // Guests can't hold a push token (the profiles write is refused by RLS), so don't
+    // raise an OS permission prompt we can't honour.
+    if (!session || isGuest(session)) return
     async function registerPushToken() {
       try {
         if (!Device.isDevice) return
@@ -676,9 +710,16 @@ export default function App() {
   } else if (onboarded === false) {
     content = <OnboardingScreen onComplete={completeOnboarding} />
   } else if (!session && showWelcome) {
-    content = <WelcomeScreen lang={lang} onContinue={() => setShowWelcome(false)} />
+    content = (
+      <WelcomeScreen
+        lang={lang}
+        onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l) }}
+        onLogin={() => { setAuthMode('login'); setShowWelcome(false) }}
+        onSignUp={() => { setAuthMode('signup'); setShowWelcome(false) }}
+      />
+    )
   } else if (!session) {
-    content = <AuthScreen lang={lang} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l) }} />
+    content = <AuthScreen lang={lang} initialMode={authMode} onLangChange={l => { setPendingLang(l); AsyncStorage.setItem('@trnc_lang', l) }} />
   } else if (loading || !profile) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -828,22 +869,22 @@ export default function App() {
         lang={lang}
         session={session}
         onClose={() => setShowAccommodation(false)}
-        onBecomeAgent={() => { setShowAccommodation(false); setShowAgentOnboarding(true) }}
+        onBecomeAgent={() => { if (requireAccount('gateEstateAgent')) return; setShowAccommodation(false); setShowAgentOnboarding(true) }}
         onOpenProperty={prop => setOpenedProperty(prop)}
       />
     )
   } else if (showHomeServices) {
-    content = <HomeServicesScreen lang={lang} session={session} onBack={() => setShowHomeServices(false)} />
+    content = <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowHomeServices(false)} />
   } else if (showJobPostings) {
-    content = <JobPostingsScreen lang={lang} session={session} onBack={() => setShowJobPostings(false)} />
+    content = <JobPostingsScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowJobPostings(false)} />
   } else if (showTransport) {
-    content = <TransportScreen lang={lang} session={session} onBack={() => setShowTransport(false)} />
+    content = <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowTransport(false)} />
   } else if (selectedPlace) {
     content = <PlaceProfileScreen place={selectedPlace} lang={lang} onBack={() => setSelectedPlace(null)} />
   } else if (showBeachesLandmarks) {
     content = (
       <BLErrorBoundary>
-        <BeachesLandmarksScreen lang={lang} onBack={() => setShowBeachesLandmarks(false)} userLocation={userLocation} onSelectPlace={setSelectedPlace} session={session} />
+        <BeachesLandmarksScreen lang={lang} onBack={() => setShowBeachesLandmarks(false)} userLocation={userLocation} onSelectPlace={setSelectedPlace} session={session} onRequireAccount={requireAccount} />
       </BLErrorBoundary>
     )
   } else if (showNewcomerEssentials) {
@@ -977,7 +1018,8 @@ export default function App() {
       lang={lang}
       isFavorite={favorites.has(selectedFacility.id)}
       onToggleFavorite={() => toggleFavorite(selectedFacility.id)}
-      onBook={() => setBookingFacility(selectedFacility)}
+      onBook={() => { if (requireAccount('gateBooking')) return; setBookingFacility(selectedFacility) }}
+      onRequireAccount={requireAccount}
       onBack={() => setSelectedFacility(null)}
     />
   } else {
@@ -1002,7 +1044,7 @@ export default function App() {
 
             dutyBannerRef={dutyBannerRef}
             onOpenMenu={openMenu}
-            onShowNotifs={() => setShowNotifs(true)}
+            onShowNotifs={() => { if (requireAccount('gateNotifications')) return; setShowNotifs(true) }}
             onShowDutyList={() => setShowDutyList(true)}
             onSelectFacility={setSelectedFacility}
             onUnclaimedFacility={setUnclaimedFacility}
@@ -1130,7 +1172,12 @@ export default function App() {
           />
         )}
 
-        <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} mapTabRef={mapTabRef} lang={lang} />
+        <BottomTabBar
+          activeTab={activeTab}
+          onTabPress={tab => { if (tab === 'profile' && requireAccount('gateProfile')) return; setActiveTab(tab) }}
+          mapTabRef={mapTabRef}
+          lang={lang}
+        />
 
         {showMenu && (
           <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />
@@ -1151,11 +1198,13 @@ export default function App() {
               )
               return (
                 <View style={[styles.menuAvatar, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.menuAvatarText}>{session.user.email[0].toUpperCase()}</Text>
+                  <Text style={styles.menuAvatarText}>
+                    {session.user.email?.[0]?.toUpperCase() ?? t('guestLabel', lang)[0].toUpperCase()}
+                  </Text>
                 </View>
               )
             })()}
-            <Text style={styles.menuEmail} numberOfLines={1}>{session.user.email}</Text>
+            <Text style={styles.menuEmail} numberOfLines={1}>{session.user.email ?? t('guestLabel', lang)}</Text>
             <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ flexShrink: 0 }}>
               <Ionicons name="close" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
@@ -1406,6 +1455,13 @@ export default function App() {
     <SafeAreaProvider>
       {content}
       {oliVisible && <OliGuide lang={lang} onNavigate={oliNavigate} />}
+      <AccountRequiredSheet
+        visible={!!gateKey}
+        messageKey={gateKey}
+        lang={lang}
+        onSignUp={gateSignUp}
+        onClose={() => setGateKey(null)}
+      />
     </SafeAreaProvider>
   )
 }

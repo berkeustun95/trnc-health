@@ -13,9 +13,9 @@ const LANGUAGES = [
   { key: 'Spanish', code: 'ES' }, { key: 'German',  code: 'DE' }, { key: 'Persian', code: 'FA' },
 ]
 
-export default function AuthScreen({ lang: initialLang = 'English', onLangChange }) {
+export default function AuthScreen({ lang: initialLang = 'English', onLangChange, initialMode = 'login' }) {
   const [lang, setLang] = useState(initialLang)
-  const [mode, setMode] = useState('login')
+  const [mode, setMode] = useState(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)

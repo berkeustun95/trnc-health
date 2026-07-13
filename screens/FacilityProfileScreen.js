@@ -17,7 +17,7 @@ const TODAY_KEY    = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
-export default function FacilityProfileScreen({ facility, lang, isFavorite, onToggleFavorite, onBook, onBack }) {
+export default function FacilityProfileScreen({ facility, lang, isFavorite, onToggleFavorite, onBook, onBack, onRequireAccount }) {
   const [reviews, setReviews]           = useState([])
   const [reviewTotal, setReviewTotal]   = useState(0)
   const [reviewAvg, setReviewAvg]       = useState(null)
@@ -67,7 +67,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
   }, [facility.id])
 
   if (showAllReviews) {
-    return <ReviewsScreen facility={facility} lang={lang} onBack={() => setShowAllReviews(false)} />
+    return <ReviewsScreen facility={facility} lang={lang} onBack={() => setShowAllReviews(false)} onRequireAccount={onRequireAccount} />
   }
 
   const tc         = typeColors[facility.type] || typeColors.clinic
@@ -290,7 +290,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                         <Text style={s.stars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</Text>
                         <View style={s.reviewTopRight}>
                           <Text style={s.reviewDate}>{new Date(r.created_at).toLocaleDateString([], { dateStyle: 'medium' })}</Text>
-                          <ContentReportMenu contentType="review" contentId={r.id} lang={lang} onBlocked={reloadReviews} />
+                          <ContentReportMenu contentType="review" contentId={r.id} lang={lang} onBlocked={reloadReviews} onRequireAccount={onRequireAccount} />
                         </View>
                       </View>
                       {r.comment ? <Text style={s.reviewComment}>{r.comment}</Text> : null}
