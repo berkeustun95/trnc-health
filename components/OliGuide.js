@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react'
-import { View, Text, Image, TouchableOpacity, Modal, TextInput, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, Platform } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { View, Text, Image, TouchableOpacity, Modal, TextInput, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, useWindowDimensions, Platform } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors, shadow, radius } from '../constants/theme'
@@ -7,6 +8,19 @@ import { t } from '../constants/i18n'
 import { resolveOliQuery, getIntent } from '../constants/oliIntents'
 
 const SCREEN_H = Dimensions.get('window').height
+
+const FAB_SIZE = 62
+const EDGE_MARGIN = 16
+// Bottom tab bar = borderTop 1 + paddingTop 10 + icon 24 + gap 3 + label ~14, plus insets.bottom.
+const TAB_BAR_H = 52
+const TAB_BAR_GAP = 20
+// Clears the screen header (~68) + the global search entry (~44) so the button never sits on them.
+const TOP_CLEARANCE = 112
+// Movement under this (px) on release counts as a tap, not a drag.
+const TAP_SLOP = 10
+const OLI_POS_KEY = '@trnc_oli_pos'
+
+const clamp = (v, min, max) => Math.min(Math.max(v, min), max)
 
 // Starter chips → intent targets. Matching/navigation lands in Slice 2.
 const CHIPS = [
@@ -20,11 +34,118 @@ const CHIPS = [
 
 export default function OliGuide({ lang, onNavigate }) {
   const insets = useSafeAreaInsets()
+  const { width, height } = useWindowDimensions()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState(null) // null = home (chips); [] = no match; [intents] = matches
   const translateY = useRef(new Animated.Value(SCREEN_H)).current
   const backdrop = useRef(new Animated.Value(0)).current
+
+  // --- Draggable floating button -------------------------------------------
+  const minX = EDGE_MARGIN
+  const maxX = width - FAB_SIZE - EDGE_MARGIN
+  const minY = insets.top + TOP_CLEARANCE
+  const maxY = Math.max(minY, height - (TAB_BAR_H + insets.bottom) - TAB_BAR_GAP - FAB_SIZE)
+
+  // Handlers live in a ref'd PanResponder, so they read bounds through a ref rather than a stale closure.
+  const boundsRef = useRef(null)
+  boundsRef.current = { minX, maxX, minY, maxY, width }
+
+  // Resting spot is stored as an edge + a vertical offset (never a free-floating x).
+  const restRef = useRef(null)
+  if (!restRef.current) restRef.current = { edge: 'right', y: maxY }
+
+  const pos = useRef(new Animated.ValueXY({ x: maxX, y: maxY })).current
+  const scale = useRef(new Animated.Value(1)).current
+  const dragFrom = useRef({ x: 0, y: 0 })
+
+  // Hidden until the saved position is read, so a left-edge rest doesn't flash in at bottom-right first.
+  const [hydrated, setHydrated] = useState(false)
+  const opacity = useRef(new Animated.Value(0)).current
+
+  // Re-clamp if the window or insets change (rotation, inset shifts). Keeps the same edge.
+  useEffect(() => {
+    const rest = restRef.current
+    const y = clamp(rest.y, minY, maxY)
+    const x = rest.edge === 'left' ? minX : maxX
+    restRef.current = { edge: rest.edge, y }
+    pos.setValue({ x, y })
+  }, [minX, maxX, minY, maxY])
+
+  // Restore the saved resting spot on launch. Anything missing or malformed falls back to bottom-right.
+  useEffect(() => {
+    let alive = true
+    AsyncStorage.getItem(OLI_POS_KEY)
+      .then(raw => {
+        if (!alive || !raw) return
+        const saved = JSON.parse(raw)
+        if (saved?.edge !== 'left' && saved?.edge !== 'right') return
+        if (!Number.isFinite(saved?.y)) return
+        const b = boundsRef.current
+        const y = clamp(saved.y, b.minY, b.maxY)
+        restRef.current = { edge: saved.edge, y }
+        pos.setValue({ x: saved.edge === 'left' ? b.minX : b.maxX, y })
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!alive) return
+        setHydrated(true)
+        Animated.timing(opacity, { toValue: 1, duration: 160, useNativeDriver: true }).start()
+      })
+    return () => { alive = false }
+  }, [])
+
+  const drag = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        const b = boundsRef.current
+        const rest = restRef.current
+        dragFrom.current = { x: rest.edge === 'left' ? b.minX : b.maxX, y: rest.y }
+        Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, friction: 6, tension: 140 }).start()
+      },
+      onPanResponderMove: (_, g) => {
+        const b = boundsRef.current
+        // setValue (not Animated.event) so the value stays native-driven for the snap spring.
+        pos.x.setValue(clamp(dragFrom.current.x + g.dx, 0, b.width - FAB_SIZE))
+        pos.y.setValue(clamp(dragFrom.current.y + g.dy, b.minY, b.maxY))
+      },
+      onPanResponderRelease: (_, g) => {
+        const b = boundsRef.current
+        Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 140 }).start()
+
+        if (Math.abs(g.dx) < TAP_SLOP && Math.abs(g.dy) < TAP_SLOP) {
+          settle(restRef.current)
+          openSheet()
+          return
+        }
+
+        const x = clamp(dragFrom.current.x + g.dx, 0, b.width - FAB_SIZE)
+        const y = clamp(dragFrom.current.y + g.dy, b.minY, b.maxY)
+        const edge = x + FAB_SIZE / 2 < b.width / 2 ? 'left' : 'right'
+        restRef.current = { edge, y }
+        settle({ edge, y })
+        AsyncStorage.setItem(OLI_POS_KEY, JSON.stringify({ edge, y })).catch(() => {})
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 140 }).start()
+        settle(restRef.current)
+      },
+    })
+  ).current
+
+  // Springs the button onto its resting edge. Native driver: transform only.
+  const settle = ({ edge, y }) => {
+    const b = boundsRef.current
+    Animated.spring(pos, {
+      toValue: { x: edge === 'left' ? b.minX : b.maxX, y },
+      useNativeDriver: true,
+      friction: 7,
+      tension: 70,
+    }).start()
+  }
 
   const openSheet = () => {
     setOpen(true)
@@ -77,14 +198,17 @@ export default function OliGuide({ lang, onNavigate }) {
 
   return (
     <>
-      <TouchableOpacity
-        style={[s.fab, { bottom: insets.bottom + 72 }]}
-        activeOpacity={0.85}
-        onPress={openSheet}
+      <Animated.View
+        {...drag.panHandlers}
+        pointerEvents={hydrated ? 'auto' : 'none'}
+        style={[s.fab, { opacity, transform: [...pos.getTranslateTransform(), { scale }] }]}
+        accessible
+        accessibilityRole="button"
         accessibilityLabel="Ask Oli"
+        onAccessibilityTap={openSheet}
       >
         <Image source={require('../assets/oli-button.png')} style={s.fabImg} resizeMode="cover" fadeDuration={0} />
-      </TouchableOpacity>
+      </Animated.View>
 
       <Modal visible={open} transparent animationType="none" onRequestClose={closeSheet} statusBarTranslucent>
         <Animated.View style={[s.backdrop, { opacity: backdrop }]}>
@@ -165,7 +289,7 @@ export default function OliGuide({ lang, onNavigate }) {
 
 const s = StyleSheet.create({
   fab: {
-    position: 'absolute', right: 16, width: 62, height: 62, borderRadius: 31,
+    position: 'absolute', left: 0, top: 0, width: FAB_SIZE, height: FAB_SIZE, borderRadius: FAB_SIZE / 2,
     backgroundColor: colors.cardBg, borderWidth: 2, borderColor: colors.primary,
     overflow: 'hidden', justifyContent: 'center', alignItems: 'center', zIndex: 50,
     ...shadow, shadowOpacity: 0.18, elevation: 8,
