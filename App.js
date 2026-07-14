@@ -1,6 +1,6 @@
 import { Component, useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal, Dimensions } from 'react-native'
+import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
 import { BlurView } from 'expo-blur'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
@@ -53,6 +53,7 @@ import HomeScreen from './screens/HomeScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import { haversineKm, parseIsOpen, coarseCoord } from './utils/facilityUtils'
+import { evaluateCityWelcome } from './utils/cityWelcome'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
 import * as Updates from 'expo-updates'
@@ -691,7 +692,34 @@ export default function App() {
     load()
   }, [retryCount])
 
+  // City welcome — foreground trigger. Slice 2 is log-only: the decision is
+  // computed and printed, never rendered. Slice 3 renders the card from it.
+  //
+  // Fires on cold start and on every background -> active transition. iOS also
+  // emits 'active' when a transient overlay (notification centre, control
+  // centre) is dismissed, so the previous state is tracked and only a real
+  // background -> active counts — otherwise a pull-down would burn the city's
+  // 30-day cooldown.
+  useEffect(() => {
+    let cancelled = false
+    const prevState = { current: AppState.currentState }
 
+    const check = async trigger => {
+      const decision = await evaluateCityWelcome(trigger)
+      if (cancelled || !decision?.show) return
+      // slice 3: setCityWelcome(decision) -> render the card, then markWelcomeShown()
+    }
+
+    check('cold-start')
+
+    const sub = AppState.addEventListener('change', next => {
+      const wasBackgrounded = prevState.current.match(/inactive|background/)
+      prevState.current = next
+      if (wasBackgrounded && next === 'active') check('foreground')
+    })
+
+    return () => { cancelled = true; sub.remove() }
+  }, [])
 
   const lang = profile?.preferred_language || pendingLang
 
