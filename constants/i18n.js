@@ -1,3 +1,8 @@
+// Extension is explicit so plain Node (scripts/validate-i18n-city.mjs) can import
+// this module and render the real strings. Metro resolves both forms. No cycle:
+// regions.js imports nothing.
+import { REGION_LABEL_KEY } from './regions.js'
+
 export const LANG_CODES = {
   'English': 'en', 'Turkish': 'tr', 'Arabic': 'ar',
   'Russian': 'ru', 'Greek': 'el', 'French': 'fr',
@@ -1152,17 +1157,36 @@ const translations = {
     blDistrictMorphou: 'Güzelyurt', blDistrictIskele: 'İskele', blDistrictLefke: 'Lefke', blDistrictKarpaz: 'Karpaz',
     blNoPlaces: 'Bu bölgede yer bulunamadı.',
 
-    // City welcome
-    cwWelcomeTitle: '{city} bölgesine hoş geldiniz!',
-    cwWelcomeBody: 'Şu anda {city} bölgesindesiniz. Buradayken bilmeye değer birkaç şey.',
-    cwNudgeTitle: 'Şu anda {city} bölgesindesiniz',
+    // City welcome — the only locale with a cityForms table. See tCity() at the
+    // bottom of this file.
+    //
+    // Turkish inflects a place name for case, and no single suffix works for all
+    // seven regions: it is "Girne'ye" but "Lefkoşa'ya", "Girne'de" but
+    // "Güzelyurt'ta". The copula harmonises too, so you cannot compose a bare
+    // locative with a fixed ending — "Girne'desiniz" but "Güzelyurt'tasınız"
+    // (back vowel). That third form therefore has to be stored, not derived.
+    //
+    // `-ki` IS invariant after -de/-da, so cwEventsFiltered composes safely off
+    // `loc` alone ("Girne'deki", "Güzelyurt'taki").
+    cityForms: {
+      nicosia:   { dat: "Lefkoşa'ya",    loc: "Lefkoşa'da",    locCop: "Lefkoşa'dasınız" },
+      kyrenia:   { dat: "Girne'ye",      loc: "Girne'de",      locCop: "Girne'desiniz" },
+      famagusta: { dat: "Gazimağusa'ya", loc: "Gazimağusa'da", locCop: "Gazimağusa'dasınız" },
+      morphou:   { dat: "Güzelyurt'a",   loc: "Güzelyurt'ta",  locCop: "Güzelyurt'tasınız" },
+      iskele:    { dat: "İskele'ye",     loc: "İskele'de",     locCop: "İskele'desiniz" },
+      lefke:     { dat: "Lefke'ye",      loc: "Lefke'de",      locCop: "Lefke'desiniz" },
+      karpaz:    { dat: "Karpaz'a",      loc: "Karpaz'da",     locCop: "Karpaz'dasınız" },
+    },
+    cwWelcomeTitle: '{cityDat} hoş geldiniz!',
+    cwWelcomeBody: 'Şu anda {cityLocCop}. Buradayken bilmeye değer birkaç şey.',
+    cwNudgeTitle: 'Şu anda {cityLocCop}',
     cwNudgeBody: 'Yine buradasınız — neler oluyor, bakalım.',
     cwBeaches: 'Plajlar ve yerler',
     cwEvents: 'Etkinlikler',
     cwDuty: 'Nöbetçi eczaneler',
     cwDismiss: 'Kapat',
     cwTurnOff: 'Bunları kapat',
-    cwEventsFiltered: '{city} bölgesindeki etkinlikler',
+    cwEventsFiltered: '{cityLoc}ki etkinlikler',
     cwClearFilter: 'Tümünü göster',
     cwAskTitle: 'Nerede yaşıyorsunuz?',
     cwAskBody: 'Böylece sizi yalnızca yeni olan yerlerde karşılarız — kendi şehrinizde asla.',
@@ -1170,7 +1194,7 @@ const translations = {
     cwAskVisitingHint: 'Gittiğim her şehri bana tanıt',
     cwAskLiveHere: 'Burada yaşıyorum',
     cwAskPickCity: 'Şehriniz',
-    cwAskDetected: 'Şu anda {city} bölgesinde görünüyorsunuz.',
+    cwAskDetected: 'Şu anda {cityLoc} görünüyorsunuz.',
     cwAskLater: 'Şimdi değil',
     cwMenuCityWelcome: 'Şehir karşılamaları',
     cwSettingsTitle: 'Şehir karşılamaları',
@@ -4825,4 +4849,34 @@ const translations = {
 export function t(key, lang) {
   const code = LANG_CODES[lang] || 'en'
   return translations[code]?.[key] ?? translations.en[key] ?? key
+}
+
+// t() for a string that names a region.
+//
+// Most languages take an uninflected prepositional phrase ("Willkommen in
+// {city}"), and for them this is just t() + interpolation. Turkish inflects the
+// place name itself, and no suffix is right for all seven regions, so `tr` ships
+// a `cityForms` table of pre-inflected forms and its templates use case-specific
+// placeholders ({cityDat}, {cityLoc}, {cityLocCop}) instead of {city}.
+//
+// A locale with no cityForms simply never has those placeholders in its strings
+// and falls through to the {city} path unchanged — which is why adding Turkish
+// grammar cost the other eight locales nothing. Russian and Greek deliberately
+// stay on the safe "region {city}" construction, where the case lands on a common
+// noun instead of the proper noun.
+//
+// If a region is somehow missing from cityForms, every placeholder degrades to
+// the bare label: ungrammatical, but never a raw "{cityDat}" on screen.
+// validate-i18n-city.mjs makes that unreachable in a shipped build.
+export function tCity(key, region, lang) {
+  const code = LANG_CODES[lang] || 'en'
+  const template = translations[code]?.[key] ?? translations.en[key] ?? key
+  const label = REGION_LABEL_KEY[region] ? t(REGION_LABEL_KEY[region], lang) : ''
+  const forms = translations[code]?.cityForms?.[region]
+
+  return template
+    .replace('{cityLocCop}', forms?.locCop ?? label)
+    .replace('{cityLoc}', forms?.loc ?? label)
+    .replace('{cityDat}', forms?.dat ?? label)
+    .replace('{city}', label)
 }

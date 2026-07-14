@@ -10,8 +10,7 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow } from '../constants/theme'
-import { t } from '../constants/i18n'
-import { REGION_LABEL_KEY } from '../constants/regions'
+import { t, tCity } from '../constants/i18n'
 import { resolveRegion } from '../utils/resolveRegion'
 import { openTicketUrl } from '../utils/events'
 
@@ -305,9 +304,7 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
                   accessibilityRole="button"
                 >
                   <Feather name="map-pin" size={13} color={colors.primary} />
-                  <Text style={s.districtPillText}>
-                    {t('cwEventsFiltered', lang).replace('{city}', t(REGION_LABEL_KEY[district], lang))}
-                  </Text>
+                  <Text style={s.districtPillText}>{tCity('cwEventsFiltered', district, lang)}</Text>
                   <Text style={s.districtPillClear}>{t('cwClearFilter', lang)}</Text>
                   <Feather name="x" size={13} color={colors.textSecondary} />
                 </TouchableOpacity>

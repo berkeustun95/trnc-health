@@ -3,8 +3,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, Animated, D
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../constants/theme'
-import { t } from '../constants/i18n'
-import { REGION_LABEL_KEY } from '../constants/regions'
+import { t, tCity } from '../constants/i18n'
 
 // The city-welcome card. Mounted at the root of App.js next to OliGuide — the
 // canonical app-wide overlay pattern (see architecture.md). It slides up over
@@ -36,10 +35,11 @@ export default function CityWelcomeCard({ region, variant, lang, onNavigate, onD
     }).start()
   }, [slide])
 
-  const city = t(REGION_LABEL_KEY[region], lang)
+  // tCity, not t(...).replace('{city}') — Turkish inflects the place name and
+  // needs a pre-inflected form per region. See tCity() in constants/i18n.js.
   const isRich = variant === 'rich'
-  const title = t(isRich ? 'cwWelcomeTitle' : 'cwNudgeTitle', lang).replace('{city}', city)
-  const body  = t(isRich ? 'cwWelcomeBody'  : 'cwNudgeBody',  lang).replace('{city}', city)
+  const title = tCity(isRich ? 'cwWelcomeTitle' : 'cwNudgeTitle', region, lang)
+  const body  = tCity(isRich ? 'cwWelcomeBody'  : 'cwNudgeBody',  region, lang)
 
   return (
     <View style={s.backdrop} pointerEvents="box-none">

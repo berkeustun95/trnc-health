@@ -3,8 +3,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, Animated, D
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../constants/theme'
-import { t } from '../constants/i18n'
-import { REGION_LABEL_KEY } from '../constants/regions'
+import { t, tCity } from '../constants/i18n'
 import { VISITING } from '../utils/cityWelcomeRules'
 import CityPicker from './CityPicker'
 
@@ -33,9 +32,7 @@ export default function HomeCitySheet({ detectedRegion, lang, onResolve, onDismi
     Animated.spring(slide, { toValue: 0, useNativeDriver: true, bounciness: 4, speed: 12 }).start()
   }, [slide])
 
-  const hint = detectedRegion
-    ? t('cwAskDetected', lang).replace('{city}', t(REGION_LABEL_KEY[detectedRegion], lang))
-    : null
+  const hint = detectedRegion ? tCity('cwAskDetected', detectedRegion, lang) : null
 
   return (
     <View style={s.backdrop} pointerEvents="box-none">
