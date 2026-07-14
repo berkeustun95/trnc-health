@@ -45,11 +45,15 @@ export const REGION_TO_DUTY = {
 // ---------------------------------------------------------------------------
 // ANCHORS — the classifier's training set. [lat, lng, region]
 //
-// GENERATED, NOT HAND-PICKED. Every coordinate is lifted verbatim from
-// `seed_pharmacies_geocoded.sql` (387 KTEB pharmacies, geocoded via Nominatim),
-// deduplicated by coordinate. Each is a real populated place whose district we
-// know from the pharmacy's own address. `resolveRegion` assigns a coordinate to
-// the district of its NEAREST anchor.
+// GENERATED, NOT HAND-PICKED. Every coordinate outside the karpaz block is
+// lifted verbatim from `seed_pharmacies_geocoded.sql` (387 KTEB pharmacies,
+// geocoded via Nominatim), deduplicated by coordinate. Each is a real populated
+// place whose district we know from the pharmacy's own address. `resolveRegion`
+// assigns a coordinate to the district of its NEAREST anchor.
+//
+// Karpaz is the one exception, and the karpaz block says why: the peninsula had
+// only three pharmacy coordinates, two of them badly geocoded, so it uses
+// verified town centres instead.
 //
 // Why anchors and not one centroid per district: Tatlısu is administratively
 // Gazimağusa but sits on the north coast ~30 km from Famagusta city, and Dikmen
@@ -60,13 +64,14 @@ export const REGION_TO_DUTY = {
 // The near-duplicate city-centre entries are deliberate — they cost nothing and
 // keep this list a faithful projection of the data rather than a curated one.
 //
-// TWO EDITS were applied to the raw data, and only two:
+// EDITS applied to the raw pharmacy data, and only these:
 //   1. MESARYA FOLD. `Alt Mesarya` -> famagusta; `Üst Mesarya` -> nicosia,
 //      except Geçitkale and Serdarlı, which sit in Gazimağusa district.
 //   2. DROPPED the single 'Yeni İskele' row. Its address is a real
 //      İskele-district place but the geocoder returned YENIERENKÖY's coordinates
 //      (35.5343, 34.1886) — ~75 km away, in Karpaz. Keeping it would drag all of
 //      Yenierenköy into `iskele`. It is a seed-data bug, fix it in the DB.
+//   3. KARPAZ REPLACED with verified town centres — see that block.
 // ---------------------------------------------------------------------------
 
 export const ANCHORS = [
@@ -222,14 +227,24 @@ export const ANCHORS = [
   [35.1724843, 32.9164496, 'lefke'], // Gaziveren
 
   // --- karpaz (3) ---
-  // WEAKEST REGION IN THIS SET. Only three unique pharmacy coordinates exist for
-  // the whole peninsula, and the two eastern ones look coarsely geocoded (their
-  // addresses say Çayırova and Mehmetçik, but both snap toward Dipkarpaz). The
-  // İskele/Karpaz boundary is therefore the least-evidenced line in this file.
-  // Middle-peninsula towns (Bafra, Kumyalı, Dipkarpaz proper) have no anchor.
-  [35.5343185, 34.1886490, 'karpaz'], // Yenierenköy
-  [35.6046231, 34.3807815, 'karpaz'], // toward Dipkarpaz ("Çayırova" row — coarse)
-  [35.6587420, 34.5235773, 'karpaz'], // near the tip ("Mehmetçik" row — coarse)
+  // The ONLY region not drawn from the pharmacy seed. The peninsula had just
+  // three pharmacy coordinates and two were badly geocoded, so these are verified
+  // town centres (Google Places locality centroids, checked on a map) instead.
+  // Karpaz is no longer the weak spot in this file.
+  //
+  // All three old pharmacy pins were DROPPED:
+  //   - old Yenierenköy sat 110 m from the verified pin — redundant.
+  //   - the "Çayırova" row sat 650 m from Dipkarpaz — redundant, and its address
+  //     was a bad geocode anyway.
+  //   - the "Mehmetçik" row (35.6587, 34.5236) is nowhere near Mehmetçik. It was
+  //     tempting to keep it for tip coverage, but that turned out to be a
+  //     non-reason: with it gone, Golden Beach, Apostolos Andreas Monastery and
+  //     Zafer Burnu still resolve to karpaz off Dipkarpaz (13.4 / 18.6 / 19.3 km,
+  //     against MAX_ANCHOR_KM 25). It bought nothing, and it is a coordinate we
+  //     cannot vouch for. Dropped.
+  [35.4281800, 34.1308300, 'karpaz'], // Kumyalı — base of the peninsula
+  [35.5353100, 34.1894100, 'karpaz'], // Yenierenköy — midway
+  [35.5987500, 34.3807700, 'karpaz'], // Dipkarpaz (Rizokarpaso town, not the park)
 ]
 
 // ---------------------------------------------------------------------------
