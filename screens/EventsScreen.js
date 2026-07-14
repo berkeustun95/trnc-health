@@ -11,6 +11,8 @@ import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { REGION_LABEL_KEY } from '../constants/regions'
+import { resolveRegion } from '../utils/resolveRegion'
 import { openTicketUrl } from '../utils/events'
 
 const { width: SCREEN_W } = Dimensions.get('window')
@@ -233,12 +235,17 @@ function EventDetailScreen({ event, lang, onBack }) {
 
 export { EventDetailScreen }
 
-export default function EventsScreen({ lang, onBack }) {
+// `initialDistrict` is a canonical region slug, set when the user arrives from a
+// city-welcome card. The events table has no district column — only lat/lng — so
+// the district is derived from the coordinates with resolveRegion. An event with
+// no coordinates cannot be placed, so it drops out while a district filter is on.
+export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [category, setCategory] = useState('all')
+  const [district, setDistrict] = useState(initialDistrict)
 
   const load = useCallback(async () => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -252,7 +259,10 @@ export default function EventsScreen({ lang, onBack }) {
     setLoading(false)
   }, [])
 
-  const filtered = category === 'all' ? events : events.filter(e => e.category === category)
+  const byCategory = category === 'all' ? events : events.filter(e => e.category === category)
+  const filtered = district
+    ? byCategory.filter(e => resolveRegion(e.latitude, e.longitude) === district)
+    : byCategory
 
   useEffect(() => { load() }, [load])
 
@@ -287,6 +297,21 @@ export default function EventsScreen({ lang, onBack }) {
                 subtitle={t('eventsSubtitle', lang)}
                 style={s.introCard}
               />
+              {district ? (
+                <TouchableOpacity
+                  style={s.districtPill}
+                  onPress={() => setDistrict(null)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                >
+                  <Feather name="map-pin" size={13} color={colors.primary} />
+                  <Text style={s.districtPillText}>
+                    {t('cwEventsFiltered', lang).replace('{city}', t(REGION_LABEL_KEY[district], lang))}
+                  </Text>
+                  <Text style={s.districtPillClear}>{t('cwClearFilter', lang)}</Text>
+                  <Feather name="x" size={13} color={colors.textSecondary} />
+                </TouchableOpacity>
+              ) : null}
               <View style={s.filterRow}>
                 {CATEGORIES.map(c => (
                   <TouchableOpacity
@@ -325,6 +350,11 @@ const s = StyleSheet.create({
 
   // Filter chips
   introCard:          { marginBottom: 16 },
+  districtPill:       { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+                        backgroundColor: colors.primaryLight, borderRadius: 20,
+                        paddingHorizontal: 12, paddingVertical: 7, marginBottom: 10 },
+  districtPillText:   { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
+  districtPillClear:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   filterRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4 },
   chip:               { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                         backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },

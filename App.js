@@ -53,7 +53,8 @@ import HomeScreen from './screens/HomeScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import { haversineKm, parseIsOpen, coarseCoord } from './utils/facilityUtils'
-import { evaluateCityWelcome } from './utils/cityWelcome'
+import { evaluateCityWelcome, markWelcomeShown, setCityWelcomeEnabled } from './utils/cityWelcome'
+import CityWelcomeCard from './components/CityWelcomeCard'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
 import * as Updates from 'expo-updates'
@@ -159,6 +160,13 @@ export default function App() {
   const [userLocation, setUserLocation] = useState(null)
   const [locationDenied, setLocationDenied] = useState(false)
   const [dutyFacilityId, setDutyFacilityId] = useState(null)
+  // City welcome: the pending decision, plus the region each deep-linked screen
+  // should open pre-filtered to. Cleared on that screen's back, so a later manual
+  // open is not still filtered to a city the user has since left.
+  const [cityWelcome, setCityWelcome] = useState(null)
+  const [beachesDistrict, setBeachesDistrict] = useState(null)
+  const [eventsDistrict, setEventsDistrict] = useState(null)
+  const [dutyRegion, setDutyRegion] = useState(null)
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [bookingFacility, setBookingFacility] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -692,8 +700,7 @@ export default function App() {
     load()
   }, [retryCount])
 
-  // City welcome — foreground trigger. Slice 2 is log-only: the decision is
-  // computed and printed, never rendered. Slice 3 renders the card from it.
+  // City welcome — foreground trigger.
   //
   // Fires on cold start and on every background -> active transition. iOS also
   // emits 'active' when a transient overlay (notification centre, control
@@ -707,7 +714,7 @@ export default function App() {
     const check = async trigger => {
       const decision = await evaluateCityWelcome(trigger)
       if (cancelled || !decision?.show) return
-      // slice 3: setCityWelcome(decision) -> render the card, then markWelcomeShown()
+      setCityWelcome(decision)
     }
 
     check('cold-start')
@@ -720,6 +727,25 @@ export default function App() {
 
     return () => { cancelled = true; sub.remove() }
   }, [])
+
+  // The customer hub: signed in (guest or not), on a customer role, with no
+  // drawer, coach marks or facility sheet covering the screen. Gates both the
+  // Ask Oli button and the city-welcome card — neither may appear over an auth
+  // screen or a provider dashboard.
+  const inCustomerHub =
+    !!session && !!profile &&
+    !['admin', 'provider', 'estate_agent', 'organizer', 'home_service_provider'].includes(profile.role) &&
+    !showMenu && !showCoachMarks &&
+    !selectedFacility && !bookingFacility
+
+  const cityWelcomeVisible = !!cityWelcome && inCustomerHub
+
+  // Burn the city's 30-day cooldown only once the card is actually on screen.
+  // Marking it at decision time would spend the cooldown on a card the user
+  // never saw — e.g. one decided while they were still on the auth screen.
+  useEffect(() => {
+    if (cityWelcomeVisible) markWelcomeShown(cityWelcome.region)
+  }, [cityWelcomeVisible, cityWelcome?.region])
 
   const lang = profile?.preferred_language || pendingLang
 
@@ -871,9 +897,9 @@ export default function App() {
       }}
     />
   } else if (showDutyList) {
-    content = <DutyListScreen onBack={() => setShowDutyList(false)} lang={lang} userLocation={userLocation} locationDenied={locationDenied} />
+    content = <DutyListScreen onBack={() => { setShowDutyList(false); setDutyRegion(null) }} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
   } else if (showEvents) {
-    content = <EventsScreen lang={lang} onBack={() => setShowEvents(false)} />
+    content = <EventsScreen lang={lang} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} initialDistrict={eventsDistrict} />
   } else if (showAgentOnboarding) {
     content = (
       <EstateAgentOnboardingScreen
@@ -912,7 +938,7 @@ export default function App() {
   } else if (showBeachesLandmarks) {
     content = (
       <BLErrorBoundary>
-        <BeachesLandmarksScreen lang={lang} onBack={() => setShowBeachesLandmarks(false)} userLocation={userLocation} onSelectPlace={setSelectedPlace} session={session} onRequireAccount={requireAccount} />
+        <BeachesLandmarksScreen lang={lang} onBack={() => { setShowBeachesLandmarks(false); setBeachesDistrict(null) }} userLocation={userLocation} onSelectPlace={setSelectedPlace} session={session} onRequireAccount={requireAccount} initialDistrict={beachesDistrict} />
       </BLErrorBoundary>
     )
   } else if (showNewcomerEssentials) {
@@ -1473,16 +1499,41 @@ export default function App() {
     }
   }
 
-  const oliVisible =
-    !!session && !!profile &&
-    !['admin', 'provider', 'estate_agent', 'organizer', 'home_service_provider'].includes(profile.role) &&
-    !showMenu && !showCoachMarks &&
-    !selectedFacility && !bookingFacility
+  // City-welcome routing: same reset-then-open shape as oliNavigate, but it also
+  // carries the region so the target screen opens filtered to that city.
+  const cityNavigate = (target) => {
+    const region = cityWelcome?.region
+    setCityWelcome(null)
+    setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
+    setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
+    setShowJobPostings(false); setShowBeachesLandmarks(false); setShowTransport(false)
+    setShowNewcomerEssentials(false); setShowExchangeRates(false)
+    setSelectedPlace(null); setShowNotifs(false)
+    switch (target) {
+      case 'beaches': setBeachesDistrict(region); setShowBeachesLandmarks(true); break
+      case 'events':  setEventsDistrict(region);  setShowEvents(true); break
+      case 'duty':    setActiveTab('home'); setDutyRegion(region); setShowDutyList(true); break
+    }
+  }
+
+  // Oli is hidden under the card (same reason it hides for the drawer and coach
+  // marks — the card is a root overlay and would cover the floating button).
+  const oliVisible = inCustomerHub && !cityWelcomeVisible
 
   return (
     <SafeAreaProvider>
       {content}
       {oliVisible && <OliGuide lang={lang} onNavigate={oliNavigate} />}
+      {cityWelcomeVisible && (
+        <CityWelcomeCard
+          region={cityWelcome.region}
+          variant={cityWelcome.variant}
+          lang={lang}
+          onNavigate={cityNavigate}
+          onDismiss={() => setCityWelcome(null)}
+          onTurnOff={() => { setCityWelcomeEnabled(false); setCityWelcome(null) }}
+        />
+      )}
       <AccountRequiredSheet
         visible={!!gateKey}
         messageKey={gateKey}

@@ -7,6 +7,7 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { REGION_TO_DUTY } from '../constants/regions'
 
 
 const REGION_TO_BL_KEY = {
@@ -89,7 +90,11 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
   )
 }
 
-export default function DutyListScreen({ onBack, lang, userLocation, locationDenied }) {
+// `initialRegion` is a canonical region slug (from city welcome). We hoist that
+// region's sections to the top rather than scrolling to them: the list is short,
+// and SectionList.scrollToLocation throws when the index is out of range — which
+// it would be on any day that region has no duty pharmacy.
+export default function DutyListScreen({ onBack, lang, userLocation, locationDenied, initialRegion = null }) {
   const [sections, setSections] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -113,12 +118,19 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
           ...DISTRICT_ORDER.filter(d => map[d]).map(d => ({ title: d, data: map[d] })),
           ...Object.entries(map).filter(([k]) => !knownSet.has(k)).map(([k, v]) => ({ title: k, data: v })),
         ]
-        setSections(sorted)
+
+        // Arrived from a city-welcome card: float that city's sections to the top,
+        // keeping DISTRICT_ORDER within each group so the rest of the list is
+        // untouched.
+        const hoist = new Set(REGION_TO_DUTY[initialRegion] ?? [])
+        setSections(hoist.size
+          ? [...sorted.filter(x => hoist.has(x.title)), ...sorted.filter(x => !hoist.has(x.title))]
+          : sorted)
       }
       setLoading(false)
     }
     load()
-  }, [])
+  }, [initialRegion])
 
   const d = new Date()
   const dateLabel = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })

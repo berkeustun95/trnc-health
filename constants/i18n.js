@@ -494,6 +494,20 @@ const translations = {
     blDistrictNicosia: 'Nicosia', blDistrictKyrenia: 'Kyrenia', blDistrictFamagusta: 'Famagusta',
     blDistrictMorphou: 'Morphou', blDistrictIskele: 'İskele', blDistrictLefke: 'Lefke', blDistrictKarpaz: 'Karpaz',
     blNoPlaces: 'No places found.',
+
+    // City welcome. English only for now — slice 5 translates the other 8 locales.
+    // t() falls back to English, so nothing shows a raw key in the meantime.
+    cwWelcomeTitle: 'Welcome to {city}!',
+    cwWelcomeBody: "You're in {city}. Here's what's worth knowing while you're here.",
+    cwNudgeTitle: "You're in {city}",
+    cwNudgeBody: "Back again — here's what's on.",
+    cwBeaches: 'Beaches & places',
+    cwEvents: "What's on",
+    cwDuty: 'Duty pharmacies',
+    cwDismiss: 'Dismiss',
+    cwTurnOff: 'Turn these off',
+    cwEventsFiltered: 'Events in {city}',
+    cwClearFilter: 'Show all',
     blBlueFlagLabel: 'Blue Flag',
     blAccessPublic: 'Public', blAccessPrivate: 'Private',
     blCatCastleFortress: 'Castle & Fortress', blCatAncientRuins: 'Ancient Ruins',

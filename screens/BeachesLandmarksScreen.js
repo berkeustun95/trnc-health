@@ -203,9 +203,9 @@ function PlacesMapView({ places, userLocation, lang, onSelectPlace }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount }) {
+export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, initialDistrict = null }) {
   const [placeType,   setPlaceType]   = useState('all')
-  const [district,    setDistrict]    = useState(null)
+  const [district,    setDistrict]    = useState(initialDistrict)
   const [places,      setPlaces]      = useState([])
   const [loading,     setLoading]     = useState(true)
   const [view,        setView]        = useState('list') // 'list' | 'map'
