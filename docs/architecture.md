@@ -206,8 +206,24 @@ Oli shows only in the **customer** app. It is hidden when:
 
 RN `Modal`s (emergency / language / municipal) render on the native layer **above** the root overlay, so they need no gate.
 
-### Placement
-`bottom: insets.bottom + 72` clears the `BottomTabBar` on the home tabs; full-screen sub-screens (no tab bar) get the same bottom-right corner at the safe-area edge — consistent across routes.
+### Placement — draggable, edge-snapped, persisted (no longer a fixed FAB)
+The button is **not** a static bottom-right FAB. It is an `Animated.View` with `PanResponder` handlers that the user drags; on release it **springs to whichever side edge its centre is nearer** (never rests mid-screen), and the resting spot **persists across launches** (`@trnc_oli_pos`, see below). First launch defaults to the old bottom-right position, so nothing moved for existing users.
+
+All of this lives **inside `OliGuide.js`** — the root mount in `App.js` was not touched. That is the point of the global-overlay pattern: the overlay owns its own placement.
+
+**Core `Animated` + `PanResponder` only.** Reanimated / gesture-handler are native deps — they'd force a native build and break OTA safety. Do not "upgrade" this to them without a native release.
+
+Three non-obvious constraints, each of which will bite anyone editing this:
+
+- **The drag is driven by imperative `pos.setValue()`, not `Animated.event`.** Mixing a JS-driven `Animated.event` with a native-driven spring on the *same* value makes RN throw *"node has been moved to native"*. `setValue` on a native node is supported, so the snap spring keeps `useNativeDriver: true`. Movement is therefore `transform: translateX/translateY` only — **never** `left`/`top`/`bottom`, which can't use the native driver.
+- **Position state of record is JS refs (`restRef {edge, y}`), never `pos._value`.** A native-driven `Animated.Value`'s JS-side `_value` is not guaranteed to be in sync (native only reports back when a listener is attached). Reading it back would be a latent bug.
+- **Tap vs drag is hand-rolled.** The PanResponder claims the touch on start, so there is no `TouchableOpacity` and no `onPress`. Under `TAP_SLOP` (10px) of movement on release ⇒ open the sheet; anything more ⇒ drag, sheet does **not** open. Because a screen reader never fires a PanResponder, `accessibilityRole="button"` + `onAccessibilityTap` carry the VoiceOver path — **do not remove them**, or Ask Oli becomes unreachable with VoiceOver on.
+
+**Safe bounds** are clamped *during* the drag, not just on release, so the button can't be pushed under the notch, under the `BottomTabBar`, or over the global search entry. Vertical range is `[insets.top + TOP_CLEARANCE, height − (TAB_BAR_H + insets.bottom) − TAB_BAR_GAP − FAB_SIZE]`.
+
+- `TAB_BAR_H = 52` / `TAB_BAR_GAP = 20` are **derived** from the real `BottomTabBar` layout in `App.js` (`borderTop 1 + paddingTop 10 + icon 24 + gap 3 + label ~14`, plus `insets.bottom`). The resulting lower bound lands on *exactly* the pixel the old fixed FAB occupied — that coincidence is the check that confirms them. **They go stale silently if that tab bar's padding or labels ever change.**
+- `TOP_CLEARANCE = 112` is an **estimate** of header (~68) + global search entry (~44), not a measured value. It is the one number here likely to need tuning.
+- The lower bound assumes a tab bar exists. Full-screen sub-screens (no tab bar) simply float a little higher than strictly necessary — same as the old hardcoded behaviour, so no regression.
 
 ### Routing seam
 Intent config lives in a **pure-data** module (`constants/oliIntents.js`): each intent is `{ id, keywords, msgKey }` where `id` is both the intent id and the navigation target. `App.js` owns the `oliNavigate(id)` dispatcher, which resets the open module sub-screens then sets the target's state flag (e.g. `pharmacy` → `setShowDutyList(true)`, `clinic` → `setActiveTab('home')`, `emergency` → `setShowEmergencyModal(true)`).
@@ -312,3 +328,25 @@ The **entry screen carries a language pill** (native names — `Türkçe`, `ال
 - **Device-locale default — needs a native build.** The app **never reads device locale**; `expo-localization` is not a dependency. Default is a hardcoded `'English'` (`App.js` `pendingLang`, `OnboardingScreen` `lang`). `expo-localization` is a native module and **cannot ride an OTA**. The entry-screen language pill is the OTA-safe mitigation, not the fix.
 - **`view_count` → `SECURITY DEFINER` RPC.** `PropertyDetailScreen` increments `properties.view_count` **from the client** — a write on a browse path. The veto now 403s it for guests, so guest views silently stop counting. The RPC fix also closes the fact that this counter is currently client-incrementable and therefore **spoofable by any authenticated user**. Schema change → not an OTA.
 - **Abandoned-guest cleanup** is not built. Anonymous users accumulate in `auth.users`; treat as a monthly-maintenance job.
+
+## AsyncStorage keys — device-local state
+
+Every key the app reads or writes. **Device-local, never synced** — nothing here survives a reinstall, and none of it is per-account (a guest and a signed-in user on the same phone share these).
+
+| Key | Written by | Value | Notes |
+|---|---|---|---|
+| `@trnc_lang` | `App.js`, `AuthScreen`, `WelcomeScreen` | language name, e.g. `'English'` | Selected UI language. |
+| `@trnc_onboarded` | `App.js` | `'true'` | Carousel/onboarding completed. Gates the welcome path. |
+| `@trnc_coach_v2` | `App.js` | `'true'` | Coach marks shown once. `_v2` suffix is how the deck was re-shown after a redesign — **bump the suffix, don't clear the key**, if the coach marks change again. |
+| `@trnc_oli_pos` | `components/OliGuide.js` | `JSON.stringify({ edge: 'left'\|'right', y: <px> })` | Resting spot of the draggable Ask Oli button. See the Ask Oli section. |
+| `ada_favorites` | `App.js` | JSON array of facility ids | **Prefix inconsistency is pre-existing** (`ada_`, not `@trnc_`). Left alone deliberately: renaming it would silently drop every existing user's favourites. New keys use `@trnc_`. |
+
+Supabase auth additionally uses AsyncStorage as its session store (`lib/supabase.js`, `storage: AsyncStorage`), which owns its own `sb-*` keys — don't hand-edit or clear those.
+
+**`ada_favorites` is deliberately not gated for guests** — see the guest-access section. It is the one piece of user state that survives the guest → signup handoff, precisely because it's device-local rather than server-side.
+
+### `@trnc_oli_pos` read/write contract
+- **Write:** once per drag, in `onPanResponderRelease` (never per frame, never on a tap). Fire-and-forget; errors swallowed, because a storage failure should cost a remembered position, not break the button.
+- **Read:** once on mount. Validates `edge ∈ {left, right}` and `Number.isFinite(y)`, then **re-clamps `y` to current bounds** before applying — so a stale entry (different device, changed insets, hand-edited value) falls back to the default instead of parking the button off-screen.
+- `x` is deliberately **not** stored: the button always snaps to an edge, so the edge plus a `y` is the whole state.
+- The button renders at `opacity: 0` (and `pointerEvents: 'none'`) until that read resolves, so a saved left-edge position doesn't flash in at bottom-right first. A `null` read (first launch) is the legacy bottom-right corner.
