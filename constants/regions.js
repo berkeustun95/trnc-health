@@ -242,6 +242,14 @@ export const ANCHORS = [
   //     Zafer Burnu still resolve to karpaz off Dipkarpaz (13.4 / 18.6 / 19.3 km,
   //     against MAX_ANCHOR_KM 25). It bought nothing, and it is a coordinate we
   //     cannot vouch for. Dropped.
+  // THE RULE IS: EAST OF BOĞAZ = KARPAZ, NO EXCEPTION.
+  //
+  // This means the Bafra resort strip resolves to `karpaz`, not `iskele`, because
+  // Kumyalı is ~9 km away and the nearest İskele anchor (Boğaz) is ~13 km. That is
+  // DELIBERATE — do not "fix" it by adding a Bafra anchor. Bafra is east of Boğaz,
+  // on the peninsula, and functions as the Karpaz gateway: its guests are there
+  // for the peninsula. "Welcome to Karpaz" is right at the Kaya Artemis;
+  // "Welcome to İskele" would not be.
   [35.4281800, 34.1308300, 'karpaz'], // Kumyalı — base of the peninsula
   [35.5353100, 34.1894100, 'karpaz'], // Yenierenköy — midway
   [35.5987500, 34.3807700, 'karpaz'], // Dipkarpaz (Rizokarpaso town, not the park)
