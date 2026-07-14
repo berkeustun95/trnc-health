@@ -10,11 +10,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Location from 'expo-location'
 import { resolveRegion } from './resolveRegion'
 import {
-  KEY_ENABLED, KEY_HOME, KEY_SEEN, KEY_ASKED,
-  decideWelcome, parseSeen,
+  KEY_ENABLED, KEY_HOME, KEY_SEEN, KEY_ASKED, KEY_ASK_LAST,
+  decideWelcome, shouldAskHomeCity, parseSeen,
 } from './cityWelcomeRules'
 
-export { VISITING, COOLDOWN_MS, decideWelcome } from './cityWelcomeRules'
+export { VISITING, COOLDOWN_MS, decideWelcome, shouldAskHomeCity } from './cityWelcomeRules'
 
 // --- flags ------------------------------------------------------------------
 
@@ -29,15 +29,23 @@ export const DEBUG_FORCE_REGION = null
 // --- storage ----------------------------------------------------------------
 
 export async function loadCityWelcomeState() {
-  const [[, enabled], [, home], [, seenRaw], [, asked]] = await AsyncStorage.multiGet([
-    KEY_ENABLED, KEY_HOME, KEY_SEEN, KEY_ASKED,
+  const [[, enabled], [, home], [, seenRaw], [, asked], [, askLast]] = await AsyncStorage.multiGet([
+    KEY_ENABLED, KEY_HOME, KEY_SEEN, KEY_ASKED, KEY_ASK_LAST,
   ])
   return {
-    enabled: enabled !== 'off', // absent => on
-    home:    home ?? null,      // null | region slug | 'visiting'
+    enabled: enabled !== 'off',    // absent => on
+    home:    home ?? null,         // null | region slug | 'visiting'
     seen:    parseSeen(seenRaw),
     asked:   asked === 'true',
+    askLast: Number(askLast) || 0, // 0 => never asked
   }
+}
+
+// Recorded when the question goes ON SCREEN, not when it is answered — a soft
+// dismiss leaves `asked` false, and this timestamp is the only thing stopping us
+// asking again on the very next launch.
+export async function markAskShown(now = Date.now()) {
+  try { await AsyncStorage.setItem(KEY_ASK_LAST, String(now)) } catch {}
 }
 
 // Errors are swallowed: a storage failure should cost a remembered timestamp,

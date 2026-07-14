@@ -5,7 +5,9 @@
 // cooldown boundary — can be verified here in milliseconds instead of by
 // waiting a month and driving between cities.
 
-import { decideWelcome, COOLDOWN_MS, VISITING } from '../utils/cityWelcomeRules.js'
+import {
+  decideWelcome, shouldAskHomeCity, COOLDOWN_MS, ASK_COOLDOWN_MS, VISITING,
+} from '../utils/cityWelcomeRules.js'
 
 const NOW = Date.UTC(2026, 6, 14) // fixed clock; no wall-time flake
 const DAY = 24 * 60 * 60 * 1000
@@ -90,6 +92,54 @@ for (const [name, state, region, expect] of cases) {
   if (!ok) console.log(`       expected show=${expect.show}${expect.variant ? ` ${expect.variant}` : ''} (${expect.reason})`)
 }
 
+// --- the home-city question: when do we ask? --------------------------------
+
+const unasked = { asked: false, enabled: true, askLast: 0, coachMarksRunning: false }
+
+const askCases = [
+  ['first eligible cold start — ask',
+    unasked, { ask: true, reason: 'first-ask' }],
+
+  ['first run (coach marks up) — defer, do not stack a 4th thing on first open',
+    { ...unasked, coachMarksRunning: true }, { ask: false, reason: 'first-run-busy' }],
+
+  ['soft-dismissed 1h ago — do NOT re-ask this launch',
+    { ...unasked, askLast: NOW - 60 * 60 * 1000 }, { ask: false, reason: 'ask-cooldown' }],
+  ['soft-dismissed 23h59m ago — still silent',
+    { ...unasked, askLast: NOW - ASK_COOLDOWN_MS + 60 * 1000 }, { ask: false, reason: 'ask-cooldown' }],
+  ['soft-dismissed 24h ago — re-ask (never locked out forever)',
+    { ...unasked, askLast: NOW - ASK_COOLDOWN_MS }, { ask: true, reason: 're-ask' }],
+  ['soft-dismissed 3 days ago — re-ask',
+    { ...unasked, askLast: NOW - 3 * 24 * 60 * 60 * 1000 }, { ask: true, reason: 're-ask' }],
+
+  ['answered ("I live in Kyrenia") — never ask again',
+    { ...unasked, asked: true }, { ask: false, reason: 'already-answered' }],
+  ['answered ("just visiting") — never ask again',
+    { ...unasked, asked: true }, { ask: false, reason: 'already-answered' }],
+
+  ['welcomes turned off — do not nag for a home city',
+    { ...unasked, enabled: false }, { ask: false, reason: 'disabled' }],
+  ['answered outranks the ask-cooldown (ordering sanity)',
+    { ...unasked, asked: true, askLast: NOW - 10 * 24 * 60 * 60 * 1000 },
+    { ask: false, reason: 'already-answered' }],
+]
+
 console.log('\n' + '-'.repeat(78))
-console.log(`\n${pass}/${cases.length} passed${fails.length ? ` — ${fails.length} FAILED` : ' — clean'}\n`)
+console.log('HOME-CITY QUESTION — WHEN DO WE ASK?')
+console.log('-'.repeat(78) + '\n')
+
+for (const [name, state, expect] of askCases) {
+  const got = shouldAskHomeCity({ ...state, now: NOW })
+  const ok = got.ask === expect.ask && got.reason === expect.reason
+  if (ok) pass++
+  else fails.push({ name, expect, got })
+  console.log(`  ${ok ? 'OK  ' : 'FAIL'} ${name}`)
+  console.log(`       ask=${got.ask} (${got.reason})`)
+  if (!ok) console.log(`       expected ask=${expect.ask} (${expect.reason})`)
+}
+
+const total = cases.length + askCases.length
+
+console.log('\n' + '-'.repeat(78))
+console.log(`\n${pass}/${total} passed${fails.length ? ` — ${fails.length} FAILED` : ' — clean'}\n`)
 process.exit(fails.length ? 1 : 0)

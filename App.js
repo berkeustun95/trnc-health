@@ -53,8 +53,13 @@ import HomeScreen from './screens/HomeScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import { haversineKm, parseIsOpen, coarseCoord } from './utils/facilityUtils'
-import { evaluateCityWelcome, markWelcomeShown, setCityWelcomeEnabled } from './utils/cityWelcome'
+import {
+  evaluateCityWelcome, markWelcomeShown, setCityWelcomeEnabled,
+  loadCityWelcomeState, shouldAskHomeCity, markAskShown, setHomeCity,
+} from './utils/cityWelcome'
 import CityWelcomeCard from './components/CityWelcomeCard'
+import HomeCitySheet from './components/HomeCitySheet'
+import CityWelcomeSettings from './components/CityWelcomeSettings'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
 import * as Updates from 'expo-updates'
@@ -167,6 +172,9 @@ export default function App() {
   const [beachesDistrict, setBeachesDistrict] = useState(null)
   const [eventsDistrict, setEventsDistrict] = useState(null)
   const [dutyRegion, setDutyRegion] = useState(null)
+  const [detectedRegion, setDetectedRegion] = useState(null)
+  const [showHomeCityAsk, setShowHomeCityAsk] = useState(false)
+  const [showCitySettings, setShowCitySettings] = useState(false)
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [bookingFacility, setBookingFacility] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -529,8 +537,20 @@ export default function App() {
           loadProviderFacility()
         } else if (!data?.role || data?.role === 'customer') {
           scheduleAppointmentReminders(session.user.id, data?.preferred_language ?? 'en')
-          AsyncStorage.getItem('@trnc_coach_v2').then(shown => {
-            if (!shown) { AsyncStorage.setItem('@trnc_coach_v2', 'true'); startCoachMarks() }
+          AsyncStorage.getItem('@trnc_coach_v2').then(async shown => {
+            // First run is already spending its attention on the carousel, the
+            // entry screen and the coach marks. The home-city question waits for
+            // the NEXT cold start, where it is the only thing on screen.
+            const coachMarksRunning = !shown
+            if (coachMarksRunning) { AsyncStorage.setItem('@trnc_coach_v2', 'true'); startCoachMarks() }
+
+            // This effect runs once per session mount, so this is a cold-start-only
+            // path by construction — a foreground can never surface the question.
+            const st = await loadCityWelcomeState()
+            if (shouldAskHomeCity({ ...st, coachMarksRunning, now: Date.now() }).ask) {
+              markAskShown()
+              setShowHomeCityAsk(true)
+            }
           })
         }
       })
@@ -713,7 +733,11 @@ export default function App() {
 
     const check = async trigger => {
       const decision = await evaluateCityWelcome(trigger)
-      if (cancelled || !decision?.show) return
+      if (cancelled) return
+      // Kept even when the card is suppressed: the home-city question uses it to
+      // say "Looks like you're in Kyrenia" as a HINT. It never pre-selects.
+      setDetectedRegion(decision?.region ?? null)
+      if (!decision?.show) return
       setCityWelcome(decision)
     }
 
@@ -738,7 +762,12 @@ export default function App() {
     !showMenu && !showCoachMarks &&
     !selectedFacility && !bookingFacility
 
-  const cityWelcomeVisible = !!cityWelcome && inCustomerHub
+  // The question outranks the card: if we do not yet know where they live, we
+  // must not be welcoming them anywhere. (decideWelcome already guarantees this
+  // — asked=false suppresses the card — but the two overlays share a slot, so
+  // this makes the precedence explicit rather than incidental.)
+  const homeCityAskVisible = showHomeCityAsk && inCustomerHub
+  const cityWelcomeVisible = !!cityWelcome && inCustomerHub && !homeCityAskVisible
 
   // Burn the city's 30-day cooldown only once the card is actually on screen.
   // Marking it at decision time would spend the cooldown on a card the user
@@ -1271,6 +1300,14 @@ export default function App() {
               <Text style={styles.menuItemText}>{t('menuLanguage', lang)}</Text>
             </TouchableOpacity>
 
+            {/* Sits next to Language because the drawer is the only settings
+                surface a guest can reach — the profile tab is behind
+                requireAccount, and a guest tourist is this feature's main user. */}
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowCitySettings(true) }}>
+              <Ionicons name="location-outline" size={20} color={colors.textPrimary} />
+              <Text style={styles.menuItemText}>{t('cwMenuCityWelcome', lang)}</Text>
+            </TouchableOpacity>
+
             <View style={styles.menuDivider} />
             <TouchableOpacity ref={menuEmergencyRef} style={styles.menuItem} onPress={() => { closeMenu(); showEmergencyNumbers() }}>
               <Ionicons name="call-outline" size={20} color={colors.danger} />
@@ -1516,9 +1553,21 @@ export default function App() {
     }
   }
 
-  // Oli is hidden under the card (same reason it hides for the drawer and coach
-  // marks — the card is a root overlay and would cover the floating button).
-  const oliVisible = inCustomerHub && !cityWelcomeVisible
+  // Oli is hidden under either sheet (same reason it hides for the drawer and
+  // coach marks — they are root overlays and would cover the floating button).
+  const oliVisible = inCustomerHub && !cityWelcomeVisible && !homeCityAskVisible
+
+  // Explicit answer -> asked=true, and city welcome goes live. 'visiting' is a
+  // real answer, not an absence of one: it means every city is welcome-eligible.
+  const resolveHomeCity = (value) => {
+    setHomeCity(value)
+    setShowHomeCityAsk(false)
+  }
+
+  // Soft dismiss. Deliberately resolves to NOTHING: `asked` stays false, so we
+  // re-ask on a later cold start (bounded to daily by shouldAskHomeCity). It must
+  // never silently fall through to "visitor".
+  const dismissHomeCityAsk = () => setShowHomeCityAsk(false)
 
   return (
     <SafeAreaProvider>
@@ -1534,6 +1583,19 @@ export default function App() {
           onTurnOff={() => { setCityWelcomeEnabled(false); setCityWelcome(null) }}
         />
       )}
+      {homeCityAskVisible && (
+        <HomeCitySheet
+          detectedRegion={detectedRegion}
+          lang={lang}
+          onResolve={resolveHomeCity}
+          onDismiss={dismissHomeCityAsk}
+        />
+      )}
+      <CityWelcomeSettings
+        visible={showCitySettings}
+        lang={lang}
+        onClose={() => setShowCitySettings(false)}
+      />
       <AccountRequiredSheet
         visible={!!gateKey}
         messageKey={gateKey}
