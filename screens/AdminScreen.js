@@ -1065,7 +1065,7 @@ function DutyTab() {
 
 // ─── Claims Tab ─────────────────────────────────────────────────────────────
 
-function ClaimsTab() {
+function ClaimsTab({ session }) {
   const [claims, setClaims] = useState([])
   const [loading, setLoading] = useState(true)
   const [rejectTarget, setRejectTarget] = useState(null)
@@ -1074,7 +1074,7 @@ function ClaimsTab() {
     setLoading(true)
     const { data } = await supabase
       .from('claim_requests')
-      .select('id, requester_id, requested_tier, created_at, registration_number, facilities(id, name, type)')
+      .select('id, requester_id, requested_tier, created_at, registration_number, tax_registration_no, facilities(id, name, type, address, phone)')
       .eq('status', 'pending')
       .order('created_at')
     const rows = data ?? []
@@ -1110,7 +1110,12 @@ function ClaimsTab() {
     }).eq('id', claim.facilities.id)
     if (err) { Alert.alert('Error', err.message); return }
     await Promise.all([
-      supabase.from('claim_requests').update({ status: 'approved' }).eq('id', claim.id),
+      supabase.from('claim_requests').update({
+        status:            'approved',
+        business_verified: true,
+        verified_by:       session.user.id,
+        verified_at:       new Date().toISOString(),
+      }).eq('id', claim.id),
       supabase.from('provider_documents').update({ status: 'approved' }).eq('facility_id', claim.facilities.id),
     ])
     const { data: p } = await supabase.from('profiles').select('push_token, preferred_language').eq('id', claim.requester_id).maybeSingle()
@@ -1153,8 +1158,33 @@ function ClaimsTab() {
             </Text>
             <Text style={s.cardSub}>{c.facilities?.type} · {c.requested_tier === 'pro' ? 'Pro' : 'Basic'}</Text>
             <Text style={[s.cardSub, { marginTop: 4 }]} numberOfLines={1}>{c._profile?.full_name || c.requester_id.slice(0, 8).toUpperCase()}</Text>
-            {c.registration_number ? <Text style={[s.cardSub, { fontSize: 11, marginTop: 2 }]} numberOfLines={1}>Reg: {c.registration_number}</Text> : null}
-            <Text style={[s.cardSub, { fontSize: 10, marginTop: 2 }]}>
+
+            {/* Business identity — what the admin cross-checks before approving. */}
+            <View style={s.claimIdentity}>
+              <Text style={s.claimIdentityLabel}>BUSINESS IDENTITY — VERIFY BEFORE APPROVING</Text>
+              <View style={s.claimDetailRow}>
+                <Text style={s.claimDetailKey}>Tax Registration No.</Text>
+                <Text style={[s.claimDetailVal, s.claimDetailKey_tax]} selectable>{c.tax_registration_no || '—'}</Text>
+              </View>
+              <View style={s.claimDetailRow}>
+                <Text style={s.claimDetailKey}>Registration No.</Text>
+                <Text style={s.claimDetailVal} selectable>{c.registration_number || '—'}</Text>
+              </View>
+              {c.facilities?.address ? (
+                <View style={s.claimDetailRow}>
+                  <Text style={s.claimDetailKey}>Address</Text>
+                  <Text style={s.claimDetailVal} numberOfLines={2}>{c.facilities.address}</Text>
+                </View>
+              ) : null}
+              {c.facilities?.phone ? (
+                <View style={s.claimDetailRow}>
+                  <Text style={s.claimDetailKey}>Phone</Text>
+                  <Text style={s.claimDetailVal} selectable>{c.facilities.phone}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Text style={[s.cardSub, { fontSize: 10, marginTop: 6 }]}>
               {new Date(c.created_at).toLocaleDateString()}
             </Text>
 
@@ -1913,17 +1943,135 @@ function BroadcastTab() {
 
 // ─── Events Tab ─────────────────────────────────────────────────────────────
 
+function eventStatusColor(status) {
+  if (status === 'approved') return colors.success
+  if (status === 'rejected') return colors.danger
+  if (status === 'pending')  return '#C2410C'
+  return colors.textSecondary
+}
+
+function EventDetailModal({ event, visible, onClose, onApprove, onReject, onDelete }) {
+  if (!event) return null
+
+  const fmt = (iso, withTime) => iso
+    ? new Date(iso).toLocaleString('en-GB', {
+        day: 'numeric', month: 'short', year: 'numeric',
+        ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+      })
+    : '—'
+
+  const images = event.images || []
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <View style={s.modalHeader}>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="chevron-down" size={24} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <Text style={s.modalTitle} numberOfLines={1}>Event review</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false}>
+          <View style={[s.pillGrey, { backgroundColor: eventStatusColor(event.status) + '20', marginBottom: 14 }]}>
+            <Text style={[s.pillText, { color: eventStatusColor(event.status) }]}>{event.status}</Text>
+          </View>
+
+          <Text style={[s.cardTitle, { fontSize: 20, marginBottom: 18 }]}>{event.title}</Text>
+
+          <Text style={s.sectionTitle}>Photos ({images.length})</Text>
+          {images.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+              {images.map((uri, i) => (
+                <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => Linking.openURL(uri)}>
+                  <Image
+                    source={{ uri }}
+                    style={{ width: 220, height: 150, borderRadius: 12, marginRight: 10, backgroundColor: colors.border }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={[s.cardSub, { marginBottom: 20 }]}>No images attached.</Text>
+          )}
+
+          <Text style={s.sectionTitle}>Organiser</Text>
+          <View style={[s.card, { marginBottom: 20 }]}>
+            <Text style={s.cardTitle}>{event.organizer_name || '—'}</Text>
+            <Text style={s.cardSub}>Account: {event.profiles?.full_name || 'Unknown'}</Text>
+            {event.profiles?.phone ? (
+              <TouchableOpacity onPress={() => Linking.openURL(`tel:${event.profiles.phone}`)} style={{ marginTop: 6 }}>
+                <Text style={[s.cardSub, { color: colors.primary }]}>📞 {event.profiles.phone}</Text>
+              </TouchableOpacity>
+            ) : null}
+            <Text style={[s.cardSub, { marginTop: 6 }]}>Submitted: {fmt(event.created_at, true)}</Text>
+          </View>
+
+          <Text style={s.sectionTitle}>When</Text>
+          <View style={[s.card, { marginBottom: 20 }]}>
+            <Text style={s.cardSub}>Starts: <Text style={{ color: colors.textPrimary }}>{fmt(event.start_date, true)}</Text></Text>
+            <Text style={[s.cardSub, { marginTop: 6 }]}>Ends: <Text style={{ color: colors.textPrimary }}>{fmt(event.end_date, true)}</Text></Text>
+          </View>
+
+          <Text style={s.sectionTitle}>Where</Text>
+          <View style={[s.card, { marginBottom: 20 }]}>
+            <Text style={s.cardSub}>{event.location || 'No location given.'}</Text>
+            {event.location_url ? (
+              <TouchableOpacity onPress={() => Linking.openURL(event.location_url)} style={{ marginTop: 8 }}>
+                <Text style={[s.cardSub, { color: colors.primary }]}>🗺️  Open in Maps</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <Text style={s.sectionTitle}>Description</Text>
+          <View style={[s.card, { marginBottom: 20 }]}>
+            <Text style={[s.cardSub, { lineHeight: 20 }]}>{event.description || '—'}</Text>
+          </View>
+
+          {event.status === 'rejected' && event.rejection_reason ? (
+            <>
+              <Text style={s.sectionTitle}>Rejection reason</Text>
+              <View style={[s.card, { marginBottom: 20 }]}>
+                <Text style={[s.cardSub, { color: colors.danger }]}>{event.rejection_reason}</Text>
+              </View>
+            </>
+          ) : null}
+
+          <View style={[s.rowActions, { marginLeft: 0, marginTop: 4 }]}>
+            {event.status !== 'approved' && (
+              <TouchableOpacity style={s.ghostBtn} onPress={() => onApprove(event.id)}>
+                <Text style={s.ghostBtnText}>Approve</Text>
+              </TouchableOpacity>
+            )}
+            {event.status !== 'rejected' && (
+              <TouchableOpacity style={s.dangerGhostBtn} onPress={() => onReject(event)}>
+                <Text style={s.dangerGhostText}>Reject</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={s.dangerGhostBtn} onPress={() => onDelete(event.id)}>
+              <Text style={s.dangerGhostText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  )
+}
+
 function EventsTab() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('pending')
   const [rejectTarget, setRejectTarget] = useState(null)
+  const [detailTarget, setDetailTarget] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     let query = supabase
       .from('events')
-      .select('id, title, organizer_name, start_date, status, rejection_reason, organizer_id, profiles(full_name)')
+      .select('id, title, description, organizer_name, start_date, end_date, location, location_url, images, status, rejection_reason, organizer_id, created_at, profiles(full_name, phone)')
       .order('created_at', { ascending: false })
     if (filter !== 'all') query = query.eq('status', filter)
     const { data } = await query
@@ -1935,6 +2083,7 @@ function EventsTab() {
 
   async function approve(id) {
     await supabase.from('events').update({ status: 'approved', rejection_reason: null }).eq('id', id)
+    setDetailTarget(null)
     load()
   }
 
@@ -1947,15 +2096,8 @@ function EventsTab() {
   async function deleteEvent(id) {
     Alert.alert('Delete event?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('events').delete().eq('id', id); load() } },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('events').delete().eq('id', id); setDetailTarget(null); load() } },
     ])
-  }
-
-  function statusColor(status) {
-    if (status === 'approved') return colors.success
-    if (status === 'rejected') return colors.danger
-    if (status === 'pending')  return '#C2410C'
-    return colors.textSecondary
   }
 
   return (
@@ -1979,7 +2121,11 @@ function EventsTab() {
             ListEmptyComponent={<SectionEmpty text={`No ${filter} events.`} />}
             renderItem={({ item }) => (
               <View style={s.card}>
-                <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setDetailTarget(item)}
+                  style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}
+                >
                   <View style={{ flex: 1 }}>
                     <Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
                     <Text style={s.cardSub}>{item.organizer_name || item.profiles?.full_name || 'Unknown organiser'}</Text>
@@ -1988,11 +2134,12 @@ function EventsTab() {
                         {new Date(item.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </Text>
                     )}
+                    <Text style={[s.cardSub, { color: colors.primary, marginTop: 4 }]}>Tap to review details ›</Text>
                   </View>
-                  <View style={[s.pillGrey, { backgroundColor: statusColor(item.status) + '20', marginLeft: 8 }]}>
-                    <Text style={[s.pillText, { color: statusColor(item.status) }]}>{item.status}</Text>
+                  <View style={[s.pillGrey, { backgroundColor: eventStatusColor(item.status) + '20', marginLeft: 8 }]}>
+                    <Text style={[s.pillText, { color: eventStatusColor(item.status) }]}>{item.status}</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
 
                 {item.status === 'rejected' && item.rejection_reason ? (
                   <Text style={[s.cardSub, { color: colors.danger, marginTop: 6 }]}>Reason: {item.rejection_reason}</Text>
@@ -2018,6 +2165,15 @@ function EventsTab() {
           />
         )
       }
+
+      <EventDetailModal
+        event={detailTarget}
+        visible={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        onApprove={approve}
+        onReject={ev => { setDetailTarget(null); setRejectTarget(ev) }}
+        onDelete={deleteEvent}
+      />
 
       <RejectModal
         visible={!!rejectTarget}
@@ -3046,7 +3202,7 @@ export default function AdminScreen({ session }) {
           {tab === 'Dashboard'   && <DashboardTab onNavigate={navigateTo} />}
           {tab === 'Reports'     && <ReportsTab session={session} />}
           {tab === 'Changes'     && <ChangesTab />}
-          {tab === 'Claims'      && <ClaimsTab />}
+          {tab === 'Claims'      && <ClaimsTab session={session} />}
           {tab === 'Providers'   && <ProvidersTab />}
           {tab === 'Credentials' && <CredentialsTab />}
           {tab === 'Facilities'  && <FacilitiesTab />}
@@ -3174,6 +3330,12 @@ const s = StyleSheet.create({
   // document rows
   docsSection:        { marginTop: 10, backgroundColor: colors.primaryLight, borderRadius: 10, padding: 10, gap: 6 },
   docsSectionLabel:   { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.5, marginBottom: 2 },
+  claimIdentity:      { marginTop: 8, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 10, gap: 5 },
+  claimIdentityLabel: { fontSize: 9, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: 3 },
+  claimDetailRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  claimDetailKey:     { width: 118, fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  claimDetailVal:     { flex: 1, fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  claimDetailKey_tax: { fontSize: 14, color: colors.primary },
   docRow:             { flexDirection: 'row', alignItems: 'center', gap: 6 },
   docRowText:         { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.primary },
 
