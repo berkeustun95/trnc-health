@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
+import { t } from '../constants/i18n'
 import { colors, shadow } from '../constants/theme'
 import HoursPicker from '../components/HoursPicker'
 import MapPinPicker from '../components/MapPinPicker'
@@ -46,7 +47,7 @@ const TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS  = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const TYPE_LABELS = { pharmacy: 'Pharmacy', clinic: 'Clinic', hospital: 'Hospital', dentist: 'Dentist' }
 
-export default function ProviderOnboardingScreen({ session, onDone }) {
+export default function ProviderOnboardingScreen({ session, lang = 'English', onDone }) {
   const [step, setStep]   = useState(1) // 1 | 2 | '2b' | 3
   const [mode, setMode]   = useState(null) // 'claim' | 'new'
   const [unclaimedFacilities, setUnclaimedFacilities] = useState([])
@@ -55,6 +56,7 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [form, setForm] = useState({
     name: '', type: 'clinic', address: '', phone: '', opening_hours: '', membership_tier: 'basic', registration_number: '',
+    tax_registration_no: '',
     latitude: null, longitude: null,
   })
   const [saving, setSaving]               = useState(false)
@@ -122,11 +124,13 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
     setError(null)
     const facilityName = mode === 'claim' ? selectedFacility?.name : form.name.trim()
     if (mode === 'claim') {
+      if (!form.tax_registration_no.trim()) { setError(t('taxRegistrationNoRequired', lang)); setSaving(false); return }
       const { error: err } = await supabase.from('claim_requests').insert({
         facility_id:         selectedFacility.id,
         requester_id:        session.user.id,
         requested_tier:      form.membership_tier,
         registration_number: form.registration_number.trim() || null,
+        tax_registration_no: form.tax_registration_no.trim(),
       })
       if (err) { setError(err.message); setSaving(false); return }
       if (form.latitude != null && form.longitude != null) {
@@ -137,23 +141,26 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
       await uploadDocuments(selectedFacility.id)
     } else {
       if (!form.name.trim()) { setError('Facility name is required.'); setSaving(false); return }
-      const { data: newFacility, error: err } = await supabase.from('facilities').insert({
-        name:                form.name.trim(),
-        type:                form.type,
-        address:             form.address.trim() || null,
-        phone:               form.phone.trim() || null,
-        opening_hours:       form.opening_hours.trim() || null,
-        membership_tier:     form.membership_tier,
-        status:              'pending',
-        provider_id:         session.user.id,
-        is_public:           false,
-        verified:            false,
-        registration_number: form.registration_number.trim() || null,
-        latitude:            form.latitude,
-        longitude:           form.longitude,
-      }).select('id').single()
+      if (!form.tax_registration_no.trim()) { setError(t('taxRegistrationNoRequired', lang)); setSaving(false); return }
+      // Atomic server-side create: inserts the facility (born unclaimed/pending)
+      // AND its claim_requests row in one transaction, returning the new facility
+      // id. Done via RPC so the client never reads facilities back under the
+      // restrictive SELECT policy (a pending/unclaimed row is invisible to its
+      // creator, which broke the old insert().select() read-back).
+      const { data: newFacilityId, error: err } = await supabase.rpc('create_facility_claim', {
+        p_name:                form.name.trim(),
+        p_type:                form.type,
+        p_address:             form.address.trim() || null,
+        p_phone:               form.phone.trim() || null,
+        p_opening_hours:       form.opening_hours.trim() || null,
+        p_membership_tier:     form.membership_tier,
+        p_registration_number: form.registration_number.trim() || null,
+        p_tax_registration_no: form.tax_registration_no.trim(),
+        p_latitude:            form.latitude,
+        p_longitude:           form.longitude,
+      })
       if (err) { setError(err.message); setSaving(false); return }
-      if (newFacility?.id) await uploadDocuments(newFacility.id)
+      if (newFacilityId) await uploadDocuments(newFacilityId)
     }
     setSaving(false)
     try {
@@ -409,9 +416,20 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
             : 'Both plans include a 5-day free trial. No payment until you\'re verified and live.'}
         </Text>
 
+        {/* Tax registration number — required on BOTH paths (claim + new). */}
+        <Text style={s.fieldLabel}>{t('taxRegistrationNo', lang).toUpperCase()} *</Text>
+        <TextInput
+          style={s.input}
+          value={form.tax_registration_no}
+          onChangeText={set('tax_registration_no')}
+          placeholder={t('taxRegistrationNo', lang)}
+          placeholderTextColor={colors.border}
+          autoCapitalize="none"
+        />
+
         {mode === 'claim' && (
           <>
-            <Text style={s.fieldLabel}>BUSINESS REGISTRATION / LICENSE NO.</Text>
+            <Text style={[s.fieldLabel, { marginTop: 18 }]}>BUSINESS REGISTRATION / LICENSE NO.</Text>
             <TextInput
               style={s.input}
               value={form.registration_number}
@@ -420,6 +438,7 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
               placeholderTextColor={colors.border}
               autoCapitalize="none"
             />
+
             <Text style={[s.fieldLabel, { marginTop: 18 }]}>MAP LOCATION</Text>
             {form.latitude != null
               ? <Text style={s.locationSet}>📍 {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}</Text>
@@ -451,7 +470,6 @@ export default function ProviderOnboardingScreen({ session, onDone }) {
           { key: 'medical_license',   label: 'Medical License / Practice Certificate' },
           { key: 'registration_cert', label: 'Chamber / Ministry Registration' },
           { key: 'business_license',  label: 'Business License' },
-          { key: 'national_id',       label: 'National ID / Passport' },
         ].map(({ key, label }) => {
           const attached = documents.find(d => d.doc_type === key)
           return (

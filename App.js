@@ -847,7 +847,7 @@ export default function App() {
         </SafeAreaView>
       )
     } else if (providerFacility === null) {
-      content = <ProviderOnboardingScreen session={session} onDone={loadProviderFacility} />
+      content = <ProviderOnboardingScreen session={session} lang={lang} onDone={loadProviderFacility} />
     } else if (providerFacility.status === 'pending') {
       content = (
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
