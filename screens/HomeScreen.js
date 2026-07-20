@@ -39,26 +39,25 @@ const CODE_TO_NAME = {
 }
 
 const MODULES = [
-  { id: 'exchangeRates',      icon: 'trending-up-outline', color: '#0E7C7B', bg: '#E0F5F4', labelKey: 'menuExchangeRates'      },
-  { id: 'newcomerEssentials', icon: 'compass-outline',     color: '#185FA5', bg: '#EEF2F8', labelKey: 'menuNewcomerEssentials' },
-  { id: 'events',        icon: 'calendar-outline', color: '#5B5BD6', bg: '#EAE8F5', labelKey: 'menuEvents' },
-  { id: 'accommodation', icon: 'home-outline',      color: '#0E7C7B', bg: '#E0F5F4', labelKey: 'menuAccommodations' },
-  { id: 'pets',          icon: 'paw-outline',       color: '#D1495B', bg: '#FAEAEC', labelKey: 'menuPets' },
-  { id: 'homeServices',  icon: 'hammer-outline',    color: '#FF8552', bg: '#FFF0EB', labelKey: 'menuHomeServices' },
-  { id: 'jobPostings',  icon: 'briefcase-outline', color: '#0369A1', bg: '#E0F2FE', labelKey: 'menuJobPostings' },
-  { id: 'beaches',       icon: 'umbrella-outline',  color: '#0E7C7B', bg: '#E0F5F4', labelKey: 'menuBeachesLandmarks' },
-  { id: 'transport',     icon: 'car-outline',       color: '#5B5BD6', bg: '#EAE8F5', labelKey: 'menuTransportation' },
-  { id: 'municipal',     icon: 'business-outline',  color: '#64748B', bg: '#F1F5F9', labelKey: 'menuMunicipalities' },
+  { id: 'exchangeRates',      icon: 'trending-up-outline', labelKey: 'menuExchangeRates'      },
+  { id: 'newcomerEssentials', icon: 'compass-outline',     labelKey: 'menuNewcomerEssentials' },
+  { id: 'accommodation', icon: 'home-outline',      labelKey: 'menuAccommodations' },
+  { id: 'pets',          icon: 'paw-outline',       labelKey: 'menuPets' },
+  { id: 'homeServices',  icon: 'hammer-outline',    labelKey: 'menuHomeServices' },
+  { id: 'jobPostings',  icon: 'briefcase-outline', labelKey: 'menuJobPostings' },
+  { id: 'beaches',       icon: 'umbrella-outline',  labelKey: 'menuBeachesLandmarks' },
+  { id: 'transport',     icon: 'car-outline',       labelKey: 'menuTransportation' },
+  { id: 'municipal',     icon: 'business-outline',  labelKey: 'menuMunicipalities' },
 ]
 
-const RESULT_META = {
-  medical:      { icon: 'medkit-outline',    color: '#0E7C7B', bg: '#E0F5F4' },
-  events:       { icon: 'calendar-outline',  color: '#5B5BD6', bg: '#EAE8F5' },
-  beach:        { icon: 'umbrella-outline',  color: '#0E7C7B', bg: '#E0F5F4' },
-  landmark:     { icon: 'flag-outline',      color: '#FF8552', bg: '#FFF0EB' },
-  homeServices: { icon: 'hammer-outline',    color: '#FF8552', bg: '#FFF0EB' },
-  transport:    { icon: 'car-outline',       color: '#5B5BD6', bg: '#EAE8F5' },
-  jobPostings:  { icon: 'briefcase-outline', color: '#0E7C7B', bg: '#E0F5F4' },
+const RESULT_ICONS = {
+  medical:      'medkit-outline',
+  events:       'calendar-outline',
+  beach:        'umbrella-outline',
+  landmark:     'flag-outline',
+  homeServices: 'hammer-outline',
+  transport:    'car-outline',
+  jobPostings:  'briefcase-outline',
 }
 
 export default function HomeScreen({
@@ -157,7 +156,6 @@ export default function HomeScreen({
   const moduleHandlers = {
     exchangeRates:      onShowExchangeRates,
     newcomerEssentials: onShowNewcomerEssentials,
-    events:             onShowEvents,
     accommodation:      onShowAccommodation,
     pets:               onShowPets,
     homeServices:       onShowHomeServices,
@@ -274,11 +272,11 @@ export default function HomeScreen({
     return (
       <View style={s.searchResultsWrap}>
         {globalResults.map((item, idx) => {
-          const meta = RESULT_META[item.module] ?? { icon: 'search-outline', color: colors.textSecondary, bg: colors.cardBg }
+          const icon = RESULT_ICONS[item.module] ?? 'search-outline'
           return (
             <TouchableOpacity key={item.id + idx} style={s.searchResultRow} onPress={() => handleResultPress(item)} activeOpacity={0.75}>
-              <View style={[s.searchResultIcon, { backgroundColor: meta.bg }]}>
-                <Ionicons name={meta.icon} size={18} color={meta.color} />
+              <View style={[s.searchResultIcon, { backgroundColor: colors.primaryLight }]}>
+                <Ionicons name={icon} size={18} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.searchResultTitle} numberOfLines={1}>{item.title}</Text>
@@ -362,8 +360,8 @@ export default function HomeScreen({
                 onPress={moduleHandlers[mod.id]}
                 activeOpacity={0.8}
               >
-                <View style={[s.moduleIcon, { backgroundColor: mod.bg }]}>
-                  <Ionicons name={mod.icon} size={24} color={mod.color} />
+                <View style={[s.moduleIcon, { backgroundColor: colors.primaryLight }]}>
+                  <Ionicons name={mod.icon} size={24} color={colors.primary} />
                 </View>
                 <Text style={s.moduleLabel} numberOfLines={2}>{t(mod.labelKey, lang)}</Text>
               </TouchableOpacity>
