@@ -38,26 +38,34 @@ const CODE_TO_NAME = {
   el: 'greek', fr: 'french', es: 'spanish', de: 'german', fa: 'persian',
 }
 
+// Icon tint by module category: urgent (health / emergency), service (everyday
+// admin), lifestyle (leisure). Pairs live in theme.js.
+const TINTS = {
+  urgent:    { bg: colors.tintUrgentBg,    fg: colors.tintUrgentFg    },
+  service:   { bg: colors.tintServiceBg,   fg: colors.tintServiceFg   },
+  lifestyle: { bg: colors.tintLifestyleBg, fg: colors.tintLifestyleFg },
+}
+
 const MODULES = [
-  { id: 'exchangeRates',      icon: 'trending-up-outline', labelKey: 'menuExchangeRates'      },
-  { id: 'newcomerEssentials', icon: 'compass-outline',     labelKey: 'menuNewcomerEssentials' },
-  { id: 'accommodation', icon: 'home-outline',      labelKey: 'menuAccommodations' },
-  { id: 'pets',          icon: 'paw-outline',       labelKey: 'menuPets' },
-  { id: 'homeServices',  icon: 'hammer-outline',    labelKey: 'menuHomeServices' },
-  { id: 'jobPostings',  icon: 'briefcase-outline', labelKey: 'menuJobPostings' },
-  { id: 'beaches',       icon: 'umbrella-outline',  labelKey: 'menuBeachesLandmarks' },
-  { id: 'transport',     icon: 'car-outline',       labelKey: 'menuTransportation' },
-  { id: 'municipal',     icon: 'business-outline',  labelKey: 'menuMunicipalities' },
+  { id: 'exchangeRates',      icon: 'trending-up-outline', tint: 'service',   labelKey: 'menuExchangeRates'      },
+  { id: 'newcomerEssentials', icon: 'compass-outline',     tint: 'service',   labelKey: 'menuNewcomerEssentials' },
+  { id: 'accommodation', icon: 'home-outline',      tint: 'lifestyle', labelKey: 'menuAccommodations' },
+  { id: 'pets',          icon: 'paw-outline',       tint: 'lifestyle', labelKey: 'menuPets' },
+  { id: 'homeServices',  icon: 'hammer-outline',    tint: 'service',   labelKey: 'menuHomeServices' },
+  { id: 'jobPostings',  icon: 'briefcase-outline', tint: 'service',   labelKey: 'menuJobPostings' },
+  { id: 'beaches',       icon: 'umbrella-outline',  tint: 'lifestyle', labelKey: 'menuBeachesLandmarks' },
+  { id: 'transport',     icon: 'car-outline',       tint: 'service',   labelKey: 'menuTransportation' },
+  { id: 'municipal',     icon: 'business-outline',  tint: 'service',   labelKey: 'menuMunicipalities' },
 ]
 
-const RESULT_ICONS = {
-  medical:      'medkit-outline',
-  events:       'calendar-outline',
-  beach:        'umbrella-outline',
-  landmark:     'flag-outline',
-  homeServices: 'hammer-outline',
-  transport:    'car-outline',
-  jobPostings:  'briefcase-outline',
+const RESULT_META = {
+  medical:      { icon: 'medkit-outline',    tint: 'urgent'    },
+  events:       { icon: 'calendar-outline',  tint: 'lifestyle' },
+  beach:        { icon: 'umbrella-outline',  tint: 'lifestyle' },
+  landmark:     { icon: 'flag-outline',      tint: 'lifestyle' },
+  homeServices: { icon: 'hammer-outline',    tint: 'service'   },
+  transport:    { icon: 'car-outline',       tint: 'service'   },
+  jobPostings:  { icon: 'briefcase-outline', tint: 'service'   },
 }
 
 export default function HomeScreen({
@@ -272,11 +280,12 @@ export default function HomeScreen({
     return (
       <View style={s.searchResultsWrap}>
         {globalResults.map((item, idx) => {
-          const icon = RESULT_ICONS[item.module] ?? 'search-outline'
+          const meta = RESULT_META[item.module] ?? { icon: 'search-outline', tint: 'service' }
+          const tint = TINTS[meta.tint]
           return (
             <TouchableOpacity key={item.id + idx} style={s.searchResultRow} onPress={() => handleResultPress(item)} activeOpacity={0.75}>
-              <View style={[s.searchResultIcon, { backgroundColor: colors.primaryLight }]}>
-                <Ionicons name={icon} size={18} color={colors.primary} />
+              <View style={[s.searchResultIcon, { backgroundColor: tint.bg }]}>
+                <Ionicons name={meta.icon} size={18} color={tint.fg} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.searchResultTitle} numberOfLines={1}>{item.title}</Text>
@@ -318,8 +327,8 @@ export default function HomeScreen({
         {!globalQuery.trim() && <>
           <TouchableOpacity ref={dutyBannerRef} style={s.medicalTile} onPress={onShowDutyList} activeOpacity={0.85}>
             <View style={s.medicalTileLeft}>
-              <View style={[s.medicalTileIcon, { backgroundColor: colors.accentLight }]}>
-                <Ionicons name="medical-outline" size={26} color={colors.accent} />
+              <View style={[s.medicalTileIcon, { backgroundColor: TINTS.urgent.bg }]}>
+                <Ionicons name="medical-outline" size={26} color={TINTS.urgent.fg} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.medicalTileTitle}>{t('tonightDuty', lang)}</Text>
@@ -331,22 +340,22 @@ export default function HomeScreen({
 
           <View style={s.quickRow}>
             <TouchableOpacity style={s.quickBtn} onPress={() => setShowFacilityList(true)} activeOpacity={0.8}>
-              <View style={[s.quickIcon, { backgroundColor: colors.primaryLight }]}>
-                <Ionicons name="medkit-outline" size={22} color={colors.primary} />
+              <View style={[s.quickIcon, { backgroundColor: TINTS.urgent.bg }]}>
+                <Ionicons name="medkit-outline" size={22} color={TINTS.urgent.fg} />
               </View>
               <Text style={s.quickLabel} numberOfLines={2}>{t('hubMedicalTitle', lang)}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.quickBtn} onPress={onShowEmergency} activeOpacity={0.8}>
-              <View style={[s.quickIcon, { backgroundColor: '#FAEAEC' }]}>
-                <Ionicons name="call-outline" size={22} color={colors.danger} />
+              <View style={[s.quickIcon, { backgroundColor: TINTS.urgent.bg }]}>
+                <Ionicons name="call-outline" size={22} color={TINTS.urgent.fg} />
               </View>
               <Text style={s.quickLabel} numberOfLines={2}>{t('menuEmergency', lang)}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.quickBtn} onPress={onShowEvents} activeOpacity={0.8}>
-              <View style={[s.quickIcon, { backgroundColor: '#EAE8F5' }]}>
-                <Ionicons name="calendar-outline" size={22} color="#5B5BD6" />
+              <View style={[s.quickIcon, { backgroundColor: TINTS.lifestyle.bg }]}>
+                <Ionicons name="calendar-outline" size={22} color={TINTS.lifestyle.fg} />
               </View>
               <Text style={s.quickLabel} numberOfLines={2}>{t('menuEvents', lang)}</Text>
             </TouchableOpacity>
@@ -360,8 +369,8 @@ export default function HomeScreen({
                 onPress={moduleHandlers[mod.id]}
                 activeOpacity={0.8}
               >
-                <View style={[s.moduleIcon, { backgroundColor: colors.primaryLight }]}>
-                  <Ionicons name={mod.icon} size={24} color={colors.primary} />
+                <View style={[s.moduleIcon, { backgroundColor: TINTS[mod.tint].bg }]}>
+                  <Ionicons name={mod.icon} size={24} color={TINTS[mod.tint].fg} />
                 </View>
                 <Text style={s.moduleLabel} numberOfLines={2}>{t(mod.labelKey, lang)}</Text>
               </TouchableOpacity>

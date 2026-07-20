@@ -13,6 +13,16 @@ export const colors = {
   successLight:  '#E6F5ED',
   danger:        '#D1495B',
   dangerLight:   '#FAEAEC',
+
+  // Home icon tints, one pair per module category. Urgent and service alias the
+  // existing palette; tintLifestyleFg is a deepened accent because accent itself
+  // only hits 2.17 contrast on accentLight and is unreadable at icon size.
+  tintUrgentBg:    '#FAEAEC',
+  tintUrgentFg:    '#D1495B',
+  tintServiceBg:   '#E6F4F4',
+  tintServiceFg:   '#0E7C7B',
+  tintLifestyleBg: '#FFF0EB',
+  tintLifestyleFg: '#C2410C',
 }
 
 export const typeColors = {
