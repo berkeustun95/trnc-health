@@ -81,7 +81,7 @@ export default function PetsHomeScreen({ lang, onBack, onNavigate }) {
 const s = StyleSheet.create({
   safe:          { flex: 1, backgroundColor: colors.bg },
   scroll:        { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
   heroCard:      { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16, ...shadow },
   heroMascot:    { marginBottom: 8 },
   heroText:      { fontSize: 14, color: colors.textSecondary, textAlign: 'center', fontFamily: 'Inter_400Regular', paddingHorizontal: 8, lineHeight: 20 },
