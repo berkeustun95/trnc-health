@@ -335,7 +335,7 @@ export default function HomeScreen({
                 <Text style={s.medicalTileSub} numberOfLines={1}>{t('hubDutySub', lang)}</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.accent} />
+            <Ionicons name="chevron-forward" size={18} color={TINTS.urgent.fg} />
           </TouchableOpacity>
 
           <View style={s.quickRow}>
