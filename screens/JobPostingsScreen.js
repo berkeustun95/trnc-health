@@ -394,7 +394,7 @@ const s = StyleSheet.create({
   chipTextActive:   { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // Job list
-  listContent:      { padding: 16, paddingBottom: 40, gap: 12 },
+  listContent:      { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },
 
   // Job card
   card:             { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 16,

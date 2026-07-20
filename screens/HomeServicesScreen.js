@@ -323,7 +323,7 @@ const s = StyleSheet.create({
   chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // Provider list
-  listContent:    { padding: 16, paddingBottom: 40, gap: 12 },
+  listContent:    { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },
   emptyWrap:      { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
   emptyCard:      { backgroundColor: colors.cardBg, borderRadius: 16, paddingHorizontal: 24,
                     paddingVertical: 20, alignItems: 'center', ...shadow },
