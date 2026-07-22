@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import JobPostingProfileScreen from './JobPostingProfileScreen'
 import JobPostOnboardingScreen from './JobPostOnboardingScreen'
+import MyJobPostingsScreen from './MyJobPostingsScreen'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow, radius } from '../constants/theme'
@@ -144,10 +145,12 @@ export default function JobPostingsScreen({ lang, session, onBack, onRequireAcco
   const [selectedDistrict,   setSelectedDistrict]   = useState(null)
   const [selectedJob,        setSelectedJob]        = useState(null)
   const [showPostForm,       setShowPostForm]       = useState(false)
+  const [showMyPostings,     setShowMyPostings]     = useState(false)
   const [jobs,               setJobs]               = useState([])
   const [loading,            setLoading]            = useState(false)
 
-  const openPostForm = () => { if (onRequireAccount?.('gateJobPost')) return; setShowPostForm(true) }
+  const openPostForm   = () => { if (onRequireAccount?.('gateJobPost')) return; setShowPostForm(true) }
+  const openMyPostings = () => { if (onRequireAccount?.('gateJobPost')) return; setShowMyPostings(true) }
 
   const loadJobs = useCallback(async (category, empType, district) => {
     setLoading(true)
@@ -193,6 +196,17 @@ export default function JobPostingsScreen({ lang, session, onBack, onRequireAcco
   const activeCat   = CATEGORIES.find(c => c.key === selectedCategory)
   const headerTitle = activeCat ? t(activeCat.labelKey, lang) : t('jobTitle', lang)
   const backLabel   = selectedCategory !== null ? t('jobAllCategories', lang) : t('back', lang)
+
+  // ── My postings ───────────────────────────────────────────────────────────
+  if (showMyPostings) {
+    return (
+      <MyJobPostingsScreen
+        session={session}
+        lang={lang}
+        onBack={() => setShowMyPostings(false)}
+      />
+    )
+  }
 
   // ── Post form ─────────────────────────────────────────────────────────────
   if (showPostForm) {
@@ -349,6 +363,19 @@ export default function JobPostingsScreen({ lang, session, onBack, onRequireAcco
             <View style={{ flex: 1 }}>
               <Text style={s.ctaTitle}>{t('jobPostCTA', lang)}</Text>
               <Text style={s.ctaSub}>{t('jobPostCTASub', lang)}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
+        {!!session && (
+          <TouchableOpacity style={[s.ctaCard, { marginTop: 12 }]} onPress={openMyPostings} activeOpacity={0.8}>
+            <View style={s.ctaIconWrap}>
+              <Ionicons name="list-outline" size={26} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.ctaTitle}>{t('jobMyTitle', lang)}</Text>
+              <Text style={s.ctaSub}>{t('jobMyCTASub', lang)}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
