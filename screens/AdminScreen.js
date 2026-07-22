@@ -85,6 +85,42 @@ function RejectModal({ visible, entityName, onConfirm, onCancel }) {
   )
 }
 
+// Admin-only. Payment wording is fine HERE (internal panel) but must never
+// appear in a consumer screen — see 20260722_job_postings_business_paid_tier.sql.
+function ActivateJobModal({ visible, jobTitle, isRenew, onConfirm, onCancel }) {
+  const [ref, setRef] = useState('')
+  function handleConfirm() { onConfirm(ref.trim()); setRef('') }
+  function handleCancel()  { onCancel(); setRef('') }
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleCancel}>
+      <TouchableOpacity style={s.rejectOverlay} activeOpacity={1} onPress={handleCancel}>
+        <TouchableOpacity style={s.rejectSheet} activeOpacity={1}>
+          <Text style={s.rejectTitle}>{isRenew ? 'Renew' : 'Activate'}{jobTitle ? ` "${jobTitle}"` : ''}?</Text>
+          <Text style={s.rejectSub}>
+            Confirm the bank transfer has landed. This publishes the listing for 30 days.
+          </Text>
+          <TextInput
+            style={[s.rejectInput, { minHeight: 40 }]}
+            value={ref}
+            onChangeText={setRef}
+            placeholder="Bank reference (optional)"
+            placeholderTextColor={colors.textSecondary}
+            maxLength={120}
+          />
+          <View style={s.rejectBtnRow}>
+            <TouchableOpacity style={s.rejectCancelBtn} onPress={handleCancel}>
+              <Text style={s.rejectCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.rejectConfirmBtn, { backgroundColor: colors.primary }]} onPress={handleConfirm}>
+              <Text style={s.rejectConfirmText}>{isRenew ? 'Renew' : 'Activate'}</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  )
+}
+
 function SubscribeModal({ visible, agentName, isExtend, onConfirm, onCancel }) {
   const [days, setDays] = useState(30)
   const OPTIONS = [30, 90, 180, 365]
@@ -3027,10 +3063,11 @@ function PlacesTab() {
 // ─── Job Postings Tab ────────────────────────────────────────────────────────
 
 function JobPostingsTab() {
-  const [jobs,         setJobs]         = useState([])
-  const [loading,      setLoading]      = useState(true)
-  const [filter,       setFilter]       = useState('pending')
-  const [rejectTarget, setRejectTarget] = useState(null)
+  const [jobs,           setJobs]           = useState([])
+  const [loading,        setLoading]        = useState(true)
+  const [filter,         setFilter]         = useState('pending')
+  const [rejectTarget,   setRejectTarget]   = useState(null)
+  const [activateTarget, setActivateTarget] = useState(null)  // { item, isRenew }
 
   const CATEGORY_LABELS = {
     hospitality: 'Hospitality', construction: 'Construction', retail: 'Retail',
@@ -3043,9 +3080,11 @@ function JobPostingsTab() {
     setLoading(true)
     let query = supabase
       .from('job_postings')
-      .select('id, job_title, employer_name, category, employment_type, district, phone, status, rejection_reason, owner_id, created_at, expires_at')
+      .select('id, job_title, employer_name, category, employment_type, district, phone, status, rejection_reason, owner_id, created_at, expires_at, poster_type, payment_status, paid_at, payment_ref')
       .order('created_at', { ascending: false })
-    if (filter === 'expired') {
+    if (filter === 'awaiting_payment') {
+      query = query.eq('payment_status', 'awaiting_payment').eq('status', 'pending')
+    } else if (filter === 'expired') {
       // Auto-expire flips active→expired hourly; also catch active rows already
       // past expiry but not yet swept by the cron.
       const nowIso = new Date().toISOString()
@@ -3065,6 +3104,28 @@ function JobPostingsTab() {
     await supabase.from('job_postings')
       .update({ status: 'active', expires_at: expiresAt, rejection_reason: null })
       .eq('id', item.id)
+    load()
+  }
+
+  // Business posts: publish once the off-app bank transfer has landed. Renewal
+  // extends from the current expiry when it is still in the future, else from
+  // now — same semantics as extendSubscription() for estate agents.
+  async function activate(item, isRenew, paymentRef) {
+    const base = isRenew && item.expires_at && new Date(item.expires_at) > new Date()
+      ? new Date(item.expires_at)
+      : new Date()
+    const expiresAt = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    await supabase.from('job_postings')
+      .update({
+        status:           'active',
+        payment_status:   'paid',
+        paid_at:          new Date().toISOString(),
+        payment_ref:      paymentRef || null,
+        expires_at:       expiresAt,
+        rejection_reason: null,
+      })
+      .eq('id', item.id)
+    setActivateTarget(null)
     load()
   }
 
@@ -3098,9 +3159,11 @@ function JobPostingsTab() {
     <View style={{ flex: 1 }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
         <View style={[s.chipRow, { marginBottom: 12 }]}>
-          {['pending', 'active', 'rejected', 'filled', 'expired', 'all'].map(f => (
+          {['pending', 'awaiting_payment', 'active', 'rejected', 'filled', 'expired', 'all'].map(f => (
             <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
-              <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+              <Text style={[s.chipText, filter === f && s.chipTextActive]}>
+                {f === 'awaiting_payment' ? 'Awaiting payment' : f.charAt(0).toUpperCase() + f.slice(1)}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -3114,8 +3177,11 @@ function JobPostingsTab() {
             keyExtractor={j => j.id}
             contentContainerStyle={s.listContent}
             showsVerticalScrollIndicator={false}
-            ListEmptyComponent={<SectionEmpty text={`No ${filter} job postings.`} />}
-            renderItem={({ item }) => (
+            ListEmptyComponent={<SectionEmpty text={`No ${filter.replace('_', ' ')} job postings.`} />}
+            renderItem={({ item }) => {
+              const isBusiness = item.poster_type === 'business'
+              const awaitingPayment = isBusiness && item.payment_status === 'awaiting_payment'
+              return (
               <View style={s.card}>
                 <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
                   <View style={{ flex: 1 }}>
@@ -3127,21 +3193,41 @@ function JobPostingsTab() {
                       <Text style={s.cardSub}>Expires: {new Date(item.expires_at).toLocaleDateString('en-GB')}</Text>
                     )}
                   </View>
-                  <View style={[s.pillGrey, { backgroundColor: statusColor(item.status) + '20', marginLeft: 8 }]}>
-                    <Text style={[s.pillText, { color: statusColor(item.status) }]}>{item.status}</Text>
+                  <View style={{ alignItems: 'flex-end', marginLeft: 8, gap: 4 }}>
+                    <View style={[s.pillGrey, { backgroundColor: statusColor(item.status) + '20' }]}>
+                      <Text style={[s.pillText, { color: statusColor(item.status) }]}>{item.status}</Text>
+                    </View>
+                    {isBusiness && (
+                      <View style={[s.pillGrey, { backgroundColor: (awaitingPayment ? colors.accent : colors.success) + '20' }]}>
+                        <Text style={[s.pillText, { color: awaitingPayment ? colors.accent : colors.success }]}>
+                          {awaitingPayment ? 'unpaid' : 'business'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </View>
 
                 {item.status === 'rejected' && item.rejection_reason && (
                   <Text style={[s.cardSub, { color: colors.danger, marginTop: 6 }]}>Reason: {item.rejection_reason}</Text>
                 )}
+                {isBusiness && item.payment_ref && (
+                  <Text style={[s.cardSub, { marginTop: 6 }]}>Ref: {item.payment_ref}</Text>
+                )}
 
                 <View style={[s.rowActions, { marginTop: 10, marginLeft: 0 }]}>
-                  {item.status !== 'active' && item.status !== 'filled' && (
-                    <TouchableOpacity style={s.ghostBtn} onPress={() => approve(item)}>
-                      <Text style={s.ghostBtnText}>Approve</Text>
-                    </TouchableOpacity>
-                  )}
+                  {/* Business posts publish through Activate (confirms the off-app
+                      transfer landed); individuals keep the free Approve path. */}
+                  {isBusiness
+                    ? item.status !== 'filled' && (
+                      <TouchableOpacity style={s.ghostBtn} onPress={() => setActivateTarget({ item, isRenew: item.status === 'active' || item.status === 'expired' })}>
+                        <Text style={s.ghostBtnText}>{item.status === 'active' || item.status === 'expired' ? 'Renew' : 'Activate'}</Text>
+                      </TouchableOpacity>
+                    )
+                    : item.status !== 'active' && item.status !== 'filled' && (
+                      <TouchableOpacity style={s.ghostBtn} onPress={() => approve(item)}>
+                        <Text style={s.ghostBtnText}>Approve</Text>
+                      </TouchableOpacity>
+                    )}
                   {item.status !== 'rejected' && item.status !== 'filled' && (
                     <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget(item)}>
                       <Text style={s.dangerGhostText}>Reject</Text>
@@ -3152,7 +3238,8 @@ function JobPostingsTab() {
                   </TouchableOpacity>
                 </View>
               </View>
-            )}
+              )
+            }}
           />
         )
       }
@@ -3162,6 +3249,14 @@ function JobPostingsTab() {
         entityName={rejectTarget?.job_title}
         onConfirm={reason => reject(rejectTarget.id, reason)}
         onCancel={() => setRejectTarget(null)}
+      />
+
+      <ActivateJobModal
+        visible={!!activateTarget}
+        jobTitle={activateTarget?.item?.job_title}
+        isRenew={activateTarget?.isRenew}
+        onConfirm={ref => activate(activateTarget.item, activateTarget.isRenew, ref)}
+        onCancel={() => setActivateTarget(null)}
       />
     </View>
   )
