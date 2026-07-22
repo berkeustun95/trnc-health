@@ -37,6 +37,14 @@ const DISTRICT_KEYS = {
   iskele: 'jobDistrictIskele', lefke: 'jobDistrictLefke', karpaz: 'jobDistrictKarpaz',
 }
 
+// Declaring individual vs business is allowed in the consumer app — it is not
+// payment UI. Businesses are told about payment off-app; nothing here, on the
+// success state, or on the dashboard may mention pricing or bank transfer.
+const POSTER_TYPES = [
+  { key: 'individual', labelKey: 'jobPosterIndividual', icon: 'person-outline' },
+  { key: 'business',   labelKey: 'jobPosterBusiness',   icon: 'business-outline' },
+]
+
 const CONTACT_PREFS = [
   { key: 'whatsapp', labelKey: 'jobContactPrefWA',   icon: 'logo-whatsapp' },
   { key: 'call',     labelKey: 'jobContactPrefCall',  icon: 'call-outline' },
@@ -68,6 +76,7 @@ function Field({ label, children }) {
 export default function JobPostOnboardingScreen({ session, lang, onClose }) {
   const [submitted,   setSubmitted]   = useState(false)
 
+  const [posterType,  setPosterType]  = useState('individual')
   const [jobTitle,    setJobTitle]    = useState('')
   const [employer,    setEmployer]    = useState('')
   const [category,    setCategory]    = useState(null)
@@ -95,6 +104,7 @@ export default function JobPostOnboardingScreen({ session, lang, onClose }) {
     try {
       const { error: err } = await supabase.from('job_postings').insert({
         owner_id:        session.user.id,
+        poster_type:     posterType,
         job_title:       jobTitle.trim(),
         employer_name:   employer.trim(),
         category,
@@ -140,6 +150,27 @@ export default function JobPostOnboardingScreen({ session, lang, onClose }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          <Field label={t('jobFormPosterType', lang)}>
+            <View style={s.chipRow}>
+              {POSTER_TYPES.map(p => (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[s.selChip, posterType === p.key && s.selChipActive]}
+                  onPress={() => setPosterType(p.key)}
+                >
+                  <Ionicons
+                    name={p.icon}
+                    size={13}
+                    color={posterType === p.key ? colors.primary : colors.textSecondary}
+                  />
+                  <Text style={[s.selChipText, posterType === p.key && s.selChipTextActive]}>
+                    {t(p.labelKey, lang)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Field>
+
           <Field label={t('jobFormJobTitle', lang)}>
             <TextInput
               style={s.input}
