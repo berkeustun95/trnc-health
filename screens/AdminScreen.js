@@ -23,16 +23,16 @@ async function sendPushNotification(token, title, body, data = {}) {
   } catch {}
 }
 
-// ⚠️ BROKEN — TODO(next task): this silently writes nothing. The only INSERT
-// policy on notifications is "service insert notifications" WITH CHECK (false)
-// (20260718_capture_5_rls_policies.sql), so every insert here is rejected by RLS
-// and swallowed. Pushes still send, which is why it looks like it works, but no
-// row lands in the user's inbox. Fix by switching every call site to the
-// insert_notification RPC (SECURITY DEFINER), as ProviderScreen.js:52,
-// BookingScreen.js:33 and notifyJobLive() below already do. Affects claim,
-// facility and content-report notifications.
+// Writes via the insert_notification RPC (SECURITY DEFINER) — a direct insert is
+// always rejected, because the only INSERT policy on notifications is
+// WITH CHECK (false). The error is surfaced rather than swallowed: this helper
+// failed silently for every call site until now, and supabase-js returns
+// { error } instead of throwing, so a try/catch would not have caught it either.
 async function recordNotification(userId, title, body) {
-  try { await supabase.from('notifications').insert({ user_id: userId, title, body }) } catch {}
+  const { error } = await supabase.rpc('insert_notification', {
+    p_user_id: userId, p_title: title, p_body: body,
+  })
+  if (error) console.warn('recordNotification failed:', error.message)
 }
 
 // ─── Shared ────────────────────────────────────────────────────────────────
