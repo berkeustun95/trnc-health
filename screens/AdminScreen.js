@@ -23,6 +23,14 @@ async function sendPushNotification(token, title, body, data = {}) {
   } catch {}
 }
 
+// ⚠️ BROKEN — TODO(next task): this silently writes nothing. The only INSERT
+// policy on notifications is "service insert notifications" WITH CHECK (false)
+// (20260718_capture_5_rls_policies.sql), so every insert here is rejected by RLS
+// and swallowed. Pushes still send, which is why it looks like it works, but no
+// row lands in the user's inbox. Fix by switching every call site to the
+// insert_notification RPC (SECURITY DEFINER), as ProviderScreen.js:52,
+// BookingScreen.js:33 and notifyJobLive() below already do. Affects claim,
+// facility and content-report notifications.
 async function recordNotification(userId, title, body) {
   try { await supabase.from('notifications').insert({ user_id: userId, title, body }) } catch {}
 }
@@ -3099,11 +3107,27 @@ function JobPostingsTab() {
 
   useEffect(() => { load() }, [load])
 
+  // Uses the insert_notification RPC, not recordNotification(): the only INSERT
+  // policy on notifications is WITH CHECK (false), so a direct client insert is
+  // always rejected. The RPC is SECURITY DEFINER and bypasses it.
+  // No payment wording — this reaches the consumer app.
+  async function notifyJobLive(ownerId, jobTitle) {
+    if (!ownerId) return
+    const { data: p } = await supabase.from('profiles')
+      .select('push_token, preferred_language').eq('id', ownerId).maybeSingle()
+    const lang  = p?.preferred_language || 'English'
+    const title = t('notifJobLiveTitle', lang)
+    const body  = t('notifJobLiveBody', lang).replace('{title}', jobTitle || '')
+    if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+    await supabase.rpc('insert_notification', { p_user_id: ownerId, p_title: title, p_body: body })
+  }
+
   async function approve(item) {
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     await supabase.from('job_postings')
       .update({ status: 'active', expires_at: expiresAt, rejection_reason: null })
       .eq('id', item.id)
+    await notifyJobLive(item.owner_id, item.job_title)
     load()
   }
 
@@ -3126,6 +3150,7 @@ function JobPostingsTab() {
       })
       .eq('id', item.id)
     setActivateTarget(null)
+    await notifyJobLive(item.owner_id, item.job_title)
     load()
   }
 
