@@ -717,7 +717,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   value={form.full_name}
                   onChangeText={set('full_name')}
                   placeholder="Your full name"
-                  placeholderTextColor={colors.border}
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
@@ -733,7 +733,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                     value={form.phone}
                     onChangeText={set('phone')}
                     placeholder="555 000 00 00"
-                    placeholderTextColor={colors.border}
+                    placeholderTextColor={colors.textSecondary}
                     keyboardType="phone-pad"
                   />
                 </View>

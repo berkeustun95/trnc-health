@@ -737,19 +737,19 @@ function FacilitiesTab() {
                 <TextInput style={s.input} value={form.address} onChangeText={set('address')} />
               </Field>
               <Field label="Latitude">
-                <TextInput style={s.input} value={form.latitude} onChangeText={set('latitude')} keyboardType="decimal-pad" placeholder="e.g. 35.1856" placeholderTextColor={colors.border} />
+                <TextInput style={s.input} value={form.latitude} onChangeText={set('latitude')} keyboardType="decimal-pad" placeholder="e.g. 35.1856" placeholderTextColor={colors.textSecondary} />
               </Field>
               <Field label="Longitude">
-                <TextInput style={s.input} value={form.longitude} onChangeText={set('longitude')} keyboardType="decimal-pad" placeholder="e.g. 33.3823" placeholderTextColor={colors.border} />
+                <TextInput style={s.input} value={form.longitude} onChangeText={set('longitude')} keyboardType="decimal-pad" placeholder="e.g. 33.3823" placeholderTextColor={colors.textSecondary} />
               </Field>
               <Field label="Opening hours">
-                <TextInput style={s.input} value={form.opening_hours} onChangeText={set('opening_hours')} placeholder="Mon-Fri 08:00-18:00 or 24/7" placeholderTextColor={colors.border} />
+                <TextInput style={s.input} value={form.opening_hours} onChangeText={set('opening_hours')} placeholder="Mon-Fri 08:00-18:00 or 24/7" placeholderTextColor={colors.textSecondary} />
               </Field>
               <Field label="Languages (comma-separated)">
-                <TextInput style={s.input} value={form.languages} onChangeText={set('languages')} placeholder="English, Turkish" placeholderTextColor={colors.border} />
+                <TextInput style={s.input} value={form.languages} onChangeText={set('languages')} placeholder="English, Turkish" placeholderTextColor={colors.textSecondary} />
               </Field>
               <Field label="Provider ID (UUID)">
-                <TextInput style={s.input} value={form.provider_id} onChangeText={set('provider_id')} autoCapitalize="none" placeholder="Leave blank if none" placeholderTextColor={colors.border} />
+                <TextInput style={s.input} value={form.provider_id} onChangeText={set('provider_id')} autoCapitalize="none" placeholder="Leave blank if none" placeholderTextColor={colors.textSecondary} />
               </Field>
 
               <View style={s.switchRow}>
@@ -959,6 +959,7 @@ function DutyTab() {
           value={pharmacySearch}
           onChangeText={setPharmacySearch}
           placeholder="Search pharmacies…"
+          placeholderTextColor={colors.textSecondary}
         />
         {pharmacies.filter(p => p.name.toLowerCase().includes(pharmacySearch.toLowerCase())).map(p => (
           <TouchableOpacity key={p.id} style={[s.card, selectedId === p.id && s.cardSelected]} onPress={() => setSelectedId(p.id)}>
@@ -1028,7 +1029,7 @@ function DutyTab() {
                 value={swapSearch}
                 onChangeText={setSwapSearch}
                 placeholder="Search pharmacies…"
-                placeholderTextColor={colors.border}
+                placeholderTextColor={colors.textSecondary}
               />
               {pharmacies
                 .filter(p => p.name.toLowerCase().includes(swapSearch.toLowerCase()))
@@ -1050,7 +1051,7 @@ function DutyTab() {
                     value={swapPhone}
                     onChangeText={setSwapPhone}
                     placeholder="e.g. 0548 831 00 00"
-                    placeholderTextColor={colors.border}
+                    placeholderTextColor={colors.textSecondary}
                     keyboardType="phone-pad"
                   />
                 </Field>
@@ -1878,7 +1879,7 @@ function BroadcastTab() {
           value={title}
           onChangeText={v => { setTitle(v); setResult(null) }}
           placeholder="e.g. Duty pharmacy update"
-          placeholderTextColor={colors.border}
+          placeholderTextColor={colors.textSecondary}
           maxLength={100}
         />
       </Field>
@@ -1889,7 +1890,7 @@ function BroadcastTab() {
           value={body}
           onChangeText={v => { setBody(v); setResult(null) }}
           placeholder="Enter your message…"
-          placeholderTextColor={colors.border}
+          placeholderTextColor={colors.textSecondary}
           multiline
           maxLength={300}
         />

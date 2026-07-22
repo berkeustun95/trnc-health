@@ -303,7 +303,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
               value={form.name}
               onChangeText={set('name')}
               placeholder="e.g. Lefkoşa Central Clinic"
-              placeholderTextColor={colors.border}
+              placeholderTextColor={colors.textSecondary}
             />
 
             <Text style={s.fieldLabel}>TYPE</Text>
@@ -327,7 +327,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
               value={form.address}
               onChangeText={set('address')}
               placeholder="Street, City"
-              placeholderTextColor={colors.border}
+              placeholderTextColor={colors.textSecondary}
             />
 
             <Text style={s.fieldLabel}>MAP LOCATION</Text>
@@ -358,7 +358,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
               value={form.phone}
               onChangeText={set('phone')}
               placeholder="+90 392 000 0000"
-              placeholderTextColor={colors.border}
+              placeholderTextColor={colors.textSecondary}
               keyboardType="phone-pad"
             />
 
@@ -371,7 +371,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
               value={form.registration_number}
               onChangeText={set('registration_number')}
               placeholder="e.g. Ministry reg. no."
-              placeholderTextColor={colors.border}
+              placeholderTextColor={colors.textSecondary}
               autoCapitalize="none"
             />
 
@@ -423,7 +423,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
           value={form.tax_registration_no}
           onChangeText={set('tax_registration_no')}
           placeholder={t('taxRegistrationNo', lang)}
-          placeholderTextColor={colors.border}
+          placeholderTextColor={colors.textSecondary}
           autoCapitalize="none"
         />
 
@@ -435,7 +435,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
               value={form.registration_number}
               onChangeText={set('registration_number')}
               placeholder="e.g. Ministry reg. no."
-              placeholderTextColor={colors.border}
+              placeholderTextColor={colors.textSecondary}
               autoCapitalize="none"
             />
 

@@ -263,6 +263,22 @@ function BordersCard({ lang }) {
   )
 }
 
+function PhoneRow({ phone, label, iconName = 'call-outline', iconColor }) {
+  return (
+    <TouchableOpacity
+      style={s.embassyRow}
+      activeOpacity={0.6}
+      onPress={() => Linking.openURL(`tel:${phone.replace(/\s/g, '')}`)}
+    >
+      <Ionicons name={iconName} size={15} color={iconColor || colors.textSecondary} style={{ marginTop: 1 }} />
+      <Text style={s.embassyDetail}>
+        {label ? <Text style={s.embassyPhoneLabel}>{label}: </Text> : null}
+        <Text style={s.embassyPhoneLink}>{phone}</Text>
+      </Text>
+    </TouchableOpacity>
+  )
+}
+
 function OfficeRow({ office }) {
   return (
     <View style={s.embassyBlock}>
@@ -271,10 +287,7 @@ function OfficeRow({ office }) {
         <Ionicons name="location-outline" size={15} color={colors.textSecondary} style={{ marginTop: 1 }} />
         <Text style={s.embassyDetail}>{office.address}</Text>
       </View>
-      <View style={s.embassyRow}>
-        <Ionicons name="call-outline" size={15} color={colors.textSecondary} style={{ marginTop: 1 }} />
-        <Text style={s.embassyDetail}>{office.phone}</Text>
-      </View>
+      <PhoneRow phone={office.phone} />
     </View>
   )
 }
@@ -290,11 +303,19 @@ function EmbassiesCard({ lang }) {
           <Ionicons name="location-outline" size={15} color={colors.textSecondary} style={{ marginTop: 1 }} />
           <Text style={s.embassyDetail}>{t('essEmbTurkeyAddress', lang)}</Text>
         </View>
-        <View style={s.embassyRow}>
-          <Ionicons name="call-outline" size={15} color={colors.textSecondary} style={{ marginTop: 1 }} />
-          <Text style={[s.embassyDetail, { fontStyle: 'italic', color: colors.textSecondary }]}>{t('essEmbTurkeyPhoneNote', lang)}</Text>
-        </View>
+        <PhoneRow phone="+90 392 600 3100" />
+        <PhoneRow
+          phone="+90 539 100 10 20"
+          label={t('essEmbTurkeyEmergencyLabel', lang)}
+          iconName="alert-circle-outline"
+          iconColor={colors.danger}
+        />
         <Text style={s.embassyNote}>{t('essEmbTurkeyNote', lang)}</Text>
+      </View>
+
+      <View style={s.embassyBlock}>
+        <Text style={s.embassyTitle}>{t('essEmbFamagustaTitle', lang)}</Text>
+        <PhoneRow phone="+90 392 633 02 00" />
       </View>
 
       <SectionTitle text={t('essEmbOtherTitle', lang)} />
@@ -584,6 +605,13 @@ const s = StyleSheet.create({
     fontSize: 14,
     color: colors.textPrimary,
     lineHeight: 20,
+  },
+  embassyPhoneLabel: {
+    color: colors.textSecondary,
+  },
+  embassyPhoneLink: {
+    color: colors.primary,
+    fontWeight: '600',
   },
   embassyNote: {
     fontSize: 13,
