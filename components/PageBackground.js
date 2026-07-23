@@ -10,6 +10,7 @@ const TOPIC_CONFIG = {
   accommodation:       { asset: require('../assets/backgrounds/ada-bg-accommodation.png') },
   pets:                { asset: require('../assets/backgrounds/ada-bg-pets.jpg') },
   home_services:       { asset: require('../assets/backgrounds/ada-bg-home-services.png') },
+  insurance:           { asset: require('../assets/backgrounds/ada-bg-insurance.png') },
   beaches_landmarks:   { asset: require('../assets/backgrounds/ada-bg-beaches-landmarks.png') },
   transportation:      { asset: require('../assets/backgrounds/ada-bg-transportation.png') },
   municipalities:      { asset: require('../assets/backgrounds/ada-bg-municipalities.png') },

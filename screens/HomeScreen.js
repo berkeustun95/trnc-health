@@ -701,6 +701,8 @@ export default function HomeScreen({
 
   return (
     <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
+      {/* Facility-list mode swaps the hub's sky for the medical-facilities art (full-bleed). */}
+      {showFacilityList && <PageBackground topic="medical_facilities" />}
       <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
         <View style={s.container}>
           <View style={[s.header, showFacilityList && { justifyContent: 'space-between' }]}>
