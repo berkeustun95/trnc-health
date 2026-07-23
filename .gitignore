@@ -43,3 +43,6 @@ google-play-service-account.json
 # generated native folders
 /ios
 /android
+
+# dev-only test tooling (not part of the app bundle)
+scripts/send-test-duty-push.js
