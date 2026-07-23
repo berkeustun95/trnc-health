@@ -23,6 +23,20 @@ async function sendPushNotification(token, title, body, data = {}) {
   } catch {}
 }
 
+// Broadcast push to many tokens. Expo's push API caps a single request at 100
+// messages, so we chunk. Each chunk is one fetch carrying an array payload.
+async function sendPushBatch(tokens, title, body, data = {}) {
+  for (let i = 0; i < tokens.length; i += 100) {
+    const chunk = tokens.slice(i, i + 100)
+    try {
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(chunk.map(to => ({ to, title, body, sound: 'default', data }))),
+      })
+    } catch {}
+  }
+}
+
 // Writes via the insert_notification RPC (SECURITY DEFINER) — a direct insert is
 // always rejected, because the only INSERT policy on notifications is
 // WITH CHECK (false). The error is surfaced rather than swallowed: this helper
@@ -1905,14 +1919,23 @@ function BroadcastTab() {
 
     const trimmedTitle = title.trim()
     const b = body.trim()
-    let pushCount = 0
+    const recipients = profiles ?? []
 
-    for (const p of profiles ?? []) {
-      await recordNotification(p.id, trimmedTitle, b)
-      if (p.push_token) { await sendPushNotification(p.push_token, trimmedTitle, b); pushCount++ }
+    // DB inserts: the insert_notification RPC is one-row-per-call, so we can't do
+    // a single multi-row insert without a new RPC. Fire them in parallel chunks
+    // of 25 instead of awaiting each serially. recordNotification swallows its
+    // own errors, so one failure won't abort the batch.
+    for (let i = 0; i < recipients.length; i += 25) {
+      await Promise.all(
+        recipients.slice(i, i + 25).map(p => recordNotification(p.id, trimmedTitle, b))
+      )
     }
 
-    setResult({ total: (profiles ?? []).length, pushCount })
+    // Pushes: one array-payload fetch per 100 tokens (Expo's per-request cap).
+    const tokens = recipients.filter(p => p.push_token).map(p => p.push_token)
+    await sendPushBatch(tokens, trimmedTitle, b)
+
+    setResult({ total: recipients.length, pushCount: tokens.length })
     setSending(false)
   }
 
