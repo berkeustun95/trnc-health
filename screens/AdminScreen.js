@@ -12,7 +12,7 @@ import { t } from '../constants/i18n'
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'BusRoutes', 'Places', 'JobPostings']
+const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'BusRoutes', 'Places', 'JobPostings']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -205,6 +205,7 @@ function DashboardTab({ onNavigate }) {
         { count: pendingAgents },
         { count: pendingHomeServices },
         { count: pendingTransport },
+        { count: pendingInsurance },
         { count: pendingBeaches },
         { count: pendingLandmarks },
         { count: pendingJobPostings },
@@ -223,13 +224,14 @@ function DashboardTab({ onNavigate }) {
         supabase.from('estate_agents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('home_services').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('transport_providers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('insurance_companies').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('beaches').select('*',   { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('landmarks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('job_postings').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('content_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ])
       const pendingPlaces = (pendingBeaches ?? 0) + (pendingLandmarks ?? 0)
-      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingPlaces, pendingJobPostings, pendingReports })
+      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingPlaces, pendingJobPostings, pendingReports })
     }
     load()
   }, [])
@@ -249,6 +251,7 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingAgents ?? 0)      > 0 && { label: 'Agent applications pending',       count: stats.pendingAgents,         tab: 'Agents',       color: '#7C3AED' },
     (stats.pendingHomeServices ?? 0) > 0 && { label: 'Home service providers pending',  count: stats.pendingHomeServices,   tab: 'HomeServices', color: colors.primary },
     (stats.pendingTransport ?? 0)    > 0 && { label: 'Transport providers pending',      count: stats.pendingTransport,       tab: 'Transport',    color: colors.primary },
+    (stats.pendingInsurance ?? 0)    > 0 && { label: 'Insurance companies pending',      count: stats.pendingInsurance,       tab: 'Insurance',    color: colors.primary },
     (stats.pendingPlaces ?? 0)       > 0 && { label: 'Beaches & landmarks to review',   count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
     (stats.pendingJobPostings ?? 0)  > 0 && { label: 'Job postings awaiting approval',  count: stats.pendingJobPostings,     tab: 'JobPostings',  color: colors.primary },
   ].filter(Boolean)
@@ -2617,6 +2620,131 @@ function HomeServicesTab() {
   )
 }
 
+// ─── Insurance Tab ────────────────────────────────────────────────────────────
+
+function InsuranceTab() {
+  const [companies, setCompanies]           = useState([])
+  const [loading, setLoading]               = useState(true)
+  const [filter, setFilter]                 = useState('pending')
+  const [rejectTarget, setRejectTarget]     = useState(null)
+
+  const TYPE_LABELS = { health: 'Health', car: 'Car', home: 'Home', travel: 'Travel' }
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    let query = supabase
+      .from('insurance_companies')
+      .select('id, name, phone, whatsapp, email, contact_pref, district, insurance_types, status, rejection_reason, owner_id, verified')
+      .order('created_at', { ascending: false })
+    if (filter !== 'all') query = query.eq('status', filter)
+    const { data } = await query
+    setCompanies(data ?? [])
+    setLoading(false)
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(item) {
+    await supabase.from('insurance_companies').update({ status: 'active', rejection_reason: null }).eq('id', item.id)
+    if (item.owner_id) {
+      await supabase.from('profiles').update({ role: 'insurance_provider' }).eq('id', item.owner_id)
+    }
+    load()
+  }
+
+  async function reject(id, reason) {
+    await supabase.from('insurance_companies').update({ status: 'rejected', rejection_reason: reason || 'Does not meet our guidelines.' }).eq('id', id)
+    setRejectTarget(null)
+    load()
+  }
+
+  async function deleteCompany(id) {
+    Alert.alert('Delete listing?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('insurance_companies').delete().eq('id', id); load() } },
+    ])
+  }
+
+  function statusColor(status) {
+    if (status === 'active')   return colors.success
+    if (status === 'rejected') return colors.danger
+    if (status === 'pending')  return '#C2410C'
+    return colors.textSecondary
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={[s.chipRow, { marginBottom: 12 }]}>
+        {['pending', 'active', 'rejected', 'all'].map(f => (
+          <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
+            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading
+        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        : (
+          <FlatList
+            data={companies}
+            keyExtractor={p => p.id}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text={`No ${filter} insurance companies.`} />}
+            renderItem={({ item }) => (
+              <View style={s.card}>
+                <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.cardTitle} numberOfLines={1}>{item.name}</Text>
+                    <Text style={s.cardSub}>{item.district} · {item.phone}</Text>
+                    {item.insurance_types?.length > 0 && (
+                      <Text style={s.cardSub}>{item.insurance_types.map(k => TYPE_LABELS[k] || k).join(', ')}</Text>
+                    )}
+                    {item.owner_id
+                      ? <Text style={[s.cardSub, { color: colors.textSecondary }]}>Self-registered</Text>
+                      : <Text style={[s.cardSub, { color: colors.textSecondary }]}>Admin-seeded</Text>
+                    }
+                  </View>
+                  <View style={[s.pillGrey, { backgroundColor: statusColor(item.status) + '20', marginLeft: 8 }]}>
+                    <Text style={[s.pillText, { color: statusColor(item.status) }]}>{item.status}</Text>
+                  </View>
+                </View>
+
+                {item.status === 'rejected' && item.rejection_reason && (
+                  <Text style={[s.cardSub, { color: colors.danger, marginTop: 6 }]}>Reason: {item.rejection_reason}</Text>
+                )}
+
+                <View style={[s.rowActions, { marginTop: 10, marginLeft: 0 }]}>
+                  {item.status !== 'active' && (
+                    <TouchableOpacity style={s.ghostBtn} onPress={() => approve(item)}>
+                      <Text style={s.ghostBtnText}>Approve</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.status !== 'rejected' && (
+                    <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget(item)}>
+                      <Text style={s.dangerGhostText}>Reject</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={s.dangerGhostBtn} onPress={() => deleteCompany(item.id)}>
+                    <Text style={s.dangerGhostText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          />
+        )
+      }
+
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget?.name}
+        onConfirm={reason => reject(rejectTarget.id, reason)}
+        onCancel={() => setRejectTarget(null)}
+      />
+    </View>
+  )
+}
+
 // ─── Transport Tab ────────────────────────────────────────────────────────────
 
 function TransportTab() {
@@ -3336,6 +3464,7 @@ export default function AdminScreen({ session }) {
           {tab === 'Agents'        && <AgentsTab />}
           {tab === 'HomeServices'  && <HomeServicesTab />}
           {tab === 'Transport'     && <TransportTab />}
+          {tab === 'Insurance'     && <InsuranceTab />}
           {tab === 'BusRoutes'     && <BusRoutesTab />}
           {tab === 'Places'        && <PlacesTab />}
           {tab === 'JobPostings'   && <JobPostingsTab />}
