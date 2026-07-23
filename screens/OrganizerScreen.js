@@ -28,6 +28,30 @@ function statusLabel(status, lang) {
   return t('eventStatusDraft', lang)
 }
 
+function decode(base64) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  const lookup = new Uint8Array(256)
+  for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i
+  lookup['='.charCodeAt(0)] = 0
+  const len = base64.length
+  let bufLen = (len * 3) >> 2
+  if (base64[len - 1] === '=') bufLen--
+  if (base64[len - 2] === '=') bufLen--
+  const buf = new ArrayBuffer(bufLen)
+  const out = new Uint8Array(buf)
+  let p = 0
+  for (let i = 0; i < len; i += 4) {
+    const a = lookup[base64.charCodeAt(i)]
+    const b = lookup[base64.charCodeAt(i + 1)]
+    const c = lookup[base64.charCodeAt(i + 2)]
+    const d = lookup[base64.charCodeAt(i + 3)]
+    out[p++] = (a << 2) | (b >> 4)
+    if (p < bufLen) out[p++] = ((b & 15) << 4) | (c >> 2)
+    if (p < bufLen) out[p++] = ((c & 3) << 6) | d
+  }
+  return buf
+}
+
 function formatDate(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleString('en-GB', {
@@ -138,21 +162,22 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
       allowsMultipleSelection: false,
+      base64: true,
     })
     if (res.canceled || !res.assets?.length) return
     const asset = res.assets[0]
+    if (!asset.base64) { Alert.alert('Upload failed', 'Could not read the selected image. Please try again.'); return }
     setUploading(true)
     try {
-      const ext = asset.uri.split('.').pop()
+      const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
+      const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
       const path = `events/${session.user.id}/${Date.now()}.${ext}`
-      const resp = await fetch(asset.uri)
-      const blob = await resp.blob()
-      const { error } = await supabase.storage.from('event-images').upload(path, blob, { contentType: `image/${ext}` })
+      const { error } = await supabase.storage.from('event-images').upload(path, decode(asset.base64), { contentType })
       if (error) throw error
       const { data: { publicUrl } } = supabase.storage.from('event-images').getPublicUrl(path)
       setImages(prev => [...prev, publicUrl])
-    } catch {
-      Alert.alert('Upload failed', 'Could not upload image. Please try again.')
+    } catch (e) {
+      Alert.alert('Upload failed', e?.message || 'Could not upload image. Please try again.')
     } finally {
       setUploading(false)
     }
