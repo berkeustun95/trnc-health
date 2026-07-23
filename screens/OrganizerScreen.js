@@ -216,7 +216,7 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
     if (!organizerName.trim()) { Alert.alert('', 'Please enter an organiser name.'); return }
 
     setSaving(true)
-    const payload = {
+    const fields = {
       organizer_id:   session.user.id,
       organizer_name: organizerName.trim(),
       title:          title.trim(),
@@ -226,14 +226,23 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
       end_date:       endDate?.toISOString() ?? null,
       location:       location.trim() || null,
       location_url:   locationUrl.trim() || null,
-      status:         asDraft ? 'draft' : 'pending',
     }
 
     let error
     if (isNew) {
-      ;({ error } = await supabase.from('events').insert(payload))
+      // Server guard requires new rows to be inserted as 'draft'. Insert as draft,
+      // then promote to 'pending' with a follow-up update when the organizer submits.
+      const { data, error: insErr } = await supabase
+        .from('events')
+        .insert({ ...fields, status: 'draft' })
+        .select('id')
+        .single()
+      error = insErr
+      if (!error && !asDraft && data?.id) {
+        ;({ error } = await supabase.from('events').update({ status: 'pending' }).eq('id', data.id))
+      }
     } else {
-      ;({ error } = await supabase.from('events').update(payload).eq('id', event.id))
+      ;({ error } = await supabase.from('events').update({ ...fields, status: asDraft ? 'draft' : 'pending' }).eq('id', event.id))
     }
     setSaving(false)
     if (error) { Alert.alert('Error', error.message); return }
