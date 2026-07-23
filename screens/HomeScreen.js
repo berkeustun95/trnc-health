@@ -56,6 +56,7 @@ const MODULES = [
   { id: 'jobPostings',  icon: 'briefcase-outline', tint: 'service',   labelKey: 'menuJobPostings' },
   { id: 'beaches',       icon: 'umbrella-outline',  tint: 'lifestyle', labelKey: 'menuBeachesLandmarks' },
   { id: 'transport',     icon: 'car-outline',       tint: 'service',   labelKey: 'menuTransportation' },
+  { id: 'insurance',     icon: 'shield-checkmark-outline', tint: 'service', labelKey: 'menuInsurance' },
   { id: 'municipal',     icon: 'business-outline',  tint: 'service',   labelKey: 'menuMunicipalities' },
 ]
 
@@ -97,6 +98,7 @@ export default function HomeScreen({
   onShowJobPostings,
   onShowBeachesLandmarks,
   onShowTransport,
+  onShowInsurance,
   onShowEmergency,
   onShowMunicipal,
   onSelectPlace,
@@ -171,6 +173,7 @@ export default function HomeScreen({
     jobPostings:        onShowJobPostings,
     beaches:            onShowBeachesLandmarks,
     transport:          onShowTransport,
+    insurance:          onShowInsurance,
     municipal:          onShowMunicipal,
   }
 

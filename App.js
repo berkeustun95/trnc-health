@@ -38,6 +38,7 @@ import HomeServicesScreen from './screens/HomeServicesScreen'
 import JobPostingsScreen from './screens/JobPostingsScreen'
 import BeachesLandmarksScreen from './screens/BeachesLandmarksScreen'
 import TransportScreen from './screens/TransportScreen'
+import InsuranceScreen from './screens/InsuranceScreen'
 import PlaceProfileScreen from './screens/PlaceProfileScreen'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
 import BringingPetScreen from './screens/pets/BringingPetScreen'
@@ -208,6 +209,7 @@ export default function App() {
   const [showJobPostings,  setShowJobPostings]  = useState(false)
   const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
   const [showTransport, setShowTransport] = useState(false)
+  const [showInsurance, setShowInsurance] = useState(false)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [selectedPlace,        setSelectedPlace]        = useState(null)
@@ -452,6 +454,7 @@ export default function App() {
       if (showHomeServices) { setShowHomeServices(false); return true }
       if (showJobPostings)  { setShowJobPostings(false);  return true }
       if (showTransport) { setShowTransport(false); return true }
+      if (showInsurance) { setShowInsurance(false); return true }
       if (selectedPlace)        { setSelectedPlace(null); return true }
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
@@ -461,7 +464,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome])
 
   useEffect(() => {
     Promise.all([
@@ -962,6 +965,8 @@ export default function App() {
     content = <JobPostingsScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowJobPostings(false)} />
   } else if (showTransport) {
     content = <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowTransport(false)} />
+  } else if (showInsurance) {
+    content = <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowInsurance(false)} />
   } else if (selectedPlace) {
     content = <PlaceProfileScreen place={selectedPlace} lang={lang} onBack={() => setSelectedPlace(null)} />
   } else if (showBeachesLandmarks) {
@@ -1140,6 +1145,7 @@ export default function App() {
             onShowJobPostings={() => setShowJobPostings(true)}
             onShowBeachesLandmarks={() => setShowBeachesLandmarks(true)}
             onShowTransport={() => setShowTransport(true)}
+            onShowInsurance={() => setShowInsurance(true)}
             onShowEmergency={() => setShowEmergencyModal(true)}
             onShowMunicipal={() => setShowMunicipalModal(true)}
             onSelectPlace={setSelectedPlace}
@@ -1345,6 +1351,10 @@ export default function App() {
               <Ionicons name="car-outline" size={20} color={colors.primary} />
               <Text style={styles.menuItemText}>{t('menuTransportation', lang)}</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowInsurance(true) }}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
+              <Text style={styles.menuItemText}>{t('menuInsurance', lang)}</Text>
+            </TouchableOpacity>
 
             <View style={styles.menuDivider} />
             <TouchableOpacity style={styles.menuItem} onPress={rateApp}>
@@ -1517,6 +1527,7 @@ export default function App() {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowBeachesLandmarks(false); setShowTransport(false)
+    setShowInsurance(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedPlace(null); setShowNotifs(false)
     switch (target) {
@@ -1544,6 +1555,7 @@ export default function App() {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowBeachesLandmarks(false); setShowTransport(false)
+    setShowInsurance(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedPlace(null); setShowNotifs(false)
     switch (target) {
