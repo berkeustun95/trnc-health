@@ -61,7 +61,9 @@ CREATE POLICY "authenticated upload event images"
   TO authenticated
   WITH CHECK (bucket_id = 'event-images');
 
+-- Path layout is events/{uid}/{file}, so the uid is folder segment [2], not [1].
+DROP POLICY IF EXISTS "organizer delete own event images" ON storage.objects;
 CREATE POLICY "organizer delete own event images"
   ON storage.objects FOR DELETE
   TO authenticated
-  USING (bucket_id = 'event-images' AND (storage.foldername(name))[1] = auth.uid()::text);
+  USING (bucket_id = 'event-images' AND (storage.foldername(name))[2] = auth.uid()::text);
