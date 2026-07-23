@@ -39,6 +39,7 @@ import JobPostingsScreen from './screens/JobPostingsScreen'
 import BeachesLandmarksScreen from './screens/BeachesLandmarksScreen'
 import TransportScreen from './screens/TransportScreen'
 import InsuranceScreen from './screens/InsuranceScreen'
+import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import PlaceProfileScreen from './screens/PlaceProfileScreen'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
 import BringingPetScreen from './screens/pets/BringingPetScreen'
@@ -761,7 +762,7 @@ export default function App() {
   // screen or a provider dashboard.
   const inCustomerHub =
     !!session && !!profile &&
-    !['admin', 'provider', 'estate_agent', 'organizer', 'home_service_provider'].includes(profile.role) &&
+    !['admin', 'provider', 'estate_agent', 'organizer', 'home_service_provider', 'insurance_provider'].includes(profile.role) &&
     !showMenu && !showCoachMarks &&
     !selectedFacility && !bookingFacility
 
@@ -914,6 +915,8 @@ export default function App() {
     content = <OrganizerScreen session={session} lang={lang} />
   } else if (profile.role === 'home_service_provider') {
     content = <HomeServiceDashboardScreen session={session} lang={lang} />
+  } else if (profile.role === 'insurance_provider') {
+    content = <InsuranceDashboardScreen session={session} lang={lang} />
   } else if (showNotifs) {
     content = <NotificationsScreen
       notifications={notifications}
