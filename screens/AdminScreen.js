@@ -1903,13 +1903,13 @@ function BroadcastTab() {
     const { data: profiles, error: fetchErr } = await query
     if (fetchErr) { setError(fetchErr.message); setSending(false); return }
 
-    const t = title.trim()
+    const trimmedTitle = title.trim()
     const b = body.trim()
     let pushCount = 0
 
     for (const p of profiles ?? []) {
-      await recordNotification(p.id, t, b)
-      if (p.push_token) { await sendPushNotification(p.push_token, t, b); pushCount++ }
+      await recordNotification(p.id, trimmedTitle, b)
+      if (p.push_token) { await sendPushNotification(p.push_token, trimmedTitle, b); pushCount++ }
     }
 
     setResult({ total: (profiles ?? []).length, pushCount })
