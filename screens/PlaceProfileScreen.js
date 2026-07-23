@@ -96,6 +96,11 @@ export default function PlaceProfileScreen({ place, lang, onBack }) {
           </View>
         )}
 
+        {/* Attribution for the currently visible photo (CC BY-SA requires it). */}
+        {photos.length > 0 && place.photo_credits?.[imgIdx] ? (
+          <Text style={s.photoCredit}>{place.photo_credits[imgIdx]}</Text>
+        ) : null}
+
         <View style={s.body}>
           {/* Type + district row */}
           <View style={s.pillRow}>
@@ -178,6 +183,8 @@ const s = StyleSheet.create({
 
   // Gallery
   galleryImg:         { width: W, height: GALLERY_H },
+  photoCredit:        { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+                        paddingHorizontal: 16, paddingTop: 8 },
   galleryPlaceholder: { width: W, height: GALLERY_H, alignItems: 'center', justifyContent: 'center' },
   galleryEmoji:       { fontSize: 80 },
   dotRow:             { flexDirection: 'row', justifyContent: 'center', gap: 6,
