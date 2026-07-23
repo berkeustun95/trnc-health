@@ -1,5 +1,13 @@
 -- ─── Events feature migration ────────────────────────────────────────────────
 -- Run this in Supabase SQL Editor
+--
+-- Safe to re-run: the table uses CREATE TABLE IF NOT EXISTS (its inline CHECK
+-- constraints ride along only on first create), the bucket insert uses
+-- ON CONFLICT DO NOTHING, and every policy is dropped-then-created. Postgres has
+-- no CREATE POLICY IF NOT EXISTS, so a re-run without the DROPs errors with
+-- "policy ... already exists" — hence the drop-then-create on each.
+
+BEGIN;
 
 -- 1. Create events table
 CREATE TABLE IF NOT EXISTS events (
@@ -23,12 +31,14 @@ CREATE TABLE IF NOT EXISTS events (
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 
 -- 3. Policy: any authenticated user can read approved events
+DROP POLICY IF EXISTS "read approved events" ON events;
 CREATE POLICY "read approved events"
   ON events FOR SELECT
   TO authenticated
   USING (status = 'approved');
 
 -- 4. Policy: organizer can manage their own events (all statuses)
+DROP POLICY IF EXISTS "organizer manage own events" ON events;
 CREATE POLICY "organizer manage own events"
   ON events FOR ALL
   TO authenticated
@@ -36,6 +46,7 @@ CREATE POLICY "organizer manage own events"
   WITH CHECK (organizer_id = auth.uid());
 
 -- 5. Policy: admin can manage all events
+DROP POLICY IF EXISTS "admin manage all events" ON events;
 CREATE POLICY "admin manage all events"
   ON events FOR ALL
   TO authenticated
@@ -52,10 +63,12 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('event-images', 'event-images', true)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "public read event images" ON storage.objects;
 CREATE POLICY "public read event images"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'event-images');
 
+DROP POLICY IF EXISTS "authenticated upload event images" ON storage.objects;
 CREATE POLICY "authenticated upload event images"
   ON storage.objects FOR INSERT
   TO authenticated
@@ -67,3 +80,5 @@ CREATE POLICY "organizer delete own event images"
   ON storage.objects FOR DELETE
   TO authenticated
   USING (bucket_id = 'event-images' AND (storage.foldername(name))[2] = auth.uid()::text);
+
+COMMIT;
