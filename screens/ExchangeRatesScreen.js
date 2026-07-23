@@ -11,24 +11,81 @@ import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 
-const FX_CACHE_KEY = 'ada_fx_rates_cache'
-const API_URL = 'https://api.frankfurter.dev/v1/latest?base=TRY&symbols=GBP,EUR,USD'
+// New cache key: the KKTC payload shape differs from the old Frankfurter one,
+// so a fresh key avoids parsing a stale incompatible cache after the OTA.
+const FX_CACHE_KEY = 'ada_kktc_fx_cache_v1'
 
+// ─── PINNED SCHEMA — KKTC Merkez Bankası daily FX feed ──────────────────────
+// Source: https://www.mb.gov.ct.tr/kur/gunluk.xml  (official TRNC Central Bank,
+// public, no API key, XML published since 2011). Parsed with regex against a
+// FIXED, government-controlled flat schema — deliberately no XML library.
+// Header:   <Kur_Tarihi> DD/MM/YYYY   <Gecerli_Tarih_Araligi> single date OR
+//           "DD/MM/YYYY - DD/MM/YYYY" (weekends/holidays span a range).
+// Per row:  <Resmi_Kur> … <Birim> <Sembol> <Doviz_Alis> <Doviz_Satis>
+//           <Efektif_Alis> <Efektif_Satis> … </Resmi_Kur>
+// If parseKktcFx() starts returning null, these element names likely changed —
+// diff against a fresh fetch of the URL above to diagnose.
+const FX_URL = 'https://www.mb.gov.ct.tr/kur/gunluk.xml'
+
+// Display order + flags. Adding a currency = one entry here (parser is generic).
 const PAIRS = [
+  { code: 'USD', flag: '🇺🇸' },
   { code: 'GBP', flag: '🇬🇧' },
   { code: 'EUR', flag: '🇪🇺' },
-  { code: 'USD', flag: '🇺🇸' },
 ]
+const WANTED = PAIRS.map(p => p.code)
+
+function tag(xml, name) {
+  const m = xml.match(new RegExp(`<${name}>([^<]*)</${name}>`))
+  return m ? m[1].trim() : null
+}
+
+function parseKktcFx(xml) {
+  if (!xml) return null
+  const date = tag(xml, 'Kur_Tarihi')
+  const validRange = tag(xml, 'Gecerli_Tarih_Araligi')
+  const rates = {}
+  const blocks = xml.match(/<Resmi_Kur>[\s\S]*?<\/Resmi_Kur>/g) || []
+  for (const block of blocks) {
+    const sym = tag(block, 'Sembol')
+    if (!sym || !WANTED.includes(sym)) continue
+    // Birim is the unit multiplier (e.g. JPY quotes per 100). Always divide so
+    // adding a Birim>1 currency later can never silently produce a 100× value.
+    const birim = parseFloat(tag(block, 'Birim')) || 1
+    const num = name => {
+      const v = parseFloat(tag(block, name))
+      return Number.isFinite(v) ? v / birim : null
+    }
+    rates[sym] = {
+      dovizAlis:    num('Doviz_Alis'),
+      dovizSatis:   num('Doviz_Satis'),
+      efektifAlis:  num('Efektif_Alis'),
+      efektifSatis: num('Efektif_Satis'),
+    }
+  }
+  if (!date || Object.keys(rates).length === 0) return null
+  return { date, validRange, rates }
+}
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
+async function fetchKktcFx() {
+  const resp = await fetch(FX_URL)
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+  const xml = await resp.text()
+  const parsed = parseKktcFx(xml)
+  if (!parsed) throw new Error('parse failed')
+  return { ...parsed, fetchedOn: todayStr() }
+}
+
 export default function ExchangeRatesScreen({ lang, onBack }) {
-  // cacheData shape: { rates: { GBP, EUR, USD }, apiDate: string, fetchedOn: string }
+  // cacheData shape: { date, validRange, rates: { USD, GBP, EUR }, fetchedOn }
   const [cacheData, setCacheData]     = useState(null)
   const [loading, setLoading]         = useState(true)
   const [fetchFailed, setFetchFailed] = useState(false)
+  const [mode, setMode]               = useState('efektif') // 'efektif' (cash) | 'doviz' (transfer)
 
   useEffect(() => {
     let cancelled = false
@@ -46,12 +103,9 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
       }
 
       try {
-        const resp = await fetch(API_URL)
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-        const data = await resp.json()
-        const newCache = { rates: data.rates, apiDate: data.date, fetchedOn: todayStr() }
-        await AsyncStorage.setItem(FX_CACHE_KEY, JSON.stringify(newCache))
-        if (!cancelled) { setCacheData(newCache); setLoading(false) }
+        const fresh = await fetchKktcFx()
+        await AsyncStorage.setItem(FX_CACHE_KEY, JSON.stringify(fresh))
+        if (!cancelled) { setCacheData(fresh); setLoading(false) }
       } catch (_) {
         if (!cancelled) {
           setCacheData(cache)
@@ -69,12 +123,9 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
     setLoading(true)
     setFetchFailed(false)
     try {
-      const resp = await fetch(API_URL)
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-      const data = await resp.json()
-      const newCache = { rates: data.rates, apiDate: data.date, fetchedOn: todayStr() }
-      await AsyncStorage.setItem(FX_CACHE_KEY, JSON.stringify(newCache))
-      setCacheData(newCache)
+      const fresh = await fetchKktcFx()
+      await AsyncStorage.setItem(FX_CACHE_KEY, JSON.stringify(fresh))
+      setCacheData(fresh)
     } catch (_) {
       setFetchFailed(true)
     } finally {
@@ -86,10 +137,15 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
   const isStale = fetchFailed && hasData
   const noData  = fetchFailed && !hasData
 
-  function formatRate(code) {
-    const raw = cacheData?.rates?.[code]
-    if (!raw) return '—'
-    return (1 / raw).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const isRange = typeof cacheData?.validRange === 'string' && cacheData.validRange.includes(' - ')
+
+  function formatVal(code) {
+    const r = cacheData?.rates?.[code]
+    if (!r) return { buy: '—', sell: '—' }
+    const buy  = mode === 'efektif' ? r.efektifAlis  : r.dovizAlis
+    const sell = mode === 'efektif' ? r.efektifSatis : r.dovizSatis
+    const fmt = v => v == null ? '—' : v.toFixed(2)
+    return { buy: fmt(buy), sell: fmt(sell) }
   }
 
   return (
@@ -131,20 +187,51 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
             </View>
           )}
 
-          <View style={s.ratesCard}>
-            {PAIRS.map((pair, idx) => (
-              <View key={pair.code} style={[s.rateRow, idx < PAIRS.length - 1 && s.rateRowBorder]}>
-                <Text style={s.rateFlag}>{pair.flag}</Text>
-                <Text style={s.rateCurrency}>{pair.code}</Text>
-                <View style={s.rateRight}>
-                  <Text style={s.rateValue}>{formatRate(pair.code)}</Text>
-                  <Text style={s.rateTRY}>₺</Text>
-                </View>
-              </View>
-            ))}
+          <View style={s.dateHeader}>
+            <Text style={s.officialLabel}>{t('fxOfficialRate', lang)}</Text>
+            <Text style={s.dateValue}>{cacheData.date}</Text>
+            {isRange && (
+              <Text style={s.rangeLabel}>{t('fxValidRange', lang)} {cacheData.validRange}</Text>
+            )}
           </View>
 
-          <Text style={s.dateLabel}>{t('fxAsOf', lang)} {cacheData.apiDate}</Text>
+          <View style={s.toggleRow}>
+            <TouchableOpacity
+              style={[s.toggleChip, mode === 'efektif' && s.toggleChipActive]}
+              onPress={() => setMode('efektif')}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.toggleText, mode === 'efektif' && s.toggleTextActive]}>{t('fxCash', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.toggleChip, mode === 'doviz' && s.toggleChipActive]}
+              onPress={() => setMode('doviz')}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.toggleText, mode === 'doviz' && s.toggleTextActive]}>{t('fxTransfer', lang)}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={s.ratesCard}>
+            <View style={s.headerRow}>
+              <View style={s.currCell} />
+              <Text style={s.colHeader}>{t('fxColBuy', lang)}</Text>
+              <Text style={s.colHeader}>{t('fxColSell', lang)}</Text>
+            </View>
+            {PAIRS.map((pair, idx) => {
+              const { buy, sell } = formatVal(pair.code)
+              return (
+                <View key={pair.code} style={[s.rateRow, idx < PAIRS.length - 1 && s.rateRowBorder]}>
+                  <View style={s.currCell}>
+                    <Text style={s.rateFlag}>{pair.flag}</Text>
+                    <Text style={s.rateCurrency}>{pair.code}</Text>
+                  </View>
+                  <Text style={s.rateValue}>{buy}</Text>
+                  <Text style={s.rateValue}>{sell}</Text>
+                </View>
+              )
+            })}
+          </View>
 
           <View style={s.disclaimerCard}>
             <Ionicons name="information-circle-outline" size={15} color={colors.textSecondary} style={{ marginTop: 1 }} />
@@ -225,53 +312,108 @@ const s = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: 18,
   },
+  dateHeader: {
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  officialLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  dateValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: 2,
+  },
+  rangeLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  toggleChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  toggleChipActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  toggleTextActive: {
+    color: colors.primary,
+  },
   ratesCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 16,
     ...shadow,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  colHeader: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   rateRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 18,
-    gap: 12,
+    paddingVertical: 16,
   },
   rateRowBorder: {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  rateFlag: { fontSize: 26 },
+  currCell: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  rateFlag: { fontSize: 24 },
   rateCurrency: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
-    width: 44,
-  },
-  rateRight: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'flex-end',
-    gap: 4,
   },
   rateValue: {
-    fontSize: 26,
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
-  },
-  rateTRY: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  dateLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    textAlign: 'right',
-    marginBottom: 14,
+    fontVariant: ['tabular-nums'],
   },
   disclaimerCard: {
     flexDirection: 'row',
