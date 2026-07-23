@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
+import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import InsuranceProfileScreen from './InsuranceProfileScreen'
@@ -211,11 +212,12 @@ export default function InsuranceScreen({ lang, session, onBack, onRequireAccoun
           contentContainerStyle={s.catScroll}
           showsVerticalScrollIndicator={false}
         >
-          {/* TODO: swap for <MascotIntroCard module="insurance" title subtitle /> when mascot art lands. */}
-          <View style={s.introCard}>
-            <Text style={s.introTitle}>{t('insIntroTitle', lang)}</Text>
-            <Text style={s.introSub}>{t('insIntroSub', lang)}</Text>
-          </View>
+          <MascotIntroCard
+            module="insurance"
+            title={t('insIntroTitle', lang)}
+            subtitle={t('insIntroSub', lang)}
+            style={s.introCard}
+          />
 
           <View style={s.grid}>
             {CATEGORIES.map(cat => (
@@ -302,8 +304,6 @@ const s = StyleSheet.create({
   // Category picker
   catScroll:      { padding: 20, paddingBottom: 40 },
   introCard:      { marginBottom: 20 },
-  introTitle:     { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
-  introSub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20 },
   grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   catTile:        { width: '47%', backgroundColor: colors.cardBg, borderRadius: radius.card,
                     padding: 18, alignItems: 'center', gap: 10, ...shadow,

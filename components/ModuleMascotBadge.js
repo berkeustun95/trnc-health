@@ -9,6 +9,7 @@ const MASCOT_CONFIG = {
   exchange:          require('../assets/mascots/mascot-exchange.png'),
   health_facilities: require('../assets/mascots/mascot-health-facilities.png'),
   house_services:    require('../assets/mascots/mascot-house-services.png'),
+  insurance:         require('../assets/mascots/mascot-insurance.png'),
   pets:              require('../assets/mascots/mascot-pets.png'),
   emergency:         require('../assets/mascots/mascot-emergency-contacts.png'),
   welcome_guide:     require('../assets/mascots/mascot-welcome-guide.png'),
