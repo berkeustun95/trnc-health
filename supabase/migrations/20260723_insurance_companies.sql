@@ -11,6 +11,10 @@
 --
 -- APPLY THIS IN SUPABASE BEFORE publishing the OTA that ships the insurance
 -- screens — the browse query hits insurance_companies on load.
+--
+-- Safe to re-run: every object is created with IF NOT EXISTS / CREATE OR REPLACE,
+-- or dropped-then-created (constraints, trigger, policies). A partially-applied
+-- earlier run is reconciled by running the whole file again.
 
 BEGIN;
 
@@ -36,15 +40,21 @@ CREATE TABLE IF NOT EXISTS public.insurance_companies (
 
 -- ─── Constraints ─────────────────────────────────────────────────────────────
 
-ALTER TABLE public.insurance_companies
-  ADD CONSTRAINT insurance_companies_contact_pref_check
-    CHECK (contact_pref = ANY (ARRAY['call'::text, 'whatsapp'::text, 'both'::text])),
-  ADD CONSTRAINT insurance_companies_district_check
-    CHECK (district = ANY (ARRAY['nicosia'::text, 'kyrenia'::text, 'famagusta'::text, 'morphou'::text, 'iskele'::text, 'lefke'::text, 'karpaz'::text])),
-  ADD CONSTRAINT insurance_companies_status_check
-    CHECK (status = ANY (ARRAY['pending'::text, 'active'::text, 'rejected'::text])),
-  ADD CONSTRAINT insurance_companies_types_check
-    CHECK (insurance_types <@ ARRAY['health'::text, 'car'::text, 'home'::text, 'travel'::text]);
+-- Drop-then-add so the whole migration is safe to re-run (matches the repo's
+-- capture_2 convention). Splitting into separate statements also makes the
+-- DROP ... IF EXISTS idempotent per constraint.
+ALTER TABLE public.insurance_companies DROP CONSTRAINT IF EXISTS insurance_companies_contact_pref_check;
+ALTER TABLE public.insurance_companies ADD CONSTRAINT insurance_companies_contact_pref_check
+  CHECK (contact_pref = ANY (ARRAY['call'::text, 'whatsapp'::text, 'both'::text]));
+ALTER TABLE public.insurance_companies DROP CONSTRAINT IF EXISTS insurance_companies_district_check;
+ALTER TABLE public.insurance_companies ADD CONSTRAINT insurance_companies_district_check
+  CHECK (district = ANY (ARRAY['nicosia'::text, 'kyrenia'::text, 'famagusta'::text, 'morphou'::text, 'iskele'::text, 'lefke'::text, 'karpaz'::text]));
+ALTER TABLE public.insurance_companies DROP CONSTRAINT IF EXISTS insurance_companies_status_check;
+ALTER TABLE public.insurance_companies ADD CONSTRAINT insurance_companies_status_check
+  CHECK (status = ANY (ARRAY['pending'::text, 'active'::text, 'rejected'::text]));
+ALTER TABLE public.insurance_companies DROP CONSTRAINT IF EXISTS insurance_companies_types_check;
+ALTER TABLE public.insurance_companies ADD CONSTRAINT insurance_companies_types_check
+  CHECK (insurance_types <@ ARRAY['health'::text, 'car'::text, 'home'::text, 'travel'::text]);
 
 -- ─── Index ───────────────────────────────────────────────────────────────────
 -- RLS ins_select_public / ins_update_self (owner_id = auth.uid()), owner dashboard.
@@ -101,6 +111,7 @@ BEGIN
   RETURN NEW;
 END $$;
 
+DROP TRIGGER IF EXISTS ins_guard_write ON public.insurance_companies;
 CREATE TRIGGER ins_guard_write
   BEFORE INSERT OR UPDATE ON public.insurance_companies
   FOR EACH ROW EXECUTE FUNCTION public.ins_guard_write();
@@ -111,6 +122,9 @@ ALTER TABLE public.insurance_companies ENABLE ROW LEVEL SECURITY;
 
 -- Public read: only active rows are visible to everyone; owners see their own
 -- row in any status; admins see all.
+-- Postgres has no CREATE POLICY IF NOT EXISTS, so drop-then-create each so the
+-- migration stays re-runnable.
+DROP POLICY IF EXISTS "ins_select_public" ON public.insurance_companies;
 CREATE POLICY "ins_select_public" ON public.insurance_companies
   FOR SELECT TO public
   USING (
@@ -121,12 +135,14 @@ CREATE POLICY "ins_select_public" ON public.insurance_companies
 
 -- Self-serve insert: a user may only create a row owned by themselves. The guard
 -- forces status='pending' and verified=false.
+DROP POLICY IF EXISTS "ins_insert_self" ON public.insurance_companies;
 CREATE POLICY "ins_insert_self" ON public.insurance_companies
   FOR INSERT TO public
   WITH CHECK (owner_id = auth.uid());
 
 -- Update: owner may edit their own row (guard locks moderation columns); admin
 -- may edit anything.
+DROP POLICY IF EXISTS "ins_update_self" ON public.insurance_companies;
 CREATE POLICY "ins_update_self" ON public.insurance_companies
   FOR UPDATE TO public
   USING (
@@ -135,17 +151,21 @@ CREATE POLICY "ins_update_self" ON public.insurance_companies
   );
 
 -- Delete: admin only.
+DROP POLICY IF EXISTS "ins_delete_admin" ON public.insurance_companies;
 CREATE POLICY "ins_delete_admin" ON public.insurance_companies
   FOR DELETE TO public
   USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
 -- Block anonymous sessions from all writes.
+DROP POLICY IF EXISTS "no_anon_insert_insurance_companies" ON public.insurance_companies;
 CREATE POLICY "no_anon_insert_insurance_companies" ON public.insurance_companies
   AS RESTRICTIVE FOR INSERT TO authenticated
   WITH CHECK (NOT is_anonymous_session());
+DROP POLICY IF EXISTS "no_anon_update_insurance_companies" ON public.insurance_companies;
 CREATE POLICY "no_anon_update_insurance_companies" ON public.insurance_companies
   AS RESTRICTIVE FOR UPDATE TO authenticated
   USING (NOT is_anonymous_session()) WITH CHECK (NOT is_anonymous_session());
+DROP POLICY IF EXISTS "no_anon_delete_insurance_companies" ON public.insurance_companies;
 CREATE POLICY "no_anon_delete_insurance_companies" ON public.insurance_companies
   AS RESTRICTIVE FOR DELETE TO authenticated
   USING (NOT is_anonymous_session());
