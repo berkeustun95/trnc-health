@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import DateTimePicker from '@react-native-community/datetimepicker'
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -158,6 +158,33 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
     }
   }
 
+  // Android has no combined 'datetime' picker — open date, then time, and compose.
+  function openAndroidPicker(which) {
+    const base = which === 'start' ? (startDate ?? new Date()) : (endDate ?? startDate ?? new Date())
+    const minimumDate = which === 'end' && startDate ? startDate : new Date()
+    const setter = which === 'start' ? setStartDate : setEndDate
+    DateTimePickerAndroid.open({
+      value: base,
+      mode: 'date',
+      display: 'spinner',
+      minimumDate,
+      onChange: (_, selectedDate) => {
+        if (!selectedDate) return
+        DateTimePickerAndroid.open({
+          value: selectedDate,
+          mode: 'time',
+          display: 'spinner',
+          onChange: (_, selectedTime) => {
+            if (!selectedTime) return
+            const combined = new Date(selectedDate)
+            combined.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0)
+            setter(combined)
+          },
+        })
+      },
+    })
+  }
+
   async function handleSave(asDraft) {
     if (!title.trim()) { Alert.alert('', 'Please add an event title.'); return }
     if (!startDate) { Alert.alert('', 'Please set a start date.'); return }
@@ -259,7 +286,7 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
 
             {/* Start date */}
             <Text style={s.fieldLabel}>{t('eventStart', lang)} *</Text>
-            <TouchableOpacity style={s.dateBtn} onPress={() => setActivePicker('start')}>
+            <TouchableOpacity style={s.dateBtn} onPress={Platform.OS === 'ios' ? () => setActivePicker('start') : () => openAndroidPicker('start')}>
               <Ionicons name="calendar-outline" size={18} color={colors.primary} />
               <Text style={[s.dateBtnText, !startDate && s.datePlaceholder]}>
                 {startDate ? formatDate(startDate.toISOString()) : 'Select start date & time'}
@@ -268,7 +295,7 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
 
             {/* End date */}
             <Text style={s.fieldLabel}>{t('eventEnd', lang)}</Text>
-            <TouchableOpacity style={s.dateBtn} onPress={() => setActivePicker('end')}>
+            <TouchableOpacity style={s.dateBtn} onPress={Platform.OS === 'ios' ? () => setActivePicker('end') : () => openAndroidPicker('end')}>
               <Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />
               <Text style={[s.dateBtnText, !endDate && s.datePlaceholder]}>
                 {endDate ? formatDate(endDate.toISOString()) : 'Select end date & time'}
@@ -344,7 +371,7 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
           </ScrollView>
         </KeyboardAvoidingView>
 
-        {activePicker !== null && (
+        {activePicker !== null && Platform.OS === 'ios' && (
           <Modal transparent animationType="fade" onRequestClose={() => setActivePicker(null)}>
             <TouchableOpacity style={s.pickerBackdrop} activeOpacity={1} onPress={() => setActivePicker(null)} />
             <View style={s.pickerSheet}>
