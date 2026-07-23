@@ -8,6 +8,7 @@ import { BlurView } from 'expo-blur'
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
+import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
@@ -390,6 +391,12 @@ export default function HomeScreen({
 
     return (
       <View style={{ flex: 1 }}>
+        <MascotIntroCard
+          module="health_facilities"
+          title={t('medIntroTitle', lang)}
+          subtitle={t('medIntroSub', lang)}
+          style={s.medIntroCard}
+        />
         <View style={s.searchBar}>
           <Feather name="search" size={16} color={colors.textSecondary} />
           <TextInput
@@ -779,6 +786,7 @@ const s = StyleSheet.create({
   searchNoResults:    { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', paddingVertical: 20 },
 
   // Facility list controls
+  medIntroCard:       { marginBottom: 12 },
   searchBar:          { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 10, gap: 10, borderWidth: 1, borderColor: colors.border },
   searchInput:        { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, padding: 0 },
   filterBar:          { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
