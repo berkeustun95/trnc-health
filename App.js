@@ -1,6 +1,6 @@
 import { Component, useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
+import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Pressable, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
 import { BlurView } from 'expo-blur'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
@@ -139,6 +139,27 @@ const tabBar = StyleSheet.create({
   label:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   labelActive:{ fontFamily: 'Inter_700Bold', color: colors.primary },
 })
+
+// Centered sheet rendered as a root-level absolute overlay, NOT a <Modal>.
+// A native Modal opens its own window above the whole React root, so the Ask Oli
+// floating button can never be drawn or tapped over one — no zIndex reaches it.
+// Anything Oli must stay reachable from (Emergency, Municipalities) belongs here
+// instead, in the same hierarchy as the FAB, where stacking is ours to control.
+// Same pattern as CityWelcomeCard / HomeCitySheet.
+function SheetOverlay({ onDismiss, children }) {
+  const fade = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true }).start()
+  }, [fade])
+
+  return (
+    <Animated.View style={[styles.sheetOverlay, { opacity: fade }]} pointerEvents="box-none">
+      <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />
+      {children}
+    </Animated.View>
+  )
+}
 
 class BLErrorBoundary extends Component {
   state = { hasError: false }
@@ -439,6 +460,10 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS !== 'android') return
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      // These two are root overlays, not <Modal>s, so there is no onRequestClose
+      // to catch the hardware back button. They are topmost, so they go first.
+      if (showMunicipalModal) { setShowMunicipalModal(false); return true }
+      if (showEmergencyModal) { setShowEmergencyModal(false); return true }
       if (showMenu) { closeMenu(); return true }
       if (showPasswordReset) { setShowPasswordReset(false); return true }
       if (showNotifs) { setShowNotifs(false); return true }
@@ -465,7 +490,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -1409,109 +1434,6 @@ export default function App() {
           </TouchableOpacity>
         </Modal>
 
-        <Modal visible={showEmergencyModal} transparent animationType="fade" onRequestClose={() => setShowEmergencyModal(false)}>
-          <TouchableOpacity style={styles.emergencyBackdrop} activeOpacity={1} onPress={() => setShowEmergencyModal(false)}>
-            <View style={styles.emergencySheet} onStartShouldSetResponder={() => true}>
-              <View style={styles.emergencyHeader}>
-                <Text style={styles.emergencyTitle}>{t('menuEmergency', lang)}</Text>
-                <TouchableOpacity onPress={() => setShowEmergencyModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Ionicons name="close" size={22} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.emergencySubtitle}>{t('emergencySubtitle', lang)}</Text>
-              {[
-                { label: t('menuPolice', lang), number: '155', icon: 'shield-outline' },
-                { label: t('menuAmbulance', lang), number: '112', icon: 'medkit-outline' },
-                { label: t('menuFire', lang), number: '199', icon: 'flame-outline' },
-                { label: t('menuCoastGuard', lang), number: '158', icon: 'boat-outline' },
-                { label: t('menuCWRI', lang), number: '+905488111190', icon: 'paw-outline', subtitle: t('menuCWRISubtitle', lang) },
-              ].map(({ label, number, icon, subtitle }) => (
-                <TouchableOpacity key={number} style={styles.emergencyRow} onPress={() => { setShowEmergencyModal(false); Linking.openURL(`tel:${number}`) }}>
-                  <View style={styles.emergencyIconWrap}>
-                    <Ionicons name={icon} size={20} color={colors.danger} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.emergencyEntryLabel}>{label}</Text>
-                    {subtitle ? <Text style={styles.emergencySubLabel}>{subtitle}</Text> : null}
-                  </View>
-                  <Text style={styles.emergencyNumber}>{number}</Text>
-                  <Ionicons name="call" size={18} color={colors.danger} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
-        <Modal visible={showMunicipalModal} transparent animationType="fade" onRequestClose={() => setShowMunicipalModal(false)}>
-          <View style={styles.emergencyBackdrop}>
-            <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowMunicipalModal(false)} />
-            <View style={[styles.emergencySheet, { maxHeight: Dimensions.get('window').height * 0.75 }]}>
-              <View style={styles.emergencyHeader}>
-                <Text style={styles.emergencyTitle}>{t('menuMunicipalities', lang)}</Text>
-                <TouchableOpacity onPress={() => setShowMunicipalModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Ionicons name="close" size={22} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.emergencySubtitle}>Kıbrıs Türk Belediyeler Birliği</Text>
-              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                {[
-                  { name: 'Lefkoşa',                  phone: '03922285221', mapQuery: 'Lefkoşa Türk Belediyesi' },
-                  { name: 'Gazimağusa',                phone: '03923665332', mapQuery: 'Gazimağusa Belediyesi Fazıl Polatpaşa Bulvarı Gazimağusa KKTC' },
-                  { name: 'Girne',                     phone: '03928152118', mapQuery: 'Girne Belediyesi Ecevit Caddesi 68 Girne KKTC' },
-                  { name: 'Gönyeli-Alayköy',           phone: '03922231901', mapQuery: 'Gönyeli Belediyesi Belediye Bulvarı 30 Yenikent Gönyeli KKTC' },
-                  { name: 'Lapta-Alsancak-Çamlıbel',  phone: '03928228623', mapQuery: 'Lapta Belediyesi Lapta Girne KKTC' },
-                  { name: 'Güzelyurt',                 phone: '03927142813', mapQuery: 'Güzelyurt Belediyesi Alemdar Sokak 14 Güzelyurt KKTC' },
-                  { name: 'Değirmenlik-Akıncılar',     phone: '03922323322', mapQuery: 'Değirmenlik Belediyesi Başpınar Yolu Sokak 27 Değirmenlik KKTC' },
-                  { name: 'Dikmen',                    phone: '03922372863', mapQuery: 'Dikmen Belediyesi 20 Temmuz Caddesi Dikmen Girne KKTC' },
-                  { name: 'Lefke',                     phone: '03927287347', mapQuery: 'Lefke Belediyesi Tahir Efendi Sokak 1 Lefke KKTC' },
-                  { name: 'Mesarya',                   phone: '03923777459', mapQuery: 'Mesarya Belediyesi Ulus Ülfet Sokak 6 Akdoğan KKTC' },
-                  { name: 'Çatalköy-Esentepe',         phone: '03928244068', mapQuery: 'Çatalköy Belediyesi Mücahit Sokak 10 Çatalköy Girne KKTC' },
-                  { name: 'İskele',                    phone: '03923712521', mapQuery: 'İskele Belediyesi Bozdağ Sokak 4 İskele KKTC' },
-                  { name: 'Erenköy-Karpaz',            phone: '03923744350', mapQuery: 'Yeni Erenköy Belediyesi İstiklal Caddesi Yeni Erenköy İskele KKTC' },
-                  { name: 'Yeni Boğaziçi',             phone: '03923788145', mapQuery: 'Yeniboğaziçi Belediyesi İstiklal Caddesi Yeniboğaziçi Gazimağusa KKTC' },
-                  { name: 'Geçitkale-Serdarlı',        phone: '03923733147', mapQuery: 'Geçitkale Belediyesi Ecevit Caddesi 70 Geçitkale Gazimağusa KKTC' },
-                  { name: 'Mehmetçik-Büyükkonuk',      phone: '03923755090', mapQuery: 'Mehmetçik Belediyesi Atatürk Meydanı 3 Mehmetçik İskele KKTC' },
-                  { name: 'Beyarmudu',                 phone: '03923799401', mapQuery: 'Beyarmudu Belediyesi Hüseyin Kafa Caddesi 68 Beyarmudu Gazimağusa KKTC' },
-                  { name: 'Tatlısu',                   phone: '03923892026', mapQuery: 'Tatlısu Belediyesi Cumhuriyet Sokak 9 Tatlısu Gazimağusa KKTC' },
-                ].map(({ name, phone, mapQuery }) => {
-                  const isExpanded = expandedMuni === name
-                  return (
-                    <View key={name}>
-                      <View style={styles.emergencyRow}>
-                        <View style={styles.emergencyIconWrap}>
-                          <Ionicons name="business-outline" size={18} color={colors.textSecondary} />
-                        </View>
-                        <TouchableOpacity style={{ flex: 1 }} onPress={() => setExpandedMuni(isExpanded ? null : name)}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Text style={[styles.emergencyLabel, { flex: 0 }]}>{name}</Text>
-                            <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={13} color={colors.textSecondary} />
-                          </View>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
-                          <Ionicons name="map-outline" size={18} color={colors.textSecondary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                          <Ionicons name="call" size={18} color={colors.primary} />
-                        </TouchableOpacity>
-                      </View>
-                      {isExpanded && (
-                        <View style={styles.muniHoursBubble}>
-                          <Ionicons name="time-outline" size={13} color={colors.primary} style={{ marginTop: 1 }} />
-                          <View>
-                            <Text style={styles.muniHoursText}>Mon – Wed, Fri{'  '}08:00 – 15:30</Text>
-                            <Text style={styles.muniHoursText}>Thu{'  '}08:00 – 12:30 / 13:00 – 17:30</Text>
-                            <Text style={styles.muniHoursText}>Sat – Sun{'  '}Closed</Text>
-                          </View>
-                        </View>
-                      )}
-                    </View>
-                  )
-                })}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
         <TutorialCoachMarks
           steps={coachSteps}
           visible={showCoachMarks}
@@ -1588,6 +1510,109 @@ export default function App() {
     <SafeAreaProvider>
       {content}
       {oliVisible && <OliGuide lang={lang} onNavigate={oliNavigate} />}
+
+      {showEmergencyModal && (
+        <SheetOverlay onDismiss={() => setShowEmergencyModal(false)}>
+          <View style={styles.emergencySheet}>
+            <View style={styles.emergencyHeader}>
+              <Text style={styles.emergencyTitle}>{t('menuEmergency', lang)}</Text>
+              <TouchableOpacity onPress={() => setShowEmergencyModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.emergencySubtitle}>{t('emergencySubtitle', lang)}</Text>
+            {[
+              { label: t('menuPolice', lang), number: '155', icon: 'shield-outline' },
+              { label: t('menuAmbulance', lang), number: '112', icon: 'medkit-outline' },
+              { label: t('menuFire', lang), number: '199', icon: 'flame-outline' },
+              { label: t('menuCoastGuard', lang), number: '158', icon: 'boat-outline' },
+              { label: t('menuCWRI', lang), number: '+905488111190', icon: 'paw-outline', subtitle: t('menuCWRISubtitle', lang) },
+            ].map(({ label, number, icon, subtitle }) => (
+              <TouchableOpacity key={number} style={styles.emergencyRow} onPress={() => { setShowEmergencyModal(false); Linking.openURL(`tel:${number}`) }}>
+                <View style={styles.emergencyIconWrap}>
+                  <Ionicons name={icon} size={20} color={colors.danger} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.emergencyEntryLabel}>{label}</Text>
+                  {subtitle ? <Text style={styles.emergencySubLabel}>{subtitle}</Text> : null}
+                </View>
+                <Text style={styles.emergencyNumber}>{number}</Text>
+                <Ionicons name="call" size={18} color={colors.danger} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </SheetOverlay>
+      )}
+
+      {showMunicipalModal && (
+        <SheetOverlay onDismiss={() => setShowMunicipalModal(false)}>
+          <View style={[styles.emergencySheet, { maxHeight: Dimensions.get('window').height * 0.75 }]}>
+            <View style={styles.emergencyHeader}>
+              <Text style={styles.emergencyTitle}>{t('menuMunicipalities', lang)}</Text>
+              <TouchableOpacity onPress={() => setShowMunicipalModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.emergencySubtitle}>Kıbrıs Türk Belediyeler Birliği</Text>
+            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              {[
+                { name: 'Lefkoşa',                  phone: '03922285221', mapQuery: 'Lefkoşa Türk Belediyesi' },
+                { name: 'Gazimağusa',                phone: '03923665332', mapQuery: 'Gazimağusa Belediyesi Fazıl Polatpaşa Bulvarı Gazimağusa KKTC' },
+                { name: 'Girne',                     phone: '03928152118', mapQuery: 'Girne Belediyesi Ecevit Caddesi 68 Girne KKTC' },
+                { name: 'Gönyeli-Alayköy',           phone: '03922231901', mapQuery: 'Gönyeli Belediyesi Belediye Bulvarı 30 Yenikent Gönyeli KKTC' },
+                { name: 'Lapta-Alsancak-Çamlıbel',  phone: '03928228623', mapQuery: 'Lapta Belediyesi Lapta Girne KKTC' },
+                { name: 'Güzelyurt',                 phone: '03927142813', mapQuery: 'Güzelyurt Belediyesi Alemdar Sokak 14 Güzelyurt KKTC' },
+                { name: 'Değirmenlik-Akıncılar',     phone: '03922323322', mapQuery: 'Değirmenlik Belediyesi Başpınar Yolu Sokak 27 Değirmenlik KKTC' },
+                { name: 'Dikmen',                    phone: '03922372863', mapQuery: 'Dikmen Belediyesi 20 Temmuz Caddesi Dikmen Girne KKTC' },
+                { name: 'Lefke',                     phone: '03927287347', mapQuery: 'Lefke Belediyesi Tahir Efendi Sokak 1 Lefke KKTC' },
+                { name: 'Mesarya',                   phone: '03923777459', mapQuery: 'Mesarya Belediyesi Ulus Ülfet Sokak 6 Akdoğan KKTC' },
+                { name: 'Çatalköy-Esentepe',         phone: '03928244068', mapQuery: 'Çatalköy Belediyesi Mücahit Sokak 10 Çatalköy Girne KKTC' },
+                { name: 'İskele',                    phone: '03923712521', mapQuery: 'İskele Belediyesi Bozdağ Sokak 4 İskele KKTC' },
+                { name: 'Erenköy-Karpaz',            phone: '03923744350', mapQuery: 'Yeni Erenköy Belediyesi İstiklal Caddesi Yeni Erenköy İskele KKTC' },
+                { name: 'Yeni Boğaziçi',             phone: '03923788145', mapQuery: 'Yeniboğaziçi Belediyesi İstiklal Caddesi Yeniboğaziçi Gazimağusa KKTC' },
+                { name: 'Geçitkale-Serdarlı',        phone: '03923733147', mapQuery: 'Geçitkale Belediyesi Ecevit Caddesi 70 Geçitkale Gazimağusa KKTC' },
+                { name: 'Mehmetçik-Büyükkonuk',      phone: '03923755090', mapQuery: 'Mehmetçik Belediyesi Atatürk Meydanı 3 Mehmetçik İskele KKTC' },
+                { name: 'Beyarmudu',                 phone: '03923799401', mapQuery: 'Beyarmudu Belediyesi Hüseyin Kafa Caddesi 68 Beyarmudu Gazimağusa KKTC' },
+                { name: 'Tatlısu',                   phone: '03923892026', mapQuery: 'Tatlısu Belediyesi Cumhuriyet Sokak 9 Tatlısu Gazimağusa KKTC' },
+              ].map(({ name, phone, mapQuery }) => {
+                const isExpanded = expandedMuni === name
+                return (
+                  <View key={name}>
+                    <View style={styles.emergencyRow}>
+                      <View style={styles.emergencyIconWrap}>
+                        <Ionicons name="business-outline" size={18} color={colors.textSecondary} />
+                      </View>
+                      <TouchableOpacity style={{ flex: 1 }} onPress={() => setExpandedMuni(isExpanded ? null : name)}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Text style={[styles.emergencyLabel, { flex: 0 }]}>{name}</Text>
+                          <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={13} color={colors.textSecondary} />
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
+                        <Ionicons name="map-outline" size={18} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="call" size={18} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                    {isExpanded && (
+                      <View style={styles.muniHoursBubble}>
+                        <Ionicons name="time-outline" size={13} color={colors.primary} style={{ marginTop: 1 }} />
+                        <View>
+                          <Text style={styles.muniHoursText}>Mon – Wed, Fri{'  '}08:00 – 15:30</Text>
+                          <Text style={styles.muniHoursText}>Thu{'  '}08:00 – 12:30 / 13:00 – 17:30</Text>
+                          <Text style={styles.muniHoursText}>Sat – Sun{'  '}Closed</Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )
+              })}
+            </ScrollView>
+          </View>
+        </SheetOverlay>
+      )}
+
       {cityWelcomeVisible && (
         <CityWelcomeCard
           region={cityWelcome.region}
@@ -1774,6 +1799,11 @@ const styles = StyleSheet.create({
   langRowLabel:       { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   langRowLabelActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
   emergencyBackdrop:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  // Root overlay for the Emergency / Municipalities sheets. zIndex 100 puts them
+  // over the screen; the Ask Oli FAB sits at 200 so it stays tappable on top of
+  // them, and TutorialCoachMarks stays above everything at 9999. elevation is
+  // raised in step with zIndex because on Android it can override draw order.
+  sheetOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24, zIndex: 100, elevation: 12 },
   emergencySheet:     { width: '100%', backgroundColor: colors.bg, borderRadius: 18, padding: 20, ...shadow },
   emergencyHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   emergencyTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },

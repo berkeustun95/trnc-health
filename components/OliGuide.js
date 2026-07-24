@@ -291,8 +291,11 @@ const s = StyleSheet.create({
   fab: {
     position: 'absolute', left: 0, top: 0, width: FAB_SIZE, height: FAB_SIZE, borderRadius: FAB_SIZE / 2,
     backgroundColor: colors.cardBg, borderWidth: 2, borderColor: colors.primary,
-    overflow: 'hidden', justifyContent: 'center', alignItems: 'center', zIndex: 50,
-    ...shadow, shadowOpacity: 0.18, elevation: 8,
+    overflow: 'hidden', justifyContent: 'center', alignItems: 'center', zIndex: 200,
+    // 200 clears the root sheet overlays (Emergency, Municipalities) at 100 so Oli
+    // stays tappable on top of them, and stays under TutorialCoachMarks at 9999.
+    // elevation must move with zIndex: Android can draw by elevation instead.
+    ...shadow, shadowOpacity: 0.18, elevation: 24,
   },
   // Gentle zoom so Oli's head/face fills the circle naturally. Tune scale to taste.
   fabImg: { width: '100%', height: '100%', transform: [{ scale: 1.35 }] },
