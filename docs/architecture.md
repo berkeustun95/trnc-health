@@ -127,7 +127,7 @@ Two coexisting event sources share one `events` table:
 
 | Column | Type | Notes |
 |--------|------|-------|
-| `category` | text | `concert` \| `festival` \| `nightlife` \| `other` (default). Legacy rows backfilled to `other` |
+| `category` | text | `music` \| `nightlife` \| `sports` \| `arts` \| `family` \| `other` (default). Set by the organizer on submit, editable by admin. See "Category taxonomy" below |
 | `ticket_url` | text | gisekibris.com event URL — the Buy Ticket target |
 | `latitude` / `longitude` | numeric | Coordinate-based Maps deep link (`destination={lat},{lng}`) — supersedes legacy `location_url` |
 | `price_from` / `price_text` | numeric / text | `price_text` wins in UI; else `From ₺{price_from}` |
@@ -136,11 +136,37 @@ Two coexisting event sources share one `events` table:
 
 `organizer_id` is now nullable (admin/API events have no organizer user). RLS unchanged: public reads approved+upcoming; only admins (or an event's own organizer) write.
 
+`ev_guard_write()` does **not** police `category` — an organizer may set and change it freely on their own rows. The CHECK constraint is the only validation.
+
+### Category taxonomy
+
+Six values, fixed by `events_category_check`: `music`, `nightlife`, `sports`, `arts`, `family`, `other` (default).
+
+Retired in July 2026: `concert` and `festival`, both folded into `music`. The swap shipped as a **two-file migration straddling the OTA** — `20260724_events_category_widen.sql` (superset accepting old + new) before the update, `20260724_events_category_narrow.sql` (fold legacy values, narrow to the final six) after.
+
+**The ordering rule, stated precisely, because the original write-up got it backwards:** the constraint must be widened *before* the OTA because the **new** bundle writes values the old constraint rejects. The reverse hazard does not exist — the pre-`6fd49d9` bundle had no category picker and never sent the column at all, so it could not violate a narrowed constraint. Narrowing late is a cosmetic courtesy to stale clients (they render unknown values as "Other"), not a correctness requirement.
+
+`EventsScreen.js` keeps a `LEGACY_MUSIC` alias so the Music chip also matches `concert`/`festival` while any un-migrated rows remain. Dead once the narrow migration is applied; safe to delete.
+
+**Data-entry rule for admin-curated rows:** `start_date` is `timestamptz`, so always write an explicit offset — `'2026-08-01 21:00+03'`, never a bare `'2026-08-01 21:00'`. A bare timestamp is read in the DB session zone (UTC), landing the event at 00:00 the *next* day on a TRNC phone. Cards display the start time, so this is user-visible.
+
 ### Screens & helpers
 
-- `EventsScreen.js` — list (category chips All/Concerts/Festivals/Nightlife, client-side filter; `'other'` shows under All only) + `EventDetailScreen` (coord Maps link, price, Buy Ticket CTA).
+- `EventsScreen.js` — list + `EventDetailScreen` (coord Maps link, price, Buy Ticket CTA). Two stacked filter rows, both horizontal `ScrollView`s with a `marginHorizontal: -16` edge-bleed so the half-cut chip signals scrollability:
+  - **Category** — All + the six categories.
+  - **Date** — All / Today / This weekend / This week / This month / Pick a date.
+
+  Category, date and district compose client-side over one fetch. Date windows anchor at **today 00:00**, not `now`, so an event already underway today still matches (consistent with the 24h expiry grace). "This weekend" is the *remainder* of the current weekend when it is already Sat/Sun — on a Sunday that is Sunday alone, never spilling into Monday. "This week" is Monday-start (TR convention), running to the upcoming Sunday, and is a strict superset of the weekend window.
+
+  Cards show the start time (`21:00`, or `21:00 – 23:30` for same-day ends). **No all-day heuristic on `00:00`** — a midnight start is real for nightlife, and suppressing it would blank the time on exactly the events where it matters most. An accidental midnight comes from the data-entry rule above, and is fixed there.
+- `OrganizerScreen.js` — submit/edit form. Category is a wrapped chip row (not a horizontal scroll — the form is already inside a vertical `ScrollView`) between Description and Start date. Four touchpoints to keep in sync when adding any field: `useState` init, the visible-reset block, the `fields` payload, **and the `load()` `.select()`** — omitting the last silently resets the value on every save.
+- `AdminScreen.js` `EventsTab` — category on the moderation card sub-line, and an editable chip row in the review modal so a miscategorised submission can be fixed without raw SQL. English-only, like the rest of the admin UI.
 - `utils/events.js` — `buildTicketUrl()` / `openTicketUrl()`. **Single injection point** for the outbound handoff. Currently `Linking.openURL` (OTA-safe); upgrade to `WebBrowser.openBrowserAsync` once `expo-web-browser` ships in a native build. Slice 2 commission params inject here only.
 - Expiry: query filters `start_date >= now() - 1 day` (Job Postings pattern). Already registered in the `search_content` RPC and the home-hub `MODULES` tile.
+
+**Date picker convention** (`@react-native-community/datetimepicker`, already in the native binary — importing it anywhere is OTA-safe). Two deliberately different shapes:
+- **Datetime capture** (`OrganizerScreen`) — Android has no combined picker, so `DateTimePickerAndroid.open` is chained date → time and recomposed; iOS uses one inline `mode="datetime"` sheet.
+- **Date-only filtering** (`EventsScreen`) — single step, `mode="date"`, no chain. Filtering to a day has no time component.
 
 ### Slice 2 — Gişe Kıbrıs API sync (blocked on their API docs)
 
@@ -151,11 +177,14 @@ Automated API sync + commission/affiliate tracking, replacing manual SQL entry. 
 - **Source branding:** subtle "via Gişe Kıbrıs" badge on API-sourced cards + detail — co-brand for the partnership, trust cue on the Buy Ticket step.
 - **Commission:** injected only in `utils/events.js` `openTicketUrl()`.
 - **Extra fields (TBD — pending API schema):** likely price range + availability status; lineup optional. `featured` flag dropped for now (pure date sort has no featured strip to drive).
+- **Category mapping (TBD — pending API schema):** their taxonomy is unknown, so the sync job needs a mapping table into our six. Expected shape: `konser → music`, `tiyatro`/`sergi → arts`, `spor → sports`, `çocuk → family`, anything unmapped → `other`. Design `other` as a safe sink.
+- **⚠️ The sync job writes as service-role, so `auth.uid()` is NULL and `ev_guard_write()` returns early — it bypasses every trigger guard.** The CHECK constraint is the only thing validating an API-supplied category. Keep it strict, and validate in the sync job too.
+- **Timestamps:** the API's times must be normalised to an explicit offset before insert, same rule as manual entry (`+03`). A naive timestamp from their feed lands at the wrong hour and possibly the wrong day.
 
 ### Other pending
 
-- **Follow-up slice**: add a category picker to `OrganizerScreen.js` so new organizer submissions are categorised instead of defaulting to `other`.
 - Multi-language event *content* (title/description are admin data, not i18n keys) is a Slice 2+ question.
+- Date filtering is client-side over one unpaginated fetch. Fine at current volume; if the event count grows past a few hundred, move the date window into the Supabase query.
 
 ## Job Postings module
 
