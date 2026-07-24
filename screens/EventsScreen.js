@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView,
   Image, Dimensions, ActivityIndicator, RefreshControl, Linking,
+  Modal, Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
@@ -45,6 +47,77 @@ function categoryLabel(category, lang) {
     concert: 'catMusic', festival: 'catMusic',
   }
   return t(map[category] || 'catOther', lang)
+}
+
+// ─── Date filters ────────────────────────────────────────────────────────────
+
+const DATE_FILTERS = [
+  { key: 'all',     labelKey: 'filterAll' },
+  { key: 'today',   labelKey: 'dateToday' },
+  { key: 'weekend', labelKey: 'dateThisWeekend' },
+  { key: 'week',    labelKey: 'dateThisWeek' },
+  { key: 'month',   labelKey: 'dateThisMonth' },
+]
+
+const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+const endOfDay   = d => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x }
+const addDays    = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
+
+// Every window is anchored at today 00:00 rather than `now`, so an event that
+// already started earlier today still matches — consistent with the feed's
+// existing 24h grace on start_date.
+function dateRange(key, pickedDate) {
+  const today = startOfDay(new Date())
+  const dow = today.getDay() // 0 = Sunday, 6 = Saturday
+
+  switch (key) {
+    case 'today':
+      return { from: today, to: endOfDay(today) }
+
+    // If we are already inside the weekend, this is the REMAINDER of it — on a
+    // Sunday that means Sunday alone, never spilling into Monday. Otherwise it
+    // is the next Sat + Sun.
+    case 'weekend':
+      if (dow === 6) return { from: today, to: endOfDay(addDays(today, 1)) }
+      if (dow === 0) return { from: today, to: endOfDay(today) }
+      return { from: addDays(today, 6 - dow), to: endOfDay(addDays(today, 7 - dow)) }
+
+    // Monday-start week (TR convention), so it runs to the upcoming Sunday and
+    // is a strict superset of 'weekend'.
+    case 'week':
+      return { from: today, to: endOfDay(addDays(today, dow === 0 ? 0 : 7 - dow)) }
+
+    case 'month':
+      return { from: today, to: endOfDay(new Date(today.getFullYear(), today.getMonth() + 1, 0)) }
+
+    case 'picked':
+      return pickedDate ? { from: startOfDay(pickedDate), to: endOfDay(pickedDate) } : null
+
+    default:
+      return null
+  }
+}
+
+function matchesDate(event, key, pickedDate) {
+  const range = dateRange(key, pickedDate)
+  if (!range) return true
+  const s = new Date(event.start_date)
+  return s >= range.from && s <= range.to
+}
+
+// Card-level time. Deliberately no all-day heuristic: a 00:00 start is real for
+// nightlife, and blanking it would hide the time on exactly the events where it
+// matters most. A bare timestamp in admin SQL is a data-entry bug, not a case to
+// paper over here — write '2026-08-01 21:00+03', not '2026-08-01 21:00'.
+function formatEventTime(start, end) {
+  if (!start) return ''
+  const opts = { hour: '2-digit', minute: '2-digit' }
+  const s = new Date(start)
+  const startStr = s.toLocaleTimeString('en-GB', opts)
+  if (!end) return startStr
+  const e = new Date(end)
+  if (s.toDateString() !== e.toDateString()) return startStr
+  return `${startStr} – ${e.toLocaleTimeString('en-GB', opts)}`
 }
 
 function priceLabel(event, lang) {
@@ -94,6 +167,12 @@ function EventCard({ event, lang, onPress }) {
       </View>
       <View style={s.cardBody}>
         <Text style={s.cardTitle} numberOfLines={2}>{event.title}</Text>
+        <View style={s.cardMeta}>
+          <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
+          <Text style={s.cardMetaText} numberOfLines={1}>
+            {formatEventTime(event.start_date, event.end_date)}
+          </Text>
+        </View>
         {event.organizer_name ? (
           <View style={s.cardMeta}>
             <Ionicons name="business-outline" size={12} color={colors.textSecondary} />
@@ -262,6 +341,9 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
   const [refreshing, setRefreshing] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [category, setCategory] = useState('all')
+  const [dateFilter, setDateFilter] = useState('all')
+  const [pickedDate, setPickedDate] = useState(null)
+  const [showDatePicker, setShowDatePicker] = useState(false)
   const [district, setDistrict] = useState(initialDistrict)
 
   const load = useCallback(async () => {
@@ -276,12 +358,30 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
     setLoading(false)
   }, [])
 
-  const byCategory = events.filter(e => matchesCategory(e, category))
-  const filtered = district
-    ? byCategory.filter(e => resolveRegion(e.latitude, e.longitude) === district)
-    : byCategory
+  const filtered = events
+    .filter(e => matchesCategory(e, category))
+    .filter(e => matchesDate(e, dateFilter, pickedDate))
+    .filter(e => !district || resolveRegion(e.latitude, e.longitude) === district)
 
   useEffect(() => { load() }, [load])
+
+  // Single date step only — unlike the organizer form, filtering to a day has no
+  // time component, so there is no date→time chain here. Android keeps the
+  // imperative DateTimePickerAndroid.open call; iOS gets the inline sheet.
+  function openDatePicker() {
+    if (Platform.OS !== 'android') { setShowDatePicker(true); return }
+    DateTimePickerAndroid.open({
+      value: pickedDate ?? new Date(),
+      mode: 'date',
+      display: 'spinner',
+      minimumDate: startOfDay(new Date()),
+      onChange: (_, selected) => {
+        if (!selected) return
+        setPickedDate(selected)
+        setDateFilter('picked')
+      },
+    })
+  }
 
   async function onRefresh() {
     setRefreshing(true)
@@ -349,6 +449,49 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={s.filterScrollSecond}
+                contentContainerStyle={s.filterRow}
+              >
+                {DATE_FILTERS.map(d => (
+                  <TouchableOpacity
+                    key={d.key}
+                    style={[s.chip, dateFilter === d.key && s.chipActive]}
+                    onPress={() => setDateFilter(d.key)}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[s.chipText, dateFilter === d.key && s.chipTextActive]}
+                      numberOfLines={1}
+                    >
+                      {t(d.labelKey, lang)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+
+                <TouchableOpacity
+                  style={[s.chip, s.chipWithIcon, dateFilter === 'picked' && s.chipActive]}
+                  onPress={openDatePicker}
+                  activeOpacity={0.8}
+                >
+                  <Feather
+                    name="calendar"
+                    size={12}
+                    color={dateFilter === 'picked' ? colors.primary : colors.textSecondary}
+                  />
+                  <Text
+                    style={[s.chipText, dateFilter === 'picked' && s.chipTextActive]}
+                    numberOfLines={1}
+                  >
+                    {dateFilter === 'picked' && pickedDate
+                      ? pickedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                      : t('datePickDate', lang)}
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
           }
           ListEmptyComponent={
@@ -363,6 +506,35 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
             <EventCard event={item} lang={lang} onPress={() => setSelectedEvent(item)} />
           )}
         />
+      )}
+
+      {/* iOS gets an inline sheet; Android is handled imperatively in
+          openDatePicker. This Modal covers the Ask Oli FAB while open, which is
+          the accepted trade for a picker (see the SheetOverlay convention). */}
+      {showDatePicker && Platform.OS === 'ios' && (
+        <Modal transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
+          <TouchableOpacity style={s.pickerBackdrop} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
+          <View style={s.pickerSheet}>
+            <View style={s.pickerSheetHeader}>
+              <Text style={s.pickerSheetTitle}>{t('datePickDate', lang)}</Text>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Text style={s.pickerDoneText}>{t('done', lang)}</Text>
+              </TouchableOpacity>
+            </View>
+            <DateTimePicker
+              value={pickedDate ?? new Date()}
+              mode="date"
+              display="spinner"
+              minimumDate={startOfDay(new Date())}
+              onChange={(_, date) => {
+                if (!date) return
+                setPickedDate(date)
+                setDateFilter('picked')
+              }}
+              style={{ alignSelf: 'stretch' }}
+            />
+          </View>
+        </Modal>
       )}
     </SafeAreaView>
   )
@@ -383,12 +555,23 @@ const s = StyleSheet.create({
   // Negative margin cancels listContent's 16pt inset so the row bleeds to the
   // screen edge — the half-cut chip is what signals there is more to scroll.
   filterScroll:       { flexGrow: 0, marginHorizontal: -16 },
+  filterScrollSecond: { flexGrow: 0, marginHorizontal: -16, marginTop: 8 },
   filterRow:          { flexDirection: 'row', gap: 8, paddingTop: 4, paddingHorizontal: 16 },
   chip:               { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                         backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
+  chipWithIcon:       { flexDirection: 'row', alignItems: 'center', gap: 5 },
   chipActive:         { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   chipText:           { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   chipTextActive:     { fontFamily: 'Inter_700Bold', color: colors.primary },
+
+  // Date picker sheet (iOS) — mirrors the OrganizerScreen picker.
+  pickerBackdrop:     { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  pickerSheet:        { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.cardBg,
+                        borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 },
+  pickerSheetHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                        paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  pickerSheetTitle:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  pickerDoneText:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // Category badge (on card image)
   catBadge:           { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.55)',
