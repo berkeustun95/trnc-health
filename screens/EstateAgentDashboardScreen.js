@@ -222,7 +222,9 @@ export default function EstateAgentDashboardScreen({ session, lang }) {
         </TouchableOpacity>
       </View>
 
-      {/* Subscription banner */}
+      {/* Subscription banner — states listing visibility only. Never add a price,
+          a renewal instruction, or any off-app payment route here: this screen
+          ships in the consumer binary (iOS 3.1.1 anti-steering). */}
       {(() => {
         const exp = agentRecord.subscription_expires_at ? new Date(agentRecord.subscription_expires_at) : null
         const now = new Date()
@@ -230,15 +232,15 @@ export default function EstateAgentDashboardScreen({ session, lang }) {
         let bg, textColor, icon, msg
         if (!exp || exp < now) {
           bg = '#FEE2E2'; textColor = '#DC2626'; icon = '⚠️'
-          msg = 'Subscription expired — your listings are hidden from visitors. Contact admin to renew.'
+          msg = t('agentSubExpired', lang)
         } else {
           const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24))
           if (daysLeft <= 7) {
             bg = '#FEF3C7'; textColor = '#D97706'; icon = '⏰'
-            msg = `Subscription expires soon — ${dateStr} (${daysLeft} days left)`
+            msg = t('agentSubExpiringSoon', lang).replace('{date}', dateStr).replace('{days}', daysLeft)
           } else {
             bg = '#D1FAE5'; textColor = '#059669'; icon = '✓'
-            msg = `Subscription active until ${dateStr}`
+            msg = t('agentSubActive', lang).replace('{date}', dateStr)
           }
         }
         return (
