@@ -2021,7 +2021,23 @@ function eventStatusColor(status) {
   return colors.textSecondary
 }
 
-function EventDetailModal({ event, visible, onClose, onApprove, onReject, onDelete }) {
+// Admin UI is English-only throughout — no t() here.
+const EVENT_CATEGORIES = [
+  { key: 'music',     label: 'Music' },
+  { key: 'nightlife', label: 'Nightlife' },
+  { key: 'sports',    label: 'Sports' },
+  { key: 'arts',      label: 'Arts' },
+  { key: 'family',    label: 'Family' },
+  { key: 'other',     label: 'Other' },
+]
+
+function eventCategoryLabel(key) {
+  // 'concert'/'festival' linger until the narrow migration folds them into music.
+  if (key === 'concert' || key === 'festival') return 'Music'
+  return EVENT_CATEGORIES.find(c => c.key === key)?.label ?? 'Other'
+}
+
+function EventDetailModal({ event, visible, onClose, onApprove, onReject, onDelete, onSetCategory }) {
   if (!event) return null
 
   const fmt = (iso, withTime) => iso
@@ -2078,6 +2094,22 @@ function EventDetailModal({ event, visible, onClose, onApprove, onReject, onDele
               </TouchableOpacity>
             ) : null}
             <Text style={[s.cardSub, { marginTop: 6 }]}>Submitted: {fmt(event.created_at, true)}</Text>
+          </View>
+
+          <Text style={s.sectionTitle}>Category</Text>
+          <View style={[s.chipRow, { marginBottom: 20 }]}>
+            {EVENT_CATEGORIES.map(c => {
+              const active = eventCategoryLabel(event.category) === c.label
+              return (
+                <TouchableOpacity
+                  key={c.key}
+                  style={[s.chip, active && s.chipActive]}
+                  onPress={() => onSetCategory(event.id, c.key)}
+                >
+                  <Text style={[s.chipText, active && s.chipTextActive]}>{c.label}</Text>
+                </TouchableOpacity>
+              )
+            })}
           </View>
 
           <Text style={s.sectionTitle}>When</Text>
@@ -2142,7 +2174,7 @@ function EventsTab() {
     setLoading(true)
     let query = supabase
       .from('events')
-      .select('id, title, description, organizer_name, start_date, end_date, location, location_url, images, status, rejection_reason, organizer_id, created_at, profiles(full_name, phone)')
+      .select('id, title, description, organizer_name, start_date, end_date, location, location_url, images, category, status, rejection_reason, organizer_id, created_at, profiles(full_name, phone)')
       .order('created_at', { ascending: false })
     if (filter !== 'all') query = query.eq('status', filter)
     const { data } = await query
@@ -2161,6 +2193,12 @@ function EventsTab() {
   async function reject(id, reason) {
     await supabase.from('events').update({ status: 'rejected', rejection_reason: reason || 'Does not meet guidelines.' }).eq('id', id)
     setRejectTarget(null)
+    load()
+  }
+
+  async function setCategory(id, category) {
+    await supabase.from('events').update({ category }).eq('id', id)
+    setDetailTarget(prev => (prev && prev.id === id ? { ...prev, category } : prev))
     load()
   }
 
@@ -2203,6 +2241,7 @@ function EventsTab() {
                     {item.start_date && (
                       <Text style={[s.cardSub, { marginTop: 2 }]}>
                         {new Date(item.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {' · '}{eventCategoryLabel(item.category)}
                       </Text>
                     )}
                     <Text style={[s.cardSub, { color: colors.primary, marginTop: 4 }]}>Tap to review details ›</Text>
@@ -2244,6 +2283,7 @@ function EventsTab() {
         onApprove={approve}
         onReject={ev => { setDetailTarget(null); setRejectTarget(ev) }}
         onDelete={deleteEvent}
+        onSetCategory={setCategory}
       />
 
       <RejectModal

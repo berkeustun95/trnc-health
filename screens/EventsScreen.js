@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView,
   Image, Dimensions, ActivityIndicator, RefreshControl, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -16,16 +16,34 @@ import { openTicketUrl } from '../utils/events'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 
-// Consumer-grade filters. 'other' (legacy/uncategorised) events live under 'all' only.
+// Consumer-grade filters. One label key per category — the chip and the card
+// badge share it.
 const CATEGORIES = [
   { key: 'all',       labelKey: 'filterAll' },
-  { key: 'concert',   labelKey: 'filterConcerts' },
-  { key: 'festival',  labelKey: 'filterFestivals' },
-  { key: 'nightlife', labelKey: 'filterNightlife' },
+  { key: 'music',     labelKey: 'catMusic' },
+  { key: 'nightlife', labelKey: 'catNightlife' },
+  { key: 'sports',    labelKey: 'catSports' },
+  { key: 'arts',      labelKey: 'catArts' },
+  { key: 'family',    labelKey: 'catFamily' },
+  { key: 'other',     labelKey: 'catOther' },
 ]
 
+// The retired keys still exist in the DB until the narrow migration runs, so
+// Music matches them too. Dead once 20260724_events_category_narrow.sql is applied.
+const LEGACY_MUSIC = ['concert', 'festival']
+
+function matchesCategory(event, category) {
+  if (category === 'all') return true
+  if (category === 'music') return event.category === 'music' || LEGACY_MUSIC.includes(event.category)
+  return event.category === category
+}
+
 function categoryLabel(category, lang) {
-  const map = { concert: 'catConcert', festival: 'catFestival', nightlife: 'catNightlife', other: 'catOther' }
+  const map = {
+    music: 'catMusic', nightlife: 'catNightlife', sports: 'catSports',
+    arts: 'catArts', family: 'catFamily', other: 'catOther',
+    concert: 'catMusic', festival: 'catMusic',
+  }
   return t(map[category] || 'catOther', lang)
 }
 
@@ -68,7 +86,7 @@ function EventCard({ event, lang, onPress }) {
           <Text style={s.dateBadgeDay}>{day}</Text>
           <Text style={s.dateBadgeMonth}>{month}</Text>
         </View>
-        {event.category && event.category !== 'other' ? (
+        {event.category ? (
           <View style={s.catBadge}>
             <Text style={s.catBadgeText}>{categoryLabel(event.category, lang)}</Text>
           </View>
@@ -258,7 +276,7 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
     setLoading(false)
   }, [])
 
-  const byCategory = category === 'all' ? events : events.filter(e => e.category === category)
+  const byCategory = events.filter(e => matchesCategory(e, category))
   const filtered = district
     ? byCategory.filter(e => resolveRegion(e.latitude, e.longitude) === district)
     : byCategory
@@ -309,7 +327,12 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
                   <Feather name="x" size={13} color={colors.textSecondary} />
                 </TouchableOpacity>
               ) : null}
-              <View style={s.filterRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={s.filterScroll}
+                contentContainerStyle={s.filterRow}
+              >
                 {CATEGORIES.map(c => (
                   <TouchableOpacity
                     key={c.key}
@@ -317,10 +340,15 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
                     onPress={() => setCategory(c.key)}
                     activeOpacity={0.8}
                   >
-                    <Text style={[s.chipText, category === c.key && s.chipTextActive]}>{t(c.labelKey, lang)}</Text>
+                    <Text
+                      style={[s.chipText, category === c.key && s.chipTextActive]}
+                      numberOfLines={1}
+                    >
+                      {t(c.labelKey, lang)}
+                    </Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
             </View>
           }
           ListEmptyComponent={
@@ -352,7 +380,10 @@ const s = StyleSheet.create({
                         paddingHorizontal: 12, paddingVertical: 7, marginBottom: 10 },
   districtPillText:   { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
   districtPillClear:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  filterRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4 },
+  // Negative margin cancels listContent's 16pt inset so the row bleeds to the
+  // screen edge — the half-cut chip is what signals there is more to scroll.
+  filterScroll:       { flexGrow: 0, marginHorizontal: -16 },
+  filterRow:          { flexDirection: 'row', gap: 8, paddingTop: 4, paddingHorizontal: 16 },
   chip:               { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                         backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipActive:         { backgroundColor: colors.primaryLight, borderColor: colors.primary },

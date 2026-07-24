@@ -14,6 +14,15 @@ import { t } from '../constants/i18n'
 const { width: SCREEN_W } = Dimensions.get('window')
 const DESC_LIMIT = 500
 
+const CATEGORIES = [
+  { key: 'music',     labelKey: 'catMusic' },
+  { key: 'nightlife', labelKey: 'catNightlife' },
+  { key: 'sports',    labelKey: 'catSports' },
+  { key: 'arts',      labelKey: 'catArts' },
+  { key: 'family',    labelKey: 'catFamily' },
+  { key: 'other',     labelKey: 'catOther' },
+]
+
 function statusStyle(status) {
   if (status === 'approved') return { bg: colors.successLight, text: colors.success }
   if (status === 'rejected') return { bg: colors.dangerLight, text: colors.danger }
@@ -135,6 +144,7 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
   const [organizerName, setOrganizerName] = useState('')
+  const [category, setCategory] = useState('other')
   const [location, setLocation] = useState('')
   const [locationUrl, setLocationUrl] = useState('')
   const [images, setImages] = useState([])
@@ -149,6 +159,7 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
       setTitle(event?.title ?? '')
       setDesc(event?.description ?? '')
       setOrganizerName(event?.organizer_name ?? '')
+      setCategory(event?.category ?? 'other')
       setLocation(event?.location ?? '')
       setLocationUrl(event?.location_url ?? '')
       setImages(event?.images ?? [])
@@ -221,6 +232,7 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
       organizer_name: organizerName.trim(),
       title:          title.trim(),
       description:    desc.trim() || null,
+      category,
       images,
       start_date:     startDate.toISOString(),
       end_date:       endDate?.toISOString() ?? null,
@@ -317,6 +329,24 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
               multiline
               textAlignVertical="top"
             />
+
+            {/* Category — wraps rather than scrolls; this form is already inside
+                a vertical ScrollView. */}
+            <Text style={s.fieldLabel}>{t('eventCategory', lang)} *</Text>
+            <View style={s.chipRow}>
+              {CATEGORIES.map(c => (
+                <TouchableOpacity
+                  key={c.key}
+                  style={[s.chip, category === c.key && s.chipActive]}
+                  onPress={() => setCategory(c.key)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.chipText, category === c.key && s.chipTextActive]}>
+                    {t(c.labelKey, lang)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             {/* Start date */}
             <Text style={s.fieldLabel}>{t('eventStart', lang)} *</Text>
@@ -450,7 +480,7 @@ export default function OrganizerScreen({ session, lang }) {
     setLoading(true)
     const { data } = await supabase
       .from('events')
-      .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, status, rejection_reason')
+      .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, category, status, rejection_reason')
       .eq('organizer_id', session.user.id)
       .order('created_at', { ascending: false })
     setEvents(data ?? [])
@@ -596,6 +626,12 @@ const s = StyleSheet.create({
   fieldLabelRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 16 },
   charCount:          { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 6 },
   charCountWarn:      { color: colors.accent },
+
+  chipRow:            { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:               { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.cardBg },
+  chipActive:         { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  chipText:           { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  chipTextActive:     { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   input:              { backgroundColor: colors.cardBg, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   inputMulti:         { height: 110, textAlignVertical: 'top' },
