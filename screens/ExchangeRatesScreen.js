@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet,
+  View, Text, TouchableOpacity, ActivityIndicator, ScrollView, StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -162,24 +162,32 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
 
       {loading && (
         <View style={s.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={s.loadingText}>{t('fxLoading', lang)}</Text>
+          <View style={s.stateCard}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={s.loadingText}>{t('fxLoading', lang)}</Text>
+          </View>
         </View>
       )}
 
       {!loading && noData && (
         <View style={s.center}>
-          <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
-          <Text style={s.noDataTitle}>{t('fxNoData', lang)}</Text>
-          <Text style={s.noDataDetail}>{t('fxNoDataDetail', lang)}</Text>
-          <TouchableOpacity style={s.retryBtn} onPress={retry} activeOpacity={0.8}>
-            <Text style={s.retryBtnText}>{t('fxRetry', lang)}</Text>
-          </TouchableOpacity>
+          <View style={s.stateCard}>
+            <Ionicons name="cloud-offline-outline" size={48} color={colors.textSecondary} />
+            <Text style={s.noDataTitle}>{t('fxNoData', lang)}</Text>
+            <Text style={s.noDataDetail}>{t('fxNoDataDetail', lang)}</Text>
+            <TouchableOpacity style={s.retryBtn} onPress={retry} activeOpacity={0.8}>
+              <Text style={s.retryBtnText}>{t('fxRetry', lang)}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
       {!loading && hasData && (
-        <View style={s.body}>
+        <ScrollView
+          style={s.body}
+          contentContainerStyle={s.bodyContent}
+          showsVerticalScrollIndicator={false}
+        >
           {isStale && (
             <View style={s.offlineBanner}>
               <Ionicons name="information-circle-outline" size={16} color={colors.accent} style={{ marginTop: 1 }} />
@@ -235,17 +243,18 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
 
           <View style={s.disclaimerCard}>
             <Ionicons name="information-circle-outline" size={15} color={colors.textSecondary} style={{ marginTop: 1 }} />
-            <Text style={s.disclaimerText}>{t('fxDisclaimer', lang)}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.disclaimerText}>{t('fxDisclaimer', lang)}</Text>
+              <Text style={s.sourceLabel}>{t('fxSource', lang)}</Text>
+            </View>
           </View>
-
-          <Text style={s.sourceLabel}>{t('fxSource', lang)}</Text>
 
           {isStale && (
             <TouchableOpacity style={s.retryLink} onPress={retry} activeOpacity={0.7}>
               <Text style={s.retryLinkText}>{t('fxRetry', lang)}</Text>
             </TouchableOpacity>
           )}
-        </View>
+        </ScrollView>
       )}
     </SafeAreaView>
   )
@@ -262,7 +271,18 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
+  },
+  // Loading and empty states need their own surface: bare text sits on the
+  // photographic background and drops to ~1.7:1 against the scrimmed sky.
+  stateCard: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
     gap: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    ...shadow,
   },
   loadingText: {
     fontSize: 15,
@@ -295,7 +315,10 @@ const s = StyleSheet.create({
   },
   body: {
     flex: 1,
+  },
+  bodyContent: {
     paddingHorizontal: 16,
+    paddingBottom: 24,
   },
   offlineBanner: {
     flexDirection: 'row',
@@ -312,9 +335,17 @@ const s = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: 18,
   },
+  // Pill, not a full-bleed card: the rates table below is already full width, and
+  // a second slab reads as two competing headers. Auto-width keeps it a caption.
   dateHeader: {
+    alignSelf: 'center',
     alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     marginBottom: 14,
+    ...shadow,
   },
   officialLabel: {
     fontSize: 12,
@@ -422,10 +453,9 @@ const s = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     borderRadius: radius.md,
     padding: 12,
-    marginBottom: 6,
+    marginBottom: 16,
   },
   disclaimerText: {
-    flex: 1,
     fontSize: 13,
     color: colors.textSecondary,
     lineHeight: 18,
@@ -433,8 +463,7 @@ const s = StyleSheet.create({
   sourceLabel: {
     fontSize: 12,
     color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 4,
+    marginTop: 6,
   },
   retryLink: {
     alignSelf: 'center',
