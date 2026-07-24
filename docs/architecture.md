@@ -188,7 +188,9 @@ Automated API sync + commission/affiliate tracking, replacing manual SQL entry. 
 
 ## Job Postings module
 
-Free, self-post jobs board. Table `job_postings` (see `20260702_job_postings.sql`). Status enum: `pending → active → filled | expired`, plus `rejected`. `expires_at` is NULL until admin approval, then `now()+30d`.
+Self-post jobs board. Table `job_postings` (see `20260702_job_postings.sql`). Status enum: `pending → active → filled | expired`, plus `rejected`. `expires_at` is NULL until admin approval, then `now()+30d`.
+
+Individuals post free; businesses pay (`poster_type`, see **Monetization** below). Payment is entirely **off-app** — bank transfer, manual admin activation. There is no payment SDK and no in-app purchase anywhere in the project.
 
 ### RLS model (post-lockdown, `20260705_job_postings_rls_lockdown.sql`)
 
@@ -203,6 +205,37 @@ Free, self-post jobs board. Table `job_postings` (see `20260702_job_postings.sql
   - for owners, blocks changes to `owner_id`, `expires_at`, `rejection_reason`, and any status change **except** `active → filled` (the in-app "Mark Filled" flow, `JobPostingProfileScreen.js`).
 
 Any future table with an owner-writable moderation column needs the same pattern — column-restrict `status`/`expires_at` in a trigger or moderation is bypassable via the API.
+
+### Monetization — Bucket A, business paid postings (`20260722_job_postings_business_paid_tier.sql`)
+
+Four columns on `job_postings`:
+
+| Column | Values | Written by |
+|---|---|---|
+| `poster_type` | `individual` (default) \| `business` | client, at insert only — immutable after |
+| `payment_status` | `not_required` (default) \| `awaiting_payment` \| `paid` | **derived server-side**, then admin-only |
+| `paid_at` | timestamptz | admin only |
+| `payment_ref` | text — bank transfer reference | admin only, optional |
+
+**Two axes, deliberately separate:** `status` is content moderation, `payment_status` is money. There is intentionally **no** "content approved but unpaid" state — admin reviews content at activation time, and reject stays available independent of payment as the safety valve.
+
+**No RLS change was needed.** `jp_select` already requires `status='active' AND expires_at > now()` for public reads, so an unpaid business post is invisible to the public for free.
+
+The monetization columns are **derived, not accepted**. Both guards from the RLS section above are extended:
+  - `jp_guard_insert` overwrites `payment_status` from `poster_type` (`business → awaiting_payment`, else `not_required`) and nulls `paid_at`/`payment_ref`. A poster who sends `payment_status='paid'` has it silently discarded.
+  - `jp_guard_owner_update` rejects owner writes to all four columns. Without it an owner could flip their own post to `paid` with one direct Supabase API call.
+
+**Admin Activate/Renew path** (`AdminScreen.js`, `JobPostingsTab`): business posts do **not** use the free `Approve` button — that renders only for `poster_type='individual'`. They publish through `Activate`, which confirms the off-app transfer landed and sets `status='active'`, `payment_status='paid'`, `paid_at=now()`, optional `payment_ref`, and `expires_at=now()+30d` in one update. `Renew` is the same call on an already-active or expired post, extending from the current expiry when it is still in the future, else from now — same semantics as `extendSubscription()` for estate agents. An `Awaiting payment` filter chip lists what is owed.
+
+**Free-period caveat:** `Activate` always writes `payment_status='paid'`, so there is no way in the admin UI to publish a business post without marking it paid. During a free launch, type a sentinel (e.g. `FREE-LAUNCH`) into the bank-reference box — otherwise the only way to tell comped rows from genuinely paid ones later is `paid_at` against the free-period cutoff date, and `payment_ref` is optional so a blank ref proves nothing.
+
+### Anti-steering rule (iOS 3.1.1) — applies to every consumer screen
+
+`payment_status` is a **backend/admin concept**. It must never be rendered in the consumer app, and no consumer screen may carry pricing, payment, bank-transfer, or "contact us to renew/pay" copy. Apple rejects apps that direct users to a purchase mechanism outside the app.
+
+This is enforced **structurally, not by discipline**: `MyJobPostingsScreen.js` does not even select `payment_status`, so a business post awaiting payment has `status='pending'` and renders as "Under review" — identical to a post awaiting content review. Keep it that way; do not add the column to that query.
+
+The same rule binds every other paid surface. `EstateAgentDashboardScreen.js` violated it until `d4939f6` — its expired-subscription banner read "Contact admin to renew" — and now states listing visibility only (`agentSubExpired` / `agentSubExpiringSoon` / `agentSubActive` in `i18n.js`). Note `ProviderOnboardingScreen.js` still carries "Both plans include a 5-day free trial. No payment until you're verified and live." on the tier-selection step; the tier cards themselves show no prices.
 
 ### Auto-expire (`20260705_job_postings_auto_expire.sql`)
 
