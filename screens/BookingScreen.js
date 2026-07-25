@@ -184,8 +184,18 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
       facility_id: facility.id,
       requested_time: requestedTime,
     })
-    if (error) setError(error.message)
-    else {
+    if (error) {
+      if (error.code === '23505') {
+        // Slot was taken by another customer mid-race (DB unique guard fired).
+        setError(t('slotTaken', lang))
+        if (hasSlots && selectedDate) {
+          setSelectedSlot(null)
+          loadBookedSlots(selectedDate)
+        }
+      } else {
+        setError(error.message)
+      }
+    } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setDone(true)
       notifyProvider(facility, 'notifNewApptTitle', 'notifNewApptBody')
