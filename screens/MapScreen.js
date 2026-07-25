@@ -38,6 +38,7 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
     : LEFKOSA
 
   const mapped = facilities
+    .filter(f => FACILITY_TYPES.includes(f.type))
     .filter(f => f.latitude != null && f.longitude != null)
     .filter(f => filterType == null || f.type === filterType)
     .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)

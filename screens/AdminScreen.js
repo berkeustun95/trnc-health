@@ -12,7 +12,7 @@ import { t } from '../constants/i18n'
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'BusRoutes', 'Places', 'JobPostings']
+const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'BusRoutes', 'Places', 'JobPostings']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -220,6 +220,7 @@ function DashboardTab({ onNavigate }) {
         { count: pendingHomeServices },
         { count: pendingTransport },
         { count: pendingInsurance },
+        { count: pendingGrooming },
         { count: pendingBeaches },
         { count: pendingLandmarks },
         { count: pendingJobPostings },
@@ -233,7 +234,7 @@ function DashboardTab({ onNavigate }) {
         supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('claim_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('facility_change_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('facilities').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('facilities').select('*', { count: 'exact', head: true }).eq('status', 'pending').neq('type', 'grooming'),
         supabase.from('provider_credentials').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('provider_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('events').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -242,6 +243,7 @@ function DashboardTab({ onNavigate }) {
         supabase.from('home_services').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('transport_providers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('insurance_companies').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('facilities').select('*', { count: 'exact', head: true }).eq('status', 'pending').eq('type', 'grooming'),
         supabase.from('beaches').select('*',   { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('landmarks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('job_postings').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -251,7 +253,7 @@ function DashboardTab({ onNavigate }) {
         supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }).eq('audience', 'student'),
       ])
       const pendingPlaces = (pendingBeaches ?? 0) + (pendingLandmarks ?? 0)
-      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingPlaces, pendingJobPostings, pendingReports, esimTotal, esimTourist, esimStudent })
+      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingReports, esimTotal, esimTourist, esimStudent })
     }
     load()
   }, [])
@@ -272,6 +274,7 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingHomeServices ?? 0) > 0 && { label: 'Home service providers pending',  count: stats.pendingHomeServices,   tab: 'HomeServices', color: colors.primary },
     (stats.pendingTransport ?? 0)    > 0 && { label: 'Transport providers pending',      count: stats.pendingTransport,       tab: 'Transport',    color: colors.primary },
     (stats.pendingInsurance ?? 0)    > 0 && { label: 'Insurance companies pending',      count: stats.pendingInsurance,       tab: 'Insurance',    color: colors.primary },
+    (stats.pendingGrooming ?? 0)     > 0 && { label: 'Grooming providers pending',       count: stats.pendingGrooming,        tab: 'Grooming',     color: colors.primary },
     (stats.pendingPlaces ?? 0)       > 0 && { label: 'Beaches & landmarks to review',   count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
     (stats.pendingJobPostings ?? 0)  > 0 && { label: 'Job postings awaiting approval',  count: stats.pendingJobPostings,     tab: 'JobPostings',  color: colors.primary },
   ].filter(Boolean)
@@ -2821,6 +2824,120 @@ function InsuranceTab() {
   )
 }
 
+// ─── Grooming Tab ─────────────────────────────────────────────────────────────
+// Beauty & Grooming providers are facilities rows (type='grooming'). Approve flips
+// status→active + is_public→true (directory becomes visible). Reject→suspended
+// (facilities has no rejection_reason column, so no reason is stored). Ownership
+// (provider_id) is already set at signup, so NO role change here — that would trap
+// the owner in the health provider dashboard (routing is role-based). Deferred to Slice 2.
+
+function GroomingTab() {
+  const [providers, setProviders]       = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [filter, setFilter]             = useState('pending')
+
+  const CAT_LABELS = { barber: 'Barber', hairdresser: 'Hairdresser', nails: 'Nails', beauty: 'Beauty' }
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    let query = supabase
+      .from('facilities')
+      .select('id, name, category, address, phone, status, provider_id')
+      .eq('type', 'grooming')
+      .order('created_at', { ascending: false })
+    if (filter !== 'all') query = query.eq('status', filter)
+    const { data } = await query
+    setProviders(data ?? [])
+    setLoading(false)
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(item) {
+    await supabase.from('facilities').update({ status: 'active', is_public: true }).eq('id', item.id)
+    load()
+  }
+
+  function reject(item) {
+    Alert.alert('Decline listing?', `"${item.name}" will be hidden from the directory.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Decline', style: 'destructive', onPress: async () => {
+        await supabase.from('facilities').update({ status: 'suspended', is_public: false }).eq('id', item.id)
+        load()
+      } },
+    ])
+  }
+
+  function deleteProvider(id) {
+    Alert.alert('Delete listing?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('facilities').delete().eq('id', id); load() } },
+    ])
+  }
+
+  function statusColor(status) {
+    if (status === 'active')    return colors.success
+    if (status === 'suspended') return colors.danger
+    if (status === 'pending')   return '#C2410C'
+    return colors.textSecondary
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={[s.chipRow, { marginBottom: 12 }]}>
+        {['pending', 'active', 'suspended', 'all'].map(f => (
+          <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
+            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading
+        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        : (
+          <FlatList
+            data={providers}
+            keyExtractor={p => p.id}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text={`No ${filter} grooming providers.`} />}
+            renderItem={({ item }) => (
+              <View style={s.card}>
+                <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.cardTitle} numberOfLines={1}>{item.name}</Text>
+                    <Text style={s.cardSub}>{CAT_LABELS[item.category] || item.category}{item.address ? ` · ${item.address}` : ''}</Text>
+                    {!!item.phone && <Text style={s.cardSub}>{item.phone}</Text>}
+                  </View>
+                  <View style={[s.pillGrey, { backgroundColor: statusColor(item.status) + '20', marginLeft: 8 }]}>
+                    <Text style={[s.pillText, { color: statusColor(item.status) }]}>{item.status}</Text>
+                  </View>
+                </View>
+
+                <View style={[s.rowActions, { marginTop: 10, marginLeft: 0 }]}>
+                  {item.status !== 'active' && (
+                    <TouchableOpacity style={s.ghostBtn} onPress={() => approve(item)}>
+                      <Text style={s.ghostBtnText}>Approve</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.status !== 'suspended' && (
+                    <TouchableOpacity style={s.dangerGhostBtn} onPress={() => reject(item)}>
+                      <Text style={s.dangerGhostText}>Decline</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={s.dangerGhostBtn} onPress={() => deleteProvider(item.id)}>
+                    <Text style={s.dangerGhostText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          />
+        )
+      }
+    </View>
+  )
+}
+
 // ─── Transport Tab ────────────────────────────────────────────────────────────
 
 function TransportTab() {
@@ -3541,6 +3658,7 @@ export default function AdminScreen({ session }) {
           {tab === 'HomeServices'  && <HomeServicesTab />}
           {tab === 'Transport'     && <TransportTab />}
           {tab === 'Insurance'     && <InsuranceTab />}
+          {tab === 'Grooming'      && <GroomingTab />}
           {tab === 'BusRoutes'     && <BusRoutesTab />}
           {tab === 'Places'        && <PlacesTab />}
           {tab === 'JobPostings'   && <JobPostingsTab />}

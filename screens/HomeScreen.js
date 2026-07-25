@@ -47,6 +47,11 @@ const TINTS = {
   lifestyle: { bg: colors.tintLifestyleBg, fg: colors.tintLifestyleFg },
 }
 
+// The home facility list + map show only health facilities. Other facility types
+// (vet has its own directory; grooming has its own module) are gated out so they
+// never leak into the health "All" view.
+const HEALTH_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
+
 const MODULES = [
   { id: 'exchangeRates',      icon: 'trending-up-outline', tint: 'service',   labelKey: 'menuExchangeRates'      },
   { id: 'newcomerEssentials', icon: 'compass-outline',     tint: 'service',   labelKey: 'menuNewcomerEssentials' },
@@ -57,6 +62,7 @@ const MODULES = [
   { id: 'beaches',       icon: 'umbrella-outline',  tint: 'lifestyle', labelKey: 'menuBeachesLandmarks' },
   { id: 'transport',     icon: 'car-outline',       tint: 'service',   labelKey: 'menuTransportation' },
   { id: 'insurance',     icon: 'shield-checkmark-outline', tint: 'service', labelKey: 'menuInsurance' },
+  { id: 'grooming',      icon: 'cut-outline',       tint: 'lifestyle', labelKey: 'menuGrooming' },
   { id: 'esim',          icon: 'cellular-outline',  tint: 'service',   labelKey: 'menuEsim' },
   { id: 'municipal',     icon: 'business-outline',  tint: 'service',   labelKey: 'menuMunicipalities' },
 ]
@@ -100,6 +106,7 @@ export default function HomeScreen({
   onShowBeachesLandmarks,
   onShowTransport,
   onShowInsurance,
+  onShowGrooming,
   onShowEsim,
   onShowEmergency,
   onShowMunicipal,
@@ -176,11 +183,13 @@ export default function HomeScreen({
     beaches:            onShowBeachesLandmarks,
     transport:          onShowTransport,
     insurance:          onShowInsurance,
+    grooming:           onShowGrooming,
     esim:               onShowEsim,
     municipal:          onShowMunicipal,
   }
 
   const listed = facilities
+    .filter(f => HEALTH_TYPES.includes(f.type))
     .map(f => ({
       ...f,
       _dist: userLocation && f.latitude != null && f.longitude != null

@@ -39,6 +39,7 @@ import JobPostingsScreen from './screens/JobPostingsScreen'
 import BeachesLandmarksScreen from './screens/BeachesLandmarksScreen'
 import TransportScreen from './screens/TransportScreen'
 import InsuranceScreen from './screens/InsuranceScreen'
+import GroomingScreen from './screens/GroomingScreen'
 import EsimScreen from './screens/EsimScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import PlaceProfileScreen from './screens/PlaceProfileScreen'
@@ -233,6 +234,7 @@ export default function App() {
   const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
   const [showTransport, setShowTransport] = useState(false)
   const [showInsurance, setShowInsurance] = useState(false)
+  const [showGrooming, setShowGrooming] = useState(false)
   const [showEsim, setShowEsim] = useState(false)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
@@ -483,6 +485,7 @@ export default function App() {
       if (showJobPostings)  { setShowJobPostings(false);  return true }
       if (showTransport) { setShowTransport(false); return true }
       if (showInsurance) { setShowInsurance(false); return true }
+      if (showGrooming) { setShowGrooming(false); return true }
       if (showEsim) { setShowEsim(false); return true }
       if (selectedPlace)        { setSelectedPlace(null); return true }
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
@@ -493,7 +496,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showEsim, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showEsim, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -1143,6 +1146,8 @@ export default function App() {
       onRequireAccount={requireAccount}
       onBack={() => setSelectedFacility(null)}
     />
+  } else if (showGrooming) {
+    content = <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGrooming(false)} onOpenFacility={setSelectedFacility} />
   } else {
     const favList = facilities.filter(f => favorites.has(f.id))
     content = (
@@ -1179,6 +1184,7 @@ export default function App() {
             onShowBeachesLandmarks={() => setShowBeachesLandmarks(true)}
             onShowTransport={() => setShowTransport(true)}
             onShowInsurance={() => setShowInsurance(true)}
+            onShowGrooming={() => setShowGrooming(true)}
             onShowEsim={() => setShowEsim(true)}
             onShowEmergency={() => setShowEmergencyModal(true)}
             onShowMunicipal={() => setShowMunicipalModal(true)}
