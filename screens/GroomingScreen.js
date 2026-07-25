@@ -67,7 +67,7 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
     setError(false)
     const { data, error: err } = await supabase
       .from('facilities')
-      .select('id, name, type, category, address, phone, opening_hours, description, languages, specialty, latitude, longitude, photos, verified, availability, cover_image_url, logo_url')
+      .select('id, name, type, category, address, phone, opening_hours, description, languages, specialty, latitude, longitude, photos, verified, availability, cover_image_url, logo_url, provider_id')
       .eq('type', 'grooming')
       .eq('status', 'active')
       .order('name', { ascending: true })

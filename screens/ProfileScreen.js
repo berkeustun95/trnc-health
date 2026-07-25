@@ -121,7 +121,8 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
   const review      = reviewsMap.get(booking.id)
   const tc          = TYPE_COLORS[f.type] ?? TYPE_COLORS.clinic
 
-  const statusLabel     = isConfirmed ? t('statusConfirmed', lang) : isPending ? t('statusPending', lang) : isCompleted ? t('statusCompleted', lang) : t('statusCancelled', lang)
+  const pendingLabel    = f.type === 'grooming' ? t('groomStatusRequested', lang) : t('statusPending', lang)
+  const statusLabel     = isConfirmed ? t('statusConfirmed', lang) : isPending ? pendingLabel : isCompleted ? t('statusCompleted', lang) : t('statusCancelled', lang)
   const statusPillStyle = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : isCompleted ? s.pillGreen : s.pillRed
   const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : isCompleted ? s.pillTextGreen : s.pillTextRed
 
@@ -657,7 +658,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               const isConfirmed = b.status === 'confirmed'
               const isCompleted = b.status === 'completed'
               const statusLabel = isConfirmed ? t('statusConfirmed', lang)
-                : isPending ? t('statusPending', lang)
+                : isPending ? (b.facilities?.type === 'grooming' ? t('groomStatusRequested', lang) : t('statusPending', lang))
                 : isCompleted ? t('statusCompleted', lang)
                 : t('statusCancelled', lang)
               const statusStyle     = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : isCompleted ? s.pillGreen : s.pillRed

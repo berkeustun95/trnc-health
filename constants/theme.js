@@ -31,6 +31,7 @@ export const typeColors = {
   hospital: { bg: '#FAEAEC', text: '#D1495B' },
   dentist:  { bg: '#E6F5ED', text: '#2E9E5B' },
   vet:      { bg: '#FEF3C7', text: '#D97706' },
+  grooming: { bg: '#FCE7F3', text: '#BE185D' },
 }
 
 export const placeColors = {

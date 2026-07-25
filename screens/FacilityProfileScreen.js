@@ -72,8 +72,6 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
 
   const tc         = typeColors[facility.type] || typeColors.clinic
   const isPharmacy = facility.type === 'pharmacy'
-  // Grooming providers have no booking yet (Slice 1 is directory-only) — hide the CTA.
-  const isGrooming = facility.type === 'grooming'
   const languages  = Array.isArray(facility.languages)
     ? facility.languages
     : typeof facility.languages === 'string' && facility.languages
@@ -323,7 +321,7 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
         </Modal>
 
         {/* Sticky Book CTA */}
-        {!isPharmacy && !isGrooming && (
+        {!isPharmacy && (
           <View style={s.ctaWrap}>
             <TouchableOpacity style={s.ctaBtn} onPress={onBook} activeOpacity={0.85}>
               <Text style={s.ctaText}>
