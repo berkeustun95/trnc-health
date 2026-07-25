@@ -18,6 +18,7 @@ const CARDS = [
   { id: 'ports',     icon: 'airplane-outline',   color: '#FF8552', bg: '#FFF0EB', labelKey: 'essCardPorts'     },
   { id: 'borders',   icon: 'git-branch-outline', color: '#64748B', bg: '#F1F5F9', labelKey: 'essCardBorders'   },
   { id: 'embassies', icon: 'business-outline',   color: '#5B5BD6', bg: '#EAE8F5', labelKey: 'essCardEmbassies' },
+  { id: 'living',    icon: 'bulb-outline',       color: '#C77800', bg: '#FBF1D9', labelKey: 'essCardLiving'    },
 ]
 
 // Seeded June 2026 — flag each field for Berke's sign-off before ship.
@@ -108,6 +109,7 @@ function CurrencyCard({ lang, onShowExchangeRates }) {
         <BulletRow iconName="cash-outline" iconColor={colors.primary} text={t('essCurrPrimary', lang)} />
         <BulletRow text={t('essCurrAccepted', lang)} />
         <BulletRow iconName="cart-outline" iconColor={colors.accent} text={t('essCurrCash', lang)} />
+        <BulletRow iconName="card-outline" iconColor={colors.primary} text={t('essCurrCards', lang)} />
         <BulletRow iconName="location-outline" iconColor={colors.textSecondary} text={t('essCurrATM', lang)} />
         <BulletRow iconName="swap-horizontal-outline" iconColor={colors.textSecondary} text={t('essCurrBureaux', lang)} />
 
@@ -133,6 +135,9 @@ function HolidaysCard({ lang }) {
         {RELIGIOUS_HOLIDAYS.map(key => (
           <BulletRow key={key} iconName="moon-outline" iconColor="#5B5BD6" text={t(key, lang)} />
         ))}
+
+        <SectionTitle text={t('essHolClosuresTitle', lang)} />
+        <BulletRow iconName="lock-closed-outline" iconColor={colors.textSecondary} text={t('essHolClosuresNote', lang)} />
 
         <Text style={s.yearNote}>{t('essHolYearNote', lang)}</Text>
       </ContentCard>
@@ -329,6 +334,39 @@ function EmbassiesCard({ lang }) {
   )
 }
 
+function LivingCard({ lang }) {
+  return (
+    <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
+      <LastReviewedTag text={t('essLivingLastReviewed', lang)} />
+      <ContentCard>
+        <SectionTitle text={t('essLivingWaterTitle', lang)} />
+        <BulletRow iconName="water-outline" iconColor="#185FA5" text={t('essLivingWater1', lang)} />
+        <BulletRow iconName="cube-outline" iconColor={colors.textSecondary} text={t('essLivingWater2', lang)} />
+
+        <SectionTitle text={t('essLivingHoursTitle', lang)} />
+        <BulletRow iconName="sunny-outline" iconColor={colors.accent} text={t('essLivingHours1', lang)} />
+        <BulletRow iconName="time-outline" iconColor={colors.textSecondary} text={t('essLivingHours2', lang)} />
+        <BulletRow iconName="business-outline" iconColor={colors.textSecondary} text={t('essLivingHours3', lang)} />
+
+        <SectionTitle text={t('essLivingCutsTitle', lang)} />
+        <BulletRow iconName="flash-off-outline" iconColor={colors.danger} text={t('essLivingCuts1', lang)} />
+        <BulletRow iconName="call-outline" iconColor={colors.primary} text={t('essLivingCuts2', lang)} />
+        <BulletRow iconName="water-outline" iconColor="#185FA5" text={t('essLivingCuts3', lang)} />
+        <BulletRow iconName="information-circle-outline" iconColor={colors.textSecondary} text={t('essLivingCuts4', lang)} />
+
+        <SectionTitle text={t('essLivingJellyTitle', lang)} />
+        <BulletRow iconName="alert-circle-outline" iconColor="#0E7C7B" text={t('essLivingJelly1', lang)} />
+        <BulletRow iconName="medkit-outline" iconColor={colors.danger} text={t('essLivingJelly2', lang)} />
+
+        <SectionTitle text={t('essLivingViperTitle', lang)} />
+        <BulletRow iconName="warning-outline" iconColor={colors.danger} text={t('essLivingViper1', lang)} />
+        <BulletRow iconName="footsteps-outline" iconColor={colors.textSecondary} text={t('essLivingViper2', lang)} />
+        <BulletRow iconName="medkit-outline" iconColor={colors.danger} text={t('essLivingViper3', lang)} />
+      </ContentCard>
+    </ScrollView>
+  )
+}
+
 function PendingCard({ lang, msgKey }) {
   return (
     <View style={s.pendingWrap}>
@@ -346,6 +384,7 @@ function renderCardContent(cardId, lang, onShowExchangeRates) {
     case 'ports':     return <PortsCard lang={lang} />
     case 'borders':   return <BordersCard lang={lang} />
     case 'embassies': return <EmbassiesCard lang={lang} />
+    case 'living':    return <LivingCard lang={lang} />
     default: return null
   }
 }
