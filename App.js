@@ -39,6 +39,7 @@ import JobPostingsScreen from './screens/JobPostingsScreen'
 import BeachesLandmarksScreen from './screens/BeachesLandmarksScreen'
 import TransportScreen from './screens/TransportScreen'
 import InsuranceScreen from './screens/InsuranceScreen'
+import EsimScreen from './screens/EsimScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import PlaceProfileScreen from './screens/PlaceProfileScreen'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
@@ -232,6 +233,7 @@ export default function App() {
   const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
   const [showTransport, setShowTransport] = useState(false)
   const [showInsurance, setShowInsurance] = useState(false)
+  const [showEsim, setShowEsim] = useState(false)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [selectedPlace,        setSelectedPlace]        = useState(null)
@@ -481,6 +483,7 @@ export default function App() {
       if (showJobPostings)  { setShowJobPostings(false);  return true }
       if (showTransport) { setShowTransport(false); return true }
       if (showInsurance) { setShowInsurance(false); return true }
+      if (showEsim) { setShowEsim(false); return true }
       if (selectedPlace)        { setSelectedPlace(null); return true }
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
@@ -490,7 +493,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showEsim, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -995,6 +998,8 @@ export default function App() {
     content = <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowTransport(false)} />
   } else if (showInsurance) {
     content = <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowInsurance(false)} />
+  } else if (showEsim) {
+    content = <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowEsim(false)} />
   } else if (selectedPlace) {
     content = <PlaceProfileScreen place={selectedPlace} lang={lang} onBack={() => setSelectedPlace(null)} />
   } else if (showBeachesLandmarks) {
@@ -1174,6 +1179,7 @@ export default function App() {
             onShowBeachesLandmarks={() => setShowBeachesLandmarks(true)}
             onShowTransport={() => setShowTransport(true)}
             onShowInsurance={() => setShowInsurance(true)}
+            onShowEsim={() => setShowEsim(true)}
             onShowEmergency={() => setShowEmergencyModal(true)}
             onShowMunicipal={() => setShowMunicipalModal(true)}
             onSelectPlace={setSelectedPlace}
@@ -1452,7 +1458,7 @@ export default function App() {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowBeachesLandmarks(false); setShowTransport(false)
-    setShowInsurance(false)
+    setShowInsurance(false); setShowEsim(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedPlace(null); setShowNotifs(false)
     switch (target) {
@@ -1480,7 +1486,7 @@ export default function App() {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowBeachesLandmarks(false); setShowTransport(false)
-    setShowInsurance(false)
+    setShowInsurance(false); setShowEsim(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedPlace(null); setShowNotifs(false)
     switch (target) {

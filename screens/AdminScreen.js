@@ -224,6 +224,9 @@ function DashboardTab({ onNavigate }) {
         { count: pendingLandmarks },
         { count: pendingJobPostings },
         { count: pendingReports },
+        { count: esimTotal },
+        { count: esimTourist },
+        { count: esimStudent },
       ] = await Promise.all([
         supabase.from('facilities').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -243,9 +246,12 @@ function DashboardTab({ onNavigate }) {
         supabase.from('landmarks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('job_postings').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('content_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }),
+        supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }).eq('audience', 'tourist'),
+        supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }).eq('audience', 'student'),
       ])
       const pendingPlaces = (pendingBeaches ?? 0) + (pendingLandmarks ?? 0)
-      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingPlaces, pendingJobPostings, pendingReports })
+      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingPlaces, pendingJobPostings, pendingReports, esimTotal, esimTourist, esimStudent })
     }
     load()
   }, [])
@@ -276,6 +282,13 @@ function DashboardTab({ onNavigate }) {
         <StatCard label="Facilities" value={stats.facilities} />
         <StatCard label="Users" value={stats.users} />
         <StatCard label="Appt. pending" value={stats.pendingAppts} color={stats.pendingAppts > 0 ? colors.accent : undefined} />
+      </View>
+
+      <Text style={[s.sectionTitle, { marginTop: 24 }]}>eSIM waitlist</Text>
+      <View style={s.statsGrid}>
+        <StatCard label="Total" value={stats.esimTotal ?? 0} color={(stats.esimTotal ?? 0) > 0 ? colors.primary : undefined} />
+        <StatCard label="Tourist" value={stats.esimTourist ?? 0} />
+        <StatCard label="Student" value={stats.esimStudent ?? 0} />
       </View>
 
       {urgencies.length > 0 && (
