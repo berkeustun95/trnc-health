@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import GroomingAvailabilityEditor from './GroomingAvailabilityEditor'
 
 const CATEGORIES = [
   { key: 'barber',     icon: 'cut-outline',        labelKey: 'groomCatBarber' },
@@ -44,12 +45,16 @@ function DeclinedState({ lang, onClose }) {
   )
 }
 
-function ActiveState({ lang, onClose }) {
+function ActiveState({ lang, onClose, onEditAvailability }) {
   return (
     <View style={s.stateWrap}>
       <Text style={s.stateEmoji}>✅</Text>
       <Text style={s.stateTitle}>{t('groomRegisterActive', lang)}</Text>
       <Text style={s.stateSub}>{t('groomRegisterActiveSub', lang)}</Text>
+      <TouchableOpacity style={s.primaryBtn} onPress={onEditAvailability} activeOpacity={0.85}>
+        <Ionicons name="calendar-outline" size={18} color="#fff" />
+        <Text style={s.primaryBtnText}>{t('groomManageAvail', lang)}</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={s.ghostBtn} onPress={onClose}>
         <Text style={s.ghostBtnText}>{t('back', lang)}</Text>
       </TouchableOpacity>
@@ -73,6 +78,7 @@ function Field({ label, children }) {
 export default function GroomingOnboardingScreen({ session, lang, onClose, onSubmitted }) {
   const [existing, setExisting] = useState(undefined)
   const [checking, setChecking] = useState(true)
+  const [editingAvail, setEditingAvail] = useState(false)
 
   const [name,        setName]        = useState('')
   const [category,    setCategory]    = useState(null)
@@ -88,7 +94,7 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
     async function checkExisting() {
       const { data } = await supabase
         .from('facilities')
-        .select('id, status')
+        .select('id, status, availability, provider_id')
         .eq('provider_id', session.user.id)
         .eq('type', 'grooming')
         .maybeSingle()
@@ -139,9 +145,21 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
   }
 
   if (existing?.status === 'active') {
+    // Owner-only editor: `existing` came from a provider_id = session.user.id query,
+    // so it is inherently this user's own facility (RLS enforces the write too).
+    if (editingAvail && existing.provider_id === session.user.id) {
+      return (
+        <GroomingAvailabilityEditor
+          facility={existing}
+          lang={lang}
+          onBack={() => setEditingAvail(false)}
+          onSaved={a => setExisting(prev => ({ ...prev, availability: a }))}
+        />
+      )
+    }
     return (
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-        <ActiveState lang={lang} onClose={onClose} />
+        <ActiveState lang={lang} onClose={onClose} onEditAvailability={() => setEditingAvail(true)} />
       </SafeAreaView>
     )
   }
@@ -317,6 +335,10 @@ const s = StyleSheet.create({
                       textAlign: 'center' },
   stateSub:         { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                       textAlign: 'center', lineHeight: 21 },
+  primaryBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 14,
+                      paddingHorizontal: 28, marginTop: 8 },
+  primaryBtnText:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
   ghostBtn:         { paddingVertical: 12, paddingHorizontal: 24 },
   ghostBtnText:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 })
