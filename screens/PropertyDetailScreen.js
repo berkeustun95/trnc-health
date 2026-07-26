@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
   FlatList, Dimensions, Linking, ActivityIndicator,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
@@ -113,6 +113,7 @@ function CurrencyConverter({ price, currency, period, lang }) {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function PropertyDetailScreen({ property: prop, lang, onClose, onOpenMap }) {
+  const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
   const images = (prop.property_images || []).sort((a, b) => a.sort_order - b.sort_order)
   const agent  = prop.estate_agents
@@ -142,7 +143,7 @@ export default function PropertyDetailScreen({ property: prop, lang, onClose, on
   return (
     <SafeAreaView style={ds.safe} edges={['top']}>
       {/* Back button overlaid on gallery */}
-      <TouchableOpacity style={ds.backBtn} onPress={onClose}>
+      <TouchableOpacity style={[ds.backBtn, { top: insets.top + 8 }]} onPress={onClose}>
         <Ionicons name="arrow-back" size={22} color="#fff" />
       </TouchableOpacity>
 
@@ -310,7 +311,7 @@ function SpecItem({ icon, label }) {
 
 const ds = StyleSheet.create({
   safe:                  { flex: 1, backgroundColor: colors.bg },
-  backBtn:               { position: 'absolute', top: 12, left: 16, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  backBtn:               { position: 'absolute', left: 16, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
 
   galleryImg:            { width: W, height: GALLERY_H },
   galleryPlaceholder:    { width: W, height: GALLERY_H, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },

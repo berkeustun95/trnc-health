@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Image, FlatList, Dimensions, Linking,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
@@ -48,6 +48,7 @@ function districtLabel(d, lang) {
 }
 
 export default function PlaceProfileScreen({ place, lang, onBack }) {
+  const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
 
   const isBeach = place._type === 'beach'
@@ -61,7 +62,7 @@ export default function PlaceProfileScreen({ place, lang, onBack }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       {/* Back button — overlaid on gallery */}
-      <TouchableOpacity style={s.backBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity style={[s.backBtn, { top: insets.top + 8 }]} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Ionicons name="arrow-back" size={22} color="#fff" />
       </TouchableOpacity>
 
@@ -193,7 +194,7 @@ const s = StyleSheet.create({
   dotActive:          { backgroundColor: '#fff', width: 18 },
 
   // Back button (overlaid)
-  backBtn: { position: 'absolute', top: 52, left: 16, zIndex: 10,
+  backBtn: { position: 'absolute', left: 16, zIndex: 10,
              width: 38, height: 38, borderRadius: 19,
              backgroundColor: 'rgba(0,0,0,0.35)',
              alignItems: 'center', justifyContent: 'center' },
