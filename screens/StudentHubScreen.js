@@ -186,7 +186,7 @@ function BasicsTab({ lang, onShowEsim, onShowNewcomerEssentials }) {
 function ComingSoon({ lang, onBack }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <PageBackground topic="newcomer_essentials" />
+      <PageBackground topic="student_hub" scrimOpacity={0.4} />
       <ScreenHeader onBack={onBack} lang={lang} title={t('menuStudentHub', lang)} />
       <View style={s.comingWrap}>
         <MascotIntroCard
@@ -208,7 +208,7 @@ export default function StudentHubScreen({ lang, onBack, isAdmin, onShowEsim, on
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <PageBackground topic="newcomer_essentials" />
+      <PageBackground topic="student_hub" scrimOpacity={0.4} />
       <ScreenHeader onBack={onBack} lang={lang} title={t('menuStudentHub', lang)} />
 
       <View style={s.introWrap}>

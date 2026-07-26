@@ -16,6 +16,7 @@ const TOPIC_CONFIG = {
   municipalities:      { asset: require('../assets/backgrounds/ada-bg-municipalities.png') },
   newcomer_essentials: { asset: require('../assets/backgrounds/ada-bg-transportation.png') },
   exchange_rates:      { asset: require('../assets/backgrounds/ada-bg-exchange-rates.png') },
+  student_hub:         { asset: require('../assets/backgrounds/ada-bg-student-hub.png') },
 }
 
 export default function PageBackground({ topic, scrimOpacity = SCRIM_OPACITY }) {
