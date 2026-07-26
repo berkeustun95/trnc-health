@@ -3611,7 +3611,7 @@ function JobPostingsTab() {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-export default function AdminScreen({ session }) {
+export default function AdminScreen({ session, onPreviewStudentHub }) {
   const [tab, setTab] = useState('Dashboard')
   const navigateTo = t => setTab(t)
 
@@ -3623,9 +3623,16 @@ export default function AdminScreen({ session }) {
             <Image source={require('../assets/adalogo.png')} style={s.headerIcon} resizeMode="contain" />
             <Text style={s.headerLabel}>Admin</Text>
           </View>
-          <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
-            <Text style={s.signOutText}>Sign out</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {onPreviewStudentHub ? (
+              <TouchableOpacity style={s.previewBtn} onPress={onPreviewStudentHub}>
+                <Text style={s.previewText}>🎓 Student Hub</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
+              <Text style={s.signOutText}>Sign out</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
@@ -3682,6 +3689,8 @@ const s = StyleSheet.create({
   headerLabel:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   signOutBtn:         { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.dangerLight },
   signOutText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
+  previewBtn:         { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.primaryLight },
+  previewText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   tabBar:             { flexGrow: 0, marginBottom: 16 },
   tabBarContent:      { gap: 8, paddingRight: 4 },

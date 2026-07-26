@@ -55,6 +55,7 @@ import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import HomeScreen from './screens/HomeScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
+import StudentHubScreen from './screens/StudentHubScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import { haversineKm, parseIsOpen, coarseCoord } from './utils/facilityUtils'
 import {
@@ -237,6 +238,7 @@ export default function App() {
   const [showGrooming, setShowGrooming] = useState(false)
   const [showEsim, setShowEsim] = useState(false)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
+  const [showStudentHub, setShowStudentHub] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [selectedPlace,        setSelectedPlace]        = useState(null)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
@@ -490,13 +492,14 @@ export default function App() {
       if (selectedPlace)        { setSelectedPlace(null); return true }
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
+      if (showStudentHub) { setShowStudentHub(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showEsim, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showEsim, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showStudentHub, showExchangeRates, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -859,8 +862,20 @@ export default function App() {
         </View>
       </SafeAreaView>
     )
+  } else if (showStudentHub) {
+    // Above the role gate so admins (who otherwise only see AdminScreen) can
+    // preview. isAdmin unlocks the real hub pre-launch; everyone else sees Coming Soon.
+    content = (
+      <StudentHubScreen
+        lang={lang}
+        isAdmin={profile.role === 'admin'}
+        onBack={() => setShowStudentHub(false)}
+        onShowEsim={() => { setShowStudentHub(false); setShowEsim(true) }}
+        onShowNewcomerEssentials={() => { setShowStudentHub(false); setShowNewcomerEssentials(true) }}
+      />
+    )
   } else if (profile.role === 'admin') {
-    content = <AdminScreen session={session} />
+    content = <AdminScreen session={session} onPreviewStudentHub={() => setShowStudentHub(true)} />
   } else if (profile.role === 'provider') {
     if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
       content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
@@ -1190,6 +1205,7 @@ export default function App() {
             onShowMunicipal={() => setShowMunicipalModal(true)}
             onSelectPlace={setSelectedPlace}
             onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
+            onShowStudentHub={() => setShowStudentHub(true)}
             onShowExchangeRates={() => setShowExchangeRates(true)}
           />
         )}
@@ -1465,7 +1481,7 @@ export default function App() {
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowBeachesLandmarks(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false)
-    setShowNewcomerEssentials(false); setShowExchangeRates(false)
+    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
     setSelectedPlace(null); setShowNotifs(false)
     switch (target) {
       case 'pharmacy':      setActiveTab('home'); setShowDutyList(true); break
@@ -1493,7 +1509,7 @@ export default function App() {
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowBeachesLandmarks(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false)
-    setShowNewcomerEssentials(false); setShowExchangeRates(false)
+    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
     setSelectedPlace(null); setShowNotifs(false)
     switch (target) {
       case 'beaches': setBeachesDistrict(region); setShowBeachesLandmarks(true); break

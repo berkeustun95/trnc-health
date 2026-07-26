@@ -55,6 +55,7 @@ const HEALTH_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const MODULES = [
   { id: 'exchangeRates',      icon: 'trending-up-outline', tint: 'service',   labelKey: 'menuExchangeRates'      },
   { id: 'newcomerEssentials', icon: 'compass-outline',     tint: 'service',   labelKey: 'menuNewcomerEssentials' },
+  { id: 'studentHub',         icon: 'school-outline',      tint: 'service',   labelKey: 'menuStudentHub' },
   { id: 'accommodation', icon: 'home-outline',      tint: 'lifestyle', labelKey: 'menuAccommodations' },
   { id: 'pets',          icon: 'paw-outline',       tint: 'lifestyle', labelKey: 'menuPets' },
   { id: 'homeServices',  icon: 'hammer-outline',    tint: 'service',   labelKey: 'menuHomeServices' },
@@ -112,6 +113,7 @@ export default function HomeScreen({
   onShowMunicipal,
   onSelectPlace,
   onShowNewcomerEssentials,
+  onShowStudentHub,
   onShowExchangeRates,
 }) {
   const [showFacilityList, setShowFacilityList] = useState(false)
@@ -176,6 +178,7 @@ export default function HomeScreen({
   const moduleHandlers = {
     exchangeRates:      onShowExchangeRates,
     newcomerEssentials: onShowNewcomerEssentials,
+    studentHub:         onShowStudentHub,
     accommodation:      onShowAccommodation,
     pets:               onShowPets,
     homeServices:       onShowHomeServices,
