@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { View, Text, Image, ImageBackground, TextInput, TouchableOpacity, StyleSheet,
          ActivityIndicator, ScrollView } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -15,6 +15,7 @@ const LANGUAGES = [
 ]
 
 export default function AuthScreen({ lang: initialLang = 'English', onLangChange, initialMode = 'login', onBack }) {
+  const insets = useSafeAreaInsets()
   const [lang, setLang] = useState(initialLang)
   const [mode, setMode] = useState(initialMode)
   const [email, setEmail] = useState('')
@@ -294,7 +295,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
         </ScrollView>
       </KeyboardAwareForm>
       <TouchableOpacity
-        style={styles.backBtn}
+        style={[styles.backBtn, { top: insets.top + 8 }]}
         onPress={onBack}
         accessibilityLabel={t('back', lang)}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
   formCard:          { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 24, padding: 24, paddingTop: 20 },
   overlay:           { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.55)' },
   kav:               { flex: 1 },
-  backBtn:           { position: 'absolute', top: 8, left: 12, zIndex: 10, padding: 8 },
+  backBtn:           { position: 'absolute', left: 12, zIndex: 10, padding: 8 },
   container:         { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
   logoArea:          { alignItems: 'center', marginBottom: 40 },
   logoImg:           { width: 460, height: 180 },
