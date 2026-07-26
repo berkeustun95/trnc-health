@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Image
+  ScrollView, FlatList, ActivityIndicator, Image
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
@@ -288,7 +289,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
   if (step === '2b') {
     return (
       <SafeAreaView style={s.safe} edges={['top']}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAwareForm>
           <ScrollView contentContainerStyle={s.formWrap} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <TouchableOpacity style={s.backBtn} onPress={() => setStep(2)}>
               <Text style={s.backBtnText}>← Back</Text>
@@ -383,7 +384,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
               <Text style={s.primaryBtnText}>Next →</Text>
             </TouchableOpacity>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardAwareForm>
       </SafeAreaView>
     )
   }

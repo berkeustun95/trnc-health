@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  Switch, ActivityIndicator, KeyboardAvoidingView, Platform, BackHandler, Alert,
+  Switch, ActivityIndicator, BackHandler, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, radius, shadow } from '../constants/theme'
@@ -95,7 +96,7 @@ export default function GroomingAvailabilityEditor({ facility, lang = 'English',
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAwareForm>
         <View style={s.header}>
           <TouchableOpacity onPress={confirmLeave} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
@@ -209,7 +210,7 @@ export default function GroomingAvailabilityEditor({ facility, lang = 'English',
             }
           </TouchableOpacity>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareForm>
     </SafeAreaView>
   )
 }

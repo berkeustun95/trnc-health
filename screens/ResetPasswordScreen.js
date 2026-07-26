@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors } from '../constants/theme'
@@ -35,6 +36,7 @@ export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
 
   return (
     <SafeAreaView style={s.safe}>
+      <KeyboardAwareForm>
       <View style={s.container}>
         {!done && (
           <TouchableOpacity style={s.cancelBtn} onPress={onDone}>
@@ -94,6 +96,7 @@ export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
           </>
         )}
       </View>
+      </KeyboardAwareForm>
     </SafeAreaView>
   )
 }

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, Image, ScrollView,
-  TextInput, ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform, Dimensions,
+  TextInput, ActivityIndicator, Alert, Modal, Platform, Dimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
@@ -285,7 +286,7 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
           <View style={{ width: 24 }} />
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAwareForm>
           <ScrollView
             contentContainerStyle={s.formContent}
             showsVerticalScrollIndicator={false}
@@ -433,7 +434,7 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
               )}
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardAwareForm>
 
         {activePicker !== null && Platform.OS === 'ios' && (
           <Modal transparent animationType="fade" onRequestClose={() => setActivePicker(null)}>

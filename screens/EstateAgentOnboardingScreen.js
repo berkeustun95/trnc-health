@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Image,
+  ActivityIndicator, Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
@@ -236,7 +237,7 @@ export default function EstateAgentOnboardingScreen({ session, lang, onClose, on
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAwareForm>
         {/* Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={onClose}>
@@ -246,7 +247,7 @@ export default function EstateAgentOnboardingScreen({ session, lang, onClose, on
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Type selector */}
           <Text style={s.sectionLabel}>I am…</Text>
           <View style={s.typeRow}>
@@ -380,7 +381,7 @@ export default function EstateAgentOnboardingScreen({ session, lang, onClose, on
             Your application will be reviewed by our team. You'll receive a notification once approved.
           </Text>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareForm>
     </SafeAreaView>
   )
 }

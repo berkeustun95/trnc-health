@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Image, Switch,
+  ActivityIndicator, Image, Switch,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
@@ -219,7 +220,7 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
 
   return (
     <SafeAreaView style={ps.safe} edges={['top']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAwareForm>
         {/* Header */}
         <View style={ps.header}>
           <TouchableOpacity onPress={onClose}>
@@ -229,7 +230,7 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView contentContainerStyle={ps.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={ps.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
           {/* Basic info */}
           <Field label={t('accomPropTitle', lang)}>
@@ -372,7 +373,7 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
           </TouchableOpacity>
           <Text style={ps.reviewNote}>Listing will be reviewed before going live.</Text>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareForm>
 
       <MapPinPicker
         visible={showMapPicker}

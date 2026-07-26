@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import KeyboardAwareForm from './KeyboardAwareForm'
 
 const REASONS = [
   { key: 'offensive',  label: 'reasonOffensive' },
@@ -118,6 +119,7 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
+        <KeyboardAwareForm>
         <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={close}>
           <TouchableOpacity style={s.sheet} activeOpacity={1}>
 
@@ -232,6 +234,7 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
 
           </TouchableOpacity>
         </TouchableOpacity>
+        </KeyboardAwareForm>
       </Modal>
     </>
   )

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, Linking,
+  ScrollView, FlatList, ActivityIndicator, Platform, Linking,
   Modal, LayoutAnimation, UIManager,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import * as Notifications from 'expo-notifications'
@@ -132,7 +133,7 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAwareForm>
         <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={s.header}>
             <TouchableOpacity onPress={onBack} style={s.backBtn}>
@@ -253,7 +254,7 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
             </View>
           )}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareForm>
     </SafeAreaView>
   )
 }
@@ -555,7 +556,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAwareForm>
         <ScrollView
           contentContainerStyle={s.container}
           showsVerticalScrollIndicator={false}
@@ -866,7 +867,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             </View>
           </Modal>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareForm>
     </SafeAreaView>
   )
 }
