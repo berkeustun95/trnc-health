@@ -57,6 +57,7 @@ const MODULES = [
   { id: 'newcomerEssentials', icon: 'compass-outline',     tint: 'service',   labelKey: 'menuNewcomerEssentials' },
   { id: 'accommodation', icon: 'home-outline',      tint: 'lifestyle', labelKey: 'menuAccommodations' },
   { id: 'pets',          icon: 'paw-outline',       tint: 'lifestyle', labelKey: 'menuPets' },
+  { id: 'games',         icon: 'game-controller-outline', tint: 'lifestyle', labelKey: 'menuGames' },
   { id: 'homeServices',  icon: 'hammer-outline',    tint: 'service',   labelKey: 'menuHomeServices' },
   { id: 'jobPostings',  icon: 'briefcase-outline', tint: 'service',   labelKey: 'menuJobPostings' },
   { id: 'beaches',       icon: 'umbrella-outline',  tint: 'lifestyle', labelKey: 'menuBeachesLandmarks' },
@@ -113,6 +114,7 @@ export default function HomeScreen({
   onSelectPlace,
   onShowNewcomerEssentials,
   onShowExchangeRates,
+  onShowGames,
 }) {
   const [showFacilityList, setShowFacilityList] = useState(false)
   const [searchText, setSearchText]             = useState('')
@@ -176,6 +178,7 @@ export default function HomeScreen({
   const moduleHandlers = {
     exchangeRates:      onShowExchangeRates,
     newcomerEssentials: onShowNewcomerEssentials,
+    games:              onShowGames,
     accommodation:      onShowAccommodation,
     pets:               onShowPets,
     homeServices:       onShowHomeServices,

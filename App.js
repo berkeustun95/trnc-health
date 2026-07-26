@@ -56,6 +56,11 @@ import WelcomeScreen from './screens/WelcomeScreen'
 import HomeScreen from './screens/HomeScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
+import GamesHubScreen from './screens/games/GamesHubScreen'
+import XoxGameScreen from './screens/games/XoxGameScreen'
+import MemoryMatchScreen from './screens/games/MemoryMatchScreen'
+import Game2048Screen from './screens/games/Game2048Screen'
+import SudokuScreen from './screens/games/SudokuScreen'
 import { haversineKm, parseIsOpen, coarseCoord } from './utils/facilityUtils'
 import {
   evaluateCityWelcome, markWelcomeShown, setCityWelcomeEnabled,
@@ -240,6 +245,8 @@ export default function App() {
   const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [selectedPlace,        setSelectedPlace]        = useState(null)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
+  const [showGames, setShowGames] = useState(false)
+  const [gamesSubScreen, setGamesSubScreen] = useState(null)
   const [openedProperty, setOpenedProperty] = useState(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
@@ -491,12 +498,14 @@ export default function App() {
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
+      if (gamesSubScreen) { setGamesSubScreen(null); return true }
+      if (showGames) { setShowGames(false); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showEsim, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showEsim, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -1021,6 +1030,18 @@ export default function App() {
     )
   } else if (showExchangeRates) {
     content = <ExchangeRatesScreen lang={lang} onBack={() => setShowExchangeRates(false)} />
+  } else if (showGames) {
+    if (gamesSubScreen === 'xox') {
+      content = <XoxGameScreen lang={lang} onBack={() => setGamesSubScreen(null)} />
+    } else if (gamesSubScreen === 'memory') {
+      content = <MemoryMatchScreen lang={lang} onBack={() => setGamesSubScreen(null)} />
+    } else if (gamesSubScreen === '2048') {
+      content = <Game2048Screen lang={lang} onBack={() => setGamesSubScreen(null)} />
+    } else if (gamesSubScreen === 'sudoku') {
+      content = <SudokuScreen lang={lang} onBack={() => setGamesSubScreen(null)} />
+    } else {
+      content = <GamesHubScreen lang={lang} onBack={() => setShowGames(false)} onNavigate={setGamesSubScreen} />
+    }
   } else if (showPets) {
     if (petsSubScreen === 'bringing') {
       content = <BringingPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
@@ -1191,6 +1212,7 @@ export default function App() {
             onSelectPlace={setSelectedPlace}
             onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
             onShowExchangeRates={() => setShowExchangeRates(true)}
+            onShowGames={() => setShowGames(true)}
           />
         )}
 
