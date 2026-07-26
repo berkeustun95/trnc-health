@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking, Switch, Modal, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
@@ -603,6 +604,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
 
         {tab === 'profile' ? (
           <>
+          <KeyboardAwareForm>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
             <View style={styles.card}>
               <Text style={styles.fieldLabel}>{t('coverPhoto', lang)}</Text>
@@ -981,9 +983,11 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
             </View>
 
           </ScrollView>
+          </KeyboardAwareForm>
 
           {/* ── Add credential modal ─────────────────────────── */}
           <Modal visible={credModalVisible} animationType="slide" transparent onRequestClose={() => setCredModalVisible(false)}>
+            <KeyboardAwareForm>
             <View style={styles.credModalOverlay}>
               <View style={styles.credModalSheet}>
                 <View style={styles.credModalHeader}>
@@ -1058,6 +1062,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 </ScrollView>
               </View>
             </View>
+          </KeyboardAwareForm>
           </Modal>
           </>
 
@@ -1242,6 +1247,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           loadingQ ? (
             <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
           ) : (
+            <KeyboardAwareForm>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
               {questions.length === 0 ? (
                 <View style={styles.empty}>
@@ -1295,6 +1301,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 </>
               )}
             </ScrollView>
+            </KeyboardAwareForm>
           )
         )}
       </View>

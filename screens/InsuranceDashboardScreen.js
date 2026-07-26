@@ -4,6 +4,7 @@ import {
   ScrollView, ActivityIndicator, Image, AppState, RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
@@ -150,6 +151,7 @@ export default function InsuranceDashboardScreen({ session, lang = 'English' }) 
         </TouchableOpacity>
       </View>
 
+      <KeyboardAwareForm>
       <ScrollView
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
@@ -308,6 +310,7 @@ export default function InsuranceDashboardScreen({ session, lang = 'English' }) 
         </View>
 
       </ScrollView>
+      </KeyboardAwareForm>
     </SafeAreaView>
   )
 }

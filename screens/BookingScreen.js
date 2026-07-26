@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ScrollView, TextInput, KeyboardAvoidingView, Linking } from 'react-native'
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ScrollView, TextInput, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
@@ -274,7 +275,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAwareForm>
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
@@ -532,7 +533,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
           ))
         )}
       </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareForm>
     </SafeAreaView>
   )
 }

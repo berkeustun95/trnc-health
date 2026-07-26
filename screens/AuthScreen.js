@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { View, Text, Image, ImageBackground, TextInput, TouchableOpacity, StyleSheet,
-         ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+         ActivityIndicator, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
@@ -13,7 +14,7 @@ const LANGUAGES = [
   { key: 'Spanish', code: 'ES' }, { key: 'German',  code: 'DE' }, { key: 'Persian', code: 'FA' },
 ]
 
-export default function AuthScreen({ lang: initialLang = 'English', onLangChange, initialMode = 'login' }) {
+export default function AuthScreen({ lang: initialLang = 'English', onLangChange, initialMode = 'login', onBack }) {
   const [lang, setLang] = useState(initialLang)
   const [mode, setMode] = useState(initialMode)
   const [email, setEmail] = useState('')
@@ -103,7 +104,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
       <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
         <View style={styles.overlay} />
       <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.kav}>
+        <KeyboardAwareForm style={styles.kav}>
           <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.logoArea}>
               <Image source={require('../assets/logonobg.png')} style={styles.logoImg} resizeMode="contain" />
@@ -165,7 +166,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
               </View>
             )}
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardAwareForm>
       </SafeAreaView>
       </ImageBackground>
     )
@@ -175,10 +176,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
     <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
       <View style={styles.overlay} />
     <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.kav}
-      >
+      <KeyboardAwareForm style={styles.kav}>
         <ScrollView
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
@@ -294,7 +292,15 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
           </View>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareForm>
+      <TouchableOpacity
+        style={styles.backBtn}
+        onPress={onBack}
+        accessibilityLabel={t('back', lang)}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Feather name="arrow-left" size={24} color={colors.textPrimary} />
+      </TouchableOpacity>
     </SafeAreaView>
     </ImageBackground>
   )
@@ -305,6 +311,7 @@ const styles = StyleSheet.create({
   formCard:          { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 24, padding: 24, paddingTop: 20 },
   overlay:           { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.55)' },
   kav:               { flex: 1 },
+  backBtn:           { position: 'absolute', top: 8, left: 12, zIndex: 10, padding: 8 },
   container:         { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
   logoArea:          { alignItems: 'center', marginBottom: 40 },
   logoImg:           { width: 460, height: 180 },

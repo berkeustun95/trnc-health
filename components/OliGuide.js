@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Text, Image, TouchableOpacity, Modal, TextInput, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, useWindowDimensions, Platform } from 'react-native'
+import { View, Text, Image, TouchableOpacity, Modal, TextInput, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, useWindowDimensions, Platform, Keyboard } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -40,6 +40,31 @@ export default function OliGuide({ lang, onNavigate }) {
   const [results, setResults] = useState(null) // null = home (chips); [] = no match; [intents] = matches
   const translateY = useRef(new Animated.Value(SCREEN_H)).current
   const backdrop = useRef(new Animated.Value(0)).current
+
+  // Composer keyboard avoidance (OTA, RN-core): animate the input bar's bottom
+  // padding to the keyboard height so the input row rises above the keyboard on
+  // BOTH platforms. This is layout-only and never touches the sheet's translateY
+  // entrance animation. Listeners are scoped to `open` and removed on cleanup.
+  const kbPad = useRef(new Animated.Value(insets.bottom + 10)).current
+  useEffect(() => {
+    if (!open) return
+    const base = insets.bottom + 10
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+    const onShow = e => Animated.timing(kbPad, {
+      toValue: (e.endCoordinates?.height ?? 0) + 10,
+      duration: e.duration || 220,
+      useNativeDriver: false,
+    }).start()
+    const onHide = e => Animated.timing(kbPad, {
+      toValue: base,
+      duration: e?.duration || 220,
+      useNativeDriver: false,
+    }).start()
+    const subShow = Keyboard.addListener(showEvt, onShow)
+    const subHide = Keyboard.addListener(hideEvt, onHide)
+    return () => { subShow.remove(); subHide.remove(); kbPad.setValue(base) }
+  }, [open, insets.bottom])
 
   // --- Draggable floating button -------------------------------------------
   const minX = EDGE_MARGIN
@@ -267,7 +292,7 @@ export default function OliGuide({ lang, onNavigate }) {
             )}
           </ScrollView>
 
-          <View style={[s.inputBar, { paddingBottom: insets.bottom + 10 }]}>
+          <Animated.View style={[s.inputBar, { paddingBottom: kbPad }]}>
             <TextInput
               style={s.input}
               value={query}
@@ -280,7 +305,7 @@ export default function OliGuide({ lang, onNavigate }) {
             <TouchableOpacity style={s.sendBtn} activeOpacity={0.85} onPress={handleSubmit}>
               <Ionicons name="arrow-up" size={20} color="#fff" />
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </Animated.View>
       </Modal>
     </>

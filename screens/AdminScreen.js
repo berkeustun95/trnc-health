@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
-  Modal, TextInput, Switch, ScrollView, Alert, KeyboardAvoidingView, Platform, Linking,
+  Modal, TextInput, Switch, ScrollView, Alert, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow } from '../constants/theme'
@@ -785,7 +786,7 @@ function FacilitiesTab() {
       <FacilityActivityModal facility={activityFacility} visible={!!activityFacility} onClose={() => setActivityFacility(null)} />
 
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAwareForm>
           <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
             <View style={s.modalHeader}>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -841,7 +842,7 @@ function FacilitiesTab() {
               {error && <Text style={s.errorText}>{error}</Text>}
             </ScrollView>
           </SafeAreaView>
-        </KeyboardAvoidingView>
+        </KeyboardAwareForm>
       </Modal>
     </View>
   )
@@ -1079,7 +1080,7 @@ function DutyTab() {
       </ScrollView>
 
       <Modal visible={swapModalVisible} animationType="slide" presentationStyle="pageSheet">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAwareForm>
           <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
             <View style={s.modalHeader}>
               <TouchableOpacity onPress={() => setSwapModalVisible(false)}>
@@ -1135,7 +1136,7 @@ function DutyTab() {
               )}
             </ScrollView>
           </SafeAreaView>
-        </KeyboardAvoidingView>
+        </KeyboardAwareForm>
       </Modal>
     </View>
   )

@@ -4,6 +4,7 @@ import {
   TextInput, ScrollView, Image, Dimensions, Modal, Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
@@ -396,6 +397,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
 
       {/* Price range modal */}
       <Modal visible={showPriceModal} transparent animationType="slide">
+        <KeyboardAwareForm>
         <Pressable style={cs.overlay} onPress={() => setShowPriceModal(false)}>
           <Pressable style={cs.sheet}>
             <Text style={cs.sheetTitle}>{t('accomFilterPriceRange', lang)}</Text>
@@ -437,6 +439,7 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
             </TouchableOpacity>
           </Pressable>
         </Pressable>
+        </KeyboardAwareForm>
       </Modal>
     </SafeAreaView>
   )
