@@ -1,4 +1,4 @@
-import { Component, useEffect, useState, useRef } from 'react'
+import { Component, Fragment, useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Pressable, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
 import { BlurView } from 'expo-blur'
@@ -54,6 +54,7 @@ import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import HomeScreen from './screens/HomeScreen'
+import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import GamesHubScreen from './screens/games/GamesHubScreen'
@@ -147,6 +148,23 @@ const tabBar = StyleSheet.create({
   labelActive:{ fontFamily: 'Inter_700Bold', color: colors.primary },
 })
 
+// Gate the Welcome Video drawer row until a real video (and its playback tech)
+// exists. Kept false so the row does not render — flip to true once wired.
+const WELCOME_VIDEO_LIVE = false
+
+// One repeatable drawer row. Defined at module level so it never remounts with
+// the parent. Each item: { key, iconSet, icon, labelKey, onPress, danger? }.
+function DrawerRow({ item, lang }) {
+  const Icon = item.iconSet === 'feather' ? Feather : Ionicons
+  const color = item.danger ? colors.danger : colors.textPrimary
+  return (
+    <TouchableOpacity style={styles.menuItem} onPress={item.onPress}>
+      <Icon name={item.icon} size={20} color={color} />
+      <Text style={[styles.menuItemText, item.danger && { color: colors.danger }]}>{t(item.labelKey, lang)}</Text>
+    </TouchableOpacity>
+  )
+}
+
 // Centered sheet rendered as a root-level absolute overlay, NOT a <Modal>.
 // A native Modal opens its own window above the whole React root, so the Ask Oli
 // floating button can never be drawn or tapped over one — no zIndex reaches it.
@@ -239,6 +257,7 @@ export default function App() {
   const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
   const [showTransport, setShowTransport] = useState(false)
   const [showInsurance, setShowInsurance] = useState(false)
+  const [showLegal, setShowLegal] = useState(false)
   const [showGrooming, setShowGrooming] = useState(false)
   const [showEsim, setShowEsim] = useState(false)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
@@ -257,19 +276,7 @@ export default function App() {
   const filterBarRef       = useRef(null)
   const dutyBannerRef      = useRef(null)
   const mapTabRef          = useRef(null)
-  const menuLangRef           = useRef(null)
-  const menuEmergencyRef      = useRef(null)
-  const menuMunicipalitiesRef = useRef(null)
-  const menuEventsRef         = useRef(null)
-  const menuAccommodationRef  = useRef(null)
-  const menuPetsRef           = useRef(null)
-  const menuHomeServicesRef   = useRef(null)
-  const menuJobPostingsRef    = useRef(null)
-  const menuBeachesRef        = useRef(null)
-  const menuTransportRef      = useRef(null)
-  const menuTutorialItemRef   = useRef(null)
   const menuAnim = useRef(new Animated.Value(260)).current
-  const menuStepCountRef = useRef(0)
   const sessionRef = useRef(null)
   const toSignUpRef = useRef(false)
   const handledColdStartRef = useRef(false)
@@ -295,8 +302,9 @@ export default function App() {
     setActiveTab('home')
     setShowNotifs(false)
     await new Promise(r => setTimeout(r, 400))
-    menuStepCountRef.current = 0
 
+    // On-screen basics only. The drawer is now settings, not navigation, so the
+    // menu step just highlights the button — it never opens the drawer.
     const [menuBtn, search, duty, map] = await Promise.all([
       measureRef(hamburgerRef),
       measureRef(searchRef),
@@ -312,68 +320,24 @@ export default function App() {
     if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
   }
 
-  async function handleCoachNext(fromStep) {
-    if (fromStep === 0) {
-      // Hamburger step done — open menu and inject in-menu steps before advancing
-      openMenu()
-      await new Promise(r => setTimeout(r, 350))
-      const [langItem, emergencyItem, municipalitiesItem, eventsItem, accommodationItem, petsItem, homeServicesItem, jobPostingsItem, beachesItem, transportItem, tutorialItem] = await Promise.all([
-        measureRef(menuLangRef),
-        measureRef(menuEmergencyRef),
-        measureRef(menuMunicipalitiesRef),
-        measureRef(menuEventsRef),
-        measureRef(menuAccommodationRef),
-        measureRef(menuPetsRef),
-        measureRef(menuHomeServicesRef),
-        measureRef(menuJobPostingsRef),
-        measureRef(menuBeachesRef),
-        measureRef(menuTransportRef),
-        measureRef(menuTutorialItemRef),
-      ])
-      const menuItems = []
-      if (langItem)           menuItems.push({ ...langItem,           title: t('coachLangTitle', lang),              body: t('coachLangBody', lang) })
-      if (emergencyItem)      menuItems.push({ ...emergencyItem,      title: t('coachEmergencyTitle', lang),         body: t('coachEmergencyBody', lang) })
-      if (municipalitiesItem) menuItems.push({ ...municipalitiesItem, title: t('coachMunicipalitiesTitle', lang),    body: t('coachMunicipalitiesBody', lang) })
-      if (eventsItem)         menuItems.push({ ...eventsItem,         title: t('coachEventsTitle', lang),            body: t('coachEventsBody', lang) })
-      if (accommodationItem)  menuItems.push({ ...accommodationItem,  title: t('coachAccommodationTitle', lang),     body: t('coachAccommodationBody', lang) })
-      if (petsItem)           menuItems.push({ ...petsItem,           title: t('coachPetsTitle', lang),              body: t('coachPetsBody', lang) })
-      if (homeServicesItem)   menuItems.push({ ...homeServicesItem,   title: t('coachHomeServicesTitle', lang),      body: t('coachHomeServicesBody', lang) })
-      if (jobPostingsItem)    menuItems.push({ ...jobPostingsItem,    title: t('coachJobPostingsTitle', lang),       body: t('coachJobPostingsBody', lang) })
-      if (beachesItem)        menuItems.push({ ...beachesItem,        title: t('coachBeachesTitle', lang),           body: t('coachBeachesBody', lang) })
-      if (transportItem)      menuItems.push({ ...transportItem,      title: t('coachTransportTitle', lang),         body: t('coachTransportBody', lang) })
-      if (tutorialItem)       menuItems.push({ ...tutorialItem,       title: t('coachTutorialItemTitle', lang),      body: t('coachTutorialItemBody', lang) })
-      menuStepCountRef.current = menuItems.length
-      if (menuItems.length > 0) {
-        setCoachSteps(prev => [prev[0], ...menuItems, ...prev.slice(1)])
-      }
-    } else if (menuStepCountRef.current > 0 && fromStep === menuStepCountRef.current) {
-      // Last in-menu step done — close menu before showing screen steps
-      closeMenu()
-      await new Promise(r => setTimeout(r, 250))
-    }
-  }
-
   function handleCoachFinish() {
     setShowCoachMarks(false)
     closeMenu()
   }
 
   function shareApp() {
-    Share.share({
-      message: 'Find pharmacies, clinics, hospitals and dentists in North Cyprus with ADA.',
-      url: 'https://play.google.com/store/apps/details?id=com.berkeustun95.ada',
-    })
+    const link = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/app/id6783996527'
+      : 'https://play.google.com/store/apps/details?id=com.berkeustun95.ada'
+    Share.share({ message: `${t('shareAppMessage', lang)}\n${link}` })
   }
   function rateApp() {
     const url = Platform.OS === 'ios'
-      ? 'https://apps.apple.com/app/id'
+      ? 'https://apps.apple.com/app/id6783996527?action=write-review'
       : 'market://details?id=com.berkeustun95.ada'
     Linking.openURL(url).catch(() =>
       Linking.openURL('https://play.google.com/store/apps/details?id=com.berkeustun95.ada')
     )
-  }
-  function showEmergencyNumbers() {
-    setShowEmergencyModal(true)
   }
   // Returns true if the action was gated (caller should stop). Guests only.
   function requireAccount(messageKey) {
@@ -494,6 +458,7 @@ export default function App() {
       if (showInsurance) { setShowInsurance(false); return true }
       if (showGrooming) { setShowGrooming(false); return true }
       if (showEsim) { setShowEsim(false); return true }
+      if (showLegal) { setShowLegal(false); return true }
       if (selectedPlace)        { setSelectedPlace(null); return true }
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
@@ -505,7 +470,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showEsim, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showEsim, showLegal, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -1012,6 +977,8 @@ export default function App() {
     content = <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowInsurance(false)} />
   } else if (showEsim) {
     content = <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowEsim(false)} />
+  } else if (showLegal) {
+    content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
   } else if (selectedPlace) {
     content = <PlaceProfileScreen place={selectedPlace} lang={lang} onBack={() => setSelectedPlace(null)} />
   } else if (showBeachesLandmarks) {
@@ -1171,6 +1138,20 @@ export default function App() {
     content = <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGrooming(false)} onOpenFacility={setSelectedFacility} />
   } else {
     const favList = facilities.filter(f => favorites.has(f.id))
+    // Utility-only drawer. Home's module grid is the app's navigation now, so the
+    // drawer holds settings & app options. `dividerBefore` opens a visual group.
+    const drawerItems = [
+      { key: 'language',     iconSet: 'ionicons', icon: 'globe-outline',             labelKey: 'menuLanguage',     dividerBefore: true, onPress: () => { closeMenu(); setShowLangModal(true) } },
+      { key: 'cityWelcome',  iconSet: 'ionicons', icon: 'location-outline',          labelKey: 'cwMenuCityWelcome', onPress: () => { closeMenu(); setShowCitySettings(true) } },
+      { key: 'legal',        iconSet: 'ionicons', icon: 'document-text-outline',     labelKey: 'menuLegal',        onPress: () => { closeMenu(); setShowLegal(true) } },
+      { key: 'contact',      iconSet: 'ionicons', icon: 'mail-outline',              labelKey: 'menuContact',      onPress: () => { closeMenu(); Linking.openURL(`mailto:getadaapp@gmail.com?subject=${encodeURIComponent('ADA Feedback')}`) } },
+      { key: 'welcomeVideo', iconSet: 'ionicons', icon: 'play-circle-outline',       labelKey: 'menuWelcomeVideo', visible: WELCOME_VIDEO_LIVE, onPress: () => {} },
+      { key: 'rate',         iconSet: 'ionicons', icon: 'star-outline',              labelKey: 'menuRateApp',      dividerBefore: true, onPress: rateApp },
+      { key: 'share',        iconSet: 'feather',  icon: 'share-2',                   labelKey: 'menuShareApp',     onPress: shareApp },
+      { key: 'about',        iconSet: 'ionicons', icon: 'information-circle-outline', labelKey: 'menuAbout',        onPress: showAbout },
+      { key: 'tutorial',     iconSet: 'ionicons', icon: 'compass-outline',           labelKey: 'menuTutorial',     dividerBefore: true, onPress: () => { closeMenu(); startCoachMarks() } },
+      { key: 'signOut',      iconSet: 'feather',  icon: 'log-out',                   labelKey: 'signOut',          danger: true, onPress: () => supabase.auth.signOut() },
+    ].filter(i => i.visible !== false)
     content = (
       <View style={{ flex: 1 }}>
 
@@ -1361,87 +1342,14 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity ref={menuLangRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowLangModal(true) }}>
-              <Ionicons name="globe-outline" size={20} color={colors.textPrimary} />
-              <Text style={styles.menuItemText}>{t('menuLanguage', lang)}</Text>
-            </TouchableOpacity>
-
-            {/* Sits next to Language because the drawer is the only settings
-                surface a guest can reach — the profile tab is behind
-                requireAccount, and a guest tourist is this feature's main user. */}
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowCitySettings(true) }}>
-              <Ionicons name="location-outline" size={20} color={colors.textPrimary} />
-              <Text style={styles.menuItemText}>{t('cwMenuCityWelcome', lang)}</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-            <TouchableOpacity ref={menuEmergencyRef} style={styles.menuItem} onPress={() => { closeMenu(); showEmergencyNumbers() }}>
-              <Ionicons name="call-outline" size={20} color={colors.danger} />
-              <Text style={styles.menuItemText}>{t('menuEmergency', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity ref={menuMunicipalitiesRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowMunicipalModal(true) }}>
-              <Ionicons name="business-outline" size={20} color={colors.textPrimary} />
-              <Text style={styles.menuItemText}>{t('menuMunicipalities', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity ref={menuEventsRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowEvents(true) }}>
-              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-              <Text style={styles.menuItemText}>{t('menuEvents', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity ref={menuAccommodationRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowAccommodation(true) }}>
-              <Ionicons name="home-outline" size={20} color={colors.textPrimary} />
-              <Text style={styles.menuItemText}>{t('menuAccommodations', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity ref={menuPetsRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowPets(true) }}>
-              <Ionicons name="paw-outline" size={20} color={colors.primary} />
-              <Text style={styles.menuItemText}>{t('menuPets', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity ref={menuHomeServicesRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowHomeServices(true) }}>
-              <Ionicons name="hammer-outline" size={20} color={colors.primary} />
-              <Text style={styles.menuItemText}>{t('menuHomeServices', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity ref={menuJobPostingsRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowJobPostings(true) }}>
-              <Ionicons name="briefcase-outline" size={20} color={colors.primary} />
-              <Text style={styles.menuItemText}>{t('menuJobPostings', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity ref={menuBeachesRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowBeachesLandmarks(true) }}>
-              <Ionicons name="umbrella-outline" size={20} color={colors.primary} />
-              <Text style={styles.menuItemText}>{t('menuBeachesLandmarks', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity ref={menuTransportRef} style={styles.menuItem} onPress={() => { closeMenu(); setShowTransport(true) }}>
-              <Ionicons name="car-outline" size={20} color={colors.primary} />
-              <Text style={styles.menuItemText}>{t('menuTransportation', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); setShowInsurance(true) }}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
-              <Text style={styles.menuItemText}>{t('menuInsurance', lang)}</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuItem} onPress={rateApp}>
-              <Ionicons name="star-outline" size={20} color={colors.textPrimary} />
-              <Text style={styles.menuItemText}>{t('menuRateApp', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={shareApp}>
-              <Feather name="share-2" size={20} color={colors.textPrimary} />
-              <Text style={styles.menuItemText}>{t('menuShareApp', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={showAbout}>
-              <Ionicons name="information-circle-outline" size={20} color={colors.textPrimary} />
-              <Text style={styles.menuItemText}>{t('menuAbout', lang)}</Text>
-            </TouchableOpacity>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+            {drawerItems.map(item => (
+              <Fragment key={item.key}>
+                {item.dividerBefore && <View style={styles.menuDivider} />}
+                <DrawerRow item={item} lang={lang} />
+              </Fragment>
+            ))}
           </ScrollView>
-
-          <View style={styles.menuDivider} />
-          <TouchableOpacity ref={menuTutorialItemRef} style={styles.menuItem} onPress={() => { closeMenu(); startCoachMarks() }}>
-            <Ionicons name="compass-outline" size={20} color={colors.textPrimary} />
-            <Text style={styles.menuItemText}>{t('menuTutorial', lang)}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.menuItem, { paddingBottom: 24 }]} onPress={() => supabase.auth.signOut()}>
-            <Feather name="log-out" size={20} color={colors.danger} />
-            <Text style={[styles.menuItemText, { color: colors.danger }]}>{t('signOut', lang)}</Text>
-          </TouchableOpacity>
           </SafeAreaView>
         </Animated.View>
         )}
@@ -1471,7 +1379,6 @@ export default function App() {
         <TutorialCoachMarks
           steps={coachSteps}
           visible={showCoachMarks}
-          onNext={handleCoachNext}
           onFinish={handleCoachFinish}
           lang={lang}
         />
