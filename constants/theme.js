@@ -39,6 +39,38 @@ export const placeColors = {
   landmark: { bg: '#FEF9C3', text: '#A16207' },
 }
 
+export const gameColors = {
+  // 2048 tile ramp — a cohesive designed gradient, kept whole as literals.
+  tile2048: {
+    2:    { bg: '#E6F4F4', text: colors.textPrimary },
+    4:    { bg: '#CDEAEA', text: colors.textPrimary },
+    8:    { bg: '#FFF0EB', text: '#C2410C' },
+    16:   { bg: '#FFD9C7', text: '#C2410C' },
+    32:   { bg: '#FF8552', text: '#FFFFFF' },
+    64:   { bg: '#F97316', text: '#FFFFFF' },
+    128:  { bg: '#FBBF24', text: '#FFFFFF' },
+    256:  { bg: '#F59E0B', text: '#FFFFFF' },
+    512:  { bg: '#2E9E5B', text: '#FFFFFF' },
+    1024: { bg: '#0E7C7B', text: '#FFFFFF' },
+    2048: { bg: '#7C3AED', text: '#FFFFFF' },
+    high: { bg: '#1A2B33', text: '#FFFFFF' },   // >= 4096
+  },
+
+  // Sudoku selection/peer highlights — no token equivalents.
+  sudoku: {
+    selected:  '#BFE3E3',
+    sameValue: '#DCF0F0',
+    peer:      '#F1F7F7',
+  },
+
+  // Memory face tints — all 9 are exact matches to existing tokens.
+  memoryTints: [
+    colors.primary, colors.accent, colors.success, colors.danger,
+    typeColors.pharmacy.text, typeColors.vet.text, typeColors.grooming.text,
+    placeColors.beach.text, placeColors.landmark.text,
+  ],
+}
+
 export const shadow = {
   shadowColor:   '#1A2B33',
   shadowOpacity: 0.07,

@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import ScreenHeader from '../../components/ScreenHeader'
 import ContentCard from '../../components/ContentCard'
-import { colors, spacing, radius, fontSize, shadow } from '../../constants/theme'
+import { colors, spacing, radius, fontSize, shadow, gameColors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 
 const BEST_KEY = 'ada_games_memory_v1'
@@ -14,7 +14,7 @@ const EMPTY_BEST = { easy: null, hard: null }
 
 // Nine distinct hues drawn from the theme palette; cycled across the faces so
 // the first 8 (Easy) are all different colours and no pair reads alike.
-const PALETTE = ['#0E7C7B', '#FF8552', '#2E9E5B', '#D1495B', '#7C3AED', '#D97706', '#BE185D', '#0369A1', '#A16207']
+const PALETTE = gameColors.memoryTints
 
 // 18 recognisable, non-confusable filled Ionicons. Easy uses the first 8.
 const ICONS = [

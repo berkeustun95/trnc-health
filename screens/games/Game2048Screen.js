@@ -5,28 +5,14 @@ import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import ScreenHeader from '../../components/ScreenHeader'
 import ContentCard from '../../components/ContentCard'
-import { colors, spacing, radius, fontSize, shadow } from '../../constants/theme'
+import { colors, spacing, radius, fontSize, shadow, gameColors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 
 const STORE_KEY = 'ada_games_2048_v1'
 const SIZE = 4
 const SWIPE_MIN = 24
 
-const TILE = {
-  2:    { bg: '#E6F4F4', text: colors.textPrimary },
-  4:    { bg: '#CDEAEA', text: colors.textPrimary },
-  8:    { bg: '#FFF0EB', text: '#C2410C' },
-  16:   { bg: '#FFD9C7', text: '#C2410C' },
-  32:   { bg: '#FF8552', text: '#FFFFFF' },
-  64:   { bg: '#F97316', text: '#FFFFFF' },
-  128:  { bg: '#FBBF24', text: '#FFFFFF' },
-  256:  { bg: '#F59E0B', text: '#FFFFFF' },
-  512:  { bg: '#2E9E5B', text: '#FFFFFF' },
-  1024: { bg: '#0E7C7B', text: '#FFFFFF' },
-  2048: { bg: '#7C3AED', text: '#FFFFFF' },
-}
-const TILE_HIGH = { bg: '#1A2B33', text: '#FFFFFF' }   // >= 4096
-const tileStyle = v => TILE[v] || TILE_HIGH
+const tileStyle = v => gameColors.tile2048[v] || gameColors.tile2048.high
 
 const emptyBoard = () => Array.from({ length: SIZE }, () => Array(SIZE).fill(0))
 

@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import ScreenHeader from '../../components/ScreenHeader'
 import ContentCard from '../../components/ContentCard'
-import { colors, spacing, radius, fontSize, shadow } from '../../constants/theme'
+import { colors, spacing, radius, fontSize, shadow, gameColors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { generate } from './sudokuEngine'
 
@@ -150,11 +150,11 @@ export default function SudokuScreen({ lang, onBack }) {
 
   function cellBg(i) {
     if (selected == null) return colors.cardBg
-    if (i === selected) return '#BFE3E3'
+    if (i === selected) return gameColors.sudoku.selected
     const c = cells[i]
-    if (selVal > 0 && c.value === selVal) return '#DCF0F0'
+    if (selVal > 0 && c.value === selVal) return gameColors.sudoku.sameValue
     const r = Math.floor(i / 9), col = i % 9
-    if (r === selR || col === selC || boxOf(i) === selBox) return '#F1F7F7'
+    if (r === selR || col === selC || boxOf(i) === selBox) return gameColors.sudoku.peer
     return colors.cardBg
   }
 
