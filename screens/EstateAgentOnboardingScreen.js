@@ -131,11 +131,25 @@ export default function EstateAgentOnboardingScreen({ session, lang, onClose, on
     setUploading(true)
     try {
       const ext  = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
-      const path = `${session.user.id}/${field}.${ext}`
-      const url  = await uploadImage('property-images', path, asset.base64, ext)
-      if (field === 'agent-photo')  setPhotoUrl(url)
-      if (field === 'agent-id-doc') setIdDocUrl(url)
-      if (field === 'agency-logo')  setLogoUrl(url)
+      if (field === 'agent-id-doc') {
+        // ID/passport → PRIVATE bucket. Store the object PATH, not a URL; admin
+        // mints a signed URL at review time. Bypasses uploadImage's public-URL return.
+        // No upsert: the bucket has INSERT + admin-SELECT policies but no UPDATE
+        // policy, and upsert makes storage evaluate UPDATE → RLS reject. A unique
+        // timestamped path keeps every (re-)upload a fresh INSERT.
+        const path = `${session.user.id}/id_${Date.now()}.${ext}`
+        const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('estate-agent-documents')
+          .upload(path, decode(asset.base64), { contentType })
+        if (upErr) throw upErr
+        setIdDocUrl(path)
+      } else {
+        const path = `${session.user.id}/${field}.${ext}`
+        const url  = await uploadImage('property-images', path, asset.base64, ext)
+        if (field === 'agent-photo')  setPhotoUrl(url)
+        if (field === 'agency-logo')  setLogoUrl(url)
+      }
     } catch {
       setError('Image upload failed. Try again.')
     } finally {

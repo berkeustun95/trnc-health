@@ -9,6 +9,20 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { storageObjectPath } from '../utils/facilityUtils'
+
+// Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
+// expire. Requires an admin storage.objects SELECT policy on the bucket.
+async function openSignedDoc(bucket, storedValue) {
+  const path = storageObjectPath(storedValue, bucket)
+  if (!path) { Alert.alert('Document unavailable', 'No document on file.'); return }
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 60)
+  if (error || !data?.signedUrl) {
+    Alert.alert('Could not open document', 'The document link could not be generated. Please try again.')
+    return
+  }
+  Linking.openURL(data.signedUrl)
+}
 
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
@@ -1271,7 +1285,7 @@ function ClaimsTab({ session }) {
               <View style={s.docsSection}>
                 <Text style={s.docsSectionLabel}>ID DOCUMENTS ({c._docs.length})</Text>
                 {c._docs.map(doc => (
-                  <TouchableOpacity key={doc.id} style={s.docRow} onPress={() => Linking.openURL(doc.document_url)}>
+                  <TouchableOpacity key={doc.id} style={s.docRow} onPress={() => openSignedDoc('provider-documents', doc.document_url)}>
                     <Feather name="file-text" size={13} color={colors.primary} />
                     <Text style={s.docRowText}>{DOC_LABELS[doc.doc_type] ?? doc.doc_type}</Text>
                     <Feather name="external-link" size={12} color={colors.primary} />
@@ -1437,7 +1451,7 @@ function ProvidersTab() {
               <View style={s.docsSection}>
                 <Text style={s.docsSectionLabel}>ID DOCUMENTS ({f._docs.length})</Text>
                 {f._docs.map(doc => (
-                  <TouchableOpacity key={doc.id} style={s.docRow} onPress={() => Linking.openURL(doc.document_url)}>
+                  <TouchableOpacity key={doc.id} style={s.docRow} onPress={() => openSignedDoc('provider-documents', doc.document_url)}>
                     <Feather name="file-text" size={13} color={colors.primary} />
                     <Text style={s.docRowText}>{{ medical_license: 'Medical License', registration_cert: 'Registration Cert', business_license: 'Business License', national_id: 'National ID' }[doc.doc_type] ?? doc.doc_type}</Text>
                     <Feather name="external-link" size={12} color={colors.primary} />
@@ -1871,7 +1885,7 @@ function CredentialsTab() {
               <Text style={[s.cardSub, { fontSize: 10, marginTop: 2 }]}>{new Date(cred.created_at).toLocaleDateString()}</Text>
 
               {cred.document_url ? (
-                <TouchableOpacity style={[s.docRow, { marginTop: 8 }]} onPress={() => Linking.openURL(cred.document_url)}>
+                <TouchableOpacity style={[s.docRow, { marginTop: 8 }]} onPress={() => openSignedDoc('provider-credentials', cred.document_url)}>
                   <Feather name="file-text" size={13} color={colors.primary} />
                   <Text style={s.docRowText}>View document</Text>
                   <Feather name="external-link" size={12} color={colors.primary} />
@@ -2491,7 +2505,7 @@ function AgentsTab() {
                     <Text style={s.cardTitle}>{item.full_name}</Text>
                     <Text style={s.cardSub}>{item.phone}{item.email ? ` · ${item.email}` : ''}</Text>
                     {item.id_document_url && (
-                      <TouchableOpacity onPress={() => Linking.openURL(item.id_document_url)}>
+                      <TouchableOpacity onPress={() => openSignedDoc('estate-agent-documents', item.id_document_url)}>
                         <Text style={[s.cardSub, { color: colors.primary }]}>View ID document</Text>
                       </TouchableOpacity>
                     )}

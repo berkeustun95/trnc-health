@@ -107,12 +107,13 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
           .from('provider-documents')
           .upload(path, decode(doc.base64), { contentType, upsert: true })
         if (!upErr) {
-          const { data: { publicUrl } } = supabase.storage.from('provider-documents').getPublicUrl(path)
+          // document_url now holds the private object PATH (bucket is private);
+          // admin mints a signed URL from it at review time.
           await supabase.from('provider_documents').insert({
             facility_id:  facilityId,
             provider_id:  session.user.id,
             doc_type:     doc.doc_type,
-            document_url: publicUrl,
+            document_url: path,
           })
         }
       } catch {}

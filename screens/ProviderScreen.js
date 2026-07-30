@@ -491,8 +491,8 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           .from('provider-credentials')
           .upload(path, decode(credImageBase64), { contentType })
         if (!upErr) {
-          const { data: { publicUrl } } = supabase.storage.from('provider-credentials').getPublicUrl(path)
-          document_url = publicUrl
+          // Store the private object PATH; a signed URL is minted at view time.
+          document_url = path
         }
       } catch {}
       setUploadingCredDoc(false)

@@ -75,3 +75,16 @@ export function isAvailableToday(availability) {
   const day = availability.schedule[AVAIL_DAY_KEYS[new Date().getDay()]]
   return !!(day && !day.closed)
 }
+
+// Given a stored provider/agent document reference — either a legacy full public
+// URL (…/object/public/<bucket>/<path>) or a new bare object path — return the
+// object PATH to sign. These buckets are private, so callers mint a short-lived
+// signed URL from this at view time; the stored value is not a working URL itself.
+export function storageObjectPath(storedValue, bucket) {
+  if (!storedValue) return null
+  let v = storedValue.split('?')[0]            // strip ?t=… / any query suffix
+  const marker = `/object/public/${bucket}/`
+  const i = v.indexOf(marker)
+  if (i !== -1) v = v.slice(i + marker.length) // legacy URL → path; else already a path
+  return v
+}
