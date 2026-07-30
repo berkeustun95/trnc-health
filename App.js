@@ -403,6 +403,19 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Supabase RN token auto-refresh: complement to autoRefreshToken:true in
+  // lib/supabase.js. Keep the refresh ticker running only while foregrounded
+  // (RN throttles JS timers in the background). Start once on mount because the
+  // app launches 'active' and the 'change' event won't fire for that initial state.
+  useEffect(() => {
+    supabase.auth.startAutoRefresh()
+    const sub = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') supabase.auth.startAutoRefresh()
+      else supabase.auth.stopAutoRefresh()
+    })
+    return () => sub.remove()
+  }, [])
+
   useEffect(() => {
     async function handleDeepLink(url) {
       if (!url?.startsWith('ada://')) return
