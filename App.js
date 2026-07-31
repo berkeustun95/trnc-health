@@ -40,6 +40,7 @@ import BeachesLandmarksScreen from './screens/BeachesLandmarksScreen'
 import TransportScreen from './screens/TransportScreen'
 import InsuranceScreen from './screens/InsuranceScreen'
 import GroomingScreen from './screens/GroomingScreen'
+import GaragesScreen from './screens/GaragesScreen'
 import EsimScreen from './screens/EsimScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import PlaceProfileScreen from './screens/PlaceProfileScreen'
@@ -152,6 +153,11 @@ const tabBar = StyleSheet.create({
 // exists. Kept false so the row does not render — flip to true once wired.
 const WELCOME_VIDEO_LIVE = false
 
+// Garages / Auto Services dark-launch. false hides the Home tile from normal
+// users; admins still see it (garagesTileVisible) so the module can be previewed
+// before public launch. Flip to true to release Slice 1.
+const GARAGES_LIVE = false
+
 // One repeatable drawer row. Defined at module level so it never remounts with
 // the parent. Each item: { key, iconSet, icon, labelKey, onPress, danger? }.
 function DrawerRow({ item, lang }) {
@@ -259,6 +265,7 @@ export default function App() {
   const [showInsurance, setShowInsurance] = useState(false)
   const [showLegal, setShowLegal] = useState(false)
   const [showGrooming, setShowGrooming] = useState(false)
+  const [showGarages, setShowGarages] = useState(false)
   const [showEsim, setShowEsim] = useState(false)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
@@ -470,6 +477,7 @@ export default function App() {
       if (showTransport) { setShowTransport(false); return true }
       if (showInsurance) { setShowInsurance(false); return true }
       if (showGrooming) { setShowGrooming(false); return true }
+      if (showGarages) { setShowGarages(false); return true }
       if (showEsim) { setShowEsim(false); return true }
       if (showLegal) { setShowLegal(false); return true }
       if (selectedPlace)        { setSelectedPlace(null); return true }
@@ -483,7 +491,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showEsim, showLegal, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showEsim, showLegal, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -847,7 +855,7 @@ export default function App() {
       </SafeAreaView>
     )
   } else if (profile.role === 'admin') {
-    content = <AdminScreen session={session} />
+    content = <AdminScreen session={session} lang={lang} />
   } else if (profile.role === 'provider') {
     if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
       content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
@@ -1149,6 +1157,8 @@ export default function App() {
     />
   } else if (showGrooming) {
     content = <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGrooming(false)} onOpenFacility={setSelectedFacility} />
+  } else if (showGarages) {
+    content = <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} />
   } else {
     const favList = facilities.filter(f => favorites.has(f.id))
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
@@ -1200,6 +1210,8 @@ export default function App() {
             onShowTransport={() => setShowTransport(true)}
             onShowInsurance={() => setShowInsurance(true)}
             onShowGrooming={() => setShowGrooming(true)}
+            onShowGarages={() => setShowGarages(true)}
+            garagesTileVisible={GARAGES_LIVE}
             onShowEsim={() => setShowEsim(true)}
             onShowEmergency={() => setShowEmergencyModal(true)}
             onShowMunicipal={() => setShowMunicipalModal(true)}

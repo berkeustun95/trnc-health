@@ -64,6 +64,7 @@ const MODULES = [
   { id: 'transport',     icon: 'car-outline',       tint: 'service',   labelKey: 'menuTransportation' },
   { id: 'insurance',     icon: 'shield-checkmark-outline', tint: 'service', labelKey: 'menuInsurance' },
   { id: 'grooming',      icon: 'cut-outline',       tint: 'lifestyle', labelKey: 'menuGrooming' },
+  { id: 'garages',       icon: 'car-sport-outline', tint: 'service',   labelKey: 'menuGarages' },
   { id: 'esim',          icon: 'cellular-outline',  tint: 'service',   labelKey: 'menuEsim' },
   { id: 'municipal',     icon: 'business-outline',  tint: 'service',   labelKey: 'menuMunicipalities' },
 ]
@@ -108,6 +109,8 @@ export default function HomeScreen({
   onShowTransport,
   onShowInsurance,
   onShowGrooming,
+  onShowGarages,
+  garagesTileVisible,
   onShowEsim,
   onShowEmergency,
   onShowMunicipal,
@@ -187,6 +190,7 @@ export default function HomeScreen({
     transport:          onShowTransport,
     insurance:          onShowInsurance,
     grooming:           onShowGrooming,
+    garages:            onShowGarages,
     esim:               onShowEsim,
     municipal:          onShowMunicipal,
   }
@@ -381,7 +385,7 @@ export default function HomeScreen({
           </View>
 
           <View style={s.moduleGrid}>
-            {MODULES.map(mod => (
+            {MODULES.filter(mod => mod.id !== 'garages' || garagesTileVisible).map(mod => (
               <TouchableOpacity
                 key={mod.id}
                 style={s.moduleCard}

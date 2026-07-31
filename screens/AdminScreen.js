@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { storageObjectPath } from '../utils/facilityUtils'
+import GaragesScreen from './GaragesScreen'
 
 // Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
 // expire. Requires an admin storage.objects SELECT policy on the bucket.
@@ -27,7 +28,7 @@ async function openSignedDoc(bucket, storedValue) {
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'BusRoutes', 'Places', 'JobPostings']
+const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'Garages', 'BusRoutes', 'Places', 'JobPostings']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -2953,6 +2954,133 @@ function GroomingTab() {
   )
 }
 
+// ─── Garages Tab ──────────────────────────────────────────────────────────────
+
+function GaragesTab({ lang, session }) {
+  const [garages, setGarages]           = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [filter, setFilter]             = useState('pending')
+  const [preview, setPreview]           = useState(false)
+
+  const CAT_LABELS = { muayene: 'Inspection', repair: 'Repair', tyres: 'Tyres', wash: 'Car Wash', parts: 'Parts', towing: 'Towing' }
+  const typesLabel = arr => (Array.isArray(arr) ? arr.map(st => CAT_LABELS[st] || st).join(', ') : '')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    let query = supabase
+      .from('facilities')
+      .select('id, name, service_types, address, phone, status, provider_id')
+      .eq('type', 'garage')
+      .order('created_at', { ascending: false })
+    if (filter !== 'all') query = query.eq('status', filter)
+    const { data } = await query
+    setGarages(data ?? [])
+    setLoading(false)
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(item) {
+    await supabase.from('facilities').update({ status: 'active', is_public: true }).eq('id', item.id)
+    load()
+  }
+
+  function reject(item) {
+    Alert.alert('Decline listing?', `"${item.name}" will be hidden from the directory.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Decline', style: 'destructive', onPress: async () => {
+        await supabase.from('facilities').update({ status: 'suspended', is_public: false }).eq('id', item.id)
+        load()
+      } },
+    ])
+  }
+
+  function deleteGarage(id) {
+    Alert.alert('Delete listing?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('facilities').delete().eq('id', id); load() } },
+    ])
+  }
+
+  function statusColor(status) {
+    if (status === 'active')    return colors.success
+    if (status === 'suspended') return colors.danger
+    if (status === 'pending')   return '#C2410C'
+    return colors.textSecondary
+  }
+
+  // Admin-only preview of the real consumer directory (the Home tile stays
+  // GARAGES_LIVE-gated for everyone else). Admins never render HomeScreen, so
+  // this is their way to see the module before public launch.
+  if (preview) {
+    return <GaragesScreen lang={lang} session={session} onBack={() => setPreview(false)} />
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <TouchableOpacity
+        onPress={() => setPreview(true)}
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                 backgroundColor: colors.primaryLight, borderRadius: 10, paddingVertical: 10, marginBottom: 12 }}
+      >
+        <Ionicons name="eye-outline" size={16} color={colors.primary} />
+        <Text style={{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary }}>Preview directory ↗</Text>
+      </TouchableOpacity>
+
+      <View style={[s.chipRow, { marginBottom: 12 }]}>
+        {['pending', 'active', 'suspended', 'all'].map(f => (
+          <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
+            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading
+        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        : (
+          <FlatList
+            data={garages}
+            keyExtractor={p => p.id}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text={`No ${filter} garages.`} />}
+            renderItem={({ item }) => (
+              <View style={s.card}>
+                <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.cardTitle} numberOfLines={1}>{item.name}</Text>
+                    <Text style={s.cardSub}>{typesLabel(item.service_types)}{item.address ? ` · ${item.address}` : ''}</Text>
+                    {!!item.phone && <Text style={s.cardSub}>{item.phone}</Text>}
+                  </View>
+                  <View style={[s.pillGrey, { backgroundColor: statusColor(item.status) + '20', marginLeft: 8 }]}>
+                    <Text style={[s.pillText, { color: statusColor(item.status) }]}>{item.status}</Text>
+                  </View>
+                </View>
+
+                <View style={[s.rowActions, { marginTop: 10, marginLeft: 0 }]}>
+                  {item.status !== 'active' && (
+                    <TouchableOpacity style={s.ghostBtn} onPress={() => approve(item)}>
+                      <Text style={s.ghostBtnText}>Approve</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.status !== 'suspended' && (
+                    <TouchableOpacity style={s.dangerGhostBtn} onPress={() => reject(item)}>
+                      <Text style={s.dangerGhostText}>Decline</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={s.dangerGhostBtn} onPress={() => deleteGarage(item.id)}>
+                    <Text style={s.dangerGhostText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          />
+        )
+      }
+    </View>
+  )
+}
+
 // ─── Transport Tab ────────────────────────────────────────────────────────────
 
 function TransportTab() {
@@ -3625,7 +3753,7 @@ function JobPostingsTab() {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-export default function AdminScreen({ session }) {
+export default function AdminScreen({ session, lang }) {
   const [tab, setTab] = useState('Dashboard')
   const navigateTo = t => setTab(t)
 
@@ -3674,6 +3802,7 @@ export default function AdminScreen({ session }) {
           {tab === 'Transport'     && <TransportTab />}
           {tab === 'Insurance'     && <InsuranceTab />}
           {tab === 'Grooming'      && <GroomingTab />}
+          {tab === 'Garages'       && <GaragesTab lang={lang} session={session} />}
           {tab === 'BusRoutes'     && <BusRoutesTab />}
           {tab === 'Places'        && <PlacesTab />}
           {tab === 'JobPostings'   && <JobPostingsTab />}
