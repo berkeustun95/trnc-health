@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Linking,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -29,10 +29,10 @@ function categoryLabel(key, lang) { return t(CATEGORY_KEYS[key] || key, lang) }
 
 // ─── Garage card ──────────────────────────────────────────────────────────────
 
-function GarageCard({ item, lang }) {
+function GarageCard({ item, lang, onPress }) {
   const types = Array.isArray(item.service_types) ? item.service_types : []
   return (
-    <View style={s.card}>
+    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
       <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
 
       {types.length > 0 && (
@@ -63,19 +63,17 @@ function GarageCard({ item, lang }) {
         <Text style={s.cardDesc} numberOfLines={2}>{item.description}</Text>
       )}
 
-      {!!item.phone && (
-        <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${item.phone}`)} activeOpacity={0.8}>
-          <Ionicons name="call-outline" size={15} color={colors.primary} />
-          <Text style={s.callText}>{t('garageCall', lang)}</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+      <View style={s.cardCta}>
+        <Text style={s.cardCtaText}>{t('garageViewDetails', lang)}</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+      </View>
+    </TouchableOpacity>
   )
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function GaragesScreen({ lang, session, onBack, onRequireAccount }) {
+export default function GaragesScreen({ lang, session, onBack, onRequireAccount, onOpenFacility }) {
   const [garages, setGarages]         = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(false)
@@ -87,7 +85,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount 
     setError(false)
     let query = supabase
       .from('facilities')
-      .select('id, name, service_types, address, phone, opening_hours, description')
+      .select('id, name, type, service_types, address, phone, opening_hours, description')
       .eq('type', 'garage')
       .eq('status', 'active')
       .order('name', { ascending: true })
@@ -198,7 +196,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount 
                 </View>
               </View>
             }
-            renderItem={({ item }) => <GarageCard item={item} lang={lang} />}
+            renderItem={({ item }) => <GarageCard item={item} lang={lang} onPress={() => onOpenFacility?.(item)} />}
           />
         )}
       </View>
@@ -254,8 +252,6 @@ const s = StyleSheet.create({
   cardMeta:       { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   cardDesc:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                     lineHeight: 19, marginTop: 2, marginBottom: 10 },
-  callBtn:        { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
-                    marginTop: 4, backgroundColor: colors.primaryLight, borderRadius: radius.md,
-                    paddingHorizontal: 14, paddingVertical: 8 },
-  callText:       { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
+  cardCta:        { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  cardCtaText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
 })

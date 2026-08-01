@@ -60,6 +60,11 @@ function generateSlots(date, availability, bookedSlots) {
   return slots
 }
 
+const GARAGE_SVC_KEY = {
+  muayene: 'garageCatMuayene', repair: 'garageCatRepair', tyres: 'garageCatTyres',
+  wash: 'garageCatWash', parts: 'garageCatParts', towing: 'garageCatTowing',
+}
+
 export default function BookingScreen({ facility, session, lang, blockedUntil, onBack }) {
   const hasSlots = !!facility.availability
 
@@ -73,6 +78,13 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
   // slot picker state (only used when facility.availability is set)
   const [selectedDate, setSelectedDate]   = useState(null)
   const [selectedSlot, setSelectedSlot]   = useState(null)
+  const [selectedServices, setSelectedServices] = useState([]) // garage: chosen service_types
+  const [carMake, setCarMake]   = useState('')
+  const [carModel, setCarModel] = useState('')
+  const [carYear, setCarYear]   = useState('')
+  const [carPlate, setCarPlate] = useState('')
+  const [custPhone, setCustPhone] = useState('')
+  const [notes, setNotes]       = useState('')
   const [bookedSlots, setBookedSlots]     = useState(new Set())
   const [loadingSlots, setLoadingSlots]   = useState(false)
 
@@ -180,11 +192,16 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
       d.setHours(h, m, 0, 0)
       requestedTime = d.toISOString()
     }
-    const { error } = await supabase.from('appointments').insert({
-      customer_id: session.user.id,
-      facility_id: facility.id,
-      requested_time: requestedTime,
-    })
+    const payload = { customer_id: session.user.id, facility_id: facility.id, requested_time: requestedTime }
+    if (facility.type === 'garage') {
+      payload.garage_booking_details = {
+        services: selectedServices,
+        car: { make: carMake.trim() || null, model: carModel.trim() || null, year: carYear.trim() || null, plate: carPlate.trim() || null },
+        phone: custPhone.trim() || null,
+        notes: notes.trim() || null,
+      }
+    }
+    const { error } = await supabase.from('appointments').insert(payload)
     if (error) {
       if (error.code === '23505') {
         // Slot was taken by another customer mid-race (DB unique guard fired).
@@ -359,13 +376,57 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
 
         {facility.type !== 'pharmacy' && (
           <>
+            {facility.type === 'garage' && facility.service_types?.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>{t('garageBkSelectServices', lang)}</Text>
+                <View style={styles.serviceRow}>
+                  {facility.service_types.map(st => {
+                    const isSelected = selectedServices.includes(st)
+                    return (
+                      <TouchableOpacity
+                        key={st}
+                        style={[styles.serviceChip, isSelected && styles.serviceChipActive]}
+                        onPress={() => setSelectedServices(prev => (prev.includes(st) ? prev.filter(k => k !== st) : [...prev, st]))}
+                      >
+                        <Text style={[styles.serviceChipText, isSelected && styles.serviceChipTextActive]}>
+                          {t(GARAGE_SVC_KEY[st] || st, lang)}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+
+                <Text style={styles.sectionLabel}>{t('garageBkCarSection', lang)}</Text>
+                <View style={styles.gRow}>
+                  <TextInput style={[styles.gInput, styles.gInputHalf]} value={carMake} onChangeText={setCarMake}
+                    placeholder={t('garageBkCarMake', lang)} placeholderTextColor={colors.textSecondary} />
+                  <TextInput style={[styles.gInput, styles.gInputHalf]} value={carModel} onChangeText={setCarModel}
+                    placeholder={t('garageBkCarModel', lang)} placeholderTextColor={colors.textSecondary} />
+                </View>
+                <View style={styles.gRow}>
+                  <TextInput style={[styles.gInput, styles.gInputHalf]} value={carYear} onChangeText={setCarYear}
+                    placeholder={t('garageBkCarYear', lang)} placeholderTextColor={colors.textSecondary} keyboardType="number-pad" maxLength={4} />
+                  <TextInput style={[styles.gInput, styles.gInputHalf]} value={carPlate} onChangeText={setCarPlate}
+                    placeholder={t('garageBkCarPlate', lang)} placeholderTextColor={colors.textSecondary} autoCapitalize="characters" />
+                </View>
+
+                <Text style={styles.sectionLabel}>{t('garageBkPhone', lang)}</Text>
+                <TextInput style={styles.gInput} value={custPhone} onChangeText={setCustPhone}
+                  placeholder="+90 5xx xxx xxxx" placeholderTextColor={colors.textSecondary} keyboardType="phone-pad" />
+
+                <Text style={styles.sectionLabel}>{t('garageBkNotes', lang)}</Text>
+                <TextInput style={[styles.gInput, styles.gInputMulti]} value={notes} onChangeText={setNotes}
+                  placeholder={t('garageBkNotesPlaceholder', lang)} placeholderTextColor={colors.textSecondary}
+                  multiline maxLength={500} textAlignVertical="top" />
+              </>
+            )}
             {hasSlots ? (() => {
               const today = new Date(); today.setHours(0, 0, 0, 0)
               const dates = Array.from({ length: 14 }, (_, i) => {
                 const d = new Date(today); d.setDate(today.getDate() + i); return d
               })
               const slots = selectedDate ? generateSlots(selectedDate, facility.availability, bookedSlots) : []
-              const canBook = selectedDate && selectedSlot
+              const canBook = selectedDate && selectedSlot && (facility.type !== 'garage' || (selectedServices.length > 0 && !!custPhone.trim()))
               return (
                 <>
                   <Text style={styles.sectionLabel}>{t('selectDate', lang)}</Text>
@@ -470,7 +531,11 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
                 )}
 
                 {error && <Text style={styles.error}>{error}</Text>}
-                <TouchableOpacity style={styles.submit} onPress={submit} disabled={loading}>
+                <TouchableOpacity
+                  style={[styles.submit, (facility.type === 'garage' && !(selectedServices.length > 0 && custPhone.trim())) && { opacity: 0.4 }]}
+                  onPress={submit}
+                  disabled={loading || (facility.type === 'garage' && !(selectedServices.length > 0 && custPhone.trim()))}
+                >
                   {loading
                     ? <ActivityIndicator color="#fff" />
                     : <Text style={styles.submitText}>{t('requestAppointment', lang)}</Text>
@@ -591,6 +656,18 @@ const styles = StyleSheet.create({
   dateChipNum:        { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 2 },
   dateChipTextActive: { color: '#fff' },
   slotGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+  serviceRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  serviceChip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5,
+                        borderColor: colors.border, backgroundColor: colors.cardBg },
+  serviceChipActive:  { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  serviceChipText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  serviceChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
+  gRow:               { flexDirection: 'row', gap: 10 },
+  gInput:             { backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border,
+                        borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15,
+                        fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginBottom: 12 },
+  gInputHalf:         { flex: 1 },
+  gInputMulti:        { minHeight: 90, paddingTop: 12 },
   slotChip:           { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 12, backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: 'transparent', ...shadow },
   slotChipActive:     { backgroundColor: colors.primary, borderColor: colors.primary },
   slotChipUnavailable:{ backgroundColor: colors.surface, opacity: 0.45 },

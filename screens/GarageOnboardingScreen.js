@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator,
+  ActivityIndicator, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
+import GarageBookingsScreen from './GarageBookingsScreen'
 
 // ─── State screens ────────────────────────────────────────────────────────────
 
@@ -40,12 +41,24 @@ function DeclinedState({ lang, onClose }) {
 }
 
 // Slice 1: no booking/availability management yet (that arrives in Slice 2).
-function ActiveState({ lang, onClose }) {
+function ActiveState({ lang, onClose, onManageBookings, onManageAvailability, onEdit }) {
   return (
     <View style={s.stateWrap}>
       <Text style={s.stateEmoji}>✅</Text>
       <Text style={s.stateTitle}>{t('garageRegisterActive', lang)}</Text>
       <Text style={s.stateSub}>{t('garageRegisterActiveSub', lang)}</Text>
+      <TouchableOpacity style={s.primaryBtn} onPress={onManageBookings} activeOpacity={0.85}>
+        <Ionicons name="list-outline" size={18} color="#fff" />
+        <Text style={s.primaryBtnText}>{t('garageManageBookings', lang)}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={s.secondaryBtn} onPress={onManageAvailability} activeOpacity={0.85}>
+        <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+        <Text style={s.secondaryBtnText}>{t('garageManageAvail', lang)}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={s.secondaryBtn} onPress={onEdit} activeOpacity={0.85}>
+        <Ionicons name="create-outline" size={18} color={colors.primary} />
+        <Text style={s.secondaryBtnText}>{t('garageEditListing', lang)}</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={s.ghostBtn} onPress={onClose}>
         <Text style={s.ghostBtnText}>{t('back', lang)}</Text>
       </TouchableOpacity>
@@ -69,6 +82,9 @@ function Field({ label, children }) {
 export default function GarageOnboardingScreen({ session, lang, onClose, onSubmitted }) {
   const [existing, setExisting] = useState(undefined)
   const [checking, setChecking] = useState(true)
+  const [managingBookings, setManagingBookings] = useState(false)
+  const [availStub, setAvailStub] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   const [name,        setName]        = useState('')
   const [services,    setServices]    = useState([]) // multi-select category keys
@@ -84,7 +100,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
     async function checkExisting() {
       const { data } = await supabase
         .from('facilities')
-        .select('id, status, provider_id')
+        .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types')
         .eq('provider_id', session.user.id)
         .eq('type', 'garage')
         .maybeSingle()
@@ -122,6 +138,53 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
     }
   }
 
+  function startEdit() {
+    setName(existing.name || '')
+    setServices(existing.service_types || [])
+    setArea(existing.address || '')
+    setPhone(existing.phone || '')
+    setHours(existing.opening_hours || '')
+    setDescription(existing.description || '')
+    setError(null)
+    setEditing(true)
+  }
+
+  async function handleEdit() {
+    setError(null)
+    if (!name.trim())          { setError(t('garageErrorName', lang)); return }
+    if (services.length === 0) { setError(t('garageErrorServices', lang)); return }
+
+    setSaving(true)
+    try {
+      const { data: material, error: err } = await supabase.rpc('update_garage_facility', {
+        p_facility_id:   existing.id,
+        p_name:          name.trim(),
+        p_service_types: services,
+        p_address:       area.trim() || null,
+        p_phone:         phone.trim() || null,
+        p_opening_hours: hours.trim() || null,
+        p_description:   description.trim() || null,
+      })
+      if (err) throw err
+      setEditing(false)
+      if (material) {
+        Alert.alert('', t('garageEditPendingNote', lang))
+        // Material change flipped the row back to pending — refresh so the pending state shows.
+        const { data } = await supabase
+          .from('facilities')
+          .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types')
+          .eq('id', existing.id).maybeSingle()
+        setExisting(data)
+      } else {
+        Alert.alert('', t('garageEditSaved', lang))
+      }
+    } catch (err) {
+      setError(err.message || t('garageErrorGeneric', lang))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (checking) {
     return (
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -138,10 +201,34 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
     )
   }
 
-  if (existing?.status === 'active') {
+  if (existing?.status === 'active' && !editing) {
+    if (managingBookings) {
+      return <GarageBookingsScreen facility={existing} lang={lang} onBack={() => setManagingBookings(false)} />
+    }
+    if (availStub) {
+      // Slice 2a: availability editor stubbed — full garage-labeled editor lands in 2b.
+      return (
+        <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+          <View style={s.stateWrap}>
+            <Text style={s.stateEmoji}>🗓️</Text>
+            <Text style={s.stateTitle}>{t('garageManageAvail', lang)}</Text>
+            <Text style={s.stateSub}>{t('garageAvailSoon', lang)}</Text>
+            <TouchableOpacity style={s.ghostBtn} onPress={() => setAvailStub(false)}>
+              <Text style={s.ghostBtnText}>{t('back', lang)}</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      )
+    }
     return (
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-        <ActiveState lang={lang} onClose={onClose} />
+        <ActiveState
+          lang={lang}
+          onClose={onClose}
+          onManageBookings={() => setManagingBookings(true)}
+          onManageAvailability={() => setAvailStub(true)}
+          onEdit={startEdit}
+        />
       </SafeAreaView>
     )
   }
@@ -158,10 +245,10 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
     <SafeAreaView style={s.safe} edges={['top']}>
       <KeyboardAwareForm>
         <View style={s.header}>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={editing ? () => setEditing(false) : onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>{t('garageRegisterTitle', lang)}</Text>
+          <Text style={s.headerTitle}>{editing ? t('garageEditTitle', lang) : t('garageRegisterTitle', lang)}</Text>
           <View style={{ width: 24 }} />
         </View>
 
@@ -170,7 +257,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={s.intro}>{t('garageRegisterIntro', lang)}</Text>
+          <Text style={s.intro}>{editing ? t('garageEditMaterialNote', lang) : t('garageRegisterIntro', lang)}</Text>
 
           {/* Business name */}
           <Field label={t('garageRegisterName', lang)}>
@@ -260,13 +347,13 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
 
           <TouchableOpacity
             style={[s.submitBtn, saving && s.submitBtnDisabled]}
-            onPress={handleSubmit}
+            onPress={editing ? handleEdit : handleSubmit}
             disabled={saving}
             activeOpacity={0.85}
           >
             {saving
               ? <ActivityIndicator color="#fff" />
-              : <Text style={s.submitBtnText}>{t('garageRegisterSubmit', lang)}</Text>
+              : <Text style={s.submitBtnText}>{editing ? t('garageEditSubmit', lang) : t('garageRegisterSubmit', lang)}</Text>
             }
           </TouchableOpacity>
         </ScrollView>
@@ -317,6 +404,14 @@ const s = StyleSheet.create({
                       textAlign: 'center' },
   stateSub:         { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                       textAlign: 'center', lineHeight: 21 },
+  primaryBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 14,
+                      paddingHorizontal: 28, marginTop: 8 },
+  primaryBtnText:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+  secondaryBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      backgroundColor: colors.primaryLight, borderRadius: radius.md, paddingVertical: 14,
+                      paddingHorizontal: 28, marginTop: 10 },
+  secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
   ghostBtn:         { paddingVertical: 12, paddingHorizontal: 24 },
   ghostBtnText:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 })
