@@ -11,6 +11,7 @@ import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
 import GarageBookingsScreen from './GarageBookingsScreen'
+import GroomingAvailabilityEditor from './GroomingAvailabilityEditor'
 
 // ─── State screens ────────────────────────────────────────────────────────────
 
@@ -40,7 +41,6 @@ function DeclinedState({ lang, onClose }) {
   )
 }
 
-// Slice 1: no booking/availability management yet (that arrives in Slice 2).
 function ActiveState({ lang, onClose, onManageBookings, onManageAvailability, onEdit }) {
   return (
     <View style={s.stateWrap}>
@@ -83,7 +83,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
   const [existing, setExisting] = useState(undefined)
   const [checking, setChecking] = useState(true)
   const [managingBookings, setManagingBookings] = useState(false)
-  const [availStub, setAvailStub] = useState(false)
+  const [editingAvail, setEditingAvail] = useState(false)
   const [editing, setEditing] = useState(false)
 
   const [name,        setName]        = useState('')
@@ -100,7 +100,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
     async function checkExisting() {
       const { data } = await supabase
         .from('facilities')
-        .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types')
+        .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types, availability')
         .eq('provider_id', session.user.id)
         .eq('type', 'garage')
         .maybeSingle()
@@ -172,7 +172,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
         // Material change flipped the row back to pending — refresh so the pending state shows.
         const { data } = await supabase
           .from('facilities')
-          .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types')
+          .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types, availability')
           .eq('id', existing.id).maybeSingle()
         setExisting(data)
       } else {
@@ -205,19 +205,16 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
     if (managingBookings) {
       return <GarageBookingsScreen facility={existing} lang={lang} onBack={() => setManagingBookings(false)} />
     }
-    if (availStub) {
-      // Slice 2a: availability editor stubbed — full garage-labeled editor lands in 2b.
+    if (editingAvail) {
+      // Reuses the service-neutral availability editor (writes facilities.availability
+      // jsonb, the same shape BookingScreen.generateSlots reads for garages).
       return (
-        <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-          <View style={s.stateWrap}>
-            <Text style={s.stateEmoji}>🗓️</Text>
-            <Text style={s.stateTitle}>{t('garageManageAvail', lang)}</Text>
-            <Text style={s.stateSub}>{t('garageAvailSoon', lang)}</Text>
-            <TouchableOpacity style={s.ghostBtn} onPress={() => setAvailStub(false)}>
-              <Text style={s.ghostBtnText}>{t('back', lang)}</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
+        <GroomingAvailabilityEditor
+          facility={existing}
+          lang={lang}
+          onBack={() => setEditingAvail(false)}
+          onSaved={a => setExisting(prev => ({ ...prev, availability: a }))}
+        />
       )
     }
     return (
@@ -226,7 +223,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
           lang={lang}
           onClose={onClose}
           onManageBookings={() => setManagingBookings(true)}
-          onManageAvailability={() => setAvailStub(true)}
+          onManageAvailability={() => setEditingAvail(true)}
           onEdit={startEdit}
         />
       </SafeAreaView>
