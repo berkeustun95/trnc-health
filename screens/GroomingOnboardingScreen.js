@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator,
+  ActivityIndicator, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
@@ -11,6 +11,7 @@ import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import GroomingAvailabilityEditor from './GroomingAvailabilityEditor'
 import GroomingBookingsScreen from './GroomingBookingsScreen'
+import FacilityPhotoManager from '../components/FacilityPhotoManager'
 
 const CATEGORIES = [
   { key: 'barber',     icon: 'cut-outline',        labelKey: 'groomCatBarber' },
@@ -47,7 +48,7 @@ function DeclinedState({ lang, onClose }) {
   )
 }
 
-function ActiveState({ lang, onClose, onEditAvailability, onManageBookings }) {
+function ActiveState({ lang, onClose, onEditAvailability, onManageBookings, onManagePhotos, onEdit }) {
   return (
     <View style={s.stateWrap}>
       <Text style={s.stateEmoji}>✅</Text>
@@ -60,6 +61,14 @@ function ActiveState({ lang, onClose, onEditAvailability, onManageBookings }) {
       <TouchableOpacity style={s.secondaryBtn} onPress={onEditAvailability} activeOpacity={0.85}>
         <Ionicons name="calendar-outline" size={18} color={colors.primary} />
         <Text style={s.secondaryBtnText}>{t('groomManageAvail', lang)}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={s.secondaryBtn} onPress={onManagePhotos} activeOpacity={0.85}>
+        <Ionicons name="image-outline" size={18} color={colors.primary} />
+        <Text style={s.secondaryBtnText}>{t('groomManagePhotos', lang)}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={s.secondaryBtn} onPress={onEdit} activeOpacity={0.85}>
+        <Ionicons name="create-outline" size={18} color={colors.primary} />
+        <Text style={s.secondaryBtnText}>{t('groomEditListing', lang)}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={s.ghostBtn} onPress={onClose}>
         <Text style={s.ghostBtnText}>{t('back', lang)}</Text>
@@ -86,6 +95,8 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
   const [checking, setChecking] = useState(true)
   const [editingAvail, setEditingAvail] = useState(false)
   const [managingBookings, setManagingBookings] = useState(false)
+  const [managingPhotos, setManagingPhotos] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   const [name,        setName]        = useState('')
   const [category,    setCategory]    = useState(null)
@@ -97,19 +108,18 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState(null)
 
-  useEffect(() => {
-    async function checkExisting() {
-      const { data } = await supabase
-        .from('facilities')
-        .select('id, status, availability, provider_id')
-        .eq('provider_id', session.user.id)
-        .eq('type', 'grooming')
-        .maybeSingle()
-      setExisting(data)
-      setChecking(false)
-    }
-    checkExisting()
+  const loadExisting = useCallback(async () => {
+    const { data } = await supabase
+      .from('facilities')
+      .select('id, name, status, category, address, phone, opening_hours, description, availability, provider_id, cover_image_url, logo_url, photos')
+      .eq('provider_id', session.user.id)
+      .eq('type', 'grooming')
+      .maybeSingle()
+    setExisting(data)
+    setChecking(false)
   }, [session.user.id])
+
+  useEffect(() => { loadExisting() }, [loadExisting])
 
   async function handleSubmit() {
     setError(null)
@@ -135,6 +145,45 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
     }
   }
 
+  function startEdit() {
+    setName(existing.name || '')
+    setCategory(existing.category || null)
+    setArea(existing.address || '')
+    setPhone(existing.phone || '')
+    setHours(existing.opening_hours || '')
+    setDescription(existing.description || '')
+    setError(null)
+    setEditing(true)
+  }
+
+  async function handleEdit() {
+    setError(null)
+    if (!name.trim())  { setError(t('groomErrorName', lang)); return }
+    if (!category)     { setError(t('groomErrorCategory', lang)); return }
+
+    setSaving(true)
+    try {
+      const { data: material, error: err } = await supabase.rpc('update_grooming_facility', {
+        p_facility_id:   existing.id,
+        p_name:          name.trim(),
+        p_category:      category,
+        p_address:       area.trim() || null,
+        p_phone:         phone.trim() || null,
+        p_opening_hours: hours.trim() || null,
+        p_description:   description.trim() || null,
+      })
+      if (err) throw err
+      setEditing(false)
+      // Material change flipped the row back to pending — refetch so the pending state shows.
+      await loadExisting()
+      Alert.alert('', t(material ? 'groomEditPendingNote' : 'groomEditSaved', lang))
+    } catch (err) {
+      setError(err.message || t('groomErrorGeneric', lang))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (checking) {
     return (
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -151,7 +200,7 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
     )
   }
 
-  if (existing?.status === 'active') {
+  if (existing?.status === 'active' && !editing) {
     // Owner-only surfaces: `existing` came from a provider_id = session.user.id query,
     // so it is inherently this user's own facility (RLS enforces reads/writes too).
     const isOwner = existing.provider_id === session.user.id
@@ -174,6 +223,29 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
         />
       )
     }
+    if (managingPhotos && isOwner) {
+      return (
+        <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={() => setManagingPhotos(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={s.headerTitle}>{t('groomManagePhotos', lang)}</Text>
+            <View style={{ width: 24 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+            <FacilityPhotoManager
+              facilityId={existing.id}
+              initialCover={existing.cover_image_url}
+              initialLogo={existing.logo_url}
+              initialPhotos={existing.photos}
+              lang={lang}
+              onFacilityUpdated={loadExisting}
+            />
+          </ScrollView>
+        </SafeAreaView>
+      )
+    }
     return (
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
         <ActiveState
@@ -181,6 +253,8 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
           onClose={onClose}
           onEditAvailability={() => setEditingAvail(true)}
           onManageBookings={() => setManagingBookings(true)}
+          onManagePhotos={() => setManagingPhotos(true)}
+          onEdit={startEdit}
         />
       </SafeAreaView>
     )
@@ -198,10 +272,10 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
     <SafeAreaView style={s.safe} edges={['top']}>
       <KeyboardAwareForm>
         <View style={s.header}>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={editing ? () => setEditing(false) : onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>{t('groomRegisterTitle', lang)}</Text>
+          <Text style={s.headerTitle}>{editing ? t('groomEditTitle', lang) : t('groomRegisterTitle', lang)}</Text>
           <View style={{ width: 24 }} />
         </View>
 
@@ -210,7 +284,7 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={s.intro}>{t('groomRegisterIntro', lang)}</Text>
+          <Text style={s.intro}>{editing ? t('groomEditMaterialNote', lang) : t('groomRegisterIntro', lang)}</Text>
 
           {/* Business name */}
           <Field label={t('groomRegisterName', lang)}>
@@ -300,13 +374,13 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
 
           <TouchableOpacity
             style={[s.submitBtn, saving && s.submitBtnDisabled]}
-            onPress={handleSubmit}
+            onPress={editing ? handleEdit : handleSubmit}
             disabled={saving}
             activeOpacity={0.85}
           >
             {saving
               ? <ActivityIndicator color="#fff" />
-              : <Text style={s.submitBtnText}>{t('groomRegisterSubmit', lang)}</Text>
+              : <Text style={s.submitBtnText}>{editing ? t('groomEditSubmit', lang) : t('groomRegisterSubmit', lang)}</Text>
             }
           </TouchableOpacity>
         </ScrollView>
