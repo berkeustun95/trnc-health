@@ -241,6 +241,7 @@ export default function App() {
   const [showNotifs, setShowNotifs] = useState(false)
   const [providerFacility, setProviderFacility] = useState(undefined)
   const [pendingClaim, setPendingClaim] = useState(undefined)
+  const [ownsGarage, setOwnsGarage] = useState(false) // drives the dark-launched garages tile for owners (see gate)
   const [unclaimedFacility, setUnclaimedFacility] = useState(null)
   const [favorites, setFavorites] = useState(new Set())
   const [showPasswordReset, setShowPasswordReset] = useState(false)
@@ -558,7 +559,7 @@ export default function App() {
     setShowMenu(false)
     setShowNotifs(false)
     if (!session) {
-      setProfile(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); return
+      setProfile(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); setOwnsGarage(false); return
     }
     supabase.from('profiles').select('role, preferred_language, avatar_url, blocked_until').eq('id', session.user.id).single()
       .then(async ({ data }) => {
@@ -588,6 +589,16 @@ export default function App() {
     supabase.from('notifications').select('id, title, body, read, created_at')
       .eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
       .then(({ data }) => { if (data) setNotifications(data); setNotifsLoading(false) })
+
+    // Owns a garage? Drives the dark-launched garages tile for owners onboarded
+    // before GARAGES_LIVE flips public. Guests can't own one — skip the query.
+    if (!isGuest(session)) {
+      supabase.from('facilities').select('id')
+        .eq('provider_id', session.user.id).eq('type', 'garage').limit(1)
+        .then(({ data }) => setOwnsGarage((data?.length ?? 0) > 0))
+    } else {
+      setOwnsGarage(false)
+    }
   }, [session])
 
   async function scheduleAppointmentReminders(userId, currentLang) {
@@ -1211,7 +1222,7 @@ export default function App() {
             onShowInsurance={() => setShowInsurance(true)}
             onShowGrooming={() => setShowGrooming(true)}
             onShowGarages={() => setShowGarages(true)}
-            garagesTileVisible={GARAGES_LIVE}
+            garagesTileVisible={GARAGES_LIVE || profile?.role === 'admin' || ownsGarage}
             onShowEsim={() => setShowEsim(true)}
             onShowEmergency={() => setShowEmergencyModal(true)}
             onShowMunicipal={() => setShowMunicipalModal(true)}
