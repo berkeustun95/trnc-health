@@ -61,6 +61,7 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
   const [error, setError]                 = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [showOnboarding, setShowOnboarding]     = useState(false)
+  const [myFacility, setMyFacility]             = useState(null) // the caller's own grooming facility, if any
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -78,13 +79,28 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
 
   useEffect(() => { load() }, [load])
 
+  // Does the caller already own a grooming facility? Drives the CTA label (register vs manage).
+  // Any status — a pending/suspended facility still means "manage", not "register".
+  const checkMyFacility = useCallback(async () => {
+    if (!session?.user?.id) { setMyFacility(null); return }
+    const { data } = await supabase
+      .from('facilities')
+      .select('id, status')
+      .eq('provider_id', session.user.id)
+      .eq('type', 'grooming')
+      .maybeSingle()
+    setMyFacility(data ?? null)
+  }, [session?.user?.id])
+
+  useEffect(() => { checkMyFacility() }, [checkMyFacility])
+
   if (showOnboarding) {
     return (
       <GroomingOnboardingScreen
         session={session}
         lang={lang}
         onClose={() => setShowOnboarding(false)}
-        onSubmitted={() => { setShowOnboarding(false); load() }}
+        onSubmitted={() => { setShowOnboarding(false); load(); checkMyFacility() }}
       />
     )
   }
@@ -156,11 +172,11 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
                   activeOpacity={0.8}
                 >
                   <View style={s.ctaIconWrap}>
-                    <Ionicons name="add-circle-outline" size={26} color={colors.primary} />
+                    <Ionicons name={myFacility ? 'construct-outline' : 'add-circle-outline'} size={26} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.ctaCardTitle}>{t('groomRegisterCTA', lang)}</Text>
-                    <Text style={s.ctaCardSub}>{t('groomRegisterCTASub', lang)}</Text>
+                    <Text style={s.ctaCardTitle}>{t(myFacility ? 'groomManageCta' : 'groomRegisterCTA', lang)}</Text>
+                    <Text style={s.ctaCardSub}>{t(myFacility ? 'groomManageCtaSub' : 'groomRegisterCTASub', lang)}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
