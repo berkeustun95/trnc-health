@@ -79,6 +79,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
   const [error, setError]             = useState(false)
   const [selected, setSelected]       = useState([]) // multi-select category keys
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [myGarage, setMyGarage]       = useState(null) // the caller's own garage row, if any
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -98,6 +99,21 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
 
   useEffect(() => { load() }, [load])
 
+  // Does the caller already own a garage? Drives the CTA label (list vs manage).
+  // Any status — a pending/suspended garage still means "manage", not "list".
+  const checkMyGarage = useCallback(async () => {
+    if (!session?.user?.id) { setMyGarage(null); return }
+    const { data } = await supabase
+      .from('facilities')
+      .select('id, status')
+      .eq('provider_id', session.user.id)
+      .eq('type', 'garage')
+      .maybeSingle()
+    setMyGarage(data ?? null)
+  }, [session?.user?.id])
+
+  useEffect(() => { checkMyGarage() }, [checkMyGarage])
+
   function toggleCategory(key) {
     setSelected(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
   }
@@ -108,7 +124,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
         session={session}
         lang={lang}
         onClose={() => setShowOnboarding(false)}
-        onSubmitted={() => { setShowOnboarding(false); load() }}
+        onSubmitted={() => { setShowOnboarding(false); load(); checkMyGarage() }}
       />
     )
   }
@@ -177,11 +193,11 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
                   activeOpacity={0.8}
                 >
                   <View style={s.ctaIconWrap}>
-                    <Ionicons name="add-circle-outline" size={26} color={colors.primary} />
+                    <Ionicons name={myGarage ? 'construct-outline' : 'add-circle-outline'} size={26} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.ctaCardTitle}>{t('garageListCta', lang)}</Text>
-                    <Text style={s.ctaCardSub}>{t('garageListCtaSub', lang)}</Text>
+                    <Text style={s.ctaCardTitle}>{t(myGarage ? 'garageManageCta' : 'garageListCta', lang)}</Text>
+                    <Text style={s.ctaCardSub}>{t(myGarage ? 'garageManageCtaSub' : 'garageListCtaSub', lang)}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
