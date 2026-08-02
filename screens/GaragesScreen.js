@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView,
+  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -33,39 +33,49 @@ function GarageCard({ item, lang, onPress }) {
   const types = Array.isArray(item.service_types) ? item.service_types : []
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
-      <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
-
-      {types.length > 0 && (
-        <View style={s.badgeRow}>
-          {types.map(ty => (
-            <View key={ty} style={s.categoryBadge}>
-              <Text style={s.categoryText}>{categoryLabel(ty, lang)}</Text>
-            </View>
-          ))}
+      {!!item.cover_image_url && (
+        <Image source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
+      )}
+      <View style={s.cardBody}>
+        <View style={s.cardHead}>
+          {!!item.logo_url && (
+            <Image source={{ uri: item.logo_url }} style={s.cardLogo} resizeMode="cover" />
+          )}
+          <Text style={[s.cardName, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
         </View>
-      )}
 
-      {!!item.address && (
-        <View style={s.cardRow}>
-          <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
-          <Text style={s.cardMeta} numberOfLines={1}>{item.address}</Text>
+        {types.length > 0 && (
+          <View style={s.badgeRow}>
+            {types.map(ty => (
+              <View key={ty} style={s.categoryBadge}>
+                <Text style={s.categoryText}>{categoryLabel(ty, lang)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {!!item.address && (
+          <View style={s.cardRow}>
+            <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+            <Text style={s.cardMeta} numberOfLines={1}>{item.address}</Text>
+          </View>
+        )}
+
+        {!!item.opening_hours && (
+          <View style={s.cardRow}>
+            <Ionicons name="time-outline" size={13} color={colors.textSecondary} />
+            <Text style={s.cardMeta} numberOfLines={1}>{item.opening_hours}</Text>
+          </View>
+        )}
+
+        {!!item.description && (
+          <Text style={s.cardDesc} numberOfLines={2}>{item.description}</Text>
+        )}
+
+        <View style={s.cardCta}>
+          <Text style={s.cardCtaText}>{t('garageViewDetails', lang)}</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.primary} />
         </View>
-      )}
-
-      {!!item.opening_hours && (
-        <View style={s.cardRow}>
-          <Ionicons name="time-outline" size={13} color={colors.textSecondary} />
-          <Text style={s.cardMeta} numberOfLines={1}>{item.opening_hours}</Text>
-        </View>
-      )}
-
-      {!!item.description && (
-        <Text style={s.cardDesc} numberOfLines={2}>{item.description}</Text>
-      )}
-
-      <View style={s.cardCta}>
-        <Text style={s.cardCtaText}>{t('garageViewDetails', lang)}</Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.primary} />
       </View>
     </TouchableOpacity>
   )
@@ -86,7 +96,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
     setError(false)
     let query = supabase
       .from('facilities')
-      .select('id, name, type, service_types, address, phone, opening_hours, description')
+      .select('id, name, type, service_types, address, phone, opening_hours, description, cover_image_url, logo_url, photos, availability')
       .eq('type', 'garage')
       .eq('status', 'active')
       .order('name', { ascending: true })
@@ -257,9 +267,13 @@ const s = StyleSheet.create({
   retryBtnText:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // Garage card
-  card:           { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 16,
+  card:           { backgroundColor: colors.cardBg, borderRadius: radius.card, overflow: 'hidden',
                     ...shadow, borderWidth: 1, borderColor: colors.border },
-  cardName:       { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8 },
+  cardCover:      { width: '100%', height: 120, backgroundColor: colors.border },
+  cardBody:       { padding: 16 },
+  cardHead:       { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  cardLogo:       { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.border },
+  cardName:       { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   badgeRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   categoryBadge:  { backgroundColor: colors.primaryLight, paddingHorizontal: 8, paddingVertical: 3,
                     borderRadius: 10 },

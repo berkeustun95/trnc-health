@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView,
+  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -27,27 +27,35 @@ function categoryLabel(key, lang) { return t(CATEGORY_KEYS[key] || key, lang) }
 function ProviderCard({ item, lang, onPress }) {
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
-      <View style={s.cardTop}>
-        <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
-        <View style={s.categoryBadge}>
-          <Text style={s.categoryText}>{categoryLabel(item.category, lang)}</Text>
-        </View>
-      </View>
-
-      {!!item.address && (
-        <View style={s.cardRow}>
-          <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
-          <Text style={s.cardMeta} numberOfLines={1}>{item.address}</Text>
-        </View>
+      {!!item.cover_image_url && (
+        <Image source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
       )}
+      <View style={s.cardBody}>
+        <View style={s.cardTop}>
+          {!!item.logo_url && (
+            <Image source={{ uri: item.logo_url }} style={s.cardLogo} resizeMode="cover" />
+          )}
+          <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
+          <View style={s.categoryBadge}>
+            <Text style={s.categoryText}>{categoryLabel(item.category, lang)}</Text>
+          </View>
+        </View>
 
-      {!!item.description && (
-        <Text style={s.cardDesc} numberOfLines={2}>{item.description}</Text>
-      )}
+        {!!item.address && (
+          <View style={s.cardRow}>
+            <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+            <Text style={s.cardMeta} numberOfLines={1}>{item.address}</Text>
+          </View>
+        )}
 
-      <View style={s.cardCta}>
-        <Text style={s.cardCtaText}>{t('groomViewProfile', lang)}</Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+        {!!item.description && (
+          <Text style={s.cardDesc} numberOfLines={2}>{item.description}</Text>
+        )}
+
+        <View style={s.cardCta}>
+          <Text style={s.cardCtaText}>{t('groomViewProfile', lang)}</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+        </View>
       </View>
     </TouchableOpacity>
   )
@@ -238,9 +246,12 @@ const s = StyleSheet.create({
   retryBtnText:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // Provider card
-  card:           { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 16,
+  card:           { backgroundColor: colors.cardBg, borderRadius: radius.card, overflow: 'hidden',
                     ...shadow, borderWidth: 1, borderColor: colors.border },
-  cardTop:        { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
+  cardCover:      { width: '100%', height: 120, backgroundColor: colors.border },
+  cardBody:       { padding: 16 },
+  cardLogo:       { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.border },
+  cardTop:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                     marginBottom: 6, gap: 8 },
   cardName:       { flex: 1, fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   categoryBadge:  { backgroundColor: colors.primaryLight, paddingHorizontal: 8, paddingVertical: 3,

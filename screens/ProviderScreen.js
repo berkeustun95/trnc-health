@@ -10,6 +10,7 @@ import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import HoursPicker from '../components/HoursPicker'
 import MapPinPicker from '../components/MapPinPicker'
+import FacilityPhotoManager from '../components/FacilityPhotoManager'
 import ContentReportMenu from '../components/ContentReportMenu'
 import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
@@ -105,13 +106,6 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   )
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
-  const [coverUrl, setCoverUrl] = useState(facility.cover_image_url ?? null)
-  const [logoUrl, setLogoUrl] = useState(facility.logo_url ?? null)
-  const [uploadingCover, setUploadingCover] = useState(false)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [imageError, setImageError] = useState(null)
-  const [photos, setPhotos]               = useState(Array.isArray(facility.photos) ? facility.photos : [])
-  const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [specialty, setSpecialty] = useState(
     Array.isArray(facility.specialty) ? facility.specialty : (facility.specialty ? [facility.specialty] : [])
   )
@@ -335,81 +329,6 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     })
   }
 
-  async function pickAndUploadImage(type) {
-    const isCover = type === 'cover'
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: isCover ? [16, 9] : [1, 1],
-      quality: 0.7,
-      base64: true,
-    })
-    if (result.canceled) return
-    const asset = result.assets[0]
-    if (isCover) setUploadingCover(true); else setUploadingLogo(true)
-    setImageError(null)
-    try {
-      const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
-      const path = `${facility.id}/${type}.${ext}`
-      const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
-      const { error: uploadError } = await supabase.storage
-        .from('facility-images')
-        .upload(path, decode(asset.base64), { contentType, upsert: true })
-      if (uploadError) throw uploadError
-      const { data: { publicUrl } } = supabase.storage.from('facility-images').getPublicUrl(path)
-      const url = `${publicUrl}?t=${Date.now()}`
-      const field = isCover ? 'cover_image_url' : 'logo_url'
-      await supabase.from('facilities').update({ [field]: url }).eq('id', facility.id)
-      if (isCover) setCoverUrl(url); else setLogoUrl(url)
-      if (onFacilityUpdated) onFacilityUpdated()
-    } catch (err) {
-      console.error('Image upload error:', err)
-      setImageError(t('uploadFailed', lang))
-    } finally {
-      if (isCover) setUploadingCover(false); else setUploadingLogo(false)
-    }
-  }
-
-  async function addPhoto() {
-    if (photos.length >= 8) return
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-      base64: true,
-    })
-    if (result.canceled) return
-    const asset = result.assets[0]
-    setUploadingPhoto(true)
-    setImageError(null)
-    try {
-      const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
-      const path = `${facility.id}/photos/${Date.now()}.${ext}`
-      const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
-      const { error: upErr } = await supabase.storage
-        .from('facility-images')
-        .upload(path, decode(asset.base64), { contentType })
-      if (upErr) throw upErr
-      const { data: { publicUrl } } = supabase.storage.from('facility-images').getPublicUrl(path)
-      const next = [...photos, publicUrl]
-      await supabase.from('facilities').update({ photos: next }).eq('id', facility.id)
-      setPhotos(next)
-      if (onFacilityUpdated) onFacilityUpdated()
-    } catch {
-      setImageError(t('uploadFailed', lang))
-    } finally {
-      setUploadingPhoto(false)
-    }
-  }
-
-  async function removePhoto(url) {
-    const next = photos.filter(p => p !== url)
-    await supabase.from('facilities').update({ photos: next }).eq('id', facility.id)
-    setPhotos(next)
-    if (onFacilityUpdated) onFacilityUpdated()
-  }
-
   async function confirmFacilityLocation(lat, lng) {
     const { error } = await supabase
       .from('facilities')
@@ -606,69 +525,14 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           <>
           <KeyboardAwareForm>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
-            <View style={styles.card}>
-              <Text style={styles.fieldLabel}>{t('coverPhoto', lang)}</Text>
-              <TouchableOpacity style={styles.coverUploadArea} onPress={() => pickAndUploadImage('cover')} activeOpacity={0.8}>
-                {coverUrl
-                  ? <Image source={{ uri: coverUrl }} style={styles.coverPreview} resizeMode="cover" />
-                  : <View style={styles.uploadPlaceholder}>
-                      <Feather name="camera" size={22} color={colors.textSecondary} />
-                      <Text style={styles.uploadHint}>{t('tapToAddCover', lang)}</Text>
-                    </View>
-                }
-                {uploadingCover && <ActivityIndicator style={StyleSheet.absoluteFill} color={colors.primary} />}
-                {coverUrl && (
-                  <View style={styles.uploadEditBadge}>
-                    <Feather name="edit-2" size={11} color="#fff" />
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>{t('logoLabel', lang)}</Text>
-              <TouchableOpacity style={styles.logoUploadArea} onPress={() => pickAndUploadImage('logo')} activeOpacity={0.8}>
-                {logoUrl
-                  ? <Image source={{ uri: logoUrl }} style={styles.logoPreview} resizeMode="cover" />
-                  : <View style={styles.uploadPlaceholder}>
-                      <Feather name="image" size={18} color={colors.textSecondary} />
-                      <Text style={styles.uploadHint}>{t('tapToAddLogo', lang)}</Text>
-                    </View>
-                }
-                {uploadingLogo && <ActivityIndicator style={StyleSheet.absoluteFill} color={colors.primary} />}
-                {logoUrl && (
-                  <View style={styles.uploadEditBadge}>
-                    <Feather name="edit-2" size={11} color="#fff" />
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.photosHeader}>
-                <Text style={[styles.fieldLabel, { marginTop: 16, marginBottom: 0 }]}>PHOTOS</Text>
-                <Text style={styles.photoCount}>{photos.length}/8</Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoScroll} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
-                {photos.map((url, i) => (
-                  <View key={i} style={styles.photoThumb}>
-                    <Image source={{ uri: url }} style={styles.photoThumbImg} resizeMode="cover" />
-                    <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => removePhoto(url)} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
-                      <Feather name="x" size={11} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                {photos.length < 8 && (
-                  <TouchableOpacity style={styles.photoAddThumb} onPress={addPhoto} disabled={uploadingPhoto} activeOpacity={0.8}>
-                    {uploadingPhoto
-                      ? <ActivityIndicator size="small" color={colors.primary} />
-                      : <>
-                          <Feather name="plus" size={20} color={colors.primary} />
-                          <Text style={styles.photoAddText}>Add</Text>
-                        </>
-                    }
-                  </TouchableOpacity>
-                )}
-              </ScrollView>
-
-              {imageError && <Text style={styles.imageErrorText}>{imageError}</Text>}
-            </View>
+            <FacilityPhotoManager
+              facilityId={facility.id}
+              initialCover={facility.cover_image_url}
+              initialLogo={facility.logo_url}
+              initialPhotos={facility.photos}
+              lang={lang}
+              onFacilityUpdated={onFacilityUpdated}
+            />
 
             <View style={styles.card}>
               <Text style={styles.fieldLabel}>{t('phone', lang)}</Text>
@@ -1380,22 +1244,6 @@ const styles = StyleSheet.create({
   locationBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 13, marginTop: 4 },
   locationBtnText:{ fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   locationHint:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 8, textAlign: 'center' },
-  coverUploadArea:  { height: 140, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', position: 'relative' },
-  coverPreview:     { width: '100%', height: '100%' },
-  logoUploadArea:   { width: 90, height: 90, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', position: 'relative' },
-  logoPreview:      { width: '100%', height: '100%' },
-  uploadPlaceholder: { alignItems: 'center', gap: 8 },
-  uploadHint:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  uploadEditBadge:  { position: 'absolute', bottom: 8, right: 8, width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  imageErrorText:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger, marginTop: 8 },
-  photosHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
-  photoCount:       { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  photoScroll:      { marginTop: 10 },
-  photoThumb:       { width: 90, height: 68, borderRadius: 10, overflow: 'hidden', position: 'relative' },
-  photoThumbImg:    { width: '100%', height: '100%' },
-  photoRemoveBtn:   { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
-  photoAddThumb:    { width: 90, height: 68, borderRadius: 10, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 3 },
-  photoAddText:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
   specialtyGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   specialtyChip:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
   specialtyChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },

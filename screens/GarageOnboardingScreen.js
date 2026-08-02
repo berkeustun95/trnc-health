@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
   ActivityIndicator, Alert,
@@ -12,6 +12,7 @@ import { t } from '../constants/i18n'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
 import GarageBookingsScreen from './GarageBookingsScreen'
 import GroomingAvailabilityEditor from './GroomingAvailabilityEditor'
+import FacilityPhotoManager from '../components/FacilityPhotoManager'
 
 // ─── State screens ────────────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ function DeclinedState({ lang, onClose }) {
   )
 }
 
-function ActiveState({ lang, onClose, onManageBookings, onManageAvailability, onEdit }) {
+function ActiveState({ lang, onClose, onManageBookings, onManageAvailability, onManagePhotos, onEdit }) {
   return (
     <View style={s.stateWrap}>
       <Text style={s.stateEmoji}>✅</Text>
@@ -54,6 +55,10 @@ function ActiveState({ lang, onClose, onManageBookings, onManageAvailability, on
       <TouchableOpacity style={s.secondaryBtn} onPress={onManageAvailability} activeOpacity={0.85}>
         <Ionicons name="calendar-outline" size={18} color={colors.primary} />
         <Text style={s.secondaryBtnText}>{t('garageManageAvail', lang)}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={s.secondaryBtn} onPress={onManagePhotos} activeOpacity={0.85}>
+        <Ionicons name="image-outline" size={18} color={colors.primary} />
+        <Text style={s.secondaryBtnText}>{t('garageManagePhotos', lang)}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={s.secondaryBtn} onPress={onEdit} activeOpacity={0.85}>
         <Ionicons name="create-outline" size={18} color={colors.primary} />
@@ -84,6 +89,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
   const [checking, setChecking] = useState(true)
   const [managingBookings, setManagingBookings] = useState(false)
   const [editingAvail, setEditingAvail] = useState(false)
+  const [managingPhotos, setManagingPhotos] = useState(false)
   const [editing, setEditing] = useState(false)
 
   const [name,        setName]        = useState('')
@@ -96,19 +102,18 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState(null)
 
-  useEffect(() => {
-    async function checkExisting() {
-      const { data } = await supabase
-        .from('facilities')
-        .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types, availability')
-        .eq('provider_id', session.user.id)
-        .eq('type', 'garage')
-        .maybeSingle()
-      setExisting(data)
-      setChecking(false)
-    }
-    checkExisting()
+  const loadExisting = useCallback(async () => {
+    const { data } = await supabase
+      .from('facilities')
+      .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types, availability, cover_image_url, logo_url, photos')
+      .eq('provider_id', session.user.id)
+      .eq('type', 'garage')
+      .maybeSingle()
+    setExisting(data)
+    setChecking(false)
   }, [session.user.id])
+
+  useEffect(() => { loadExisting() }, [loadExisting])
 
   function toggleService(key) {
     setServices(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
@@ -217,6 +222,29 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
         />
       )
     }
+    if (managingPhotos) {
+      return (
+        <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={() => setManagingPhotos(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={s.headerTitle}>{t('garageManagePhotos', lang)}</Text>
+            <View style={{ width: 24 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+            <FacilityPhotoManager
+              facilityId={existing.id}
+              initialCover={existing.cover_image_url}
+              initialLogo={existing.logo_url}
+              initialPhotos={existing.photos}
+              lang={lang}
+              onFacilityUpdated={loadExisting}
+            />
+          </ScrollView>
+        </SafeAreaView>
+      )
+    }
     return (
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
         <ActiveState
@@ -224,6 +252,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
           onClose={onClose}
           onManageBookings={() => setManagingBookings(true)}
           onManageAvailability={() => setEditingAvail(true)}
+          onManagePhotos={() => setManagingPhotos(true)}
           onEdit={startEdit}
         />
       </SafeAreaView>

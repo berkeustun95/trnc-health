@@ -100,7 +100,9 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
 
           {/* Cover image */}
           {facility.cover_image_url
-            ? <Image source={{ uri: facility.cover_image_url }} style={s.cover} resizeMode="cover" />
+            ? <TouchableOpacity activeOpacity={0.9} onPress={() => setLightbox(facility.cover_image_url)}>
+                <Image source={{ uri: facility.cover_image_url }} style={s.cover} resizeMode="cover" />
+              </TouchableOpacity>
             : <View style={[s.cover, s.coverFallback, { backgroundColor: tc.bg }]}>
                 <Text style={s.coverFallbackIcon}>{TYPE_ICONS[facility.type] ?? '🏥'}</Text>
               </View>
@@ -110,7 +112,9 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
             {/* Identity */}
             <View style={s.identityRow}>
               {facility.logo_url
-                ? <Image source={{ uri: facility.logo_url }} style={s.logo} resizeMode="contain" />
+                ? <TouchableOpacity activeOpacity={0.9} onPress={() => setLightbox(facility.logo_url)}>
+                    <Image source={{ uri: facility.logo_url }} style={s.logo} resizeMode="contain" />
+                  </TouchableOpacity>
                 : <View style={[s.logo, s.logoFallback, { backgroundColor: tc.bg }]}>
                     <Text style={{ fontSize: 22 }}>{TYPE_ICONS[facility.type] ?? '🏥'}</Text>
                   </View>
