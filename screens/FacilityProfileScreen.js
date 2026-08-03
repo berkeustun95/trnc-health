@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { View, Text, Image, ScrollView, FlatList, TouchableOpacity, Modal, StyleSheet, Linking, Dimensions } from 'react-native'
+import MapView, { Marker } from 'react-native-maps'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { REGION_LABEL_KEY } from '../constants/regions'
+import { areaName } from '../constants/areas'
 import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton } from '../components/Skeleton'
 import ContentReportMenu from '../components/ContentReportMenu'
@@ -187,6 +190,33 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
               </View>
             ) : null}
 
+            {/* Map location */}
+            {facility.latitude != null && facility.longitude != null && (
+              <View style={s.section}>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${facility.latitude},${facility.longitude}`)}
+                >
+                  <MapView
+                    style={s.miniMap}
+                    pointerEvents="none"
+                    scrollEnabled={false}
+                    zoomEnabled={false}
+                    rotateEnabled={false}
+                    pitchEnabled={false}
+                    initialRegion={{
+                      latitude: facility.latitude,
+                      longitude: facility.longitude,
+                      latitudeDelta: 0.008,
+                      longitudeDelta: 0.008,
+                    }}
+                  >
+                    <Marker coordinate={{ latitude: facility.latitude, longitude: facility.longitude }} pinColor={colors.primary} />
+                  </MapView>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Contact */}
             <View style={s.section}>
               {facility.address ? (
@@ -201,6 +231,16 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
                   <Text style={[s.contactText, { flex: 1 }]}>{facility.address}</Text>
                   <Text style={s.contactAction}>{t('getDirections', lang)}</Text>
                 </TouchableOpacity>
+              ) : null}
+              {facility.city && REGION_LABEL_KEY[facility.city] ? (
+                <View style={s.contactRow}>
+                  <View style={[s.contactIcon, { backgroundColor: colors.primaryLight }]}>
+                    <Feather name="map" size={15} color={colors.primary} />
+                  </View>
+                  <Text style={[s.contactText, { flex: 1 }]}>
+                    {facility.area ? `${areaName(facility.area, facility.city)}, ` : ''}{t(REGION_LABEL_KEY[facility.city], lang)}
+                  </Text>
+                </View>
               ) : null}
               {facility.phone ? (
                 <TouchableOpacity
@@ -356,6 +396,7 @@ const s = StyleSheet.create({
   name:              { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.3, marginBottom: 3 },
   specialty:         { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
   section:           { marginBottom: 24 },
+  miniMap:           { width: '100%', height: 150, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.border },
   sectionLabel:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   chipRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:              { backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },

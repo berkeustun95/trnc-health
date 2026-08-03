@@ -13,6 +13,10 @@ import { GARAGE_CATEGORIES } from './GaragesScreen'
 import GarageBookingsScreen from './GarageBookingsScreen'
 import GroomingAvailabilityEditor from './GroomingAvailabilityEditor'
 import FacilityPhotoManager from '../components/FacilityPhotoManager'
+import MapPinPicker from '../components/MapPinPicker'
+import Dropdown from '../components/Dropdown'
+import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
+import { areaOptions } from '../constants/areas'
 
 // ─── State screens ────────────────────────────────────────────────────────────
 
@@ -94,10 +98,15 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
 
   const [name,        setName]        = useState('')
   const [services,    setServices]    = useState([]) // multi-select category keys
-  const [area,        setArea]        = useState('')
+  const [address,     setAddress]     = useState('') // free-text street/building → facilities.address
+  const [city,        setCity]        = useState(null) // region slug (REGIONS)
+  const [area,        setArea]        = useState(null) // area slug (AREAS_BY_REGION[city])
   const [phone,       setPhone]       = useState('')
   const [hours,       setHours]       = useState('')
   const [description, setDescription] = useState('')
+  const [lat,         setLat]         = useState(null)
+  const [lng,         setLng]         = useState(null)
+  const [showMapPicker, setShowMapPicker] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState(null)
@@ -105,7 +114,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
   const loadExisting = useCallback(async () => {
     const { data } = await supabase
       .from('facilities')
-      .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types, availability, cover_image_url, logo_url, photos')
+      .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types, availability, cover_image_url, logo_url, photos, latitude, longitude, city, area')
       .eq('provider_id', session.user.id)
       .eq('type', 'garage')
       .maybeSingle()
@@ -119,6 +128,12 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
     setServices(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
   }
 
+  // Changing region invalidates the dependent area — clear it so no stale mismatch persists.
+  function selectCity(region) {
+    setCity(region)
+    setArea(null)
+  }
+
   async function handleSubmit() {
     setError(null)
     if (!name.trim())       { setError(t('garageErrorName', lang)); return }
@@ -126,15 +141,24 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
 
     setSaving(true)
     try {
-      const { error: err } = await supabase.rpc('create_garage_facility', {
+      const { data: newId, error: err } = await supabase.rpc('create_garage_facility', {
         p_name:          name.trim(),
         p_service_types: services,
-        p_address:       area.trim() || null,
+        p_address:       address.trim() || null,
         p_phone:         phone.trim() || null,
         p_opening_hours: hours.trim() || null,
         p_description:   description.trim() || null,
       })
       if (err) throw err
+      // location + city + area live in non-guard-locked columns the owner may write
+      // directly via RLS. Persist whatever was set on the fresh row in one update.
+      const patch = {}
+      if (lat != null && lng != null) { patch.latitude = lat; patch.longitude = lng }
+      if (city) patch.city = city
+      if (area) patch.area = area
+      if (newId && Object.keys(patch).length) {
+        await supabase.from('facilities').update(patch).eq('id', newId)
+      }
       onSubmitted?.()
     } catch (err) {
       setError(err.message || t('garageErrorGeneric', lang))
@@ -146,12 +170,27 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
   function startEdit() {
     setName(existing.name || '')
     setServices(existing.service_types || [])
-    setArea(existing.address || '')
+    setAddress(existing.address || '')
+    setCity(existing.city ?? null)
+    setArea(existing.area ?? null)
     setPhone(existing.phone || '')
     setHours(existing.opening_hours || '')
     setDescription(existing.description || '')
+    setLat(existing.latitude ?? null)
+    setLng(existing.longitude ?? null)
     setError(null)
     setEditing(true)
+  }
+
+  // Location is not a guard-locked column, so an owner may write it directly (RLS
+  // "Provider can update own facility"). While editing an existing row, persist the
+  // pin immediately; during create it's held in state and written after the RPC.
+  async function confirmLocation(la, lo) {
+    setLat(la); setLng(lo); setShowMapPicker(false)
+    if (editing && existing?.id) {
+      await supabase.from('facilities').update({ latitude: la, longitude: lo }).eq('id', existing.id)
+      setExisting(prev => ({ ...prev, latitude: la, longitude: lo }))
+    }
   }
 
   async function handleEdit() {
@@ -165,24 +204,18 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
         p_facility_id:   existing.id,
         p_name:          name.trim(),
         p_service_types: services,
-        p_address:       area.trim() || null,
+        p_address:       address.trim() || null,
         p_phone:         phone.trim() || null,
         p_opening_hours: hours.trim() || null,
         p_description:   description.trim() || null,
       })
       if (err) throw err
+      // city + area are non-material (not guard-locked) — persist them directly, outside the RPC.
+      await supabase.from('facilities').update({ city, area }).eq('id', existing.id)
       setEditing(false)
-      if (material) {
-        Alert.alert('', t('garageEditPendingNote', lang))
-        // Material change flipped the row back to pending — refresh so the pending state shows.
-        const { data } = await supabase
-          .from('facilities')
-          .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types, availability')
-          .eq('id', existing.id).maybeSingle()
-        setExisting(data)
-      } else {
-        Alert.alert('', t('garageEditSaved', lang))
-      }
+      // Material change flipped the row back to pending — refetch so the pending state shows.
+      await loadExisting()
+      Alert.alert('', t(material ? 'garageEditPendingNote' : 'garageEditSaved', lang))
     } catch (err) {
       setError(err.message || t('garageErrorGeneric', lang))
     } finally {
@@ -321,15 +354,51 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
             </View>
           </Field>
 
-          {/* Area / city */}
+          {/* City / region (dropdown) */}
+          <Field label={t('garageRegisterCity', lang)}>
+            <Dropdown
+              value={city}
+              options={REGIONS.map(r => ({ value: r, label: t(REGION_LABEL_KEY[r], lang) }))}
+              onSelect={selectCity}
+              placeholder={t('dropdownSelect', lang)}
+            />
+          </Field>
+
+          {/* Area / neighbourhood (dependent dropdown) */}
           <Field label={t('garageRegisterArea', lang)}>
+            <Dropdown
+              value={area}
+              options={areaOptions(city)}
+              onSelect={setArea}
+              placeholder={t('dropdownSelect', lang)}
+              disabled={!city}
+              disabledText={t('dropdownPickCityFirst', lang)}
+            />
+          </Field>
+
+          {/* Street address (free-text building/street detail) */}
+          <Field label={t('garageRegisterStreet', lang)}>
             <TextInput
               style={s.input}
-              value={area}
-              onChangeText={setArea}
-              placeholder={t('garageRegisterAreaPlaceholder', lang)}
+              value={address}
+              onChangeText={setAddress}
+              placeholder={t('garageRegisterStreetPlaceholder', lang)}
               placeholderTextColor={colors.textSecondary}
             />
+          </Field>
+
+          {/* Business location (map pin + GPS) */}
+          <Field label={t('garageRegisterLocation', lang)}>
+            {lat != null && lng != null && (
+              <View style={s.locRow}>
+                <Ionicons name="location" size={14} color={colors.primary} />
+                <Text style={s.locText}>{lat.toFixed(5)}, {lng.toFixed(5)}</Text>
+              </View>
+            )}
+            <TouchableOpacity style={s.locBtn} onPress={() => setShowMapPicker(true)} activeOpacity={0.85}>
+              <Ionicons name="map-outline" size={16} color={colors.primary} />
+              <Text style={s.locBtnText}>{lat != null ? t('garageLocationUpdate', lang) : t('garageLocationSet', lang)}</Text>
+            </TouchableOpacity>
           </Field>
 
           {/* Phone */}
@@ -384,6 +453,14 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAwareForm>
+
+      <MapPinPicker
+        visible={showMapPicker}
+        initialLat={lat}
+        initialLng={lng}
+        onConfirm={confirmLocation}
+        onCancel={() => setShowMapPicker(false)}
+      />
     </SafeAreaView>
   )
 }
@@ -407,6 +484,12 @@ const s = StyleSheet.create({
                       borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12,
                       fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   inputMulti:       { minHeight: 100, paddingTop: 12 },
+  locRow:           { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  locText:          { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
+  locBtn:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+                      borderWidth: 1.5, borderColor: colors.primary, borderRadius: radius.md,
+                      paddingVertical: 12, backgroundColor: colors.cardBg },
+  locBtnText:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   chipRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   selChip:          { flexDirection: 'row', alignItems: 'center', gap: 5,

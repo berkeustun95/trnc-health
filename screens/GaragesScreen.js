@@ -10,6 +10,7 @@ import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import GarageOnboardingScreen from './GarageOnboardingScreen'
 
 // Multi-tag auto-service categories. A garage can offer several; the directory
@@ -88,6 +89,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(false)
   const [selected, setSelected]       = useState([]) // multi-select category keys
+  const [regions, setRegions]         = useState([]) // multi-select region slugs
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [myGarage, setMyGarage]       = useState(null) // the caller's own garage row, if any
 
@@ -96,16 +98,21 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
     setError(false)
     let query = supabase
       .from('facilities')
-      .select('id, name, type, service_types, address, phone, opening_hours, description, cover_image_url, logo_url, photos, availability')
+      .select('id, name, type, service_types, address, phone, opening_hours, description, cover_image_url, logo_url, photos, availability, city, area')
       .eq('type', 'garage')
       .eq('status', 'active')
       .order('name', { ascending: true })
     if (selected.length > 0) query = query.overlaps('service_types', selected)
+    if (regions.length > 0) query = query.in('city', regions)
     const { data, error: err } = await query
     if (err) setError(true)
     else setGarages(data || [])
     setLoading(false)
-  }, [selected])
+  }, [selected, regions])
+
+  function toggleRegion(key) {
+    setRegions(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -166,6 +173,32 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
                 onPress={() => toggleCategory(c.key)}
               >
                 <Text style={[s.chipText, active && s.chipTextActive]}>{t(c.labelKey, lang)}</Text>
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={s.filterRow}
+        >
+          <TouchableOpacity
+            style={[s.chip, regions.length === 0 && s.chipActive]}
+            onPress={() => setRegions([])}
+          >
+            <Text style={[s.chipText, regions.length === 0 && s.chipTextActive]}>{t('filterAll', lang)}</Text>
+          </TouchableOpacity>
+          {REGIONS.map(r => {
+            const active = regions.includes(r)
+            return (
+              <TouchableOpacity
+                key={r}
+                style={[s.chip, active && s.chipActive]}
+                onPress={() => toggleRegion(r)}
+              >
+                <Text style={[s.chipText, active && s.chipTextActive]}>{t(REGION_LABEL_KEY[r], lang)}</Text>
               </TouchableOpacity>
             )
           })}

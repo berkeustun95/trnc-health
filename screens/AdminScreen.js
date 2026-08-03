@@ -2853,12 +2853,13 @@ function GroomingTab() {
   const [filter, setFilter]             = useState('pending')
 
   const CAT_LABELS = { barber: 'Barber', hairdresser: 'Hairdresser', nails: 'Nails', beauty: 'Beauty' }
+  const typesLabel = arr => (Array.isArray(arr) ? arr.map(st => CAT_LABELS[st] || st).join(', ') : '')
 
   const load = useCallback(async () => {
     setLoading(true)
     let query = supabase
       .from('facilities')
-      .select('id, name, category, address, phone, status, provider_id')
+      .select('id, name, service_types, address, phone, status, provider_id')
       .eq('type', 'grooming')
       .order('created_at', { ascending: false })
     if (filter !== 'all') query = query.eq('status', filter)
@@ -2922,7 +2923,7 @@ function GroomingTab() {
                 <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={s.cardTitle} numberOfLines={1}>{item.name}</Text>
-                    <Text style={s.cardSub}>{CAT_LABELS[item.category] || item.category}{item.address ? ` · ${item.address}` : ''}</Text>
+                    <Text style={s.cardSub}>{typesLabel(item.service_types)}{item.address ? ` · ${item.address}` : ''}</Text>
                     {!!item.phone && <Text style={s.cardSub}>{item.phone}</Text>}
                   </View>
                   <View style={[s.pillGrey, { backgroundColor: statusColor(item.status) + '20', marginLeft: 8 }]}>

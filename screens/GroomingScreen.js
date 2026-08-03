@@ -10,6 +10,7 @@ import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import GroomingOnboardingScreen from './GroomingOnboardingScreen'
 
 const CATEGORIES = [
@@ -25,6 +26,7 @@ function categoryLabel(key, lang) { return t(CATEGORY_KEYS[key] || key, lang) }
 // ─── Provider card ────────────────────────────────────────────────────────────
 
 function ProviderCard({ item, lang, onPress }) {
+  const types = Array.isArray(item.service_types) ? item.service_types : []
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
       {!!item.cover_image_url && (
@@ -36,10 +38,17 @@ function ProviderCard({ item, lang, onPress }) {
             <Image source={{ uri: item.logo_url }} style={s.cardLogo} resizeMode="cover" />
           )}
           <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
-          <View style={s.categoryBadge}>
-            <Text style={s.categoryText}>{categoryLabel(item.category, lang)}</Text>
-          </View>
         </View>
+
+        {types.length > 0 && (
+          <View style={s.badgeRow}>
+            {types.map(ty => (
+              <View key={ty} style={s.categoryBadge}>
+                <Text style={s.categoryText}>{categoryLabel(ty, lang)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {!!item.address && (
           <View style={s.cardRow}>
@@ -67,23 +76,35 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
   const [providers, setProviders]         = useState([])
   const [loading, setLoading]             = useState(true)
   const [error, setError]                 = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [selected, setSelected]           = useState([]) // multi-select category keys
+  const [regions, setRegions]             = useState([]) // multi-select region slugs
   const [showOnboarding, setShowOnboarding]     = useState(false)
   const [myFacility, setMyFacility]             = useState(null) // the caller's own grooming facility, if any
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(false)
-    const { data, error: err } = await supabase
+    let query = supabase
       .from('facilities')
-      .select('id, name, type, category, address, phone, opening_hours, description, languages, specialty, latitude, longitude, photos, verified, availability, cover_image_url, logo_url, provider_id')
+      .select('id, name, type, service_types, address, phone, opening_hours, description, languages, specialty, latitude, longitude, photos, verified, availability, cover_image_url, logo_url, provider_id, city, area')
       .eq('type', 'grooming')
       .eq('status', 'active')
       .order('name', { ascending: true })
+    if (selected.length > 0) query = query.overlaps('service_types', selected)
+    if (regions.length > 0) query = query.in('city', regions)
+    const { data, error: err } = await query
     if (err) setError(true)
     else setProviders(data || [])
     setLoading(false)
-  }, [])
+  }, [selected, regions])
+
+  function toggleCategory(key) {
+    setSelected(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
+  }
+
+  function toggleRegion(key) {
+    setRegions(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -113,10 +134,6 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
     )
   }
 
-  const filtered = selectedCategory
-    ? providers.filter(p => p.category === selectedCategory)
-    : providers
-
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="grooming" />
@@ -130,22 +147,51 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
           contentContainerStyle={s.filterRow}
         >
           <TouchableOpacity
-            style={[s.chip, !selectedCategory && s.chipActive]}
-            onPress={() => setSelectedCategory(null)}
+            style={[s.chip, selected.length === 0 && s.chipActive]}
+            onPress={() => setSelected([])}
           >
-            <Text style={[s.chipText, !selectedCategory && s.chipTextActive]}>{t('groomFilterAll', lang)}</Text>
+            <Text style={[s.chipText, selected.length === 0 && s.chipTextActive]}>{t('groomFilterAll', lang)}</Text>
           </TouchableOpacity>
-          {CATEGORIES.map(c => (
-            <TouchableOpacity
-              key={c.key}
-              style={[s.chip, selectedCategory === c.key && s.chipActive]}
-              onPress={() => setSelectedCategory(c.key)}
-            >
-              <Text style={[s.chipText, selectedCategory === c.key && s.chipTextActive]}>
-                {t(c.labelKey, lang)}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {CATEGORIES.map(c => {
+            const active = selected.includes(c.key)
+            return (
+              <TouchableOpacity
+                key={c.key}
+                style={[s.chip, active && s.chipActive]}
+                onPress={() => toggleCategory(c.key)}
+              >
+                <Text style={[s.chipText, active && s.chipTextActive]}>
+                  {t(c.labelKey, lang)}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={s.filterRow}
+        >
+          <TouchableOpacity
+            style={[s.chip, regions.length === 0 && s.chipActive]}
+            onPress={() => setRegions([])}
+          >
+            <Text style={[s.chipText, regions.length === 0 && s.chipTextActive]}>{t('groomFilterAll', lang)}</Text>
+          </TouchableOpacity>
+          {REGIONS.map(r => {
+            const active = regions.includes(r)
+            return (
+              <TouchableOpacity
+                key={r}
+                style={[s.chip, active && s.chipActive]}
+                onPress={() => toggleRegion(r)}
+              >
+                <Text style={[s.chipText, active && s.chipTextActive]}>{t(REGION_LABEL_KEY[r], lang)}</Text>
+              </TouchableOpacity>
+            )
+          })}
         </ScrollView>
 
         {loading ? (
@@ -162,7 +208,7 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
           </View>
         ) : (
           <FlatList
-            data={filtered}
+            data={providers}
             keyExtractor={item => item.id}
             contentContainerStyle={s.listContent}
             showsVerticalScrollIndicator={false}
@@ -254,6 +300,7 @@ const s = StyleSheet.create({
   cardTop:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                     marginBottom: 6, gap: 8 },
   cardName:       { flex: 1, fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  badgeRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   categoryBadge:  { backgroundColor: colors.primaryLight, paddingHorizontal: 8, paddingVertical: 3,
                     borderRadius: 10 },
   categoryText:   { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
