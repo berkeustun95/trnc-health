@@ -536,7 +536,7 @@ export default function App() {
   async function loadProviderFacility() {
     const { data: fac } = await supabase
       .from('facilities')
-      .select('id, name, type, status, membership_tier, trial_ends_at, phone, address, opening_hours, cover_image_url, logo_url, availability, description, languages, specialty, latitude, longitude, photos')
+      .select('id, name, type, status, hidden_at, hidden_reason, membership_tier, trial_ends_at, phone, address, opening_hours, cover_image_url, logo_url, availability, description, languages, specialty, latitude, longitude, photos')
       .eq('provider_id', session?.user.id)
       .maybeSingle()
     setProviderFacility(fac ?? null)

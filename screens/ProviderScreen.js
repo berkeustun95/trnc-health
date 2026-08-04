@@ -12,6 +12,7 @@ import HoursPicker from '../components/HoursPicker'
 import MapPinPicker from '../components/MapPinPicker'
 import FacilityPhotoManager from '../components/FacilityPhotoManager'
 import ContentReportMenu from '../components/ContentReportMenu'
+import ListingHiddenBanner from '../components/ListingHiddenBanner'
 import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 
@@ -472,6 +473,13 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
             <Text style={styles.signOutText}>{t('signOut', lang)}</Text>
           </TouchableOpacity>
         </View>
+
+        <ListingHiddenBanner
+          hiddenAt={facility.hidden_at}
+          hiddenReason={facility.hidden_reason}
+          lang={lang}
+          style={{ marginHorizontal: 16, marginTop: 12 }}
+        />
 
         {trialDaysLeft !== null && trialDaysLeft !== undefined && (
           <TouchableOpacity

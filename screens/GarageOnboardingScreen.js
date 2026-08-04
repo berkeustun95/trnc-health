@@ -15,6 +15,7 @@ import GroomingAvailabilityEditor from './GroomingAvailabilityEditor'
 import FacilityPhotoManager from '../components/FacilityPhotoManager'
 import MapPinPicker from '../components/MapPinPicker'
 import Dropdown from '../components/Dropdown'
+import ListingHiddenBanner from '../components/ListingHiddenBanner'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions } from '../constants/areas'
 
@@ -46,9 +47,10 @@ function DeclinedState({ lang, onClose }) {
   )
 }
 
-function ActiveState({ lang, onClose, onManageBookings, onManageAvailability, onManagePhotos, onEdit }) {
+function ActiveState({ lang, hiddenAt, hiddenReason, onClose, onManageBookings, onManageAvailability, onManagePhotos, onEdit }) {
   return (
     <View style={s.stateWrap}>
+      <ListingHiddenBanner hiddenAt={hiddenAt} hiddenReason={hiddenReason} lang={lang} style={{ marginBottom: 20, alignSelf: 'stretch' }} />
       <Text style={s.stateEmoji}>✅</Text>
       <Text style={s.stateTitle}>{t('garageRegisterActive', lang)}</Text>
       <Text style={s.stateSub}>{t('garageRegisterActiveSub', lang)}</Text>
@@ -114,7 +116,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
   const loadExisting = useCallback(async () => {
     const { data } = await supabase
       .from('facilities')
-      .select('id, name, status, provider_id, address, phone, opening_hours, description, service_types, availability, cover_image_url, logo_url, photos, latitude, longitude, city, area')
+      .select('id, name, status, hidden_at, hidden_reason, provider_id, address, phone, opening_hours, description, service_types, availability, cover_image_url, logo_url, photos, latitude, longitude, city, area')
       .eq('provider_id', session.user.id)
       .eq('type', 'garage')
       .maybeSingle()
@@ -282,6 +284,8 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
         <ActiveState
           lang={lang}
+          hiddenAt={existing.hidden_at}
+          hiddenReason={existing.hidden_reason}
           onClose={onClose}
           onManageBookings={() => setManagingBookings(true)}
           onManageAvailability={() => setEditingAvail(true)}
