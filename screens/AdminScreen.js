@@ -421,7 +421,13 @@ function ReportsTab({ session }) {
       .update({ hidden_at: new Date().toISOString(), hidden_reason: 'admin_removed' })
       .eq('id', g.contentId)
     await resolveReports(g, 'actioned')
-    await notifyAuthor(g, 'Content removed', `Your ${g.contentType} was removed for violating ADA's content policy.`)
+    // Facilities are HIDDEN (recoverable), not deleted — say so, matching the owner
+    // "listing hidden" banner. review/question/answer keep the "removed" wording.
+    if (g.contentType === 'facility') {
+      await notifyAuthor(g, 'Listing hidden', 'Your listing is currently hidden and not visible to customers. If you think this is a mistake, please get in touch and we’ll take another look.')
+    } else {
+      await notifyAuthor(g, 'Content removed', `Your ${g.contentType} was removed for violating ADA's content policy.`)
+    }
     setBusy(null); load()
   }
 
@@ -431,6 +437,11 @@ function ReportsTab({ session }) {
       .update({ hidden_at: null, hidden_reason: null })
       .eq('id', g.contentId)
     await resolveReports(g, 'dismissed')
+    // Only facilities get a restore push — the owner saw the "hidden" banner and
+    // should learn it's back. review/question/answer restores stay silent (unchanged).
+    if (g.contentType === 'facility') {
+      await notifyAuthor(g, 'Listing visible again', 'Good news — your listing is visible to customers again.')
+    }
     setBusy(null); load()
   }
 
