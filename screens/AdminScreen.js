@@ -342,9 +342,9 @@ function DashboardTab({ onNavigate }) {
 // publish a 24h removal commitment in the Terms).
 
 const REASON_LABELS  = { offensive: 'Offensive', harassment: 'Harassment', spam: 'Spam', false_info: 'False info', other: 'Other' }
-const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers' }
-const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id' }
-const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body' }
+const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities' }
+const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id' }
+const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name' }
 
 function timeAgo(iso) {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
@@ -374,7 +374,7 @@ function ReportsTab({ session }) {
     // type. It may be missing entirely — delete_own_account hard-deletes a user's
     // reviews, which leaves their reports dangling.
     const contentByKey = new Map()
-    for (const type of ['review', 'question', 'answer']) {
+    for (const type of ['review', 'question', 'answer', 'facility']) {
       const ids = [...new Set(reports.filter(r => r.content_type === type).map(r => r.content_id))]
       if (!ids.length) continue
       const { data } = await supabase
@@ -534,7 +534,7 @@ function ReportsTab({ session }) {
                         <Text style={s.dangerGhostText}>Remove</Text>
                       </TouchableOpacity>
                   )}
-                  {!missing && (
+                  {!missing && g.contentType !== 'facility' && (
                     <TouchableOpacity style={s.dangerGhostBtn} onPress={() => confirmBan(g)}>
                       <Text style={s.dangerGhostText}>Ban author</Text>
                     </TouchableOpacity>

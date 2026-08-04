@@ -30,8 +30,9 @@ async function sendPushNotification(token, title, body) {
 async function notifyAdmins(contentType) {
   try {
     const { data: admins } = await supabase.from('profiles').select('id, push_token').eq('role', 'admin')
+    const label = contentType === 'facility' ? 'business listing' : contentType
     const title = 'Content reported'
-    const body  = `A ${contentType} was reported and is awaiting review.`
+    const body  = `A ${label} was reported and is awaiting review.`
     for (const admin of admins ?? []) {
       if (admin.push_token) await sendPushNotification(admin.push_token, title, body)
       await supabase.from('notifications').insert({ user_id: admin.id, title, body })
@@ -51,7 +52,8 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
   // Reviews are the only surface where one user sees another user's content, so
   // they are the only place a block is meaningful. Questions/answers are a
   // private thread with the business — the RPC rejects them server-side too.
-  const canBlock = contentType === 'review'
+  const canBlock   = contentType === 'review'
+  const isFacility = contentType === 'facility'
 
   function close() {
     setOpen(false)
@@ -172,8 +174,8 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
 
             {step === 'form' && (
               <>
-                <Text style={s.title}>{t('reportTitle', lang)}</Text>
-                <Text style={s.sub}>{t('reportSubtitle', lang)}</Text>
+                <Text style={s.title}>{t(isFacility ? 'reportBusinessTitle' : 'reportTitle', lang)}</Text>
+                <Text style={s.sub}>{t(isFacility ? 'reportBusinessSub' : 'reportSubtitle', lang)}</Text>
 
                 {REASONS.map(r => (
                   <TouchableOpacity

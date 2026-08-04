@@ -1160,6 +1160,7 @@ export default function App() {
     content = <FacilityProfileScreen
       facility={selectedFacility}
       lang={lang}
+      session={session}
       isFavorite={favorites.has(selectedFacility.id)}
       onToggleFavorite={() => toggleFavorite(selectedFacility.id)}
       onBook={() => { if (requireAccount('gateBooking')) return; setBookingFacility(selectedFacility) }}

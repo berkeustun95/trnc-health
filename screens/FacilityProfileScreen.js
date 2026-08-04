@@ -20,7 +20,11 @@ const TODAY_KEY    = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
-export default function FacilityProfileScreen({ facility, lang, isFavorite, onToggleFavorite, onBook, onBack, onRequireAccount }) {
+export default function FacilityProfileScreen({ facility, lang, session, isFavorite, onToggleFavorite, onBook, onBack, onRequireAccount }) {
+  // Any signed-in viewer who is NOT the listing's owner may report it. Logged-out
+  // taps fall through to onRequireAccount inside ContentReportMenu. Unclaimed
+  // health facilities (provider_id null) are reportable by anyone signed in.
+  const canReport = facility.provider_id !== session?.user?.id
   const [reviews, setReviews]           = useState([])
   const [reviewTotal, setReviewTotal]   = useState(0)
   const [reviewAvg, setReviewAvg]       = useState(null)
@@ -92,13 +96,23 @@ export default function FacilityProfileScreen({ facility, lang, isFavorite, onTo
               <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
               <Text style={s.backText}>{t('back', lang)}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons
-                name={isFavorite ? 'heart' : 'heart-outline'}
-                size={22}
-                color={isFavorite ? colors.danger : colors.textSecondary}
-              />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              {canReport && (
+                <ContentReportMenu
+                  contentType="facility"
+                  contentId={facility.id}
+                  lang={lang}
+                  onRequireAccount={onRequireAccount}
+                />
+              )}
+              <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons
+                  name={isFavorite ? 'heart' : 'heart-outline'}
+                  size={22}
+                  color={isFavorite ? colors.danger : colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Cover image */}
