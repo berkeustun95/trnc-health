@@ -156,7 +156,7 @@ const WELCOME_VIDEO_LIVE = false
 // Garages / Auto Services dark-launch. false hides the Home tile from normal
 // users; admins still see it (garagesTileVisible) so the module can be previewed
 // before public launch. Flip to true to release Slice 1.
-const GARAGES_LIVE = false
+const GARAGES_LIVE = true
 
 // One repeatable drawer row. Defined at module level so it never remounts with
 // the parent. Each item: { key, iconSet, icon, labelKey, onPress, danger? }.
