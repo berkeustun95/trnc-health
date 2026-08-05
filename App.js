@@ -1170,7 +1170,7 @@ export default function App() {
   } else if (showGrooming) {
     content = <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGrooming(false)} onOpenFacility={setSelectedFacility} />
   } else if (showGarages) {
-    content = <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} onOpenFacility={setSelectedFacility} />
+    content = <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} onOpenFacility={setSelectedFacility} isAdmin={profile?.role === 'admin'} />
   } else {
     const favList = facilities.filter(f => favorites.has(f.id))
     // Utility-only drawer. Home's module grid is the app's navigation now, so the

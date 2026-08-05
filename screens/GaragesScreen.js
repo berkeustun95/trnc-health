@@ -8,9 +8,12 @@ import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
+import FeaturedBadge from '../components/FeaturedBadge'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
+import { FEATURED_LIVE } from '../constants/flags'
+import { partitionFeatured, isFeatured } from '../utils/featured'
 import GarageOnboardingScreen from './GarageOnboardingScreen'
 
 // Multi-tag auto-service categories. A garage can offer several; the directory
@@ -30,7 +33,7 @@ function categoryLabel(key, lang) { return t(CATEGORY_KEYS[key] || key, lang) }
 
 // ─── Garage card ──────────────────────────────────────────────────────────────
 
-function GarageCard({ item, lang, onPress }) {
+function GarageCard({ item, lang, onPress, showFeatured }) {
   const types = Array.isArray(item.service_types) ? item.service_types : []
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
@@ -38,6 +41,7 @@ function GarageCard({ item, lang, onPress }) {
         <Image source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
       )}
       <View style={s.cardBody}>
+        {showFeatured && isFeatured(item) && <FeaturedBadge lang={lang} style={{ marginBottom: 8 }} />}
         <View style={s.cardHead}>
           {!!item.logo_url && (
             <Image source={{ uri: item.logo_url }} style={s.cardLogo} resizeMode="cover" />
@@ -84,7 +88,10 @@ function GarageCard({ item, lang, onPress }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function GaragesScreen({ lang, session, onBack, onRequireAccount, onOpenFacility }) {
+export default function GaragesScreen({ lang, session, onBack, onRequireAccount, onOpenFacility, isAdmin = false }) {
+  // Dark launch: featured pinning + badge show only once live, or to an admin
+  // previewing the directory. Mirrors the GARAGES_LIVE tile-gate.
+  const showFeatured = FEATURED_LIVE || isAdmin
   const [garages, setGarages]         = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(false)
@@ -98,7 +105,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
     setError(false)
     let query = supabase
       .from('facilities')
-      .select('id, name, type, service_types, address, phone, opening_hours, description, cover_image_url, logo_url, photos, availability, city, area')
+      .select('id, name, type, service_types, address, phone, opening_hours, description, cover_image_url, logo_url, photos, availability, city, area, featured_until')
       .eq('type', 'garage')
       .eq('status', 'active')
       .order('name', { ascending: true })
@@ -106,9 +113,11 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
     if (regions.length > 0) query = query.in('city', regions)
     const { data, error: err } = await query
     if (err) setError(true)
-    else setGarages(data || [])
+    // Featured rows pinned + fairly rotated to the top when surfacing is enabled;
+    // otherwise the plain name sort is left untouched.
+    else setGarages(showFeatured ? partitionFeatured(data || []) : (data || []))
     setLoading(false)
-  }, [selected, regions])
+  }, [selected, regions, showFeatured])
 
   function toggleRegion(key) {
     setRegions(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
@@ -255,7 +264,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
                 </View>
               </View>
             }
-            renderItem={({ item }) => <GarageCard item={item} lang={lang} onPress={() => onOpenFacility?.(item)} />}
+            renderItem={({ item }) => <GarageCard item={item} lang={lang} showFeatured={showFeatured} onPress={() => onOpenFacility?.(item)} />}
           />
         )}
       </View>

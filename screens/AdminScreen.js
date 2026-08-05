@@ -28,7 +28,7 @@ async function openSignedDoc(bucket, storedValue) {
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'Garages', 'BusRoutes', 'Places', 'JobPostings']
+const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'JobPostings']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -151,6 +151,47 @@ function ActivateJobModal({ visible, jobTitle, isRenew, onConfirm, onCancel }) {
             </TouchableOpacity>
             <TouchableOpacity style={[s.rejectConfirmBtn, { backgroundColor: colors.primary }]} onPress={handleConfirm}>
               <Text style={s.rejectConfirmText}>{isRenew ? 'Renew' : 'Activate'}</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  )
+}
+
+// Featured activation — admin picks how long to pin the listing. NO price shown
+// (payment is arranged off-app; consumer/owner screens never see money either).
+function FeatureFacilityModal({ visible, facilityName, isExtend, onConfirm, onCancel }) {
+  const [days, setDays] = useState(30)
+  const OPTIONS = [30, 90, 180, 365]
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <TouchableOpacity style={s.rejectOverlay} activeOpacity={1} onPress={onCancel}>
+        <TouchableOpacity style={s.rejectSheet} activeOpacity={1}>
+          <Text style={s.rejectTitle}>{isExtend ? 'Extend featured' : 'Feature'}{facilityName ? ` "${facilityName}"` : ''}?</Text>
+          <Text style={s.rejectSub}>Pins this listing to the top of its directory for the selected period.</Text>
+          <Text style={[s.rejectSub, { marginTop: 12, marginBottom: 8, fontFamily: 'Inter_700Bold', color: colors.textPrimary }]}>
+            Duration
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+            {OPTIONS.map(d => (
+              <TouchableOpacity
+                key={d}
+                onPress={() => setDays(d)}
+                style={[s.chip, days === d && s.chipActive, { paddingHorizontal: 16, paddingVertical: 9 }]}
+              >
+                <Text style={[s.chipText, days === d && s.chipTextActive]}>
+                  {d === 365 ? '1 year' : `${d} days`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={s.rejectBtnRow}>
+            <TouchableOpacity style={s.rejectCancelBtn} onPress={onCancel}>
+              <Text style={s.rejectCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.rejectConfirmBtn, { backgroundColor: colors.primary }]} onPress={() => onConfirm(days)}>
+              <Text style={s.rejectConfirmText}>{isExtend ? 'Extend' : 'Feature'}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -3025,7 +3066,7 @@ function GaragesTab({ lang, session }) {
   // GARAGES_LIVE-gated for everyone else). Admins never render HomeScreen, so
   // this is their way to see the module before public launch.
   if (preview) {
-    return <GaragesScreen lang={lang} session={session} onBack={() => setPreview(false)} />
+    return <GaragesScreen lang={lang} session={session} onBack={() => setPreview(false)} isAdmin />
   }
 
   return (
@@ -3763,6 +3804,170 @@ function JobPostingsTab() {
   )
 }
 
+// ─── Featured Tab ─────────────────────────────────────────────────────────────
+// Generic across the facilities table (garage/grooming/health). "Actively
+// featured" = featured_until > now (auto-expires, no cron). Pending = a request
+// (featured_requested_at set) not yet featured. Activation writes featured_until
+// directly — admin bypasses facilities_guard_update. NO price anywhere.
+function FeaturedTab() {
+  const [items,  setItems]  = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('pending')
+  const [target, setTarget] = useState(null)   // { item, isExtend }
+
+  const TYPE_LABELS = {
+    garage: 'Garage', grooming: 'Grooming', pharmacy: 'Pharmacy',
+    clinic: 'Clinic', hospital: 'Hospital', dentist: 'Dentist', vet: 'Vet',
+  }
+  const isActive = it => !!it.featured_until && new Date(it.featured_until) > new Date()
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const nowIso = new Date().toISOString()
+    let query = supabase
+      .from('facilities')
+      .select('id, name, type, status, provider_id, phone, featured_until, featured_requested_at')
+      .order('created_at', { ascending: false })
+    if (filter === 'pending') {
+      // Requested, and not currently featured.
+      query = query.not('featured_requested_at', 'is', null)
+                   .or(`featured_until.is.null,featured_until.lte.${nowIso}`)
+    } else if (filter === 'active') {
+      query = query.gt('featured_until', nowIso).order('featured_until', { ascending: true })
+    } else {
+      query = query.or('featured_until.not.is.null,featured_requested_at.not.is.null')
+    }
+    const { data } = await query
+    setItems(data ?? [])
+    setLoading(false)
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  // No payment wording — this reaches the consumer app.
+  async function notifyFeatured(providerId, name) {
+    if (!providerId) return
+    const { data: p } = await supabase.from('profiles')
+      .select('push_token, preferred_language').eq('id', providerId).maybeSingle()
+    const lang  = p?.preferred_language || 'English'
+    const title = t('notifFeaturedLiveTitle', lang)
+    const body  = t('notifFeaturedLiveBody', lang).replace('{name}', name || '')
+    if (p?.push_token) await sendPushNotification(p.push_token, title, body)
+    await supabase.rpc('insert_notification', { p_user_id: providerId, p_title: title, p_body: body })
+  }
+
+  // Extend from the current window when still featured, else from now.
+  async function activate(item, isExtend, days) {
+    const base = isExtend && isActive(item) ? new Date(item.featured_until) : new Date()
+    const until = new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString()
+    await supabase.from('facilities')
+      .update({ featured_until: until, featured_requested_at: null })
+      .eq('id', item.id)
+    setTarget(null)
+    await notifyFeatured(item.provider_id, item.name)
+    load()
+  }
+
+  function deactivate(item) {
+    Alert.alert('End featured placement?', `"${item.name}" will no longer be pinned.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'End', style: 'destructive', onPress: async () => {
+        // Expire now (featured_until in the past) and clear any pending request.
+        await supabase.from('facilities')
+          .update({ featured_until: new Date().toISOString(), featured_requested_at: null })
+          .eq('id', item.id)
+        load()
+      } },
+    ])
+  }
+
+  function dismissRequest(item) {
+    Alert.alert('Dismiss request?', `Clears the featured request from "${item.name}" without featuring it.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Dismiss', style: 'destructive', onPress: async () => {
+        await supabase.from('facilities').update({ featured_requested_at: null }).eq('id', item.id)
+        load()
+      } },
+    ])
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={[s.chipRow, { marginBottom: 12 }]}>
+        {['pending', 'active', 'all'].map(f => (
+          <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
+            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading
+        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+        : (
+          <FlatList
+            data={items}
+            keyExtractor={i => i.id}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text={`No ${filter} featured listings.`} />}
+            renderItem={({ item }) => {
+              const active = isActive(item)
+              const expiry = active ? fmtExpiry(item.featured_until) : null
+              return (
+                <View style={s.card}>
+                  <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cardTitle} numberOfLines={1}>{item.name}</Text>
+                      <Text style={s.cardSub}>{TYPE_LABELS[item.type] || item.type}{item.phone ? ` · ${item.phone}` : ''}</Text>
+                      {active
+                        ? <Text style={[s.cardSub, { color: expiry.color, marginTop: 2 }]}>{expiry.label}</Text>
+                        : item.featured_requested_at && (
+                          <Text style={[s.cardSub, { marginTop: 2 }]}>
+                            Requested {new Date(item.featured_requested_at).toLocaleDateString('en-GB')}
+                          </Text>
+                        )}
+                    </View>
+                    <View style={[s.pillGrey, { backgroundColor: (active ? colors.success : colors.accent) + '20', marginLeft: 8 }]}>
+                      <Text style={[s.pillText, { color: active ? colors.success : colors.accent }]}>
+                        {active ? 'featured' : 'requested'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={[s.rowActions, { marginTop: 10, marginLeft: 0 }]}>
+                    <TouchableOpacity style={s.ghostBtn} onPress={() => setTarget({ item, isExtend: active })}>
+                      <Text style={s.ghostBtnText}>{active ? 'Extend' : 'Feature'}</Text>
+                    </TouchableOpacity>
+                    {active
+                      ? (
+                        <TouchableOpacity style={s.dangerGhostBtn} onPress={() => deactivate(item)}>
+                          <Text style={s.dangerGhostText}>End</Text>
+                        </TouchableOpacity>
+                      )
+                      : item.featured_requested_at && (
+                        <TouchableOpacity style={s.dangerGhostBtn} onPress={() => dismissRequest(item)}>
+                          <Text style={s.dangerGhostText}>Dismiss</Text>
+                        </TouchableOpacity>
+                      )}
+                  </View>
+                </View>
+              )
+            }}
+          />
+        )
+      }
+
+      <FeatureFacilityModal
+        visible={!!target}
+        facilityName={target?.item?.name}
+        isExtend={target?.isExtend}
+        onConfirm={days => activate(target.item, target.isExtend, days)}
+        onCancel={() => setTarget(null)}
+      />
+    </View>
+  )
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 export default function AdminScreen({ session, lang }) {
@@ -3815,6 +4020,7 @@ export default function AdminScreen({ session, lang }) {
           {tab === 'Insurance'     && <InsuranceTab />}
           {tab === 'Grooming'      && <GroomingTab />}
           {tab === 'Garages'       && <GaragesTab lang={lang} session={session} />}
+          {tab === 'Featured'      && <FeaturedTab />}
           {tab === 'BusRoutes'     && <BusRoutesTab />}
           {tab === 'Places'        && <PlacesTab />}
           {tab === 'JobPostings'   && <JobPostingsTab />}
