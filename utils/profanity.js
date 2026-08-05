@@ -43,7 +43,8 @@ export async function containsBlockedTerm(text) {
 // can fire even when the client pre-check passed (e.g. a stale term cache).
 export function moderationErrorKey(error) {
   if (!error?.message) return null
-  if (error.message.includes('BLOCKED_TERM')) return 'contentBlockedTerm'
-  if (error.message.includes('UGC_BANNED'))   return 'contentBannedUser'
+  if (error.message.includes('BLOCKED_PAYMENT')) return 'contentPaymentBlocked'
+  if (error.message.includes('BLOCKED_TERM'))    return 'contentBlockedTerm'
+  if (error.message.includes('UGC_BANNED'))      return 'contentBannedUser'
   return null
 }

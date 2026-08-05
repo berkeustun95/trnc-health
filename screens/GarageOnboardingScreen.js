@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { moderationErrorKey } from '../utils/profanity'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
 import GarageBookingsScreen from './GarageBookingsScreen'
 import GroomingAvailabilityEditor from './GroomingAvailabilityEditor'
@@ -163,7 +164,8 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
       }
       onSubmitted?.()
     } catch (err) {
-      setError(err.message || t('garageErrorGeneric', lang))
+      const key = moderationErrorKey(err)
+      setError(key ? t(key, lang) : (err.message || t('garageErrorGeneric', lang)))
     } finally {
       setSaving(false)
     }
@@ -219,7 +221,8 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
       await loadExisting()
       Alert.alert('', t(material ? 'garageEditPendingNote' : 'garageEditSaved', lang))
     } catch (err) {
-      setError(err.message || t('garageErrorGeneric', lang))
+      const key = moderationErrorKey(err)
+      setError(key ? t(key, lang) : (err.message || t('garageErrorGeneric', lang)))
     } finally {
       setSaving(false)
     }

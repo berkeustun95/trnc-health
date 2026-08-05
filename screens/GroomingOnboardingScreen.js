@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { moderationErrorKey } from '../utils/profanity'
 import GroomingAvailabilityEditor from './GroomingAvailabilityEditor'
 import GroomingBookingsScreen from './GroomingBookingsScreen'
 import FacilityPhotoManager from '../components/FacilityPhotoManager'
@@ -169,7 +170,8 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
       }
       onSubmitted?.()
     } catch (err) {
-      setError(err.message || t('groomErrorGeneric', lang))
+      const key = moderationErrorKey(err)
+      setError(key ? t(key, lang) : (err.message || t('groomErrorGeneric', lang)))
     } finally {
       setSaving(false)
     }
@@ -225,7 +227,8 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
       await loadExisting()
       Alert.alert('', t(material ? 'groomEditPendingNote' : 'groomEditSaved', lang))
     } catch (err) {
-      setError(err.message || t('groomErrorGeneric', lang))
+      const key = moderationErrorKey(err)
+      setError(key ? t(key, lang) : (err.message || t('groomErrorGeneric', lang)))
     } finally {
       setSaving(false)
     }
