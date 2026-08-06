@@ -11,6 +11,7 @@ import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
+import { areaOptions } from '../constants/areas'
 import GroomingOnboardingScreen from './GroomingOnboardingScreen'
 
 const CATEGORIES = [
@@ -78,6 +79,7 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
   const [error, setError]                 = useState(false)
   const [selected, setSelected]           = useState([]) // multi-select category keys
   const [regions, setRegions]             = useState([]) // multi-select region slugs
+  const [areas, setAreas]                 = useState([]) // multi-select area slugs (only when 1 region)
   const [showOnboarding, setShowOnboarding]     = useState(false)
   const [myFacility, setMyFacility]             = useState(null) // the caller's own grooming facility, if any
 
@@ -92,18 +94,28 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
       .order('name', { ascending: true })
     if (selected.length > 0) query = query.overlaps('service_types', selected)
     if (regions.length > 0) query = query.in('city', regions)
+    // Area sub-filter only ever holds slugs for the single selected region (cleared
+    // on any region change), so ANDing it with the city filter can't leak cross-region.
+    if (areas.length > 0) query = query.in('area', areas)
     const { data, error: err } = await query
     if (err) setError(true)
     else setProviders(data || [])
     setLoading(false)
-  }, [selected, regions])
+  }, [selected, regions, areas])
 
   function toggleCategory(key) {
     setSelected(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
   }
 
+  // Changing the region selection clears any chosen areas — no stale area filter
+  // survives a region change (same discipline as the onboarding city→area dropdown).
   function toggleRegion(key) {
     setRegions(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
+    setAreas([])
+  }
+
+  function toggleArea(key) {
+    setAreas(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
   }
 
   useEffect(() => { load() }, [load])
@@ -176,7 +188,7 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
         >
           <TouchableOpacity
             style={[s.chip, regions.length === 0 && s.chipActive]}
-            onPress={() => setRegions([])}
+            onPress={() => { setRegions([]); setAreas([]) }}
           >
             <Text style={[s.chipText, regions.length === 0 && s.chipTextActive]}>{t('groomFilterAll', lang)}</Text>
           </TouchableOpacity>
@@ -193,6 +205,35 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
             )
           })}
         </ScrollView>
+
+        {/* Dependent area sub-row: only when EXACTLY ONE region is selected. */}
+        {regions.length === 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={s.filterRow}
+          >
+            <TouchableOpacity
+              style={[s.areaChip, areas.length === 0 && s.chipActive]}
+              onPress={() => setAreas([])}
+            >
+              <Text style={[s.chipText, areas.length === 0 && s.chipTextActive]}>{t('groomFilterAll', lang)}</Text>
+            </TouchableOpacity>
+            {areaOptions(regions[0]).map(a => {
+              const active = areas.includes(a.value)
+              return (
+                <TouchableOpacity
+                  key={a.value}
+                  style={[s.areaChip, active && s.chipActive]}
+                  onPress={() => toggleArea(a.value)}
+                >
+                  <Text style={[s.chipText, active && s.chipTextActive]}>{a.label}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </ScrollView>
+        )}
 
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
@@ -265,6 +306,9 @@ const s = StyleSheet.create({
   chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   chipText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
+  // Area sub-row chip: slightly smaller to signal it's dependent on the region above.
+  areaChip:       { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16,
+                    backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
 
   // List
   listContent:    { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },
