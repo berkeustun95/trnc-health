@@ -362,6 +362,9 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     if (!error) {
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
+    } else {
+      const key = moderationErrorKey(error)
+      if (key) Alert.alert('', t(key, lang))
     }
   }
 
