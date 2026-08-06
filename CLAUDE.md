@@ -58,6 +58,19 @@ eas build --platform android --profile production
 - Never put the Supabase service_role key or the database password in app code.
   Only the anon public key belongs in lib/supabase.js.
 
+## Migrations (manual-apply — no CI)
+Migrations are applied by hand (SQL editor, Role → postgres), so nothing catches a
+file that was committed but never applied (this is how `facilities.area` silently
+went missing). Two mandatory rules:
+- **Register every new object in `supabase/verify_schema.sql`.** When a migration
+  adds a table/column/function/trigger/constraint/index/cron/policy, add it to the
+  matching section of that drift-check script. Behavior-only `CREATE OR REPLACE`
+  (no new named object) needs an H-section token. An unlisted object is invisible
+  to the check. Run the script after applying to confirm the DB matches the repo.
+- **Every ADD COLUMN migration ends with `NOTIFY pgrst, 'reload schema';`** (after
+  `RESET ROLE;`). Without it, a stale PostgREST cache reports 42703 "column does
+  not exist" through the REST API even though the column exists in Postgres.
+
 ## Conventions
 - Functional React components with hooks.
 - Keep components small; one screen per file.

@@ -29,6 +29,13 @@ ALTER TABLE public.facilities ADD COLUMN IF NOT EXISTS area text;
 COMMIT;
 RESET ROLE;
 
+-- PostgREST schema-cache refresh: makes the new column queryable through the REST
+-- API immediately. Without it a stale cache raises 42703 "column ... does not exist"
+-- via PostgREST even though the column exists in Postgres (this is exactly what
+-- masked `area` being unapplied). MANDATORY tail on every ADD COLUMN migration —
+-- see supabase/verify_schema.sql and CLAUDE.md.
+NOTIFY pgrst, 'reload schema';
+
 -- ─── Verification (run after applying) ───────────────────────────────────────
 --   -- Column exists, all existing rows NULL:
 --   SELECT count(*) FILTER (WHERE area IS NULL) AS null_area, count(*) AS total FROM facilities;
