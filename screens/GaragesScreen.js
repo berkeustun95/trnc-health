@@ -13,9 +13,11 @@ import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions } from '../constants/areas'
-import { FEATURED_LIVE } from '../constants/flags'
+import { FEATURED_LIVE, PRICE_COMPARE_LIVE } from '../constants/flags'
 import { partitionFeatured, isFeatured } from '../utils/featured'
+import { pricedServices, formatPriceRange } from '../utils/servicePrices'
 import GarageOnboardingScreen from './GarageOnboardingScreen'
+import GaragePriceCompareScreen from './GaragePriceCompareScreen'
 
 // Multi-tag auto-service categories. A garage can offer several; the directory
 // filters with .overlaps() (OR semantics). Keys must match the DB CHECK +
@@ -34,8 +36,11 @@ function categoryLabel(key, lang) { return t(CATEGORY_KEYS[key] || key, lang) }
 
 // ─── Garage card ──────────────────────────────────────────────────────────────
 
+const CATEGORY_ORDER = GARAGE_CATEGORIES.map(c => c.key)
+
 function GarageCard({ item, lang, onPress, showFeatured }) {
-  const types = Array.isArray(item.service_types) ? item.service_types : []
+  const types  = Array.isArray(item.service_types) ? item.service_types : []
+  const priced = pricedServices(item, CATEGORY_ORDER)
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
       {!!item.cover_image_url && (
@@ -57,6 +62,16 @@ function GarageCard({ item, lang, onPress, showFeatured }) {
                 <Text style={s.categoryText}>{categoryLabel(ty, lang)}</Text>
               </View>
             ))}
+          </View>
+        )}
+
+        {priced.length > 0 && (
+          <View style={s.priceRow}>
+            <Ionicons name="pricetag-outline" size={13} color={colors.primary} />
+            <Text style={s.priceText} numberOfLines={1}>
+              {categoryLabel(priced[0].key, lang)} {formatPriceRange(priced[0])}
+              {priced.length > 1 ? `  +${priced.length - 1}` : ''}
+            </Text>
           </View>
         )}
 
@@ -93,6 +108,9 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
   // Dark launch: featured pinning + badge show only once live, or to an admin
   // previewing the directory. Mirrors the GARAGES_LIVE tile-gate.
   const showFeatured = FEATURED_LIVE || isAdmin
+  // Dark launch: the price-compare entry + screen show only once live, or to an admin
+  // previewing while the price dataset fills in. Mirrors the showFeatured gate.
+  const priceCompareVisible = PRICE_COMPARE_LIVE || isAdmin
   const [garages, setGarages]         = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(false)
@@ -100,6 +118,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
   const [regions, setRegions]         = useState([]) // multi-select region slugs
   const [areas, setAreas]             = useState([]) // multi-select area slugs (only when 1 region)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showCompare, setShowCompare] = useState(false)
   const [myGarage, setMyGarage]       = useState(null) // the caller's own garage row, if any
 
   const load = useCallback(async () => {
@@ -107,7 +126,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
     setError(false)
     let query = supabase
       .from('facilities')
-      .select('id, name, type, service_types, address, phone, opening_hours, description, cover_image_url, logo_url, photos, availability, city, area, featured_until')
+      .select('id, name, type, service_types, service_prices, address, phone, opening_hours, description, cover_image_url, logo_url, photos, availability, city, area, featured_until')
       .eq('type', 'garage')
       .eq('status', 'active')
       .order('name', { ascending: true })
@@ -117,7 +136,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
     // on any region change), so ANDing it with the city filter can't leak cross-region.
     if (areas.length > 0) query = query.in('area', areas)
     const { data, error: err } = await query
-    if (err) setError(true)
+    if (err) { console.warn('garages load error:', err.message, err.code); setError(true) }
     // Featured rows pinned + fairly rotated to the top when surfacing is enabled;
     // otherwise the plain name sort is left untouched.
     else setGarages(showFeatured ? partitionFeatured(data || []) : (data || []))
@@ -154,6 +173,16 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
 
   function toggleCategory(key) {
     setSelected(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
+  }
+
+  if (showCompare) {
+    return (
+      <GaragePriceCompareScreen
+        lang={lang}
+        onBack={() => setShowCompare(false)}
+        onOpenFacility={onOpenFacility}
+      />
+    )
   }
 
   if (showOnboarding) {
@@ -294,6 +323,18 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
+                {priceCompareVisible && (
+                  <TouchableOpacity style={s.ctaCard} onPress={() => setShowCompare(true)} activeOpacity={0.8}>
+                    <View style={s.ctaIconWrap}>
+                      <Ionicons name="pricetags-outline" size={24} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.ctaCardTitle}>{t('priceCompareCta', lang)}</Text>
+                      <Text style={s.ctaCardSub}>{t('priceCompareCtaSub', lang)}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
               </>
             }
             ListEmptyComponent={
@@ -365,6 +406,8 @@ const s = StyleSheet.create({
                     borderRadius: 10 },
   categoryText:   { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
   cardRow:        { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 },
+  priceRow:       { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 },
+  priceText:      { flex: 1, fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
   cardMeta:       { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   cardDesc:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                     lineHeight: 19, marginTop: 2, marginBottom: 10 },

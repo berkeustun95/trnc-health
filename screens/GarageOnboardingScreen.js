@@ -103,6 +103,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
 
   const [name,        setName]        = useState('')
   const [services,    setServices]    = useState([]) // multi-select category keys
+  const [prices,      setPrices]      = useState({}) // { serviceKey: { from, to } } as input strings
   const [address,     setAddress]     = useState('') // free-text street/building → facilities.address
   const [city,        setCity]        = useState(null) // region slug (REGIONS)
   const [area,        setArea]        = useState(null) // area slug (AREAS_BY_REGION[city])
@@ -119,7 +120,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
   const loadExisting = useCallback(async () => {
     const { data } = await supabase
       .from('facilities')
-      .select('id, name, status, hidden_at, hidden_reason, provider_id, address, phone, opening_hours, description, service_types, availability, cover_image_url, logo_url, photos, latitude, longitude, city, area, featured_until, featured_requested_at')
+      .select('id, name, status, hidden_at, hidden_reason, provider_id, address, phone, opening_hours, description, service_types, service_prices, availability, cover_image_url, logo_url, photos, latitude, longitude, city, area, featured_until, featured_requested_at')
       .eq('provider_id', session.user.id)
       .eq('type', 'garage')
       .maybeSingle()
@@ -133,6 +134,54 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
     setServices(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
   }
 
+  // Numeric-only price entry — strip anything but digits as the user types.
+  function setPriceField(key, field, val) {
+    const digits = val.replace(/[^0-9]/g, '')
+    setPrices(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [field]: digits } }))
+  }
+
+  // Reject only a filled from > to; empty rows are fine (price is optional).
+  function pricesValid() {
+    for (const key of services) {
+      const row = prices[key]
+      if (!row) continue
+      const from = row.from ? Number(row.from) : null
+      const to   = row.to   ? Number(row.to)   : null
+      if (from != null && to != null && to < from) return false
+    }
+    return true
+  }
+
+  // Build the persisted jsonb from input strings: numeric only, ONLY for
+  // currently-selected services (deselecting a service drops its price). A single
+  // filled value = a fixed price (from == to). Returns null when nothing is set.
+  function buildServicePrices() {
+    const out = {}
+    for (const key of services) {
+      const row = prices[key]
+      if (!row) continue
+      let from = row.from ? Number(row.from) : null
+      let to   = row.to   ? Number(row.to)   : null
+      if (from == null && to == null) continue
+      if (from == null) from = to
+      if (to   == null) to   = from
+      out[key] = { from, to }
+    }
+    return Object.keys(out).length ? out : null
+  }
+
+  // Existing numeric prices → input-string state for editing.
+  function pricesToState(sp) {
+    if (!sp || typeof sp !== 'object') return {}
+    const out = {}
+    for (const [k, v] of Object.entries(sp)) {
+      if (v && typeof v === 'object') {
+        out[k] = { from: v.from != null ? String(v.from) : '', to: v.to != null ? String(v.to) : '' }
+      }
+    }
+    return out
+  }
+
   // Changing region invalidates the dependent area — clear it so no stale mismatch persists.
   function selectCity(region) {
     setCity(region)
@@ -143,6 +192,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
     setError(null)
     if (!name.trim())       { setError(t('garageErrorName', lang)); return }
     if (services.length === 0) { setError(t('garageErrorServices', lang)); return }
+    if (!pricesValid())     { setError(t('garagePriceInvalid', lang)); return }
 
     setSaving(true)
     try {
@@ -161,6 +211,8 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
       if (lat != null && lng != null) { patch.latitude = lat; patch.longitude = lng }
       if (city) patch.city = city
       if (area) patch.area = area
+      const sp = buildServicePrices()
+      if (sp) patch.service_prices = sp
       if (newId && Object.keys(patch).length) {
         await supabase.from('facilities').update(patch).eq('id', newId)
       }
@@ -176,6 +228,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
   function startEdit() {
     setName(existing.name || '')
     setServices(existing.service_types || [])
+    setPrices(pricesToState(existing.service_prices))
     setAddress(existing.address || '')
     setCity(existing.city ?? null)
     setArea(existing.area ?? null)
@@ -203,6 +256,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
     setError(null)
     if (!name.trim())          { setError(t('garageErrorName', lang)); return }
     if (services.length === 0) { setError(t('garageErrorServices', lang)); return }
+    if (!pricesValid())        { setError(t('garagePriceInvalid', lang)); return }
 
     setSaving(true)
     try {
@@ -216,8 +270,9 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
         p_description:   description.trim() || null,
       })
       if (err) throw err
-      // city + area are non-material (not guard-locked) — persist them directly, outside the RPC.
-      await supabase.from('facilities').update({ city, area }).eq('id', existing.id)
+      // city + area + service_prices are non-material (not guard-locked) — persist directly,
+      // outside the RPC. service_prices is always included so clearing all prices writes null.
+      await supabase.from('facilities').update({ city, area, service_prices: buildServicePrices() }).eq('id', existing.id)
       setEditing(false)
       // Material change flipped the row back to pending — refetch so the pending state shows.
       await loadExisting()
@@ -365,6 +420,39 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
             </View>
           </Field>
 
+          {/* Per-service price ranges (optional) — only for services actually offered */}
+          {services.length > 0 && (
+            <Field label={t('garagePricesLabel', lang)}>
+              <Text style={s.priceHint}>{t('garagePricesHint', lang)}</Text>
+              {GARAGE_CATEGORIES.filter(c => services.includes(c.key)).map(c => {
+                const row = prices[c.key] || {}
+                return (
+                  <View key={c.key} style={s.priceRow}>
+                    <Text style={s.priceService} numberOfLines={1}>{t(c.labelKey, lang)}</Text>
+                    <TextInput
+                      style={s.priceInput}
+                      value={row.from || ''}
+                      onChangeText={v => setPriceField(c.key, 'from', v)}
+                      placeholder={t('garagePriceFrom', lang)}
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="number-pad"
+                    />
+                    <Text style={s.priceDash}>–</Text>
+                    <TextInput
+                      style={s.priceInput}
+                      value={row.to || ''}
+                      onChangeText={v => setPriceField(c.key, 'to', v)}
+                      placeholder={t('garagePriceTo', lang)}
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="number-pad"
+                    />
+                    <Text style={s.priceCurrency}>TL</Text>
+                  </View>
+                )
+              })}
+            </Field>
+          )}
+
           {/* City / region (dropdown) */}
           <Field label={t('garageRegisterCity', lang)}>
             <Dropdown
@@ -501,6 +589,17 @@ const s = StyleSheet.create({
                       borderWidth: 1.5, borderColor: colors.primary, borderRadius: radius.md,
                       paddingVertical: 12, backgroundColor: colors.cardBg },
   locBtnText:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
+
+  priceHint:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+                      lineHeight: 17, marginBottom: 12 },
+  priceRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  priceService:     { flex: 1.2, fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  priceInput:       { flex: 1, backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border,
+                      borderRadius: radius.md, paddingHorizontal: 10, paddingVertical: 9,
+                      fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary,
+                      textAlign: 'center' },
+  priceDash:        { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  priceCurrency:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, width: 22 },
 
   chipRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   selChip:          { flexDirection: 'row', alignItems: 'center', gap: 5,

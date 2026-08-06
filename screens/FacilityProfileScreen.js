@@ -12,6 +12,11 @@ import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton } from '../components/Skeleton'
 import ContentReportMenu from '../components/ContentReportMenu'
 import { formatHoursDisplay } from '../components/HoursPicker'
+import { pricedServices, formatPriceRange } from '../utils/servicePrices'
+import { GARAGE_CATEGORIES } from './GaragesScreen'
+
+const GARAGE_LABEL_KEY = Object.fromEntries(GARAGE_CATEGORIES.map(c => [c.key, c.labelKey]))
+const GARAGE_KEY_ORDER = GARAGE_CATEGORIES.map(c => c.key)
 
 const SW = Dimensions.get('window').width
 const SCHED_KEYS   = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
@@ -79,6 +84,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
 
   const tc         = typeColors[facility.type] || typeColors.clinic
   const isPharmacy = facility.type === 'pharmacy'
+  const garagePrices = facility.type === 'garage' ? pricedServices(facility, GARAGE_KEY_ORDER) : []
   const languages  = Array.isArray(facility.languages)
     ? facility.languages
     : typeof facility.languages === 'string' && facility.languages
@@ -203,6 +209,19 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
                 <Text style={s.description}>{facility.description}</Text>
               </View>
             ) : null}
+
+            {/* Service prices (garage physical-service ranges, TL) */}
+            {garagePrices.length > 0 && (
+              <View style={s.section}>
+                <Text style={s.sectionLabel}>{t('garagePricesLabel', lang)}</Text>
+                {garagePrices.map(p => (
+                  <View key={p.key} style={s.priceRow}>
+                    <Text style={s.priceService}>{t(GARAGE_LABEL_KEY[p.key] || p.key, lang)}</Text>
+                    <Text style={s.priceValue}>{formatPriceRange(p)}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* Map location */}
             {facility.latitude != null && facility.longitude != null && (
@@ -416,6 +435,9 @@ const s = StyleSheet.create({
   chip:              { backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   chipText:          { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.primary },
   description:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 22 },
+  priceRow:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
+  priceService:      { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  priceValue:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
   credRow:           { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
   credIcon:          { fontSize: 20, marginTop: 1 },
   credTitle:         { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 2 },
