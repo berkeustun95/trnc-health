@@ -184,7 +184,9 @@ WITH report AS (
     ('0731_garages_directory','facilities_service_types_values_check'),
     ('0804_grooming_multi_category','facilities_service_types_type_check'),
     ('0725_grooming_directory','facilities_category_check'),
-    ('0725_grooming_directory','facilities_grooming_category_check'),
+    -- NB: facilities_grooming_category_check is intentionally DROPPED by
+    -- 0804_grooming_multi_category (grooming moved to service_types[]; grooming rows
+    -- now have category=NULL). Its absence is correct — do NOT re-add it.
     ('0805_facilities_city','facilities_city_check'),
     ('0724_events_category','events_category_check'),
     ('0701_security_fixes','reviews_customer_facility_unique'),
