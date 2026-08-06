@@ -3870,7 +3870,7 @@ function FeaturedTab() {
     const base = isExtend && isActive(item) ? new Date(item.featured_until) : new Date()
     const until = new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString()
     await supabase.from('facilities')
-      .update({ featured_until: until, featured_requested_at: null })
+      .update({ featured_until: until, featured_requested_at: null, featured_reminded_at: null })
       .eq('id', item.id)
     setTarget(null)
     await notifyFeatured(item.provider_id, item.name)
