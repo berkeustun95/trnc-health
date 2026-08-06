@@ -448,10 +448,17 @@ function ReportsTab({ session }) {
       .eq('content_type', g.contentType).eq('content_id', g.contentId).eq('status', 'pending')
   }
 
-  async function notifyAuthor(g, title, body) {
+  // Localizes to the RECIPIENT's (the author's) preferred_language, not the
+  // admin's. `key` is an i18n key; `bodyKey` its body key. English fallback is
+  // built into t().
+  async function notifyAuthor(g, titleKey, bodyKey) {
     const authorId = g.content?.[AUTHOR_COL[g.contentType]]
     if (!authorId) return
-    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', authorId).maybeSingle()
+    const { data: p } = await supabase.from('profiles')
+      .select('push_token, preferred_language').eq('id', authorId).maybeSingle()
+    const lang  = p?.preferred_language || 'English'
+    const title = t(titleKey, lang)
+    const body  = t(bodyKey, lang)
     if (p?.push_token) await sendPushNotification(p.push_token, title, body)
     await recordNotification(authorId, title, body)
   }
@@ -465,9 +472,9 @@ function ReportsTab({ session }) {
     // Facilities are HIDDEN (recoverable), not deleted — say so, matching the owner
     // "listing hidden" banner. review/question/answer keep the "removed" wording.
     if (g.contentType === 'facility') {
-      await notifyAuthor(g, 'Listing hidden', 'Your listing is currently hidden and not visible to customers. If you think this is a mistake, please get in touch and we’ll take another look.')
+      await notifyAuthor(g, 'notifListingHiddenTitle', 'notifListingHiddenBody')
     } else {
-      await notifyAuthor(g, 'Content removed', `Your ${g.contentType} was removed for violating ADA's content policy.`)
+      await notifyAuthor(g, 'notifContentRemovedTitle', 'notifContentRemovedBody')
     }
     setBusy(null); load()
   }
@@ -481,7 +488,7 @@ function ReportsTab({ session }) {
     // Only facilities get a restore push — the owner saw the "hidden" banner and
     // should learn it's back. review/question/answer restores stay silent (unchanged).
     if (g.contentType === 'facility') {
-      await notifyAuthor(g, 'Listing visible again', 'Good news — your listing is visible to customers again.')
+      await notifyAuthor(g, 'notifListingVisibleTitle', 'notifListingVisibleBody')
     }
     setBusy(null); load()
   }
@@ -1895,9 +1902,11 @@ function CredentialsTab() {
   async function approve(cred) {
     setActionLoading(cred.id)
     await supabase.from('provider_credentials').update({ status: 'approved' }).eq('id', cred.id)
-    const { data: p } = await supabase.from('profiles').select('push_token').eq('id', cred.provider_id).maybeSingle()
-    const title = 'Credential approved'
-    const body = `Your ${cred.cred_type} "${cred.title}" is now visible on your profile.`
+    const { data: p } = await supabase.from('profiles')
+      .select('push_token, preferred_language').eq('id', cred.provider_id).maybeSingle()
+    const lang  = p?.preferred_language || 'English'
+    const title = t('notifCredApprovedTitle', lang)
+    const body  = t('notifCredApprovedBody', lang).replace('{title}', cred.title || '')
     if (p?.push_token) await sendPushNotification(p.push_token, title, body)
     await recordNotification(cred.provider_id, title, body)
     setActionLoading(null)
