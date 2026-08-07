@@ -55,6 +55,7 @@ const HEALTH_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const MODULES = [
   { id: 'exchangeRates',      icon: 'trending-up-outline', tint: 'service',   labelKey: 'menuExchangeRates'      },
   { id: 'newcomerEssentials', icon: 'compass-outline',     tint: 'service',   labelKey: 'menuNewcomerEssentials' },
+  { id: 'studentHub',         icon: 'school-outline',      tint: 'service',   labelKey: 'menuStudentHub' },
   { id: 'accommodation', icon: 'home-outline',      tint: 'lifestyle', labelKey: 'menuAccommodations' },
   { id: 'pets',          icon: 'paw-outline',       tint: 'lifestyle', labelKey: 'menuPets' },
   { id: 'games',         icon: 'game-controller-outline', tint: 'lifestyle', labelKey: 'menuGames' },
@@ -118,6 +119,7 @@ export default function HomeScreen({
   onShowNewcomerEssentials,
   onShowExchangeRates,
   onShowGames,
+  onShowStudentHub,
 }) {
   const [showFacilityList, setShowFacilityList] = useState(false)
   const [searchText, setSearchText]             = useState('')
@@ -193,6 +195,7 @@ export default function HomeScreen({
     garages:            onShowGarages,
     esim:               onShowEsim,
     municipal:          onShowMunicipal,
+    studentHub:         onShowStudentHub,
   }
 
   const listed = facilities

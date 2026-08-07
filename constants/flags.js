@@ -30,4 +30,5 @@ export const MODULE_FLAGS = {
   events:       false,
   jobs:         false,
   accommodation: false,
+  studentHub:   false,
 }

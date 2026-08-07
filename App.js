@@ -271,6 +271,7 @@ export default function App() {
   const [showLegal, setShowLegal] = useState(false)
   const [showGrooming, setShowGrooming] = useState(false)
   const [showGarages, setShowGarages] = useState(false)
+  const [showStudentHub, setShowStudentHub] = useState(false)
   const [showEsim, setShowEsim] = useState(false)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
@@ -483,6 +484,7 @@ export default function App() {
       if (showInsurance) { setShowInsurance(false); return true }
       if (showGrooming) { setShowGrooming(false); return true }
       if (showGarages) { setShowGarages(false); return true }
+      if (showStudentHub) { setShowStudentHub(false); return true }
       if (showEsim) { setShowEsim(false); return true }
       if (showLegal) { setShowLegal(false); return true }
       if (selectedPlace)        { setSelectedPlace(null); return true }
@@ -496,7 +498,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showEsim, showLegal, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -1200,6 +1202,12 @@ export default function App() {
     content = (MODULE_FLAGS.garages || isAdmin || ownsGarage)
       ? <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} onOpenFacility={setSelectedFacility} isAdmin={profile?.role === 'admin'} />
       : <ComingSoonScreen lang={lang} moduleKey="garages" titleKey="menuGarages" session={session} onBack={() => setShowGarages(false)} />
+  } else if (showStudentHub) {
+    // No StudentHubScreen in main yet (it lives on the unmerged feat/student-hub
+    // branch). Route ALL users — admins included — to Coming Soon; the flag exists
+    // so a future merge can restore the standard gate:
+    //   (MODULE_FLAGS.studentHub || isAdmin) ? <StudentHubScreen/> : <ComingSoonScreen/>
+    content = <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
   } else {
     const favList = facilities.filter(f => favorites.has(f.id))
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
@@ -1253,6 +1261,7 @@ export default function App() {
             onShowGrooming={() => setShowGrooming(true)}
             onShowGarages={() => setShowGarages(true)}
             garagesTileVisible={GARAGES_LIVE || profile?.role === 'admin' || ownsGarage}
+            onShowStudentHub={() => setShowStudentHub(true)}
             onShowEsim={() => setShowEsim(true)}
             onShowEmergency={() => setShowEmergencyModal(true)}
             onShowMunicipal={() => setShowMunicipalModal(true)}
