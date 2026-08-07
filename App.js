@@ -155,10 +155,12 @@ const tabBar = StyleSheet.create({
 // exists. Kept false so the row does not render — flip to true once wired.
 const WELCOME_VIDEO_LIVE = false
 
-// Garages / Auto Services dark-launch. false hides the Home tile from normal
-// users; admins still see it (garagesTileVisible) so the module can be previewed
-// before public launch. Flip to true to release Slice 1.
-const GARAGES_LIVE = true
+// Garages / Auto Services dark-launch. Controls only the Home TILE's visibility;
+// the module screen itself is gated by MODULE_FLAGS.garages (Coming Soon). false
+// hides the tile from normal users so a tap can't dead-end in Coming Soon; admins
+// and existing garage owners still see it (garagesTileVisible) for preview. Flip
+// to true only in lockstep with MODULE_FLAGS.garages when the module launches.
+const GARAGES_LIVE = false
 
 // One repeatable drawer row. Defined at module level so it never remounts with
 // the parent. Each item: { key, iconSet, icon, labelKey, onPress, danger? }.
