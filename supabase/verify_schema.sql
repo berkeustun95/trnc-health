@@ -138,7 +138,9 @@ WITH report AS (
     ('0808/0809_facilities_guard_update','facilities_guard_update'),
     ('0809_featured_expiry_reminder','featured_notif_text'),
     ('0809_featured_expiry_reminder','process_featured_expiring'),
-    ('0810_change_request_content_filter','check_change_request_content')
+    ('0810_change_request_content_filter','check_change_request_content'),
+    ('0813_notify_module_waitlist','module_notif_text'),
+    ('0813_notify_module_waitlist','notify_module_waitlist')
   ) e(m,o)
 
   UNION ALL
@@ -248,7 +250,8 @@ WITH report AS (
     ('0802_update_garage_facility','update_garage_facility'),
     ('0725_grooming_directory','create_grooming_facility'),
     ('0803_grooming_owner_edit','update_grooming_facility'),
-    ('0719_create_facility_claim_rpc','create_facility_claim')
+    ('0719_create_facility_claim_rpc','create_facility_claim'),
+    ('0813_notify_module_waitlist','notify_module_waitlist')
   ) e(m,o)
 
   UNION ALL
@@ -293,6 +296,9 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='check_change_request_content'
           AND pg_get_functiondef(p.oid) ILIKE '%contains_payment_solicitation%')
+    UNION ALL SELECT '0814_module_waitlist_generalize_check','module_waitlist_module_check is shape guard (not enum)',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='module_waitlist_module_check'
+        AND pg_get_constraintdef(c.oid) NOT ILIKE '%homeServices%')
   ) z
 
   UNION ALL
