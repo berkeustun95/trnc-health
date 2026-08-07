@@ -12,3 +12,22 @@ export const FEATURED_LIVE = false
 // admins still see them (isAdmin override) to preview while the price dataset fills
 // in. Flip to true once enough garages have published prices. Mirrors FEATURED_LIVE.
 export const PRICE_COMPARE_LIVE = false
+
+// Marketplace module gating. Each key is a module that is empty in prod today, so
+// it renders a "Coming soon" screen (with one-tap Notify me) instead of an empty
+// list that reads as broken. false = gated (Coming Soon); flip to true via OTA to
+// go live. Admins bypass the gate for preview (see the gate in App.js); garages
+// additionally bypasses for an owner via ownsGarage. Each key is the module's
+// stable identifier, reused verbatim by the gate here, and (Slices 2-3) the
+// waitlist `module` column + its CHECK and the go-live notify RPC.
+export const MODULE_FLAGS = {
+  homeServices: false,
+  grooming:     false,
+  garages:      false,
+  transport:    false,
+  insurance:    false,
+  pets:         false,
+  events:       false,
+  jobs:         false,
+  accommodation: false,
+}

@@ -17,6 +17,7 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t } from './constants/i18n'
 import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
+import { MODULE_FLAGS } from './constants/flags'
 import AuthScreen from './screens/AuthScreen'
 import BookingScreen from './screens/BookingScreen'
 import FacilityProfileScreen from './screens/FacilityProfileScreen'
@@ -73,6 +74,7 @@ import HomeCitySheet from './components/HomeCitySheet'
 import CityWelcomeSettings from './components/CityWelcomeSettings'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
+import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 
 Notifications.setNotificationHandler({
@@ -829,6 +831,13 @@ export default function App() {
 
   let content
 
+  // Admins bypass the marketplace module gate to preview a "Coming soon" module.
+  // (Mirrors the existing garagesTileVisible admin check.) Admins normally render
+  // AdminScreen and don't reach the module chain, so in practice previewing a
+  // gated module is done by flipping its MODULE_FLAGS entry, but the bypass is
+  // kept for parity and any path that does reach these screens as admin.
+  const isAdmin = profile?.role === 'admin'
+
   if (session === undefined || !fontsLoaded || onboarded === null) {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   } else if (onboarded === false) {
@@ -971,7 +980,9 @@ export default function App() {
   } else if (showDutyList) {
     content = <DutyListScreen onBack={() => { setShowDutyList(false); setDutyRegion(null) }} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
   } else if (showEvents) {
-    content = <EventsScreen lang={lang} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} initialDistrict={eventsDistrict} />
+    content = (MODULE_FLAGS.events || isAdmin)
+      ? <EventsScreen lang={lang} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} initialDistrict={eventsDistrict} />
+      : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} />
   } else if (showAgentOnboarding) {
     content = (
       <EstateAgentOnboardingScreen
@@ -990,7 +1001,7 @@ export default function App() {
       />
     )
   } else if (showAccommodation) {
-    content = (
+    content = (MODULE_FLAGS.accommodation || isAdmin) ? (
       <AccommodationScreen
         lang={lang}
         session={session}
@@ -998,15 +1009,25 @@ export default function App() {
         onBecomeAgent={() => { if (requireAccount('gateEstateAgent')) return; setShowAccommodation(false); setShowAgentOnboarding(true) }}
         onOpenProperty={prop => setOpenedProperty(prop)}
       />
+    ) : (
+      <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccommodations" session={session} onBack={() => setShowAccommodation(false)} />
     )
   } else if (showHomeServices) {
-    content = <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowHomeServices(false)} />
+    content = (MODULE_FLAGS.homeServices || isAdmin)
+      ? <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowHomeServices(false)} />
+      : <ComingSoonScreen lang={lang} moduleKey="homeServices" titleKey="menuHomeServices" session={session} onBack={() => setShowHomeServices(false)} />
   } else if (showJobPostings) {
-    content = <JobPostingsScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowJobPostings(false)} />
+    content = (MODULE_FLAGS.jobs || isAdmin)
+      ? <JobPostingsScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowJobPostings(false)} />
+      : <ComingSoonScreen lang={lang} moduleKey="jobs" titleKey="menuJobPostings" session={session} onBack={() => setShowJobPostings(false)} />
   } else if (showTransport) {
-    content = <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowTransport(false)} />
+    content = (MODULE_FLAGS.transport || isAdmin)
+      ? <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowTransport(false)} />
+      : <ComingSoonScreen lang={lang} moduleKey="transport" titleKey="menuTransportation" session={session} onBack={() => setShowTransport(false)} />
   } else if (showInsurance) {
-    content = <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowInsurance(false)} />
+    content = (MODULE_FLAGS.insurance || isAdmin)
+      ? <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowInsurance(false)} />
+      : <ComingSoonScreen lang={lang} moduleKey="insurance" titleKey="menuInsurance" session={session} onBack={() => setShowInsurance(false)} />
   } else if (showEsim) {
     content = <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowEsim(false)} />
   } else if (showLegal) {
@@ -1042,7 +1063,9 @@ export default function App() {
       content = <GamesHubScreen lang={lang} onBack={() => setShowGames(false)} onNavigate={setGamesSubScreen} />
     }
   } else if (showPets) {
-    if (petsSubScreen === 'bringing') {
+    if (!MODULE_FLAGS.pets && !isAdmin) {
+      content = <ComingSoonScreen lang={lang} moduleKey="pets" titleKey="menuPets" session={session} onBack={() => setShowPets(false)} />
+    } else if (petsSubScreen === 'bringing') {
       content = <BringingPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
     } else if (petsSubScreen === 'timeline') {
       content = <TimelineCalculatorScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
@@ -1168,9 +1191,13 @@ export default function App() {
       onBack={() => setSelectedFacility(null)}
     />
   } else if (showGrooming) {
-    content = <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGrooming(false)} onOpenFacility={setSelectedFacility} />
+    content = (MODULE_FLAGS.grooming || isAdmin)
+      ? <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGrooming(false)} onOpenFacility={setSelectedFacility} />
+      : <ComingSoonScreen lang={lang} moduleKey="grooming" titleKey="menuGrooming" session={session} onBack={() => setShowGrooming(false)} />
   } else if (showGarages) {
-    content = <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} onOpenFacility={setSelectedFacility} isAdmin={profile?.role === 'admin'} />
+    content = (MODULE_FLAGS.garages || isAdmin || ownsGarage)
+      ? <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} onOpenFacility={setSelectedFacility} isAdmin={profile?.role === 'admin'} />
+      : <ComingSoonScreen lang={lang} moduleKey="garages" titleKey="menuGarages" session={session} onBack={() => setShowGarages(false)} />
   } else {
     const favList = facilities.filter(f => favorites.has(f.id))
     // Utility-only drawer. Home's module grid is the app's navigation now, so the

@@ -39,6 +39,7 @@ WITH report AS (
     ('0712_ugc_moderation','blocked_terms'),
     ('0723_insurance_companies','insurance_companies'),
     ('0725_esim_waitlist','esim_waitlist'),
+    ('0812_module_waitlist','module_waitlist'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -81,7 +82,8 @@ WITH report AS (
     ('0808_facility_featured_tier','facilities','featured_until'),
     ('0808_facility_featured_tier','facilities','featured_requested_at'),
     ('0809_featured_expiry_reminder','facilities','featured_reminded_at'),
-    ('0811_facilities_service_prices','facilities','service_prices')
+    ('0811_facilities_service_prices','facilities','service_prices'),
+    ('0812_module_waitlist','module_waitlist','notified_at')
   ) e(m,t,c)
 
   UNION ALL
@@ -194,7 +196,8 @@ WITH report AS (
     ('capture_2','facilities_membership_tier_check'),
     ('0719_fix_signup','profiles_role_check'),
     ('0803_facility_report_moderation','content_reports_content_type_check'),
-    ('0723_insurance_companies','insurance_companies_status_check')
+    ('0723_insurance_companies','insurance_companies_status_check'),
+    ('0812_module_waitlist','module_waitlist_module_check')
   ) e(m,o)
 
   UNION ALL
@@ -300,7 +303,7 @@ WITH report AS (
   WHERE n.nspname='public' AND c.relkind='r' AND c.relname IN (
     'profiles','facilities','appointments','reviews','questions','answers',
     'notifications','claim_requests','facility_change_requests','job_postings',
-    'content_reports','blocks','insurance_companies','esim_waitlist',
+    'content_reports','blocks','insurance_companies','esim_waitlist','module_waitlist',
     'provider_documents','provider_credentials','quiz_submissions','pharmacist_scores'
   )
 )
