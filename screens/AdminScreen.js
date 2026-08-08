@@ -1132,7 +1132,7 @@ function DutyTab() {
           onPress={notifyDuty}
           disabled={!selectedId || notifying}
         >
-          <Text style={s.ghostBtnText}>{notified ? 'Notified!' : notifying ? 'Sending…' : "Notify users about tonight's duty"}</Text>
+          <Text style={s.ghostBtnText}>{notified ? 'Notified!' : notifying ? 'Sending…' : "Notify users about today's duty"}</Text>
         </TouchableOpacity>
 
         {upcoming.length > 0 && (

@@ -2,27 +2,27 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const DUTY_TITLES: Record<string, string> = {
-  English: "💊 Tonight's Duty Pharmacy",
-  Turkish: '💊 Bu Gece Nöbetçi Eczane',
-  Arabic:  '💊 صيدلية المناوبة الليلة',
-  Russian: '💊 Дежурная аптека сегодня ночью',
-  Greek:   '💊 Εφημερεύον Φαρμακείο Απόψε',
-  French:  '💊 Pharmacie de garde ce soir',
-  Spanish: '💊 Farmacia de guardia esta noche',
-  German:  '💊 Notdienstapotheke heute Nacht',
-  Persian: '💊 داروخانه نوبتی امشب',
+  English: "💊 Today's Duty Pharmacy",
+  Turkish: '💊 Bugünkü Nöbetçi Eczane',
+  Arabic:  '💊 صيدلية المناوبة اليوم',
+  Russian: '💊 Дежурная аптека сегодня',
+  Greek:   '💊 Εφημερεύον Φαρμακείο Σήμερα',
+  French:  "💊 Pharmacie de garde aujourd'hui",
+  Spanish: '💊 Farmacia de guardia hoy',
+  German:  '💊 Notdienstapotheke heute',
+  Persian: '💊 داروخانه نوبتی امروز',
 }
 
 const DUTY_BODY_MULTI: Record<string, string> = {
-  English: '{count} pharmacies on duty tonight — open the app to see the list',
-  Turkish: 'Bu gece {count} nöbetçi eczane var — listeyi görmek için uygulamayı açın',
-  Arabic:  '{count} صيدليات في المناوبة الليلة — افتح التطبيق لرؤية القائمة',
-  Russian: '{count} дежурных аптек сегодня ночью — откройте приложение для просмотра',
-  Greek:   '{count} εφημερεύοντα φαρμακεία απόψε — ανοίξτε την εφαρμογή για τη λίστα',
-  French:  "{count} pharmacies de garde ce soir — ouvrez l'application pour voir la liste",
-  Spanish: '{count} farmacias de guardia esta noche — abre la app para ver la lista',
-  German:  '{count} Notdienstapotheken heute Nacht — App öffnen für die Liste',
-  Persian: '{count} داروخانه نوبتی امشب — برای دیدن لیست اپ را باز کنید',
+  English: '{count} pharmacies on duty today — open the app to see the list',
+  Turkish: 'Bugün {count} nöbetçi eczane var — listeyi görmek için uygulamayı açın',
+  Arabic:  '{count} صيدليات في المناوبة اليوم — افتح التطبيق لرؤية القائمة',
+  Russian: '{count} дежурных аптек сегодня — откройте приложение для просмотра',
+  Greek:   '{count} εφημερεύοντα φαρμακεία σήμερα — ανοίξτε την εφαρμογή για τη λίστα',
+  French:  "{count} pharmacies de garde aujourd'hui — ouvrez l'application pour voir la liste",
+  Spanish: '{count} farmacias de guardia hoy — abre la app para ver la lista',
+  German:  '{count} Notdienstapotheken heute — App öffnen für die Liste',
+  Persian: '{count} داروخانه نوبتی امروز — برای دیدن لیست اپ را باز کنید',
 }
 
 function getDutyTitle(lang: string): string {
