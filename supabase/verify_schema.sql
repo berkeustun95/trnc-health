@@ -299,6 +299,10 @@ WITH report AS (
     UNION ALL SELECT '0814_module_waitlist_generalize_check','module_waitlist_module_check is shape guard (not enum)',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='module_waitlist_module_check'
         AND pg_get_constraintdef(c.oid) NOT ILIKE '%homeServices%')
+    UNION ALL SELECT '0815_questions_block_blocked_customers','insert questions policy blocks is_customer_blocked',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='questions'
+        AND policyname='insert questions'
+        AND with_check ILIKE '%is_customer_blocked%')
   ) z
 
   UNION ALL
