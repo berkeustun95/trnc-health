@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, ScrollView, FlatList, TouchableOpacity, Modal, StyleSheet, Linking, Dimensions } from 'react-native'
+import { View, Text, Image, ScrollView, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Modal, StyleSheet, Linking, Dimensions } from 'react-native'
 import MapView, { Marker } from 'react-native-maps'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
@@ -13,6 +13,8 @@ import { ReviewSkeleton } from '../components/Skeleton'
 import ContentReportMenu from '../components/ContentReportMenu'
 import { formatHoursDisplay } from '../components/HoursPicker'
 import { pricedServices, formatPriceRange } from '../utils/servicePrices'
+import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
+import { notifyProvider } from '../utils/notify'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
 
 const GARAGE_LABEL_KEY = Object.fromEntries(GARAGE_CATEGORIES.map(c => [c.key, c.labelKey]))
@@ -37,6 +39,11 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
   const [showAllReviews, setShowAllReviews] = useState(false)
   const [lightbox, setLightbox]             = useState(null)
   const [credentials, setCredentials]       = useState([])
+  const [questions, setQuestions]           = useState([])
+  const [questionsLoading, setQuestionsLoading] = useState(true)
+  const [newQ, setNewQ]                     = useState('')
+  const [qError, setQError]                 = useState(null)
+  const [submittingQ, setSubmittingQ]       = useState(false)
 
   const reloadReviews = async () => {
     const [{ data, count }, { data: allRatings }] = await Promise.all([
@@ -49,6 +56,49 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
     setReviewAvg(allRatings?.length
       ? (allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length).toFixed(1)
       : null)
+  }
+
+  async function loadQuestions() {
+    setQuestionsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('questions')
+        .select('id, body, created_at, answers(id, body, created_at)')
+        .eq('facility_id', facility.id)
+        .order('created_at', { ascending: false })
+      if (!error && data) setQuestions(data)
+    } finally {
+      setQuestionsLoading(false)
+    }
+  }
+
+  async function submitQuestion() {
+    if (onRequireAccount?.('gateQuestion')) return
+    const body = newQ.trim()
+    if (!body) return
+    setSubmittingQ(true)
+    setQError(null)
+
+    if (await containsBlockedTerm(body)) {
+      setQError(t('contentBlockedTerm', lang))
+      setSubmittingQ(false)
+      return
+    }
+
+    const { error } = await supabase.from('questions').insert({
+      facility_id: facility.id,
+      customer_id: session.user.id,
+      body,
+    })
+    if (!error) {
+      setNewQ('')
+      await loadQuestions()
+      notifyProvider(facility, 'notifNewQuestionTitle', 'notifNewQuestionBody')
+    } else {
+      const key = moderationErrorKey(error)
+      setQError(key ? t(key, lang) : t('questionSubmitError', lang))
+    }
+    setSubmittingQ(false)
   }
 
   useEffect(() => {
@@ -76,6 +126,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
       setCredentials(creds ?? [])
     }
     loadData()
+    loadQuestions()
   }, [facility.id])
 
   if (showAllReviews) {
@@ -382,6 +433,60 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
                 </>
               )}
             </View>
+
+            {/* Questions & Answers — shown for every facility type, incl. pharmacy */}
+            <View style={s.section}>
+              <Text style={s.sectionLabel}>{t('questionsAnswers', lang)}</Text>
+
+              <View style={s.askRow}>
+                <TextInput
+                  style={s.askInput}
+                  value={newQ}
+                  onChangeText={setNewQ}
+                  placeholder={t('askPlaceholder', lang)}
+                  placeholderTextColor={colors.textSecondary}
+                  multiline
+                  maxLength={300}
+                />
+                <TouchableOpacity
+                  style={[s.askBtn, (!newQ.trim() || submittingQ) && { opacity: 0.4 }]}
+                  onPress={submitQuestion}
+                  disabled={!newQ.trim() || submittingQ}
+                >
+                  {submittingQ
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.askBtnText}>{t('ask', lang)}</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+
+              {qError && <Text style={s.error}>{qError}</Text>}
+
+              <Text style={s.termsNotice}>{t('termsAgreeContent', lang)}</Text>
+
+              {questionsLoading ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
+              ) : questions.length === 0 ? (
+                <Text style={s.noQText}>{t('noQuestions', lang)}</Text>
+              ) : (
+                questions.map(q => (
+                  <View key={q.id} style={s.qCard}>
+                    <Text style={s.qBody}>{q.body}</Text>
+                    {q.answers && q.answers.length > 0 ? (
+                      <View style={s.answerBlock}>
+                        <View style={s.answerTop}>
+                          <Text style={s.answerLabel}>{t('providerAnswer', lang)}</Text>
+                          <ContentReportMenu contentType="answer" contentId={q.answers[0].id} lang={lang} onRequireAccount={onRequireAccount} />
+                        </View>
+                        <Text style={s.answerBody}>{q.answers[0].body}</Text>
+                      </View>
+                    ) : (
+                      <Text style={s.noAnswer}>{t('awaitingAnswer', lang)}</Text>
+                    )}
+                  </View>
+                ))
+              )}
+            </View>
           </View>
         </ScrollView>
 
@@ -458,6 +563,20 @@ const s = StyleSheet.create({
   reviewComment:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },
   seeAllBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12 },
   seeAllText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
+  error:             { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 10 },
+  askRow:            { flexDirection: 'row', gap: 10, alignItems: 'flex-end', marginBottom: 16 },
+  askInput:          { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface, maxHeight: 100 },
+  askBtn:            { backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, justifyContent: 'center', alignItems: 'center' },
+  askBtnText:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+  noQText:           { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 8, marginBottom: 16 },
+  qCard:             { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
+  qBody:             { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginBottom: 10, lineHeight: 20 },
+  answerBlock:       { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10 },
+  answerTop:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  termsNotice:       { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 16, marginTop: 8 },
+  answerLabel:       { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  answerBody:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
+  noAnswer:          { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic' },
   scheduleCard:      { backgroundColor: colors.cardBg, borderRadius: 14, overflow: 'hidden', ...shadow },
   scheduleRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
   scheduleRowToday:  { backgroundColor: colors.primaryLight },

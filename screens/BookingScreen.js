@@ -11,29 +11,7 @@ import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton, SlotGridSkeleton } from '../components/Skeleton'
 import ContentReportMenu from '../components/ContentReportMenu'
-import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
-
-async function notifyProvider(facility, titleKey, bodyKey) {
-  if (!facility.provider_id) return
-  try {
-    const { data: prov } = await supabase
-      .from('profiles')
-      .select('push_token, preferred_language')
-      .eq('id', facility.provider_id)
-      .maybeSingle()
-    const lang = prov?.preferred_language || 'English'
-    const title = t(titleKey, lang)
-    const body = t(bodyKey, lang).replace('{name}', facility.name)
-    if (prov?.push_token) {
-      await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ to: prov.push_token, title, body, sound: 'default' }),
-      })
-    }
-    await supabase.rpc('insert_notification', { p_user_id: facility.provider_id, p_title: title, p_body: body })
-  } catch {}
-}
+import { notifyProvider } from '../utils/notify'
 
 const SLOT_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const SLOT_DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -91,17 +69,12 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
-  const [questions, setQuestions] = useState([])
-  const [questionsLoading, setQuestionsLoading] = useState(true)
-  const [newQ, setNewQ] = useState('')
-  const [qError, setQError] = useState(null)
-  const [submittingQ, setSubmittingQ] = useState(false)
   const [reviews, setReviews] = useState([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [reviewTotal, setReviewTotal] = useState(0)
   const [showAllReviews, setShowAllReviews] = useState(false)
 
-  useEffect(() => { loadQuestions(); loadReviews() }, [])
+  useEffect(() => { loadReviews() }, [])
 
   async function loadReviews() {
     setReviewsLoading(true)
@@ -119,48 +92,6 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
     } finally {
       setReviewsLoading(false)
     }
-  }
-
-  async function loadQuestions() {
-    setQuestionsLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('questions')
-        .select('id, body, created_at, answers(id, body, created_at)')
-        .eq('facility_id', facility.id)
-        .order('created_at', { ascending: false })
-      if (!error && data) setQuestions(data)
-    } finally {
-      setQuestionsLoading(false)
-    }
-  }
-
-  async function submitQuestion() {
-    const body = newQ.trim()
-    if (!body) return
-    setSubmittingQ(true)
-    setQError(null)
-
-    if (await containsBlockedTerm(body)) {
-      setQError(t('contentBlockedTerm', lang))
-      setSubmittingQ(false)
-      return
-    }
-
-    const { error } = await supabase.from('questions').insert({
-      facility_id: facility.id,
-      customer_id: session.user.id,
-      body,
-    })
-    if (!error) {
-      setNewQ('')
-      await loadQuestions()
-      notifyProvider(facility, 'notifNewQuestionTitle', 'notifNewQuestionBody')
-    } else {
-      const key = moderationErrorKey(error)
-      setQError(key ? t(key, lang) : t('questionSubmitError', lang))
-    }
-    setSubmittingQ(false)
   }
 
   async function loadBookedSlots(d) {
@@ -545,58 +476,6 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
             )}
           </>
         )}
-
-        <View style={styles.divider} />
-        <Text style={styles.sectionLabel}>{t('questionsAnswers', lang)}</Text>
-
-        <View style={styles.askRow}>
-          <TextInput
-            style={styles.askInput}
-            value={newQ}
-            onChangeText={setNewQ}
-            placeholder={t('askPlaceholder', lang)}
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            maxLength={300}
-          />
-          <TouchableOpacity
-            style={[styles.askBtn, (!newQ.trim() || submittingQ) && { opacity: 0.4 }]}
-            onPress={submitQuestion}
-            disabled={!newQ.trim() || submittingQ}
-          >
-            {submittingQ
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.askBtnText}>{t('ask', lang)}</Text>
-            }
-          </TouchableOpacity>
-        </View>
-
-        {qError && <Text style={styles.error}>{qError}</Text>}
-
-        <Text style={styles.termsNotice}>{t('termsAgreeContent', lang)}</Text>
-
-        {questionsLoading ? (
-          <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
-        ) : questions.length === 0 ? (
-          <Text style={styles.noQText}>{t('noQuestions', lang)}</Text>
-        ) : (
-          questions.map(q => (
-            <View key={q.id} style={styles.qCard}>
-              <Text style={styles.qBody}>{q.body}</Text>
-              {q.answers && q.answers.length > 0 ? (
-                <View style={styles.answerBlock}>
-                  <View style={styles.answerTop}>
-                    <Text style={styles.answerLabel}>{t('providerAnswer', lang)}</Text>
-                    <ContentReportMenu contentType="answer" contentId={q.answers[0].id} lang={lang} />
-                  </View>
-                  <Text style={styles.answerBody}>{q.answers[0].body}</Text>
-                </View>
-              ) : (
-                <Text style={styles.noAnswer}>{t('awaitingAnswer', lang)}</Text>
-              )}
-            </View>
-          ))
-        )}
       </ScrollView>
       </KeyboardAwareForm>
     </SafeAreaView>
@@ -629,19 +508,6 @@ const styles = StyleSheet.create({
   submit:          { backgroundColor: colors.primary, borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 8 },
   submitText:      { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.2 },
   divider:         { height: 1, backgroundColor: colors.border, marginVertical: 28 },
-  askRow:          { flexDirection: 'row', gap: 10, alignItems: 'flex-end', marginBottom: 16 },
-  askInput:        { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface, maxHeight: 100 },
-  askBtn:          { backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, justifyContent: 'center', alignItems: 'center' },
-  askBtnText:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
-  noQText:         { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 8, marginBottom: 16 },
-  qCard:           { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
-  qBody:           { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginBottom: 10, lineHeight: 20 },
-  answerBlock:     { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10 },
-  answerTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  termsNotice:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 16, marginTop: 8 },
-  answerLabel:     { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  answerBody:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
-  noAnswer:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic' },
   seeAllBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, marginBottom: 4 },
   seeAllText:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
   reviewCard:      { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 8, ...shadow },
