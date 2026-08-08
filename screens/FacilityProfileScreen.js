@@ -15,6 +15,7 @@ import { formatHoursDisplay } from '../components/HoursPicker'
 import { pricedServices, formatPriceRange } from '../utils/servicePrices'
 import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { notifyProvider } from '../utils/notify'
+import { HEALTH_TYPES } from '../constants/facilityTypes'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
 
 const GARAGE_LABEL_KEY = Object.fromEntries(GARAGE_CATEGORIES.map(c => [c.key, c.labelKey]))
@@ -134,7 +135,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
   }
 
   const tc         = typeColors[facility.type] || typeColors.clinic
-  const isPharmacy = facility.type === 'pharmacy'
+  const isHealthType = HEALTH_TYPES.includes(facility.type)
   const garagePrices = facility.type === 'garage' ? pricedServices(facility, GARAGE_KEY_ORDER) : []
   const languages  = Array.isArray(facility.languages)
     ? facility.languages
@@ -145,7 +146,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: isPharmacy ? 40 : (!facility.availability && facility.phone ? 160 : 108) }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: isHealthType ? 40 : (!facility.availability && facility.phone ? 160 : 108) }}>
 
           {/* Nav bar */}
           <View style={s.navBar}>
@@ -502,8 +503,8 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
           </TouchableOpacity>
         </Modal>
 
-        {/* Sticky Book CTA */}
-        {!isPharmacy && (
+        {/* Sticky Book CTA — hidden for health types (directory only) */}
+        {!isHealthType && (
           <View style={s.ctaWrap}>
             <TouchableOpacity style={s.ctaBtn} onPress={onBook} activeOpacity={0.85}>
               <Text style={s.ctaText}>

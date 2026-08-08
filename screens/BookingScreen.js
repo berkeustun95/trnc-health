@@ -12,6 +12,7 @@ import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton, SlotGridSkeleton } from '../components/Skeleton'
 import ContentReportMenu from '../components/ContentReportMenu'
 import { notifyProvider } from '../utils/notify'
+import { HEALTH_TYPES } from '../constants/facilityTypes'
 
 const SLOT_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const SLOT_DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -305,7 +306,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
           )
         })()}
 
-        {facility.type !== 'pharmacy' && (
+        {!HEALTH_TYPES.includes(facility.type) && (
           <>
             {facility.type === 'garage' && facility.service_types?.length > 0 && (
               <>

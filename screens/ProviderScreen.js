@@ -15,6 +15,7 @@ import ContentReportMenu from '../components/ContentReportMenu'
 import ListingHiddenBanner from '../components/ListingHiddenBanner'
 import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
+import { HEALTH_TYPES } from '../constants/facilityTypes'
 
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -80,9 +81,9 @@ const DEFAULT_AVAIL = {
 }
 
 export default function ProviderScreen({ session, lang = 'English', facility, trialDaysLeft, onFacilityUpdated }) {
-  const isPharmacy   = facility.type === 'pharmacy'
+  const isHealthType = HEALTH_TYPES.includes(facility.type)
 
-  const [tab, setTab] = useState(isPharmacy ? 'qa' : 'requests')
+  const [tab, setTab] = useState(isHealthType ? 'qa' : 'requests')
   const [appointments, setAppointments] = useState([])
   const [upcomingConfirmed, setUpcomingConfirmed] = useState([])
   const [pastConfirmed, setPastConfirmed] = useState([])
@@ -131,7 +132,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
 
   useEffect(() => {
     async function load() {
-      if (!isPharmacy) {
+      if (!isHealthType) {
         const { data, error } = await supabase
           .from('appointments')
           .select('id, requested_time, customer_id')
@@ -497,7 +498,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         )}
 
         <View style={styles.tabs}>
-          {!isPharmacy && (
+          {!isHealthType && (
             <TouchableOpacity
               style={[styles.tabBtn, tab === 'requests' && styles.tabBtnActive]}
               onPress={() => setTab('requests')}
@@ -657,7 +658,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
             </View>
 
             {/* Availability / slot booking */}
-            {!isPharmacy && (
+            {!isHealthType && (
               <View style={[styles.card, { marginTop: 16 }]}>
                 <View style={styles.availHeader}>
                   <View>
@@ -946,7 +947,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
             <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
-              {!isPharmacy && (
+              {!isHealthType && (
                 <>
                   <Text style={styles.sectionTitle}>{t('statAppointments', lang)}</Text>
                   <View style={styles.statRow}>
@@ -967,7 +968,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 </>
               )}
 
-              <Text style={[styles.sectionTitle, !isPharmacy && { marginTop: 24 }]}>{t('tabQA', lang)}</Text>
+              <Text style={[styles.sectionTitle, !isHealthType && { marginTop: 24 }]}>{t('tabQA', lang)}</Text>
               <View style={styles.statRow}>
                 <View style={[styles.statTile, { backgroundColor: colors.cardBg }]}>
                   <Text style={[styles.statNum, { color: colors.textPrimary }]}>{questions.length}</Text>
