@@ -3,7 +3,13 @@
 -- Manual-apply workflow has no CI, so this checks the LIVE DB against every
 -- object the repo migrations claim to create. Run in Supabase SQL editor
 -- (Role → postgres). Scan for status <> 'OK'. The `migration` column tells you
--- which file to apply. `area` will show MISSING until 20260806 is applied.
+-- which file to apply.
+--
+-- ▶ HOW TO RUN — the SQL editor shows only the LAST result set, so run the four
+--   queries ONE AT A TIME. Each is a standalone statement under a
+--   `═══ QUERY n / 4 ═══` banner: select from a banner down to the next banner
+--   (or end of file) and run just that block.  1 = main report · 2 = cron ·
+--   3 = RLS policy counts · 4 = storage.objects policies.
 --
 -- CONVENTION (keep this file the source of truth for schema drift):
 --   • Every new migration MUST register the objects it creates into the relevant
@@ -18,8 +24,11 @@
 --     stale PostgREST cache can't mask a missing column as a 42703 query error.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- ── QUERY 1 — MAIN REPORT (tables, columns, functions, triggers, constraints,
---              grants, behavior-version tokens, RLS-enabled). One query. ──────
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ═══ QUERY 1 / 4 — MAIN REPORT — run alone (select down to the QUERY 2 banner) ═══
+-- ═══════════════════════════════════════════════════════════════════════════
+-- tables · columns · functions · triggers · constraints · indexes · grants ·
+-- behavior/version tokens · RLS-enabled. One big statement.
 WITH report AS (
 
   -- ── A. TABLES ─────────────────────────────────────────────────────────────
@@ -350,8 +359,10 @@ SELECT * FROM report
 ORDER BY (status IN ('OK','ON')) ASC, section, migration, object;   -- problems float to top
 
 
--- ── QUERY 2 — CRON JOBS (separate: errors if pg_cron isn't installed, which is
---              itself the finding). Expect 4 rows, all present. ───────────────
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ═══ QUERY 2 / 4 — CRON JOBS — run alone ═══
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Errors if pg_cron isn't installed (itself the finding). Expect 4 rows present.
 SELECT e.m migration, e.o job,
        CASE WHEN EXISTS (SELECT 1 FROM cron.job WHERE jobname=e.o) THEN 'OK' ELSE 'MISSING' END status
 FROM (VALUES
@@ -363,17 +374,22 @@ FROM (VALUES
 ORDER BY status ASC, migration;
 
 
--- ── QUERY 3 — RLS POLICY COUNT per table (sanity vs capture_5's 172 policies).
---              A table that should be locked down showing 0 = a gap. ──────────
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ═══ QUERY 3 / 4 — RLS POLICY COUNT per table — run alone ═══
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Sanity vs capture_5's 172 policies. A table that should be locked down but
+-- shows 0 = a gap.
 SELECT tablename, count(*) AS policies
 FROM pg_policies WHERE schemaname='public'
 GROUP BY tablename ORDER BY tablename;
 
 
--- ── QUERY 4 — STORAGE.OBJECTS POLICIES (Slice 5). The bucket ACLs live OUTSIDE
---              migrations/ (created in the dashboard / by Slices 1-2), so nothing
---              else catches drift on them. Listing, not pass/fail — eyeball each
---              policy's cmd / roles / qual / with_check. Reference after Slices 1-2:
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ═══ QUERY 4 / 4 — STORAGE.OBJECTS POLICIES — run alone (to end of file) ═══
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Bucket ACLs live OUTSIDE migrations/ (dashboard / Slices 1-2), so nothing else
+-- catches drift on them. Listing, not pass/fail — eyeball each policy's
+-- cmd / roles / qual / with_check. Reference after Slices 1-2:
 --                • provider-documents / provider-credentials: *_owner_{insert,select,
 --                  update,delete} (writes carry NOT is_anonymous_session()) + the
 --                  pre-existing *_admin_read SELECT. No public/anon rows.
