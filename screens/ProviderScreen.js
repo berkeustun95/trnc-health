@@ -144,9 +144,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           let nameMap = {}
           if (customerIds.length) {
             const { data: profiles } = await supabase
-              .from('profiles')
-              .select('id, full_name')
-              .in('id', customerIds)
+              .rpc('get_customer_contacts', { p_ids: customerIds })
             if (profiles) profiles.forEach(p => { nameMap[p.id] = p.full_name })
           }
           setAppointments(data.map(a => ({ ...a, customer_name: nameMap[a.customer_id] ?? null })))
@@ -164,7 +162,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           const pastIds = [...new Set(past.map(a => a.customer_id).filter(Boolean))]
           let pastNameMap = {}
           if (pastIds.length) {
-            const { data: pastProfiles } = await supabase.from('profiles').select('id, full_name').in('id', pastIds)
+            const { data: pastProfiles } = await supabase.rpc('get_customer_contacts', { p_ids: pastIds })
             if (pastProfiles) pastProfiles.forEach(p => { pastNameMap[p.id] = p.full_name })
           }
           setPastConfirmed(past.map(a => ({ ...a, customer_name: pastNameMap[a.customer_id] ?? null })))
@@ -182,7 +180,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           const upIds = [...new Set(upcoming.map(a => a.customer_id).filter(Boolean))]
           let upNameMap = {}
           if (upIds.length) {
-            const { data: upProfiles } = await supabase.from('profiles').select('id, full_name').in('id', upIds)
+            const { data: upProfiles } = await supabase.rpc('get_customer_contacts', { p_ids: upIds })
             if (upProfiles) upProfiles.forEach(p => { upNameMap[p.id] = p.full_name })
           }
           setUpcomingConfirmed(upcoming.map(a => ({ ...a, customer_name: upNameMap[a.customer_id] ?? null })))
@@ -249,8 +247,9 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
     if (!error) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-      const { data: profile } = await supabase
-        .from('profiles').select('push_token, preferred_language').eq('id', customerId).maybeSingle()
+      const { data: contacts } = await supabase
+        .rpc('get_customer_contacts', { p_ids: [customerId] })
+      const profile = contacts?.[0]
       if (profile) {
         const confirmed = status === 'confirmed'
         const cLang = profile.preferred_language || 'English'

@@ -23,12 +23,14 @@ async function sendPush(token, title, body) {
 }
 
 // Notify the booking customer (push + in-app inbox row), localized to their language.
-// The owner-read profiles policy scopes this read to the caller's own booking-customers;
-// insert_notification's owner→customer branch is role-agnostic (facility ownership).
+// get_customer_contacts returns only the caller's own booking-customers (an appointment
+// at their facility) and only safe columns; insert_notification's owner→customer branch
+// is role-agnostic (facility ownership).
 async function notifyCustomer(customerId, facilityName, titleKey, bodyKey) {
   try {
-    const { data: p } = await supabase
-      .from('profiles').select('push_token, preferred_language').eq('id', customerId).maybeSingle()
+    const { data: contacts } = await supabase
+      .rpc('get_customer_contacts', { p_ids: [customerId] })
+    const p = contacts?.[0]
     const cLang = p?.preferred_language || 'English'
     const title = t(titleKey, cLang)
     const body  = t(bodyKey, cLang).replace('{name}', facilityName)
@@ -82,7 +84,7 @@ export default function GroomingBookingsScreen({ facility, lang = 'English', onB
     const ids = [...new Set(rows.map(r => r.customer_id).filter(Boolean))]
     const names = {}
     if (ids.length) {
-      const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', ids)
+      const { data: profs } = await supabase.rpc('get_customer_contacts', { p_ids: ids })
       ;(profs || []).forEach(p => { names[p.id] = p.full_name })
     }
     const withNames = rows.map(r => ({ ...r, customer_name: names[r.customer_id] || null }))
