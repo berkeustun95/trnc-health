@@ -65,6 +65,9 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
   const [showMapPicker, setShowMapPicker] = useState(false)
   const [documents, setDocuments]         = useState([]) // [{ doc_type, uri, base64 }]
   const [uploadingDocs, setUploadingDocs] = useState(false)
+  // Set when the facility/claim row was created but its documents failed to upload;
+  // a re-tap of Submit then retries ONLY the upload (never re-creates the row).
+  const [submittedFacilityId, setSubmittedFacilityId] = useState(null)
 
   useEffect(() => {
     if (step !== 2) return
@@ -95,9 +98,13 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
     })
   }
 
+  // Returns the count of documents that failed to upload OR whose metadata row
+  // failed to insert (0 = all good). A metadata row is inserted ONLY after its
+  // object uploads, so a failure never leaves an orphan row pointing at nothing.
   async function uploadDocuments(facilityId) {
-    if (documents.length === 0) return
+    if (documents.length === 0) return 0
     setUploadingDocs(true)
+    let failed = 0
     for (const doc of documents) {
       try {
         const ext = (doc.uri.split('.').pop() || 'jpg').toLowerCase()
@@ -106,65 +113,26 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
         const { error: upErr } = await supabase.storage
           .from('provider-documents')
           .upload(path, decode(doc.base64), { contentType, upsert: true })
-        if (!upErr) {
-          // document_url now holds the private object PATH (bucket is private);
-          // admin mints a signed URL from it at review time.
-          await supabase.from('provider_documents').insert({
-            facility_id:  facilityId,
-            provider_id:  session.user.id,
-            doc_type:     doc.doc_type,
-            document_url: path,
-          })
-        }
-      } catch {}
+        if (upErr) { failed++; continue }
+        // document_url now holds the private object PATH (bucket is private);
+        // admin mints a signed URL from it at review time.
+        const { error: insErr } = await supabase.from('provider_documents').insert({
+          facility_id:  facilityId,
+          provider_id:  session.user.id,
+          doc_type:     doc.doc_type,
+          document_url: path,
+        })
+        if (insErr) failed++
+      } catch {
+        failed++
+      }
     }
     setUploadingDocs(false)
+    return failed
   }
 
-  async function submit() {
-    setSaving(true)
-    setError(null)
-    const facilityName = mode === 'claim' ? selectedFacility?.name : form.name.trim()
-    if (mode === 'claim') {
-      if (!form.tax_registration_no.trim()) { setError(t('taxRegistrationNoRequired', lang)); setSaving(false); return }
-      const { error: err } = await supabase.from('claim_requests').insert({
-        facility_id:         selectedFacility.id,
-        requester_id:        session.user.id,
-        requested_tier:      form.membership_tier,
-        registration_number: form.registration_number.trim() || null,
-        tax_registration_no: form.tax_registration_no.trim(),
-      })
-      if (err) { setError(err.message); setSaving(false); return }
-      if (form.latitude != null && form.longitude != null) {
-        await supabase.from('facilities')
-          .update({ latitude: form.latitude, longitude: form.longitude })
-          .eq('id', selectedFacility.id)
-      }
-      await uploadDocuments(selectedFacility.id)
-    } else {
-      if (!form.name.trim()) { setError('Facility name is required.'); setSaving(false); return }
-      if (!form.tax_registration_no.trim()) { setError(t('taxRegistrationNoRequired', lang)); setSaving(false); return }
-      // Atomic server-side create: inserts the facility (born unclaimed/pending)
-      // AND its claim_requests row in one transaction, returning the new facility
-      // id. Done via RPC so the client never reads facilities back under the
-      // restrictive SELECT policy (a pending/unclaimed row is invisible to its
-      // creator, which broke the old insert().select() read-back).
-      const { data: newFacilityId, error: err } = await supabase.rpc('create_facility_claim', {
-        p_name:                form.name.trim(),
-        p_type:                form.type,
-        p_address:             form.address.trim() || null,
-        p_phone:               form.phone.trim() || null,
-        p_opening_hours:       form.opening_hours.trim() || null,
-        p_membership_tier:     form.membership_tier,
-        p_registration_number: form.registration_number.trim() || null,
-        p_tax_registration_no: form.tax_registration_no.trim(),
-        p_latitude:            form.latitude,
-        p_longitude:           form.longitude,
-      })
-      if (err) { setError(err.message); setSaving(false); return }
-      if (newFacilityId) await uploadDocuments(newFacilityId)
-    }
-    setSaving(false)
+  // Notify admins the submission is ready for review, then leave the screen.
+  async function finalizeSubmission(facilityName) {
     try {
       const { data: admins } = await supabase.from('profiles').select('id, push_token').eq('role', 'admin')
       const title = mode === 'claim' ? 'New facility claim' : 'New provider application'
@@ -175,6 +143,78 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
       }
     } catch {}
     onDone()
+  }
+
+  async function submit() {
+    setSaving(true)
+    setError(null)
+    const facilityName = mode === 'claim' ? selectedFacility?.name : form.name.trim()
+
+    // Retry path: the facility/claim row already exists from a previous attempt
+    // whose document upload failed. Skip re-creating it and retry ONLY the upload,
+    // so a retry can never duplicate the facility, the claim, or the admin notice.
+    let facilityId = submittedFacilityId
+
+    if (!facilityId) {
+      if (mode === 'claim') {
+        if (!form.tax_registration_no.trim()) { setError(t('taxRegistrationNoRequired', lang)); setSaving(false); return }
+        const { error: err } = await supabase.from('claim_requests').insert({
+          facility_id:         selectedFacility.id,
+          requester_id:        session.user.id,
+          requested_tier:      form.membership_tier,
+          registration_number: form.registration_number.trim() || null,
+          tax_registration_no: form.tax_registration_no.trim(),
+        })
+        if (err) { setError(err.message); setSaving(false); return }
+        if (form.latitude != null && form.longitude != null) {
+          await supabase.from('facilities')
+            .update({ latitude: form.latitude, longitude: form.longitude })
+            .eq('id', selectedFacility.id)
+        }
+        facilityId = selectedFacility.id
+      } else {
+        if (!form.name.trim()) { setError('Facility name is required.'); setSaving(false); return }
+        if (!form.tax_registration_no.trim()) { setError(t('taxRegistrationNoRequired', lang)); setSaving(false); return }
+        // Atomic server-side create: inserts the facility (born unclaimed/pending)
+        // AND its claim_requests row in one transaction, returning the new facility
+        // id. Done via RPC so the client never reads facilities back under the
+        // restrictive SELECT policy (a pending/unclaimed row is invisible to its
+        // creator, which broke the old insert().select() read-back).
+        const { data: newFacilityId, error: err } = await supabase.rpc('create_facility_claim', {
+          p_name:                form.name.trim(),
+          p_type:                form.type,
+          p_address:             form.address.trim() || null,
+          p_phone:               form.phone.trim() || null,
+          p_opening_hours:       form.opening_hours.trim() || null,
+          p_membership_tier:     form.membership_tier,
+          p_registration_number: form.registration_number.trim() || null,
+          p_tax_registration_no: form.tax_registration_no.trim(),
+          p_latitude:            form.latitude,
+          p_longitude:           form.longitude,
+        })
+        if (err) { setError(err.message); setSaving(false); return }
+        facilityId = newFacilityId
+      }
+    }
+
+    // Impossible unless create_facility_claim returned no id without an error;
+    // abort quietly rather than upload to a `{uid}/null/…` path or fake success.
+    if (!facilityId) { setSaving(false); return }
+
+    // Upload identity documents last. On any failure, keep the created row, remember
+    // its id, and surface the error — a re-tap of Submit retries only the upload.
+    // No admin notification and no onDone() until every document is in.
+    const failedCount = await uploadDocuments(facilityId)
+    if (failedCount > 0) {
+      setSubmittedFacilityId(facilityId)
+      setError(t('providerDocsUploadFailed', lang))
+      setSaving(false)
+      return
+    }
+
+    setSubmittedFacilityId(null)
+    setSaving(false)
+    await finalizeSubmission(facilityName)
   }
 
   // ── Step 1: Welcome ────────────────────────────────────────────────────────

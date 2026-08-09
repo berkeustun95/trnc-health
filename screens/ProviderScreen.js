@@ -407,6 +407,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     let document_url = null
     if (credImageBase64) {
       setUploadingCredDoc(true)
+      let upFailed = false
       try {
         const ext = (credImageUri?.split('.').pop() || 'jpg').toLowerCase()
         const path = `${session.user.id}/${Date.now()}.${ext}`
@@ -414,12 +415,20 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         const { error: upErr } = await supabase.storage
           .from('provider-credentials')
           .upload(path, decode(credImageBase64), { contentType })
-        if (!upErr) {
-          // Store the private object PATH; a signed URL is minted at view time.
-          document_url = path
-        }
-      } catch {}
+        if (upErr) upFailed = true
+        // Store the private object PATH; a signed URL is minted at view time.
+        else document_url = path
+      } catch {
+        upFailed = true
+      }
       setUploadingCredDoc(false)
+      // Abort before insert: never write a credential row with a missing
+      // document_url (that was the orphan source — insert used to run regardless).
+      if (upFailed) {
+        setSavingCred(false)
+        Alert.alert('', t('uploadFailed', lang))
+        return
+      }
     }
     await supabase.from('provider_credentials').insert({
       facility_id:  facility.id,
