@@ -303,6 +303,10 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='questions'
         AND policyname='insert questions'
         AND with_check ILIKE '%is_customer_blocked%')
+    UNION ALL SELECT '0818_preferred_language_nullable','profiles.preferred_language nullable + no default (unset = NULL, not code ''en'')',
+      (SELECT is_nullable='YES' AND column_default IS NULL
+         FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='profiles' AND column_name='preferred_language')
   ) z
 
   UNION ALL
