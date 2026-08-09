@@ -570,10 +570,29 @@ export default function App() {
     supabase.from('profiles').select('role, preferred_language, avatar_url, blocked_until').eq('id', session.user.id).single()
       .then(async ({ data }) => {
         setProfile(data ?? null)
+
+        // Language self-heal (SERVER column only — in-app already resolves a NULL
+        // column via pendingLang since the L1 migration). A pre-auth/onboarding
+        // language pick lives solely in AsyncStorage (@trnc_lang) because no session
+        // exists at onboarding; persist it to the server the FIRST time the column is
+        // still unset, so cross-user notifications and the duty-push edge function use
+        // the right language. Reads @trnc_lang directly (not the possibly-stale
+        // pendingLang state) to avoid a mount-effect race. Runs on every session load,
+        // but writes at most once: the `== null` guard means an existing value is
+        // never overwritten, and guests are excluded EXPLICITLY (they cannot write the
+        // row — not left to the RLS block to fail silently).
+        const storedLang = await AsyncStorage.getItem('@trnc_lang')
+        const effectiveLang = data?.preferred_language || storedLang || 'English'
+        if (data && data.preferred_language == null && !isGuest(session) && storedLang) {
+          const { error: syncErr } = await supabase.from('profiles')
+            .update({ preferred_language: storedLang }).eq('id', session.user.id)
+          if (!syncErr) setProfile(prev => (prev ? { ...prev, preferred_language: storedLang } : prev))
+        }
+
         if (data?.role === 'provider') {
           loadProviderFacility()
         } else if (!data?.role || data?.role === 'customer') {
-          scheduleAppointmentReminders(session.user.id, data?.preferred_language ?? 'en')
+          scheduleAppointmentReminders(session.user.id, effectiveLang)
           AsyncStorage.getItem('@trnc_coach_v2').then(async shown => {
             // First run is already spending its attention on the carousel, the
             // entry screen and the coach marks. The home-city question waits for
@@ -1439,7 +1458,10 @@ export default function App() {
                 </TouchableOpacity>
               </View>
               {LANGUAGES.map(({ key, label }) => {
-                const active = (profile?.preferred_language || 'English') === key
+                // Compare against the RESOLVED language (profile?.preferred_language ||
+                // pendingLang), not the raw column — so a NULL-column user who picked
+                // Turkish at onboarding sees Turkish highlighted, not English.
+                const active = lang === key
                 return (
                   <TouchableOpacity key={key} style={styles.langRow} onPress={() => selectLang(key)}>
                     <Text style={[styles.langRowLabel, active && styles.langRowLabelActive]}>{label}</Text>
