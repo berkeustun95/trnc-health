@@ -318,7 +318,11 @@ WITH report AS (
     'profiles','facilities','appointments','reviews','questions','answers',
     'notifications','claim_requests','facility_change_requests','job_postings',
     'content_reports','blocks','insurance_companies','esim_waitlist','module_waitlist',
-    'provider_documents','provider_credentials','quiz_submissions','pharmacist_scores'
+    'provider_documents','provider_credentials','quiz_submissions','pharmacist_scores',
+    -- directory / UGC tables (Slice 5 — user-writable rows, so RLS must be ON here too)
+    'beaches','landmarks','events','home_services','transport_providers',
+    'estate_agencies','estate_agents','properties','property_images',
+    'duty_list','duty_schedule','blocked_terms','bus_routes'
   )
 )
 SELECT * FROM report
@@ -343,3 +347,21 @@ ORDER BY status ASC, migration;
 SELECT tablename, count(*) AS policies
 FROM pg_policies WHERE schemaname='public'
 GROUP BY tablename ORDER BY tablename;
+
+
+-- ── QUERY 4 — STORAGE.OBJECTS POLICIES (Slice 5). The bucket ACLs live OUTSIDE
+--              migrations/ (created in the dashboard / by Slices 1-2), so nothing
+--              else catches drift on them. Listing, not pass/fail — eyeball each
+--              policy's cmd / roles / qual / with_check. Reference after Slices 1-2:
+--                • provider-documents / provider-credentials: *_owner_{insert,select,
+--                  update,delete} (writes carry NOT is_anonymous_session()) + the
+--                  pre-existing *_admin_read SELECT. No public/anon rows.
+--                • estate-agent-documents INSERT + event-images INSERT pin the
+--                  uploader UID by folder segment ([1] and [2] respectively).
+--                • public image buckets (avatars/facility-images/property-images/
+--                  event-images) keep their broad `USING (bucket_id=…)` SELECT —
+--                  known follow-up (anon object enumeration), not changed here. ─────
+SELECT policyname, cmd, roles, qual, with_check
+FROM pg_policies
+WHERE schemaname='storage' AND tablename='objects'
+ORDER BY policyname;
