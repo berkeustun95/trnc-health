@@ -140,7 +140,8 @@ WITH report AS (
     ('0809_featured_expiry_reminder','process_featured_expiring'),
     ('0810_change_request_content_filter','check_change_request_content'),
     ('0813_notify_module_waitlist','module_notif_text'),
-    ('0813_notify_module_waitlist','notify_module_waitlist')
+    ('0813_notify_module_waitlist','notify_module_waitlist'),
+    ('0819_get_customer_contacts_rpc','get_customer_contacts')
   ) e(m,o)
 
   UNION ALL
@@ -251,7 +252,8 @@ WITH report AS (
     ('0725_grooming_directory','create_grooming_facility'),
     ('0803_grooming_owner_edit','update_grooming_facility'),
     ('0719_create_facility_claim_rpc','create_facility_claim'),
-    ('0813_notify_module_waitlist','notify_module_waitlist')
+    ('0813_notify_module_waitlist','notify_module_waitlist'),
+    ('0819_get_customer_contacts_rpc','get_customer_contacts')
   ) e(m,o)
 
   UNION ALL
@@ -307,6 +309,25 @@ WITH report AS (
       (SELECT is_nullable='YES' AND column_default IS NULL
          FROM information_schema.columns
         WHERE table_schema='public' AND table_name='profiles' AND column_name='preferred_language')
+    -- The three below close the drift-check gap on this session's most critical fixes:
+    -- the two remaining unpinned SECURITY DEFINER functions, and the S1 signup
+    -- allow-list (the token above only checks the unrelated home_service_provider role).
+    UNION ALL SELECT '0719_pin_definer_search_path','my_provider_facility_ids pinned search_path',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='my_provider_facility_ids'
+          AND array_to_string(p.proconfig,',') ILIKE '%search_path%')
+    UNION ALL SELECT '0719_pin_definer_search_path','update_pharmacist_score pinned search_path',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='update_pharmacist_score'
+          AND array_to_string(p.proconfig,',') ILIKE '%search_path%')
+    UNION ALL SELECT '0719_fix_signup','handle_new_user sanitizes signup role to allow-list (NOT IN customer/provider/organizer)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='handle_new_user'
+          AND pg_get_functiondef(p.oid) ILIKE '%not in%organizer%')
+    UNION ALL SELECT '0819_record_no_show_time_guard','record_no_show requires requested_time < now()',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='record_no_show'
+          AND pg_get_functiondef(p.oid) ILIKE '%requested_time < now()%')
   ) z
 
   UNION ALL
