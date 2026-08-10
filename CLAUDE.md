@@ -41,6 +41,8 @@ eas build --platform android --profile production
 
 **EAS environment variables:** Use `eas env:create` (not `eas secret:create` — deprecated). `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is set for the production environment. Changes to env vars require a new native build to take effect.
 
+**Google Maps key is RESTRICTED in Cloud Console** (Android apps: `com.berkeustun95.ada` + upload SHA-1; API: Maps SDK for Android only), so a blank Android map with **no error** = a SHA-1 mismatch. After the first Play release, the **Play App Signing SHA-1 must be ADDED** as a 2nd entry (keep the upload one). Detail + checklist: `~/ObsidianVault/10-ada/play-console-status.md`.
+
 **facility_change_requests.proposed_changes:** The `languages` field is stored as a comma-separated string (e.g. `"English, Turkish"`). When approving and writing to `facilities.languages` (which is `text[]`), split it first: `changes.languages.split(',').map(l => l.trim())`.
 
 ## How I want you to work
@@ -80,6 +82,10 @@ went missing). Two mandatory rules:
 - Views with `borderRadius` + `borderWidth` on Android may render an opaque background unless `backgroundColor: 'transparent'` is set explicitly.
 - Never cache element positions in `onLayout` for later use — layout can shift (e.g. async data loading) and the cached value goes stale. Always measure with `measureRef()` at the moment you need the position.
 
+## Advisor
+
+Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.
+
 ## Don't
 - Don't add analytics, tracking, or third-party SDKs without asking.
 - Don't generate large files of placeholder/sample code — ask what's real.
@@ -94,3 +100,4 @@ When I ask for a summary for the dev journal, follow this format:
 - "Watch out for" — gotchas, deferred TODOs, things future-me needs to remember
 - **When more than one reasonable approach existed for a decision, include an options table with tradeoffs — not just the choice.**
 - "→ architecture.md updates needed" if structural (new tables, screens, conventions)
+
