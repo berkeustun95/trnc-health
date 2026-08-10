@@ -39,6 +39,7 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
 
   const mapped = facilities
     .filter(f => FACILITY_TYPES.includes(f.type))
+    .filter(f => (f.status === 'active' || f.status === 'trial') && !f.hidden_at)  // moderation (defense-in-depth; RLS 20260820 is the gate)
     .filter(f => f.latitude != null && f.longitude != null)
     .filter(f => filterType == null || f.type === filterType)
     .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)

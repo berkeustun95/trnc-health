@@ -200,6 +200,9 @@ export default function HomeScreen({
 
   const listed = facilities
     .filter(f => HEALTH_TYPES.includes(f.type))
+    // Defense-in-depth for moderation (the RLS gate in 20260820 is the real fix):
+    // keep suspended/pending/hidden listings out of the browse list, incl. own.
+    .filter(f => (f.status === 'active' || f.status === 'trial') && !f.hidden_at)
     .map(f => ({
       ...f,
       _dist: userLocation && f.latitude != null && f.longitude != null

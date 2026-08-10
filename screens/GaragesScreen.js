@@ -129,6 +129,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
       .select('id, name, type, service_types, service_prices, address, phone, opening_hours, description, cover_image_url, logo_url, photos, availability, city, area, featured_until')
       .eq('type', 'garage')
       .eq('status', 'active')
+      .is('hidden_at', null)   // moderation: also drop Hidden listings (RLS 20260820 is the gate)
       .order('name', { ascending: true })
     if (selected.length > 0) query = query.overlaps('service_types', selected)
     if (regions.length > 0) query = query.in('city', regions)

@@ -70,6 +70,8 @@ export default function VetDirectoryScreen({ lang, onBack, onOpenVet }) {
       .from('facilities')
       .select('*')
       .eq('type', 'vet')
+      .in('status', ['active', 'trial'])   // moderation: hide suspended/pending (RLS 20260820 is the gate)
+      .is('hidden_at', null)
       .order('verified', { ascending: false })
       .order('name', { ascending: true })
     if (err) {

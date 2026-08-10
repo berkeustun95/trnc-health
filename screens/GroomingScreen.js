@@ -91,6 +91,7 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
       .select('id, name, type, service_types, address, phone, opening_hours, description, languages, specialty, latitude, longitude, photos, verified, availability, cover_image_url, logo_url, provider_id, city, area')
       .eq('type', 'grooming')
       .eq('status', 'active')
+      .is('hidden_at', null)   // moderation: also drop Hidden listings (RLS 20260820 is the gate)
       .order('name', { ascending: true })
     if (selected.length > 0) query = query.overlaps('service_types', selected)
     if (regions.length > 0) query = query.in('city', regions)

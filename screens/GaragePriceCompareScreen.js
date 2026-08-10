@@ -70,6 +70,7 @@ export default function GaragePriceCompareScreen({ lang, onBack, onOpenFacility 
       .select(SELECT)
       .eq('type', 'garage')
       .eq('status', 'active')
+      .is('hidden_at', null)   // moderation: also drop Hidden listings (RLS 20260820 is the gate)
       .overlaps('service_types', [service])
     if (regions.length > 0) query = query.in('city', regions)
     if (areas.length > 0) query = query.in('area', areas)
