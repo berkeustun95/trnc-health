@@ -337,6 +337,16 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='record_no_show'
           AND pg_get_functiondef(p.oid) ILIKE '%requested_time < now()%')
+    UNION ALL SELECT '0820_facilities_moderation_read_policy','facilities public read is moderation-gated (no USING(true))',
+      (EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='facilities'
+                AND policyname='public read live facilities'
+                AND qual ILIKE '%hidden_at%' AND qual ILIKE '%active%')
+       AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='facilities'
+                AND policyname='Anyone can read facilities'))
+    UNION ALL SELECT '0820_search_content_gate_facilities','search_content facilities arm filters status/hidden_at',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='search_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%f.hidden_at is null%')
   ) z
 
   UNION ALL
