@@ -347,6 +347,9 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='search_content'
           AND pg_get_functiondef(p.oid) ILIKE '%f.hidden_at is null%')
+    UNION ALL SELECT '0821_drop_providers_read_customer','profiles over-share policy removed (providers use get_customer_contacts RPC)',
+      NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles'
+                AND policyname='providers read customer push token')
   ) z
 
   UNION ALL
