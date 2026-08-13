@@ -341,29 +341,36 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
         />
       ) : (
         <View style={{ flex: 1 }}>
-          {/* Category sub-filter (only when the group has >1 category with data) */}
+          {/* Category sub-filter (only when the group has >1 category with data).
+              Horizontal ScrollView + shared chip styles — matches the shipped
+              grooming/garages filter rows (a flex-wrap View squashes the chips). */}
           {groupCats.length > 1 && (
-            <View style={s.typeRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={s.filterRow}
+            >
               <TouchableOpacity
-                style={[s.typeChip, !activeCat && s.typeChipActive]}
+                style={[s.chip, !activeCat && s.chipActive]}
                 onPress={() => setActiveCat(null)}
                 activeOpacity={0.8}
               >
-                <Text style={[s.typeChipText, !activeCat && s.typeChipTextActive]}>{t('blFilterAll', lang)}</Text>
+                <Text style={[s.chipText, !activeCat && s.chipTextActive]}>{t('blFilterAll', lang)}</Text>
               </TouchableOpacity>
               {groupCats.map(c => (
                 <TouchableOpacity
                   key={c}
-                  style={[s.typeChip, activeCat === c && s.typeChipActive]}
+                  style={[s.chip, activeCat === c && s.chipActive]}
                   onPress={() => setActiveCat(c)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[s.typeChipText, activeCat === c && s.typeChipTextActive]}>
+                  <Text style={[s.chipText, activeCat === c && s.chipTextActive]}>
                     {categoryLabel(c, lang)}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           )}
 
           {/* Region filter */}
@@ -371,7 +378,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
             horizontal
             showsHorizontalScrollIndicator={false}
             style={{ flexGrow: 0 }}
-            contentContainerStyle={s.districtRow}
+            contentContainerStyle={s.filterRow}
           >
             <TouchableOpacity
               style={[s.chip, !region && s.chipActive]}
@@ -447,17 +454,8 @@ const s = StyleSheet.create({
   tileLabel: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   tileCount: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
 
-  // Category sub-filter
-  typeRow:            { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, flexWrap: 'wrap' },
-  typeChip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.md,
-                        backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border,
-                        alignItems: 'center' },
-  typeChipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  typeChipText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  typeChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
-
-  // Region filter
-  districtRow:    { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
+  // Filter rows (category sub-filter + region) — horizontal ScrollViews, shipped pattern.
+  filterRow:      { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
   chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                     backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
