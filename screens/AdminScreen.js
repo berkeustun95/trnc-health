@@ -3979,7 +3979,7 @@ function FeaturedTab() {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-export default function AdminScreen({ session, lang }) {
+export default function AdminScreen({ session, lang, onShowExplore }) {
   const [tab, setTab] = useState('Dashboard')
   const navigateTo = t => setTab(t)
 
@@ -3995,6 +3995,16 @@ export default function AdminScreen({ session, lang }) {
             <Text style={s.signOutText}>Sign out</Text>
           </TouchableOpacity>
         </View>
+
+        {/* TEMPORARY (Slice 2) — admins never reach HomeScreen / the customer module
+            chain, so the Explore module is previewed from here. REMOVE at Slice 5 when
+            the real customer tile ships (gated on MODULE_FLAGS.explore). */}
+        {onShowExplore && (
+          <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowExplore} activeOpacity={0.85}>
+            <Ionicons name="map-outline" size={16} color={colors.primary} />
+            <Text style={s.explorePreviewText}>Open Explore (preview)</Text>
+          </TouchableOpacity>
+        )}
 
         <ScrollView
           horizontal
@@ -4052,6 +4062,11 @@ const s = StyleSheet.create({
   headerLabel:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   signOutBtn:         { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.dangerLight },
   signOutText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
+  explorePreviewBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        marginHorizontal: 16, marginTop: 10, paddingVertical: 12, borderRadius: 12,
+                        borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.primary,
+                        backgroundColor: colors.primaryLight },
+  explorePreviewText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   tabBar:             { flexGrow: 0, marginBottom: 16 },
   tabBarContent:      { gap: 8, paddingRight: 4 },

@@ -62,7 +62,6 @@ const MODULES = [
   { id: 'homeServices',  icon: 'hammer-outline',    tint: 'service',   labelKey: 'menuHomeServices' },
   { id: 'jobPostings',  icon: 'briefcase-outline', tint: 'service',   labelKey: 'menuJobPostings' },
   { id: 'beaches',       icon: 'umbrella-outline',  tint: 'lifestyle', labelKey: 'menuBeachesLandmarks' },
-  { id: 'explore',       icon: 'map-outline',       tint: 'lifestyle', labelKey: 'menuBeachesLandmarks' },  // admin-only preview; menuExplore key + real tile land in Slice 5
   { id: 'transport',     icon: 'car-outline',       tint: 'service',   labelKey: 'menuTransportation' },
   { id: 'insurance',     icon: 'shield-checkmark-outline', tint: 'service', labelKey: 'menuInsurance' },
   { id: 'grooming',      icon: 'cut-outline',       tint: 'lifestyle', labelKey: 'menuGrooming' },
@@ -108,8 +107,6 @@ export default function HomeScreen({
   onShowHomeServices,
   onShowJobPostings,
   onShowBeachesLandmarks,
-  onShowExplore,
-  exploreTileVisible,
   onShowTransport,
   onShowInsurance,
   onShowGrooming,
@@ -192,7 +189,6 @@ export default function HomeScreen({
     homeServices:       onShowHomeServices,
     jobPostings:        onShowJobPostings,
     beaches:            onShowBeachesLandmarks,
-    explore:            onShowExplore,
     transport:          onShowTransport,
     insurance:          onShowInsurance,
     grooming:           onShowGrooming,
@@ -395,8 +391,7 @@ export default function HomeScreen({
           </View>
 
           <View style={s.moduleGrid}>
-            {MODULES.filter(mod => mod.id !== 'garages' || garagesTileVisible)
-                    .filter(mod => mod.id !== 'explore' || exploreTileVisible).map(mod => (
+            {MODULES.filter(mod => mod.id !== 'garages' || garagesTileVisible).map(mod => (
               <TouchableOpacity
                 key={mod.id}
                 style={s.moduleCard}

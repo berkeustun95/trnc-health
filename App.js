@@ -268,8 +268,11 @@ export default function App() {
   const [showHomeServices, setShowHomeServices] = useState(false)
   const [showJobPostings,  setShowJobPostings]  = useState(false)
   const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
-  const [showExplore, setShowExplore] = useState(false)                  // Explore module (admin-only preview until Slice 5)
-  const [selectedExplorePlace, setSelectedExplorePlace] = useState(null) // Explore profile — separate from selectedPlace (frozen beaches flow)
+  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | (future preview keys). Admins never reach HomeScreen /
+                                                                         // the customer module chain (role-first branch below), so any admin preview
+                                                                         // surface is entered from AdminScreen via this single gate — one condition,
+                                                                         // not a per-surface boolean.
+  const [selectedExplorePlace, setSelectedExplorePlace] = useState(null) // Explore profile drill-down — separate from selectedPlace (frozen beaches flow)
   const [showTransport, setShowTransport] = useState(false)
   const [showInsurance, setShowInsurance] = useState(false)
   const [showLegal, setShowLegal] = useState(false)
@@ -494,7 +497,7 @@ export default function App() {
       if (selectedPlace)        { setSelectedPlace(null); return true }
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
       if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
-      if (showExplore)          { setShowExplore(false); return true }
+      if (adminPreview)         { setAdminPreview(null); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
@@ -504,7 +507,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showBeachesLandmarks, showExplore, selectedExplorePlace, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showBeachesLandmarks, adminPreview, selectedExplorePlace, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -903,8 +906,8 @@ export default function App() {
         </View>
       </SafeAreaView>
     )
-  } else if (profile.role === 'admin') {
-    content = <AdminScreen session={session} lang={lang} />
+  } else if (profile.role === 'admin' && !adminPreview) {
+    content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} />
   } else if (profile.role === 'provider') {
     if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
       content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
@@ -1071,10 +1074,10 @@ export default function App() {
     )
   } else if (selectedExplorePlace) {
     content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} onBack={() => setSelectedExplorePlace(null)} />
-  } else if (showExplore) {
+  } else if (adminPreview === 'explore') {
     content = (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} isAdmin={isAdmin} />
+        <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} isAdmin={isAdmin} />
       </BLErrorBoundary>
     )
   } else if (showNewcomerEssentials) {
@@ -1289,8 +1292,6 @@ export default function App() {
             onShowHomeServices={() => setShowHomeServices(true)}
             onShowJobPostings={() => setShowJobPostings(true)}
             onShowBeachesLandmarks={() => setShowBeachesLandmarks(true)}
-            onShowExplore={() => setShowExplore(true)}
-            exploreTileVisible={isAdmin}
             onShowTransport={() => setShowTransport(true)}
             onShowInsurance={() => setShowInsurance(true)}
             onShowGrooming={() => setShowGrooming(true)}

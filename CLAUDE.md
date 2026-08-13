@@ -77,6 +77,11 @@ went missing). Two mandatory rules:
 - Functional React components with hooks.
 - Keep components small; one screen per file.
 - Facility types are limited to: pharmacy, clinic, hospital, dentist.
+- Admins never reach HomeScreen or the customer module chain — the App.js content
+  selector is role-first (`profile.role === 'admin'` renders AdminScreen and short-
+  circuits everything below). Any admin preview surface must be entered from
+  AdminScreen via the `adminPreview` state, never from a HomeScreen tile gated on
+  `isAdmin` (that tile is unreachable for admins and hidden for customers).
 
 ## Android Gotchas
 - Views with `borderRadius` + `borderWidth` on Android may render an opaque background unless `backgroundColor: 'transparent'` is set explicitly.
