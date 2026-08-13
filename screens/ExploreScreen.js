@@ -1,7 +1,4 @@
-// FROZEN — serves the live beaches tile off beaches/landmarks.
-// Superseded by ExploreScreen.js (reads `places`). Do not edit.
-// Deleted in Slice 5 when MODULE_FLAGS.explore flips.
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, ScrollView, Image,
@@ -10,31 +7,21 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import MapView, { Marker } from 'react-native-maps'
 import { supabase } from '../lib/supabase'
-import PlaceSubmitScreen from './PlaceSubmitScreen'
+import ExploreSubmitScreen from './ExploreSubmitScreen'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
-
-const DISTRICTS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
-
-const CATEGORY_KEY = {
-  castle_fortress: 'blCatCastleFortress',
-  ancient_ruins:   'blCatAncientRuins',
-  museum:          'blCatMuseum',
-  religious_site:  'blCatReligiousSite',
-  monument:        'blCatMonument',
-  nature_scenic:   'blCatNatureScenic',
-}
+import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
+import {
+  EXPLORE_GROUPS, GROUP_ORDER, GROUP_META, CATEGORY_LABEL_KEY,
+  categoryToGroup, groupVisible,
+} from '../constants/exploreCategories'
 
 const TRNC_CENTER = { latitude: 35.2, longitude: 33.5, latitudeDelta: 0.9, longitudeDelta: 0.9 }
 
-const PIN_COLORS = {
-  beach:    placeColors.beach.text,    // '#0369A1'
-  landmark: placeColors.landmark.text, // '#A16207'
-}
-
-function extractJsonb(obj, lang) {
+// name_i18n[lang] if present, else fall through to the plain `name` column (never '').
+function extractI18n(obj, lang) {
   if (!obj) return ''
   if (typeof obj !== 'object') return String(obj)
   const code = LANG_CODES[lang] ?? lang
@@ -44,29 +31,33 @@ function extractJsonb(obj, lang) {
   }
   return result != null ? String(result) : ''
 }
+function placeName(p, lang) { return extractI18n(p.name_i18n, lang) || p.name || '' }
+function placeDesc(p, lang) { return extractI18n(p.description_i18n, lang) }
 
-function placeDesc(item, lang) { return extractJsonb(item.description, lang) }
-function placeName(item, lang) { return extractJsonb(item.name, lang) }
-
-function districtLabel(d, lang) {
-  const map = {
-    nicosia:   t('blDistrictNicosia', lang),
-    kyrenia:   t('blDistrictKyrenia', lang),
-    famagusta: t('blDistrictFamagusta', lang),
-    morphou:   t('blDistrictMorphou', lang),
-    iskele:    t('blDistrictIskele', lang),
-    lefke:     t('blDistrictLefke', lang),
-    karpaz:    t('blDistrictKarpaz', lang),
-  }
-  return map[d] || d
+function regionLabel(region, lang) {
+  return REGION_LABEL_KEY[region] ? t(REGION_LABEL_KEY[region], lang) : (region || '')
+}
+function categoryLabel(category, lang) {
+  const key = CATEGORY_LABEL_KEY[category]
+  return key ? t(key, lang) : category   // keyless categories → raw slug (admin-only today)
+}
+function groupLabel(group, lang) {
+  const key = GROUP_META[group]?.labelKey
+  return key ? t(key, lang) : group      // keyless groups → raw slug (admin-only today)
+}
+function groupEmoji(group) {
+  if (group === 'nature')   return '🏖️'
+  if (group === 'heritage') return '🏛️'
+  return '📍'
 }
 
 // ─── Place card (list view) ───────────────────────────────────────────────────
 
 function PlaceCard({ item, lang, onPress }) {
-  const isBeach = item._type === 'beach'
-  const pc      = isBeach ? placeColors.beach : placeColors.landmark
-  const photo   = item.photo_urls?.[0]
+  const group   = categoryToGroup(item.category)
+  const pc      = GROUP_META[group]?.colorToken || placeColors.landmark
+  const isBeach = item.category === 'beach'
+  const photo   = item.cover_image_url || item.photos?.[0]
 
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.88}>
@@ -74,12 +65,12 @@ function PlaceCard({ item, lang, onPress }) {
         {photo
           ? <Image source={{ uri: photo }} style={s.photo} resizeMode="cover" />
           : <View style={[s.photoPlaceholder, { backgroundColor: pc.bg }]}>
-              <Text style={s.photoEmoji}>{isBeach ? '🏖️' : '🏛️'}</Text>
+              <Text style={s.photoEmoji}>{groupEmoji(group)}</Text>
             </View>
         }
         <View style={[s.typePill, { backgroundColor: pc.bg }]}>
           <Text style={[s.typePillText, { color: pc.text }]}>
-            {t(isBeach ? 'blFilterBeaches' : 'blFilterLandmarks', lang)}
+            {categoryLabel(item.category, lang)}
           </Text>
         </View>
       </View>
@@ -88,30 +79,27 @@ function PlaceCard({ item, lang, onPress }) {
         <View style={s.nameRow}>
           <Text style={s.name} numberOfLines={1}>{placeName(item, lang)}</Text>
           <View style={s.districtBadge}>
-            <Text style={s.districtText}>{districtLabel(item.district, lang)}</Text>
+            <Text style={s.districtText}>{regionLabel(item.region, lang)}</Text>
           </View>
         </View>
 
-        <View style={s.badgeRow}>
-          {isBeach && item.blue_flag && (
-            <View style={s.blueFlagBadge}>
-              <Ionicons name="flag" size={11} color={colors.primary} />
-              <Text style={s.blueFlagText}>{t('blBlueFlagLabel', lang)}</Text>
-            </View>
-          )}
-          {isBeach && (
-            <View style={s.accessBadge}>
-              <Text style={s.accessText}>
-                {item.access_type === 'public' ? t('blAccessPublic', lang) : t('blAccessPrivate', lang)}
-              </Text>
-            </View>
-          )}
-          {!isBeach && CATEGORY_KEY[item.category] && (
-            <View style={[s.catBadge, { backgroundColor: pc.bg }]}>
-              <Text style={[s.catText, { color: pc.text }]}>{t(CATEGORY_KEY[item.category], lang)}</Text>
-            </View>
-          )}
-        </View>
+        {(isBeach && (item.blue_flag || item.access_type)) && (
+          <View style={s.badgeRow}>
+            {isBeach && item.blue_flag && (
+              <View style={s.blueFlagBadge}>
+                <Ionicons name="flag" size={11} color={colors.primary} />
+                <Text style={s.blueFlagText}>{t('blBlueFlagLabel', lang)}</Text>
+              </View>
+            )}
+            {isBeach && item.access_type && (
+              <View style={s.accessBadge}>
+                <Text style={s.accessText}>
+                  {item.access_type === 'public' ? t('blAccessPublic', lang) : t('blAccessPrivate', lang)}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {!!placeDesc(item, lang) && (
           <Text style={s.desc} numberOfLines={2}>{placeDesc(item, lang)}</Text>
@@ -124,9 +112,9 @@ function PlaceCard({ item, lang, onPress }) {
 // ─── Map pin bottom card ───────────────────────────────────────────────────────
 
 function BottomPinCard({ item, lang, onClose, onViewProfile }) {
-  const isBeach = item._type === 'beach'
-  const pc      = isBeach ? placeColors.beach : placeColors.landmark
-  const photo   = item.photo_urls?.[0]
+  const group = categoryToGroup(item.category)
+  const pc    = GROUP_META[group]?.colorToken || placeColors.landmark
+  const photo = item.cover_image_url || item.photos?.[0]
 
   return (
     <View style={pm.card}>
@@ -134,17 +122,17 @@ function BottomPinCard({ item, lang, onClose, onViewProfile }) {
         {photo
           ? <Image source={{ uri: photo }} style={pm.thumb} resizeMode="cover" />
           : <View style={[pm.thumb, pm.thumbFallback, { backgroundColor: pc.bg }]}>
-              <Text style={pm.thumbEmoji}>{isBeach ? '🏖️' : '🏛️'}</Text>
+              <Text style={pm.thumbEmoji}>{groupEmoji(group)}</Text>
             </View>
         }
         <View style={{ flex: 1 }}>
           <View style={[pm.typeBadge, { backgroundColor: pc.bg }]}>
             <Text style={[pm.typeBadgeText, { color: pc.text }]}>
-              {t(isBeach ? 'blFilterBeaches' : 'blFilterLandmarks', lang)}
+              {categoryLabel(item.category, lang)}
             </Text>
           </View>
           <Text style={pm.name} numberOfLines={1}>{placeName(item, lang)}</Text>
-          <Text style={pm.district}>{districtLabel(item.district, lang)}</Text>
+          <Text style={pm.district}>{regionLabel(item.region, lang)}</Text>
         </View>
         <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="close-circle" size={22} color={colors.textSecondary} />
@@ -181,15 +169,19 @@ function PlacesMapView({ places, userLocation, lang, onSelectPlace }) {
         showsUserLocation={!!userLocation}
         onPress={() => setSelectedPin(null)}
       >
-        {pinnable.map(p => (
-          <Marker
-            key={`${p._type}-${p.id}`}
-            coordinate={{ latitude: p.latitude, longitude: p.longitude }}
-            pinColor={PIN_COLORS[p._type]}
-            tracksViewChanges={false}
-            onPress={e => { e.stopPropagation(); setSelectedPin(p) }}
-          />
-        ))}
+        {pinnable.map(p => {
+          const group = categoryToGroup(p.category)
+          const pc    = GROUP_META[group]?.colorToken || placeColors.landmark
+          return (
+            <Marker
+              key={p.id}
+              coordinate={{ latitude: p.latitude, longitude: p.longitude }}
+              pinColor={pc.text}
+              tracksViewChanges={false}
+              onPress={e => { e.stopPropagation(); setSelectedPin(p) }}
+            />
+          )
+        })}
       </MapView>
 
       {selectedPin && (
@@ -204,62 +196,107 @@ function PlacesMapView({ places, userLocation, lang, onSelectPlace }) {
   )
 }
 
+// ─── Group-tile landing ────────────────────────────────────────────────────────
+
+function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
+  return (
+    <ScrollView contentContainerStyle={s.tilesWrap} showsVerticalScrollIndicator={false}>
+      {visibleGroups.map(g => {
+        const meta = GROUP_META[g] || {}
+        const pc   = meta.colorToken || placeColors.landmark
+        return (
+          <TouchableOpacity
+            key={g}
+            style={s.tile}
+            onPress={() => onSelectGroup(g)}
+            activeOpacity={0.85}
+          >
+            <View style={[s.tileIcon, { backgroundColor: pc.bg }]}>
+              <Ionicons name={meta.icon || 'ellipse-outline'} size={26} color={pc.text} />
+            </View>
+            <Text style={s.tileLabel} numberOfLines={1}>{groupLabel(g, lang)}</Text>
+            <Text style={s.tileCount}>{counts[g] || 0}</Text>
+          </TouchableOpacity>
+        )
+      })}
+    </ScrollView>
+  )
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, initialDistrict = null }) {
-  const [placeType,   setPlaceType]   = useState('all')
-  const [district,    setDistrict]    = useState(initialDistrict)
+export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, isAdmin = false }) {
   const [places,      setPlaces]      = useState([])
   const [loading,     setLoading]     = useState(true)
+  const [activeGroup, setActiveGroup] = useState(null)   // null = group-tile landing
+  const [activeCat,   setActiveCat]   = useState(null)   // null = all categories in group
+  const [region,      setRegion]      = useState(null)   // null = all regions
   const [view,        setView]        = useState('list') // 'list' | 'map'
   const [showSubmit,  setShowSubmit]  = useState(false)
 
-  const load = useCallback(async (type, dist) => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const fetchTable = async (table, tag) => {
-        let q = supabase.from(table).select('*').eq('status', 'active')
-        if (dist) q = q.eq('district', dist)
-        const { data } = await q
-        return (data || []).map(r => ({ ...r, _type: tag }))
-      }
-
-      const [beaches, landmarks] = await Promise.all([
-        type !== 'landmark' ? fetchTable('beaches',   'beach')    : Promise.resolve([]),
-        type !== 'beach'    ? fetchTable('landmarks', 'landmark') : Promise.resolve([]),
-      ])
-
-      setPlaces([...beaches, ...landmarks].sort((a, b) =>
+      const { data } = await supabase
+        .from('places').select('*').eq('status', 'active')
+      setPlaces((data || []).sort((a, b) =>
         placeName(a, 'en').localeCompare(placeName(b, 'en'))
       ))
     } catch (err) {
-      console.error('BL load error:', err)
+      console.error('Explore load error:', err)
       setPlaces([])
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { load(placeType, district) }, [placeType, district, load])
+  useEffect(() => { load() }, [load])
 
-  function selectType(type) {
-    setDistrict(null)
-    setPlaceType(type)
-  }
+  // Group counts over the fetched active set — the threshold gate reads these.
+  const counts = useMemo(() => {
+    const c = {}
+    for (const p of places) {
+      const g = categoryToGroup(p.category)
+      if (g) c[g] = (c[g] || 0) + 1
+    }
+    return c
+  }, [places])
 
-  const TYPE_FILTERS = [
-    { key: 'all',      labelKey: 'blFilterAll' },
-    { key: 'beach',    labelKey: 'blFilterBeaches' },
-    { key: 'landmark', labelKey: 'blFilterLandmarks' },
-  ]
+  const visibleGroups = useMemo(
+    () => GROUP_ORDER.filter(g => groupVisible(g, counts[g] || 0, isAdmin)),
+    [counts, isAdmin]
+  )
+
+  // Categories inside the active group that actually have rows (for the sub-filter chips).
+  const groupCats = useMemo(() => {
+    if (!activeGroup) return []
+    const present = new Set(places.filter(p => categoryToGroup(p.category) === activeGroup).map(p => p.category))
+    return EXPLORE_GROUPS[activeGroup].filter(c => present.has(c))
+  }, [activeGroup, places])
+
+  // Filtered list for the active group.
+  // AREA RULE: no area filter exists yet (backfilled rows are area=NULL, and the area
+  // UI needs Slice-5 i18n). When one is added it must exclude area=NULL ONLY while a
+  // specific area is selected — region-level and unfiltered views always include them.
+  const filtered = useMemo(() => {
+    if (!activeGroup) return []
+    return places.filter(p =>
+      categoryToGroup(p.category) === activeGroup
+      && (!activeCat || p.category === activeCat)
+      && (!region || p.region === region)
+    )
+  }, [places, activeGroup, activeCat, region])
+
+  function openGroup(g) { setActiveGroup(g); setActiveCat(null); setRegion(null); setView('list') }
+  function leaveGroup()  { setActiveGroup(null); setActiveCat(null); setRegion(null) }
 
   if (showSubmit) {
     return (
-      <PlaceSubmitScreen
+      <ExploreSubmitScreen
         session={session}
         lang={lang}
         onBack={() => setShowSubmit(false)}
-        onSubmitted={() => { setShowSubmit(false); load(placeType, district) }}
+        onSubmitted={() => { setShowSubmit(false); load() }}
       />
     )
   }
@@ -268,10 +305,10 @@ export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, us
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="beaches_landmarks" />
       <ScreenHeader
-        onBack={onBack}
-        title={t('blTitle', lang)}
+        onBack={activeGroup ? leaveGroup : onBack}
+        title={activeGroup ? groupLabel(activeGroup, lang) : t('blTitle', lang)}
         lang={lang}
-        rightElement={
+        rightElement={activeGroup ? (
           <TouchableOpacity
             style={s.viewToggle}
             onPress={() => setView(v => v === 'list' ? 'map' : 'list')}
@@ -283,89 +320,102 @@ export default function BeachesLandmarksScreen({ lang, onBack, onSelectPlace, us
               color={colors.primary}
             />
           </TouchableOpacity>
-        }
+        ) : null}
       />
 
-      {view === 'map' ? (
+      {loading ? (
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
+      ) : !activeGroup ? (
+        <GroupTiles
+          counts={counts}
+          visibleGroups={visibleGroups}
+          lang={lang}
+          onSelectGroup={openGroup}
+        />
+      ) : view === 'map' ? (
         <PlacesMapView
-          places={places}
+          places={filtered}
           userLocation={userLocation}
           lang={lang}
           onSelectPlace={onSelectPlace}
         />
       ) : (
-        <>
-          {/* Type filter */}
-          <View style={s.typeRow}>
-            {TYPE_FILTERS.map(f => (
+        <View style={{ flex: 1 }}>
+          {/* Category sub-filter (only when the group has >1 category with data) */}
+          {groupCats.length > 1 && (
+            <View style={s.typeRow}>
               <TouchableOpacity
-                key={f.key}
-                style={[s.typeChip, placeType === f.key && s.typeChipActive]}
-                onPress={() => selectType(f.key)}
+                style={[s.typeChip, !activeCat && s.typeChipActive]}
+                onPress={() => setActiveCat(null)}
                 activeOpacity={0.8}
               >
-                <Text style={[s.typeChipText, placeType === f.key && s.typeChipTextActive]}>
-                  {t(f.labelKey, lang)}
-                </Text>
+                <Text style={[s.typeChipText, !activeCat && s.typeChipTextActive]}>{t('blFilterAll', lang)}</Text>
               </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={{ flex: 1 }}>
-            {/* District filter */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ flexGrow: 0 }}
-              contentContainerStyle={s.districtRow}
-            >
-              <TouchableOpacity
-                style={[s.chip, !district && s.chipActive]}
-                onPress={() => setDistrict(null)}
-              >
-                <Text style={[s.chipText, !district && s.chipTextActive]}>{t('blDistrictAll', lang)}</Text>
-              </TouchableOpacity>
-              {DISTRICTS.map(d => (
+              {groupCats.map(c => (
                 <TouchableOpacity
-                  key={d}
-                  style={[s.chip, district === d && s.chipActive]}
-                  onPress={() => setDistrict(d)}
+                  key={c}
+                  style={[s.typeChip, activeCat === c && s.typeChipActive]}
+                  onPress={() => setActiveCat(c)}
+                  activeOpacity={0.8}
                 >
-                  <Text style={[s.chipText, district === d && s.chipTextActive]}>{districtLabel(d, lang)}</Text>
+                  <Text style={[s.typeChipText, activeCat === c && s.typeChipTextActive]}>
+                    {categoryLabel(c, lang)}
+                  </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
+          )}
 
-            {/* List content */}
-            {loading ? (
-              <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
-            ) : (
-              <FlatList
-                data={places}
-                keyExtractor={item => `${item._type}-${item.id}`}
-                contentContainerStyle={s.listContent}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={s.emptyWrap}>
-                    <View style={s.emptyCard}>
-                      <Ionicons name="map-outline" size={44} color={colors.border} style={{ marginBottom: 10 }} />
-                      <Text style={s.emptyText}>{t('blNoPlaces', lang)}</Text>
-                    </View>
-                  </View>
-                }
-                renderItem={({ item }) => (
-                  <PlaceCard
-                    item={item}
-                    lang={lang}
-                    onPress={() => onSelectPlace?.(item)}
-                  />
-                )}
+          {/* Region filter */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={s.districtRow}
+          >
+            <TouchableOpacity
+              style={[s.chip, !region && s.chipActive]}
+              onPress={() => setRegion(null)}
+            >
+              <Text style={[s.chipText, !region && s.chipTextActive]}>{t('blDistrictAll', lang)}</Text>
+            </TouchableOpacity>
+            {REGIONS.map(r => (
+              <TouchableOpacity
+                key={r}
+                style={[s.chip, region === r && s.chipActive]}
+                onPress={() => setRegion(r)}
+              >
+                <Text style={[s.chipText, region === r && s.chipTextActive]}>{regionLabel(r, lang)}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* List */}
+          <FlatList
+            data={filtered}
+            keyExtractor={item => item.id}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={s.emptyWrap}>
+                <View style={s.emptyCard}>
+                  <Ionicons name="map-outline" size={44} color={colors.border} style={{ marginBottom: 10 }} />
+                  <Text style={s.emptyText}>{t('blNoPlaces', lang)}</Text>
+                </View>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <PlaceCard
+                item={item}
+                lang={lang}
+                onPress={() => onSelectPlace?.(item)}
               />
             )}
-          </View>
-        </>
+          />
+        </View>
       )}
-      {/* FAB — only for authenticated users */}
+
+      {/* FAB — authenticated users only; real-account gate before the submit form */}
       {!!session && (
         <TouchableOpacity
           style={s.fab}
@@ -388,16 +438,25 @@ const s = StyleSheet.create({
                   padding: 6, borderRadius: radius.sm,
                   backgroundColor: colors.primaryLight },
 
-  // Type filter
-  typeRow:            { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
-  typeChip:           { flex: 1, paddingVertical: 8, borderRadius: radius.md,
+  // Group tiles
+  tilesWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 16 },
+  tile:      { width: '47%', backgroundColor: colors.cardBg, borderRadius: radius.card,
+               borderWidth: 1, borderColor: colors.border, padding: 16, ...shadow },
+  tileIcon:  { width: 48, height: 48, borderRadius: 14, alignItems: 'center',
+               justifyContent: 'center', marginBottom: 12 },
+  tileLabel: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  tileCount: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+
+  // Category sub-filter
+  typeRow:            { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, flexWrap: 'wrap' },
+  typeChip:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.md,
                         backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border,
                         alignItems: 'center' },
   typeChipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   typeChipText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   typeChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
-  // District filter
+  // Region filter
   districtRow:    { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
   chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                     backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
@@ -439,8 +498,6 @@ const s = StyleSheet.create({
   accessBadge:  { backgroundColor: colors.bg, paddingHorizontal: 8, paddingVertical: 3,
                   borderRadius: 10, borderWidth: 1, borderColor: colors.border },
   accessText:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  catBadge:     { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  catText:      { fontSize: 11, fontFamily: 'Inter_700Bold' },
 
   desc: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 19 },
 

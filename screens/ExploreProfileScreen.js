@@ -1,6 +1,3 @@
-// FROZEN — serves the live beaches tile off beaches/landmarks.
-// Superseded by ExploreProfileScreen.js (reads `places`). Do not edit.
-// Deleted in Slice 5 when MODULE_FLAGS.explore flips.
 import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -10,20 +7,15 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
+import { REGION_LABEL_KEY } from '../constants/regions'
+import { categoryToGroup, GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 
 const { width: W } = Dimensions.get('window')
 const GALLERY_H    = 280
 
-const CATEGORY_KEY = {
-  castle_fortress: 'blCatCastleFortress',
-  ancient_ruins:   'blCatAncientRuins',
-  museum:          'blCatMuseum',
-  religious_site:  'blCatReligiousSite',
-  monument:        'blCatMonument',
-  nature_scenic:   'blCatNatureScenic',
-}
-
-function extractJsonb(obj, lang) {
+// name_i18n[lang] if present, else fall through to the plain `name` column. NEVER an
+// empty string when name_i18n is NULL — café rows have name only.
+function extractI18n(obj, lang) {
   if (!obj) return ''
   if (typeof obj !== 'object') return String(obj)
   const code = LANG_CODES[lang] ?? lang
@@ -33,30 +25,30 @@ function extractJsonb(obj, lang) {
   }
   return result != null ? String(result) : ''
 }
+function placeName(place, lang) { return extractI18n(place.name_i18n, lang) || place.name || '' }
+function placeDesc(place, lang) { return extractI18n(place.description_i18n, lang) }
 
-function placeDesc(place, lang) { return extractJsonb(place.description, lang) }
-function placeName(place, lang) { return extractJsonb(place.name, lang) }
-
-function districtLabel(d, lang) {
-  const map = {
-    nicosia:   t('blDistrictNicosia', lang),
-    kyrenia:   t('blDistrictKyrenia', lang),
-    famagusta: t('blDistrictFamagusta', lang),
-    morphou:   t('blDistrictMorphou', lang),
-    iskele:    t('blDistrictIskele', lang),
-    lefke:     t('blDistrictLefke', lang),
-    karpaz:    t('blDistrictKarpaz', lang),
-  }
-  return map[d] || d
+function groupEmoji(group) {
+  if (group === 'nature')   return '🏖️'
+  if (group === 'heritage') return '🏛️'
+  return '📍'
+}
+function regionLabel(region, lang) {
+  return REGION_LABEL_KEY[region] ? t(REGION_LABEL_KEY[region], lang) : (region || '')
+}
+function categoryLabel(category, lang) {
+  const key = CATEGORY_LABEL_KEY[category]
+  return key ? t(key, lang) : category   // keyless categories: raw slug (admin-only today)
 }
 
-export default function PlaceProfileScreen({ place, lang, onBack }) {
+export default function ExploreProfileScreen({ place, lang, onBack }) {
   const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
 
-  const isBeach = place._type === 'beach'
-  const pc      = isBeach ? placeColors.beach : placeColors.landmark
-  const photos  = place.photo_urls || []
+  const group   = categoryToGroup(place.category)
+  const pc      = GROUP_META[group]?.colorToken || placeColors.landmark
+  const isBeach = place.category === 'beach'
+  const photos  = place.photos || []
 
   function openDirections() {
     Linking.openURL(`https://maps.google.com/?q=${place.latitude},${place.longitude}`)
@@ -96,7 +88,7 @@ export default function PlaceProfileScreen({ place, lang, onBack }) {
           </View>
         ) : (
           <View style={[s.galleryPlaceholder, { backgroundColor: pc.bg }]}>
-            <Text style={s.galleryEmoji}>{isBeach ? '🏖️' : '🏛️'}</Text>
+            <Text style={s.galleryEmoji}>{groupEmoji(group)}</Text>
           </View>
         )}
 
@@ -106,23 +98,23 @@ export default function PlaceProfileScreen({ place, lang, onBack }) {
         ) : null}
 
         <View style={s.body}>
-          {/* Type + district row */}
+          {/* Category + region row */}
           <View style={s.pillRow}>
             <View style={[s.typePill, { backgroundColor: pc.bg }]}>
               <Text style={[s.typePillText, { color: pc.text }]}>
-                {t(isBeach ? 'blFilterBeaches' : 'blFilterLandmarks', lang)}
+                {categoryLabel(place.category, lang)}
               </Text>
             </View>
             <View style={s.districtPill}>
               <Ionicons name="location-outline" size={12} color={colors.primary} />
-              <Text style={s.districtPillText}>{districtLabel(place.district, lang)}</Text>
+              <Text style={s.districtPillText}>{regionLabel(place.region, lang)}</Text>
             </View>
           </View>
 
           {/* Name */}
           <Text style={s.name}>{placeName(place, lang)}</Text>
 
-          {/* Attribute badges */}
+          {/* Attribute badges — beach-relevant fields only render for beaches */}
           <View style={s.badgeRow}>
             {isBeach && place.blue_flag && (
               <View style={s.blueFlagBadge}>
@@ -130,19 +122,12 @@ export default function PlaceProfileScreen({ place, lang, onBack }) {
                 <Text style={s.blueFlagText}>{t('blBlueFlagLabel', lang)}</Text>
               </View>
             )}
-            {isBeach && (
+            {isBeach && place.access_type && (
               <View style={s.accessBadge}>
                 <Text style={s.accessText}>
                   {place.access_type === 'public'
                     ? t('blAccessPublic', lang)
                     : t('blAccessPrivate', lang)}
-                </Text>
-              </View>
-            )}
-            {!isBeach && CATEGORY_KEY[place.category] && (
-              <View style={[s.catBadge, { backgroundColor: pc.bg }]}>
-                <Text style={[s.catText, { color: pc.text }]}>
-                  {t(CATEGORY_KEY[place.category], lang)}
                 </Text>
               </View>
             )}
@@ -155,12 +140,12 @@ export default function PlaceProfileScreen({ place, lang, onBack }) {
             </View>
           )}
 
-          {/* Facilities (beaches only, when non-empty) */}
-          {isBeach && place.facilities?.length > 0 && (
+          {/* Amenities (any category, when non-empty) — was beach "facilities" */}
+          {place.amenities?.length > 0 && (
             <View style={s.section}>
               <Text style={s.sectionTitle}>{t('blFacilitiesTitle', lang)}</Text>
               <View style={s.facilitiesWrap}>
-                {place.facilities.map((f, i) => (
+                {place.amenities.map((f, i) => (
                   <View key={i} style={s.facilityChip}>
                     <Text style={s.facilityChipText}>{f}</Text>
                   </View>
@@ -172,12 +157,14 @@ export default function PlaceProfileScreen({ place, lang, onBack }) {
       </ScrollView>
 
       {/* Fixed footer */}
-      <View style={s.footer}>
-        <TouchableOpacity style={s.directionsBtn} onPress={openDirections} activeOpacity={0.85}>
-          <Ionicons name="navigate-outline" size={18} color="#fff" />
-          <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
-        </TouchableOpacity>
-      </View>
+      {place.latitude != null && place.longitude != null && (
+        <View style={s.footer}>
+          <TouchableOpacity style={s.directionsBtn} onPress={openDirections} activeOpacity={0.85}>
+            <Ionicons name="navigate-outline" size={18} color="#fff" />
+            <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   )
 }
@@ -224,8 +211,6 @@ const s = StyleSheet.create({
   accessBadge:  { backgroundColor: colors.bg, paddingHorizontal: 12, paddingVertical: 6,
                   borderRadius: 20, borderWidth: 1.5, borderColor: colors.border },
   accessText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  catBadge:     { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  catText:      { fontSize: 13, fontFamily: 'Inter_700Bold' },
 
   section:      { marginBottom: 20 },
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },

@@ -1,6 +1,3 @@
-// FROZEN — serves the live beaches tile off beaches/landmarks.
-// Superseded by ExploreSubmitScreen.js (reads `places`). Do not edit.
-// Deleted in Slice 5 when MODULE_FLAGS.explore flips.
 import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
@@ -11,8 +8,10 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
-import { colors, placeColors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
+import { SUBMITTABLE_CATEGORIES, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import MapPinPicker from '../components/MapPinPicker'
 
 function decode(base64) {
@@ -37,33 +36,12 @@ function decode(base64) {
   return buf
 }
 
-const DISTRICTS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
-
-const CATEGORIES = [
-  'castle_fortress', 'ancient_ruins', 'museum',
-  'religious_site',  'monument',      'nature_scenic',
-]
-
-const CATEGORY_KEY = {
-  castle_fortress: 'blCatCastleFortress',
-  ancient_ruins:   'blCatAncientRuins',
-  museum:          'blCatMuseum',
-  religious_site:  'blCatReligiousSite',
-  monument:        'blCatMonument',
-  nature_scenic:   'blCatNatureScenic',
+function regionLabel(r, lang) {
+  return REGION_LABEL_KEY[r] ? t(REGION_LABEL_KEY[r], lang) : r
 }
-
-function districtLabel(d, lang) {
-  const map = {
-    nicosia:   t('blDistrictNicosia', lang),
-    kyrenia:   t('blDistrictKyrenia', lang),
-    famagusta: t('blDistrictFamagusta', lang),
-    morphou:   t('blDistrictMorphou', lang),
-    iskele:    t('blDistrictIskele', lang),
-    lefke:     t('blDistrictLefke', lang),
-    karpaz:    t('blDistrictKarpaz', lang),
-  }
-  return map[d] || d
+function categoryLabel(c, lang) {
+  const key = CATEGORY_LABEL_KEY[c]
+  return key ? t(key, lang) : c
 }
 
 function SectionLabel({ text }) {
@@ -87,26 +65,25 @@ function SuccessState({ lang, onBack }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function PlaceSubmitScreen({ session, lang, onBack, onSubmitted }) {
-  const [placeType, setPlaceType] = useState('beach')
-  const [name,      setName]      = useState('')
-  const [district,  setDistrict]  = useState(null)
-  const [desc,      setDesc]      = useState('')
-  const [lat,       setLat]       = useState(null)
-  const [lng,       setLng]       = useState(null)
-  const [photos,    setPhotos]    = useState([])   // { uri, base64 }
+export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted }) {
+  const [category, setCategory] = useState('beach')
+  const [name,     setName]     = useState('')
+  const [region,   setRegion]   = useState(null)
+  const [desc,     setDesc]     = useState('')
+  const [lat,      setLat]      = useState(null)
+  const [lng,      setLng]      = useState(null)
+  const [photos,   setPhotos]   = useState([])   // { uri, base64 }
 
-  // Beach-specific
-  const [blueFlag,  setBlueFlag]  = useState(false)
-  const [access,    setAccess]    = useState('public')
-
-  // Landmark-specific
-  const [category,  setCategory]  = useState(null)
+  // Beach-only fields
+  const [blueFlag, setBlueFlag] = useState(false)
+  const [access,   setAccess]   = useState('public')
 
   const [showMap, setShowMap]   = useState(false)
   const [saving,  setSaving]    = useState(false)
   const [error,   setError]     = useState(null)
   const [done,    setDone]      = useState(false)
+
+  const isBeach = category === 'beach'
 
   async function addPhoto() {
     if (photos.length >= 5) return
@@ -126,37 +103,37 @@ export default function PlaceSubmitScreen({ session, lang, onBack, onSubmitted }
   async function handleSubmit() {
     setError(null)
     if (!name.trim())        { setError(t('blSubmitErrName',     lang)); return }
-    if (!district)           { setError(t('blSubmitErrDistrict', lang)); return }
+    if (!region)             { setError(t('blSubmitErrDistrict', lang)); return }
     if (lat == null || lng == null) { setError(t('blSubmitErrLocation', lang)); return }
 
     setSaving(true)
     try {
-      const table = placeType === 'beach' ? 'beaches' : 'landmarks'
-      const base  = {
-        submitted_by: session.user.id,
-        name:         { [lang]: name.trim() },
-        district,
-        latitude:     lat,
-        longitude:    lng,
-        description:  desc.trim() ? { [lang]: desc.trim() } : null,
-        status:       'pending',
-        photo_urls:   [],
+      // name = plain proper noun. name_i18n stays NULL on user submit (translations are a
+      // curation step). description is locale-specific → description_i18n.
+      const payload = {
+        submitted_by:    session.user.id,
+        category,
+        name:            name.trim(),
+        description_i18n: desc.trim() ? { [lang]: desc.trim() } : null,
+        region,
+        latitude:        lat,
+        longitude:       lng,
+        status:          'pending',
+        photos:          [],
+        ...(isBeach ? { blue_flag: blueFlag, access_type: access } : {}),
       }
-      const payload = placeType === 'beach'
-        ? { ...base, blue_flag: blueFlag, access_type: access }
-        : { ...base, category: category || 'monument' }
 
       const { data, error: insErr } = await supabase
-        .from(table).insert(payload).select('id').single()
+        .from('places').insert(payload).select('id').single()
       if (insErr) throw insErr
       const rowId = data.id
 
-      // Upload photos to place-photos bucket
+      // Upload photos to the shared place-photos bucket under a places/ prefix.
       const urls = []
       for (let i = 0; i < photos.length; i++) {
         const ph  = photos[i]
         const ext = (ph.uri.split('.').pop() || 'jpg').toLowerCase().split('?')[0]
-        const path = `${table}/${rowId}/${i}.${ext}`
+        const path = `places/${rowId}/${i}.${ext}`
         const ct   = ext === 'jpeg' || ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
         const { error: upErr } = await supabase.storage
           .from('place-photos')
@@ -168,7 +145,9 @@ export default function PlaceSubmitScreen({ session, lang, onBack, onSubmitted }
       }
 
       if (urls.length > 0) {
-        await supabase.from(table).update({ photo_urls: urls }).eq('id', rowId)
+        await supabase.from('places')
+          .update({ photos: urls, cover_image_url: urls[0] })
+          .eq('id', rowId)
       }
 
       setDone(true)
@@ -206,18 +185,18 @@ export default function PlaceSubmitScreen({ session, lang, onBack, onSubmitted }
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Type */}
+          {/* Category */}
           <SectionLabel text={t('blSubmitType', lang)} />
-          <View style={s.chipRow}>
-            {['beach', 'landmark'].map(tp => (
+          <View style={s.chipWrap}>
+            {SUBMITTABLE_CATEGORIES.map(c => (
               <TouchableOpacity
-                key={tp}
-                style={[s.chip, placeType === tp && s.chipActive]}
-                onPress={() => setPlaceType(tp)}
+                key={c}
+                style={[s.chip, category === c && s.chipActive]}
+                onPress={() => setCategory(c)}
                 activeOpacity={0.8}
               >
-                <Text style={[s.chipText, placeType === tp && s.chipTextActive]}>
-                  {t(tp === 'beach' ? 'blFilterBeaches' : 'blFilterLandmarks', lang)}
+                <Text style={[s.chipText, category === c && s.chipTextActive]}>
+                  {categoryLabel(c, lang)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -233,18 +212,18 @@ export default function PlaceSubmitScreen({ session, lang, onBack, onSubmitted }
             placeholderTextColor={colors.textSecondary}
           />
 
-          {/* District */}
+          {/* Region */}
           <SectionLabel text={t('blSubmitDistrict', lang)} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipScroll}>
-            {DISTRICTS.map(d => (
+            {REGIONS.map(r => (
               <TouchableOpacity
-                key={d}
-                style={[s.chip, district === d && s.chipActive]}
-                onPress={() => setDistrict(d)}
+                key={r}
+                style={[s.chip, region === r && s.chipActive]}
+                onPress={() => setRegion(r)}
                 activeOpacity={0.8}
               >
-                <Text style={[s.chipText, district === d && s.chipTextActive]}>
-                  {districtLabel(d, lang)}
+                <Text style={[s.chipText, region === r && s.chipTextActive]}>
+                  {regionLabel(r, lang)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -302,7 +281,7 @@ export default function PlaceSubmitScreen({ session, lang, onBack, onSubmitted }
           </View>
 
           {/* Beach-only fields */}
-          {placeType === 'beach' && (
+          {isBeach && (
             <>
               <View style={s.switchRow}>
                 <Text style={s.switchLabel}>{t('blSubmitBlueFlag', lang)}</Text>
@@ -325,27 +304,6 @@ export default function PlaceSubmitScreen({ session, lang, onBack, onSubmitted }
                   >
                     <Text style={[s.chipText, access === a && s.chipTextActive]}>
                       {t(a === 'public' ? 'blAccessPublic' : 'blAccessPrivate', lang)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
-          )}
-
-          {/* Landmark-only: category */}
-          {placeType === 'landmark' && (
-            <>
-              <SectionLabel text={t('blSubmitCategory', lang)} />
-              <View style={s.chipWrap}>
-                {CATEGORIES.map(c => (
-                  <TouchableOpacity
-                    key={c}
-                    style={[s.chip, category === c && s.chipActive]}
-                    onPress={() => setCategory(c)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[s.chipText, category === c && s.chipTextActive]}>
-                      {t(CATEGORY_KEY[c], lang)}
                     </Text>
                   </TouchableOpacity>
                 ))}

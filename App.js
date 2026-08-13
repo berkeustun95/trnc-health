@@ -45,6 +45,8 @@ import GaragesScreen from './screens/GaragesScreen'
 import EsimScreen from './screens/EsimScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import PlaceProfileScreen from './screens/PlaceProfileScreen'
+import ExploreScreen from './screens/ExploreScreen'
+import ExploreProfileScreen from './screens/ExploreProfileScreen'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
 import BringingPetScreen from './screens/pets/BringingPetScreen'
 import TimelineCalculatorScreen from './screens/pets/TimelineCalculatorScreen'
@@ -266,6 +268,8 @@ export default function App() {
   const [showHomeServices, setShowHomeServices] = useState(false)
   const [showJobPostings,  setShowJobPostings]  = useState(false)
   const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
+  const [showExplore, setShowExplore] = useState(false)                  // Explore module (admin-only preview until Slice 5)
+  const [selectedExplorePlace, setSelectedExplorePlace] = useState(null) // Explore profile — separate from selectedPlace (frozen beaches flow)
   const [showTransport, setShowTransport] = useState(false)
   const [showInsurance, setShowInsurance] = useState(false)
   const [showLegal, setShowLegal] = useState(false)
@@ -489,6 +493,8 @@ export default function App() {
       if (showLegal) { setShowLegal(false); return true }
       if (selectedPlace)        { setSelectedPlace(null); return true }
       if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
+      if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
+      if (showExplore)          { setShowExplore(false); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
@@ -498,7 +504,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showBeachesLandmarks, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showBeachesLandmarks, showExplore, selectedExplorePlace, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -1063,6 +1069,14 @@ export default function App() {
         <BeachesLandmarksScreen lang={lang} onBack={() => { setShowBeachesLandmarks(false); setBeachesDistrict(null) }} userLocation={userLocation} onSelectPlace={setSelectedPlace} session={session} onRequireAccount={requireAccount} initialDistrict={beachesDistrict} />
       </BLErrorBoundary>
     )
+  } else if (selectedExplorePlace) {
+    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} onBack={() => setSelectedExplorePlace(null)} />
+  } else if (showExplore) {
+    content = (
+      <BLErrorBoundary>
+        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} isAdmin={isAdmin} />
+      </BLErrorBoundary>
+    )
   } else if (showNewcomerEssentials) {
     content = (
       <NewcomerEssentialsScreen
@@ -1275,6 +1289,8 @@ export default function App() {
             onShowHomeServices={() => setShowHomeServices(true)}
             onShowJobPostings={() => setShowJobPostings(true)}
             onShowBeachesLandmarks={() => setShowBeachesLandmarks(true)}
+            onShowExplore={() => setShowExplore(true)}
+            exploreTileVisible={isAdmin}
             onShowTransport={() => setShowTransport(true)}
             onShowInsurance={() => setShowInsurance(true)}
             onShowGrooming={() => setShowGrooming(true)}
