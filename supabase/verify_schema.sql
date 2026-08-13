@@ -49,6 +49,7 @@ WITH report AS (
     ('0723_insurance_companies','insurance_companies'),
     ('0725_esim_waitlist','esim_waitlist'),
     ('0812_module_waitlist','module_waitlist'),
+    ('0822_places_consolidation','places'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -209,7 +210,11 @@ WITH report AS (
     ('0719_fix_signup','profiles_role_check'),
     ('0803_facility_report_moderation','content_reports_content_type_check'),
     ('0723_insurance_companies','insurance_companies_status_check'),
-    ('0812_module_waitlist','module_waitlist_module_check')
+    ('0812_module_waitlist','module_waitlist_module_check'),
+    ('0822_places_consolidation','places_category_check'),
+    ('0822_places_consolidation','places_region_check'),
+    ('0822_places_consolidation','places_status_check'),
+    ('0822_places_consolidation','places_access_type_check')
   ) e(m,o)
 
   UNION ALL
@@ -241,7 +246,12 @@ WITH report AS (
     ('0719_add_missing_indexes','idx_notifications_user_id'),
     ('0719_add_missing_indexes','idx_duty_schedule_facility_id'),
     ('0719_add_missing_indexes','idx_home_services_owner_id'),
-    ('0719_add_missing_indexes','idx_events_organizer_id')
+    ('0719_add_missing_indexes','idx_events_organizer_id'),
+    ('0822_places_consolidation','idx_places_status'),
+    ('0822_places_consolidation','idx_places_region'),
+    ('0822_places_consolidation','idx_places_category'),
+    ('0822_places_consolidation','idx_places_provider'),
+    ('0822_places_consolidation','idx_places_submitted_by')
   ) e(m,o)
 
   UNION ALL
@@ -363,7 +373,7 @@ WITH report AS (
     'content_reports','blocks','insurance_companies','esim_waitlist','module_waitlist',
     'provider_documents','provider_credentials','quiz_submissions','pharmacist_scores',
     -- directory / UGC tables (Slice 5 — user-writable rows, so RLS must be ON here too)
-    'beaches','landmarks','events','home_services','transport_providers',
+    'beaches','landmarks','places','events','home_services','transport_providers',
     'estate_agencies','estate_agents','properties','property_images',
     'duty_list','duty_schedule','blocked_terms','bus_routes'
   )
