@@ -373,7 +373,11 @@ export default function PlaceSubmitScreen({ session, lang, onBack, onSubmitted }
         visible={showMap}
         initialLat={lat}
         initialLng={lng}
-        onConfirm={({ latitude, longitude }) => {
+        // FREEZE EXCEPTION (sanctioned): MapPinPicker passes POSITIONAL (lat, lng), not an
+        // object — the object destructure left coords null, so beach submission was broken
+        // for real users. One-line correctness fix, no behaviour change to anything that
+        // works. Same fix as ExploreSubmitScreen; this file dies at Slice 5.
+        onConfirm={(latitude, longitude) => {
           setLat(latitude)
           setLng(longitude)
           setShowMap(false)
