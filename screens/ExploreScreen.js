@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import MapView, { Marker } from 'react-native-maps'
+import * as Updates from 'expo-updates'   // TEMPORARY (build marker) — remove before Slice 3
 import { supabase } from '../lib/supabase'
 import ExploreSubmitScreen from './ExploreSubmitScreen'
 import PageBackground from '../components/PageBackground'
@@ -19,6 +20,15 @@ import {
 } from '../constants/exploreCategories'
 
 const TRNC_CENTER = { latitude: 35.2, longitude: 33.5, latitudeDelta: 0.9, longitudeDelta: 0.9 }
+
+// TEMPORARY build marker (remove before Slice 3). Proves which OTA the device is running.
+// Its very presence proves this new bundle loaded — no earlier bundle renders this line.
+let BUILD_MARKER = 'n/a'
+try {
+  BUILD_MARKER = Updates.isEmbeddedLaunch
+    ? 'EMBEDDED (no OTA applied)'
+    : `OTA ${(Updates.updateId || '').slice(0, 8) || 'unknown'}`
+} catch (e) { BUILD_MARKER = 'unavailable' }
 
 // name_i18n[lang] if present, else fall through to the plain `name` column (never '').
 function extractI18n(obj, lang) {
@@ -323,6 +333,9 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
         ) : null}
       />
 
+      {/* TEMPORARY build marker (remove before Slice 3) */}
+      <Text style={s.buildMarker}>build: {BUILD_MARKER}</Text>
+
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
       ) : !activeGroup ? (
@@ -440,6 +453,10 @@ const PHOTO_H = 160
 
 const s = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: colors.bg },
+
+  // TEMPORARY build marker (remove before Slice 3)
+  buildMarker: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff', textAlign: 'center',
+                 paddingVertical: 4, backgroundColor: colors.primary, letterSpacing: 0.3 },
 
   viewToggle:   { minWidth: 70, alignItems: 'flex-end',
                   padding: 6, borderRadius: radius.sm,
