@@ -473,10 +473,10 @@ const s = StyleSheet.create({
 
   // Filter rows (category sub-filter + region) — horizontal ScrollViews, shipped pattern.
   filterRow:      { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
-  chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+  chip:           { paddingHorizontal: 14, paddingVertical: 20, borderRadius: 0, overflow: 'visible',  // DIAGNOSTIC: square, huge vpad, visible overflow — revert after isolating
                     backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText:       { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular', color: colors.textSecondary },  // lineHeight: Turkish diacritics clip on Android without it
+  chipText:       { fontSize: 13, lineHeight: 30, fontFamily: 'Inter_400Regular', color: colors.textSecondary },  // DIAGNOSTIC: absurd lineHeight — revert after isolating
   chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // List
