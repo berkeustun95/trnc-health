@@ -459,7 +459,7 @@ const s = StyleSheet.create({
   chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                     backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  chipText:       { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular', color: colors.textSecondary },  // lineHeight: Turkish diacritics clip on Android without it
   chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // List

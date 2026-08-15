@@ -82,6 +82,10 @@ went missing). Two mandatory rules:
   circuits everything below). Any admin preview surface must be entered from
   AdminScreen via the `adminPreview` state, never from a HomeScreen tile gated on
   `isAdmin` (that tile is unreachable for admins and hidden for customers).
+- Turkish diacritics (ü ö ş ğ ı ç) extend above cap-height and below the baseline.
+  Any Text style with an explicit `fontSize` MUST set `lineHeight` to ~1.4-1.5x
+  fontSize, or glyphs clip on Android. This is invisible when testing in English —
+  always spot-check new UI in Turkish before declaring it done.
 
 ## Android Gotchas
 - Views with `borderRadius` + `borderWidth` on Android may render an opaque background unless `backgroundColor: 'transparent'` is set explicitly.
