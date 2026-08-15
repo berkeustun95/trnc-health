@@ -386,13 +386,10 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
             </ScrollView>
           )}
 
-          {/* Region filter */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={s.filterRow}
-          >
+          {/* Region filter — DIAGNOSTIC: rendered as a plain flex-wrap View (NO horizontal
+              ScrollView), identical chip + chipText to the category ScrollView above. Tests
+              whether the horizontal ScrollView is what clips the glyphs. Revert after. */}
+          <View style={s.filterWrapRow}>
             <TouchableOpacity
               style={[s.chip, !region && s.chipActive]}
               onPress={() => setRegion(null)}
@@ -408,7 +405,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
                 <Text style={[s.chipText, region === r && s.chipTextActive]}>{regionLabel(r, lang)}</Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
 
           {/* List */}
           <FlatList
@@ -473,10 +470,12 @@ const s = StyleSheet.create({
 
   // Filter rows (category sub-filter + region) — horizontal ScrollViews, shipped pattern.
   filterRow:      { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
-  chip:           { paddingHorizontal: 14, paddingVertical: 20, borderRadius: 0, overflow: 'visible',  // DIAGNOSTIC: square, huge vpad, visible overflow — revert after isolating
+  // DIAGNOSTIC: same as filterRow but a wrapping row (no horizontal ScrollView). Remove after isolating.
+  filterWrapRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' },
+  chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                     backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText:       { fontSize: 13, lineHeight: 30, fontFamily: 'Inter_400Regular', color: colors.textSecondary },  // DIAGNOSTIC: absurd lineHeight — revert after isolating
+  chipText:       { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // List
