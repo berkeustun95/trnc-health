@@ -476,6 +476,7 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
 
       <MapPinPicker
         visible={showMapPicker}
+        lang={lang}
         initialLat={lat}
         initialLng={lng}
         onConfirm={confirmLocation}

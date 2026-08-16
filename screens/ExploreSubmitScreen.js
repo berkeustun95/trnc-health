@@ -334,6 +334,7 @@ export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted
 
       <MapPinPicker
         visible={showMap}
+        lang={lang}
         initialLat={lat}
         initialLng={lng}
         onConfirm={(latitude, longitude) => {   // MapPinPicker passes positional (lat, lng), not an object

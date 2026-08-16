@@ -388,6 +388,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
             </TouchableOpacity>
             <MapPinPicker
               visible={showMapPicker}
+              lang={lang}
               initialLat={form.latitude}
               initialLng={form.longitude}
               onConfirm={(lat, lng) => { setForm(f => ({ ...f, latitude: lat, longitude: lng })); setShowMapPicker(false) }}
@@ -497,6 +498,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
             </TouchableOpacity>
             <MapPinPicker
               visible={showMapPicker}
+              lang={lang}
               initialLat={form.latitude}
               initialLng={form.longitude}
               onConfirm={(lat, lng) => { setForm(f => ({ ...f, latitude: lat, longitude: lng })); setShowMapPicker(false) }}

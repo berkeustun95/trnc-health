@@ -658,6 +658,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
               </TouchableOpacity>
               <MapPinPicker
                 visible={showMapPicker}
+                lang={lang}
                 initialLat={facilityLat}
                 initialLng={facilityLng}
                 onConfirm={confirmFacilityLocation}

@@ -377,6 +377,7 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
 
       <MapPinPicker
         visible={showMapPicker}
+        lang={lang}
         initialLat={latitude}
         initialLng={longitude}
         onConfirm={(lat, lng) => { setLatitude(lat); setLongitude(lng); setShowMapPicker(false) }}

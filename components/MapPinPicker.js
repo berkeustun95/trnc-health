@@ -5,11 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { Feather } from '@expo/vector-icons'
 import { colors } from '../constants/theme'
+import { t } from '../constants/i18n'
 
 const NICOSIA = { latitude: 35.1856, longitude: 33.3823 }
 const DELTA   = { latitudeDelta: 0.012, longitudeDelta: 0.012 }
 
-export default function MapPinPicker({ visible, initialLat, initialLng, onConfirm, onCancel }) {
+export default function MapPinPicker({ visible, initialLat, initialLng, onConfirm, onCancel, lang }) {
   const [coord, setCoord]     = useState(NICOSIA)
   const [locating, setLocating] = useState(false)
   const mapRef = useRef(null)
@@ -51,9 +52,9 @@ export default function MapPinPicker({ visible, initialLat, initialLng, onConfir
       <SafeAreaView style={s.container} edges={['top', 'bottom']}>
         <View style={s.header}>
           <TouchableOpacity onPress={onCancel} hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}>
-            <Text style={s.cancelText}>Cancel</Text>
+            <Text style={s.cancelText}>{t('cancel', lang)}</Text>
           </TouchableOpacity>
-          <Text style={s.title}>Pin Your Location</Text>
+          <Text style={s.title}>{t('pinTitle', lang)}</Text>
           <View style={s.headerRight} />
         </View>
 
@@ -75,7 +76,7 @@ export default function MapPinPicker({ visible, initialLat, initialLng, onConfir
 
         <View style={s.hint}>
           <Feather name="info" size={12} color={colors.textSecondary} />
-          <Text style={s.hintText}>Tap the map or drag the pin to position your facility exactly.</Text>
+          <Text style={s.hintText}>{t('pinHint', lang)}</Text>
         </View>
 
         <View style={s.bottom}>
@@ -96,14 +97,14 @@ export default function MapPinPicker({ visible, initialLat, initialLng, onConfir
                 ? <ActivityIndicator size="small" color={colors.primary} />
                 : <Feather name="crosshair" size={15} color={colors.primary} />
               }
-              <Text style={s.myLocText}>{locating ? 'Finding…' : 'My location'}</Text>
+              <Text style={s.myLocText}>{locating ? t('pinFinding', lang) : t('pinMyLocation', lang)}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={s.confirmBtn}
               onPress={() => onConfirm(coord.latitude, coord.longitude)}
               activeOpacity={0.8}
             >
-              <Text style={s.confirmText}>Confirm Pin</Text>
+              <Text style={s.confirmText}>{t('pinConfirm', lang)}</Text>
             </TouchableOpacity>
           </View>
         </View>

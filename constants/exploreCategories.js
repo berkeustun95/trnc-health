@@ -3,10 +3,9 @@
 // axis, a shape-guarded plain text column (not a DB enum). Adding a category is a JS edit
 // + OTA, never a migration.
 //
-// i18n (Slice 2 constraint): reuse existing bl* keys where they fit; categories/groups
-// without a key are marked TODO(slice5-i18n) and cannot be shown to users until Slice 5
-// adds keys. Keyless groups are admin-gated off today (0 rows), so nothing user-facing
-// depends on them yet.
+// i18n: legacy beach/heritage categories reuse bl* keys; the Slice-5 categories + all five
+// group labels use exploreCat* / exploreGroup* keys (constants/i18n.js). Every category and
+// group has a label — none fall back to a raw slug.
 
 import { placeColors } from './theme'
 
@@ -32,24 +31,19 @@ export function categoryToGroup(category) {
   return CATEGORY_TO_GROUP[category] || null
 }
 
-// Per-group presentation. colorToken/labelKey reuse existing tokens where they exist:
-// nature -> beach token, heritage -> landmark token (the only two with live data AND an
-// existing placeColors entry + bl* label key). The other three have no color token or
-// i18n key yet; they are gated off today, so the fallback token is never rendered and
-// their label falls back to the raw group id (admin-only dev placeholder). Slice 5 adds
-// real tokens + the exploreGroup* keys.
+// Per-group presentation. Each group has its own exploreGroup* label key (Slice 5). The
+// three non-nature/heritage groups still borrow placeColors.beach as their color token —
+// they had no dedicated token pre-launch; a real token per group is deferred (backlog).
 export const GROUP_META = {
-  nature:    { icon: 'leaf-outline',      colorToken: placeColors.beach,    labelKey: 'blFilterBeaches',   todoLabelKey: 'exploreGroupNature' },
-  heritage:  { icon: 'library-outline',   colorToken: placeColors.landmark, labelKey: 'blFilterLandmarks', todoLabelKey: 'exploreGroupHeritage' },
-  eat_drink: { icon: 'cafe-outline',      colorToken: placeColors.beach,    labelKey: null,                todoLabelKey: 'exploreGroupEatDrink' },
-  active:    { icon: 'barbell-outline',   colorToken: placeColors.beach,    labelKey: null,                todoLabelKey: 'exploreGroupActive' },
-  services:  { icon: 'construct-outline', colorToken: placeColors.beach,    labelKey: null,                todoLabelKey: 'exploreGroupServices' },
+  nature:    { icon: 'leaf-outline',      colorToken: placeColors.beach,    labelKey: 'exploreGroupNature' },
+  heritage:  { icon: 'library-outline',   colorToken: placeColors.landmark, labelKey: 'exploreGroupHeritage' },
+  eat_drink: { icon: 'cafe-outline',      colorToken: placeColors.beach,    labelKey: 'exploreGroupEatDrink' },
+  active:    { icon: 'barbell-outline',   colorToken: placeColors.beach,    labelKey: 'exploreGroupActive' },
+  services:  { icon: 'construct-outline', colorToken: placeColors.beach,    labelKey: 'exploreGroupServices' },
 }
 
-// category -> i18n key, ONLY for categories that already have a key (Slice 2: no new keys,
-// no hand-written English). The submit picker + category chips render only these.
-// TODO(slice5-i18n): cafe, restaurant, bakery, gym, sports_facility, pool, barber,
-//                    print_shop, laundry
+// category -> i18n key. Legacy heritage/beach categories keep their bl* keys; the Slice-5
+// categories use exploreCat* keys. Every category in EXPLORE_GROUPS has a label here.
 export const CATEGORY_LABEL_KEY = {
   beach:           'blFilterBeaches',
   nature_scenic:   'blCatNatureScenic',
@@ -58,13 +52,25 @@ export const CATEGORY_LABEL_KEY = {
   museum:          'blCatMuseum',
   religious_site:  'blCatReligiousSite',
   monument:        'blCatMonument',
+  cafe:            'exploreCatCafe',
+  restaurant:      'exploreCatRestaurant',
+  bakery:          'exploreCatBakery',
+  gym:             'exploreCatGym',
+  sports_facility: 'exploreCatSportsFacility',
+  pool:            'exploreCatPool',
+  barber:          'exploreCatBarber',
+  print_shop:      'exploreCatPrintShop',
+  laundry:         'exploreCatLaundry',
 }
 
-// Categories a user may SUBMIT in Slice 2 — exactly the keyed set the old form offered
-// (beach + the 6 landmark categories). Keyless categories open in Slice 5.
+// Categories a user may SUBMIT. Slice 5 opened the eat_drink / active / services sets now
+// that they have labels; every entry maps to a group in EXPLORE_GROUPS and a CATEGORY_LABEL_KEY.
 export const SUBMITTABLE_CATEGORIES = [
-  'beach', 'castle_fortress', 'ancient_ruins', 'museum',
-  'religious_site', 'monument', 'nature_scenic',
+  'beach', 'nature_scenic',
+  'castle_fortress', 'ancient_ruins', 'museum', 'religious_site', 'monument',
+  'cafe', 'restaurant', 'bakery',
+  'gym', 'sports_facility', 'pool',
+  'barber', 'print_shop', 'laundry',
 ]
 
 // ─── Threshold gating ────────────────────────────────────────────────────────

@@ -346,7 +346,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
       <PageBackground topic="beaches_landmarks" />
       <ScreenHeader
         onBack={activeGroup ? leaveGroup : onBack}
-        title={activeGroup ? groupLabel(activeGroup, lang) : t('blTitle', lang)}
+        title={activeGroup ? groupLabel(activeGroup, lang) : t('exploreTitle', lang)}
         lang={lang}
         rightElement={activeGroup ? (
           <TouchableOpacity

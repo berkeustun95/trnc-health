@@ -555,6 +555,7 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
 
       <MapPinPicker
         visible={showMapPicker}
+        lang={lang}
         initialLat={lat}
         initialLng={lng}
         onConfirm={confirmLocation}
