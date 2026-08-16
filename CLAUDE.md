@@ -82,11 +82,14 @@ went missing). Two mandatory rules:
   circuits everything below). Any admin preview surface must be entered from
   AdminScreen via the `adminPreview` state, never from a HomeScreen tile gated on
   `isAdmin` (that tile is unreachable for admins and hidden for customers).
-- Always spot-check new UI in Turkish before declaring it done. Turkish labels are
-  longer than English, so they can trigger layout paths English never hits (e.g. a
-  horizontal filter-chip row that only scrolls once labels are long enough), exposing
-  Android-specific bugs that are invisible in English. (A confirmed one — horizontal
-  ScrollView chip rows clipping glyphs once scrolled — is tracked in the vault backlog.)
+- A filter row (or any fixed-height View) placed as a flex sibling ABOVE a scrollable
+  list in a `flex:1` column MUST set `flexShrink: 0` — otherwise it gets vertically
+  compressed when the list overflows, cropping its text top and bottom. It only
+  reproduces once there are enough results to make the list scroll, so it is invisible
+  with short or empty lists. (Not a lineHeight/font issue — that was a wrong early guess.)
+- Always spot-check new UI in Turkish before declaring it done. Turkish labels are longer
+  than English, so they routinely push lists past the viewport (hitting bugs like the one
+  above) where English never did.
 
 ## Android Gotchas
 - Views with `borderRadius` + `borderWidth` on Android may render an opaque background unless `backgroundColor: 'transparent'` is set explicitly.

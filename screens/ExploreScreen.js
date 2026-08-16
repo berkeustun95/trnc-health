@@ -394,7 +394,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0 }}
+            style={{ flexGrow: 0, flexShrink: 0 }}
             contentContainerStyle={s.filterRow}
             onLayout={e => setDbgRowH(Math.round(e.nativeEvent.layout.height))}
           >
@@ -479,10 +479,10 @@ const s = StyleSheet.create({
 
   // Filter rows (category sub-filter + region) — horizontal ScrollViews, shipped pattern.
   filterRow:      { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
-  chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+  chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, minHeight: 35,  // minHeight = measured natural height; defensive floor vs sibling compression
                     backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText:       { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  chipText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // List
