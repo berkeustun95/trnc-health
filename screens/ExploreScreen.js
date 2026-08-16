@@ -243,6 +243,8 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   const [region,      setRegion]      = useState(null)   // null = all regions
   const [view,        setView]        = useState('list') // 'list' | 'map'
   const [showSubmit,  setShowSubmit]  = useState(false)
+  const [dbgChipH, setDbgChipH] = useState(0)  // TEMPORARY onLayout instrumentation (remove before Slice 3)
+  const [dbgRowH,  setDbgRowH]  = useState(0)  // TEMPORARY onLayout instrumentation (remove before Slice 3)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -334,7 +336,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
       />
 
       {/* TEMPORARY build marker (remove before Slice 3) */}
-      <Text style={s.buildMarker}>build: {BUILD_MARKER}</Text>
+      <Text style={s.buildMarker}>build: {BUILD_MARKER}  ·  chip={dbgChipH} row={dbgRowH}</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
@@ -386,19 +388,20 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
             </ScrollView>
           )}
 
-          {/* Region filter — DIAGNOSTIC: ScrollView WITH removeClippedSubviews={false}. The
-              category ScrollView above keeps the RN default (control). Tests whether the
-              scroll-position clipping is removeClippedSubviews. Revert after. */}
+          {/* Region filter — DIAGNOSTIC: onLayout instrumentation. Measures whether the chip
+              and row heights shrink once the result list becomes scrollable (>=3 cards).
+              Values shown in the build-marker strip. Revert after. */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={{ flexGrow: 0 }}
             contentContainerStyle={s.filterRow}
-            removeClippedSubviews={false}
+            onLayout={e => setDbgRowH(Math.round(e.nativeEvent.layout.height))}
           >
             <TouchableOpacity
               style={[s.chip, !region && s.chipActive]}
               onPress={() => setRegion(null)}
+              onLayout={e => setDbgChipH(Math.round(e.nativeEvent.layout.height))}
             >
               <Text style={[s.chipText, !region && s.chipTextActive]}>{t('blDistrictAll', lang)}</Text>
             </TouchableOpacity>
@@ -476,8 +479,6 @@ const s = StyleSheet.create({
 
   // Filter rows (category sub-filter + region) — horizontal ScrollViews, shipped pattern.
   filterRow:      { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
-  // DIAGNOSTIC: same as filterRow but a wrapping row (no horizontal ScrollView). Remove after isolating.
-  filterWrapRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' },
   chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                     backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
