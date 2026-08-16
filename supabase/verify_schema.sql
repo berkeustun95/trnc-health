@@ -405,6 +405,17 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='places_guard_update'
           AND pg_get_functiondef(p.oid) ILIKE '%trusted write may only%')
+    -- Anchored on 'studentHub' (an identifier absent from both bodies pre-apply), NOT on
+    -- 'explore' — the English/Spanish body templates already contain "explore"/"explorar",
+    -- so an '%explore%' token would pass before the migration is applied (drift-blind).
+    UNION ALL SELECT '0828_explore_waitlist','notify_module_waitlist allow-list has explore+studentHub',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_module_waitlist'
+          AND pg_get_functiondef(p.oid) ILIKE '%studentHub%')
+    UNION ALL SELECT '0828_explore_waitlist','module_notif_text name-map has explore+studentHub',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='module_notif_text'
+          AND pg_get_functiondef(p.oid) ILIKE '%studentHub%')
   ) z
 
   UNION ALL

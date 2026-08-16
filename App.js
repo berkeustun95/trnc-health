@@ -266,6 +266,7 @@ export default function App() {
   const [showHomeServices, setShowHomeServices] = useState(false)
   const [showJobPostings,  setShowJobPostings]  = useState(false)
   const [showExploreBeach, setShowExploreBeach] = useState(false)
+  const [showExplore, setShowExplore] = useState(false)   // the full Explore module tile (dark until MODULE_FLAGS.explore)
   const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | (future preview keys). Admins never reach HomeScreen /
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
@@ -493,6 +494,7 @@ export default function App() {
       if (showLegal) { setShowLegal(false); return true }
       if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
       if (showExploreBeach)     { setShowExploreBeach(false); return true }
+      if (showExplore)          { setShowExplore(false); return true }
       if (adminPreview)         { setAdminPreview(null); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
@@ -503,7 +505,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showExploreBeach, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -1068,6 +1070,17 @@ export default function App() {
         <ExploreScreen lang={lang} onBack={() => { setShowExploreBeach(false); setExploreBeachRegion(null) }} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} initialCategory="beach" initialRegion={exploreBeachRegion} />
       </BLErrorBoundary>
     )
+  } else if (showExplore) {
+    // Public Explore tile — gated on MODULE_FLAGS.explore (|| isAdmin, house pattern; admins
+    // never reach HomeScreen so it's moot for the tile path). Dark today → Coming Soon, whose
+    // Notify-me upserts module='explore' into module_waitlist (shape-guard accepts it now).
+    content = (MODULE_FLAGS.explore || isAdmin) ? (
+      <BLErrorBoundary>
+        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} isAdmin={isAdmin} />
+      </BLErrorBoundary>
+    ) : (
+      <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />
+    )
   } else if (adminPreview === 'explore') {
     content = (
       <BLErrorBoundary>
@@ -1286,6 +1299,7 @@ export default function App() {
             onShowHomeServices={() => setShowHomeServices(true)}
             onShowJobPostings={() => setShowJobPostings(true)}
             onShowExploreBeach={() => setShowExploreBeach(true)}
+            onShowExplore={() => setShowExplore(true)}
             onShowTransport={() => setShowTransport(true)}
             onShowInsurance={() => setShowInsurance(true)}
             onShowGrooming={() => setShowGrooming(true)}
@@ -1500,7 +1514,7 @@ export default function App() {
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowTransport(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
@@ -1528,7 +1542,7 @@ export default function App() {
     setCityWelcome(null)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowTransport(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
