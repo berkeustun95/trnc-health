@@ -363,7 +363,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={{ flexGrow: 0 }}
+              style={{ flexGrow: 0, flexShrink: 0 }}
               contentContainerStyle={s.filterRow}
             >
               <TouchableOpacity
