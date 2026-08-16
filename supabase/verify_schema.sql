@@ -50,6 +50,7 @@ WITH report AS (
     ('0725_esim_waitlist','esim_waitlist'),
     ('0812_module_waitlist','module_waitlist'),
     ('0822_places_consolidation','places'),
+    ('0826_place_claims','place_claims'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -159,7 +160,9 @@ WITH report AS (
     ('0824_place_moderation','check_place_content'),
     ('0824_place_moderation','explore_category_counts'),
     ('0825_places_column_guards','places_guard_insert'),
-    ('0825_places_column_guards','places_guard_update')
+    ('0825_places_column_guards','places_guard_update'),
+    ('0826_place_claims','place_claims_guard_insert'),
+    ('0826_place_claims','approve_place_claim')
   ) e(m,o)
 
   UNION ALL
@@ -198,7 +201,8 @@ WITH report AS (
     ('0824_place_moderation','guard_place_moderation'),
     ('0824_place_moderation','check_place_content'),
     ('0825_places_column_guards','places_guard_insert'),
-    ('0825_places_column_guards','places_guard_update')
+    ('0825_places_column_guards','places_guard_update'),
+    ('0826_place_claims','place_claims_guard_insert')
   ) e(m,o)
 
   UNION ALL
@@ -226,7 +230,8 @@ WITH report AS (
     ('0822_places_consolidation','places_category_check'),
     ('0822_places_consolidation','places_region_check'),
     ('0822_places_consolidation','places_status_check'),
-    ('0822_places_consolidation','places_access_type_check')
+    ('0822_places_consolidation','places_access_type_check'),
+    ('0826_place_claims','place_claims_status_check')
   ) e(m,o)
 
   UNION ALL
@@ -263,7 +268,9 @@ WITH report AS (
     ('0822_places_consolidation','idx_places_region'),
     ('0822_places_consolidation','idx_places_category'),
     ('0822_places_consolidation','idx_places_provider'),
-    ('0822_places_consolidation','idx_places_submitted_by')
+    ('0822_places_consolidation','idx_places_submitted_by'),
+    ('0826_place_claims','idx_place_claims_place_id'),
+    ('0826_place_claims','idx_place_claims_requester_id')
   ) e(m,o)
 
   UNION ALL
@@ -285,7 +292,8 @@ WITH report AS (
     ('0719_create_facility_claim_rpc','create_facility_claim'),
     ('0813_notify_module_waitlist','notify_module_waitlist'),
     ('0819_get_customer_contacts_rpc','get_customer_contacts'),
-    ('0824_place_moderation','explore_category_counts')  -- also GRANTed to anon (public tile counts)
+    ('0824_place_moderation','explore_category_counts'),  -- also GRANTed to anon (public tile counts)
+    ('0826_place_claims','approve_place_claim')
   ) e(m,o)
 
   UNION ALL
@@ -388,6 +396,10 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='places_guard_update'
           AND pg_get_functiondef(p.oid) ILIKE '%featured_requested_at%')
+    UNION ALL SELECT '0826_place_claims','approve_place_claim is race-hardened (FOR UPDATE)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='approve_place_claim'
+          AND pg_get_functiondef(p.oid) ILIKE '%FOR UPDATE%')
   ) z
 
   UNION ALL
@@ -401,7 +413,7 @@ WITH report AS (
     'content_reports','blocks','insurance_companies','esim_waitlist','module_waitlist',
     'provider_documents','provider_credentials','quiz_submissions','pharmacist_scores',
     -- directory / UGC tables (Slice 5 — user-writable rows, so RLS must be ON here too)
-    'beaches','landmarks','places','events','home_services','transport_providers',
+    'beaches','landmarks','places','place_claims','events','home_services','transport_providers',
     'estate_agencies','estate_agents','properties','property_images',
     'duty_list','duty_schedule','blocked_terms','bus_routes'
   )

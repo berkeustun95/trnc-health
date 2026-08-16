@@ -28,7 +28,7 @@ async function openSignedDoc(bucket, storedValue) {
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'JobPostings']
+const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -3631,6 +3631,97 @@ function PlacesTab() {
   )
 }
 
+// ─── Place Claims Tab (owner claims on places; separate from ClaimsTab/KTEB) ──
+
+function PlaceClaimsTab({ session }) {
+  const [claims,       setClaims]       = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [busy,         setBusy]         = useState(null)
+  const [rejectTarget, setRejectTarget] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    // FK-embed the place (place_id → places). The requester name needs a separate fetch:
+    // requester_id FKs to auth.users, which PostgREST can't embed across to profiles.
+    const { data } = await supabase
+      .from('place_claims')
+      .select('id, place_id, requester_id, evidence_note, created_at, places(id, name, region)')
+      .eq('status', 'pending')
+      .order('created_at')
+    const rows = data ?? []
+    const requesterIds = [...new Set(rows.map(r => r.requester_id).filter(Boolean))]
+    const { data: profs } = requesterIds.length
+      ? await supabase.from('profiles').select('id, full_name').in('id', requesterIds)
+      : { data: [] }
+    const nameById = new Map((profs ?? []).map(p => [p.id, p.full_name]))
+    setClaims(rows.map(r => ({ ...r, _requester: nameById.get(r.requester_id) ?? 'Unknown' })))
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function approve(claim) {
+    setBusy(claim.id)
+    const { error } = await supabase.rpc('approve_place_claim', { p_claim_id: claim.id })
+    if (error) Alert.alert('Error', error.message)
+    setBusy(null); load()
+  }
+
+  async function reject(claim, reason) {
+    setBusy(claim.id)
+    await supabase.from('place_claims').update({
+      status:           'rejected',
+      rejection_reason: reason || 'Does not meet our guidelines.',
+      verified_by:      session.user.id,
+      verified_at:      new Date().toISOString(),
+    }).eq('id', claim.id)
+    setRejectTarget(null); setBusy(null); load()
+  }
+
+  if (loading) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+
+  return (
+    <View style={{ flex: 1 }}>
+      <FlatList
+        data={claims}
+        keyExtractor={c => c.id}
+        contentContainerStyle={s.listContent}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={<SectionEmpty text="No pending claims." />}
+        renderItem={({ item }) => (
+          <View style={s.card}>
+            <Text style={s.cardTitle} numberOfLines={1}>{placeAdminName(item.places)}</Text>
+            <Text style={s.cardSub}>{item.places?.region ?? '—'} · Claimed by {item._requester}</Text>
+            {!!item.evidence_note && <Text style={[s.cardSub, { marginTop: 4, fontStyle: 'italic' }]}>“{item.evidence_note}”</Text>}
+            <Text style={[s.cardSub, { marginTop: 2 }]}>{new Date(item.created_at).toLocaleDateString('en-GB')}</Text>
+            <View style={[s.rowActions, { marginTop: 10, marginLeft: 0 }]}>
+              {busy === item.id
+                ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 7 }} />
+                : (
+                  <>
+                    <TouchableOpacity style={s.ghostBtn} onPress={() => approve(item)}>
+                      <Text style={s.ghostBtnText}>Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.dangerGhostBtn} onPress={() => setRejectTarget(item)}>
+                      <Text style={s.dangerGhostText}>Reject</Text>
+                    </TouchableOpacity>
+                  </>
+                )
+              }
+            </View>
+          </View>
+        )}
+      />
+      <RejectModal
+        visible={!!rejectTarget}
+        entityName={rejectTarget ? placeAdminName(rejectTarget.places) : ''}
+        onConfirm={reason => reject(rejectTarget, reason)}
+        onCancel={() => setRejectTarget(null)}
+      />
+    </View>
+  )
+}
+
 // ─── Job Postings Tab ────────────────────────────────────────────────────────
 
 function JobPostingsTab() {
@@ -4079,6 +4170,7 @@ export default function AdminScreen({ session, lang, onShowExplore }) {
           {tab === 'Featured'      && <FeaturedTab />}
           {tab === 'BusRoutes'     && <BusRoutesTab />}
           {tab === 'Places'        && <PlacesTab />}
+          {tab === 'PlaceClaims'   && <PlaceClaimsTab session={session} />}
           {tab === 'JobPostings'   && <JobPostingsTab />}
         </View>
       </View>
