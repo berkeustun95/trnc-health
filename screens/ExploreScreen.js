@@ -10,6 +10,9 @@ import { supabase } from '../lib/supabase'
 import ExploreSubmitScreen from './ExploreSubmitScreen'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
+import FeaturedBadge from '../components/FeaturedBadge'
+import { EXPLORE_FEATURED_LIVE } from '../constants/flags'
+import { partitionFeatured, isFeatured } from '../utils/featured'
 import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
@@ -53,7 +56,7 @@ function groupEmoji(group) {
 
 // ─── Place card (list view) ───────────────────────────────────────────────────
 
-function PlaceCard({ item, lang, onPress }) {
+function PlaceCard({ item, lang, onPress, showFeatured }) {
   const group   = categoryToGroup(item.category)
   const pc      = GROUP_META[group]?.colorToken || placeColors.landmark
   const isBeach = item.category === 'beach'
@@ -76,6 +79,7 @@ function PlaceCard({ item, lang, onPress }) {
       </View>
 
       <View style={s.cardBody}>
+        {showFeatured && isFeatured(item) && <FeaturedBadge lang={lang} style={{ marginBottom: 8 }} />}
         <View style={s.nameRow}>
           <Text style={s.name} numberOfLines={1}>{placeName(item, lang)}</Text>
           <View style={s.districtBadge}>
@@ -225,7 +229,18 @@ function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
+// Explicit browse columns — NOT select('*'). Anti-steering (iOS 3.1.1): featured_requested_at
+// (and the moderation backend columns) never reach the client. featured_until IS included:
+// the derived isFeatured() pin/badge needs it. Covers PlaceCard, the map card, and the
+// passed-through ExploreProfileScreen. (area re-enters when the Slice-5 area filter ships.)
+const BROWSE_COLS =
+  'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
+  'cover_image_url, photos, photo_credits, blue_flag, access_type, amenities, featured_until'
+
 export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, isAdmin = false }) {
+  // Dark launch: featured pinning + badge show only once live, or to an admin previewing.
+  // Mirrors the GaragesScreen showFeatured gate. The owner "request featured" CTA lands in Slice 5.
+  const showFeatured = EXPLORE_FEATURED_LIVE || isAdmin
   const [places,      setPlaces]      = useState([])
   const [loading,     setLoading]     = useState(true)
   const [activeGroup, setActiveGroup] = useState(null)   // null = group-tile landing
@@ -242,12 +257,16 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
       // counts from the RPC (active INCLUDING hidden). If the RPC isn't there yet (OTA
       // before 20260824 is applied), fall back to counting the visible set.
       const [placesRes, countsRes] = await Promise.all([
-        supabase.from('places').select('*').eq('status', 'active'),
+        supabase.from('places').select(BROWSE_COLS).eq('status', 'active'),
         supabase.rpc('explore_category_counts'),
       ])
-      setPlaces((placesRes.data || []).sort((a, b) =>
+      const sorted = (placesRes.data || []).sort((a, b) =>
         placeName(a, 'en').localeCompare(placeName(b, 'en'))
-      ))
+      )
+      // Pin actively-featured places to the top (fair per-load shuffle among themselves),
+      // gated on showFeatured. Filtering by group/category preserves the featured-first
+      // order within each subset. Only shuffle once here — never in render.
+      setPlaces(showFeatured ? partitionFeatured(sorted) : sorted)
       setRpcCatCounts(countsRes.error ? null : (countsRes.data || []))
     } catch (err) {
       console.error('Explore load error:', err)
@@ -256,7 +275,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showFeatured])
 
   useEffect(() => { load() }, [load])
 
@@ -436,6 +455,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
               <PlaceCard
                 item={item}
                 lang={lang}
+                showFeatured={showFeatured}
                 onPress={() => onSelectPlace?.(item)}
               />
             )}

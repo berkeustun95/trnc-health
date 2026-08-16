@@ -162,7 +162,8 @@ WITH report AS (
     ('0825_places_column_guards','places_guard_insert'),
     ('0825_places_column_guards','places_guard_update'),
     ('0826_place_claims','place_claims_guard_insert'),
-    ('0826_place_claims','approve_place_claim')
+    ('0826_place_claims','approve_place_claim'),
+    ('0827_places_featured_tier','request_featured_place')
   ) e(m,o)
 
   UNION ALL
@@ -400,6 +401,10 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='approve_place_claim'
           AND pg_get_functiondef(p.oid) ILIKE '%FOR UPDATE%')
+    UNION ALL SELECT '0827_places_featured_tier','places_guard_update trusted-write scoped to featured_requested_at only',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='places_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%trusted write may only%')
   ) z
 
   UNION ALL

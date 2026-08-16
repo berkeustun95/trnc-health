@@ -7,6 +7,13 @@
 // before public launch. Flip to true to release Slice 3. Mirrors GARAGES_LIVE.
 export const FEATURED_LIVE = false
 
+// Featured tier for Explore PLACES (Slice 4 piece 3). SEPARATE from FEATURED_LIVE so the
+// two directories launch independently. false = the "Featured" badge/pinning is hidden
+// from normal users (the owner "request featured" CTA lands in Slice 5); admins still see
+// the badge/pinning (isAdmin override) to preview. Flip to true to release. Mirrors
+// FEATURED_LIVE. Listing stays free forever — only placement is paid.
+export const EXPLORE_FEATURED_LIVE = false
+
 // Garage service-price comparison (Slice 4b). false = the "Compare prices" entry
 // on the garages directory and the compare screen are hidden from normal users;
 // admins still see them (isAdmin override) to preview while the price dataset fills
