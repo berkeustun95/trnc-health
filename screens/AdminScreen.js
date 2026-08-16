@@ -387,6 +387,23 @@ const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answ
 const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by' }
 const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name' }
 
+// PlacesTab reviews THREE sources (beaches/landmarks frozen + the new places table). The
+// WRITE path (approve/reject/delete) MUST switch on _type to the right table — a `place`
+// row must never be written under a beaches column name. (Read-side normalization maps
+// places INTO the beaches shape for render; this keeps the write side explicitly typed.)
+const PLACE_TABLE = { beach: 'beaches', landmark: 'landmarks', place: 'places' }
+
+// One name extractor for all three sources: places.name is plain text, beaches/landmarks
+// name is jsonb. Used for the card title, the sort, AND RejectModal's entityName (which
+// otherwise renders "[object Object]" for the jsonb rows).
+const placeAdminName = (item) => {
+  const n = item?.name
+  if (!n) return ''
+  if (typeof n !== 'object') return String(n)
+  const r = n.en ?? n.tr ?? Object.values(n)[0]
+  return typeof r === 'object' ? (r.en ?? r.tr ?? '') : String(r ?? '')
+}
+
 function timeAgo(iso) {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
   if (mins < 60) return `${mins}m ago`
@@ -3462,6 +3479,7 @@ function PlacesTab() {
   const [rejectTarget, setRejectTarget] = useState(null)
 
   const CATEGORY_LABELS = {
+    beach: 'Beach',
     castle_fortress: 'Castle & Fortress', ancient_ruins: 'Ancient Ruins',
     museum: 'Museum', religious_site: 'Religious Site',
     monument: 'Monument', nature_scenic: 'Nature & Scenic',
@@ -3475,33 +3493,48 @@ function PlacesTab() {
       const { data } = await q
       return (data ?? []).map(r => ({ ...r, _type: tag }))
     }
-    const [beaches, landmarks] = await Promise.all([
+    // The new places table. Normalize INTO the beaches-shaped fields the render reads
+    // (district←region, photo_urls←photos); the WRITE path stays typed via PLACE_TABLE.
+    const fetchPlaces = async () => {
+      let q = supabase.from('places')
+        .select('id, name, region, status, rejection_reason, submitted_by, photos, category, access_type, blue_flag, created_at')
+        .order('created_at', { ascending: false })
+      if (filter !== 'all') q = q.eq('status', filter)
+      const { data } = await q
+      return (data ?? []).map(r => ({ ...r, _type: 'place', district: r.region, photo_urls: r.photos }))
+    }
+    const [beaches, landmarks, places] = await Promise.all([
       fetchTable('beaches',   'beach'),
       fetchTable('landmarks', 'landmark'),
+      fetchPlaces(),
     ])
-    const n = p => (typeof p.name === 'object' ? (p.name.en ?? p.name.tr ?? '') : (p.name ?? ''))
-    setPlaces([...beaches, ...landmarks].sort((a, b) => n(a).localeCompare(n(b))))
+    // NOTE: backfilled rows keep their original UUIDs, so in the 'active'/'all' filters a
+    // backfilled place shows TWICE — once from beaches/landmarks, once from places (distinct
+    // _type keys, no React collision). Expected until Slice 5 drops the old tables. The
+    // 'pending' queue (the admin's real work) is dupe-free: new submissions live in one table.
+    setPlaces([...beaches, ...landmarks, ...places].sort((a, b) =>
+      placeAdminName(a).localeCompare(placeAdminName(b))))
     setLoading(false)
   }, [filter])
 
   useEffect(() => { load() }, [load])
 
   async function approve(item) {
-    const table = item._type === 'beach' ? 'beaches' : 'landmarks'
+    const table = PLACE_TABLE[item._type]
     await supabase.from(table).update({ status: 'active', rejection_reason: null }).eq('id', item.id)
     load()
   }
 
   async function reject(item, reason) {
-    const table = item._type === 'beach' ? 'beaches' : 'landmarks'
+    const table = PLACE_TABLE[item._type]
     await supabase.from(table).update({ status: 'rejected', rejection_reason: reason || 'Does not meet our guidelines.' }).eq('id', item.id)
     setRejectTarget(null)
     load()
   }
 
   async function deletePlace(item) {
-    const table = item._type === 'beach' ? 'beaches' : 'landmarks'
-    const nameStr = typeof item.name === 'object' ? (item.name.en ?? item.name.tr ?? '') : item.name
+    const table = PLACE_TABLE[item._type]
+    const nameStr = placeAdminName(item)
     Alert.alert('Delete place?', `"${nameStr}" will be permanently removed.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from(table).delete().eq('id', item.id); load() } },
@@ -3535,19 +3568,23 @@ function PlacesTab() {
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={<SectionEmpty text={`No ${filter} places.`} />}
             renderItem={({ item }) => {
-              const isBeach = item._type === 'beach'
+              const isPlace = item._type === 'place'
+              // Deliberate shortcut for this admin tool: a beach-CATEGORY place gets beach
+              // styling/treatment; other places get the landmark palette.
+              const isBeach = item._type === 'beach' || (isPlace && item.category === 'beach')
               const pc = isBeach ? placeColors.beach : placeColors.landmark
+              const typeLabel = isPlace ? (CATEGORY_LABELS[item.category] ?? item.category) : (item._type === 'beach' ? 'Beach' : 'Landmark')
               return (
                 <View style={s.card}>
                   <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                         <View style={[s.pillGrey, { backgroundColor: pc.bg }]}>
-                          <Text style={[s.pillText, { color: pc.text }]}>{isBeach ? 'Beach' : 'Landmark'}</Text>
+                          <Text style={[s.pillText, { color: pc.text }]}>{typeLabel}</Text>
                         </View>
                       </View>
-                      <Text style={s.cardTitle} numberOfLines={1}>{(() => { const n = item.name; if (!n) return ''; if (typeof n !== 'object') return String(n); const r = n.en ?? n.tr ?? Object.values(n)[0]; return typeof r === 'object' ? (r.en ?? r.tr ?? '') : String(r ?? '') })()}</Text>
-                      <Text style={s.cardSub}>{item.district}{isBeach && item.access_type ? ` · ${item.access_type}` : ''}{!isBeach && item.category ? ` · ${CATEGORY_LABELS[item.category] ?? item.category}` : ''}</Text>
+                      <Text style={s.cardTitle} numberOfLines={1}>{placeAdminName(item)}</Text>
+                      <Text style={s.cardSub}>{item.district}{isBeach && item.access_type ? ` · ${item.access_type}` : ''}{!isBeach && !isPlace && item.category ? ` · ${CATEGORY_LABELS[item.category] ?? item.category}` : ''}</Text>
                       <Text style={s.cardSub}>
                         {item.submitted_by ? `User: ${item.submitted_by.slice(0, 8)}…` : 'Admin-seeded'}
                         {item.photo_urls?.length > 0 ? ` · ${item.photo_urls.length} photo${item.photo_urls.length > 1 ? 's' : ''}` : ' · No photos'}
@@ -3586,7 +3623,7 @@ function PlacesTab() {
 
       <RejectModal
         visible={!!rejectTarget}
-        entityName={rejectTarget?.name}
+        entityName={rejectTarget ? placeAdminName(rejectTarget) : ''}
         onConfirm={reason => reject(rejectTarget, reason)}
         onCancel={() => setRejectTarget(null)}
       />
