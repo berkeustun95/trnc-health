@@ -95,7 +95,9 @@ WITH report AS (
     ('0811_facilities_service_prices','facilities','service_prices'),
     ('0812_module_waitlist','module_waitlist','notified_at'),
     ('0824_place_moderation','places','hidden_at'),
-    ('0824_place_moderation','places','hidden_reason')
+    ('0824_place_moderation','places','hidden_reason'),
+    ('0825_places_column_guards','places','featured_until'),
+    ('0825_places_column_guards','places','featured_requested_at')
   ) e(m,t,c)
 
   UNION ALL
@@ -155,7 +157,9 @@ WITH report AS (
     ('0813_notify_module_waitlist','notify_module_waitlist'),
     ('0819_get_customer_contacts_rpc','get_customer_contacts'),
     ('0824_place_moderation','check_place_content'),
-    ('0824_place_moderation','explore_category_counts')
+    ('0824_place_moderation','explore_category_counts'),
+    ('0825_places_column_guards','places_guard_insert'),
+    ('0825_places_column_guards','places_guard_update')
   ) e(m,o)
 
   UNION ALL
@@ -192,7 +196,9 @@ WITH report AS (
     ('facilities_guard(0718→0809)','facilities_guard_update'),
     ('facilities_guard(0718→0731)','facilities_guard_insert'),
     ('0824_place_moderation','guard_place_moderation'),
-    ('0824_place_moderation','check_place_content')
+    ('0824_place_moderation','check_place_content'),
+    ('0825_places_column_guards','places_guard_insert'),
+    ('0825_places_column_guards','places_guard_update')
   ) e(m,o)
 
   UNION ALL
@@ -378,6 +384,10 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='check_place_content'
           AND pg_get_functiondef(p.oid) ILIKE '%contains_payment_solicitation%')
+    UNION ALL SELECT '0825_places_column_guards','places_guard_update locks featured_requested_at (4-column body)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='places_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%featured_requested_at%')
   ) z
 
   UNION ALL
