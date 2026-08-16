@@ -108,32 +108,25 @@ export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted
 
     setSaving(true)
     try {
-      // name = plain proper noun. name_i18n stays NULL on user submit (translations are a
-      // curation step). description is locale-specific → description_i18n.
-      const payload = {
-        submitted_by:    session.user.id,
-        category,
-        name:            name.trim(),
-        description_i18n: desc.trim() ? { [lang]: desc.trim() } : null,
-        region,
-        latitude:        lat,
-        longitude:       lng,
-        status:          'pending',
-        photos:          [],
-        ...(isBeach ? { blue_flag: blueFlag, access_type: access } : {}),
-      }
-
-      const { data, error: insErr } = await supabase
-        .from('places').insert(payload).select('id').single()
-      if (insErr) throw insErr
-      const rowId = data.id
-
-      // Upload photos to the shared place-photos bucket under a places/ prefix.
-      const urls = []
+      // PHOTO-FIRST (atomic): upload photos BEFORE inserting the row, so a failed upload
+      // aborts before any `places` row exists — no half-saved, photo-less place, and no
+      // rowId-in-path dependency. Path = {uid}/{timestamp}/i.ext: uid so the uid-owner
+      // place-photos DELETE policy lets the submitter clean up their own uploads; a
+      // timestamp (NOT crypto.randomUUID — unreliable on Hermes) for a client-unique
+      // folder, matching the events / estate-doc path convention.
+      //
+      // ORPHAN TRADE-OFF (accepted, vs orphan ROWS): a failure AFTER upload but BEFORE
+      // the insert commits leaves files under {uid}/{ts}/ with no row pointing at them.
+      // Two sources: (1) a later photo's upload throwing; (2) once Slice 3's content
+      // filter lands, the INSERT being rejected (BLOCKED_TERM) after photos are up.
+      // A backlog orphan-sweep reclaims them (see backlog.md).
+      const uid   = session.user.id
+      const stamp = Date.now()
+      const urls  = []
       for (let i = 0; i < photos.length; i++) {
         const ph  = photos[i]
         const ext = (ph.uri.split('.').pop() || 'jpg').toLowerCase().split('?')[0]
-        const path = `places/${rowId}/${i}.${ext}`
+        const path = `${uid}/${stamp}/${i}.${ext}`
         const ct   = ext === 'jpeg' || ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
         const { error: upErr } = await supabase.storage
           .from('place-photos')
@@ -144,11 +137,23 @@ export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted
         urls.push(publicUrl)
       }
 
-      if (urls.length > 0) {
-        await supabase.from('places')
-          .update({ photos: urls, cover_image_url: urls[0] })
-          .eq('id', rowId)
+      // name = plain proper noun. name_i18n stays NULL on user submit (translations are a
+      // curation step). description is locale-specific → description_i18n.
+      const payload = {
+        submitted_by:    uid,
+        category,
+        name:            name.trim(),
+        description_i18n: desc.trim() ? { [lang]: desc.trim() } : null,
+        region,
+        latitude:        lat,
+        longitude:       lng,
+        status:          'pending',
+        photos:          urls,
+        cover_image_url: urls[0] || null,
+        ...(isBeach ? { blue_flag: blueFlag, access_type: access } : {}),
       }
+      const { error: insErr } = await supabase.from('places').insert(payload)
+      if (insErr) throw insErr
 
       setDone(true)
       onSubmitted?.()

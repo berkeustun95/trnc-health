@@ -420,7 +420,11 @@ GROUP BY tablename ORDER BY tablename;
 --                  uploader UID by folder segment ([1] and [2] respectively).
 --                • public image buckets (avatars/facility-images/property-images/
 --                  event-images) keep their broad `USING (bucket_id=…)` SELECT —
---                  known follow-up (anon object enumeration), not changed here. ─────
+--                  known follow-up (anon object enumeration), not changed here.
+--                • place-photos (0823): place_photos_public (SELECT, bucket-scoped) +
+--                  place_photos_upload (INSERT authenticated, bucket-scoped, anon-guarded) +
+--                  place_photos_delete (DELETE, foldername[1]=uid OR is_admin(), anon-guarded).
+--                  Expect exactly these 3 (no UPDATE — uploads are upsert:false). ─────
 SELECT policyname, cmd, roles, qual, with_check
 FROM pg_policies
 WHERE schemaname='storage' AND tablename='objects'
