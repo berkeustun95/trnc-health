@@ -237,15 +237,19 @@ const BROWSE_COLS =
   'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
   'cover_image_url, photos, photo_credits, blue_flag, access_type, amenities, featured_until'
 
-export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, isAdmin = false }) {
+export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, isAdmin = false, initialCategory = null, initialRegion = null }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin previewing.
   // Mirrors the GaragesScreen showFeatured gate. The owner "request featured" CTA lands in Slice 5.
   const showFeatured = EXPLORE_FEATURED_LIVE || isAdmin
+  // "Rooted" entry: opened pre-filtered to one category (the Beaches tile → category='beach').
+  // Lands directly on that category's list, and its back button exits to onBack (Home) instead of
+  // the group-tile landing — preserving the old Beaches-tile behavior (swap the engine, keep the nav).
+  const rooted = initialCategory != null
   const [places,      setPlaces]      = useState([])
   const [loading,     setLoading]     = useState(true)
-  const [activeGroup, setActiveGroup] = useState(null)   // null = group-tile landing
-  const [activeCat,   setActiveCat]   = useState(null)   // null = all categories in group
-  const [region,      setRegion]      = useState(null)   // null = all regions
+  const [activeGroup, setActiveGroup] = useState(initialCategory ? categoryToGroup(initialCategory) : null)   // null = group-tile landing
+  const [activeCat,   setActiveCat]   = useState(initialCategory)   // null = all categories in group
+  const [region,      setRegion]      = useState(initialRegion)     // null = all regions
   const [view,        setView]        = useState('list') // 'list' | 'map'
   const [showSubmit,  setShowSubmit]  = useState(false)
   const [rpcCatCounts, setRpcCatCounts] = useState(null)  // per-category counts (active incl. hidden) from the RPC; null → fall back to visible-set count
@@ -345,8 +349,8 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="beaches_landmarks" />
       <ScreenHeader
-        onBack={activeGroup ? leaveGroup : onBack}
-        title={activeGroup ? groupLabel(activeGroup, lang) : t('exploreTitle', lang)}
+        onBack={activeGroup && !rooted ? leaveGroup : onBack}
+        title={rooted ? categoryLabel(initialCategory, lang) : (activeGroup ? groupLabel(activeGroup, lang) : t('exploreTitle', lang))}
         lang={lang}
         rightElement={activeGroup ? (
           <TouchableOpacity

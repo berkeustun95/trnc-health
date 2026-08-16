@@ -37,14 +37,12 @@ import HomeServiceDashboardScreen from './screens/HomeServiceDashboardScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import HomeServicesScreen from './screens/HomeServicesScreen'
 import JobPostingsScreen from './screens/JobPostingsScreen'
-import BeachesLandmarksScreen from './screens/BeachesLandmarksScreen'
 import TransportScreen from './screens/TransportScreen'
 import InsuranceScreen from './screens/InsuranceScreen'
 import GroomingScreen from './screens/GroomingScreen'
 import GaragesScreen from './screens/GaragesScreen'
 import EsimScreen from './screens/EsimScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
-import PlaceProfileScreen from './screens/PlaceProfileScreen'
 import ExploreScreen from './screens/ExploreScreen'
 import ExploreProfileScreen from './screens/ExploreProfileScreen'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
@@ -229,7 +227,7 @@ export default function App() {
   // should open pre-filtered to. Cleared on that screen's back, so a later manual
   // open is not still filtered to a city the user has since left.
   const [cityWelcome, setCityWelcome] = useState(null)
-  const [beachesDistrict, setBeachesDistrict] = useState(null)
+  const [exploreBeachRegion, setExploreBeachRegion] = useState(null)
   const [eventsDistrict, setEventsDistrict] = useState(null)
   const [dutyRegion, setDutyRegion] = useState(null)
   const [detectedRegion, setDetectedRegion] = useState(null)
@@ -267,12 +265,12 @@ export default function App() {
   const [showPets, setShowPets] = useState(false)
   const [showHomeServices, setShowHomeServices] = useState(false)
   const [showJobPostings,  setShowJobPostings]  = useState(false)
-  const [showBeachesLandmarks, setShowBeachesLandmarks] = useState(false)
+  const [showExploreBeach, setShowExploreBeach] = useState(false)
   const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | (future preview keys). Admins never reach HomeScreen /
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
                                                                          // not a per-surface boolean.
-  const [selectedExplorePlace, setSelectedExplorePlace] = useState(null) // Explore profile drill-down — separate from selectedPlace (frozen beaches flow)
+  const [selectedExplorePlace, setSelectedExplorePlace] = useState(null) // Explore profile drill-down — sole place-profile state (frozen beaches flow removed in Slice 5 pt B)
   const [showTransport, setShowTransport] = useState(false)
   const [showInsurance, setShowInsurance] = useState(false)
   const [showLegal, setShowLegal] = useState(false)
@@ -282,7 +280,6 @@ export default function App() {
   const [showEsim, setShowEsim] = useState(false)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
-  const [selectedPlace,        setSelectedPlace]        = useState(null)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
   const [showGames, setShowGames] = useState(false)
   const [gamesSubScreen, setGamesSubScreen] = useState(null)
@@ -494,9 +491,8 @@ export default function App() {
       if (showStudentHub) { setShowStudentHub(false); return true }
       if (showEsim) { setShowEsim(false); return true }
       if (showLegal) { setShowLegal(false); return true }
-      if (selectedPlace)        { setSelectedPlace(null); return true }
-      if (showBeachesLandmarks) { setShowBeachesLandmarks(false); return true }
       if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
+      if (showExploreBeach)     { setShowExploreBeach(false); return true }
       if (adminPreview)         { setAdminPreview(null); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
@@ -507,7 +503,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showBeachesLandmarks, adminPreview, selectedExplorePlace, selectedPlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showExploreBeach, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -1064,16 +1060,14 @@ export default function App() {
     content = <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowEsim(false)} />
   } else if (showLegal) {
     content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
-  } else if (selectedPlace) {
-    content = <PlaceProfileScreen place={selectedPlace} lang={lang} onBack={() => setSelectedPlace(null)} />
-  } else if (showBeachesLandmarks) {
-    content = (
-      <BLErrorBoundary>
-        <BeachesLandmarksScreen lang={lang} onBack={() => { setShowBeachesLandmarks(false); setBeachesDistrict(null) }} userLocation={userLocation} onSelectPlace={setSelectedPlace} session={session} onRequireAccount={requireAccount} initialDistrict={beachesDistrict} />
-      </BLErrorBoundary>
-    )
   } else if (selectedExplorePlace) {
     content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} />
+  } else if (showExploreBeach) {
+    content = (
+      <BLErrorBoundary>
+        <ExploreScreen lang={lang} onBack={() => { setShowExploreBeach(false); setExploreBeachRegion(null) }} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} initialCategory="beach" initialRegion={exploreBeachRegion} />
+      </BLErrorBoundary>
+    )
   } else if (adminPreview === 'explore') {
     content = (
       <BLErrorBoundary>
@@ -1291,7 +1285,7 @@ export default function App() {
             onShowPets={() => setShowPets(true)}
             onShowHomeServices={() => setShowHomeServices(true)}
             onShowJobPostings={() => setShowJobPostings(true)}
-            onShowBeachesLandmarks={() => setShowBeachesLandmarks(true)}
+            onShowExploreBeach={() => setShowExploreBeach(true)}
             onShowTransport={() => setShowTransport(true)}
             onShowInsurance={() => setShowInsurance(true)}
             onShowGrooming={() => setShowGrooming(true)}
@@ -1301,7 +1295,7 @@ export default function App() {
             onShowEsim={() => setShowEsim(true)}
             onShowEmergency={() => setShowEmergencyModal(true)}
             onShowMunicipal={() => setShowMunicipalModal(true)}
-            onSelectPlace={setSelectedPlace}
+            onSelectExplorePlace={setSelectedExplorePlace}
             onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
             onShowExchangeRates={() => setShowExchangeRates(true)}
             onShowGames={() => setShowGames(true)}
@@ -1506,10 +1500,10 @@ export default function App() {
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowBeachesLandmarks(false); setShowTransport(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
-    setSelectedPlace(null); setShowNotifs(false)
+    setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
       case 'pharmacy':      setActiveTab('home'); setShowDutyList(true); break
       case 'clinic':        setActiveTab('home'); break
@@ -1519,7 +1513,7 @@ export default function App() {
       case 'accommodation': setShowAccommodation(true); break
       case 'pets':          setShowPets(true); break
       case 'transport':     setShowTransport(true); break
-      case 'beaches':       setShowBeachesLandmarks(true); break
+      case 'beaches':       setShowExploreBeach(true); break
       case 'exchange':      setShowExchangeRates(true); break
       case 'newcomer':      setShowNewcomerEssentials(true); break
       case 'municipal':     setShowMunicipalModal(true); break
@@ -1534,12 +1528,12 @@ export default function App() {
     setCityWelcome(null)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowBeachesLandmarks(false); setShowTransport(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
-    setSelectedPlace(null); setShowNotifs(false)
+    setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
-      case 'beaches': setBeachesDistrict(region); setShowBeachesLandmarks(true); break
+      case 'beaches': setExploreBeachRegion(region); setShowExploreBeach(true); break
       case 'events':  setEventsDistrict(region);  setShowEvents(true); break
       case 'duty':    setActiveTab('home'); setDutyRegion(region); setShowDutyList(true); break
     }

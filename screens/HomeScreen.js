@@ -106,7 +106,7 @@ export default function HomeScreen({
   onShowPets,
   onShowHomeServices,
   onShowJobPostings,
-  onShowBeachesLandmarks,
+  onShowExploreBeach,
   onShowTransport,
   onShowInsurance,
   onShowGrooming,
@@ -115,7 +115,7 @@ export default function HomeScreen({
   onShowEsim,
   onShowEmergency,
   onShowMunicipal,
-  onSelectPlace,
+  onSelectExplorePlace,
   onShowNewcomerEssentials,
   onShowExchangeRates,
   onShowGames,
@@ -167,14 +167,15 @@ export default function HomeScreen({
       case 'homeServices': onShowHomeServices(); break
       case 'transport':    onShowTransport(); break
       case 'jobPostings':  onShowJobPostings(); break
-      case 'beach': {
-        const { data } = await supabase.from('beaches').select('*').eq('id', result.id).maybeSingle()
-        if (data) onSelectPlace({ ...data, _type: 'beach' })
-        break
-      }
+      case 'beach':
       case 'landmark': {
-        const { data } = await supabase.from('landmarks').select('*').eq('id', result.id).maybeSingle()
-        if (data) onSelectPlace({ ...data, _type: 'landmark' })
+        // search_content still returns 'beach'/'landmark' (its arms are deferred to the DROP
+        // migration), but both resolve against `places` by their preserved UUID → ExploreProfileScreen.
+        // A miss (id not an active/visible place) is a graceful no-op, never a crash.
+        const { data } = await supabase.from('places')
+          .select('id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, blue_flag, access_type, amenities')
+          .eq('id', result.id).eq('status', 'active').maybeSingle()
+        if (data) onSelectExplorePlace(data)
         break
       }
     }
@@ -188,7 +189,7 @@ export default function HomeScreen({
     pets:               onShowPets,
     homeServices:       onShowHomeServices,
     jobPostings:        onShowJobPostings,
-    beaches:            onShowBeachesLandmarks,
+    beaches:            onShowExploreBeach,
     transport:          onShowTransport,
     insurance:          onShowInsurance,
     grooming:           onShowGrooming,

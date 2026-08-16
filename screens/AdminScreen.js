@@ -278,8 +278,7 @@ function DashboardTab({ onNavigate }) {
         { count: pendingTransport },
         { count: pendingInsurance },
         { count: pendingGrooming },
-        { count: pendingBeaches },
-        { count: pendingLandmarks },
+        { count: pendingPlacesCount },
         { count: pendingJobPostings },
         { count: pendingReports },
         { count: esimTotal },
@@ -301,15 +300,14 @@ function DashboardTab({ onNavigate }) {
         supabase.from('transport_providers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('insurance_companies').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('facilities').select('*', { count: 'exact', head: true }).eq('status', 'pending').eq('type', 'grooming'),
-        supabase.from('beaches').select('*',   { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('landmarks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('places').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('job_postings').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('content_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }),
         supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }).eq('audience', 'tourist'),
         supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }).eq('audience', 'student'),
       ])
-      const pendingPlaces = (pendingBeaches ?? 0) + (pendingLandmarks ?? 0)
+      const pendingPlaces = pendingPlacesCount ?? 0
       setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingReports, esimTotal, esimTourist, esimStudent })
     }
     load()
@@ -332,7 +330,7 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingTransport ?? 0)    > 0 && { label: 'Transport providers pending',      count: stats.pendingTransport,       tab: 'Transport',    color: colors.primary },
     (stats.pendingInsurance ?? 0)    > 0 && { label: 'Insurance companies pending',      count: stats.pendingInsurance,       tab: 'Insurance',    color: colors.primary },
     (stats.pendingGrooming ?? 0)     > 0 && { label: 'Grooming providers pending',       count: stats.pendingGrooming,        tab: 'Grooming',     color: colors.primary },
-    (stats.pendingPlaces ?? 0)       > 0 && { label: 'Beaches & landmarks to review',   count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
+    (stats.pendingPlaces ?? 0)       > 0 && { label: 'Places to review',                count: stats.pendingPlaces,          tab: 'Places',       color: placeColors.beach.text },
     (stats.pendingJobPostings ?? 0)  > 0 && { label: 'Job postings awaiting approval',  count: stats.pendingJobPostings,     tab: 'JobPostings',  color: colors.primary },
   ].filter(Boolean)
 
@@ -3487,33 +3485,17 @@ function PlacesTab() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const fetchTable = async (table, tag) => {
-      let q = supabase.from(table).select('id, name, district, status, rejection_reason, submitted_by, photo_urls, category, access_type, blue_flag').order('created_at', { ascending: false })
-      if (filter !== 'all') q = q.eq('status', filter)
-      const { data } = await q
-      return (data ?? []).map(r => ({ ...r, _type: tag }))
-    }
-    // The new places table. Normalize INTO the beaches-shaped fields the render reads
-    // (district←region, photo_urls←photos); the WRITE path stays typed via PLACE_TABLE.
-    const fetchPlaces = async () => {
-      let q = supabase.from('places')
-        .select('id, name, region, status, rejection_reason, submitted_by, photos, category, access_type, blue_flag, created_at')
-        .order('created_at', { ascending: false })
-      if (filter !== 'all') q = q.eq('status', filter)
-      const { data } = await q
-      return (data ?? []).map(r => ({ ...r, _type: 'place', district: r.region, photo_urls: r.photos }))
-    }
-    const [beaches, landmarks, places] = await Promise.all([
-      fetchTable('beaches',   'beach'),
-      fetchTable('landmarks', 'landmark'),
-      fetchPlaces(),
-    ])
-    // NOTE: backfilled rows keep their original UUIDs, so in the 'active'/'all' filters a
-    // backfilled place shows TWICE — once from beaches/landmarks, once from places (distinct
-    // _type keys, no React collision). Expected until Slice 5 drops the old tables. The
-    // 'pending' queue (the admin's real work) is dupe-free: new submissions live in one table.
-    setPlaces([...beaches, ...landmarks, ...places].sort((a, b) =>
-      placeAdminName(a).localeCompare(placeAdminName(b))))
+    // Places only. Normalize INTO the beaches-shaped fields the render reads (district←region,
+    // photo_urls←photos); the WRITE path stays typed via PLACE_TABLE. Slice 5 pt B dropped the
+    // beaches/landmarks sources — they duplicated every backfilled row. The old tables still
+    // exist (the DROP migration is separate/later); nothing writes to them anymore.
+    let q = supabase.from('places')
+      .select('id, name, region, status, rejection_reason, submitted_by, photos, category, access_type, blue_flag, created_at')
+      .order('created_at', { ascending: false })
+    if (filter !== 'all') q = q.eq('status', filter)
+    const { data } = await q
+    const places = (data ?? []).map(r => ({ ...r, _type: 'place', district: r.region, photo_urls: r.photos }))
+    setPlaces(places.sort((a, b) => placeAdminName(a).localeCompare(placeAdminName(b))))
     setLoading(false)
   }, [filter])
 
