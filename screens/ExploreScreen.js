@@ -386,10 +386,16 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
             </ScrollView>
           )}
 
-          {/* Region filter — DIAGNOSTIC: rendered as a plain flex-wrap View (NO horizontal
-              ScrollView), identical chip + chipText to the category ScrollView above. Tests
-              whether the horizontal ScrollView is what clips the glyphs. Revert after. */}
-          <View style={s.filterWrapRow}>
+          {/* Region filter — DIAGNOSTIC: ScrollView WITH removeClippedSubviews={false}. The
+              category ScrollView above keeps the RN default (control). Tests whether the
+              scroll-position clipping is removeClippedSubviews. Revert after. */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={s.filterRow}
+            removeClippedSubviews={false}
+          >
             <TouchableOpacity
               style={[s.chip, !region && s.chipActive]}
               onPress={() => setRegion(null)}
@@ -405,7 +411,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
                 <Text style={[s.chipText, region === r && s.chipTextActive]}>{regionLabel(r, lang)}</Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
 
           {/* List */}
           <FlatList
