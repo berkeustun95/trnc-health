@@ -93,7 +93,9 @@ WITH report AS (
     ('0808_facility_featured_tier','facilities','featured_requested_at'),
     ('0809_featured_expiry_reminder','facilities','featured_reminded_at'),
     ('0811_facilities_service_prices','facilities','service_prices'),
-    ('0812_module_waitlist','module_waitlist','notified_at')
+    ('0812_module_waitlist','module_waitlist','notified_at'),
+    ('0824_place_moderation','places','hidden_at'),
+    ('0824_place_moderation','places','hidden_reason')
   ) e(m,t,c)
 
   UNION ALL
@@ -151,7 +153,9 @@ WITH report AS (
     ('0810_change_request_content_filter','check_change_request_content'),
     ('0813_notify_module_waitlist','module_notif_text'),
     ('0813_notify_module_waitlist','notify_module_waitlist'),
-    ('0819_get_customer_contacts_rpc','get_customer_contacts')
+    ('0819_get_customer_contacts_rpc','get_customer_contacts'),
+    ('0824_place_moderation','check_place_content'),
+    ('0824_place_moderation','explore_category_counts')
   ) e(m,o)
 
   UNION ALL
@@ -186,7 +190,9 @@ WITH report AS (
     ('0810_change_request_content_filter','check_change_request_content'),
     ('0719_claim_evidence_and_guard','claim_requests_guard_insert'),
     ('facilities_guard(0718→0809)','facilities_guard_update'),
-    ('facilities_guard(0718→0731)','facilities_guard_insert')
+    ('facilities_guard(0718→0731)','facilities_guard_insert'),
+    ('0824_place_moderation','guard_place_moderation'),
+    ('0824_place_moderation','check_place_content')
   ) e(m,o)
 
   UNION ALL
@@ -272,7 +278,8 @@ WITH report AS (
     ('0803_grooming_owner_edit','update_grooming_facility'),
     ('0719_create_facility_claim_rpc','create_facility_claim'),
     ('0813_notify_module_waitlist','notify_module_waitlist'),
-    ('0819_get_customer_contacts_rpc','get_customer_contacts')
+    ('0819_get_customer_contacts_rpc','get_customer_contacts'),
+    ('0824_place_moderation','explore_category_counts')  -- also GRANTed to anon (public tile counts)
   ) e(m,o)
 
   UNION ALL
@@ -360,6 +367,17 @@ WITH report AS (
     UNION ALL SELECT '0821_drop_providers_read_customer','profiles over-share policy removed (providers use get_customer_contacts RPC)',
       NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles'
                 AND policyname='providers read customer push token')
+    UNION ALL SELECT '0824_place_moderation','content_reports_content_type_check admits place',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='content_reports_content_type_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%place%')
+    UNION ALL SELECT '0824_place_moderation','auto_hide_reported_content has place branch',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='auto_hide_reported_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE places%')
+    UNION ALL SELECT '0824_place_moderation','check_place_content reuses contains_payment_solicitation',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_place_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%contains_payment_solicitation%')
   ) z
 
   UNION ALL

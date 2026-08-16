@@ -383,9 +383,9 @@ function DashboardTab({ onNavigate }) {
 // publish a 24h removal commitment in the Terms).
 
 const REASON_LABELS  = { offensive: 'Offensive', harassment: 'Harassment', spam: 'Spam', false_info: 'False info', other: 'Other' }
-const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities' }
-const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id' }
-const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name' }
+const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places' }
+const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by' }
+const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name' }
 
 function timeAgo(iso) {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
@@ -415,7 +415,7 @@ function ReportsTab({ session }) {
     // type. It may be missing entirely — delete_own_account hard-deletes a user's
     // reviews, which leaves their reports dangling.
     const contentByKey = new Map()
-    for (const type of ['review', 'question', 'answer', 'facility']) {
+    for (const type of ['review', 'question', 'answer', 'facility', 'place']) {
       const ids = [...new Set(reports.filter(r => r.content_type === type).map(r => r.content_id))]
       if (!ids.length) continue
       const { data } = await supabase
@@ -471,7 +471,7 @@ function ReportsTab({ session }) {
     await resolveReports(g, 'actioned')
     // Facilities are HIDDEN (recoverable), not deleted — say so, matching the owner
     // "listing hidden" banner. review/question/answer keep the "removed" wording.
-    if (g.contentType === 'facility') {
+    if (g.contentType === 'facility' || g.contentType === 'place') {
       await notifyAuthor(g, 'notifListingHiddenTitle', 'notifListingHiddenBody')
     } else {
       await notifyAuthor(g, 'notifContentRemovedTitle', 'notifContentRemovedBody')
@@ -487,7 +487,7 @@ function ReportsTab({ session }) {
     await resolveReports(g, 'dismissed')
     // Only facilities get a restore push — the owner saw the "hidden" banner and
     // should learn it's back. review/question/answer restores stay silent (unchanged).
-    if (g.contentType === 'facility') {
+    if (g.contentType === 'facility' || g.contentType === 'place') {
       await notifyAuthor(g, 'notifListingVisibleTitle', 'notifListingVisibleBody')
     }
     setBusy(null); load()
@@ -593,7 +593,7 @@ function ReportsTab({ session }) {
                         <Text style={s.dangerGhostText}>Remove</Text>
                       </TouchableOpacity>
                   )}
-                  {!missing && g.contentType !== 'facility' && (
+                  {!missing && g.contentType !== 'facility' && g.contentType !== 'place' && (
                     <TouchableOpacity style={s.dangerGhostBtn} onPress={() => confirmBan(g)}>
                       <Text style={s.dangerGhostText}>Ban author</Text>
                     </TouchableOpacity>

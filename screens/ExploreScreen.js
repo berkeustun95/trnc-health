@@ -233,18 +233,26 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   const [region,      setRegion]      = useState(null)   // null = all regions
   const [view,        setView]        = useState('list') // 'list' | 'map'
   const [showSubmit,  setShowSubmit]  = useState(false)
+  const [rpcCatCounts, setRpcCatCounts] = useState(null)  // per-category counts (active incl. hidden) from the RPC; null → fall back to visible-set count
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const { data } = await supabase
-        .from('places').select('*').eq('status', 'active')
-      setPlaces((data || []).sort((a, b) =>
+      // Visible rows for the list (RLS-filtered — hidden rows drop out) + the tile-gating
+      // counts from the RPC (active INCLUDING hidden). If the RPC isn't there yet (OTA
+      // before 20260824 is applied), fall back to counting the visible set.
+      const [placesRes, countsRes] = await Promise.all([
+        supabase.from('places').select('*').eq('status', 'active'),
+        supabase.rpc('explore_category_counts'),
+      ])
+      setPlaces((placesRes.data || []).sort((a, b) =>
         placeName(a, 'en').localeCompare(placeName(b, 'en'))
       ))
+      setRpcCatCounts(countsRes.error ? null : (countsRes.data || []))
     } catch (err) {
       console.error('Explore load error:', err)
       setPlaces([])
+      setRpcCatCounts(null)
     } finally {
       setLoading(false)
     }
@@ -252,22 +260,35 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
 
   useEffect(() => { load() }, [load])
 
-  // Group counts over the fetched active set — the threshold gate reads these.
+  // Group counts for the tile threshold. Prefer the RPC (active INCLUDING hidden) so an
+  // auto-hidden/reported place still counts toward its group's tile — otherwise 3 reporters
+  // could push a group below 8 and vanish its tile for everyone. Falls back to the visible
+  // set if the RPC is unavailable (pre-migration OTA).
   const counts = useMemo(() => {
     const c = {}
-    for (const p of places) {
-      const g = categoryToGroup(p.category)
-      if (g) c[g] = (c[g] || 0) + 1
+    if (rpcCatCounts) {
+      for (const { category, n } of rpcCatCounts) {
+        const g = categoryToGroup(category)
+        if (g) c[g] = (c[g] || 0) + Number(n)
+      }
+    } else {
+      for (const p of places) {
+        const g = categoryToGroup(p.category)
+        if (g) c[g] = (c[g] || 0) + 1
+      }
     }
     return c
-  }, [places])
+  }, [rpcCatCounts, places])
 
   const visibleGroups = useMemo(
     () => GROUP_ORDER.filter(g => groupVisible(g, counts[g] || 0, isAdmin)),
     [counts, isAdmin]
   )
 
-  // Categories inside the active group that actually have rows (for the sub-filter chips).
+  // Categories inside the active group that have VISIBLE rows (for the sub-filter chips).
+  // Deliberately over the visible set, NOT the RPC counts (which include hidden): a chip
+  // must only appear for a category the user can actually see rows in — a category whose
+  // only rows are hidden would filter to an empty list.
   const groupCats = useMemo(() => {
     if (!activeGroup) return []
     const present = new Set(places.filter(p => categoryToGroup(p.category) === activeGroup).map(p => p.category))

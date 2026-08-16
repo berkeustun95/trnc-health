@@ -1073,7 +1073,7 @@ export default function App() {
       </BLErrorBoundary>
     )
   } else if (selectedExplorePlace) {
-    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} onBack={() => setSelectedExplorePlace(null)} />
+    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} />
   } else if (adminPreview === 'explore') {
     content = (
       <BLErrorBoundary>

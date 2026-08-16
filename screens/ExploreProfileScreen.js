@@ -9,6 +9,7 @@ import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { categoryToGroup, GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
+import ContentReportMenu from '../components/ContentReportMenu'
 
 const { width: W } = Dimensions.get('window')
 const GALLERY_H    = 280
@@ -41,7 +42,7 @@ function categoryLabel(category, lang) {
   return key ? t(key, lang) : category   // keyless categories: raw slug (admin-only today)
 }
 
-export default function ExploreProfileScreen({ place, lang, onBack }) {
+export default function ExploreProfileScreen({ place, lang, onBack, onRequireAccount }) {
   const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
 
@@ -109,6 +110,13 @@ export default function ExploreProfileScreen({ place, lang, onBack }) {
               <Ionicons name="location-outline" size={12} color={colors.primary} />
               <Text style={s.districtPillText}>{regionLabel(place.region, lang)}</Text>
             </View>
+            <ContentReportMenu
+              contentType="place"
+              contentId={place.id}
+              lang={lang}
+              onRequireAccount={onRequireAccount}
+              style={{ marginLeft: 'auto' }}
+            />
           </View>
 
           {/* Name */}
