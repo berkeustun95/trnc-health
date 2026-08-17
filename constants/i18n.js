@@ -1065,6 +1065,8 @@ const translations = {
     fxNoData: 'Rates unavailable', fxNoDataDetail: 'Could not load rates. Check your connection and try again.',
     fxRetry: 'Try again', fxSource: 'Source: KKTC Merkez Bankası',
     fxOfficialRate: 'Official rate', fxColBuy: 'Buy', fxColSell: 'Sell', fxCash: 'Cash', fxTransfer: 'Transfer', fxValidRange: 'Valid',
+    fxCalcTitle: 'Converter', fxCalcSwap: 'Swap direction',
+    fxCalcNote: 'Uses the buy rate when you change foreign currency into lira, and the sell rate when you buy foreign currency — the same way an exchange office does.',
 
     // Content moderation (report / block / filter)
     done: 'Done',
@@ -2177,6 +2179,10 @@ const translations = {
     fxNoData: 'Kurlar mevcut değil', fxNoDataDetail: 'Kurlar yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.',
     fxRetry: 'Tekrar dene', fxSource: 'Kaynak: KKTC Merkez Bankası',
     fxOfficialRate: 'Resmî kur', fxColBuy: 'Alış', fxColSell: 'Satış', fxCash: 'Nakit', fxTransfer: 'Havale', fxValidRange: 'Geçerli',
+    // No "i" on purpose: the card title is textTransform:'uppercase', and RN's
+    // transform is locale-unaware — "çevirici" would render as "ÇEVIRICI" (dotless).
+    fxCalcTitle: 'Kur hesaplama', fxCalcSwap: 'Yönü değiştir',
+    fxCalcNote: 'Yabancı parayı liraya çevirirken alış kurunu, yabancı para alırken satış kurunu kullanır — döviz büfesindeki gibi.',
 
     // İçerik denetimi (bildir / engelle / filtre)
     done: 'Tamam',
@@ -3023,6 +3029,8 @@ const translations = {
     fxNoData: 'الأسعار غير متوفرة', fxNoDataDetail: 'تعذّر تحميل الأسعار. تحقق من اتصالك وأعد المحاولة.',
     fxRetry: 'إعادة المحاولة', fxSource: 'المصدر: KKTC Merkez Bankası',
     fxOfficialRate: 'السعر الرسمي', fxColBuy: 'شراء', fxColSell: 'بيع', fxCash: 'نقدًا', fxTransfer: 'تحويل', fxValidRange: 'ساري',
+    fxCalcTitle: 'محوّل العملات', fxCalcSwap: 'عكس الاتجاه',
+    fxCalcNote: 'يستخدم سعر الشراء عند تحويل العملة الأجنبية إلى الليرة، وسعر البيع عند شراء العملة الأجنبية — تمامًا كما يفعل مكتب الصرافة.',
   },
   ru: {
     // Ask Oli guide
@@ -3821,6 +3829,8 @@ const translations = {
     fxNoData: 'Курсы недоступны', fxNoDataDetail: 'Не удалось загрузить курсы. Проверьте соединение и повторите.',
     fxRetry: 'Повторить', fxSource: 'Источник: KKTC Merkez Bankası',
     fxOfficialRate: 'Официальный курс', fxColBuy: 'Покупка', fxColSell: 'Продажа', fxCash: 'Наличные', fxTransfer: 'Перевод', fxValidRange: 'Действует',
+    fxCalcTitle: 'Конвертер', fxCalcSwap: 'Поменять направление',
+    fxCalcNote: 'Использует курс покупки, когда вы меняете валюту на лиры, и курс продажи, когда покупаете валюту — как в обменном пункте.',
   },
   el: {
     // Ask Oli guide
@@ -4619,6 +4629,8 @@ const translations = {
     fxNoData: 'Οι ισοτιμίες δεν είναι διαθέσιμες', fxNoDataDetail: 'Αδυναμία φόρτωσης ισοτιμιών. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.',
     fxRetry: 'Επανάληψη', fxSource: 'Πηγή: KKTC Merkez Bankası',
     fxOfficialRate: 'Επίσημη τιμή', fxColBuy: 'Αγορά', fxColSell: 'Πώληση', fxCash: 'Μετρητά', fxTransfer: 'Έμβασμα', fxValidRange: 'Ισχύει',
+    fxCalcTitle: 'Μετατροπέας', fxCalcSwap: 'Αντιστροφή κατεύθυνσης',
+    fxCalcNote: 'Χρησιμοποιεί την τιμή αγοράς όταν μετατρέπετε ξένο νόμισμα σε λίρες και την τιμή πώλησης όταν αγοράζετε ξένο νόμισμα — όπως ένα ανταλλακτήριο.',
   },
   fr: {
     // Ask Oli guide
@@ -5417,6 +5429,8 @@ const translations = {
     fxNoData: 'Taux indisponibles', fxNoDataDetail: 'Impossible de charger les taux. Vérifiez votre connexion et réessayez.',
     fxRetry: 'Réessayer', fxSource: 'Source : KKTC Merkez Bankası',
     fxOfficialRate: 'Taux officiel', fxColBuy: 'Achat', fxColSell: 'Vente', fxCash: 'Espèces', fxTransfer: 'Virement', fxValidRange: 'Valable',
+    fxCalcTitle: 'Convertisseur', fxCalcSwap: 'Inverser le sens',
+    fxCalcNote: 'Utilise le taux d’achat lorsque vous convertissez des devises en livres, et le taux de vente lorsque vous achetez des devises — comme un bureau de change.',
   },
   es: {
     // Ask Oli guide
@@ -6215,6 +6229,8 @@ const translations = {
     fxNoData: 'Tipos no disponibles', fxNoDataDetail: 'No se pudieron cargar los tipos. Comprueba tu conexión e inténtalo de nuevo.',
     fxRetry: 'Reintentar', fxSource: 'Fuente: KKTC Merkez Bankası',
     fxOfficialRate: 'Tipo oficial', fxColBuy: 'Compra', fxColSell: 'Venta', fxCash: 'Efectivo', fxTransfer: 'Transferencia', fxValidRange: 'Válido',
+    fxCalcTitle: 'Conversor', fxCalcSwap: 'Invertir el sentido',
+    fxCalcNote: 'Usa el tipo de compra cuando cambias divisa a liras y el tipo de venta cuando compras divisa — igual que una casa de cambio.',
   },
   de: {
     // Ask Oli guide
@@ -7013,6 +7029,8 @@ const translations = {
     fxNoData: 'Kurse nicht verfügbar', fxNoDataDetail: 'Kurse konnten nicht geladen werden. Verbindung prüfen und erneut versuchen.',
     fxRetry: 'Wiederholen', fxSource: 'Quelle: KKTC Merkez Bankası',
     fxOfficialRate: 'Offizieller Kurs', fxColBuy: 'Ankauf', fxColSell: 'Verkauf', fxCash: 'Bargeld', fxTransfer: 'Überweisung', fxValidRange: 'Gültig',
+    fxCalcTitle: 'Umrechner', fxCalcSwap: 'Richtung tauschen',
+    fxCalcNote: 'Verwendet den Ankaufskurs, wenn Sie Fremdwährung in Lira wechseln, und den Verkaufskurs, wenn Sie Fremdwährung kaufen — genau wie eine Wechselstube.',
   },
   fa: {
     // Ask Oli guide
@@ -7811,6 +7829,8 @@ const translations = {
     fxNoData: 'نرخ‌ها در دسترس نیستند', fxNoDataDetail: 'بارگذاری نرخ‌ها ناموفق بود. اتصال را بررسی کرده و دوباره امتحان کنید.',
     fxRetry: 'تلاش مجدد', fxSource: 'منبع: KKTC Merkez Bankası',
     fxOfficialRate: 'نرخ رسمی', fxColBuy: 'خرید', fxColSell: 'فروش', fxCash: 'نقدی', fxTransfer: 'حواله', fxValidRange: 'معتبر',
+    fxCalcTitle: 'مبدل ارز', fxCalcSwap: 'تعویض جهت',
+    fxCalcNote: 'هنگام تبدیل ارز خارجی به لیر از نرخ خرید و هنگام خرید ارز خارجی از نرخ فروش استفاده می‌کند — درست مانند یک صرافی.',
   },
 }
 

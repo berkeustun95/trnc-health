@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  View, Text, TouchableOpacity, ActivityIndicator, ScrollView, StyleSheet,
+  View, Text, TouchableOpacity, ActivityIndicator, ScrollView, StyleSheet, TextInput,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -34,6 +34,7 @@ const PAIRS = [
   { code: 'EUR', flag: '🇪🇺' },
 ]
 const WANTED = PAIRS.map(p => p.code)
+const TRY_PAIR = { code: 'TRY', flag: '🇹🇷' }
 
 function tag(xml, name) {
   const m = xml.match(new RegExp(`<${name}>([^<]*)</${name}>`))
@@ -71,6 +72,34 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
+// ─── Converter helpers ───────────────────────────────────────────────────────
+// A decimal-pad shows "," on Turkish/European devices and "." on others, so both
+// arrive here; normalise to "." and keep only the first one.
+function sanitizeAmount(raw) {
+  let v = raw.replace(/,/g, '.').replace(/[^0-9.]/g, '')
+  const first = v.indexOf('.')
+  if (first !== -1) v = v.slice(0, first + 1) + v.slice(first + 1).replace(/\./g, '')
+  // 7 integer digits is the cap: the result line is numberOfLines={1}, and past
+  // ~10M the converted lira value stops fitting the row and would silently clip.
+  const [int, dec] = v.split('.')
+  return dec === undefined ? int.slice(0, 7) : `${int.slice(0, 7)}.${dec.slice(0, 2)}`
+}
+
+// Dot decimal + comma grouping in every language, deliberately: the rates table
+// directly below is not localised either, and two number conventions on one
+// screen read as a bug.
+function formatMoney(n) {
+  const [int, dec] = n.toFixed(2).split('.')
+  return `${int.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${dec}`
+}
+
+// The maths uses the feed's full precision, so the "1 USD = …" line must show it
+// too — rounded to the table's 2 dp, a user checking by hand would find the
+// result off. Trailing zeros trimmed below 4 dp, never below 2.
+function formatRate(n) {
+  return n.toFixed(4).replace(/(\.\d{2}\d*?)0+$/, '$1')
+}
+
 async function fetchKktcFx() {
   const resp = await fetch(FX_URL)
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
@@ -86,6 +115,9 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
   const [loading, setLoading]         = useState(true)
   const [fetchFailed, setFetchFailed] = useState(false)
   const [mode, setMode]               = useState('efektif') // 'efektif' (cash) | 'doviz' (transfer)
+  const [calcCurrency, setCalcCurrency] = useState('USD')
+  const [calcDir, setCalcDir]           = useState('toTry')  // 'toTry' | 'toForeign'
+  const [amount, setAmount]             = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -148,6 +180,29 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
     return { buy: fmt(buy), sell: fmt(sell) }
   }
 
+  // An exchange office BUYS the foreign currency you hand over (alış) and SELLS
+  // it to you when you pay in lira (satış) — so direction picks the rate, and the
+  // cash/transfer toggle above picks the column. Computed from the raw feed
+  // values, never the 2-dp strings the table renders.
+  const calcPair = PAIRS.find(p => p.code === calcCurrency)
+  const calcRow  = cacheData?.rates?.[calcCurrency]
+  const calcRate = calcDir === 'toTry'
+    ? (mode === 'efektif' ? calcRow?.efektifAlis  : calcRow?.dovizAlis)
+    : (mode === 'efektif' ? calcRow?.efektifSatis : calcRow?.dovizSatis)
+  const calcAmt = parseFloat(amount)
+  const calcResult = (!Number.isFinite(calcAmt) || !calcRate)
+    ? null
+    : (calcDir === 'toTry' ? calcAmt * calcRate : calcAmt / calcRate)
+  const fromPair = calcDir === 'toTry' ? calcPair : TRY_PAIR
+  const toPair   = calcDir === 'toTry' ? TRY_PAIR : calcPair
+
+  // Carry the plain fixed-point value, NOT formatMoney() — its thousands commas
+  // would be re-read as decimal separators by sanitizeAmount.
+  function swapDirection() {
+    setAmount(calcResult == null ? '' : calcResult.toFixed(2))
+    setCalcDir(d => (d === 'toTry' ? 'toForeign' : 'toTry'))
+  }
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="exchange_rates" />
@@ -187,6 +242,7 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
           style={s.body}
           contentContainerStyle={s.bodyContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {isStale && (
             <View style={s.offlineBanner}>
@@ -218,6 +274,72 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
             >
               <Text style={[s.toggleText, mode === 'doviz' && s.toggleTextActive]}>{t('fxTransfer', lang)}</Text>
             </TouchableOpacity>
+          </View>
+
+          <View style={s.calcCard}>
+            <Text style={s.calcTitle}>{t('fxCalcTitle', lang)}</Text>
+
+            <View style={s.calcChipRow}>
+              {PAIRS.map(pair => (
+                <TouchableOpacity
+                  key={pair.code}
+                  style={[s.calcChip, calcCurrency === pair.code && s.calcChipActive]}
+                  onPress={() => setCalcCurrency(pair.code)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.calcChipFlag}>{pair.flag}</Text>
+                  <Text style={[s.calcChipText, calcCurrency === pair.code && s.calcChipTextActive]}>
+                    {pair.code}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={s.calcField}>
+              <View style={s.calcFieldCurr}>
+                <Text style={s.calcFieldFlag}>{fromPair.flag}</Text>
+                <Text style={s.calcFieldCode}>{fromPair.code}</Text>
+              </View>
+              <TextInput
+                style={s.calcInput}
+                value={amount}
+                onChangeText={v => setAmount(sanitizeAmount(v))}
+                keyboardType="decimal-pad"
+                inputMode="decimal"
+                placeholder="0"
+                placeholderTextColor={colors.textSecondary}
+                selectTextOnFocus
+              />
+            </View>
+
+            <View style={s.calcSwapRow}>
+              <TouchableOpacity
+                style={s.calcSwapBtn}
+                onPress={swapDirection}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={t('fxCalcSwap', lang)}
+              >
+                <Ionicons name="swap-vertical" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[s.calcField, s.calcFieldResult]}>
+              <View style={s.calcFieldCurr}>
+                <Text style={s.calcFieldFlag}>{toPair.flag}</Text>
+                <Text style={s.calcFieldCode}>{toPair.code}</Text>
+              </View>
+              <Text style={s.calcResultValue} numberOfLines={1}>
+                {calcResult == null ? '—' : formatMoney(calcResult)}
+              </Text>
+            </View>
+
+            {calcRate ? (
+              <Text style={s.calcRateLine}>
+                {`1 ${calcCurrency} = ${formatRate(calcRate)} ₺ · ${t(calcDir === 'toTry' ? 'fxColBuy' : 'fxColSell', lang)}`}
+              </Text>
+            ) : null}
+            <Text style={s.calcNote}>{t('fxCalcNote', lang)}</Text>
           </View>
 
           <View style={s.ratesCard}>
@@ -390,6 +512,122 @@ const s = StyleSheet.create({
   },
   toggleTextActive: {
     color: colors.primary,
+  },
+  calcCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    padding: 16,
+    marginBottom: 16,
+    ...shadow,
+  },
+  calcTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 12,
+  },
+  calcChipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  calcChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: 'transparent',   // Android: radius+border can paint an opaque box
+  },
+  calcChipActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  calcChipFlag: { fontSize: 16 },
+  calcChipText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  calcChipTextActive: {
+    color: colors.primary,
+  },
+  calcField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.bg,
+  },
+  calcFieldResult: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  calcFieldCurr: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 78,
+  },
+  calcFieldFlag: { fontSize: 22 },
+  calcFieldCode: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  calcInput: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    padding: 0,
+    fontVariant: ['tabular-nums'],
+  },
+  calcResultValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.primary,
+    fontVariant: ['tabular-nums'],
+  },
+  calcSwapRow: {
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  calcSwapBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  calcRateLine: {
+    marginTop: 12,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
+  calcNote: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 17,
   },
   ratesCard: {
     backgroundColor: colors.surface,
