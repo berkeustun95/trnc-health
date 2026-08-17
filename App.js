@@ -1063,7 +1063,7 @@ export default function App() {
   } else if (showLegal) {
     content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
   } else if (selectedExplorePlace) {
-    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} />
+    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} />
   } else if (showExploreBeach) {
     content = (
       <BLErrorBoundary>

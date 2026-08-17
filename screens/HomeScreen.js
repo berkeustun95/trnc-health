@@ -175,7 +175,7 @@ export default function HomeScreen({
         // migration), but both resolve against `places` by their preserved UUID → ExploreProfileScreen.
         // A miss (id not an active/visible place) is a graceful no-op, never a crash.
         const { data } = await supabase.from('places')
-          .select('id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, blue_flag, access_type, amenities')
+          .select('id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, blue_flag, access_type, amenities, provider_id, featured_until')
           .eq('id', result.id).eq('status', 'active').maybeSingle()
         if (data) onSelectExplorePlace(data)
         break

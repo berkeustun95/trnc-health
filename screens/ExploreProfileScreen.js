@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, FlatList, Dimensions, Linking,
+  Image, FlatList, Dimensions, Linking, Modal, TextInput, ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { categoryToGroup, GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
+import { EXPLORE_FEATURED_LIVE } from '../constants/flags'
+import { isFeatured } from '../utils/featured'
 import ContentReportMenu from '../components/ContentReportMenu'
 
 const { width: W } = Dimensions.get('window')
@@ -42,7 +45,7 @@ function categoryLabel(category, lang) {
   return key ? t(key, lang) : category   // keyless categories: raw slug (admin-only today)
 }
 
-export default function ExploreProfileScreen({ place, lang, onBack, onRequireAccount }) {
+export default function ExploreProfileScreen({ place, lang, session, onBack, onRequireAccount }) {
   const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
 
@@ -51,8 +54,51 @@ export default function ExploreProfileScreen({ place, lang, onBack, onRequireAcc
   const isBeach = place.category === 'beach'
   const photos  = place.photos || []
 
+  // Owner affordances. provider_id is threaded via BROWSE_COLS (D1). featured_requested_at is
+  // deliberately NOT in the browse select (anti-steering), so "already requested" isn't shown —
+  // request_featured_place is idempotent, so a repeat tap is a silent no-op server-side.
+  const uid         = session?.user?.id
+  const isOwner     = !!uid && place.provider_id === uid
+  const isUnclaimed = place.provider_id == null
+  const featuredNow = isFeatured(place)
+
+  const [claimOpen, setClaimOpen] = useState(false)
+  const [claimNote, setClaimNote] = useState('')
+  const [claimBusy, setClaimBusy] = useState(false)
+  const [claimErr,  setClaimErr]  = useState(null)
+  const [claimed,   setClaimed]   = useState(false)   // local: submitted this session
+  const [featBusy,  setFeatBusy]  = useState(false)
+  const [featSent,  setFeatSent]  = useState(false)
+
+  const showClaim   = isUnclaimed && !claimed
+  const showFeature = isOwner && EXPLORE_FEATURED_LIVE && !featuredNow && !featSent
+
   function openDirections() {
     Linking.openURL(`https://maps.google.com/?q=${place.latitude},${place.longitude}`)
+  }
+
+  function startClaim() {
+    if (onRequireAccount?.('gatePlaceClaim')) return   // real account required (blocks guests)
+    setClaimErr(null); setClaimNote(''); setClaimOpen(true)
+  }
+
+  async function submitClaim() {
+    setClaimBusy(true); setClaimErr(null)
+    const { error } = await supabase.from('place_claims').insert({
+      place_id: place.id,
+      requester_id: uid,
+      evidence_note: claimNote.trim() || null,
+    })
+    setClaimBusy(false)
+    if (error) { setClaimErr(t('exploreClaimErr', lang)); return }   // guard: already claimed / dup pending
+    setClaimOpen(false); setClaimed(true)
+  }
+
+  async function requestFeatured() {
+    setFeatBusy(true)
+    const { error } = await supabase.rpc('request_featured_place', { p_place_id: place.id })
+    setFeatBusy(false)
+    if (!error) setFeatSent(true)
   }
 
   return (
@@ -161,6 +207,41 @@ export default function ExploreProfileScreen({ place, lang, onBack, onRequireAcc
               </View>
             </View>
           )}
+
+          {/* Owner affordances — claim (unclaimed) / request featured (owner, dark) */}
+          {showClaim && (
+            <View style={s.ownerCard}>
+              <Text style={s.ownerCardTitle}>{t('exploreClaimTitle', lang)}</Text>
+              <TouchableOpacity style={s.claimBtn} onPress={startClaim} activeOpacity={0.85}>
+                <Ionicons name="ribbon-outline" size={17} color={colors.primary} />
+                <Text style={s.claimBtnText}>{t('exploreClaimCta', lang)}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {claimed && (
+            <View style={s.ownerNotice}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={s.ownerNoticeText}>{t('exploreClaimDone', lang)}</Text>
+            </View>
+          )}
+
+          {showFeature && (
+            <View style={s.ownerCard}>
+              <Text style={s.ownerCardTitle}>{t('exploreFeatureTitle', lang)}</Text>
+              <Text style={s.ownerCardBody}>{t('exploreFeatureBody', lang)}</Text>
+              <TouchableOpacity style={s.featBtn} onPress={requestFeatured} activeOpacity={0.85} disabled={featBusy}>
+                {featBusy
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={s.featBtnText}>{t('exploreFeatureCta', lang)}</Text>}
+              </TouchableOpacity>
+            </View>
+          )}
+          {featSent && (
+            <View style={s.ownerNotice}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={s.ownerNoticeText}>{t('exploreFeatureDone', lang)}</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -173,6 +254,35 @@ export default function ExploreProfileScreen({ place, lang, onBack, onRequireAcc
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Claim modal — optional evidence note → insert place_claims (guard: unclaimed + no dup) */}
+      <Modal visible={claimOpen} transparent animationType="fade" onRequestClose={() => setClaimOpen(false)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>{t('exploreClaimCta', lang)}</Text>
+            <Text style={s.modalLabel}>{t('exploreClaimNoteLabel', lang)}</Text>
+            <TextInput
+              style={s.modalInput}
+              value={claimNote}
+              onChangeText={setClaimNote}
+              placeholder={t('exploreClaimNotePlaceholder', lang)}
+              placeholderTextColor={colors.textSecondary}
+              multiline
+            />
+            {claimErr && <Text style={s.modalErr}>{claimErr}</Text>}
+            <View style={s.modalBtnRow}>
+              <TouchableOpacity style={s.modalCancel} onPress={() => setClaimOpen(false)} disabled={claimBusy}>
+                <Text style={s.modalCancelText}>{t('cancel', lang)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.modalSubmit} onPress={submitClaim} disabled={claimBusy} activeOpacity={0.85}>
+                {claimBusy
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={s.modalSubmitText}>{t('exploreClaimSubmit', lang)}</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -240,4 +350,37 @@ const s = StyleSheet.create({
                    paddingVertical: 15, flexDirection: 'row',
                    alignItems: 'center', justifyContent: 'center', gap: 8 },
   directionsBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+
+  // Owner affordances (claim / featured)
+  ownerCard:      { backgroundColor: colors.cardBg, borderRadius: radius.card, borderWidth: 1,
+                    borderColor: colors.border, padding: 16, marginBottom: 16, ...shadow },
+  ownerCardTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
+  ownerCardBody:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+                    lineHeight: 19, marginBottom: 12 },
+  claimBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    backgroundColor: colors.primaryLight, borderRadius: radius.md, paddingVertical: 13 },
+  claimBtnText:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
+  featBtn:        { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 13,
+                    alignItems: 'center', justifyContent: 'center' },
+  featBtnText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+  ownerNotice:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.bg,
+                    borderRadius: radius.md, padding: 14, marginBottom: 16 },
+  ownerNoticeText:{ flex: 1, fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+
+  // Claim modal
+  modalOverlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 },
+  modalCard:      { backgroundColor: colors.cardBg, borderRadius: 20, padding: 20, ...shadow },
+  modalTitle:     { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 12 },
+  modalLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 8 },
+  modalInput:     { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12,
+                    fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary,
+                    minHeight: 72, textAlignVertical: 'top', backgroundColor: colors.bg },
+  modalErr:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger, marginTop: 10 },
+  modalBtnRow:    { flexDirection: 'row', gap: 10, marginTop: 16 },
+  modalCancel:    { flex: 1, borderRadius: radius.md, paddingVertical: 13, alignItems: 'center',
+                    borderWidth: 1.5, borderColor: colors.border },
+  modalCancelText:{ fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  modalSubmit:    { flex: 1.4, borderRadius: radius.md, paddingVertical: 13, alignItems: 'center',
+                    justifyContent: 'center', backgroundColor: colors.primary },
+  modalSubmitText:{ fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
 })

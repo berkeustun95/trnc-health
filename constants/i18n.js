@@ -821,6 +821,12 @@ const translations = {
     blCatMonument: 'Monument', blCatNatureScenic: 'Nature & Scenic',
     // Explore module (Slice 5)
     exploreTitle: 'Explore', menuExplore: 'Explore', menuBeaches: 'Beaches',
+    // Explore owner CTAs (Slice 5 D1)
+    gatePlaceClaim: 'Create a free account to claim a place.',
+    exploreClaimTitle: 'Own this place?', exploreClaimCta: 'Claim this place',
+    exploreClaimNoteLabel: 'How are you connected to this place? (optional)', exploreClaimNotePlaceholder: 'e.g. owner or manager', exploreClaimSubmit: 'Submit claim',
+    exploreClaimDone: 'Claim submitted — we will review it.', exploreClaimErr: 'Could not submit — this place may already be claimed.',
+    exploreFeatureTitle: 'Feature this place', exploreFeatureBody: 'Pin it to the top with a Featured badge. We will be in touch to set it up.', exploreFeatureCta: 'Request featured', exploreFeatureDone: 'Featured request sent — we will be in touch.',
     exploreGroupNature: 'Nature', exploreGroupHeritage: 'Heritage', exploreGroupEatDrink: 'Eat & Drink', exploreGroupActive: 'Active', exploreGroupServices: 'Services',
     exploreCatCafe: 'Café', exploreCatRestaurant: 'Restaurant', exploreCatBakery: 'Bakery', exploreCatGym: 'Gym', exploreCatSportsFacility: 'Sports Facility', exploreCatPool: 'Pool', exploreCatBarber: 'Barber', exploreCatPrintShop: 'Print Shop', exploreCatLaundry: 'Laundry',
     pinTitle: 'Pin Your Location', pinHint: 'Tap the map or drag the pin to position it exactly.', pinFinding: 'Finding…', pinMyLocation: 'My location', pinConfirm: 'Confirm Pin',
@@ -1872,6 +1878,12 @@ const translations = {
     blCatMonument: 'Anıt', blCatNatureScenic: 'Doğa & Manzara',
     // Explore module (Slice 5)
     exploreTitle: 'Keşfet', menuExplore: 'Keşfet', menuBeaches: 'Plajlar',
+    // Explore owner CTAs (Slice 5 D1)
+    gatePlaceClaim: 'Bir yeri sahiplenmek için ücretsiz hesap oluşturun.',
+    exploreClaimTitle: 'Buranın sahibi misiniz?', exploreClaimCta: 'Bu yeri sahiplen',
+    exploreClaimNoteLabel: 'Bu yerle bağlantınız nedir? (isteğe bağlı)', exploreClaimNotePlaceholder: 'örn. sahibi veya yöneticisi', exploreClaimSubmit: 'Talebi gönder',
+    exploreClaimDone: 'Talep gönderildi — inceleyeceğiz.', exploreClaimErr: 'Gönderilemedi — bu yer zaten sahiplenilmiş olabilir.',
+    exploreFeatureTitle: 'Bu yeri öne çıkar', exploreFeatureBody: 'Öne Çıkan rozetiyle en üste sabitlensin. Ayarlamak için sizinle iletişime geçeceğiz.', exploreFeatureCta: 'Öne çıkarma talep et', exploreFeatureDone: 'Öne çıkarma talebi gönderildi — sizinle iletişime geçeceğiz.',
     exploreGroupNature: 'Doğa', exploreGroupHeritage: 'Kültürel Miras', exploreGroupEatDrink: 'Yeme & İçme', exploreGroupActive: 'Spor & Aktivite', exploreGroupServices: 'Hizmetler',
     exploreCatCafe: 'Kafe', exploreCatRestaurant: 'Restoran', exploreCatBakery: 'Fırın', exploreCatGym: 'Spor Salonu', exploreCatSportsFacility: 'Spor Tesisi', exploreCatPool: 'Havuz', exploreCatBarber: 'Berber', exploreCatPrintShop: 'Baskı & Fotokopi', exploreCatLaundry: 'Çamaşırhane',
     pinTitle: 'Konumunu Sabitle', pinHint: 'Haritaya dokun veya iğneyi sürükleyerek tam konumu belirle.', pinFinding: 'Bulunuyor…', pinMyLocation: 'Konumum', pinConfirm: 'Konumu Onayla',
@@ -2700,6 +2712,12 @@ const translations = {
     blCatMonument: 'نصب تذكاري', blCatNatureScenic: 'طبيعة ومناظر',
     // Explore module (Slice 5)
     exploreTitle: 'استكشاف', menuExplore: 'استكشاف', menuBeaches: 'الشواطئ',
+    // Explore owner CTAs (Slice 5 D1)
+    gatePlaceClaim: 'أنشئ حسابًا مجانيًا للمطالبة بملكية مكان.',
+    exploreClaimTitle: 'هل تملك هذا المكان؟', exploreClaimCta: 'المطالبة بهذا المكان',
+    exploreClaimNoteLabel: 'ما علاقتك بهذا المكان؟ (اختياري)', exploreClaimNotePlaceholder: 'مثال: المالك أو المدير', exploreClaimSubmit: 'إرسال الطلب',
+    exploreClaimDone: 'تم إرسال الطلب — سنراجعه.', exploreClaimErr: 'تعذّر الإرسال — قد يكون هذا المكان مُطالبًا به بالفعل.',
+    exploreFeatureTitle: 'ميّز هذا المكان', exploreFeatureBody: 'ثبّته في الأعلى بشارة «مميّز». سنتواصل معك لإعداده.', exploreFeatureCta: 'طلب التمييز', exploreFeatureDone: 'تم إرسال طلب التمييز — سنتواصل معك.',
     exploreGroupNature: 'الطبيعة', exploreGroupHeritage: 'التراث', exploreGroupEatDrink: 'مأكولات ومشروبات', exploreGroupActive: 'رياضة ونشاط', exploreGroupServices: 'خدمات',
     exploreCatCafe: 'مقهى', exploreCatRestaurant: 'مطعم', exploreCatBakery: 'مخبز', exploreCatGym: 'صالة رياضية', exploreCatSportsFacility: 'منشأة رياضية', exploreCatPool: 'مسبح', exploreCatBarber: 'حلاق', exploreCatPrintShop: 'مطبعة', exploreCatLaundry: 'مغسلة',
     pinTitle: 'حدد موقعك', pinHint: 'انقر على الخريطة أو اسحب الدبوس لتحديد الموقع بدقة.', pinFinding: 'جارٍ التحديد…', pinMyLocation: 'موقعي', pinConfirm: 'تأكيد الموقع',
@@ -3487,6 +3505,12 @@ const translations = {
     blCatMonument: 'Памятник', blCatNatureScenic: 'Природа и пейзажи',
     // Explore module (Slice 5)
     exploreTitle: 'Обзор', menuExplore: 'Обзор', menuBeaches: 'Пляжи',
+    // Explore owner CTAs (Slice 5 D1)
+    gatePlaceClaim: 'Создайте бесплатный аккаунт, чтобы заявить права на место.',
+    exploreClaimTitle: 'Это ваше место?', exploreClaimCta: 'Заявить права на место',
+    exploreClaimNoteLabel: 'Как вы связаны с этим местом? (необязательно)', exploreClaimNotePlaceholder: 'напр. владелец или управляющий', exploreClaimSubmit: 'Отправить заявку',
+    exploreClaimDone: 'Заявка отправлена — мы её рассмотрим.', exploreClaimErr: 'Не удалось отправить — возможно, место уже занято.',
+    exploreFeatureTitle: 'Выделить это место', exploreFeatureBody: 'Закрепите его вверху со значком «Рекомендуемое». Мы свяжемся с вами для настройки.', exploreFeatureCta: 'Запросить продвижение', exploreFeatureDone: 'Запрос отправлен — мы свяжемся с вами.',
     exploreGroupNature: 'Природа', exploreGroupHeritage: 'Наследие', exploreGroupEatDrink: 'Еда и напитки', exploreGroupActive: 'Спорт и активность', exploreGroupServices: 'Услуги',
     exploreCatCafe: 'Кафе', exploreCatRestaurant: 'Ресторан', exploreCatBakery: 'Пекарня', exploreCatGym: 'Спортзал', exploreCatSportsFacility: 'Спортивный объект', exploreCatPool: 'Бассейн', exploreCatBarber: 'Парикмахерская', exploreCatPrintShop: 'Типография', exploreCatLaundry: 'Прачечная',
     pinTitle: 'Укажите местоположение', pinHint: 'Нажмите на карту или перетащите маркер для точного размещения.', pinFinding: 'Определение…', pinMyLocation: 'Моё местоположение', pinConfirm: 'Подтвердить',
@@ -4274,6 +4298,12 @@ const translations = {
     blCatMonument: 'Μνημείο', blCatNatureScenic: 'Φύση & Τοπίο',
     // Explore module (Slice 5)
     exploreTitle: 'Εξερεύνηση', menuExplore: 'Εξερεύνηση', menuBeaches: 'Παραλίες',
+    // Explore owner CTAs (Slice 5 D1)
+    gatePlaceClaim: 'Δημιουργήστε δωρεάν λογαριασμό για να διεκδικήσετε ένα μέρος.',
+    exploreClaimTitle: 'Δικό σας αυτό το μέρος;', exploreClaimCta: 'Διεκδίκηση αυτού του μέρους',
+    exploreClaimNoteLabel: 'Ποια είναι η σχέση σας με το μέρος; (προαιρετικό)', exploreClaimNotePlaceholder: 'π.χ. ιδιοκτήτης ή διαχειριστής', exploreClaimSubmit: 'Υποβολή αιτήματος',
+    exploreClaimDone: 'Το αίτημα υποβλήθηκε — θα το εξετάσουμε.', exploreClaimErr: 'Η υποβολή απέτυχε — το μέρος ίσως έχει ήδη διεκδικηθεί.',
+    exploreFeatureTitle: 'Προβολή αυτού του μέρους', exploreFeatureBody: 'Καρφιτσώστε το στην κορυφή με σήμα «Προβεβλημένο». Θα επικοινωνήσουμε μαζί σας.', exploreFeatureCta: 'Αίτημα προβολής', exploreFeatureDone: 'Το αίτημα προβολής στάλθηκε — θα επικοινωνήσουμε μαζί σας.',
     exploreGroupNature: 'Φύση', exploreGroupHeritage: 'Κληρονομιά', exploreGroupEatDrink: 'Φαγητό & Ποτό', exploreGroupActive: 'Άθληση & Δραστηριότητες', exploreGroupServices: 'Υπηρεσίες',
     exploreCatCafe: 'Καφέ', exploreCatRestaurant: 'Εστιατόριο', exploreCatBakery: 'Φούρνος', exploreCatGym: 'Γυμναστήριο', exploreCatSportsFacility: 'Αθλητική εγκατάσταση', exploreCatPool: 'Πισίνα', exploreCatBarber: 'Κουρείο', exploreCatPrintShop: 'Τυπογραφείο', exploreCatLaundry: 'Πλυντήριο',
     pinTitle: 'Καρφιτσώστε την τοποθεσία σας', pinHint: 'Πατήστε στον χάρτη ή σύρετε την πινέζα για ακριβή τοποθέτηση.', pinFinding: 'Εντοπισμός…', pinMyLocation: 'Η τοποθεσία μου', pinConfirm: 'Επιβεβαίωση',
@@ -5061,6 +5091,12 @@ const translations = {
     blCatMonument: 'Monument', blCatNatureScenic: 'Nature & Paysage',
     // Explore module (Slice 5)
     exploreTitle: 'Explorer', menuExplore: 'Explorer', menuBeaches: 'Plages',
+    // Explore owner CTAs (Slice 5 D1)
+    gatePlaceClaim: 'Créez un compte gratuit pour revendiquer un lieu.',
+    exploreClaimTitle: 'Vous gérez ce lieu ?', exploreClaimCta: 'Revendiquer ce lieu',
+    exploreClaimNoteLabel: 'Quel est votre lien avec ce lieu ? (facultatif)', exploreClaimNotePlaceholder: 'ex. propriétaire ou gérant', exploreClaimSubmit: 'Envoyer la demande',
+    exploreClaimDone: 'Demande envoyée — nous allons la vérifier.', exploreClaimErr: 'Envoi impossible — ce lieu est peut-être déjà revendiqué.',
+    exploreFeatureTitle: 'Mettre ce lieu en avant', exploreFeatureBody: 'Épinglez-le en haut avec un badge « En vedette ». Nous vous recontacterons pour la mise en place.', exploreFeatureCta: 'Demander la mise en avant', exploreFeatureDone: 'Demande envoyée — nous vous recontacterons.',
     exploreGroupNature: 'Nature', exploreGroupHeritage: 'Patrimoine', exploreGroupEatDrink: 'Manger & Boire', exploreGroupActive: 'Sport & Activité', exploreGroupServices: 'Services',
     exploreCatCafe: 'Café', exploreCatRestaurant: 'Restaurant', exploreCatBakery: 'Boulangerie', exploreCatGym: 'Salle de sport', exploreCatSportsFacility: 'Complexe sportif', exploreCatPool: 'Piscine', exploreCatBarber: 'Barbier', exploreCatPrintShop: 'Imprimerie', exploreCatLaundry: 'Laverie',
     pinTitle: 'Épinglez votre position', pinHint: 'Touchez la carte ou faites glisser le repère pour un placement précis.', pinFinding: 'Localisation…', pinMyLocation: 'Ma position', pinConfirm: 'Confirmer',
@@ -5848,6 +5884,12 @@ const translations = {
     blCatMonument: 'Monumento', blCatNatureScenic: 'Naturaleza y Paisaje',
     // Explore module (Slice 5)
     exploreTitle: 'Explorar', menuExplore: 'Explorar', menuBeaches: 'Playas',
+    // Explore owner CTAs (Slice 5 D1)
+    gatePlaceClaim: 'Crea una cuenta gratis para reclamar un lugar.',
+    exploreClaimTitle: '¿Es tuyo este lugar?', exploreClaimCta: 'Reclamar este lugar',
+    exploreClaimNoteLabel: '¿Cuál es tu relación con este lugar? (opcional)', exploreClaimNotePlaceholder: 'p. ej. propietario o encargado', exploreClaimSubmit: 'Enviar solicitud',
+    exploreClaimDone: 'Solicitud enviada — la revisaremos.', exploreClaimErr: 'No se pudo enviar — este lugar puede estar ya reclamado.',
+    exploreFeatureTitle: 'Destacar este lugar', exploreFeatureBody: 'Fíjalo arriba con una insignia «Destacado». Nos pondremos en contacto para configurarlo.', exploreFeatureCta: 'Solicitar destacado', exploreFeatureDone: 'Solicitud de destacado enviada — nos pondremos en contacto.',
     exploreGroupNature: 'Naturaleza', exploreGroupHeritage: 'Patrimonio', exploreGroupEatDrink: 'Comer & Beber', exploreGroupActive: 'Deporte & Actividad', exploreGroupServices: 'Servicios',
     exploreCatCafe: 'Cafetería', exploreCatRestaurant: 'Restaurante', exploreCatBakery: 'Panadería', exploreCatGym: 'Gimnasio', exploreCatSportsFacility: 'Instalación deportiva', exploreCatPool: 'Piscina', exploreCatBarber: 'Barbería', exploreCatPrintShop: 'Imprenta', exploreCatLaundry: 'Lavandería',
     pinTitle: 'Fija tu ubicación', pinHint: 'Toca el mapa o arrastra el marcador para ubicarlo con precisión.', pinFinding: 'Localizando…', pinMyLocation: 'Mi ubicación', pinConfirm: 'Confirmar',
@@ -6635,6 +6677,12 @@ const translations = {
     blCatMonument: 'Denkmal', blCatNatureScenic: 'Natur & Landschaft',
     // Explore module (Slice 5)
     exploreTitle: 'Entdecken', menuExplore: 'Entdecken', menuBeaches: 'Strände',
+    // Explore owner CTAs (Slice 5 D1)
+    gatePlaceClaim: 'Erstelle ein kostenloses Konto, um einen Ort zu beanspruchen.',
+    exploreClaimTitle: 'Gehört dir dieser Ort?', exploreClaimCta: 'Diesen Ort beanspruchen',
+    exploreClaimNoteLabel: 'Wie stehst du mit diesem Ort in Verbindung? (optional)', exploreClaimNotePlaceholder: 'z. B. Inhaber oder Manager', exploreClaimSubmit: 'Anfrage senden',
+    exploreClaimDone: 'Anfrage gesendet — wir prüfen sie.', exploreClaimErr: 'Senden fehlgeschlagen — dieser Ort ist möglicherweise bereits beansprucht.',
+    exploreFeatureTitle: 'Diesen Ort hervorheben', exploreFeatureBody: 'Ganz oben mit einem Empfohlen-Abzeichen anheften. Wir melden uns zur Einrichtung.', exploreFeatureCta: 'Hervorhebung anfragen', exploreFeatureDone: 'Anfrage gesendet — wir melden uns.',
     exploreGroupNature: 'Natur', exploreGroupHeritage: 'Kulturerbe', exploreGroupEatDrink: 'Essen & Trinken', exploreGroupActive: 'Sport & Aktivität', exploreGroupServices: 'Dienstleistungen',
     exploreCatCafe: 'Café', exploreCatRestaurant: 'Restaurant', exploreCatBakery: 'Bäckerei', exploreCatGym: 'Fitnessstudio', exploreCatSportsFacility: 'Sportanlage', exploreCatPool: 'Schwimmbad', exploreCatBarber: 'Barbier', exploreCatPrintShop: 'Druckerei', exploreCatLaundry: 'Wäscherei',
     pinTitle: 'Standort festlegen', pinHint: 'Tippe auf die Karte oder ziehe die Markierung für die genaue Position.', pinFinding: 'Wird gesucht…', pinMyLocation: 'Mein Standort', pinConfirm: 'Bestätigen',
@@ -7422,6 +7470,12 @@ const translations = {
     blCatMonument: 'بنای یادبود', blCatNatureScenic: 'طبیعت و مناظر',
     // Explore module (Slice 5)
     exploreTitle: 'کاوش', menuExplore: 'کاوش', menuBeaches: 'سواحل',
+    // Explore owner CTAs (Slice 5 D1)
+    gatePlaceClaim: 'برای ثبت مالکیت یک مکان، یک حساب رایگان بسازید.',
+    exploreClaimTitle: 'صاحب این مکان هستید؟', exploreClaimCta: 'ثبت مالکیت این مکان',
+    exploreClaimNoteLabel: 'ارتباط شما با این مکان چیست؟ (اختیاری)', exploreClaimNotePlaceholder: 'مثلاً مالک یا مدیر', exploreClaimSubmit: 'ارسال درخواست',
+    exploreClaimDone: 'درخواست ارسال شد — بررسی می‌کنیم.', exploreClaimErr: 'ارسال نشد — ممکن است این مکان قبلاً ثبت شده باشد.',
+    exploreFeatureTitle: 'برجسته‌سازی این مکان', exploreFeatureBody: 'با نشان «ویژه» به بالای فهرست سنجاق شود. برای تنظیم با شما تماس می‌گیریم.', exploreFeatureCta: 'درخواست برجسته‌سازی', exploreFeatureDone: 'درخواست برجسته‌سازی ارسال شد — با شما تماس می‌گیریم.',
     exploreGroupNature: 'طبیعت', exploreGroupHeritage: 'میراث', exploreGroupEatDrink: 'خوردن و نوشیدن', exploreGroupActive: 'ورزش و فعالیت', exploreGroupServices: 'خدمات',
     exploreCatCafe: 'کافه', exploreCatRestaurant: 'رستوران', exploreCatBakery: 'نانوایی', exploreCatGym: 'باشگاه ورزشی', exploreCatSportsFacility: 'مجموعه ورزشی', exploreCatPool: 'استخر', exploreCatBarber: 'آرایشگاه مردانه', exploreCatPrintShop: 'چاپخانه', exploreCatLaundry: 'خشکشویی',
     pinTitle: 'موقعیت خود را مشخص کنید', pinHint: 'روی نقشه بزنید یا نشانگر را بکشید تا موقعیت دقیق مشخص شود.', pinFinding: 'در حال یافتن…', pinMyLocation: 'موقعیت من', pinConfirm: 'تأیید موقعیت',

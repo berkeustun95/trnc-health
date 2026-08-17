@@ -235,7 +235,7 @@ function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
 // passed-through ExploreProfileScreen. (area re-enters when the Slice-5 area filter ships.)
 const BROWSE_COLS =
   'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
-  'cover_image_url, photos, photo_credits, blue_flag, access_type, amenities, featured_until'
+  'cover_image_url, photos, photo_credits, blue_flag, access_type, amenities, provider_id, featured_until'
 
 export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, isAdmin = false, initialCategory = null, initialRegion = null }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin previewing.
