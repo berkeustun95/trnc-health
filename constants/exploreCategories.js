@@ -65,6 +65,9 @@ export const CATEGORY_LABEL_KEY = {
 
 // Categories a user may SUBMIT. Slice 5 opened the eat_drink / active / services sets now
 // that they have labels; every entry maps to a group in EXPLORE_GROUPS and a CATEGORY_LABEL_KEY.
+// ⚠ resubmit_place() (migration 20260829) DUPLICATES this exact list in SQL to reject unknown
+//   categories (the column CHECK is only a shape regex) — keep the two in sync until the DROP-era
+//   cleanup can centralize it.
 export const SUBMITTABLE_CATEGORIES = [
   'beach', 'nature_scenic',
   'castle_fortress', 'ancient_ruins', 'museum', 'religious_site', 'monument',

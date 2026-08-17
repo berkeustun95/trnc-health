@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import MapView, { Marker } from 'react-native-maps'
 import { supabase } from '../lib/supabase'
 import ExploreSubmitScreen from './ExploreSubmitScreen'
+import ExploreMySubmissionsScreen from './ExploreMySubmissionsScreen'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import FeaturedBadge from '../components/FeaturedBadge'
@@ -252,6 +253,8 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   const [region,      setRegion]      = useState(initialRegion)     // null = all regions
   const [view,        setView]        = useState('list') // 'list' | 'map'
   const [showSubmit,  setShowSubmit]  = useState(false)
+  const [showMySubs,  setShowMySubs]  = useState(false)
+  const [hasSubs,     setHasSubs]     = useState(false)   // ≥1 own submission → show the "My submissions" affordance
   const [rpcCatCounts, setRpcCatCounts] = useState(null)  // per-category counts (active incl. hidden) from the RPC; null → fall back to visible-set count
 
   const load = useCallback(async () => {
@@ -260,9 +263,13 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
       // Visible rows for the list (RLS-filtered — hidden rows drop out) + the tile-gating
       // counts from the RPC (active INCLUDING hidden). If the RPC isn't there yet (OTA
       // before 20260824 is applied), fall back to counting the visible set.
-      const [placesRes, countsRes] = await Promise.all([
+      const uid = session?.user?.id
+      const [placesRes, countsRes, subsRes] = await Promise.all([
         supabase.from('places').select(BROWSE_COLS).eq('status', 'active'),
         supabase.rpc('explore_category_counts'),
+        // ≥1-submission gate for the "My submissions" affordance — a COUNT, never a row fetch.
+        uid ? supabase.from('places').select('id', { head: true, count: 'exact' }).eq('submitted_by', uid)
+            : Promise.resolve({ count: 0 }),
       ])
       const sorted = (placesRes.data || []).sort((a, b) =>
         placeName(a, 'en').localeCompare(placeName(b, 'en'))
@@ -272,6 +279,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
       // order within each subset. Only shuffle once here — never in render.
       setPlaces(showFeatured ? partitionFeatured(sorted) : sorted)
       setRpcCatCounts(countsRes.error ? null : (countsRes.data || []))
+      setHasSubs((subsRes.count || 0) > 0)
     } catch (err) {
       console.error('Explore load error:', err)
       setPlaces([])
@@ -279,7 +287,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
     } finally {
       setLoading(false)
     }
-  }, [showFeatured])
+  }, [showFeatured, session?.user?.id])
 
   useEffect(() => { load() }, [load])
 
@@ -334,6 +342,16 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   function openGroup(g) { setActiveGroup(g); setActiveCat(null); setRegion(null); setView('list') }
   function leaveGroup()  { setActiveGroup(null); setActiveCat(null); setRegion(null) }
 
+  if (showMySubs) {
+    return (
+      <ExploreMySubmissionsScreen
+        session={session}
+        lang={lang}
+        onBack={() => { setShowMySubs(false); load() }}
+      />
+    )
+  }
+
   if (showSubmit) {
     return (
       <ExploreSubmitScreen
@@ -364,7 +382,15 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
               color={colors.primary}
             />
           </TouchableOpacity>
-        ) : null}
+        ) : (hasSubs ? (
+          <TouchableOpacity
+            style={s.viewToggle}
+            onPress={() => setShowMySubs(true)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        ) : null)}
       />
 
       {loading ? (

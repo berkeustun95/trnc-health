@@ -821,6 +821,10 @@ const translations = {
     blCatMonument: 'Monument', blCatNatureScenic: 'Nature & Scenic',
     // Explore module (Slice 5)
     exploreTitle: 'Explore', menuExplore: 'Explore', menuBeaches: 'Beaches',
+    // My submissions + resubmit (Slice 5 D2)
+    exploreMySubmissions: 'My submissions', exploreEditResubmit: 'Edit & resubmit', exploreEditTitle: 'Edit & resubmit', exploreResubmitBtn: 'Resubmit',
+    placeStatusPending: 'Under review', placeStatusActive: 'Published', placeStatusRejected: 'Rejected', placeRejectedReason: 'Reason: {reason}',
+    exploreResubmitLimit: 'You have reached the resubmit limit for this place. Please contact us for help.', exploreBlockedContent: 'Your text contains words that are not allowed. Please revise and try again.', exploreSubmitFailed: 'Could not save. Please try again.',
     // Explore owner CTAs (Slice 5 D1)
     gatePlaceClaim: 'Create a free account to claim a place.',
     exploreClaimTitle: 'Own this place?', exploreClaimCta: 'Claim this place',
@@ -1878,6 +1882,10 @@ const translations = {
     blCatMonument: 'Anıt', blCatNatureScenic: 'Doğa & Manzara',
     // Explore module (Slice 5)
     exploreTitle: 'Keşfet', menuExplore: 'Keşfet', menuBeaches: 'Plajlar',
+    // My submissions + resubmit (Slice 5 D2)
+    exploreMySubmissions: 'Gönderilerim', exploreEditResubmit: 'Düzenle ve yeniden gönder', exploreEditTitle: 'Düzenle ve yeniden gönder', exploreResubmitBtn: 'Yeniden gönder',
+    placeStatusPending: 'İnceleniyor', placeStatusActive: 'Yayında', placeStatusRejected: 'Reddedildi', placeRejectedReason: 'Sebep: {reason}',
+    exploreResubmitLimit: 'Bu yer için yeniden gönderme sınırına ulaştınız. Lütfen bizimle iletişime geçin.', exploreBlockedContent: 'Metniniz izin verilmeyen kelimeler içeriyor. Lütfen düzeltip tekrar deneyin.', exploreSubmitFailed: 'Kaydedilemedi. Lütfen tekrar deneyin.',
     // Explore owner CTAs (Slice 5 D1)
     gatePlaceClaim: 'Bir yeri sahiplenmek için ücretsiz hesap oluşturun.',
     exploreClaimTitle: 'Buranın sahibi misiniz?', exploreClaimCta: 'Bu yeri sahiplen',
@@ -2712,6 +2720,10 @@ const translations = {
     blCatMonument: 'نصب تذكاري', blCatNatureScenic: 'طبيعة ومناظر',
     // Explore module (Slice 5)
     exploreTitle: 'استكشاف', menuExplore: 'استكشاف', menuBeaches: 'الشواطئ',
+    // My submissions + resubmit (Slice 5 D2)
+    exploreMySubmissions: 'إرسالاتي', exploreEditResubmit: 'تعديل وإعادة الإرسال', exploreEditTitle: 'تعديل وإعادة الإرسال', exploreResubmitBtn: 'إعادة الإرسال',
+    placeStatusPending: 'قيد المراجعة', placeStatusActive: 'منشور', placeStatusRejected: 'مرفوض', placeRejectedReason: 'السبب: {reason}',
+    exploreResubmitLimit: 'لقد وصلت إلى حد إعادة الإرسال لهذا المكان. يرجى التواصل معنا.', exploreBlockedContent: 'يحتوي النص على كلمات غير مسموح بها. يرجى التعديل والمحاولة مرة أخرى.', exploreSubmitFailed: 'تعذّر الحفظ. يرجى المحاولة مرة أخرى.',
     // Explore owner CTAs (Slice 5 D1)
     gatePlaceClaim: 'أنشئ حسابًا مجانيًا للمطالبة بملكية مكان.',
     exploreClaimTitle: 'هل تملك هذا المكان؟', exploreClaimCta: 'المطالبة بهذا المكان',
@@ -3505,6 +3517,10 @@ const translations = {
     blCatMonument: 'Памятник', blCatNatureScenic: 'Природа и пейзажи',
     // Explore module (Slice 5)
     exploreTitle: 'Обзор', menuExplore: 'Обзор', menuBeaches: 'Пляжи',
+    // My submissions + resubmit (Slice 5 D2)
+    exploreMySubmissions: 'Мои материалы', exploreEditResubmit: 'Изменить и отправить снова', exploreEditTitle: 'Изменить и отправить снова', exploreResubmitBtn: 'Отправить снова',
+    placeStatusPending: 'На проверке', placeStatusActive: 'Опубликовано', placeStatusRejected: 'Отклонено', placeRejectedReason: 'Причина: {reason}',
+    exploreResubmitLimit: 'Вы достигли лимита повторных отправок для этого места. Свяжитесь с нами.', exploreBlockedContent: 'Текст содержит недопустимые слова. Измените и попробуйте снова.', exploreSubmitFailed: 'Не удалось сохранить. Попробуйте снова.',
     // Explore owner CTAs (Slice 5 D1)
     gatePlaceClaim: 'Создайте бесплатный аккаунт, чтобы заявить права на место.',
     exploreClaimTitle: 'Это ваше место?', exploreClaimCta: 'Заявить права на место',
@@ -4298,6 +4314,10 @@ const translations = {
     blCatMonument: 'Μνημείο', blCatNatureScenic: 'Φύση & Τοπίο',
     // Explore module (Slice 5)
     exploreTitle: 'Εξερεύνηση', menuExplore: 'Εξερεύνηση', menuBeaches: 'Παραλίες',
+    // My submissions + resubmit (Slice 5 D2)
+    exploreMySubmissions: 'Οι υποβολές μου', exploreEditResubmit: 'Επεξεργασία και επανυποβολή', exploreEditTitle: 'Επεξεργασία και επανυποβολή', exploreResubmitBtn: 'Επανυποβολή',
+    placeStatusPending: 'Υπό έλεγχο', placeStatusActive: 'Δημοσιευμένο', placeStatusRejected: 'Απορρίφθηκε', placeRejectedReason: 'Αιτία: {reason}',
+    exploreResubmitLimit: 'Φτάσατε το όριο επανυποβολών για αυτό το μέρος. Επικοινωνήστε μαζί μας.', exploreBlockedContent: 'Το κείμενο περιέχει μη επιτρεπτές λέξεις. Διορθώστε και δοκιμάστε ξανά.', exploreSubmitFailed: 'Η αποθήκευση απέτυχε. Δοκιμάστε ξανά.',
     // Explore owner CTAs (Slice 5 D1)
     gatePlaceClaim: 'Δημιουργήστε δωρεάν λογαριασμό για να διεκδικήσετε ένα μέρος.',
     exploreClaimTitle: 'Δικό σας αυτό το μέρος;', exploreClaimCta: 'Διεκδίκηση αυτού του μέρους',
@@ -5091,6 +5111,10 @@ const translations = {
     blCatMonument: 'Monument', blCatNatureScenic: 'Nature & Paysage',
     // Explore module (Slice 5)
     exploreTitle: 'Explorer', menuExplore: 'Explorer', menuBeaches: 'Plages',
+    // My submissions + resubmit (Slice 5 D2)
+    exploreMySubmissions: 'Mes contributions', exploreEditResubmit: 'Modifier et renvoyer', exploreEditTitle: 'Modifier et renvoyer', exploreResubmitBtn: 'Renvoyer',
+    placeStatusPending: 'En cours de révision', placeStatusActive: 'Publié', placeStatusRejected: 'Refusé', placeRejectedReason: 'Motif : {reason}',
+    exploreResubmitLimit: 'Vous avez atteint la limite de renvois pour ce lieu. Merci de nous contacter.', exploreBlockedContent: 'Votre texte contient des mots non autorisés. Merci de le corriger et de réessayer.', exploreSubmitFailed: 'Enregistrement impossible. Merci de réessayer.',
     // Explore owner CTAs (Slice 5 D1)
     gatePlaceClaim: 'Créez un compte gratuit pour revendiquer un lieu.',
     exploreClaimTitle: 'Vous gérez ce lieu ?', exploreClaimCta: 'Revendiquer ce lieu',
@@ -5884,6 +5908,10 @@ const translations = {
     blCatMonument: 'Monumento', blCatNatureScenic: 'Naturaleza y Paisaje',
     // Explore module (Slice 5)
     exploreTitle: 'Explorar', menuExplore: 'Explorar', menuBeaches: 'Playas',
+    // My submissions + resubmit (Slice 5 D2)
+    exploreMySubmissions: 'Mis envíos', exploreEditResubmit: 'Editar y reenviar', exploreEditTitle: 'Editar y reenviar', exploreResubmitBtn: 'Reenviar',
+    placeStatusPending: 'En revisión', placeStatusActive: 'Publicado', placeStatusRejected: 'Rechazado', placeRejectedReason: 'Motivo: {reason}',
+    exploreResubmitLimit: 'Has alcanzado el límite de reenvíos para este lugar. Ponte en contacto con nosotros.', exploreBlockedContent: 'Tu texto contiene palabras no permitidas. Corrígelo e inténtalo de nuevo.', exploreSubmitFailed: 'No se pudo guardar. Inténtalo de nuevo.',
     // Explore owner CTAs (Slice 5 D1)
     gatePlaceClaim: 'Crea una cuenta gratis para reclamar un lugar.',
     exploreClaimTitle: '¿Es tuyo este lugar?', exploreClaimCta: 'Reclamar este lugar',
@@ -6677,6 +6705,10 @@ const translations = {
     blCatMonument: 'Denkmal', blCatNatureScenic: 'Natur & Landschaft',
     // Explore module (Slice 5)
     exploreTitle: 'Entdecken', menuExplore: 'Entdecken', menuBeaches: 'Strände',
+    // My submissions + resubmit (Slice 5 D2)
+    exploreMySubmissions: 'Meine Beiträge', exploreEditResubmit: 'Bearbeiten und erneut senden', exploreEditTitle: 'Bearbeiten und erneut senden', exploreResubmitBtn: 'Erneut senden',
+    placeStatusPending: 'In Prüfung', placeStatusActive: 'Veröffentlicht', placeStatusRejected: 'Abgelehnt', placeRejectedReason: 'Grund: {reason}',
+    exploreResubmitLimit: 'Du hast das Limit für erneute Einsendungen für diesen Ort erreicht. Bitte kontaktiere uns.', exploreBlockedContent: 'Dein Text enthält unzulässige Wörter. Bitte überarbeite ihn und versuche es erneut.', exploreSubmitFailed: 'Speichern fehlgeschlagen. Bitte versuche es erneut.',
     // Explore owner CTAs (Slice 5 D1)
     gatePlaceClaim: 'Erstelle ein kostenloses Konto, um einen Ort zu beanspruchen.',
     exploreClaimTitle: 'Gehört dir dieser Ort?', exploreClaimCta: 'Diesen Ort beanspruchen',
@@ -7470,6 +7502,10 @@ const translations = {
     blCatMonument: 'بنای یادبود', blCatNatureScenic: 'طبیعت و مناظر',
     // Explore module (Slice 5)
     exploreTitle: 'کاوش', menuExplore: 'کاوش', menuBeaches: 'سواحل',
+    // My submissions + resubmit (Slice 5 D2)
+    exploreMySubmissions: 'ارسال‌های من', exploreEditResubmit: 'ویرایش و ارسال دوباره', exploreEditTitle: 'ویرایش و ارسال دوباره', exploreResubmitBtn: 'ارسال دوباره',
+    placeStatusPending: 'در حال بررسی', placeStatusActive: 'منتشرشده', placeStatusRejected: 'رد شد', placeRejectedReason: 'دلیل: {reason}',
+    exploreResubmitLimit: 'به سقف ارسال دوباره برای این مکان رسیده‌اید. لطفاً با ما تماس بگیرید.', exploreBlockedContent: 'متن شما حاوی کلمات غیرمجاز است. لطفاً اصلاح کنید و دوباره تلاش کنید.', exploreSubmitFailed: 'ذخیره نشد. لطفاً دوباره تلاش کنید.',
     // Explore owner CTAs (Slice 5 D1)
     gatePlaceClaim: 'برای ثبت مالکیت یک مکان، یک حساب رایگان بسازید.',
     exploreClaimTitle: 'صاحب این مکان هستید؟', exploreClaimCta: 'ثبت مالکیت این مکان',

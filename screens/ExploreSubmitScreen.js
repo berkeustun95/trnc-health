@@ -44,6 +44,14 @@ function categoryLabel(c, lang) {
   return key ? t(key, lang) : c
 }
 
+// Map known server-error prefixes to i18n — raw Postgres text must never reach the form.
+function mapSubmitError(err, lang) {
+  const m = err?.message || ''
+  if (m.includes('resubmit_place: limit reached')) return t('exploreResubmitLimit', lang)
+  if (m.includes('BLOCKED_TERM') || m.includes('BLOCKED_PAYMENT')) return t('exploreBlockedContent', lang)
+  return t('exploreSubmitFailed', lang)
+}
+
 function SectionLabel({ text }) {
   return <Text style={s.sectionLabel}>{text}</Text>
 }
@@ -65,28 +73,34 @@ function SuccessState({ lang, onBack }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted }) {
-  const [category, setCategory] = useState('beach')
-  const [name,     setName]     = useState('')
-  const [region,   setRegion]   = useState(null)
-  const [desc,     setDesc]     = useState('')
-  const [lat,      setLat]      = useState(null)
-  const [lng,      setLng]      = useState(null)
-  const [photos,   setPhotos]   = useState([])   // { uri, base64 }
+export default function ExploreSubmitScreen({ session, lang, place: editPlace, onBack, onSubmitted }) {
+  const isEdit = !!editPlace   // edit mode = resubmit a rejected place (calls resubmit_place)
+  const [category, setCategory] = useState(editPlace?.category || 'beach')
+  const [name,     setName]     = useState(editPlace?.name || '')
+  const [region,   setRegion]   = useState(editPlace?.region || null)
+  const [desc,     setDesc]     = useState(() => {
+    const d = editPlace?.description_i18n
+    return d ? (d[lang] ?? Object.values(d)[0] ?? '') : ''
+  })
+  const [lat,      setLat]      = useState(editPlace?.latitude ?? null)
+  const [lng,      setLng]      = useState(editPlace?.longitude ?? null)
+  const [photos,   setPhotos]   = useState([])                              // NEW photos { uri, base64 }
+  const [existingPhotos, setExistingPhotos] = useState(editPlace?.photos || [])  // kept existing URLs (edit)
 
   // Beach-only fields
-  const [blueFlag, setBlueFlag] = useState(false)
-  const [access,   setAccess]   = useState('public')
+  const [blueFlag, setBlueFlag] = useState(editPlace?.blue_flag || false)
+  const [access,   setAccess]   = useState(editPlace?.access_type || 'public')
 
   const [showMap, setShowMap]   = useState(false)
   const [saving,  setSaving]    = useState(false)
   const [error,   setError]     = useState(null)
   const [done,    setDone]      = useState(false)
 
-  const isBeach = category === 'beach'
+  const isBeach    = category === 'beach'
+  const photoCount = existingPhotos.length + photos.length
 
   async function addPhoto() {
-    if (photos.length >= 5) return
+    if (photoCount >= 5) return
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true, aspect: [4, 3], quality: 0.8, base64: true,
@@ -98,6 +112,10 @@ export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted
 
   function removePhoto(i) {
     setPhotos(prev => prev.filter((_, j) => j !== i))
+  }
+
+  function removeExisting(i) {
+    setExistingPhotos(prev => prev.filter((_, j) => j !== i))
   }
 
   async function handleSubmit() {
@@ -122,7 +140,7 @@ export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted
       // A backlog orphan-sweep reclaims them (see backlog.md).
       const uid   = session.user.id
       const stamp = Date.now()
-      const urls  = []
+      const newUrls = []
       for (let i = 0; i < photos.length; i++) {
         const ph  = photos[i]
         const ext = (ph.uri.split('.').pop() || 'jpg').toLowerCase().split('?')[0]
@@ -134,31 +152,49 @@ export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted
         if (upErr) throw upErr
         const { data: { publicUrl } } = supabase.storage
           .from('place-photos').getPublicUrl(path)
-        urls.push(publicUrl)
+        newUrls.push(publicUrl)
       }
+      const finalPhotos = [...existingPhotos, ...newUrls]   // kept existing URLs + freshly uploaded
 
       // name = plain proper noun. name_i18n stays NULL on user submit (translations are a
       // curation step). description is locale-specific → description_i18n.
-      const payload = {
-        submitted_by:    uid,
-        category,
-        name:            name.trim(),
-        description_i18n: desc.trim() ? { [lang]: desc.trim() } : null,
-        region,
-        latitude:        lat,
-        longitude:       lng,
-        status:          'pending',
-        photos:          urls,
-        cover_image_url: urls[0] || null,
-        ...(isBeach ? { blue_flag: blueFlag, access_type: access } : {}),
+      if (isEdit) {
+        // Resubmit a REJECTED place → pending. resubmit_place re-runs the content filter and
+        // flips status via its own scoped GUC; beach fields coerce off-beach server-side.
+        const { error: rsErr } = await supabase.rpc('resubmit_place', {
+          p_place_id:         editPlace.id,
+          p_category:         category,
+          p_name:             name.trim(),
+          p_description_i18n: desc.trim() ? { [lang]: desc.trim() } : null,
+          p_region:           region,
+          p_latitude:         lat,
+          p_longitude:        lng,
+          p_photos:           finalPhotos,
+          p_blue_flag:        isBeach ? blueFlag : null,
+          p_access_type:      isBeach ? access   : null,
+        })
+        if (rsErr) throw rsErr
+      } else {
+        const { error: insErr } = await supabase.from('places').insert({
+          submitted_by:    uid,
+          category,
+          name:            name.trim(),
+          description_i18n: desc.trim() ? { [lang]: desc.trim() } : null,
+          region,
+          latitude:        lat,
+          longitude:       lng,
+          status:          'pending',
+          photos:          finalPhotos,
+          cover_image_url: finalPhotos[0] || null,
+          ...(isBeach ? { blue_flag: blueFlag, access_type: access } : {}),
+        })
+        if (insErr) throw insErr
       }
-      const { error: insErr } = await supabase.from('places').insert(payload)
-      if (insErr) throw insErr
 
       setDone(true)
       onSubmitted?.()
     } catch (err) {
-      setError(err.message || 'Submission failed. Try again.')
+      setError(mapSubmitError(err, lang))   // known prefixes → i18n; never raw Postgres text
     } finally {
       setSaving(false)
     }
@@ -181,7 +217,7 @@ export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted
           <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>{t('blSubmitTitle', lang)}</Text>
+          <Text style={s.headerTitle}>{t(isEdit ? 'exploreEditTitle' : 'blSubmitTitle', lang)}</Text>
           <View style={{ width: 24 }} />
         </View>
 
@@ -269,15 +305,23 @@ export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted
           {/* Photos */}
           <SectionLabel text={t('blSubmitPhotos', lang)} />
           <View style={s.photosRow}>
+            {existingPhotos.map((url, i) => (
+              <View key={`ex-${i}`} style={s.thumbWrap}>
+                <Image source={{ uri: url }} style={s.thumb} resizeMode="cover" />
+                <TouchableOpacity style={s.thumbRemove} onPress={() => removeExisting(i)}>
+                  <Ionicons name="close-circle" size={22} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ))}
             {photos.map((ph, i) => (
-              <View key={i} style={s.thumbWrap}>
+              <View key={`new-${i}`} style={s.thumbWrap}>
                 <Image source={{ uri: ph.uri }} style={s.thumb} resizeMode="cover" />
                 <TouchableOpacity style={s.thumbRemove} onPress={() => removePhoto(i)}>
                   <Ionicons name="close-circle" size={22} color="#fff" />
                 </TouchableOpacity>
               </View>
             ))}
-            {photos.length < 5 && (
+            {photoCount < 5 && (
               <TouchableOpacity style={s.addPhotoBtn} onPress={addPhoto} activeOpacity={0.8}>
                 <Ionicons name="add" size={28} color={colors.primary} />
                 <Text style={s.addPhotoText}>{t('blSubmitAddPhoto', lang)}</Text>
@@ -326,7 +370,7 @@ export default function ExploreSubmitScreen({ session, lang, onBack, onSubmitted
           >
             {saving
               ? <ActivityIndicator color="#fff" />
-              : <Text style={s.submitBtnText}>{t('blSubmitBtn', lang)}</Text>
+              : <Text style={s.submitBtnText}>{t(isEdit ? 'exploreResubmitBtn' : 'blSubmitBtn', lang)}</Text>
             }
           </TouchableOpacity>
         </ScrollView>

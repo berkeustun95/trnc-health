@@ -98,7 +98,8 @@ WITH report AS (
     ('0824_place_moderation','places','hidden_at'),
     ('0824_place_moderation','places','hidden_reason'),
     ('0825_places_column_guards','places','featured_until'),
-    ('0825_places_column_guards','places','featured_requested_at')
+    ('0825_places_column_guards','places','featured_requested_at'),
+    ('0829_place_resubmit','places','resubmit_count')
   ) e(m,t,c)
 
   UNION ALL
@@ -163,7 +164,8 @@ WITH report AS (
     ('0825_places_column_guards','places_guard_update'),
     ('0826_place_claims','place_claims_guard_insert'),
     ('0826_place_claims','approve_place_claim'),
-    ('0827_places_featured_tier','request_featured_place')
+    ('0827_places_featured_tier','request_featured_place'),
+    ('0829_place_resubmit','resubmit_place')
   ) e(m,o)
 
   UNION ALL
@@ -294,7 +296,8 @@ WITH report AS (
     ('0813_notify_module_waitlist','notify_module_waitlist'),
     ('0819_get_customer_contacts_rpc','get_customer_contacts'),
     ('0824_place_moderation','explore_category_counts'),  -- also GRANTed to anon (public tile counts)
-    ('0826_place_claims','approve_place_claim')
+    ('0826_place_claims','approve_place_claim'),
+    ('0829_place_resubmit','resubmit_place')
   ) e(m,o)
 
   UNION ALL
@@ -416,6 +419,10 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='module_notif_text'
           AND pg_get_functiondef(p.oid) ILIKE '%studentHub%')
+    UNION ALL SELECT '0829_place_resubmit','places_guard_update honors the trusted_place_resubmit GUC',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='places_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%trusted_place_resubmit%')
   ) z
 
   UNION ALL
