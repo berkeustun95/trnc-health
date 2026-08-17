@@ -821,6 +821,7 @@ const translations = {
     blCatMonument: 'Monument', blCatNatureScenic: 'Nature & Scenic',
     // Explore module (Slice 5)
     exploreTitle: 'Explore', menuExplore: 'Explore', menuBeaches: 'Beaches',
+    exploreSavedTitle: 'Saved places',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'My submissions', exploreEditResubmit: 'Edit & resubmit', exploreEditTitle: 'Edit & resubmit', exploreResubmitBtn: 'Resubmit',
     placeStatusPending: 'Under review', placeStatusActive: 'Published', placeStatusRejected: 'Rejected', placeRejectedReason: 'Reason: {reason}',
@@ -1882,6 +1883,7 @@ const translations = {
     blCatMonument: 'Anıt', blCatNatureScenic: 'Doğa & Manzara',
     // Explore module (Slice 5)
     exploreTitle: 'Keşfet', menuExplore: 'Keşfet', menuBeaches: 'Plajlar',
+    exploreSavedTitle: 'Kaydedilenler',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Gönderilerim', exploreEditResubmit: 'Düzenle ve yeniden gönder', exploreEditTitle: 'Düzenle ve yeniden gönder', exploreResubmitBtn: 'Yeniden gönder',
     placeStatusPending: 'İnceleniyor', placeStatusActive: 'Yayında', placeStatusRejected: 'Reddedildi', placeRejectedReason: 'Sebep: {reason}',
@@ -2720,6 +2722,7 @@ const translations = {
     blCatMonument: 'نصب تذكاري', blCatNatureScenic: 'طبيعة ومناظر',
     // Explore module (Slice 5)
     exploreTitle: 'استكشاف', menuExplore: 'استكشاف', menuBeaches: 'الشواطئ',
+    exploreSavedTitle: 'الأماكن المحفوظة',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'إرسالاتي', exploreEditResubmit: 'تعديل وإعادة الإرسال', exploreEditTitle: 'تعديل وإعادة الإرسال', exploreResubmitBtn: 'إعادة الإرسال',
     placeStatusPending: 'قيد المراجعة', placeStatusActive: 'منشور', placeStatusRejected: 'مرفوض', placeRejectedReason: 'السبب: {reason}',
@@ -3517,6 +3520,7 @@ const translations = {
     blCatMonument: 'Памятник', blCatNatureScenic: 'Природа и пейзажи',
     // Explore module (Slice 5)
     exploreTitle: 'Обзор', menuExplore: 'Обзор', menuBeaches: 'Пляжи',
+    exploreSavedTitle: 'Сохранённые места',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Мои материалы', exploreEditResubmit: 'Изменить и отправить снова', exploreEditTitle: 'Изменить и отправить снова', exploreResubmitBtn: 'Отправить снова',
     placeStatusPending: 'На проверке', placeStatusActive: 'Опубликовано', placeStatusRejected: 'Отклонено', placeRejectedReason: 'Причина: {reason}',
@@ -4314,6 +4318,7 @@ const translations = {
     blCatMonument: 'Μνημείο', blCatNatureScenic: 'Φύση & Τοπίο',
     // Explore module (Slice 5)
     exploreTitle: 'Εξερεύνηση', menuExplore: 'Εξερεύνηση', menuBeaches: 'Παραλίες',
+    exploreSavedTitle: 'Αποθηκευμένα μέρη',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Οι υποβολές μου', exploreEditResubmit: 'Επεξεργασία και επανυποβολή', exploreEditTitle: 'Επεξεργασία και επανυποβολή', exploreResubmitBtn: 'Επανυποβολή',
     placeStatusPending: 'Υπό έλεγχο', placeStatusActive: 'Δημοσιευμένο', placeStatusRejected: 'Απορρίφθηκε', placeRejectedReason: 'Αιτία: {reason}',
@@ -5111,6 +5116,7 @@ const translations = {
     blCatMonument: 'Monument', blCatNatureScenic: 'Nature & Paysage',
     // Explore module (Slice 5)
     exploreTitle: 'Explorer', menuExplore: 'Explorer', menuBeaches: 'Plages',
+    exploreSavedTitle: 'Lieux enregistrés',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Mes contributions', exploreEditResubmit: 'Modifier et renvoyer', exploreEditTitle: 'Modifier et renvoyer', exploreResubmitBtn: 'Renvoyer',
     placeStatusPending: 'En cours de révision', placeStatusActive: 'Publié', placeStatusRejected: 'Refusé', placeRejectedReason: 'Motif : {reason}',
@@ -5908,6 +5914,7 @@ const translations = {
     blCatMonument: 'Monumento', blCatNatureScenic: 'Naturaleza y Paisaje',
     // Explore module (Slice 5)
     exploreTitle: 'Explorar', menuExplore: 'Explorar', menuBeaches: 'Playas',
+    exploreSavedTitle: 'Lugares guardados',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Mis envíos', exploreEditResubmit: 'Editar y reenviar', exploreEditTitle: 'Editar y reenviar', exploreResubmitBtn: 'Reenviar',
     placeStatusPending: 'En revisión', placeStatusActive: 'Publicado', placeStatusRejected: 'Rechazado', placeRejectedReason: 'Motivo: {reason}',
@@ -6705,6 +6712,7 @@ const translations = {
     blCatMonument: 'Denkmal', blCatNatureScenic: 'Natur & Landschaft',
     // Explore module (Slice 5)
     exploreTitle: 'Entdecken', menuExplore: 'Entdecken', menuBeaches: 'Strände',
+    exploreSavedTitle: 'Gespeicherte Orte',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Meine Beiträge', exploreEditResubmit: 'Bearbeiten und erneut senden', exploreEditTitle: 'Bearbeiten und erneut senden', exploreResubmitBtn: 'Erneut senden',
     placeStatusPending: 'In Prüfung', placeStatusActive: 'Veröffentlicht', placeStatusRejected: 'Abgelehnt', placeRejectedReason: 'Grund: {reason}',
@@ -7502,6 +7510,7 @@ const translations = {
     blCatMonument: 'بنای یادبود', blCatNatureScenic: 'طبیعت و مناظر',
     // Explore module (Slice 5)
     exploreTitle: 'کاوش', menuExplore: 'کاوش', menuBeaches: 'سواحل',
+    exploreSavedTitle: 'مکان‌های ذخیره‌شده',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'ارسال‌های من', exploreEditResubmit: 'ویرایش و ارسال دوباره', exploreEditTitle: 'ویرایش و ارسال دوباره', exploreResubmitBtn: 'ارسال دوباره',
     placeStatusPending: 'در حال بررسی', placeStatusActive: 'منتشرشده', placeStatusRejected: 'رد شد', placeRejectedReason: 'دلیل: {reason}',

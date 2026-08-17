@@ -45,7 +45,7 @@ function categoryLabel(category, lang) {
   return key ? t(key, lang) : category   // keyless categories: raw slug (admin-only today)
 }
 
-export default function ExploreProfileScreen({ place, lang, session, onBack, onRequireAccount }) {
+export default function ExploreProfileScreen({ place, lang, session, onBack, onRequireAccount, isFavorite, onToggleFavorite }) {
   const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
 
@@ -156,13 +156,19 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
               <Ionicons name="location-outline" size={12} color={colors.primary} />
               <Text style={s.districtPillText}>{regionLabel(place.region, lang)}</Text>
             </View>
-            <ContentReportMenu
-              contentType="place"
-              contentId={place.id}
-              lang={lang}
-              onRequireAccount={onRequireAccount}
-              style={{ marginLeft: 'auto' }}
-            />
+            <View style={s.pillActions}>
+              {onToggleFavorite && (
+                <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} activeOpacity={0.8}>
+                  <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={22} color={isFavorite ? colors.danger : colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+              <ContentReportMenu
+                contentType="place"
+                contentId={place.id}
+                lang={lang}
+                onRequireAccount={onRequireAccount}
+              />
+            </View>
           </View>
 
           {/* Name */}
@@ -311,6 +317,7 @@ const s = StyleSheet.create({
   body:    { padding: 20, gap: 0 },
 
   pillRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  pillActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginLeft: 'auto' },
   typePill:     { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },
   typePillText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
   districtPill: { flexDirection: 'row', alignItems: 'center', gap: 4,

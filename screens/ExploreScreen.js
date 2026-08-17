@@ -57,7 +57,7 @@ function groupEmoji(group) {
 
 // ─── Place card (list view) ───────────────────────────────────────────────────
 
-function PlaceCard({ item, lang, onPress, showFeatured }) {
+function PlaceCard({ item, lang, onPress, showFeatured, isSaved, onToggleSave }) {
   const group   = categoryToGroup(item.category)
   const pc      = GROUP_META[group]?.colorToken || placeColors.landmark
   const isBeach = item.category === 'beach'
@@ -77,6 +77,16 @@ function PlaceCard({ item, lang, onPress, showFeatured }) {
             {categoryLabel(item.category, lang)}
           </Text>
         </View>
+        {onToggleSave && (
+          <TouchableOpacity
+            style={s.heartBtn}
+            onPress={onToggleSave}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={isSaved ? 'heart' : 'heart-outline'} size={19} color={isSaved ? colors.danger : '#fff'} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={s.cardBody}>
@@ -238,7 +248,7 @@ const BROWSE_COLS =
   'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
   'cover_image_url, photos, photo_credits, blue_flag, access_type, amenities, provider_id, featured_until'
 
-export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, isAdmin = false, initialCategory = null, initialRegion = null }) {
+export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, placeFavorites, onTogglePlaceFavorite, isAdmin = false, initialCategory = null, initialRegion = null }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin previewing.
   // Mirrors the GaragesScreen showFeatured gate. The owner "request featured" CTA lands in Slice 5.
   const showFeatured = EXPLORE_FEATURED_LIVE || isAdmin
@@ -254,6 +264,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   const [view,        setView]        = useState('list') // 'list' | 'map'
   const [showSubmit,  setShowSubmit]  = useState(false)
   const [showMySubs,  setShowMySubs]  = useState(false)
+  const [showSaved,   setShowSaved]   = useState(false)
   const [hasSubs,     setHasSubs]     = useState(false)   // ≥1 own submission → show the "My submissions" affordance
   const [rpcCatCounts, setRpcCatCounts] = useState(null)  // per-category counts (active incl. hidden) from the RPC; null → fall back to visible-set count
 
@@ -316,6 +327,12 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
     [counts, isAdmin]
   )
 
+  // Any loaded (active) place saved? → gates the "Saved" header affordance (landing only).
+  const hasSavedVisible = useMemo(
+    () => places.some(p => placeFavorites?.has(p.id)),
+    [places, placeFavorites]
+  )
+
   // Categories inside the active group that have VISIBLE rows (for the sub-filter chips).
   // Deliberately over the visible set, NOT the RPC counts (which include hidden): a chip
   // must only appear for a category the user can actually see rows in — a category whose
@@ -341,6 +358,40 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
 
   function openGroup(g) { setActiveGroup(g); setActiveCat(null); setRegion(null); setView('list') }
   function leaveGroup()  { setActiveGroup(null); setActiveCat(null); setRegion(null) }
+
+  if (showSaved) {
+    const saved = places.filter(p => placeFavorites?.has(p.id))
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <PageBackground topic="beaches_landmarks" />
+        <ScreenHeader onBack={() => setShowSaved(false)} title={t('exploreSavedTitle', lang)} lang={lang} />
+        <FlatList
+          data={saved}
+          keyExtractor={item => item.id}
+          contentContainerStyle={s.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={s.emptyWrap}>
+              <View style={s.emptyCard}>
+                <Ionicons name="heart-outline" size={44} color={colors.border} style={{ marginBottom: 10 }} />
+                <Text style={s.emptyText}>{t('blNoPlaces', lang)}</Text>
+              </View>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <PlaceCard
+              item={item}
+              lang={lang}
+              showFeatured={showFeatured}
+              isSaved={placeFavorites?.has(item.id)}
+              onToggleSave={() => onTogglePlaceFavorite?.(item.id)}
+              onPress={() => onSelectPlace?.(item)}
+            />
+          )}
+        />
+      </SafeAreaView>
+    )
+  }
 
   if (showMySubs) {
     return (
@@ -382,14 +433,19 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
               color={colors.primary}
             />
           </TouchableOpacity>
-        ) : (hasSubs ? (
-          <TouchableOpacity
-            style={s.viewToggle}
-            onPress={() => setShowMySubs(true)}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="document-text-outline" size={20} color={colors.primary} />
-          </TouchableOpacity>
+        ) : ((hasSubs || hasSavedVisible) ? (
+          <View style={s.headerActions}>
+            {hasSavedVisible && (
+              <TouchableOpacity style={s.headerIconBtn} onPress={() => setShowSaved(true)} activeOpacity={0.75}>
+                <Ionicons name="heart-outline" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+            {hasSubs && (
+              <TouchableOpacity style={s.headerIconBtn} onPress={() => setShowMySubs(true)} activeOpacity={0.75}>
+                <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
         ) : null)}
       />
 
@@ -486,6 +542,8 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
                 item={item}
                 lang={lang}
                 showFeatured={showFeatured}
+                isSaved={placeFavorites?.has(item.id)}
+                onToggleSave={() => onTogglePlaceFavorite?.(item.id)}
                 onPress={() => onSelectPlace?.(item)}
               />
             )}
@@ -515,6 +573,8 @@ const s = StyleSheet.create({
   viewToggle:   { minWidth: 70, alignItems: 'flex-end',
                   padding: 6, borderRadius: radius.sm,
                   backgroundColor: colors.primaryLight },
+  headerActions:{ flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerIconBtn:{ padding: 6, borderRadius: radius.sm, backgroundColor: colors.primaryLight },
 
   // Group tiles
   tilesWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 16 },
@@ -550,6 +610,10 @@ const s = StyleSheet.create({
   typePill:         { position: 'absolute', top: 10, right: 10,
                       paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   typePillText:     { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  heartBtn:         { position: 'absolute', top: 10, left: 10,
+                      width: 32, height: 32, borderRadius: 16,
+                      backgroundColor: 'rgba(0,0,0,0.35)',
+                      alignItems: 'center', justifyContent: 'center' },
 
   cardBody:     { padding: 14 },
   nameRow:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',

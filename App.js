@@ -248,6 +248,7 @@ export default function App() {
   const [ownsGarage, setOwnsGarage] = useState(false) // drives the dark-launched garages tile for owners (see gate)
   const [unclaimedFacility, setUnclaimedFacility] = useState(null)
   const [favorites, setFavorites] = useState(new Set())
+  const [placeFavorites, setPlaceFavorites] = useState(new Set())   // Explore places — SEPARATE from `favorites` (ada_fav_places), no type discriminator to corrupt the facility Saved tab
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true)
   const [authMode, setAuthMode] = useState('login')
@@ -393,6 +394,16 @@ export default function App() {
       const next = new Set(prev)
       if (next.has(id)) { next.delete(id) } else { next.add(id) }
       AsyncStorage.setItem('ada_favorites', JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  function togglePlaceFavorite(id) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setPlaceFavorites(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
+      AsyncStorage.setItem('ada_fav_places', JSON.stringify([...next]))
       return next
     })
   }
@@ -735,6 +746,8 @@ export default function App() {
     async function load() {
       const favVal = await AsyncStorage.getItem('ada_favorites')
       if (favVal) setFavorites(new Set(JSON.parse(favVal)))
+      const placeFavVal = await AsyncStorage.getItem('ada_fav_places')
+      if (placeFavVal) setPlaceFavorites(new Set(JSON.parse(placeFavVal)))
 
       const { data, error } = await supabase.from('facilities').select('*').order('name')
       if (error) setFacilityLoadError(true)
@@ -1063,11 +1076,11 @@ export default function App() {
   } else if (showLegal) {
     content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
   } else if (selectedExplorePlace) {
-    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} />
+    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} isFavorite={placeFavorites.has(selectedExplorePlace.id)} onToggleFavorite={() => togglePlaceFavorite(selectedExplorePlace.id)} />
   } else if (showExploreBeach) {
     content = (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => { setShowExploreBeach(false); setExploreBeachRegion(null) }} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} initialCategory="beach" initialRegion={exploreBeachRegion} />
+        <ExploreScreen lang={lang} onBack={() => { setShowExploreBeach(false); setExploreBeachRegion(null) }} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} />
       </BLErrorBoundary>
     )
   } else if (showExplore) {
@@ -1076,7 +1089,7 @@ export default function App() {
     // Notify-me upserts module='explore' into module_waitlist (shape-guard accepts it now).
     content = (MODULE_FLAGS.explore || isAdmin) ? (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} isAdmin={isAdmin} />
+        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />
@@ -1084,7 +1097,7 @@ export default function App() {
   } else if (adminPreview === 'explore') {
     content = (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} isAdmin={isAdmin} />
+        <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     )
   } else if (showNewcomerEssentials) {
