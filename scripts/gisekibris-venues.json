@@ -1,0 +1,25 @@
+{
+  "_note": "Venue -> coordinate lookup for the Gise Kibris import. Coordinates are Google Maps place pins (!8m2!3d/!4d), user-verified. Do not invent values; leave null until verified.",
+  "_coverage": "48/69 events",
+  "venues": [
+    { "venue": "Cage Club", "city": "Girne", "event_count": 28, "latitude": 35.3351422, "longitude": 33.3654195 },
+    { "venue": "Girne Amfi Tiyatro", "city": "Girne", "event_count": 6, "latitude": 35.33964, "longitude": 33.326215 },
+    { "venue": "Cratos Premium Hotel", "city": "Girne", "event_count": 5, "latitude": 35.3319324, "longitude": 33.3645774 },
+    { "venue": "Pera Mackenzie", "city": "İskele", "event_count": 5, "latitude": 35.2486866, "longitude": 33.9030381 },
+    { "venue": "Chamada Club", "city": "Girne", "event_count": 4, "latitude": 35.3333834, "longitude": 33.4012309 },
+    { "venue": "Mısırlızade Açık Hava Sahnesi", "city": "Lefkoşa", "event_count": 3, "latitude": null, "longitude": null },
+    { "venue": "Girne Belediyesi Batı Doğa Parkı", "city": "Girne", "event_count": 3, "latitude": null, "longitude": null },
+    { "venue": "Ülfet Beach", "city": "Girne", "event_count": 2, "latitude": null, "longitude": null },
+    { "venue": "Rocks LYRA", "city": "Girne", "event_count": 2, "latitude": null, "longitude": null },
+    { "venue": "Coco Bongo Island", "city": "Girne", "event_count": 2, "latitude": null, "longitude": null },
+    { "venue": "Concorde Aria", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "Gates of Zion", "city": "Lefkoşa", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "Girne Antik Liman", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "Chill Beach Bar", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "The Arkın Colony Hotel", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "Odyssey Club", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "Celebrity Hotel", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "Elexus Hotel", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "Salamis Antik Tiyatro", "city": "Gazimağusa", "event_count": 1, "latitude": null, "longitude": null }
+  ]
+}

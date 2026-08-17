@@ -99,7 +99,9 @@ WITH report AS (
     ('0824_place_moderation','places','hidden_reason'),
     ('0825_places_column_guards','places','featured_until'),
     ('0825_places_column_guards','places','featured_requested_at'),
-    ('0829_place_resubmit','places','resubmit_count')
+    ('0829_place_resubmit','places','resubmit_count'),
+    ('0830_events_gisekibris_import','events','source_image_url'),
+    ('0830_events_gisekibris_import','events','description_i18n')
   ) e(m,t,c)
 
   UNION ALL
@@ -234,7 +236,8 @@ WITH report AS (
     ('0822_places_consolidation','places_region_check'),
     ('0822_places_consolidation','places_status_check'),
     ('0822_places_consolidation','places_access_type_check'),
-    ('0826_place_claims','place_claims_status_check')
+    ('0826_place_claims','place_claims_status_check'),
+    ('0830_events_gisekibris_import','events_description_i18n_check')
   ) e(m,o)
 
   UNION ALL
@@ -273,7 +276,10 @@ WITH report AS (
     ('0822_places_consolidation','idx_places_provider'),
     ('0822_places_consolidation','idx_places_submitted_by'),
     ('0826_place_claims','idx_place_claims_place_id'),
-    ('0826_place_claims','idx_place_claims_requester_id')
+    ('0826_place_claims','idx_place_claims_requester_id'),
+    -- UNIQUE: correctness. Replaces the partial index events_external_id_key
+    -- (never registered here), which ON CONFLICT could not infer.
+    ('0830_events_gisekibris_import','events_external_id_unique')
   ) e(m,o)
 
   UNION ALL
@@ -313,6 +319,12 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='events_category_check'
         AND pg_get_constraintdef(c.oid) ILIKE '%music%'
         AND pg_get_constraintdef(c.oid) ILIKE '%concert%')
+    -- The widening keeps the constraint NAME, so E-constraint existence cannot see
+    -- it. Without this token a DB still on the 500-char limit reads as OK, and the
+    -- Gişe Kıbrıs import (longest row 2039 chars) fails at insert time.
+    UNION ALL SELECT '0830_events_gisekibris_import','events_description_check widened to 2500',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='events_description_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%2500%')
     UNION ALL SELECT '0719_fix_signup','profiles_role_check allows home_service_provider',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='profiles_role_check'
         AND pg_get_constraintdef(c.oid) ILIKE '%home_service_provider%')
