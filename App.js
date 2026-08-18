@@ -873,6 +873,11 @@ export default function App() {
   }
 
   let content
+  // True only when the tab shell (the final else of the chain below) renders.
+  // Every pushed module screen short-circuits earlier in that same chain, so this
+  // IS "no pushed screen open" — derived from the chain itself rather than by
+  // restating its ~25 flags, which would drift the moment a module is added.
+  let inTabShell = false
 
   // Admins bypass the marketplace module gate to preview a "Coming soon" module.
   // (Mirrors the existing garagesTileVisible admin check.) Admins normally render
@@ -1265,6 +1270,7 @@ export default function App() {
     //   (MODULE_FLAGS.studentHub || isAdmin) ? <StudentHubScreen/> : <ComingSoonScreen/>
     content = <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
   } else {
+    inTabShell = true
     const favList = facilities.filter(f => favorites.has(f.id))
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
     // drawer holds settings & app options. `dividerBefore` opens a visual group.
@@ -1568,7 +1574,16 @@ export default function App() {
 
   // Oli is hidden under either sheet (same reason it hides for the drawer and
   // coach marks — they are root overlays and would cover the floating button).
-  const oliVisible = inCustomerHub && !cityWelcomeVisible && !homeCityAskVisible
+  //
+  // HOME ONLY: `inTabShell` rules out every pushed module screen, `activeTab` rules
+  // out the Map / Saved / Profile tabs. Testers read a chatbot that follows you into
+  // every screen as clutter, and on Map it sat over the pan surface.
+  // Drag, edge-snap and @trnc_oli_pos persistence are untouched: bounds in
+  // OliGuide.js come from useWindowDimensions + safe-area insets, never from a
+  // screen's own layout, so a position saved elsewhere still clamps correctly here.
+  const oliVisible =
+    inTabShell && activeTab === 'home' &&
+    inCustomerHub && !cityWelcomeVisible && !homeCityAskVisible
 
   // Explicit answer -> asked=true, and city welcome goes live. 'visiting' is a
   // real answer, not an absence of one: it means every city is welcome-eligible.
