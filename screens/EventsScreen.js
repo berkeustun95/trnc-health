@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView,
   Image, Dimensions, ActivityIndicator, RefreshControl, Linking,
-  Modal, Platform,
+  Modal, Platform, Animated, PanResponder,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
@@ -16,7 +16,7 @@ import { t, tCity, LANG_CODES } from '../constants/i18n'
 import { resolveRegion } from '../utils/resolveRegion'
 import { openTicketUrl } from '../utils/events'
 
-const { width: SCREEN_W } = Dimensions.get('window')
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 
 // Card height AND thumbnail edge — one number, because the thumbnail is a true
 // square driven by the card height rather than by a width percentage. A percentage
@@ -218,11 +218,133 @@ function EventCard({ event, lang, onPress }) {
   )
 }
 
+// ─── Fullscreen image viewer ─────────────────────────────────────────────────
+
+// No pinch-zoom: react-native-gesture-handler is not a dependency of this app and
+// adding it would force a native build. Tap / swipe-down / Android back all close.
+// PanResponder is core RN, so this whole viewer ships over the air.
+function ImageViewer({ images, startIndex, onClose }) {
+  const insets = useSafeAreaInsets()
+  const [page, setPage] = useState(startIndex)
+  const dragY = useRef(new Animated.Value(0)).current
+
+  // The PanResponder is built once, so it would capture the first onClose forever.
+  // A ref keeps it pointed at the current one.
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+
+  const responder = useRef(
+    PanResponder.create({
+      // Axis lock: only claim a clearly vertical drag, so a horizontal swipe still
+      // reaches the pager underneath on multi-image events.
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dy) > Math.abs(g.dx) * 1.5 && Math.abs(g.dy) > 10,
+      onPanResponderMove: (_, g) => { if (g.dy > 0) dragY.setValue(g.dy) },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 120 || g.vy > 0.8) { closeRef.current(); return }
+        Animated.spring(dragY, { toValue: 0, useNativeDriver: true }).start()
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(dragY, { toValue: 0, useNativeDriver: true }).start()
+      },
+    })
+  ).current
+
+  // Backdrop thins out as the poster is dragged away, so the dismiss reads as a
+  // gesture rather than a jump cut.
+  const backdropOpacity = dragY.interpolate({
+    inputRange: [0, 250], outputRange: [1, 0.2], extrapolate: 'clamp',
+  })
+
+  return (
+    <Modal visible transparent statusBarTranslucent animationType="fade" onRequestClose={onClose}>
+      <Animated.View style={[s.viewerBackdrop, { opacity: backdropOpacity }]} />
+
+      <Animated.View
+        style={[s.viewerStage, { transform: [{ translateY: dragY }] }]}
+        {...responder.panHandlers}
+      >
+        {images.length > 1 ? (
+          <FlatList
+            data={images}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(_, i) => String(i)}
+            initialScrollIndex={startIndex}
+            getItemLayout={(_, i) => ({ length: SCREEN_W, offset: SCREEN_W * i, index: i })}
+            onMomentumScrollEnd={e => setPage(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))}
+            renderItem={({ item }) => (
+              <TouchableOpacity activeOpacity={1} onPress={onClose}>
+                <Image source={{ uri: item }} style={s.viewerImage} resizeMode="contain" />
+              </TouchableOpacity>
+            )}
+          />
+        ) : (
+          <TouchableOpacity activeOpacity={1} onPress={onClose}>
+            <Image source={{ uri: images[0] }} style={s.viewerImage} resizeMode="contain" />
+          </TouchableOpacity>
+        )}
+      </Animated.View>
+
+      <TouchableOpacity
+        style={[s.viewerClose, { top: insets.top + 8 }]}
+        onPress={onClose}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        accessibilityRole="button"
+      >
+        <Ionicons name="close" size={24} color="#fff" />
+      </TouchableOpacity>
+
+      {images.length > 1 && (
+        <View style={[s.viewerCounter, { bottom: insets.bottom + 24 }]}>
+          <Text style={s.viewerCounterText}>{page + 1} / {images.length}</Text>
+        </View>
+      )}
+    </Modal>
+  )
+}
+
 // ─── Event Detail ────────────────────────────────────────────────────────────
+
+// Hero aspect clamp. 3:4 stops a very tall poster from eating the whole screen
+// before the title is reachable; 16/9 stops a panorama from becoming a letterbox
+// strip. Real content sits at 1:1 (66 of the 68 measured partner posters), which is
+// also the default below — so the adaptive resize is invisible on almost everything
+// and only moves for organizer uploads.
+const HERO_MIN_RATIO = 3 / 4
+const HERO_MAX_RATIO = 16 / 9
 
 function EventDetailScreen({ event, lang, onBack }) {
   const [imgIndex, setImgIndex] = useState(0)
+  const [viewerIndex, setViewerIndex] = useState(null)
+  const [heroRatio, setHeroRatio] = useState(1)
   const images = event.images ?? []
+
+  // Size the hero to the images themselves so nothing crops AND nothing pillarboxes.
+  // The pager is one height, so with several images the container takes the TALLEST
+  // (smallest ratio) and the wider ones letterbox inside it — unavoidable with a
+  // single-height pager, and moot for partner events, which carry exactly one image.
+  // Starting at 1 means the ~97% of events that are square never visibly resize.
+  useEffect(() => {
+    const urls = event.images ?? []
+    if (!urls.length) return
+    let cancelled = false
+    let smallest = Infinity
+    let done = 0
+    const settle = () => {
+      if (cancelled || ++done < urls.length || !Number.isFinite(smallest)) return
+      setHeroRatio(Math.min(HERO_MAX_RATIO, Math.max(HERO_MIN_RATIO, smallest)))
+    }
+    urls.forEach(uri => {
+      Image.getSize(
+        uri,
+        (w, h) => { if (h > 0) smallest = Math.min(smallest, w / h); settle() },
+        settle,   // unreachable image keeps the 1:1 default rather than blocking
+      )
+    })
+    return () => { cancelled = true }
+  }, [event.id])
 
   const hasCoords = event.latitude != null && event.longitude != null
   const price = priceLabel(event, lang)
@@ -262,8 +384,18 @@ function EventDetailScreen({ event, lang, onBack }) {
                   onMomentumScrollEnd={e => {
                     setImgIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))
                   }}
-                  renderItem={({ item }) => (
-                    <Image source={{ uri: item }} style={s.detailImage} resizeMode="cover" />
+                  renderItem={({ item, index }) => (
+                    <TouchableOpacity
+                      activeOpacity={0.9}
+                      onPress={() => setViewerIndex(index)}
+                      accessibilityRole="imagebutton"
+                    >
+                      <Image
+                        source={{ uri: item }}
+                        style={[s.detailImage, { aspectRatio: heroRatio }]}
+                        resizeMode="contain"
+                      />
+                    </TouchableOpacity>
                   )}
                 />
                 {images.length > 1 && (
@@ -348,6 +480,14 @@ function EventDetailScreen({ event, lang, onBack }) {
           </View>
         )}
       />
+
+      {viewerIndex != null && (
+        <ImageViewer
+          images={images}
+          startIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+        />
+      )}
     </SafeAreaView>
   )
 }
@@ -415,11 +555,8 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
     setRefreshing(false)
   }
 
-  if (selectedEvent) {
-    return <EventDetailScreen event={selectedEvent} lang={lang} onBack={() => setSelectedEvent(null)} />
-  }
-
   return (
+    <View style={s.root}>
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="events" />
       <ScreenHeader onBack={onBack} title={t('eventsTitle', lang)} lang={lang} />
@@ -563,11 +700,29 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
         </Modal>
       )}
     </SafeAreaView>
+
+    {/* Sibling of the SafeAreaView, not a child: absolute children offset from the
+        parent's PADDING box, so nesting this inside edges={['top']} would apply the
+        top inset here and again in EventDetailScreen's own SafeAreaView. Rendering
+        the detail over the list instead of in place of it is the whole fix for the
+        lost scroll position — the FlatList is never unmounted, so its native scroll
+        offset survives the round trip. */}
+    {selectedEvent && (
+      <View style={s.detailOverlay}>
+        <EventDetailScreen event={selectedEvent} lang={lang} onBack={() => setSelectedEvent(null)} />
+      </View>
+    )}
+    </View>
   )
 }
 
 const s = StyleSheet.create({
+  root:               { flex: 1, backgroundColor: colors.bg },
   safe:               { flex: 1, backgroundColor: colors.bg },
+  // zIndex AND elevation: Android can draw by elevation instead of paint order, and
+  // the list underneath is full of elevation-3 cards that would punch through.
+  detailOverlay:      { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bg,
+                        zIndex: 10, elevation: 10 },
   center:             { flex: 1, justifyContent: 'center', alignItems: 'center' },
   // paddingBottom is applied inline from the safe-area inset — see the FlatList.
   listContent:        { paddingHorizontal: 16, gap: 16 },
@@ -632,7 +787,13 @@ const s = StyleSheet.create({
 
   // Detail
   detailHeader:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
-  detailImage:        { width: SCREEN_W, height: 280 },
+  backPill:           { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#FFFFFF',
+                        borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
+  backPillText:       { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  // No fixed height — aspectRatio is set inline from the measured image, and
+  // resizeMode is contain, so the poster is never cropped. backgroundColor is the
+  // ground for the residual letterbox when a pager holds mixed ratios.
+  detailImage:        { width: SCREEN_W, backgroundColor: colors.bg },
   detailImageFallback:{ height: 200, backgroundColor: colors.bg, justifyContent: 'center', alignItems: 'center' },
   dotRow:             { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 10 },
   dot:                { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
@@ -646,6 +807,16 @@ const s = StyleSheet.create({
   descBlock:          { marginTop: 8, padding: 16, backgroundColor: colors.bg, borderRadius: 14 },
   descTitle:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 },
   descText:           { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 22 },
+
+  // Fullscreen viewer
+  viewerBackdrop:     { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.94)' },
+  viewerStage:        { flex: 1, justifyContent: 'center' },
+  viewerImage:        { width: SCREEN_W, height: SCREEN_H },
+  viewerClose:        { position: 'absolute', right: 16, width: 40, height: 40, borderRadius: 20,
+                        backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center', alignItems: 'center' },
+  viewerCounter:      { position: 'absolute', alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.55)',
+                        borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
+  viewerCounterText:  { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_700Bold', color: '#fff' },
 
   // Buy Ticket CTA
   buyBtn:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
