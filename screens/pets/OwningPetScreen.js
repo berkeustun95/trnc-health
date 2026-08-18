@@ -46,7 +46,7 @@ export default function OwningPetScreen({ lang, onBack, onNavigate }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <BackButton lang={lang} onPress={onBack} style={s.backPill} />
+        <BackButton lang={lang} onPress={onBack} />
         <Text style={s.headerTitle}>{t('petsOwningTitle', lang)}</Text>
         <View style={{ width: 60 }} />
       </View>
@@ -115,7 +115,6 @@ export default function OwningPetScreen({ lang, onBack, onNavigate }) {
 const s = StyleSheet.create({
   safe:              { flex: 1, backgroundColor: colors.bg },
   header:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  backPill:          { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.bg, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12 },
   headerTitle:       { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, textAlign: 'center' },
   scroll:            { flex: 1 },
   scrollContent:     { padding: 16, paddingBottom: 48 },

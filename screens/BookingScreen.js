@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   safe:            { flex: 1, backgroundColor: colors.bg },
   container:       { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40, flexGrow: 1 },
   center:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
-  backRow:         { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 20 },
+  backRow:         { marginBottom: 20 },
   coverHero:       { width: '100%', height: 180, borderRadius: 16, marginBottom: 12, ...shadow },
   facilityCard:    { backgroundColor: colors.cardBg, borderRadius: 16, padding: 18, marginBottom: 28, ...shadow },
   facilityCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 4 },

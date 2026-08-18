@@ -86,7 +86,7 @@ export default function VetDirectoryScreen({ lang, onBack, onOpenVet }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <BackButton lang={lang} onPress={onBack} style={s.backPill} />
+        <BackButton lang={lang} onPress={onBack} />
         <Text style={s.headerTitle}>{t('petsVetDirectoryTitle', lang)}</Text>
         <View style={{ width: 60 }} />
       </View>
@@ -129,7 +129,6 @@ export default function VetDirectoryScreen({ lang, onBack, onOpenVet }) {
 const s = StyleSheet.create({
   safe:             { flex: 1, backgroundColor: colors.bg },
   header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  backPill:         { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.bg, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12 },
   headerTitle:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, textAlign: 'center' },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   emptyIcon:        { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },

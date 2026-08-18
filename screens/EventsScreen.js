@@ -362,7 +362,7 @@ function EventDetailScreen({ event, lang, onBack }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.detailHeader}>
-        <BackButton lang={lang} onPress={onBack} style={s.backPill} />
+        <BackButton lang={lang} onPress={onBack} />
       </View>
 
       <FlatList
@@ -793,8 +793,6 @@ const s = StyleSheet.create({
 
   // Detail
   detailHeader:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
-  backPill:           { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#FFFFFF',
-                        borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
   // No fixed height — aspectRatio is set inline from the measured image, and
   // resizeMode is contain, so the poster is never cropped. backgroundColor is the
   // ground for the residual letterbox when a pager holds mixed ratios.

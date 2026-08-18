@@ -163,7 +163,7 @@ const s = StyleSheet.create({
   header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                     paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg,
                     borderBottomWidth: 1, borderBottomColor: colors.border },
-  backPill:       { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 120 },
+  backPill:       { maxWidth: 120 },
   headerTitle:    { flex: 1, textAlign: 'center', fontSize: 17, fontFamily: 'Inter_700Bold',
                     color: colors.textPrimary },
 

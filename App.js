@@ -1166,7 +1166,7 @@ export default function App() {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
-          <BackButton lang={lang} onPress={() => setUnclaimedFacility(null)} style={styles.backPill} />
+          <BackButton lang={lang} onPress={() => setUnclaimedFacility(null)} />
         </View>
         <View style={styles.unclaimedWrap}>
           <View style={styles.unclaimedIconWrap}>
@@ -1830,7 +1830,6 @@ const styles = StyleSheet.create({
   verifiedBadgeText:{ fontSize: 10, fontFamily: 'Inter_700Bold', color: '#fff' },
   bookableBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.primaryLight },
   bookableBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
-  backPill:         { flexDirection: 'row', alignItems: 'center', gap: 2 },
   unclaimedWrap:    { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
   unclaimedIconWrap:{ width: 72, height: 72, borderRadius: 22, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
   unclaimedEmoji:   { fontSize: 36 },
