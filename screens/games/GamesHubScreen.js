@@ -34,12 +34,20 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
     >
       <ScreenHeader onBack={onBack} lang={lang} title={t('gamesHubTitle', lang)} />
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        onStartShouldSetResponderCapture={e => {
+          navTrace('touch:scroll', { x: Math.round(e.nativeEvent.pageX), y: Math.round(e.nativeEvent.pageY) })
+          return false   // observe only
+        }}
+      >
         <View style={s.grid}>
           <TouchableOpacity
             style={s.tileWrap}
             activeOpacity={0.85}
-            onPress={() => onNavigate('xox')}
+            onPressIn={() => navTrace('tile:pressIn', { id: 'xox' })}
+            onPress={() => { navTrace('tile:press', { id: 'xox' }); onNavigate('xox') }}
           >
             <ContentCard style={s.tile}>
               <View style={[s.iconCircle, { backgroundColor: tint.bg }]}>
@@ -52,7 +60,8 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
           <TouchableOpacity
             style={s.tileWrap}
             activeOpacity={0.85}
-            onPress={() => onNavigate('memory')}
+            onPressIn={() => navTrace('tile:pressIn', { id: 'memory' })}
+            onPress={() => { navTrace('tile:press', { id: 'memory' }); onNavigate('memory') }}
           >
             <ContentCard style={s.tile}>
               <View style={[s.iconCircle, { backgroundColor: tint.bg }]}>
@@ -65,7 +74,8 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
           <TouchableOpacity
             style={s.tileWrap}
             activeOpacity={0.85}
-            onPress={() => onNavigate('2048')}
+            onPressIn={() => navTrace('tile:pressIn', { id: '2048' })}
+            onPress={() => { navTrace('tile:press', { id: '2048' }); onNavigate('2048') }}
           >
             <ContentCard style={s.tile}>
               <View style={[s.iconCircle, { backgroundColor: tint.bg }]}>
@@ -78,7 +88,8 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
           <TouchableOpacity
             style={s.tileWrap}
             activeOpacity={0.85}
-            onPress={() => onNavigate('sudoku')}
+            onPressIn={() => navTrace('tile:pressIn', { id: 'sudoku' })}
+            onPress={() => { navTrace('tile:press', { id: 'sudoku' }); onNavigate('sudoku') }}
           >
             <ContentCard style={s.tile}>
               <View style={[s.iconCircle, { backgroundColor: tint.bg }]}>
