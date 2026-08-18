@@ -97,6 +97,19 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
     navTrace('key-change', { from: prevKey.current, to: pushedKey, txBefore: txOf(tx) })
     prevKey.current = pushedKey
     tx.setValue(0)
+
+    // DEBUG — does the reset actually land, and does it stay landed?
+    // `reset:sync` is the value immediately after setValue. `reset:stream` is what the
+    // animated node itself reports afterwards, which is the only way to see a native
+    // animation still driving the value and overwriting the reset from underneath.
+    // The two timed samples answer whether the state persists or clears on its own.
+    navTrace('reset:sync', { tx: txOf(tx), closing: closing.current })
+    let n = 0
+    const lid = tx.addListener(({ value }) => { if (n++ < 8) navTrace('reset:stream', { tx: Math.round(value) }) })
+    const raf = requestAnimationFrame(() => navTrace('reset:frame+1', { tx: txOf(tx) }))
+    const t1 = setTimeout(() => navTrace('reset:+400ms', { tx: txOf(tx) }), 400)
+    const t2 = setTimeout(() => navTrace('reset:+1500ms', { tx: txOf(tx) }), 1500)
+    return () => { cancelAnimationFrame(raf); clearTimeout(t1); clearTimeout(t2); tx.removeListener(lid) }
   }, [pushedKey])
 
   // Return the screen to rest. Shared by a cancelled drag and a terminated one so both
@@ -112,6 +125,17 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
 
   const pan = useRef(
     PanResponder.create({
+      // DEBUG probe. Capture runs before any child sees the touch; returning false means
+      // this only observes and never claims. If taps on a frozen screen produce these
+      // lines, the touch is reaching the container and dying below it; if they produce
+      // nothing, something above the container is swallowing them.
+      onStartShouldSetPanResponderCapture: (e) => {
+        navTrace('touch', {
+          x: Math.round(e.nativeEvent.pageX), y: Math.round(e.nativeEvent.pageY),
+          tx: txOf(tx), key: prevKey.current,
+        })
+        return false
+      },
       // Taps must pass straight through to the screen.
       onStartShouldSetPanResponder: () => false,
       // NON-CAPTURE, deliberately. A child horizontal scroller wins the touch, so in
