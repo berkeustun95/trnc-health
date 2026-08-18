@@ -91,6 +91,17 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
   if (!mounted.current) { mounted.current = true; navTrace('mount', { key: pushedKey, tx: txOf(tx), swipe: swipeEnabled }) }
   useEffect(() => () => navTrace('unmount', {}), [])
 
+  // DEBUG — what is actually mounted inside the container. The touch probe sits on the
+  // container, so anything rendered BELOW it is invisible to that probe; this names the
+  // child React is holding, independently of what is on screen.
+  const childName =
+    (children && children.type && (children.type.displayName || children.type.name)) || String(children && children.type)
+  const prevChild = useRef(null)
+  if (prevChild.current !== childName) {
+    navTrace('child', { was: prevChild.current ?? '-', now: childName, key: pushedKey, tx: txOf(tx) })
+    prevChild.current = childName
+  }
+
   const prevKey = useRef(pushedKey)
   useLayoutEffect(() => {
     if (prevKey.current === pushedKey) return
