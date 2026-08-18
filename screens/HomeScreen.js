@@ -737,7 +737,7 @@ export default function HomeScreen({
         <View style={s.container}>
           <View style={[s.header, showFacilityList && { justifyContent: 'space-between' }]}>
             {showFacilityList ? (
-              <BackButton lang={lang} onPress={() => setShowFacilityList(false)} />
+              <BackButton lang={lang} onImage onPress={() => setShowFacilityList(false)} />
             ) : (
               <View style={s.headerLogoWrap} pointerEvents="none">
                 <Image source={require('../assets/logonobg.png')} style={s.headerIcon} resizeMode="contain" />
