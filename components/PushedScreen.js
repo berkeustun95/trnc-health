@@ -28,6 +28,18 @@ const DURATION_OUT = 240
 // edge first and fires hardware back, which lands on the same close(). Either way
 // there is one exit path.
 const EDGE_ZONE       = 32    // one width everywhere — no per-screen variation
+// How far the finger must travel horizontally before the gesture claims the touch.
+//
+// THIS NUMBER IS A BUG FIX, not a feel preference. At the original 6px the responder
+// took taps away from buttons: a press starts on a child Touchable, but the parent's
+// onMoveShouldSetPanResponder is polled on every move, and when it returns true React
+// Native asks the current responder to give the touch up — which Touchables grant by
+// default (the same mechanism that lets a ScrollView steal a press once you scroll).
+// The press is cancelled and onPress never fires, so the control silently does nothing.
+// 6px is inside ordinary finger jitter on a tap; 24 is about three times the platform
+// touch slop, so a tap cannot reach it while a real swipe crosses it within a frame or
+// two. Do not lower it without re-reading this.
+const ACTIVATE_DISTANCE = 24
 const COMMIT_DISTANCE = 0.35  // fraction of the screen that commits the pop
 const COMMIT_VELOCITY = 0.5
 const CANCEL_DURATION = 180
@@ -92,12 +104,16 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       onMoveShouldSetPanResponder: (_, g) =>
         swipeRef.current &&
         !closing.current &&
-        g.x0 <= EDGE_ZONE &&           // must START at the edge
-        g.dx > 6 &&                    // rightward only
+        g.x0 <= EDGE_ZONE &&                 // must START at the edge
+        g.dx > ACTIVATE_DISTANCE &&          // rightward, and past a tap's jitter
         Math.abs(g.dx) > Math.abs(g.dy) * 1.5,   // and clearly horizontal
-      onPanResponderMove: (_, g) => { tx.setValue(Math.max(0, g.dx)) },
+      // The activation distance is subtracted so the screen starts moving from rest at
+      // the moment the gesture is claimed. Tracking raw g.dx would snap it 24px sideways
+      // on the first frame — trading the dead button for a visible jump.
+      onPanResponderMove: (_, g) => { tx.setValue(Math.max(0, g.dx - ACTIVATE_DISTANCE)) },
       onPanResponderRelease: (_, g) => {
-        const far  = g.dx > widthRef.current * COMMIT_DISTANCE
+        const travel = g.dx - ACTIVATE_DISTANCE      // what the user actually saw move
+        const far  = travel > widthRef.current * COMMIT_DISTANCE
         const fast = g.vx > COMMIT_VELOCITY
         if (far || fast) {
           closeRef.current?.()          // same close() as the button and hardware back
