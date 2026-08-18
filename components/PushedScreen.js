@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import { View, StyleSheet, Animated, Easing, Dimensions, PanResponder } from 'react-native'
 import { navTrace, txOf } from '../utils/navTrace'   // DEBUG — remove with the trace
+import { devAssert } from '../utils/devAssert'
 
 // The container every pushed module screen renders inside: it draws its child over
 // the persistent tab shell and slides it in and out.
@@ -40,7 +41,13 @@ const EDGE_ZONE       = 32    // one width everywhere — no per-screen variatio
 // 6px is inside ordinary finger jitter on a tap; 24 is about three times the platform
 // touch slop, so a tap cannot reach it while a real swipe crosses it within a frame or
 // two. Do not lower it without re-reading this.
-const ACTIVATE_DISTANCE = 24
+// Now that the edge gate actually gates (see startX below), this no longer has to do
+// the whole job of keeping taps out. 24 was compensation for a gate that was passing
+// everything. 16 is twice Android's 8dp touch slop and above iOS's ~10pt, so a press
+// cannot reach it, while a deliberate swipe crosses it almost immediately. It is not
+// dropped to the slop floor because the back button spans x=16..60 — its left third is
+// still inside the zone, so this term keeps a real job.
+const ACTIVATE_DISTANCE = 16
 const COMMIT_DISTANCE = 0.35  // fraction of the screen that commits the pop
 const COMMIT_VELOCITY = 0.5
 const CANCEL_DURATION = 180
@@ -80,6 +87,14 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
   const swipeRef = useRef(swipeEnabled); swipeRef.current = swipeEnabled
   const closeRef = useRef(null)
 
+  // The REAL x of the touch that started this gesture. gestureState.x0 cannot be used:
+  // React Native initialises it to 0 and only assigns it in onResponderGrant, so during
+  // onMoveShouldSetPanResponder — which runs before any grant — it is always 0 and
+  // `x0 <= EDGE_ZONE` is always true. That is why the edge zone never existed.
+  const startX = useRef(0)
+  // Whether a swipe is genuinely in flight. Cleared on every exit path.
+  const gestureActive = useRef(false)
+
   // Nothing is reset on mount: `prevKey` starts equal, so the entry animation is not
   // cut short. On any later change the child has swapped inside this container — a
   // nested push or pop — and the transform is parked at rest before the frame is drawn.
@@ -89,7 +104,11 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
   // that case never needed a reset, it only ever caused the flash.
   const mounted = useRef(false)
   if (!mounted.current) { mounted.current = true; navTrace('mount', { key: pushedKey, tx: txOf(tx), swipe: swipeEnabled }) }
-  useEffect(() => () => navTrace('unmount', {}), [])
+  useEffect(() => () => {
+    // Exit path 5. A container torn down mid-gesture must not leave the flag set.
+    gestureActive.current = false
+    navTrace('unmount', {})
+  }, [])
 
   // DEBUG — what is actually mounted inside the container. The touch probe sits on the
   // container, so anything rendered BELOW it is invisible to that probe; this names the
@@ -140,7 +159,10 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       // this only observes and never claims. If taps on a frozen screen produce these
       // lines, the touch is reaching the container and dying below it; if they produce
       // nothing, something above the container is swallowing them.
+      // Capture runs at touch start, before any grant, and carries a true pageX — which
+      // is the only place the real start position is available. Recorded, never claimed.
       onStartShouldSetPanResponderCapture: (e) => {
+        startX.current = e.nativeEvent.pageX
         navTrace('touch', {
           x: Math.round(e.nativeEvent.pageX), y: Math.round(e.nativeEvent.pageY),
           tx: txOf(tx), key: prevKey.current,
@@ -156,18 +178,29 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       onMoveShouldSetPanResponder: (_, g) =>
         swipeRef.current &&
         !closing.current &&
-        g.x0 <= EDGE_ZONE &&                 // must START at the edge
+        startX.current <= EDGE_ZONE &&       // must START at the edge — see startX
         g.dx > ACTIVATE_DISTANCE &&          // rightward, and past a tap's jitter
         Math.abs(g.dx) > Math.abs(g.dy) * 1.5,   // and clearly horizontal
       // The activation distance is subtracted so the screen starts moving from rest at
       // the moment the gesture is claimed. Tracking raw g.dx would snap it 24px sideways
       // on the first frame — trading the dead button for a visible jump.
-      onPanResponderGrant: () => navTrace('gesture:grant', { key: prevKey.current, tx: txOf(tx) }),
+      onPanResponderGrant: () => {
+        gestureActive.current = true
+        // The invariant the old gate silently violated. If a grant ever happens from
+        // outside the edge zone again, this says so instead of manifesting three weeks
+        // later as an unresponsive screen.
+        devAssert(
+          startX.current <= EDGE_ZONE,
+          `swipe granted from x=${Math.round(startX.current)}, outside the ${EDGE_ZONE}px edge zone — the activation gate is not gating`,
+        )
+        navTrace('gesture:grant', { key: prevKey.current, startX: Math.round(startX.current), tx: txOf(tx) })
+      },
       onPanResponderMove: (_, g) => { tx.setValue(Math.max(0, g.dx - ACTIVATE_DISTANCE)) },
       onPanResponderRelease: (_, g) => {
         const travel = g.dx - ACTIVATE_DISTANCE      // what the user actually saw move
         const far  = travel > widthRef.current * COMMIT_DISTANCE
         const fast = g.vx > COMMIT_VELOCITY
+        gestureActive.current = false
         navTrace('gesture:release', { dx: Math.round(g.dx), commit: far || fast, tx: txOf(tx) })
         if (far || fast) {
           closeRef.current?.('gesture')  // same close() as the button and hardware back
@@ -185,7 +218,7 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       // stranded one is a full-screen invisible surface sitting over the shell and eating
       // every tap. Termination is reachable in normal use: the OS interrupts for a call
       // or notification shade, or an ancestor claims the touch mid-drag.
-      onPanResponderTerminate: () => { navTrace('gesture:terminate', { tx: txOf(tx) }); settle() },
+      onPanResponderTerminate: () => { gestureActive.current = false; navTrace('gesture:terminate', { tx: txOf(tx) }); settle() },
     })
   ).current
 
@@ -199,6 +232,7 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       // accommodation).
       if (closing.current) { navTrace('close:BLOCKED', { src, key: prevKey.current }); return }
       closing.current = true
+      gestureActive.current = false   // exit path 3 and 4: button and hardware back
       navTrace('close:start', { src, key: prevKey.current, tx: txOf(tx) })
       Animated.timing(tx, {
         toValue: width,
