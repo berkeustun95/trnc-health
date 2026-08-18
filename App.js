@@ -863,6 +863,10 @@ export default function App() {
   // only: the gesture would fight the screen's own (maps, a game whose input IS a
   // swipe), or an accidental pop would lose typed form data.
   let swipeEnabled = true
+  // Stable identity of the screen on top. NOT a React key — it must not remount the
+  // container, or a nested pop would slide the parent in from the right. It only tells
+  // PushedScreen that its child swapped, so the transform can be parked before paint.
+  let pushedKey = null
 
   // Admins bypass the marketplace module gate to preview a "Coming soon" module.
   // (Mirrors the existing garagesTileVisible admin check.) Admins normally render
@@ -1004,6 +1008,7 @@ export default function App() {
     content = <InsuranceDashboardScreen session={session} lang={lang} />
   } else if (showNotifs) {
     dismiss = () => { setShowNotifs(false); supabase.from('notifications').update({ read: true }).eq('user_id', session.user.id).then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))) }
+    pushedKey = 'notifications'
     pushed = <NotificationsScreen
       notifications={notifications}
       loading={notifsLoading}
@@ -1019,15 +1024,18 @@ export default function App() {
     />
   } else if (showDutyList) {
     dismiss = () => { setShowDutyList(false); setDutyRegion(null) }
+    pushedKey = 'duty'
     pushed = <DutyListScreen onBack={closePushed} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
   } else if (showEvents) {
     dismiss = () => { setShowEvents(false); setEventsDistrict(null) }
+    pushedKey = 'events'
     pushed = (MODULE_FLAGS.events || isAdmin)
       ? <EventsScreen lang={lang} onBack={closePushed} initialDistrict={eventsDistrict} />
       : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={closePushed} />
   } else if (showAgentOnboarding) {
     swipeEnabled = false   // form — an accidental pop loses the agent application
     dismiss = () => setShowAgentOnboarding(false)
+    pushedKey = 'agentOnboarding'
     pushed = (
       <EstateAgentOnboardingScreen
         session={session}
@@ -1038,6 +1046,7 @@ export default function App() {
     )
   } else if (openedProperty) {
     dismiss = () => setOpenedProperty(null)
+    pushedKey = 'property'
     pushed = (
       <PropertyDetailScreen
         property={openedProperty}
@@ -1047,6 +1056,7 @@ export default function App() {
     )
   } else if (showAccommodation) {
     dismiss = () => setShowAccommodation(false)
+    pushedKey = 'accommodation'
     pushed = (MODULE_FLAGS.accommodation || isAdmin) ? (
       <AccommodationScreen
         lang={lang}
@@ -1060,36 +1070,44 @@ export default function App() {
     )
   } else if (showHomeServices) {
     dismiss = () => setShowHomeServices(false)
+    pushedKey = 'homeServices'
     pushed = (MODULE_FLAGS.homeServices || isAdmin)
       ? <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} />
       : <ComingSoonScreen lang={lang} moduleKey="homeServices" titleKey="menuHomeServices" session={session} onBack={closePushed} />
   } else if (showJobPostings) {
     dismiss = () => setShowJobPostings(false)
+    pushedKey = 'jobs'
     pushed = (MODULE_FLAGS.jobs || isAdmin)
       ? <JobPostingsScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} />
       : <ComingSoonScreen lang={lang} moduleKey="jobs" titleKey="menuJobPostings" session={session} onBack={closePushed} />
   } else if (showTransport) {
     dismiss = () => setShowTransport(false)
+    pushedKey = 'transport'
     pushed = (MODULE_FLAGS.transport || isAdmin)
       ? <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} />
       : <ComingSoonScreen lang={lang} moduleKey="transport" titleKey="menuTransportation" session={session} onBack={closePushed} />
   } else if (showInsurance) {
     dismiss = () => setShowInsurance(false)
+    pushedKey = 'insurance'
     pushed = (MODULE_FLAGS.insurance || isAdmin)
       ? <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} />
       : <ComingSoonScreen lang={lang} moduleKey="insurance" titleKey="menuInsurance" session={session} onBack={closePushed} />
   } else if (showEsim) {
     dismiss = () => setShowEsim(false)
+    pushedKey = 'esim'
     pushed = <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} />
   } else if (showLegal) {
     dismiss = () => setShowLegal(false)
+    pushedKey = 'legal'
     pushed = <LegalScreen lang={lang} onBack={closePushed} />
   } else if (selectedExplorePlace) {
     dismiss = () => setSelectedExplorePlace(null)
+    pushedKey = 'explorePlace'
     pushed = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={closePushed} onRequireAccount={requireAccount} isFavorite={placeFavorites.has(selectedExplorePlace.id)} onToggleFavorite={() => togglePlaceFavorite(selectedExplorePlace.id)} />
   } else if (showExploreBeach) {
     swipeEnabled = false   // MapView pans in every direction
     dismiss = () => { setShowExploreBeach(false); setExploreBeachRegion(null) }
+    pushedKey = 'exploreBeach'
     pushed = (
       <BLErrorBoundary>
         <ExploreScreen lang={lang} onBack={closePushed} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} />
@@ -1098,6 +1116,7 @@ export default function App() {
   } else if (showExplore) {
     swipeEnabled = false   // MapView pans in every direction
     dismiss = () => setShowExplore(false)
+    pushedKey = 'explore'
     // Public Explore tile — gated on MODULE_FLAGS.explore (|| isAdmin, house pattern; admins
     // never reach HomeScreen so it's moot for the tile path). Dark today → Coming Soon, whose
     // Notify-me upserts module='explore' into module_waitlist (shape-guard accepts it now).
@@ -1116,6 +1135,7 @@ export default function App() {
     )
   } else if (showNewcomerEssentials) {
     dismiss = () => setShowNewcomerEssentials(false)
+    pushedKey = 'newcomer'
     pushed = (
       <NewcomerEssentialsScreen
         lang={lang}
@@ -1125,9 +1145,11 @@ export default function App() {
     )
   } else if (showExchangeRates) {
     dismiss = () => setShowExchangeRates(false)
+    pushedKey = 'exchange'
     pushed = <ExchangeRatesScreen lang={lang} onBack={closePushed} />
   } else if (showGames) {
     dismiss = gamesSubScreen ? () => setGamesSubScreen(null) : () => setShowGames(false)
+    pushedKey = gamesSubScreen ? `games:${gamesSubScreen}` : 'games'
     if (gamesSubScreen === 'xox') {
       pushed = <XoxGameScreen lang={lang} onBack={closePushed} />
     } else if (gamesSubScreen === 'memory') {
@@ -1142,6 +1164,7 @@ export default function App() {
     }
   } else if (showPets) {
     dismiss = (!MODULE_FLAGS.pets && !isAdmin) ? () => setShowPets(false) : petsSubScreen ? () => setPetsSubScreen(null) : () => setShowPets(false)
+    pushedKey = petsSubScreen ? `pets:${petsSubScreen}` : 'pets'
     if (!MODULE_FLAGS.pets && !isAdmin) {
       pushed = <ComingSoonScreen lang={lang} moduleKey="pets" titleKey="menuPets" session={session} onBack={closePushed} />
     } else if (petsSubScreen === 'bringing') {
@@ -1177,6 +1200,7 @@ export default function App() {
     }
   } else if (unclaimedFacility) {
     dismiss = () => setUnclaimedFacility(null)
+    pushedKey = 'unclaimed'
     pushed = (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
@@ -1257,10 +1281,12 @@ export default function App() {
   } else if (bookingFacility) {
     swipeEnabled = false   // form — an accidental pop loses the booking in progress
     dismiss = () => setBookingFacility(null)
+    pushedKey = 'booking'
     pushed = <BookingScreen facility={bookingFacility} session={session} lang={lang} blockedUntil={profile?.blocked_until} onBack={closePushed} />
   } else if (selectedFacility) {
     swipeEnabled = false   // MapView (mini map) plus a horizontal photo strip
     dismiss = () => { setSelectedFacility(null); setBookingFacility(null) }
+    pushedKey = 'facility'
     pushed = <FacilityProfileScreen
       facility={selectedFacility}
       lang={lang}
@@ -1273,16 +1299,19 @@ export default function App() {
     />
   } else if (showGrooming) {
     dismiss = () => setShowGrooming(false)
+    pushedKey = 'grooming'
     pushed = (MODULE_FLAGS.grooming || isAdmin)
       ? <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} onOpenFacility={setSelectedFacility} />
       : <ComingSoonScreen lang={lang} moduleKey="grooming" titleKey="menuGrooming" session={session} onBack={closePushed} />
   } else if (showGarages) {
     dismiss = () => setShowGarages(false)
+    pushedKey = 'garages'
     pushed = (MODULE_FLAGS.garages || isAdmin || ownsGarage)
       ? <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} onOpenFacility={setSelectedFacility} isAdmin={profile?.role === 'admin'} />
       : <ComingSoonScreen lang={lang} moduleKey="garages" titleKey="menuGarages" session={session} onBack={closePushed} />
   } else if (showStudentHub) {
     dismiss = () => setShowStudentHub(false)
+    pushedKey = 'studentHub'
     // No StudentHubScreen in main yet (it lives on the unmerged feat/student-hub
     // branch). Route ALL users — admins included — to Coming Soon; the flag exists
     // so a future merge can restore the standard gate:
@@ -1634,7 +1663,7 @@ export default function App() {
       <View style={{ flex: 1 }}>
         {content}
         {pushed ? (
-          <PushedScreen ref={pushedRef} onClosed={dismiss} swipeEnabled={swipeEnabled}>
+          <PushedScreen ref={pushedRef} onClosed={dismiss} swipeEnabled={swipeEnabled} pushedKey={pushedKey}>
             {pushed}
           </PushedScreen>
         ) : null}

@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import { View, StyleSheet, Animated, Easing, Dimensions, PanResponder } from 'react-native'
 
 // The container every pushed module screen renders inside: it draws its child over
@@ -32,7 +32,7 @@ const COMMIT_DISTANCE = 0.35  // fraction of the screen that commits the pop
 const COMMIT_VELOCITY = 0.5
 const CANCEL_DURATION = 180
 
-const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swipeEnabled = true }, ref) {
+const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swipeEnabled = true, pushedKey }, ref) {
   // Measured per render rather than at module scope so a rotation or a foldable does
   // not leave the screen animating to a stale width.
   const width = Dimensions.get('window').width
@@ -66,6 +66,20 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
   const widthRef = useRef(width); widthRef.current = width
   const swipeRef = useRef(swipeEnabled); swipeRef.current = swipeEnabled
   const closeRef = useRef(null)
+
+  // Nothing is reset on mount: `prevKey` starts equal, so the entry animation is not
+  // cut short. On any later change the child has swapped inside this container — a
+  // nested push or pop — and the transform is parked at rest before the frame is drawn.
+  // On a pop it is off-screen at +width, so this is what brings the parent in; on a
+  // forward push it is already 0 and this is a no-op. If the container is unmounting
+  // instead (the last screen closing) no effect runs at all, which is exactly right —
+  // that case never needed a reset, it only ever caused the flash.
+  const prevKey = useRef(pushedKey)
+  useLayoutEffect(() => {
+    if (prevKey.current === pushedKey) return
+    prevKey.current = pushedKey
+    tx.setValue(0)
+  }, [pushedKey])
 
   const pan = useRef(
     PanResponder.create({
@@ -121,14 +135,16 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
         // The flag is cleared only here. This is the whole reason close() exists:
         // clearing it up front would unmount the screen before it could animate.
         //
-        // ORDER MATTERS on the four nested pushes, where clearing the flag swaps the
-        // child to the PARENT screen instead of unmounting this container. Clearing
-        // first means the swap happens while the container is still parked off-screen
-        // at +width, and the reset below then brings the parent straight in. Resetting
-        // first would snap the screen we just slid away back to rest for a frame before
-        // it swapped — a visible bounce. Worst case in this order is one frame of shell.
+        // NOTHING TOUCHES THE TRANSFORM HERE. It used to reset to 0 on this line, which
+        // is what made the exit bounce: this callback clears the flag through React, so
+        // that update is batched to the next commit, while setValue writes to the native
+        // view immediately. The container was therefore still showing the OUTGOING screen
+        // when it snapped from off-screen back to rest — visible as the screen going back,
+        // coming forward again, then landing. Reordering the two lines cannot fix it,
+        // because they are not racing on one timeline: one is synchronous to native and
+        // the other is deferred to React, so the reset always wins. The reset now happens
+        // in the layout effect below, after the new child is committed.
         onClosedRef.current?.()
-        tx.setValue(0)
         // Re-arm: this instance survives a nested pop and must close again next press.
         closing.current = false
       })
