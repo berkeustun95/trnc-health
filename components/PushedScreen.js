@@ -93,6 +93,17 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
     tx.setValue(0)
   }, [pushedKey])
 
+  // Return the screen to rest. Shared by a cancelled drag and a terminated one so both
+  // recover through exactly one path.
+  const settle = () => {
+    Animated.timing(tx, {
+      toValue: 0,
+      duration: CANCEL_DURATION,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start()
+  }
+
   const pan = useRef(
     PanResponder.create({
       // Taps must pass straight through to the screen.
@@ -118,16 +129,20 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
         if (far || fast) {
           closeRef.current?.()          // same close() as the button and hardware back
         } else {
-          Animated.timing(tx, {
-            toValue: 0,
-            duration: CANCEL_DURATION,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }).start()
+          settle()
         }
       },
       // Never hand a half-finished drag to an ancestor.
       onPanResponderTerminationRequest: () => false,
+      // A terminated gesture never reaches onPanResponderRelease, so without this the
+      // transform is left wherever the finger stopped and NOTHING recovers it: the only
+      // other reset is the layout effect, which fires solely on a pushedKey change, so a
+      // re-render with the same screen leaves it stranded. That state is not merely
+      // cosmetic — this container is absoluteFill and still carries panHandlers, so a
+      // stranded one is a full-screen invisible surface sitting over the shell and eating
+      // every tap. Termination is reachable in normal use: the OS interrupts for a call
+      // or notification shade, or an ancestor claims the touch mid-drag.
+      onPanResponderTerminate: () => { settle() },
     })
   ).current
 
