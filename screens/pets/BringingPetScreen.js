@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
+import BackButton from '../../components/BackButton'
 
 // Upload PIB.01 PDF to Supabase Storage (bucket: documents, path: pib01.pdf)
 // then replace null with the public object URL.
@@ -129,10 +130,7 @@ export default function BringingPetScreen({ lang, onBack }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <TouchableOpacity style={s.backPill} onPress={onBack}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backPillText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
+        <BackButton lang={lang} onPress={onBack} style={s.backPill} />
         <Text style={s.headerTitle}>{t('petsBringTitle', lang)}</Text>
         <View style={{ width: 60 }} />
       </View>
@@ -239,7 +237,6 @@ const s = StyleSheet.create({
   safe:                 { flex: 1, backgroundColor: colors.bg },
   header:               { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
   backPill:             { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.bg, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12 },
-  backPillText:         { fontSize: 14, color: colors.textPrimary, fontFamily: 'Inter_400Regular' },
   headerTitle:          { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, textAlign: 'center' },
   scroll:               { flex: 1 },
   scrollContent:        { padding: 16, paddingBottom: 48 },

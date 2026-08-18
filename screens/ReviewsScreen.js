@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import BackButton from '../components/BackButton'
 
 const PAGE = 20
 
@@ -92,10 +93,7 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack, onRe
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <View style={s.header}>
-        <TouchableOpacity onPress={onBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
-          <Text style={s.backText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
+        <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
       </View>
 
       {loading ? (
@@ -155,7 +153,6 @@ const s = StyleSheet.create({
   safe:          { flex: 1, backgroundColor: colors.bg },
   header:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   backBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backText:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   center:        { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list:          { paddingHorizontal: 16, paddingBottom: 40 },
   facilityName:  { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5, marginBottom: 2 },

@@ -16,6 +16,7 @@ import { getNatLabel } from '../constants/nationalityTranslations'
 import LegalScreen from './LegalScreen'
 import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { PRESET_AVATARS, getPreset } from '../constants/avatars'
+import BackButton from '../components/BackButton'
 
 const NATIONALITIES = [
   'Afghanistan', 'Albania', 'Algeria', 'Argentina', 'Armenia', 'Australia', 'Austria',
@@ -136,10 +137,7 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
       <KeyboardAwareForm>
         <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={s.header}>
-            <TouchableOpacity onPress={onBack} style={s.backBtn}>
-              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-              <Text style={s.backText}>{t('back', lang)}</Text>
-            </TouchableOpacity>
+            <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
             <Text style={s.title}>{t('bookingDetail', lang)}</Text>
             <View style={statusPillStyle}>
               <Text style={statusTextStyle}>{statusLabel}</Text>
@@ -563,10 +561,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           keyboardShouldPersistTaps="handled"
         >
           <View style={s.header}>
-            <TouchableOpacity onPress={onBack} style={s.backBtn}>
-              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-              <Text style={s.backText}>{t('back', lang)}</Text>
-            </TouchableOpacity>
+            <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
             <Text style={s.title}>{t('profile', lang)}</Text>
             <TouchableOpacity
               onPress={save}
@@ -880,7 +875,6 @@ const s = StyleSheet.create({
   header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 20 },
   title:            { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   backBtn:          { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  backText:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   saveText:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   avatarSection:    { alignItems: 'center', marginBottom: 24 },

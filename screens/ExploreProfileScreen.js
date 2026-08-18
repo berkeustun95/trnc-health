@@ -13,6 +13,7 @@ import { categoryToGroup, GROUP_META, CATEGORY_LABEL_KEY } from '../constants/ex
 import { EXPLORE_FEATURED_LIVE } from '../constants/flags'
 import { isFeatured } from '../utils/featured'
 import ContentReportMenu from '../components/ContentReportMenu'
+import BackButton from '../components/BackButton'
 
 const { width: W } = Dimensions.get('window')
 const GALLERY_H    = 280
@@ -104,9 +105,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       {/* Back button — overlaid on gallery */}
-      <TouchableOpacity style={[s.backBtn, { top: insets.top + 8 }]} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons name="arrow-back" size={22} color="#fff" />
-      </TouchableOpacity>
+      <BackButton variant="hero" lang={lang} onPress={onBack} style={[s.backBtn, { top: insets.top + 8 }]} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Gallery */}
@@ -308,10 +307,7 @@ const s = StyleSheet.create({
   dotActive:          { backgroundColor: '#fff', width: 18 },
 
   // Back button (overlaid)
-  backBtn: { position: 'absolute', left: 16, zIndex: 10,
-             width: 38, height: 38, borderRadius: 19,
-             backgroundColor: 'rgba(0,0,0,0.35)',
-             alignItems: 'center', justifyContent: 'center' },
+  backBtn: { position: 'absolute', left: 16, zIndex: 10 },
 
   // Body
   body:    { padding: 20, gap: 0 },

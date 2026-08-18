@@ -18,6 +18,7 @@ import Dropdown from '../components/Dropdown'
 import ListingHiddenBanner from '../components/ListingHiddenBanner'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions } from '../constants/areas'
+import BackButton from '../components/BackButton'
 
 const CATEGORIES = [
   { key: 'barber',     icon: 'cut-outline',        labelKey: 'groomCatBarber' },
@@ -277,11 +278,9 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
       return (
         <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
           <View style={s.header}>
-            <TouchableOpacity onPress={() => setManagingPhotos(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-            </TouchableOpacity>
+            <BackButton variant="bare" lang={lang} onPress={() => setManagingPhotos(false)} />
             <Text style={s.headerTitle}>{t('groomManagePhotos', lang)}</Text>
-            <View style={{ width: 24 }} />
+            <View style={{ width: 44 }} />
           </View>
           <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
             <FacilityPhotoManager
@@ -324,11 +323,9 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
     <SafeAreaView style={s.safe} edges={['top']}>
       <KeyboardAwareForm>
         <View style={s.header}>
-          <TouchableOpacity onPress={editing ? () => setEditing(false) : onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton variant="bare" lang={lang} onPress={editing ? () => setEditing(false) : onClose} />
           <Text style={s.headerTitle}>{editing ? t('groomEditTitle', lang) : t('groomRegisterTitle', lang)}</Text>
-          <View style={{ width: 24 }} />
+          <View style={{ width: 44 }} />
         </View>
 
         <ScrollView

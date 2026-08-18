@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import BackButton from '../components/BackButton'
 
 const CATEGORY_ICONS = {
   hospitality:       'restaurant-outline',
@@ -90,10 +91,7 @@ export default function JobPostingProfileScreen({ job, lang, session, onBack, on
         >
           {/* Nav bar */}
           <View style={s.navBar}>
-            <TouchableOpacity onPress={onBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-              <Text style={s.backText}>{t('back', lang)}</Text>
-            </TouchableOpacity>
+            <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
           </View>
 
           {/* Hero */}
@@ -241,7 +239,6 @@ const s = StyleSheet.create({
   navBar:            { flexDirection: 'row', alignItems: 'center',
                        paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   backBtn:           { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backText:          { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
 
   cover:             { width: '100%', height: 160, backgroundColor: colors.primaryLight,
                        justifyContent: 'center', alignItems: 'center' },

@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import BackButton from '../components/BackButton'
 
 const DISTRICTS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
 
@@ -89,10 +90,7 @@ export default function BusRoutesScreen({ lang, onBack }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <TouchableOpacity style={s.backPill} onPress={onBack}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backPillText}>{t('trTitle', lang)}</Text>
-        </TouchableOpacity>
+        <BackButton lang={lang} label={t('trTitle', lang)} onPress={onBack} style={s.backPill} />
         <Text style={s.headerTitle} numberOfLines={1}>{t('trBusTitle', lang)}</Text>
         <View style={{ width: 80 }} />
       </View>
@@ -166,7 +164,6 @@ const s = StyleSheet.create({
                     paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg,
                     borderBottomWidth: 1, borderBottomColor: colors.border },
   backPill:       { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 120 },
-  backPillText:   { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   headerTitle:    { flex: 1, textAlign: 'center', fontSize: 17, fontFamily: 'Inter_700Bold',
                     color: colors.textPrimary },
 

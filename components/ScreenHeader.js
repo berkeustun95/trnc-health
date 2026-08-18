@@ -1,7 +1,6 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Text, StyleSheet } from 'react-native'
 import { colors } from '../constants/theme'
-import { t } from '../constants/i18n'
+import BackButton from './BackButton'
 
 export default function ScreenHeader({
   onBack,
@@ -12,14 +11,9 @@ export default function ScreenHeader({
   titleIcon,
   rightElement,
 }) {
-  const label = backLabel ?? t('back', lang)
-
   return (
     <View style={s.bar}>
-      <TouchableOpacity style={s.back} onPress={onBack} activeOpacity={0.7}>
-        <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-        <Text style={s.backText}>{label}</Text>
-      </TouchableOpacity>
+      <BackButton lang={lang} label={backLabel} onPress={onBack} style={s.back} />
 
       <View style={s.center}>
         {titleIcon ? (
@@ -44,12 +38,11 @@ export default function ScreenHeader({
 
 const s = StyleSheet.create({
   bar:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                  paddingHorizontal: 16, paddingVertical: 12,
+                  paddingHorizontal: 16, paddingVertical: 2,
                   backgroundColor: colors.cardBg,
                   borderBottomWidth: 1, borderBottomColor: colors.border,
                   marginBottom: 18 },
-  back:         { flexDirection: 'row', alignItems: 'center', gap: 2, minWidth: 70 },
-  backText:     { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  back:         { minWidth: 70, justifyContent: 'flex-start' },
   center:       { flex: 1, alignItems: 'center' },
   iconTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title:        { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center' },

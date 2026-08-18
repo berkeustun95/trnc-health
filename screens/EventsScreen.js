@@ -15,6 +15,7 @@ import { colors, shadow } from '../constants/theme'
 import { t, tCity, LANG_CODES } from '../constants/i18n'
 import { resolveRegion } from '../utils/resolveRegion'
 import { openTicketUrl } from '../utils/events'
+import BackButton from '../components/BackButton'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 
@@ -361,10 +362,7 @@ function EventDetailScreen({ event, lang, onBack }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.detailHeader}>
-        <TouchableOpacity style={s.backPill} onPress={onBack}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backPillText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
+        <BackButton lang={lang} onPress={onBack} style={s.backPill} />
       </View>
 
       <FlatList
@@ -797,7 +795,6 @@ const s = StyleSheet.create({
   detailHeader:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
   backPill:           { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#FFFFFF',
                         borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
-  backPillText:       { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   // No fixed height — aspectRatio is set inline from the measured image, and
   // resizeMode is contain, so the poster is never cropped. backgroundColor is the
   // ground for the residual letterbox when a pager holds mixed ratios.

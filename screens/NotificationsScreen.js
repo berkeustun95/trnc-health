@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import BackButton from '../components/BackButton'
 
 function timeAgo(isoString) {
   const diff = Date.now() - new Date(isoString).getTime()
@@ -19,10 +20,7 @@ export default function NotificationsScreen({ notifications, loading, lang, onBa
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <TouchableOpacity onPress={onBack} style={s.backBtn}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
+        <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
         <Text style={s.title}>{t('notifications', lang)}</Text>
         {notifications.length > 0 ? (
           unreadCount > 0 ? (
@@ -90,7 +88,6 @@ const s = StyleSheet.create({
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
   title:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   backBtn:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  backText:    { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   actionBtn:   { width: 80, alignItems: 'flex-end' },
   markRead:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, textAlign: 'right' },
   clearAll:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger, textAlign: 'right' },

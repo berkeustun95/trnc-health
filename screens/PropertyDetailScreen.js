@@ -8,6 +8,7 @@ import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import BackButton from '../components/BackButton'
 
 const { width: W } = Dimensions.get('window')
 const GALLERY_H = 300
@@ -143,9 +144,7 @@ export default function PropertyDetailScreen({ property: prop, lang, onClose, on
   return (
     <SafeAreaView style={ds.safe} edges={['top']}>
       {/* Back button overlaid on gallery */}
-      <TouchableOpacity style={[ds.backBtn, { top: insets.top + 8 }]} onPress={onClose}>
-        <Ionicons name="arrow-back" size={22} color="#fff" />
-      </TouchableOpacity>
+      <BackButton variant="hero" lang={lang} onPress={onClose} style={[ds.backBtn, { top: insets.top + 8 }]} />
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Image gallery */}
@@ -311,7 +310,7 @@ function SpecItem({ icon, label }) {
 
 const ds = StyleSheet.create({
   safe:                  { flex: 1, backgroundColor: colors.bg },
-  backBtn:               { position: 'absolute', left: 16, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  backBtn:               { position: 'absolute', left: 16, zIndex: 10 },
 
   galleryImg:            { width: W, height: GALLERY_H },
   galleryPlaceholder:    { width: W, height: GALLERY_H, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },

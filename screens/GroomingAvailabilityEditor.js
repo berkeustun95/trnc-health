@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, radius, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import BackButton from '../components/BackButton'
 
 // Fresh copy of the availability sub-block (reference: ProviderScreen.js:783-884).
 // Deliberately NOT shared with the health editor — the live health path stays
@@ -98,11 +99,9 @@ export default function GroomingAvailabilityEditor({ facility, lang = 'English',
     <SafeAreaView style={s.safe} edges={['top']}>
       <KeyboardAwareForm>
         <View style={s.header}>
-          <TouchableOpacity onPress={confirmLeave} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton variant="bare" lang={lang} onPress={confirmLeave} />
           <Text style={s.headerTitle}>{t('groomAvailTitle', lang)}</Text>
-          <View style={{ width: 24 }} />
+          <View style={{ width: 44 }} />
         </View>
 
         <ScrollView

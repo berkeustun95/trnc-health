@@ -13,6 +13,7 @@ import { ReviewSkeleton, SlotGridSkeleton } from '../components/Skeleton'
 import ContentReportMenu from '../components/ContentReportMenu'
 import { notifyProvider } from '../utils/notify'
 import { HEALTH_TYPES } from '../constants/facilityTypes'
+import BackButton from '../components/BackButton'
 
 const SLOT_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const SLOT_DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -187,10 +188,11 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <TouchableOpacity onPress={onBack} style={[styles.backRow, { alignSelf: 'flex-start', marginBottom: 32 }]}>
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-            <Text style={styles.backText}>{t('back', lang)}</Text>
-          </TouchableOpacity>
+          <BackButton
+            lang={lang}
+            onPress={onBack}
+            style={[styles.backRow, { alignSelf: 'flex-start', marginBottom: 32 }]}
+          />
           <View style={[styles.successRing, { backgroundColor: '#FDE8EC' }]}>
             <Feather name="slash" size={32} color={colors.danger} />
           </View>
@@ -230,10 +232,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity onPress={onBack} style={styles.backRow}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={styles.backText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
+        <BackButton lang={lang} onPress={onBack} style={styles.backRow} />
 
         {facility.cover_image_url ? (
           <Image source={{ uri: facility.cover_image_url }} style={styles.coverHero} resizeMode="cover" />
@@ -488,7 +487,6 @@ const styles = StyleSheet.create({
   container:       { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40, flexGrow: 1 },
   center:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   backRow:         { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 20 },
-  backText:        { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   coverHero:       { width: '100%', height: 180, borderRadius: 16, marginBottom: 12, ...shadow },
   facilityCard:    { backgroundColor: colors.cardBg, borderRadius: 16, padding: 18, marginBottom: 28, ...shadow },
   facilityCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 4 },

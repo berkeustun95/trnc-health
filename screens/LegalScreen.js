@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
+import BackButton from '../components/BackButton'
 
 const PRIVACY = `Last updated: July 2026
 
@@ -92,10 +93,7 @@ export default function LegalScreen({ onBack, lang, initialTab = 'privacy' }) {
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.container}>
         <View style={s.header}>
-          <TouchableOpacity onPress={onBack} style={s.backBtn}>
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-            <Text style={s.backText}>{t('back', lang)}</Text>
-          </TouchableOpacity>
+          <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
           <Text style={s.title}>{tab === 'privacy' ? 'Privacy Policy' : 'Terms of Service'}</Text>
           <View style={s.headerRight} />
         </View>
@@ -128,7 +126,6 @@ const s = StyleSheet.create({
   container:   { flex: 1, paddingHorizontal: 16 },
   header:      { flexDirection: 'row', alignItems: 'center', paddingTop: 16, paddingBottom: 16 },
   backBtn:     { flexDirection: 'row', alignItems: 'center', gap: 2, minWidth: 70 },
-  backText:    { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   title:       { flex: 1, fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center' },
   headerRight: { minWidth: 70 },
   tabRow:      { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 12, padding: 3, marginBottom: 20 },

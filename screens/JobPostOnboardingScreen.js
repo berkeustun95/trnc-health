@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import BackButton from '../components/BackButton'
 
 const CATEGORIES = [
   { key: 'hospitality',       icon: 'restaurant-outline',          labelKey: 'jobCatHospitality' },
@@ -139,11 +140,9 @@ export default function JobPostOnboardingScreen({ session, lang, onClose }) {
     <SafeAreaView style={s.safe} edges={['top']}>
       <KeyboardAwareForm>
         <View style={s.header}>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton variant="bare" lang={lang} onPress={onClose} />
           <Text style={s.headerTitle}>{t('jobFormTitle', lang)}</Text>
-          <View style={{ width: 24 }} />
+          <View style={{ width: 44 }} />
         </View>
 
         <ScrollView

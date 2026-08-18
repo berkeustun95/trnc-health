@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, radius, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import BackButton from '../components/BackButton'
 
 // Owner-side bookings surface for garages. Clones the grooming version: reads/writes
 // appointments under the role-agnostic owner policies (facility ownership), so it needs
@@ -212,11 +213,9 @@ export default function GarageBookingsScreen({ facility, lang = 'English', onBac
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton variant="bare" lang={lang} onPress={onBack} />
         <Text style={s.headerTitle}>{t('garageBkTitle', lang)}</Text>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 44 }} />
       </View>
 
       {loading ? (

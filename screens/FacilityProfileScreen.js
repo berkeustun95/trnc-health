@@ -17,6 +17,7 @@ import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { notifyProvider } from '../utils/notify'
 import { HEALTH_TYPES } from '../constants/facilityTypes'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
+import BackButton from '../components/BackButton'
 
 const GARAGE_LABEL_KEY = Object.fromEntries(GARAGE_CATEGORIES.map(c => [c.key, c.labelKey]))
 const GARAGE_KEY_ORDER = GARAGE_CATEGORIES.map(c => c.key)
@@ -150,10 +151,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
 
           {/* Nav bar */}
           <View style={s.navBar}>
-            <TouchableOpacity onPress={onBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-              <Text style={s.backText}>{t('back', lang)}</Text>
-            </TouchableOpacity>
+            <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
               {canReport && (
                 <ContentReportMenu
@@ -522,7 +520,6 @@ const s = StyleSheet.create({
   safe:              { flex: 1, backgroundColor: colors.bg },
   navBar:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   backBtn:           { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backText:          { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   cover:             { width: '100%', height: 200 },
   coverFallback:     { justifyContent: 'center', alignItems: 'center' },
   coverFallbackIcon: { fontSize: 48 },

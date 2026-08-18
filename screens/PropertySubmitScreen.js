@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import MapPinPicker from '../components/MapPinPicker'
+import BackButton from '../components/BackButton'
 
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -223,11 +224,9 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
       <KeyboardAwareForm>
         {/* Header */}
         <View style={ps.header}>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton variant="bare" lang={lang} onPress={onClose} />
           <Text style={ps.headerTitle}>{isEdit ? t('accomEditTitle', lang) : t('accomSubmitTitle', lang)}</Text>
-          <View style={{ width: 24 }} />
+          <View style={{ width: 44 }} />
         </View>
 
         <ScrollView contentContainerStyle={ps.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

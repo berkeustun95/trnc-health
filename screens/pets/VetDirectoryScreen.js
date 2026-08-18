@@ -5,6 +5,7 @@ import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { colors, shadow, radius, typeColors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
+import BackButton from '../../components/BackButton'
 
 function VetCard({ vet, lang, onPress }) {
   const vetColors = typeColors.vet
@@ -85,10 +86,7 @@ export default function VetDirectoryScreen({ lang, onBack, onOpenVet }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <TouchableOpacity style={s.backPill} onPress={onBack}>
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-          <Text style={s.backPillText}>{t('back', lang)}</Text>
-        </TouchableOpacity>
+        <BackButton lang={lang} onPress={onBack} style={s.backPill} />
         <Text style={s.headerTitle}>{t('petsVetDirectoryTitle', lang)}</Text>
         <View style={{ width: 60 }} />
       </View>
@@ -132,7 +130,6 @@ const s = StyleSheet.create({
   safe:             { flex: 1, backgroundColor: colors.bg },
   header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border },
   backPill:         { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.bg, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12 },
-  backPillText:     { fontSize: 14, color: colors.textPrimary, fontFamily: 'Inter_400Regular' },
   headerTitle:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flex: 1, textAlign: 'center' },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   emptyIcon:        { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },

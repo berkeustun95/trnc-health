@@ -15,6 +15,7 @@ import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
   haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherDesc, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
+import BackButton from '../components/BackButton'
 
 const TYPE_ICON_MAP = {
   pharmacy: { lib: 'ion', name: 'medkit' },
@@ -736,10 +737,7 @@ export default function HomeScreen({
         <View style={s.container}>
           <View style={[s.header, showFacilityList && { justifyContent: 'space-between' }]}>
             {showFacilityList ? (
-              <TouchableOpacity style={s.backPill} onPress={() => setShowFacilityList(false)}>
-                <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-                <Text style={s.backPillText}>{t('back', lang)}</Text>
-              </TouchableOpacity>
+              <BackButton lang={lang} onPress={() => setShowFacilityList(false)} style={s.backPill} />
             ) : (
               <View style={s.headerLogoWrap} pointerEvents="none">
                 <Image source={require('../assets/logonobg.png')} style={s.headerIcon} resizeMode="contain" />
@@ -774,7 +772,6 @@ const s = StyleSheet.create({
   notifDot:       { position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
   hamburgerBtn:   { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
   backPill:       { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
-  backPillText:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
 
   // Hub
   hubContent:       { paddingBottom: 32, gap: 12 },

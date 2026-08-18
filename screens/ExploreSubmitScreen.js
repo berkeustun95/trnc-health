@@ -13,6 +13,7 @@ import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { SUBMITTABLE_CATEGORIES, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import MapPinPicker from '../components/MapPinPicker'
+import BackButton from '../components/BackButton'
 
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -214,11 +215,9 @@ export default function ExploreSubmitScreen({ session, lang, place: editPlace, o
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <BackButton variant="bare" lang={lang} onPress={onBack} />
           <Text style={s.headerTitle}>{t(isEdit ? 'exploreEditTitle' : 'blSubmitTitle', lang)}</Text>
-          <View style={{ width: 24 }} />
+          <View style={{ width: 44 }} />
         </View>
 
         <ScrollView

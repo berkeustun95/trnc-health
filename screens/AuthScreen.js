@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import BackButton from '../components/BackButton'
 
 const LANGUAGES = [
   { key: 'English', code: 'EN' }, { key: 'Turkish', code: 'TR' }, { key: 'Arabic', code: 'AR' },
@@ -294,14 +295,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
           </View>
         </ScrollView>
       </KeyboardAwareForm>
-      <TouchableOpacity
-        style={[styles.backBtn, { top: insets.top + 8 }]}
-        onPress={onBack}
-        accessibilityLabel={t('back', lang)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Feather name="arrow-left" size={24} color={colors.textPrimary} />
-      </TouchableOpacity>
+      <BackButton variant="bare" lang={lang} onPress={onBack} style={[styles.backBtn, { top: insets.top + 8 }]} />
     </SafeAreaView>
     </ImageBackground>
   )
