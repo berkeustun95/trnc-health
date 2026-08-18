@@ -1164,7 +1164,7 @@ export default function App() {
     } else if (gamesSubScreen === 'sudoku') {
       pushed = <SudokuScreen lang={lang} onBack={closePushed} />
     } else {
-      pushed = <GamesHubScreen lang={lang} onBack={closePushed} onNavigate={setGamesSubScreen} />
+      pushed = <GamesHubScreen lang={lang} onBack={closePushed} onNavigate={id => { navTrace('tap:gameTile', { id }); setGamesSubScreen(id) }} />
     }
   } else if (showPets) {
     dismiss = (!MODULE_FLAGS.pets && !isAdmin) ? () => setShowPets(false) : petsSubScreen ? () => setPetsSubScreen(null) : () => setShowPets(false)
@@ -1190,7 +1190,7 @@ export default function App() {
         <OwningPetScreen
           lang={lang}
           onBack={closePushed}
-          onNavigate={dest => setPetsSubScreen(dest)}
+          onNavigate={dest => { navTrace('tap:petTile', { dest }); setPetsSubScreen(dest) }}
         />
       )
     } else {
