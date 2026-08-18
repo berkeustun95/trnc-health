@@ -596,11 +596,15 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
                 style={s.filterScroll}
                 contentContainerStyle={s.filterRow}
               >
+                {/* Tapping the active chip clears it. 'all' is the cleared value, not a
+                    seventh category — matchesCategory short-circuits on it — so
+                    deselecting lands on the All chip rather than an empty state, and
+                    tapping All itself stays the no-op it already was. */}
                 {CATEGORIES.map(c => (
                   <TouchableOpacity
                     key={c.key}
                     style={[s.chip, category === c.key && s.chipActive]}
-                    onPress={() => setCategory(c.key)}
+                    onPress={() => setCategory(category === c.key ? 'all' : c.key)}
                     activeOpacity={0.8}
                   >
                     <Text
@@ -619,11 +623,15 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
                 style={s.filterScrollSecond}
                 contentContainerStyle={s.filterRow}
               >
+                {/* Same toggle-off as the category row. The picked-date chip below this
+                    map is deliberately NOT toggled: tapping it while active re-opens
+                    the picker, because changing the date is the likelier intent there
+                    and All already clears it in one tap. */}
                 {DATE_FILTERS.map(d => (
                   <TouchableOpacity
                     key={d.key}
                     style={[s.chip, dateFilter === d.key && s.chipActive]}
-                    onPress={() => setDateFilter(d.key)}
+                    onPress={() => setDateFilter(dateFilter === d.key ? 'all' : d.key)}
                     activeOpacity={0.8}
                   >
                     <Text
