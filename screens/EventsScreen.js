@@ -4,7 +4,7 @@ import {
   Image, Dimensions, ActivityIndicator, RefreshControl, Linking,
   Modal, Platform,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import { supabase } from '../lib/supabase'
@@ -12,11 +12,27 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow } from '../constants/theme'
-import { t, tCity } from '../constants/i18n'
+import { t, tCity, LANG_CODES } from '../constants/i18n'
 import { resolveRegion } from '../utils/resolveRegion'
 import { openTicketUrl } from '../utils/events'
 
 const { width: SCREEN_W } = Dimensions.get('window')
+
+// Card height AND thumbnail edge — one number, because the thumbnail is a true
+// square driven by the card height rather than by a width percentage. A percentage
+// resolves against the card (SCREEN_W - 32), so `width: '42%'` + aspectRatio: 1
+// yields a ~151pt square inside a ~158pt content column and leaves a white band
+// under the image. Sizing from the height instead means the square always fills the
+// card exactly. 160 lands at ~45% of the card on a 390pt screen and ~40% on a 430pt
+// one. The content column below is tuned to sit just inside it (158pt).
+const CARD_H = 160
+
+// The square is a fixed 160pt, but the card is not — on a 375pt screen (iPhone SE)
+// that is 47% of the card and on a 320pt one it would eat the title column alive.
+// Cap it at 45% of the card width: mainstream devices (>= 390pt) are unaffected and
+// stay exactly square, while narrow ones give up a few points of squareness instead
+// of the text.
+const THUMB_W = Math.min(CARD_H, (SCREEN_W - 32) * 0.45)
 
 // Consumer-grade filters. One label key per category — the chip and the card
 // badge share it.
@@ -140,54 +156,63 @@ function formatEventDate(start, end, lang) {
   return `${startStr} – ${e.toLocaleString('en-GB', opts)}`
 }
 
+// `events` has no venue/city columns — the Gişe Kıbrıs import folds them into a
+// single string as "Venue, City" (scripts/import-gisekibris-events.mjs). Split on
+// the LAST ", " because the city is always the appended final segment, while a
+// venue name may itself contain commas ("Rocks Hotel, Casino & Spa, Girne").
+// Display-only; nothing is written back.
+function venueCityLabel(location) {
+  if (!location) return ''
+  const i = location.lastIndexOf(', ')
+  return i === -1 ? location : `${location.slice(0, i)} / ${location.slice(i + 2)}`
+}
+
+// Long-form card date, e.g. "22 Ağustos 2026". Locale comes from the app language
+// rather than a hardcoded 'en-GB' — the month name is spelled out here, so an
+// English month on a Turkish screen would read as a bug.
+function formatCardDate(start, lang) {
+  if (!start) return ''
+  return new Date(start).toLocaleDateString(LANG_CODES[lang] || 'en',
+    { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 function EventCard({ event, lang, onPress }) {
   const img = event.images?.[0]
-  const start = new Date(event.start_date)
-  const day = start.toLocaleDateString('en-GB', { day: '2-digit' })
-  const month = start.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase()
+  const venue = venueCityLabel(event.location)
 
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.88}>
-      <View style={s.cardImageWrap}>
-        {img
-          ? <Image source={{ uri: img }} style={s.cardImage} resizeMode="cover" />
-          : <View style={[s.cardImage, s.cardImageFallback]}>
-              <Ionicons name="calendar-outline" size={36} color={colors.border} />
-            </View>
-        }
-        <View style={s.dateBadge}>
-          <Text style={s.dateBadgeDay}>{day}</Text>
-          <Text style={s.dateBadgeMonth}>{month}</Text>
-        </View>
+      {img
+        ? <Image source={{ uri: img }} style={s.thumb} resizeMode="cover" />
+        : <View style={[s.thumb, s.thumbFallback]}>
+            <Ionicons name="calendar-outline" size={32} color={colors.border} />
+          </View>
+      }
+      <View style={s.cardBody}>
         {event.category ? (
-          <View style={s.catBadge}>
-            <Text style={s.catBadgeText}>{categoryLabel(event.category, lang)}</Text>
+          <>
+            <Text style={s.catLabel} numberOfLines={1}>{categoryLabel(event.category, lang)}</Text>
+            <View style={s.divider} />
+          </>
+        ) : null}
+        <Text style={s.cardTitle} numberOfLines={2}>{event.title}</Text>
+        <View style={s.divider} />
+        {venue ? (
+          <View style={s.infoRow}>
+            <Ionicons name="location-outline" size={12} color={colors.textSecondary} />
+            <Text style={s.infoText} numberOfLines={1}>{venue}</Text>
           </View>
         ) : null}
-      </View>
-      <View style={s.cardBody}>
-        <Text style={s.cardTitle} numberOfLines={2}>{event.title}</Text>
-        <View style={s.cardMeta}>
+        <View style={s.infoRow}>
+          <Ionicons name="calendar-outline" size={12} color={colors.textSecondary} />
+          <Text style={s.infoText} numberOfLines={1}>{formatCardDate(event.start_date, lang)}</Text>
+        </View>
+        <View style={s.infoRow}>
           <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
-          <Text style={s.cardMetaText} numberOfLines={1}>
+          <Text style={s.infoText} numberOfLines={1}>
             {formatEventTime(event.start_date, event.end_date)}
           </Text>
         </View>
-        {event.organizer_name ? (
-          <View style={s.cardMeta}>
-            <Ionicons name="business-outline" size={12} color={colors.textSecondary} />
-            <Text style={s.cardMetaText} numberOfLines={1}>{event.organizer_name}</Text>
-          </View>
-        ) : null}
-        {event.location ? (
-          <View style={s.cardMeta}>
-            <Feather name="map-pin" size={12} color={colors.textSecondary} />
-            <Text style={s.cardMetaText} numberOfLines={1}>{event.location}</Text>
-          </View>
-        ) : null}
-        {event.description ? (
-          <Text style={s.cardDesc} numberOfLines={2}>{event.description}</Text>
-        ) : null}
       </View>
     </TouchableOpacity>
   )
@@ -345,6 +370,7 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
   const [pickedDate, setPickedDate] = useState(null)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [district, setDistrict] = useState(initialDistrict)
+  const insets = useSafeAreaInsets()
 
   const load = useCallback(async () => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -405,7 +431,7 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
           data={filtered}
           keyExtractor={e => e.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={s.listContent}
+          contentContainerStyle={[s.listContent, { paddingBottom: insets.bottom + 96 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           ListHeaderComponent={
             <View>
@@ -543,7 +569,8 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
 const s = StyleSheet.create({
   safe:               { flex: 1, backgroundColor: colors.bg },
   center:             { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent:        { paddingHorizontal: 16, paddingBottom: 40, gap: 16 },
+  // paddingBottom is applied inline from the safe-area inset — see the FlatList.
+  listContent:        { paddingHorizontal: 16, gap: 16 },
 
   // Filter chips
   introCard:          { marginBottom: 16 },
@@ -554,8 +581,8 @@ const s = StyleSheet.create({
   districtPillClear:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   // Negative margin cancels listContent's 16pt inset so the row bleeds to the
   // screen edge — the half-cut chip is what signals there is more to scroll.
-  filterScroll:       { flexGrow: 0, marginHorizontal: -16 },
-  filterScrollSecond: { flexGrow: 0, marginHorizontal: -16, marginTop: 8 },
+  filterScroll:       { flexGrow: 0, flexShrink: 0, marginHorizontal: -16 },
+  filterScrollSecond: { flexGrow: 0, flexShrink: 0, marginHorizontal: -16, marginTop: 8 },
   filterRow:          { flexDirection: 'row', gap: 8, paddingTop: 4, paddingHorizontal: 16 },
   chip:               { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                         backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
@@ -573,24 +600,35 @@ const s = StyleSheet.create({
   pickerSheetTitle:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   pickerDoneText:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
 
-  // Category badge (on card image)
-  catBadge:           { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.55)',
-                        borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4 },
-  catBadgeText:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.3 },
-
-  // Card
-  card:               { backgroundColor: colors.cardBg, borderRadius: 20, overflow: 'hidden', ...shadow },
-  cardImageWrap:      { position: 'relative' },
-  cardImage:          { width: '100%', height: 200 },
-  cardImageFallback:  { backgroundColor: colors.bg, justifyContent: 'center', alignItems: 'center' },
-  dateBadge:          { position: 'absolute', top: 12, left: 12, backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', ...shadow },
-  dateBadgeDay:       { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 22 },
-  dateBadgeMonth:     { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.5 },
-  cardBody:           { padding: 16 },
-  cardTitle:          { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8, lineHeight: 22 },
-  cardMeta:           { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
-  cardMetaText:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
-  cardDesc:           { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 19, marginTop: 8 },
+  // Card — horizontal: square poster flush left, content column right.
+  // minHeight keeps every card the same height in the list even when a row is
+  // missing its category or location, so the thumbnail column stays even and
+  // square. Content sums to 158 (20 padding + 16 label + 11 rule + 40 title
+  // + 11 rule + 60 rows), 2pt inside CARD_H.
+  card:               { flexDirection: 'row', backgroundColor: colors.cardBg, borderRadius: 20,
+                        overflow: 'hidden', minHeight: CARD_H, ...shadow },
+  // Square container to match the sources. MEASURED, not assumed: 66 of the 68
+  // readable Gişe Kıbrıs posters are exactly 1:1, two are 3:4 — none are portrait,
+  // so a stretched non-square container would cover-crop ~15% off each side of
+  // almost every poster, and poster text runs edge to edge.
+  // alignSelf: 'stretch' rather than a fixed height, so if accessibility font
+  // scaling pushes the content past CARD_H the thumbnail grows with the card and
+  // crops slightly instead of leaving a white gap under itself.
+  thumb:              { width: THUMB_W, alignSelf: 'stretch' },
+  thumbFallback:      { backgroundColor: colors.bg, justifyContent: 'center', alignItems: 'center' },
+  cardBody:           { flex: 1, paddingHorizontal: 13, paddingVertical: 10, justifyContent: 'center' },
+  // No textTransform: 'uppercase' — it mangles Turkish ("Diğer" → "DIĞER", not
+  // "DİĞER") and Greek accents. letterSpacing carries the same small-label read
+  // across all nine locales.
+  catLabel:           { fontSize: 11, lineHeight: 16, fontFamily: 'Inter_700Bold',
+                        color: colors.primary, letterSpacing: 0.6 },
+  divider:            { height: 1, backgroundColor: colors.border, marginVertical: 5 },
+  // minHeight reserves both lines so a one-line title does not shorten the card.
+  cardTitle:          { fontSize: 14, lineHeight: 20, minHeight: 40,
+                        fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  infoRow:            { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+  infoText:           { fontSize: 11.5, lineHeight: 17, fontFamily: 'Inter_400Regular',
+                        color: colors.textSecondary, flex: 1 },
 
   // Detail
   detailHeader:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
