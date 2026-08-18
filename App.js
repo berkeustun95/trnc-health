@@ -74,6 +74,7 @@ import HomeCitySheet from './components/HomeCitySheet'
 import CityWelcomeSettings from './components/CityWelcomeSettings'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
+import PushedScreen from './components/PushedScreen'
 import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
@@ -291,6 +292,7 @@ export default function App() {
   const [showLangModal, setShowLangModal] = useState(false)
   const [showCoachMarks, setShowCoachMarks] = useState(false)
   const [coachSteps, setCoachSteps]         = useState([])
+  const pushedRef = useRef(null)
   const hamburgerRef       = useRef(null)
   const searchRef          = useRef(null)
   const filterBarRef       = useRef(null)
@@ -484,40 +486,17 @@ export default function App() {
       if (showEmergencyModal) { setShowEmergencyModal(false); return true }
       if (showMenu) { closeMenu(); return true }
       if (showPasswordReset) { setShowPasswordReset(false); return true }
-      if (showNotifs) { setShowNotifs(false); return true }
-      if (showDutyList) { setShowDutyList(false); return true }
-      if (showEvents) { setShowEvents(false); return true }
-      if (openedProperty) { setOpenedProperty(null); return true }
-      if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
-      if (showAccommodation) { setShowAccommodation(false); return true }
-      if (unclaimedFacility) { setUnclaimedFacility(null); return true }
-      if (bookingFacility) { setBookingFacility(null); return true }
-      if (selectedFacility) { setSelectedFacility(null); setBookingFacility(null); return true }
-      if (petsSubScreen) { setPetsSubScreen(null); return true }
-      if (showPets) { setShowPets(false); return true }
-      if (showHomeServices) { setShowHomeServices(false); return true }
-      if (showJobPostings)  { setShowJobPostings(false);  return true }
-      if (showTransport) { setShowTransport(false); return true }
-      if (showInsurance) { setShowInsurance(false); return true }
-      if (showGrooming) { setShowGrooming(false); return true }
-      if (showGarages) { setShowGarages(false); return true }
-      if (showStudentHub) { setShowStudentHub(false); return true }
-      if (showEsim) { setShowEsim(false); return true }
-      if (showLegal) { setShowLegal(false); return true }
-      if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
-      if (showExploreBeach)     { setShowExploreBeach(false); return true }
-      if (showExplore)          { setShowExplore(false); return true }
-      if (adminPreview)         { setAdminPreview(null); return true }
-      if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
-      if (showExchangeRates) { setShowExchangeRates(false); return true }
-      if (gamesSubScreen) { setGamesSubScreen(null); return true }
-      if (showGames) { setShowGames(false); return true }
+      // Every pushed module screen, in one branch. The chain already decided which is
+      // on top and handed PushedScreen the matching `dismiss`, so hardware back takes
+      // the SAME close() as the back button and the swipe. One exit path, both platforms.
+      if (pushedRef.current) { closePushed(); return true }
+      if (adminPreview) { setAdminPreview(null); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showEmergencyModal, showMunicipalModal, adminPreview, activeTab, showWelcome])
 
   useEffect(() => {
     Promise.all([
@@ -873,12 +852,13 @@ export default function App() {
     )
   }
 
-  let content
-  // True only when the tab shell (the final else of the chain below) renders.
-  // Every pushed module screen short-circuits earlier in that same chain, so this
-  // IS "no pushed screen open" — derived from the chain itself rather than by
-  // restating its ~25 flags, which would drift the moment a module is added.
-  let inTabShell = false
+  // The chain below fills exactly one of these. `content` is the window: a class-(a)
+  // screen (auth, onboarding, admin, a provider dashboard) or, failing that, the tab
+  // shell. `pushed` is a module screen drawn OVER the shell instead of replacing it.
+  // `dismiss` clears the flag behind `pushed` and is run only once the exit finishes.
+  let content = null
+  let pushed  = null
+  let dismiss = null
 
   // Admins bypass the marketplace module gate to preview a "Coming soon" module.
   // (Mirrors the existing garagesTileVisible admin check.) Admins normally render
@@ -886,6 +866,12 @@ export default function App() {
   // gated module is done by flipping its MODULE_FLAGS entry, but the bypass is
   // kept for parity and any path that does reach these screens as admin.
   const isAdmin = profile?.role === 'admin'
+
+  // The single exit path for every pushed screen. The back button, the Android
+  // hardware/gesture back and (next slice) the edge swipe all call this; PushedScreen
+  // owns the exit and clears the flag through `dismiss` only when it is finished.
+  // A ref, not state: BackHandler's listener would otherwise close over a stale value.
+  const closePushed = () => pushedRef.current?.close()
 
   if (session === undefined || !fontsLoaded || onboarded === null) {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
@@ -1013,11 +999,12 @@ export default function App() {
   } else if (profile.role === 'insurance_provider') {
     content = <InsuranceDashboardScreen session={session} lang={lang} />
   } else if (showNotifs) {
-    content = <NotificationsScreen
+    dismiss = () => { setShowNotifs(false); supabase.from('notifications').update({ read: true }).eq('user_id', session.user.id).then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))) }
+    pushed = <NotificationsScreen
       notifications={notifications}
       loading={notifsLoading}
       lang={lang}
-      onBack={() => { setShowNotifs(false); supabase.from('notifications').update({ read: true }).eq('user_id', session.user.id).then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))) }}
+      onBack={closePushed}
       onMarkAllRead={markAllNotifsRead}
       onClearAll={clearAllNotifs}
       onMarkRead={markNotifRead}
@@ -1027,146 +1014,165 @@ export default function App() {
       }}
     />
   } else if (showDutyList) {
-    content = <DutyListScreen onBack={() => { setShowDutyList(false); setDutyRegion(null) }} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+    dismiss = () => { setShowDutyList(false); setDutyRegion(null) }
+    pushed = <DutyListScreen onBack={closePushed} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
   } else if (showEvents) {
-    content = (MODULE_FLAGS.events || isAdmin)
-      ? <EventsScreen lang={lang} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} initialDistrict={eventsDistrict} />
-      : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} />
+    dismiss = () => { setShowEvents(false); setEventsDistrict(null) }
+    pushed = (MODULE_FLAGS.events || isAdmin)
+      ? <EventsScreen lang={lang} onBack={closePushed} initialDistrict={eventsDistrict} />
+      : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={closePushed} />
   } else if (showAgentOnboarding) {
-    content = (
+    dismiss = () => setShowAgentOnboarding(false)
+    pushed = (
       <EstateAgentOnboardingScreen
         session={session}
         lang={lang}
-        onClose={() => setShowAgentOnboarding(false)}
-        onSubmitted={() => setShowAgentOnboarding(false)}
+        onClose={closePushed}
+        onSubmitted={closePushed}
       />
     )
   } else if (openedProperty) {
-    content = (
+    dismiss = () => setOpenedProperty(null)
+    pushed = (
       <PropertyDetailScreen
         property={openedProperty}
         lang={lang}
-        onClose={() => setOpenedProperty(null)}
+        onClose={closePushed}
       />
     )
   } else if (showAccommodation) {
-    content = (MODULE_FLAGS.accommodation || isAdmin) ? (
+    dismiss = () => setShowAccommodation(false)
+    pushed = (MODULE_FLAGS.accommodation || isAdmin) ? (
       <AccommodationScreen
         lang={lang}
         session={session}
-        onClose={() => setShowAccommodation(false)}
+        onClose={closePushed}
         onBecomeAgent={() => { if (requireAccount('gateEstateAgent')) return; setShowAccommodation(false); setShowAgentOnboarding(true) }}
         onOpenProperty={prop => setOpenedProperty(prop)}
       />
     ) : (
-      <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccommodations" session={session} onBack={() => setShowAccommodation(false)} />
+      <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccommodations" session={session} onBack={closePushed} />
     )
   } else if (showHomeServices) {
-    content = (MODULE_FLAGS.homeServices || isAdmin)
-      ? <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowHomeServices(false)} />
-      : <ComingSoonScreen lang={lang} moduleKey="homeServices" titleKey="menuHomeServices" session={session} onBack={() => setShowHomeServices(false)} />
+    dismiss = () => setShowHomeServices(false)
+    pushed = (MODULE_FLAGS.homeServices || isAdmin)
+      ? <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} />
+      : <ComingSoonScreen lang={lang} moduleKey="homeServices" titleKey="menuHomeServices" session={session} onBack={closePushed} />
   } else if (showJobPostings) {
-    content = (MODULE_FLAGS.jobs || isAdmin)
-      ? <JobPostingsScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowJobPostings(false)} />
-      : <ComingSoonScreen lang={lang} moduleKey="jobs" titleKey="menuJobPostings" session={session} onBack={() => setShowJobPostings(false)} />
+    dismiss = () => setShowJobPostings(false)
+    pushed = (MODULE_FLAGS.jobs || isAdmin)
+      ? <JobPostingsScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} />
+      : <ComingSoonScreen lang={lang} moduleKey="jobs" titleKey="menuJobPostings" session={session} onBack={closePushed} />
   } else if (showTransport) {
-    content = (MODULE_FLAGS.transport || isAdmin)
-      ? <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowTransport(false)} />
-      : <ComingSoonScreen lang={lang} moduleKey="transport" titleKey="menuTransportation" session={session} onBack={() => setShowTransport(false)} />
+    dismiss = () => setShowTransport(false)
+    pushed = (MODULE_FLAGS.transport || isAdmin)
+      ? <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} />
+      : <ComingSoonScreen lang={lang} moduleKey="transport" titleKey="menuTransportation" session={session} onBack={closePushed} />
   } else if (showInsurance) {
-    content = (MODULE_FLAGS.insurance || isAdmin)
-      ? <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowInsurance(false)} />
-      : <ComingSoonScreen lang={lang} moduleKey="insurance" titleKey="menuInsurance" session={session} onBack={() => setShowInsurance(false)} />
+    dismiss = () => setShowInsurance(false)
+    pushed = (MODULE_FLAGS.insurance || isAdmin)
+      ? <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} />
+      : <ComingSoonScreen lang={lang} moduleKey="insurance" titleKey="menuInsurance" session={session} onBack={closePushed} />
   } else if (showEsim) {
-    content = <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowEsim(false)} />
+    dismiss = () => setShowEsim(false)
+    pushed = <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} />
   } else if (showLegal) {
-    content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
+    dismiss = () => setShowLegal(false)
+    pushed = <LegalScreen lang={lang} onBack={closePushed} />
   } else if (selectedExplorePlace) {
-    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} isFavorite={placeFavorites.has(selectedExplorePlace.id)} onToggleFavorite={() => togglePlaceFavorite(selectedExplorePlace.id)} />
+    dismiss = () => setSelectedExplorePlace(null)
+    pushed = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={closePushed} onRequireAccount={requireAccount} isFavorite={placeFavorites.has(selectedExplorePlace.id)} onToggleFavorite={() => togglePlaceFavorite(selectedExplorePlace.id)} />
   } else if (showExploreBeach) {
-    content = (
+    dismiss = () => { setShowExploreBeach(false); setExploreBeachRegion(null) }
+    pushed = (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => { setShowExploreBeach(false); setExploreBeachRegion(null) }} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} />
+        <ExploreScreen lang={lang} onBack={closePushed} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} />
       </BLErrorBoundary>
     )
   } else if (showExplore) {
+    dismiss = () => setShowExplore(false)
     // Public Explore tile — gated on MODULE_FLAGS.explore (|| isAdmin, house pattern; admins
     // never reach HomeScreen so it's moot for the tile path). Dark today → Coming Soon, whose
     // Notify-me upserts module='explore' into module_waitlist (shape-guard accepts it now).
-    content = (MODULE_FLAGS.explore || isAdmin) ? (
+    pushed = (MODULE_FLAGS.explore || isAdmin) ? (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
+        <ExploreScreen lang={lang} onBack={closePushed} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     ) : (
-      <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />
+      <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={closePushed} />
     )
   } else if (adminPreview === 'explore') {
     content = (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
+        <ExploreScreen lang={lang} onBack={closePushed} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     )
   } else if (showNewcomerEssentials) {
-    content = (
+    dismiss = () => setShowNewcomerEssentials(false)
+    pushed = (
       <NewcomerEssentialsScreen
         lang={lang}
-        onBack={() => setShowNewcomerEssentials(false)}
+        onBack={closePushed}
         onShowExchangeRates={() => { setShowNewcomerEssentials(false); setShowExchangeRates(true) }}
       />
     )
   } else if (showExchangeRates) {
-    content = <ExchangeRatesScreen lang={lang} onBack={() => setShowExchangeRates(false)} />
+    dismiss = () => setShowExchangeRates(false)
+    pushed = <ExchangeRatesScreen lang={lang} onBack={closePushed} />
   } else if (showGames) {
+    dismiss = gamesSubScreen ? () => setGamesSubScreen(null) : () => setShowGames(false)
     if (gamesSubScreen === 'xox') {
-      content = <XoxGameScreen lang={lang} onBack={() => setGamesSubScreen(null)} />
+      pushed = <XoxGameScreen lang={lang} onBack={closePushed} />
     } else if (gamesSubScreen === 'memory') {
-      content = <MemoryMatchScreen lang={lang} onBack={() => setGamesSubScreen(null)} />
+      pushed = <MemoryMatchScreen lang={lang} onBack={closePushed} />
     } else if (gamesSubScreen === '2048') {
-      content = <Game2048Screen lang={lang} onBack={() => setGamesSubScreen(null)} />
+      pushed = <Game2048Screen lang={lang} onBack={closePushed} />
     } else if (gamesSubScreen === 'sudoku') {
-      content = <SudokuScreen lang={lang} onBack={() => setGamesSubScreen(null)} />
+      pushed = <SudokuScreen lang={lang} onBack={closePushed} />
     } else {
-      content = <GamesHubScreen lang={lang} onBack={() => setShowGames(false)} onNavigate={setGamesSubScreen} />
+      pushed = <GamesHubScreen lang={lang} onBack={closePushed} onNavigate={setGamesSubScreen} />
     }
   } else if (showPets) {
+    dismiss = (!MODULE_FLAGS.pets && !isAdmin) ? () => setShowPets(false) : petsSubScreen ? () => setPetsSubScreen(null) : () => setShowPets(false)
     if (!MODULE_FLAGS.pets && !isAdmin) {
-      content = <ComingSoonScreen lang={lang} moduleKey="pets" titleKey="menuPets" session={session} onBack={() => setShowPets(false)} />
+      pushed = <ComingSoonScreen lang={lang} moduleKey="pets" titleKey="menuPets" session={session} onBack={closePushed} />
     } else if (petsSubScreen === 'bringing') {
-      content = <BringingPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
+      pushed = <BringingPetScreen lang={lang} onBack={closePushed} />
     } else if (petsSubScreen === 'timeline') {
-      content = <TimelineCalculatorScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
+      pushed = <TimelineCalculatorScreen lang={lang} onBack={closePushed} />
     } else if (petsSubScreen === 'vetdirectory') {
-      content = (
+      pushed = (
         <VetDirectoryScreen
           lang={lang}
-          onBack={() => setPetsSubScreen(null)}
+          onBack={closePushed}
           onOpenVet={fac => setSelectedFacility(fac)}
         />
       )
     } else if (petsSubScreen === 'travel') {
-      content = <TravelWithPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
+      pushed = <TravelWithPetScreen lang={lang} onBack={closePushed} />
     } else if (petsSubScreen === 'owning') {
-      content = (
+      pushed = (
         <OwningPetScreen
           lang={lang}
-          onBack={() => setPetsSubScreen(null)}
+          onBack={closePushed}
           onNavigate={dest => setPetsSubScreen(dest)}
         />
       )
     } else {
-      content = (
+      pushed = (
         <PetsHomeScreen
           lang={lang}
-          onBack={() => setShowPets(false)}
+          onBack={closePushed}
           onNavigate={dest => setPetsSubScreen(dest)}
         />
       )
     }
   } else if (unclaimedFacility) {
-    content = (
+    dismiss = () => setUnclaimedFacility(null)
+    pushed = (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
-          <BackButton lang={lang} onPress={() => setUnclaimedFacility(null)} />
+          <BackButton lang={lang} onPress={closePushed} />
         </View>
         <View style={styles.unclaimedWrap}>
           <View style={styles.unclaimedIconWrap}>
@@ -1241,9 +1247,11 @@ export default function App() {
       </SafeAreaView>
     )
   } else if (bookingFacility) {
-    content = <BookingScreen facility={bookingFacility} session={session} lang={lang} blockedUntil={profile?.blocked_until} onBack={() => setBookingFacility(null)} />
+    dismiss = () => setBookingFacility(null)
+    pushed = <BookingScreen facility={bookingFacility} session={session} lang={lang} blockedUntil={profile?.blocked_until} onBack={closePushed} />
   } else if (selectedFacility) {
-    content = <FacilityProfileScreen
+    dismiss = () => { setSelectedFacility(null); setBookingFacility(null) }
+    pushed = <FacilityProfileScreen
       facility={selectedFacility}
       lang={lang}
       session={session}
@@ -1251,24 +1259,38 @@ export default function App() {
       onToggleFavorite={() => toggleFavorite(selectedFacility.id)}
       onBook={() => { if (requireAccount('gateBooking')) return; setBookingFacility(selectedFacility) }}
       onRequireAccount={requireAccount}
-      onBack={() => setSelectedFacility(null)}
+      onBack={closePushed}
     />
   } else if (showGrooming) {
-    content = (MODULE_FLAGS.grooming || isAdmin)
-      ? <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGrooming(false)} onOpenFacility={setSelectedFacility} />
-      : <ComingSoonScreen lang={lang} moduleKey="grooming" titleKey="menuGrooming" session={session} onBack={() => setShowGrooming(false)} />
+    dismiss = () => setShowGrooming(false)
+    pushed = (MODULE_FLAGS.grooming || isAdmin)
+      ? <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} onOpenFacility={setSelectedFacility} />
+      : <ComingSoonScreen lang={lang} moduleKey="grooming" titleKey="menuGrooming" session={session} onBack={closePushed} />
   } else if (showGarages) {
-    content = (MODULE_FLAGS.garages || isAdmin || ownsGarage)
-      ? <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} onOpenFacility={setSelectedFacility} isAdmin={profile?.role === 'admin'} />
-      : <ComingSoonScreen lang={lang} moduleKey="garages" titleKey="menuGarages" session={session} onBack={() => setShowGarages(false)} />
+    dismiss = () => setShowGarages(false)
+    pushed = (MODULE_FLAGS.garages || isAdmin || ownsGarage)
+      ? <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={closePushed} onOpenFacility={setSelectedFacility} isAdmin={profile?.role === 'admin'} />
+      : <ComingSoonScreen lang={lang} moduleKey="garages" titleKey="menuGarages" session={session} onBack={closePushed} />
   } else if (showStudentHub) {
+    dismiss = () => setShowStudentHub(false)
     // No StudentHubScreen in main yet (it lives on the unmerged feat/student-hub
     // branch). Route ALL users — admins included — to Coming Soon; the flag exists
     // so a future merge can restore the standard gate:
     //   (MODULE_FLAGS.studentHub || isAdmin) ? <StudentHubScreen/> : <ComingSoonScreen/>
-    content = <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
-  } else {
-    inTabShell = true
+    pushed = <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={closePushed} />
+  }
+
+  // Admins never get the customer tab shell (the role-first rule in CLAUDE.md). An
+  // admin with `adminPreview` set falls past the admin branch into the module chain,
+  // so without this a preview drill-down would mount HomeScreen behind them. Collapse
+  // it back to a full replace — exactly today's behaviour for that path.
+  if (isAdmin && pushed) { content = pushed; pushed = null; dismiss = null }
+
+  // The tab shell. Hoisted out of the chain's final else so it can render UNDER a
+  // pushed screen instead of being replaced by one. `if (!content)` reproduces the old
+  // `else` exactly: it builds only when no class-(a) screen (auth, onboarding, admin, a
+  // provider dashboard) has already claimed the whole window.
+  if (!content) {
     const favList = facilities.filter(f => favorites.has(f.id))
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
     // drawer holds settings & app options. `dividerBefore` opens a visual group.
@@ -1573,14 +1595,16 @@ export default function App() {
   // Oli is hidden under either sheet (same reason it hides for the drawer and
   // coach marks — they are root overlays and would cover the floating button).
   //
-  // HOME ONLY: `inTabShell` rules out every pushed module screen, `activeTab` rules
+  // HOME ONLY: `!pushed` rules out every module screen drawn over the shell (the shell
+  // itself is now ALWAYS mounted, so its presence no longer means "on Home"), and
+  // `activeTab` rules
   // out the Map / Saved / Profile tabs. Testers read a chatbot that follows you into
   // every screen as clutter, and on Map it sat over the pan surface.
   // Drag, edge-snap and @trnc_oli_pos persistence are untouched: bounds in
   // OliGuide.js come from useWindowDimensions + safe-area insets, never from a
   // screen's own layout, so a position saved elsewhere still clamps correctly here.
   const oliVisible =
-    inTabShell && activeTab === 'home' &&
+    !pushed && activeTab === 'home' &&
     inCustomerHub && !cityWelcomeVisible && !homeCityAskVisible
 
   // Explicit answer -> asked=true, and city welcome goes live. 'visiting' is a
@@ -1597,7 +1621,10 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      {content}
+      <View style={{ flex: 1 }}>
+        {content}
+        {pushed ? <PushedScreen ref={pushedRef} onClosed={dismiss}>{pushed}</PushedScreen> : null}
+      </View>
       {oliVisible && <OliGuide lang={lang} onNavigate={oliNavigate} />}
 
       {showEmergencyModal && (
