@@ -1,5 +1,6 @@
-import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import { View, StyleSheet, Animated, Easing, Dimensions, PanResponder } from 'react-native'
+import { navTrace, txOf } from '../utils/navTrace'   // DEBUG — remove with the trace
 
 // The container every pushed module screen renders inside: it draws its child over
 // the persistent tab shell and slides it in and out.
@@ -86,9 +87,14 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
   // forward push it is already 0 and this is a no-op. If the container is unmounting
   // instead (the last screen closing) no effect runs at all, which is exactly right —
   // that case never needed a reset, it only ever caused the flash.
+  const mounted = useRef(false)
+  if (!mounted.current) { mounted.current = true; navTrace('mount', { key: pushedKey, tx: txOf(tx), swipe: swipeEnabled }) }
+  useEffect(() => () => navTrace('unmount', {}), [])
+
   const prevKey = useRef(pushedKey)
   useLayoutEffect(() => {
     if (prevKey.current === pushedKey) return
+    navTrace('key-change', { from: prevKey.current, to: pushedKey, txBefore: txOf(tx) })
     prevKey.current = pushedKey
     tx.setValue(0)
   }, [pushedKey])
@@ -121,13 +127,15 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       // The activation distance is subtracted so the screen starts moving from rest at
       // the moment the gesture is claimed. Tracking raw g.dx would snap it 24px sideways
       // on the first frame — trading the dead button for a visible jump.
+      onPanResponderGrant: () => navTrace('gesture:grant', { key: prevKey.current, tx: txOf(tx) }),
       onPanResponderMove: (_, g) => { tx.setValue(Math.max(0, g.dx - ACTIVATE_DISTANCE)) },
       onPanResponderRelease: (_, g) => {
         const travel = g.dx - ACTIVATE_DISTANCE      // what the user actually saw move
         const far  = travel > widthRef.current * COMMIT_DISTANCE
         const fast = g.vx > COMMIT_VELOCITY
+        navTrace('gesture:release', { dx: Math.round(g.dx), commit: far || fast, tx: txOf(tx) })
         if (far || fast) {
-          closeRef.current?.()          // same close() as the button and hardware back
+          closeRef.current?.('gesture')  // same close() as the button and hardware back
         } else {
           settle()
         }
@@ -142,20 +150,21 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       // stranded one is a full-screen invisible surface sitting over the shell and eating
       // every tap. Termination is reachable in normal use: the OS interrupts for a call
       // or notification shade, or an ancestor claims the touch mid-drag.
-      onPanResponderTerminate: () => { settle() },
+      onPanResponderTerminate: () => { navTrace('gesture:terminate', { tx: txOf(tx) }); settle() },
     })
   ).current
 
   const handle = {
-    close() {
+    close(src = 'button') {
       // Idempotency guard. On an Android with gesture navigation the OS claims the
       // left edge and fires system back, while on a 3-button device our own swipe
       // fires instead — but a device can deliver both, and without this the second
       // call would pop the parent screen too on the four nested pushes (booking
       // over facility, facility over garages, place over explore, property over
       // accommodation).
-      if (closing.current) return
+      if (closing.current) { navTrace('close:BLOCKED', { src, key: prevKey.current }); return }
       closing.current = true
+      navTrace('close:start', { src, key: prevKey.current, tx: txOf(tx) })
       Animated.timing(tx, {
         toValue: width,
         duration: DURATION_OUT,
@@ -175,7 +184,9 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
         // because they are not racing on one timeline: one is synchronous to native and
         // the other is deferred to React, so the reset always wins. The reset now happens
         // in the layout effect below, after the new child is committed.
+        navTrace('close:anim-done', { src, key: prevKey.current, tx: txOf(tx) })
         onClosedRef.current?.()
+        navTrace('close:dismissed', { src, key: prevKey.current })
         // Re-arm: this instance survives a nested pop and must close again next press.
         closing.current = false
       })
