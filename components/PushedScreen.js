@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef } from 'react'
-import { View, StyleSheet, Animated, Easing, Dimensions } from 'react-native'
+import { View, StyleSheet, Animated, Easing, Dimensions, PanResponder } from 'react-native'
 
 // The container every pushed module screen renders inside: it draws its child over
 // the persistent tab shell and slides it in and out.
@@ -23,7 +23,16 @@ import { View, StyleSheet, Animated, Easing, Dimensions } from 'react-native'
 const DURATION_IN  = 280
 const DURATION_OUT = 240
 
-const PushedScreen = forwardRef(function PushedScreen({ children, onClosed }, ref) {
+// Swipe-to-go-back. Built for BOTH platforms: Android has no system gesture doing
+// this on the test device, and on an Android that does have one the OS claims the
+// edge first and fires hardware back, which lands on the same close(). Either way
+// there is one exit path.
+const EDGE_ZONE       = 32    // one width everywhere — no per-screen variation
+const COMMIT_DISTANCE = 0.35  // fraction of the screen that commits the pop
+const COMMIT_VELOCITY = 0.5
+const CANCEL_DURATION = 180
+
+const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swipeEnabled = true }, ref) {
   // Measured per render rather than at module scope so a rotation or a foldable does
   // not leave the screen animating to a stale width.
   const width = Dimensions.get('window').width
@@ -51,7 +60,48 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed }, re
 
   const closing = useRef(false)
 
-  useImperativeHandle(ref, () => ({
+  // Live refs. The PanResponder is created once and would otherwise capture the
+  // first render's values forever — the same reason OliGuide and Game2048Screen
+  // keep refs alongside their responders.
+  const widthRef = useRef(width); widthRef.current = width
+  const swipeRef = useRef(swipeEnabled); swipeRef.current = swipeEnabled
+  const closeRef = useRef(null)
+
+  const pan = useRef(
+    PanResponder.create({
+      // Taps must pass straight through to the screen.
+      onStartShouldSetPanResponder: () => false,
+      // NON-CAPTURE, deliberately. A child horizontal scroller wins the touch, so in
+      // the band where a chip bar or gallery meets the left edge the swipe does not
+      // fire and the back button is the way out. Capturing instead would take that
+      // touch from every horizontal scroller in the app, which is worse.
+      onMoveShouldSetPanResponder: (_, g) =>
+        swipeRef.current &&
+        !closing.current &&
+        g.x0 <= EDGE_ZONE &&           // must START at the edge
+        g.dx > 6 &&                    // rightward only
+        Math.abs(g.dx) > Math.abs(g.dy) * 1.5,   // and clearly horizontal
+      onPanResponderMove: (_, g) => { tx.setValue(Math.max(0, g.dx)) },
+      onPanResponderRelease: (_, g) => {
+        const far  = g.dx > widthRef.current * COMMIT_DISTANCE
+        const fast = g.vx > COMMIT_VELOCITY
+        if (far || fast) {
+          closeRef.current?.()          // same close() as the button and hardware back
+        } else {
+          Animated.timing(tx, {
+            toValue: 0,
+            duration: CANCEL_DURATION,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }).start()
+        }
+      },
+      // Never hand a half-finished drag to an ancestor.
+      onPanResponderTerminationRequest: () => false,
+    })
+  ).current
+
+  const handle = {
     close() {
       // Idempotency guard. On an Android with gesture navigation the OS claims the
       // left edge and fires system back, while on a 3-button device our own swipe
@@ -83,9 +133,18 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed }, re
         closing.current = false
       })
     },
-  }), [])
+  }
+  closeRef.current = handle.close
+  useImperativeHandle(ref, () => handle, [])
 
-  return <Animated.View style={[s.fill, { transform: [{ translateX: tx }] }]}>{children}</Animated.View>
+  return (
+    <Animated.View
+      style={[s.fill, { transform: [{ translateX: tx }] }]}
+      {...pan.panHandlers}
+    >
+      {children}
+    </Animated.View>
+  )
 })
 
 const s = StyleSheet.create({

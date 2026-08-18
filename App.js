@@ -859,6 +859,10 @@ export default function App() {
   let content = null
   let pushed  = null
   let dismiss = null
+  // Swipe-back is on by default and turned off per branch below, for two reasons
+  // only: the gesture would fight the screen's own (maps, a game whose input IS a
+  // swipe), or an accidental pop would lose typed form data.
+  let swipeEnabled = true
 
   // Admins bypass the marketplace module gate to preview a "Coming soon" module.
   // (Mirrors the existing garagesTileVisible admin check.) Admins normally render
@@ -1022,6 +1026,7 @@ export default function App() {
       ? <EventsScreen lang={lang} onBack={closePushed} initialDistrict={eventsDistrict} />
       : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={closePushed} />
   } else if (showAgentOnboarding) {
+    swipeEnabled = false   // form — an accidental pop loses the agent application
     dismiss = () => setShowAgentOnboarding(false)
     pushed = (
       <EstateAgentOnboardingScreen
@@ -1083,6 +1088,7 @@ export default function App() {
     dismiss = () => setSelectedExplorePlace(null)
     pushed = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={closePushed} onRequireAccount={requireAccount} isFavorite={placeFavorites.has(selectedExplorePlace.id)} onToggleFavorite={() => togglePlaceFavorite(selectedExplorePlace.id)} />
   } else if (showExploreBeach) {
+    swipeEnabled = false   // MapView pans in every direction
     dismiss = () => { setShowExploreBeach(false); setExploreBeachRegion(null) }
     pushed = (
       <BLErrorBoundary>
@@ -1090,6 +1096,7 @@ export default function App() {
       </BLErrorBoundary>
     )
   } else if (showExplore) {
+    swipeEnabled = false   // MapView pans in every direction
     dismiss = () => setShowExplore(false)
     // Public Explore tile — gated on MODULE_FLAGS.explore (|| isAdmin, house pattern; admins
     // never reach HomeScreen so it's moot for the tile path). Dark today → Coming Soon, whose
@@ -1126,6 +1133,7 @@ export default function App() {
     } else if (gamesSubScreen === 'memory') {
       pushed = <MemoryMatchScreen lang={lang} onBack={closePushed} />
     } else if (gamesSubScreen === '2048') {
+      swipeEnabled = false   // swiping IS the game's input
       pushed = <Game2048Screen lang={lang} onBack={closePushed} />
     } else if (gamesSubScreen === 'sudoku') {
       pushed = <SudokuScreen lang={lang} onBack={closePushed} />
@@ -1247,9 +1255,11 @@ export default function App() {
       </SafeAreaView>
     )
   } else if (bookingFacility) {
+    swipeEnabled = false   // form — an accidental pop loses the booking in progress
     dismiss = () => setBookingFacility(null)
     pushed = <BookingScreen facility={bookingFacility} session={session} lang={lang} blockedUntil={profile?.blocked_until} onBack={closePushed} />
   } else if (selectedFacility) {
+    swipeEnabled = false   // MapView (mini map) plus a horizontal photo strip
     dismiss = () => { setSelectedFacility(null); setBookingFacility(null) }
     pushed = <FacilityProfileScreen
       facility={selectedFacility}
@@ -1623,7 +1633,11 @@ export default function App() {
     <SafeAreaProvider>
       <View style={{ flex: 1 }}>
         {content}
-        {pushed ? <PushedScreen ref={pushedRef} onClosed={dismiss}>{pushed}</PushedScreen> : null}
+        {pushed ? (
+          <PushedScreen ref={pushedRef} onClosed={dismiss} swipeEnabled={swipeEnabled}>
+            {pushed}
+          </PushedScreen>
+        ) : null}
       </View>
       {oliVisible && <OliGuide lang={lang} onNavigate={oliNavigate} />}
 
