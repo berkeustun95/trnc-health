@@ -488,7 +488,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
                 <TouchableOpacity
                   key={c}
                   style={[s.chip, activeCat === c && s.chipActive]}
-                  onPress={() => setActiveCat(c)}
+                  onPress={() => setActiveCat(activeCat === c ? null : c)}
                   activeOpacity={0.8}
                 >
                   <Text style={[s.chipText, activeCat === c && s.chipTextActive]}>
@@ -516,7 +516,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
               <TouchableOpacity
                 key={r}
                 style={[s.chip, region === r && s.chipActive]}
-                onPress={() => setRegion(r)}
+                onPress={() => setRegion(region === r ? null : r)}
               >
                 <Text style={[s.chipText, region === r && s.chipTextActive]}>{regionLabel(r, lang)}</Text>
               </TouchableOpacity>

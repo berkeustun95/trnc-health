@@ -110,7 +110,7 @@ export default function BusRoutesScreen({ lang, onBack }) {
             <TouchableOpacity
               key={d}
               style={[s.chip, origin === d && s.chipActive]}
-              onPress={() => setOrigin(d)}
+              onPress={() => setOrigin(origin === d ? null : d)}
             >
               <Text style={[s.chipText, origin === d && s.chipTextActive]}>{districtLabel(d, lang)}</Text>
             </TouchableOpacity>
@@ -129,7 +129,7 @@ export default function BusRoutesScreen({ lang, onBack }) {
             <TouchableOpacity
               key={d}
               style={[s.chip, destination === d && s.chipActive]}
-              onPress={() => setDestination(d)}
+              onPress={() => setDestination(destination === d ? null : d)}
             >
               <Text style={[s.chipText, destination === d && s.chipTextActive]}>{districtLabel(d, lang)}</Text>
             </TouchableOpacity>

@@ -251,7 +251,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
               <TouchableOpacity
                 key={d}
                 style={[s.chip, selectedDistrict === d && s.chipActive]}
-                onPress={() => setSelectedDistrict(d)}
+                onPress={() => setSelectedDistrict(selectedDistrict === d ? null : d)}
               >
                 <Text style={[s.chipText, selectedDistrict === d && s.chipTextActive]}>
                   {districtLabel(d, lang)}

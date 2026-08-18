@@ -243,7 +243,7 @@ export default function TransportScreen({ lang, session, onBack, onRequireAccoun
               <TouchableOpacity
                 key={d}
                 style={[s.chip, selectedDistrict === d && s.chipActive]}
-                onPress={() => setSelectedDistrict(d)}
+                onPress={() => setSelectedDistrict(selectedDistrict === d ? null : d)}
               >
                 <Text style={[s.chipText, selectedDistrict === d && s.chipTextActive]}>
                   {districtLabel(d, lang)}

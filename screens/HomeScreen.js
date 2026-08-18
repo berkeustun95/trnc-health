@@ -508,7 +508,7 @@ export default function HomeScreen({
               <TouchableOpacity
                 key={type ?? 'all'}
                 style={[s.typeChip, activeType === type && s.typeChipActive]}
-                onPress={() => { setActiveType(type); setActiveSpecialty(null) }}
+                onPress={() => { setActiveType(activeType === type ? null : type); setActiveSpecialty(null) }}
               >
                 {type
                   ? <TypeSVGIcon type={type} size={14} color={activeType === type ? '#fff' : colors.textSecondary} />
