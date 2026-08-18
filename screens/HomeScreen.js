@@ -771,7 +771,7 @@ const s = StyleSheet.create({
   notifBtn:       { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
   notifDot:       { position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
   hamburgerBtn:   { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
-  backPill:       { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#FFFFFF', borderRadius: 22, paddingHorizontal: 10, paddingVertical: 6 },
+  backPill:       { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
 
   // Hub
   hubContent:       { paddingBottom: 32, gap: 12 },
