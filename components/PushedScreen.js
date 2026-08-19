@@ -1,7 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import { View, StyleSheet, Animated, Easing, Dimensions, PanResponder } from 'react-native'
 import { devAssert } from '../utils/devAssert'
-import { navTrace } from '../utils/navTrace'   // TEMP — delete with the trace
 
 // The container every pushed module screen renders inside: it draws its child over
 // the persistent tab shell and slides it in and out.
@@ -92,8 +91,6 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
   // onMoveShouldSetPanResponder — which runs before any grant — it is always 0 and
   // `x0 <= EDGE_ZONE` is always true. That is why the edge zone never existed.
   const startX = useRef(0)
-  const moveN = useRef(0)   // TEMP — per-move sequence, capped so one swipe stays readable
-  const capN  = useRef(0)   // TEMP — same, for the capture phase
   // Whether a swipe is genuinely in flight. Cleared on every exit path.
   const gestureActive = useRef(false)
 
@@ -134,30 +131,11 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       // Capture runs at touch start, before any grant, and carries a true pageX — which
       // is the only place the real start position is available. Recorded, never claimed.
       onStartShouldSetPanResponderCapture: (e) => {
-        const n = e.nativeEvent
-        startX.current = n.pageX
-        moveN.current = 0
-        capN.current = 0
-        // Is the handler running at all, and is pageX actually a number? `undefined <= 32`
-        // is false, which would reject every touch and look exactly like this.
-        navTrace('capture', {
-          pageX: n.pageX, type: typeof n.pageX, locationX: n.locationX,
-          wrote: startX.current, touches: n.touches ? n.touches.length : 'n/a',
-        })
+        startX.current = e.nativeEvent.pageX
         return false
       },
       // Taps must pass straight through to the screen.
       onStartShouldSetPanResponder: () => false,
-      // TEMP probe. Capture is consulted on the way down, so if these keep arriving while
-      // the bubble `gate` lines stop, a child has taken the responder and the bubble
-      // handler is simply no longer being asked. Returns false — observes, never claims.
-      onMoveShouldSetPanResponderCapture: (_, g) => {
-        if (capN.current < 40) {
-          capN.current += 1
-          navTrace('capMove', { n: capN.current, dx: Math.round(g.dx), dy: Math.round(g.dy) })
-        }
-        return false
-      },
       // NON-CAPTURE, deliberately. A child horizontal scroller wins the touch, so in
       // the band where a chip bar or gallery meets the left edge the swipe does not
       // fire and the back button is the way out. Capturing instead would take that
@@ -166,21 +144,7 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
         const inZone = startX.current <= EDGE_ZONE          // must START at the edge
         const farEnough = g.dx > ACTIVATE_DISTANCE          // rightward, past tap jitter
         const horiz = Math.abs(g.dx) > Math.abs(g.dy) * 1.5 // and clearly horizontal
-        const grant = swipeRef.current && !closing.current && inZone && farEnough && horiz
-        // EVERY move, no dedupe. The previous single line was a logging artifact and said
-        // nothing about whether dx climbed. n= is the call count: if it stops at 1 while
-        // the finger keeps moving, this handler is no longer being consulted; if it keeps
-        // counting while dx stays flat, it is being consulted and dx is not accumulating.
-        // Those are different faults.
-        if (moveN.current < 40) {
-          moveN.current += 1
-          navTrace('gate', {
-            n: moveN.current, startX: Math.round(startX.current),
-            dx: Math.round(g.dx), dy: Math.round(g.dy),
-            inZone, farEnough, horiz, GRANT: grant,
-          })
-        }
-        return grant
+        return swipeRef.current && !closing.current && inZone && farEnough && horiz
       },
       // The activation distance is subtracted so the screen starts moving from rest at
       // the moment the gesture is claimed. Tracking raw g.dx would snap it 24px sideways
