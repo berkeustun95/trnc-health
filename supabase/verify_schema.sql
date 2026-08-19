@@ -333,6 +333,15 @@ WITH report AS (
     UNION ALL SELECT '0831_events_external_id_remap','zero synthetic gisekibris external_ids remain',
       NOT EXISTS(SELECT 1 FROM public.events
         WHERE source='gisekibris' AND external_id ~ '^gk-[0-9a-f]{12}$')
+    -- NOT NULL is not a named constraint, so the E-constraint section is blind to it.
+    -- Without this token a DB that never got the migration reads as OK, and a ragged
+    -- upsert can silently NULL status again — which hides rows from every user,
+    -- because the read policy is status='approved'. Default must stay 'draft':
+    -- ev_guard_write rejects any non-admin INSERT whose status is not draft.
+    UNION ALL SELECT '0901_events_status_not_null','events.status is NOT NULL, default still draft',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='events' AND column_name='status'
+          AND is_nullable='NO' AND column_default LIKE '%draft%')
     UNION ALL SELECT '0719_fix_signup','profiles_role_check allows home_service_provider',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='profiles_role_check'
         AND pg_get_constraintdef(c.oid) ILIKE '%home_service_provider%')
