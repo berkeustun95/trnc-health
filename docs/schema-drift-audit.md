@@ -1,8 +1,8 @@
 # Schema drift audit
 
 Manual-apply migrations have no CI, so nothing catches a file that was committed but
-never applied — or applied and then edited. This documents the audit built on 19 Aug
-2026, what it found, and the two open process gaps it exposed.
+never applied — or applied and then edited. This documents the audit built on 2026-08-19,
+what it found, and the three process changes it produced.
 
 ## Headline finding: drift is one-directional
 
@@ -49,7 +49,7 @@ inference from a single case.
 
 All addressed in `supabase/migrations/20260902_capture_schema_drift.sql`.
 
-## Two process fixes
+## Three process changes
 
 ### 1. Wrap destructive statements in `BEGIN`/`COMMIT`
 
@@ -78,11 +78,17 @@ Generally: `IF NOT EXISTS` guards a *name*, and a rename invalidates the name. R
 an "idempotent" migration out of order is not free. If a column has been renamed since,
 the earlier migration is no longer safe to replay and should say so in its header.
 
-## Open: paste safety
+### 3. Paste safety — the root cause
 
-**This is the root cause of everything above, and it is still unfixed.** I identified
-partial paste as the mechanism behind `20260802` but never proposed a remedy — recording
-it here so it stops being an unstated assumption.
+See the ledger section below. Summarised: every migration now stamps its own checksum as
+the last statement inside its transaction, so a file that was never applied, or applied
+and then edited, becomes visible instead of silent.
+
+## Paste safety in detail
+
+**This is the root cause of both surviving column findings.** Partial paste was
+identified as the mechanism behind `20260802` early on but went unaddressed for most of
+this work; recording it here so it stops being an unstated assumption.
 
 Migrations are applied by selecting text in the Supabase SQL editor and running it. That
 has three failure modes, and the workflow currently detects none of them:
@@ -125,15 +131,63 @@ This closes all three:
 - **Applied, then edited** — the checksum no longer matches the file on disk. This is the
   case nothing can currently detect.
 
-`scripts/audit-schema-drift.mjs` computes the checksums (it already reads every migration),
-emits the expected ledger, and the audit gains a section comparing ledger to disk. RLS on,
-no policies, service_role and postgres only — nothing client-facing needs to read it.
+RLS on, no policies, service_role and postgres only — nothing client-facing needs to read
+it, and it names internal file paths.
 
-**Cost:** two lines per migration and one column of discipline. **Not adopted yet** — it
-needs a decision, and back-filling the ledger for ~78 existing files means either
-accepting "applied, checksum unknown" for all of them or checksumming the current files
-and treating today as the baseline. The second is honest and cheap; the first is a lie
-that would go stale.
+**Cost:** two lines per migration and one column of discipline.
+
+### Adopted — baselined 2026-08-19
+
+`scripts/migration-ledger.mjs` owns the checksum algorithm, so the baseline, the
+per-migration stamp and the check cannot drift apart:
+
+| Command | Output |
+|---|---|
+| `--baseline` | `supabase/migrations/20260903_migration_ledger.sql` — table, RLS, and 77 baseline rows. One-time; do not regenerate |
+| `--stamp <file.sql>` | the `INSERT` a new migration ends with, inside its `BEGIN/COMMIT` |
+| *(default)* | `supabase/migration_ledger_check.sql` — read-only, one statement, sections L1/L2/L3 |
+
+**What a baseline row asserts, precisely: "this file matches live as of the 2026-08-19
+drift audit" — NOT "this file is what was applied."**
+
+Those differ, and `20260802_garage_booking_details.sql` is the proof: its `ADD COLUMN` is
+live and its `DROP COLUMN` is not, so *something other than the current file* ran, and
+whatever that was is unrecoverable. Rows written after the baseline **are** provenance
+claims, because the migration stamps its own checksum at apply time. The ledger must not
+overstate what it knows about the 77 files that predate it.
+
+We chose checksum-the-current-files over `applied, checksum unknown` because the baseline
+is verified rather than assumed: the audit that day found sections A/D/E/G empty across
+390 columns, 153 constraints and 31 indexes — every object the repo declares had reached
+the database. `checksum unknown` is a placeholder that never gets resolved and quietly
+erodes trust in the whole table.
+
+Two deliberate special cases:
+
+- **The bootstrap file is absent from its own baseline.** A file cannot contain its own
+  checksum. The ledger table existing *is* its applied-record — nothing else creates it.
+- **The bootstrap aborts unless `20260902` has been applied.** The baseline is generated
+  from files on disk and claims they match live; `20260902` was on disk and unapplied when
+  it was generated, so baselining first would have written a false row into the very table
+  built to prevent false rows. Apply order is `20260902` → `20260903`.
+
+The check is a **separate file** from `schema_drift_audit.sql`, not another section of it:
+a query naming a missing table fails at plan time, and plain SQL cannot make one section
+conditional. Keeping them apart means the audit still runs before the ledger exists, and
+neither can break the other.
+
+### Going forward, every migration ends with
+
+```sql
+-- inside the migration's BEGIN/COMMIT, as the last statement
+INSERT INTO public.schema_migrations_applied (filename, checksum)
+VALUES ('<file>.sql', '<sha256 from --stamp>')
+ON CONFLICT (filename) DO UPDATE
+  SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
+```
+
+Get the line from `node scripts/migration-ledger.mjs --stamp <file>.sql`, and regenerate
+`migration_ledger_check.sql` after adding the file.
 
 ## `facilities_backup_20260718` — investigated, dropped
 

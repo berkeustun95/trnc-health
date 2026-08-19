@@ -1,10 +1,7 @@
 -- ─── Capture: reconcile the repo with the live schema ────────────────────────
 --
--- PROPOSAL — do not apply until supabase/schema_drift_audit.sql has been run. If its
--- sections B, E–H or K return rows, EXTEND this file rather than applying it and then
--- needing a second capture. One item is already known to be pending that run:
--- duty_list_date_idx exists in the database and is created by no migration, but its
--- definition can only be read from pg_indexes, so it cannot be recorded here yet.
+-- Closes all four findings from supabase/schema_drift_audit.sql, which was run on
+-- 2026-08-19 and returned exactly four rows. Sections A, D, E, G and K came back EMPTY.
 --
 -- HOW THE DRIFT WAS FOUND: every DDL statement in supabase/ and supabase/migrations/
 -- is replayed by scripts/audit-schema-drift.mjs to build the schema the repo claims,
@@ -21,7 +18,7 @@
 -- was fixed and its naming logic validated against the 47 real constraint names
 -- captured from the live database in 20260718_capture_2_check_constraints.sql.
 --
--- WHAT SURVIVED: two columns, and one table.
+-- WHAT SURVIVED: two columns, one index, and one table.
 --
 -- THE PATTERN WORTH KEEPING: of 390 columns compared, every additive migration had
 -- applied correctly — zero repo columns are missing from the database. But the repo
@@ -158,6 +155,23 @@ ALTER TABLE public.claim_requests DROP COLUMN IF EXISTS kteb_confirmed;
 -- No CASCADE, on purpose: if anything does depend on this table, the DROP must fail and
 -- tell us rather than quietly taking the dependency with it.
 DROP TABLE IF EXISTS public.facilities_backup_20260718;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4. duty_list_date_idx — record an index the database already has.
+--
+-- Live, and created by no migration in the repo. Definition taken VERBATIM from the
+-- audit's section H rather than inferred:
+--     CREATE INDEX duty_list_date_idx ON public.duty_list USING btree (duty_date)
+-- Single column, btree, not unique, no WHERE clause.
+--
+-- Guessing this would have been the worst kind of mistake available here. IF NOT EXISTS
+-- makes the statement a no-op whenever the NAME exists, so a wrong column list would
+-- leave the database correct while the repo recorded a lie — and the audit's index
+-- section compares names, so it would pass. The repo would then be confidently wrong.
+--
+-- No-op against the live database; this exists so the repo stops being silent about it.
+CREATE INDEX IF NOT EXISTS duty_list_date_idx
+  ON public.duty_list USING btree (duty_date);
 
 COMMIT;
 RESET ROLE;
