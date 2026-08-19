@@ -59,6 +59,28 @@ const CATEGORY = {
   'Sahne':               'arts',
 }
 
+// The partner's city strings → the district names the rest of the app uses
+// (constants/regions.js REGION_TO_DUTY, and scripts/gisekibris-venues.json).
+// They send the colloquial short form "Mağusa"; everything we render says
+// "Gazimağusa". `events` has no city column — the city is folded into the location
+// text — so this is display-only, but a card reading "…, Mağusa" next to a UI that
+// says "Gazimağusa" everywhere else is exactly the kind of drift that erodes trust
+// in the data.
+//
+// Unmapped is a HARD ERROR, same as category. The first version of this pipeline
+// applied this normalisation by hand and never wrote it down, so regenerating the
+// seed silently reverted one row to "Mağusa" — caught only because it showed up as
+// an unexplained `location` diff in a dry run. A one-line map entry is the whole fix.
+const CITY = {
+  'Girne':      'Girne',
+  'Lefkoşa':    'Lefkoşa',
+  'İskele':     'İskele',
+  'Mağusa':     'Gazimağusa',
+  'Gazimağusa': 'Gazimağusa',
+  'Güzelyurt':  'Güzelyurt',
+  'Lefke':      'Lefke',
+}
+
 // Mirrors events_description_check / events_description_i18n_check exactly. Checked
 // here so a violation is a readable error on a local file rather than a CHECK
 // failure partway through a live import.
@@ -183,6 +205,14 @@ feed.forEach((ev, i) => {
   if (!title) { errors.push(`${where}: empty title`); return }
   if (!ev.startdate) { errors.push(`${where}: missing startdate`); return }
 
+  const rawCity = nfc(ev.city).trim()
+  const city = rawCity ? CITY[rawCity] : null
+  if (rawCity && !city) {
+    errors.push(`${where}: unmapped city ${JSON.stringify(rawCity)} — add it to CITY in this script, ` +
+      `mapped to the district name used in constants/regions.js.`)
+    return
+  }
+
   const descTr = stripHtml(ev.description?.tr)
   const descEn = stripHtml(ev.description?.en)
 
@@ -206,7 +236,7 @@ feed.forEach((ev, i) => {
     external_id:      externalId,
     title,
     venue:            nfc(ev.venue).trim(),
-    city:             nfc(ev.city).trim() || null,
+    city,
     category,
     source_category:  ev.category,
     start_date:       ev.startdate,
