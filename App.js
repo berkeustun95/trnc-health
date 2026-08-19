@@ -75,7 +75,6 @@ import CityWelcomeSettings from './components/CityWelcomeSettings'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
 import PushedScreen from './components/PushedScreen'
-import { navTrace } from './utils/navTrace'   // DEBUG — remove with the trace
 import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
@@ -294,7 +293,6 @@ export default function App() {
   const [showCoachMarks, setShowCoachMarks] = useState(false)
   const [coachSteps, setCoachSteps]         = useState([])
   const pushedRef = useRef(null)
-  const lastTraceSig = useRef('')   // DEBUG — remove with the trace
   const hamburgerRef       = useRef(null)
   const searchRef          = useRef(null)
   const filterBarRef       = useRef(null)
@@ -491,7 +489,7 @@ export default function App() {
       // Every pushed module screen, in one branch. The chain already decided which is
       // on top and handed PushedScreen the matching `dismiss`, so hardware back takes
       // the SAME close() as the back button and the swipe. One exit path, both platforms.
-      if (pushedRef.current) { closePushed('hardware'); return true }
+      if (pushedRef.current) { closePushed(); return true }
       if (adminPreview) { setAdminPreview(null); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
@@ -881,9 +879,7 @@ export default function App() {
   // hardware/gesture back and (next slice) the edge swipe all call this; PushedScreen
   // owns the exit and clears the flag through `dismiss` only when it is finished.
   // A ref, not state: BackHandler's listener would otherwise close over a stale value.
-  // `src` tags which exit fired. Screens pass their onPress event, not a string, so
-  // anything that is not a string is the in-app header arrow.
-  const closePushed = (src) => pushedRef.current?.close(typeof src === 'string' ? src : 'button')
+  const closePushed = () => pushedRef.current?.close()
 
   if (session === undefined || !fontsLoaded || onboarded === null) {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
@@ -1164,7 +1160,7 @@ export default function App() {
     } else if (gamesSubScreen === 'sudoku') {
       pushed = <SudokuScreen lang={lang} onBack={closePushed} />
     } else {
-      pushed = <GamesHubScreen lang={lang} onBack={closePushed} onNavigate={id => { navTrace('tap:gameTile', { id }); setGamesSubScreen(id) }} />
+      pushed = <GamesHubScreen lang={lang} onBack={closePushed} onNavigate={setGamesSubScreen} />
     }
   } else if (showPets) {
     dismiss = (!MODULE_FLAGS.pets && !isAdmin) ? () => setShowPets(false) : petsSubScreen ? () => setPetsSubScreen(null) : () => setShowPets(false)
@@ -1190,7 +1186,7 @@ export default function App() {
         <OwningPetScreen
           lang={lang}
           onBack={closePushed}
-          onNavigate={dest => { navTrace('tap:petTile', { dest }); setPetsSubScreen(dest) }}
+          onNavigate={dest => setPetsSubScreen(dest)}
         />
       )
     } else {
@@ -1661,29 +1657,6 @@ export default function App() {
   // re-ask on a later cold start (bounded to daily by shouldAskHomeCity). It must
   // never silently fall through to "visitor".
   const dismissHomeCityAsk = () => setShowHomeCityAsk(false)
-
-  // DEBUG TRACE. Prints every nav flag that is currently set, so two branch flags
-  // being true at once — which the chain would hide, since it renders only the first
-  // match — is visible in the log rather than inferred.
-  const traceFlags = [
-    showNotifs && 'notifs', showDutyList && 'duty', showEvents && 'events',
-    showAgentOnboarding && 'agentOnb', openedProperty && 'property',
-    showAccommodation && 'accom', showHomeServices && 'homeSvc', showJobPostings && 'jobs',
-    showTransport && 'transport', showInsurance && 'insurance', showEsim && 'esim',
-    showLegal && 'legal', selectedExplorePlace && 'explorePlace',
-    showExploreBeach && 'exploreBeach', showExplore && 'explore', adminPreview && 'adminPrev',
-    showNewcomerEssentials && 'newcomer', showExchangeRates && 'exchange',
-    showGames && 'GAMES', gamesSubScreen && `gamesSub:${gamesSubScreen}`,
-    showPets && 'PETS', petsSubScreen && `petsSub:${petsSubScreen}`,
-    unclaimedFacility && 'unclaimed', bookingFacility && 'booking',
-    selectedFacility && 'facility', showGrooming && 'grooming', showGarages && 'garages',
-    showStudentHub && 'studentHub',
-  ].filter(Boolean).join(',')
-  const traceSig = `${pushedKey}|${traceFlags}|${activeTab}`
-  if (traceSig !== lastTraceSig.current) {
-    lastTraceSig.current = traceSig
-    navTrace('STATE', { rendering: pushedKey ?? 'shell', tab: activeTab, flagsSet: traceFlags })
-  }
 
   return (
     <SafeAreaProvider>

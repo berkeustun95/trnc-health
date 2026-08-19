@@ -7,8 +7,6 @@ import ScreenHeader from '../../components/ScreenHeader'
 import ContentCard from '../../components/ContentCard'
 import { colors, spacing, radius, fontSize, shadow } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import { useEffect as useTraceEffect } from 'react'
-import { navTrace } from '../../utils/navTrace'   // DEBUG — remove with the trace
 
 const STATS_KEY = 'ada_games_xox_v1'
 const EMPTY_STATS = {
@@ -57,12 +55,6 @@ const MARK_IMG = {
 }
 
 export default function XoxGameScreen({ lang, onBack }) {
-  // DEBUG. If a 'mount' here is never followed by an 'unmount', this screen is still
-  // alive over the hub after the pop — which the container's touch probe cannot see.
-  useTraceEffect(() => {
-    navTrace('screen:mount', { name: 'Xox' })
-    return () => navTrace('screen:unmount', { name: 'Xox' })
-  }, [])
   const [mode, setMode] = useState('ai')          // 'ai' | 'friend'
   const [board, setBoard] = useState(freshBoard)
   const [result, setResult] = useState(null)      // { winner, line } | 'draw' | null

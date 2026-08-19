@@ -1,9 +1,7 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { useEffect } from 'react'
 import ScreenHeader from '../../components/ScreenHeader'
-import { navTrace } from '../../utils/navTrace'   // DEBUG — remove with the trace
 import ContentCard from '../../components/ContentCard'
 import { colors, spacing, radius, fontSize } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -15,39 +13,16 @@ const LOCKED = []
 export default function GamesHubScreen({ lang, onBack, onNavigate }) {
   const tint = { bg: colors.tintLifestyleBg, fg: colors.tintLifestyleFg }
 
-  // DEBUG. Mount/unmount proves whether the hub is remounted by the pop or left in
-  // place. The capture probe on the root proves whether a touch gets BELOW the
-  // container and into this screen at all — the container's own probe cannot tell.
-  useEffect(() => {
-    navTrace('screen:mount', { name: 'GamesHub' })
-    return () => navTrace('screen:unmount', { name: 'GamesHub' })
-  }, [])
-
   return (
-    <SafeAreaView
-      style={s.safe}
-      edges={['top', 'bottom']}
-      onStartShouldSetResponderCapture={e => {
-        navTrace('touch:hubRoot', { x: Math.round(e.nativeEvent.pageX), y: Math.round(e.nativeEvent.pageY) })
-        return false   // observe only
-      }}
-    >
+    <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <ScreenHeader onBack={onBack} lang={lang} title={t('gamesHubTitle', lang)} />
 
-      <ScrollView
-        contentContainerStyle={s.scroll}
-        showsVerticalScrollIndicator={false}
-        onStartShouldSetResponderCapture={e => {
-          navTrace('touch:scroll', { x: Math.round(e.nativeEvent.pageX), y: Math.round(e.nativeEvent.pageY) })
-          return false   // observe only
-        }}
-      >
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.grid}>
           <TouchableOpacity
             style={s.tileWrap}
             activeOpacity={0.85}
-            onPressIn={() => navTrace('tile:pressIn', { id: 'xox' })}
-            onPress={() => { navTrace('tile:press', { id: 'xox' }); onNavigate('xox') }}
+            onPress={() => onNavigate('xox')}
           >
             <ContentCard style={s.tile}>
               <View style={[s.iconCircle, { backgroundColor: tint.bg }]}>
@@ -60,8 +35,7 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
           <TouchableOpacity
             style={s.tileWrap}
             activeOpacity={0.85}
-            onPressIn={() => navTrace('tile:pressIn', { id: 'memory' })}
-            onPress={() => { navTrace('tile:press', { id: 'memory' }); onNavigate('memory') }}
+            onPress={() => onNavigate('memory')}
           >
             <ContentCard style={s.tile}>
               <View style={[s.iconCircle, { backgroundColor: tint.bg }]}>
@@ -74,8 +48,7 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
           <TouchableOpacity
             style={s.tileWrap}
             activeOpacity={0.85}
-            onPressIn={() => navTrace('tile:pressIn', { id: '2048' })}
-            onPress={() => { navTrace('tile:press', { id: '2048' }); onNavigate('2048') }}
+            onPress={() => onNavigate('2048')}
           >
             <ContentCard style={s.tile}>
               <View style={[s.iconCircle, { backgroundColor: tint.bg }]}>
@@ -88,8 +61,7 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
           <TouchableOpacity
             style={s.tileWrap}
             activeOpacity={0.85}
-            onPressIn={() => navTrace('tile:pressIn', { id: 'sudoku' })}
-            onPress={() => { navTrace('tile:press', { id: 'sudoku' }); onNavigate('sudoku') }}
+            onPress={() => onNavigate('sudoku')}
           >
             <ContentCard style={s.tile}>
               <View style={[s.iconCircle, { backgroundColor: tint.bg }]}>
