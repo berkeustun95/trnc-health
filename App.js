@@ -1668,18 +1668,6 @@ export default function App() {
             {pushed}
           </PushedScreen>
         ) : null}
-        {/* TEMP. Last child, so it paints above everything and always reflects App's
-            own render — this is what the TREE holds, to be read against the screen
-            banners below it, which are what is PAINTED. */}
-        <DebugBanner name="TREE" top={0} color="#000000"
-          detail={`push=${pushedKey ?? 'shell'} tab=${activeTab} flags=${[
-            showNotifs && 'notifs', showDutyList && 'duty', showEvents && 'events',
-            showAccommodation && 'accom', showEsim && 'esim', showLegal && 'legal',
-            showNewcomerEssentials && 'newc', showExchangeRates && 'exch',
-            showGames && 'GAMES', gamesSubScreen && `g:${gamesSubScreen}`,
-            showPets && 'PETS', petsSubScreen && `p:${petsSubScreen}`,
-            selectedFacility && 'fac', showGrooming && 'groom', showGarages && 'gar',
-          ].filter(Boolean).join(',') || '-'}`} />
       </View>
       {oliVisible && <OliGuide lang={lang} onNavigate={oliNavigate} />}
 
@@ -1815,6 +1803,25 @@ export default function App() {
         onSignUp={gateSignUp}
         onClose={() => setGateKey(null)}
       />
+      {/* TEMP. Now the LAST root sibling, so it genuinely paints above every overlay
+          rather than only above the inner View — which is what it did before, and why
+          it read as dead. `ov=` lists every root-level overlay that is mounted; several
+          render a full-screen transparent Pressable, which is invisible and catches
+          every touch. A React Native Modal opens its own window above even this banner,
+          so `citySet` and `gate` are reported for completeness. */}
+      <DebugBanner name="TREE" top={0} color="#000000"
+        detail={`push=${pushedKey ?? 'shell'} tab=${activeTab}` +
+          ` ov=${[
+            oliVisible && 'oli', showEmergencyModal && 'emerg', showMunicipalModal && 'munic',
+            cityWelcomeVisible && 'CITYCARD', homeCityAskVisible && 'HOMEASK',
+            showCitySettings && 'citySet', gateKey && 'gate', showMenu && 'menu',
+            showCoachMarks && 'coach', showPasswordReset && 'pwReset', showLangModal && 'lang',
+            showNotifs && 'notifs',
+          ].filter(Boolean).join(',') || 'none'}` +
+          ` fl=${[
+            showGames && 'GAMES', gamesSubScreen && `g:${gamesSubScreen}`,
+            showPets && 'PETS', petsSubScreen && `p:${petsSubScreen}`,
+          ].filter(Boolean).join(',') || '-'}`} />
     </SafeAreaProvider>
   )
 }
