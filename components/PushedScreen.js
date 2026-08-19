@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import { View, StyleSheet, Animated, Easing, Dimensions, PanResponder } from 'react-native'
 import { devAssert } from '../utils/devAssert'
+import { navTrace } from '../utils/navTrace'   // TEMP — delete with the trace
 
 // The container every pushed module screen renders inside: it draws its child over
 // the persistent tab shell and slides it in and out.
@@ -91,6 +92,7 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
   // onMoveShouldSetPanResponder — which runs before any grant — it is always 0 and
   // `x0 <= EDGE_ZONE` is always true. That is why the edge zone never existed.
   const startX = useRef(0)
+  const gateLogged = useRef(false)   // TEMP — one gate line per touch, not per frame
   // Whether a swipe is genuinely in flight. Cleared on every exit path.
   const gestureActive = useRef(false)
 
@@ -131,7 +133,15 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       // Capture runs at touch start, before any grant, and carries a true pageX — which
       // is the only place the real start position is available. Recorded, never claimed.
       onStartShouldSetPanResponderCapture: (e) => {
-        startX.current = e.nativeEvent.pageX
+        const n = e.nativeEvent
+        startX.current = n.pageX
+        gateLogged.current = false
+        // Is the handler running at all, and is pageX actually a number? `undefined <= 32`
+        // is false, which would reject every touch and look exactly like this.
+        navTrace('capture', {
+          pageX: n.pageX, type: typeof n.pageX, locationX: n.locationX,
+          wrote: startX.current, touches: n.touches ? n.touches.length : 'n/a',
+        })
         return false
       },
       // Taps must pass straight through to the screen.
@@ -140,12 +150,23 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       // the band where a chip bar or gallery meets the left edge the swipe does not
       // fire and the back button is the way out. Capturing instead would take that
       // touch from every horizontal scroller in the app, which is worse.
-      onMoveShouldSetPanResponder: (_, g) =>
-        swipeRef.current &&
-        !closing.current &&
-        startX.current <= EDGE_ZONE &&       // must START at the edge — see startX
-        g.dx > ACTIVATE_DISTANCE &&          // rightward, and past a tap's jitter
-        Math.abs(g.dx) > Math.abs(g.dy) * 1.5,   // and clearly horizontal
+      onMoveShouldSetPanResponder: (_, g) => {
+        const inZone = startX.current <= EDGE_ZONE          // must START at the edge
+        const farEnough = g.dx > ACTIVATE_DISTANCE          // rightward, past tap jitter
+        const horiz = Math.abs(g.dx) > Math.abs(g.dy) * 1.5 // and clearly horizontal
+        const grant = swipeRef.current && !closing.current && inZone && farEnough && horiz
+        // One line per touch, at the first meaningful movement — every term separately,
+        // so whichever is false is named rather than inferred.
+        if (!gateLogged.current && (Math.abs(g.dx) > 8 || grant)) {
+          gateLogged.current = true
+          navTrace('gate', {
+            startX: startX.current, dx: Math.round(g.dx), dy: Math.round(g.dy),
+            swipe: swipeRef.current, closing: closing.current,
+            inZone, farEnough, horiz, GRANT: grant,
+          })
+        }
+        return grant
+      },
       // The activation distance is subtracted so the screen starts moving from rest at
       // the moment the gesture is claimed. Tracking raw g.dx would snap it 24px sideways
       // on the first frame — trading the dead button for a visible jump.
