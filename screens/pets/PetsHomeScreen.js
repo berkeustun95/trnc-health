@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import PageBackground from '../../components/PageBackground'
 import ScreenHeader from '../../components/ScreenHeader'
+import DebugBanner from '../../components/DebugBanner'   // TEMP — delete with the banners
 import ModuleMascotBadge from '../../components/ModuleMascotBadge'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -52,6 +53,7 @@ function JourneyCard({ item, lang, onPress }) {
 export default function PetsHomeScreen({ lang, onBack, onNavigate }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <DebugBanner name="PETSHUB" top={120} color="#D1495B" />
       <PageBackground topic="pets" />
       <ScreenHeader onBack={onBack} title={t('petsTitle', lang)} lang={lang} />
 

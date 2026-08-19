@@ -8,6 +8,7 @@ import { BlurView } from 'expo-blur'
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
+import DebugBanner from '../components/DebugBanner'   // TEMP — delete with the banners
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -734,6 +735,7 @@ export default function HomeScreen({
       {/* Facility-list mode swaps the hub's sky for the medical-facilities art (full-bleed). */}
       {showFacilityList && <PageBackground topic="medical_facilities" />}
       <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <DebugBanner name="HOME" top={60} color="#0E7C7B" />
         <View style={s.container}>
           <View style={[s.header, showFacilityList && { justifyContent: 'space-between' }]}>
             {showFacilityList ? (

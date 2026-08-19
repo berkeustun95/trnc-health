@@ -75,6 +75,7 @@ import CityWelcomeSettings from './components/CityWelcomeSettings'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
 import PushedScreen from './components/PushedScreen'
+import DebugBanner from './components/DebugBanner'   // TEMP — delete with the banners
 import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
@@ -1667,6 +1668,18 @@ export default function App() {
             {pushed}
           </PushedScreen>
         ) : null}
+        {/* TEMP. Last child, so it paints above everything and always reflects App's
+            own render — this is what the TREE holds, to be read against the screen
+            banners below it, which are what is PAINTED. */}
+        <DebugBanner name="TREE" top={0} color="#000000"
+          detail={`push=${pushedKey ?? 'shell'} tab=${activeTab} flags=${[
+            showNotifs && 'notifs', showDutyList && 'duty', showEvents && 'events',
+            showAccommodation && 'accom', showEsim && 'esim', showLegal && 'legal',
+            showNewcomerEssentials && 'newc', showExchangeRates && 'exch',
+            showGames && 'GAMES', gamesSubScreen && `g:${gamesSubScreen}`,
+            showPets && 'PETS', petsSubScreen && `p:${petsSubScreen}`,
+            selectedFacility && 'fac', showGrooming && 'groom', showGarages && 'gar',
+          ].filter(Boolean).join(',') || '-'}`} />
       </View>
       {oliVisible && <OliGuide lang={lang} onNavigate={oliNavigate} />}
 

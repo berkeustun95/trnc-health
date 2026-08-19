@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import ScreenHeader from '../../components/ScreenHeader'
+import DebugBanner from '../../components/DebugBanner'   // TEMP — delete with the banners
 import ContentCard from '../../components/ContentCard'
 import { colors, spacing, radius, fontSize } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -15,6 +16,7 @@ export default function GamesHubScreen({ lang, onBack, onNavigate }) {
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      <DebugBanner name="GAMESHUB" top={90} color="#C2410C" />
       <ScreenHeader onBack={onBack} lang={lang} title={t('gamesHubTitle', lang)} />
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>

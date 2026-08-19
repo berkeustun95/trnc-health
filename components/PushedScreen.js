@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import { View, StyleSheet, Animated, Easing, Dimensions, PanResponder } from 'react-native'
 import { devAssert } from '../utils/devAssert'
+import DebugBanner from './DebugBanner'   // TEMP — delete with the banners
 
 // The container every pushed module screen renders inside: it draws its child over
 // the persistent tab shell and slides it in and out.
@@ -229,6 +230,7 @@ const PushedScreen = forwardRef(function PushedScreen({ children, onClosed, swip
       style={[s.fill, { transform: [{ translateX: tx }] }]}
       {...pan.panHandlers}
     >
+      <DebugBanner name="CONTAINER" top={30} color="#7C3AED" detail={`key=${pushedKey}`} />
       {children}
     </Animated.View>
   )
