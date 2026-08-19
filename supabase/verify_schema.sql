@@ -342,6 +342,25 @@ WITH report AS (
       EXISTS(SELECT 1 FROM information_schema.columns
         WHERE table_schema='public' AND table_name='events' AND column_name='status'
           AND is_nullable='NO' AND column_default LIKE '%draft%')
+    -- ── 0902 capture. Three drift items this register could not see before, because
+    -- it only checks what somebody remembered to add to it. All three are ABSENCE
+    -- facts, which no existence section can express.
+    -- 20260802 replaced this with garage_booking_details jsonb; its DROP never ran.
+    UNION ALL SELECT '0902_capture_schema_drift','appointments.service_type is GONE',
+      NOT EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='appointments' AND column_name='service_type')
+    -- Resurrected by re-running 20260719_claim_evidence_and_guard AFTER the rename to
+    -- business_verified. ADD COLUMN IF NOT EXISTS is not re-run-safe across a RENAME.
+    UNION ALL SELECT '0902_capture_schema_drift','claim_requests.kteb_confirmed is GONE',
+      NOT EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='claim_requests' AND column_name='kteb_confirmed')
+    -- A 411-row snapshot of facilities with no CREATE anywhere in the repo. Unreachable
+    -- only because RLS is on with zero policies — assert both halves of that.
+    -- to_regclass, NOT ::regclass — the cast RAISES on a missing relation, and absence
+    -- is the PASSING state here, so the cast would turn the whole drift check into a
+    -- hard error the moment the migration succeeds.
+    UNION ALL SELECT '0902_capture_schema_drift','facilities_backup_20260718 is gone',
+      to_regclass('public.facilities_backup_20260718') IS NULL
     UNION ALL SELECT '0719_fix_signup','profiles_role_check allows home_service_provider',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='profiles_role_check'
         AND pg_get_constraintdef(c.oid) ILIKE '%home_service_provider%')
