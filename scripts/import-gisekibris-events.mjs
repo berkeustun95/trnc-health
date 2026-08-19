@@ -325,18 +325,103 @@ const unknownVenues = [...new Set(
 let written = 0
 let writeError = null
 
-if (!dry && (inserts.length || updates.length)) {
+// A PostgREST bulk upsert derives ONE column list from the union of the keys across
+// every object in the array, and fills that column with NULL wherever an object does
+// not supply it. So mixing inserts (which carry status:'approved') with updates (which
+// deliberately omit status) in a single call writes status=NULL to every update —
+// silently, because the status CHECK is `status IN (…)` and a CHECK passes on NULL.
+//
+// That is exactly what happened on the first 72-event run: 69 rows lost
+// status='approved' and disappeared from the app, while the 3 inserts were fine. It
+// could not happen the round before, when the batch was 69 inserts and no updates.
+//
+// So: one homogeneous batch per shape, never a mixed one, and assertHomogeneous()
+// below fails loudly if a future edit reintroduces a ragged payload.
+function assertHomogeneous(label, rows) {
+  if (rows.length < 2) return
+  const shape = Object.keys(rows[0]).sort().join(',')
+  const odd = rows.findIndex(r => Object.keys(r).sort().join(',') !== shape)
+  if (odd !== -1) {
+    fail(
+      `Refusing to upsert a ragged "${label}" payload — row ${odd} has a different`,
+      'column set than row 0. PostgREST would NULL every column the shorter rows omit.',
+      `  row 0    : ${shape}`,
+      `  row ${odd}: ${Object.keys(rows[odd]).sort().join(',')}`,
+    )
+  }
+}
+
+if (inserts.length || updates.length) {
   const now = new Date().toISOString()
-  const payload = [
-    ...inserts.map(r => ({ ...r, status: 'approved', updated_at: now })),
-    ...updates.map(u => ({ ...u.row, updated_at: now })),   // no status, no images
-  ]
-  const { data, error } = await supabase
+
+  // New rows: status is set here and only here.
+  const insertPayload = inserts.map(r => ({ ...r, status: 'approved', updated_at: now }))
+  // Existing rows: no status (never re-approve a deliberately hidden row) and no
+  // images (the mirror pass owns that column).
+  const updatePayload = updates.map(u => ({ ...u.row, updated_at: now }))
+
+  // Deliberately OUTSIDE the `!dry` guard. The payloads are built identically either
+  // way, so a ragged shape is fully detectable without writing anything — and a check
+  // that only runs on the real run is a check that reports damage instead of
+  // preventing it. `--dry` is where this class of bug is supposed to die.
+  assertHomogeneous('insert', insertPayload)
+  assertHomogeneous('update', updatePayload)
+
+  if (dry) {
+    const shape = p => (p.length ? Object.keys(p[0]).sort().join(', ') : '—')
+    console.log(`\n  (dry) upsert batches, shape-checked:`)
+    console.log(`    insert  ${String(insertPayload.length).padStart(3)} row(s)`)
+    console.log(`      columns: ${shape(insertPayload)}`)
+    console.log(`    update  ${String(updatePayload.length).padStart(3)} row(s)`)
+    console.log(`      columns: ${shape(updatePayload)}`)
+    if (insertPayload.length && updatePayload.length) {
+      const only = (a, b) => Object.keys(a[0]).filter(k => !(k in b[0]))
+      const iOnly = only(insertPayload, updatePayload)
+      const uOnly = only(updatePayload, insertPayload)
+      console.log(`    the two batches differ by: ${[...iOnly.map(k => `+${k}`), ...uOnly.map(k => `-${k}`)].join(', ') || 'nothing'}`)
+      console.log(`    (sent as SEPARATE upserts — one mixed batch would NULL every`)
+      console.log(`     column the other shape omits)`)
+    }
+  } else {
+    for (const payload of [insertPayload, updatePayload]) {
+      if (!payload.length) continue
+      const { data, error } = await supabase
+        .from('events')
+        .upsert(payload, { onConflict: 'external_id' })
+        .select('id')
+      if (error) { writeError = error; break }
+      written += data?.length ?? 0
+    }
+  }
+}
+
+// ─── Post-write invariant ────────────────────────────────────────────────────
+//
+// The read policy is `status = 'approved'`, so a row with status NULL is not
+// "slightly wrong" — it is invisible to every user in the app while still looking
+// present in every admin query that does not filter on status. The ragged-payload
+// bug above nulled 69 of them and nothing complained.
+//
+// This is the check that would have caught it in seconds instead of during a guest
+// read test. It runs on every non-dry run and reports loudly; it does not repair,
+// because guessing which status a row *should* have is exactly the judgement a
+// script must not make on its own.
+let statusAlarm = null
+if (!dry && !writeError) {
+  const { data: bad, error: stErr } = await supabase
     .from('events')
-    .upsert(payload, { onConflict: 'external_id' })
-    .select('id')
-  if (error) writeError = error
-  else written = data?.length ?? 0
+    .select('external_id, title, status')
+    .eq('source', SOURCE)
+    .is('status', null)
+  if (stErr) {
+    statusAlarm = `could not verify status column: ${stErr.message}`
+  } else if (bad?.length) {
+    statusAlarm =
+      `${bad.length} row(s) have status NULL and are INVISIBLE to every user ` +
+      `(the read policy requires status='approved'). Restore with:\n` +
+      `      UPDATE public.events SET status='approved'\n` +
+      `      WHERE source='${SOURCE}' AND status IS NULL;`
+  }
 }
 
 // ─── Image mirror ────────────────────────────────────────────────────────────
@@ -576,6 +661,11 @@ if (missingCoords.length) {
   for (const v of missingCoords) console.log(`      ${v}`)
   console.log('    Imported with NULL lat/lng (correct). They are invisible under the Events')
   console.log('    district filter until coords land; they show fine with no district filter.')
+}
+
+if (statusAlarm) {
+  console.error(`\n  ✗✗ STATUS ALARM — ${statusAlarm}`)
+  process.exitCode = 1
 }
 
 if (writeError) {
