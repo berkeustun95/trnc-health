@@ -325,6 +325,14 @@ WITH report AS (
     UNION ALL SELECT '0830_events_gisekibris_import','events_description_check widened to 2500',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='events_description_check'
         AND pg_get_constraintdef(c.oid) ILIKE '%2500%')
+    -- Data migration, so it creates no named object at all and every other section
+    -- is blind to it. If it was committed but never applied, the next Gişe Kıbrıs
+    -- import matches nothing on the real key and INSERTS a duplicate of all 69 rows
+    -- alongside the originals. import-gisekibris-events.mjs aborts on the same
+    -- condition at runtime; this is the audit-time half of that guard.
+    UNION ALL SELECT '0831_events_external_id_remap','zero synthetic gisekibris external_ids remain',
+      NOT EXISTS(SELECT 1 FROM public.events
+        WHERE source='gisekibris' AND external_id ~ '^gk-[0-9a-f]{12}$')
     UNION ALL SELECT '0719_fix_signup','profiles_role_check allows home_service_provider',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='profiles_role_check'
         AND pg_get_constraintdef(c.oid) ILIKE '%home_service_provider%')

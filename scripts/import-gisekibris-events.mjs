@@ -168,7 +168,12 @@ function toRow(ev, venues) {
     source_image_url: ev.source_image_url,
     latitude:         coords.latitude  ?? null,
     longitude:        coords.longitude ?? null,
-    ticket_url:       null,              // no per-event links in their export
+    // Straight from the seed. NEVER hardcode this back to null: ticket_url is in
+    // MUTABLE, so a constant here does not merely fail to populate the column — it
+    // actively overwrites every real URL with NULL on the next run. The seed value
+    // is already null for any page that failed check-gisekibris-urls.mjs, and the
+    // app hides the Buy Ticket button on null.
+    ticket_url:       ev.ticket_url ?? null,
   }
 }
 
@@ -261,6 +266,32 @@ if (readErr) {
       'the value as an argument instead):',
       `  security add-generic-password -U -a "$USER" -s ${KEYCHAIN_SERVICE} -w "$(pbpaste)"`,
     ] : []),
+  )
+}
+
+// ─── Migration guard ─────────────────────────────────────────────────────────
+//
+// Rows are keyed on the partner's own event id ('gk-' + 20-25 alphanumerics) since
+// 20260831_events_external_id_remap.sql. The superseded key was a content hash,
+// 'gk-' + 12 lowercase hex. The two shapes cannot collide.
+//
+// If that migration has not been applied, EVERY feed row looks new: nothing matches
+// on the real id, so the upsert would INSERT a full duplicate set alongside the
+// originals — 69 duplicate events, live, with the originals still present. This is
+// the `facilities.area` failure class (committed but never applied), and it is
+// silent without this check. Bail before writing anything.
+const SYNTHETIC_KEY = /^gk-[0-9a-f]{12}$/
+const stale = (existing ?? []).filter(r => SYNTHETIC_KEY.test(r.external_id ?? ''))
+if (stale.length) {
+  fail(
+    `${stale.length} existing ${SOURCE} row(s) still carry the superseded synthetic external_id.`,
+    '',
+    'Apply supabase/migrations/20260831_events_external_id_remap.sql first (SQL editor,',
+    'Role → postgres). Importing now would insert a duplicate of every row in the feed',
+    'rather than updating the existing ones.',
+    '',
+    ...stale.slice(0, 5).map(r => `  ${r.external_id}  ${r.title}`),
+    ...(stale.length > 5 ? [`  … and ${stale.length - 5} more`] : []),
   )
 }
 
@@ -366,8 +397,23 @@ function objectPathFrom(publicUrl) {
   return i === -1 ? null : publicUrl.slice(i + marker.length)
 }
 
+// Firebase Storage serves the OBJECT'S METADATA as JSON unless ?alt=media is present
+// — a 200 with content-type application/json, not an error. The committed seed has the
+// whole query string stripped (it carried the partner's token and this repo is public),
+// so a row inserted from the seed arrives with a bare object path that downloads 580
+// bytes of JSON instead of an image. Add the parameter back when there is no query.
+//
+// The token is NOT needed for reads: verified byte-identical downloads (same sha256)
+// with and without it, so their bucket allows public reads. That is why the stripped
+// seed is still a re-fetchable record. If they ever lock the bucket down, this fetch
+// starts 403-ing and the import needs the tokenised URL threaded through again.
+function fetchableImageUrl(url) {
+  if (!url) return url
+  return url.includes('?') ? url : `${url}?alt=media`
+}
+
 async function mirrorOne(row) {
-  const res = await fetch(row.source_image_url)
+  const res = await fetch(fetchableImageUrl(row.source_image_url))
   if (!res.ok) throw new Error(`download ${res.status} ${res.statusText}`)
   const contentType = res.headers.get('content-type') || 'image/jpeg'
   if (!contentType.toLowerCase().startsWith('image/')) {
@@ -390,19 +436,25 @@ async function mirrorOne(row) {
 
   const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
 
-  // A PNG→JPEG conversion changes the extension, so the previous object would be
-  // orphaned — and left behind it would keep billing storage and serve stale bytes
-  // to anyone holding the old URL. Remove it once the new one is up.
-  const oldPath = objectPathFrom(row.images?.[0])
-  if (oldPath && oldPath !== path) {
-    await supabase.storage.from(BUCKET).remove([oldPath])
-  }
-
+  // Point the row at the new object BEFORE deleting the old one. The reverse order
+  // has a window where the object is gone but the row still references it, which
+  // renders as a broken image in production if the update then fails; this order's
+  // worst case is a harmless orphaned file. The window matters most on a
+  // --remirror pass, where every row changes path at once.
   const { error: rowErr } = await supabase
     .from('events')
     .update({ images: [publicUrl], updated_at: new Date().toISOString() })
     .eq('id', row.id)
   if (rowErr) throw new Error(`row update: ${rowErr.message}`)
+
+  // The old object is orphaned whenever the path changed — a PNG→JPEG conversion
+  // changes the extension, and the external_id remap changed the filename. Left
+  // behind it keeps billing storage and serves stale bytes to anyone holding the
+  // old URL.
+  const oldPath = objectPathFrom(row.images?.[0])
+  if (oldPath && oldPath !== path) {
+    await supabase.storage.from(BUCKET).remove([oldPath])
+  }
 
   return { publicUrl, before: body.length, after: opt.buffer.length, skipped: opt.skipped }
 }

@@ -121,20 +121,60 @@ These are already white-surface cards; nesting them would create a card-in-card 
 
 Two coexisting event sources share one `events` table:
 1. **Organizer-submitted** — users with `role: 'organizer'` post via `OrganizerScreen.js`, admin approves (`status`: draft → pending → approved → rejected). `organizer_id` set.
-2. **Admin-curated Gişe Kıbrıs** (Slice 1) — flagship ticketed events seeded via SQL (`supabase/events_gisekibris_migration.sql`), `source = 'manual'`, `organizer_id` NULL, `status = 'approved'`. Funnels traffic to gisekibris.com; becomes the demo for the future commission partnership.
+2. **Gişe Kıbrıs feed import** — the partner's catalogue, imported idempotently by `scripts/import-gisekibris-events.mjs`, `source = 'gisekibris'`, `organizer_id` NULL, `status = 'approved'`. Funnels traffic to gisekibris.com; the demo for the future commission partnership. The original hand-seeded `source = 'manual'` rows (`supabase/events_gisekibris_migration.sql`) have since been deleted — verified 19 Aug 2026, `gisekibris` is the only non-null source in the table. See "Gişe Kıbrıs feed pipeline" below.
 
 ### Schema (extended columns)
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `category` | text | `music` \| `nightlife` \| `sports` \| `arts` \| `family` \| `other` (default). Set by the organizer on submit, editable by admin. See "Category taxonomy" below |
-| `ticket_url` | text | gisekibris.com event URL — the Buy Ticket target |
+| `ticket_url` | text | Partner event page — the Buy Ticket target. NULL hides the button ([EventsScreen.js:470](../screens/EventsScreen.js#L470)) |
 | `latitude` / `longitude` | numeric | Coordinate-based Maps deep link (`destination={lat},{lng}`) — supersedes legacy `location_url` |
 | `price_from` / `price_text` | numeric / text | `price_text` wins in UI; else `From ₺{price_from}` |
-| `source` | text | `manual` (Slice 1) / `gisekibris_api` (Slice 2). Forward-compat |
-| `external_id` | text | Partial-unique (non-null) — Slice 2 API upsert dedup |
+| `source` | text | `manual` (legacy hand-seeded) / `gisekibris` (feed import) / NULL (organizer-submitted) |
+| `external_id` | text | UNIQUE (`events_external_id_unique`, nulls unlimited). For `source='gisekibris'` this is `gk-` + **the partner's own event id** — see "Gişe Kıbrıs feed pipeline" |
+| `description_i18n` | jsonb | `{tr, en}`, additive. Populated by the import; **not yet read by the UI** — `EventsScreen` still renders the legacy `description` text column |
+| `source_image_url` | text | The partner's original Firebase URL (tokenised), kept so a mirrored image can be re-fetched |
 
 `organizer_id` is now nullable (admin/API events have no organizer user). RLS unchanged: public reads approved+upcoming; only admins (or an event's own organizer) write.
+
+### Gişe Kıbrıs feed pipeline
+
+Weekly drop → three scripts, in order. Each refuses to run on bad input rather than
+degrading silently.
+
+```
+raw feed (their export)
+  └─ scripts/prepare-gisekibris-feed.mjs   pure transform, no network
+       └─ supabase/seed/gisekibris-events-clean.json   (committed, tokens stripped)
+            └─ scripts/check-gisekibris-urls.mjs --apply   probes every ticket_url
+                 └─ scripts/import-gisekibris-events.mjs   upsert + image mirror
+```
+
+**Identity — `external_id` = `gk-` + the partner's own event id.** Their id appears in
+two independent places and the prepare script cross-checks them on every row:
+`.../etkinlikler/<slug>--<ID>` and `.../o/events-v2%2F<ID>%2Fbanner.png`. Ids are
+**not fixed-width** (20-char Firestore, one 25-char cuid), so extraction splits on the
+*last* `--` and assumes no length. A disagreement or a failed extraction is a hard
+error — never a fallback.
+
+Superseded (`20260831_events_external_id_remap.sql`): `gk-` + sha1(title|start_date)[:12].
+A content hash re-hashes whenever the partner fixes a typo, silently orphaning the row
+and inserting a duplicate. That migration is a pure data change creating no named
+object, so `verify_schema.sql` carries an H-section token for it and the import script
+aborts if it finds a synthetic key.
+
+**Only the id half of a ticket URL routes** — a wrong slug still resolves 200 — so a
+title edit on their side cannot break a stored `ticket_url`.
+
+**Title whitespace is load-bearing.** 20 of 72 raw names carry doubled or trailing
+spaces; the prepare script NFC-normalises and collapses internal runs. A byte-exact
+matcher against the raw feed mismatches 10 rows.
+
+**Storage paths** are `events/gisekibris/{external_id}.{ext}` in the `event-images`
+bucket, writable only by service_role. They are not derived at read time — `images[0]`
+holds the full public URL — so a path whose filename lags the current `external_id` is
+cosmetic. `--remirror` re-keys them.
 
 `ev_guard_write()` does **not** police `category` — an organizer may set and change it freely on their own rows. The CHECK constraint is the only validation.
 
@@ -170,14 +210,16 @@ Retired in July 2026: `concert` and `festival`, both folded into `music`. The sw
 
 ### Slice 2 — Gişe Kıbrıs API sync (blocked on their API docs)
 
-Automated API sync + commission/affiliate tracking, replacing manual SQL entry. `source` (`gisekibris_api`) and `external_id` (upsert dedup) already exist for this. Design decisions locked:
+Automated API sync + commission/affiliate tracking, replacing the weekly file drop. The
+feed pipeline above already settled identity (`external_id` = partner id), category
+mapping, and image mirroring, so Slice 2 is the transport layer only. Design decisions locked:
 
 - **Ranking:** pure date sort (soonest first) across both lanes — no revenue bias. Current query already does this; no featured strip.
 - **Overlap:** when the same event exists in both lanes, prefer the Gişe Kıbrıs (commissioned) row and hide the organizer duplicate. Match on title + date.
 - **Source branding:** subtle "via Gişe Kıbrıs" badge on API-sourced cards + detail — co-brand for the partnership, trust cue on the Buy Ticket step.
 - **Commission:** injected only in `utils/events.js` `openTicketUrl()`.
 - **Extra fields (TBD — pending API schema):** likely price range + availability status; lineup optional. `featured` flag dropped for now (pure date sort has no featured strip to drive).
-- **Category mapping (TBD — pending API schema):** their taxonomy is unknown, so the sync job needs a mapping table into our six. Expected shape: `konser → music`, `tiyatro`/`sergi → arts`, `spor → sports`, `çocuk → family`, anything unmapped → `other`. Design `other` as a safe sink.
+- **Category mapping — SETTLED, live in `scripts/prepare-gisekibris-feed.mjs`:** `Club & Lounge & Bar`/`Elektronik Müzik`/`Plaj Partisi → nightlife`, `Konser`/`Hotel Konseri → music`, `Sahne → arts`. An unmapped value is a hard error, deliberately *not* an `other` sink — a silent sink buries a whole new category under a chip nobody filters by.
 - **⚠️ The sync job writes as service-role, so `auth.uid()` is NULL and `ev_guard_write()` returns early — it bypasses every trigger guard.** The CHECK constraint is the only thing validating an API-supplied category. Keep it strict, and validate in the sync job too.
 - **Timestamps:** the API's times must be normalised to an explicit offset before insert, same rule as manual entry (`+03`). A naive timestamp from their feed lands at the wrong hour and possibly the wrong day.
 

@@ -1,6 +1,6 @@
 {
   "_note": "Venue -> coordinate lookup for the Gise Kibris import. Coordinates are Google Maps place pins (!8m2!3d/!4d), user-verified. Do not invent values; leave null until verified.",
-  "_coverage": "48/69 events",
+  "_coverage": "48/72 events",
   "venues": [
     { "venue": "Cage Club", "city": "Girne", "event_count": 28, "latitude": 35.3351422, "longitude": 33.3654195 },
     { "venue": "Girne Amfi Tiyatro", "city": "Girne", "event_count": 6, "latitude": 35.33964, "longitude": 33.326215 },
@@ -20,6 +20,9 @@
     { "venue": "Odyssey Club", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
     { "venue": "Celebrity Hotel", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
     { "venue": "Elexus Hotel", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
-    { "venue": "Salamis Antik Tiyatro", "city": "Gazimağusa", "event_count": 1, "latitude": null, "longitude": null }
+    { "venue": "Salamis Antik Tiyatro", "city": "Gazimağusa", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "Bliss Bar", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "Acapulco Hotel", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null },
+    { "venue": "Esentepe Public Beach", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null }
   ]
 }
