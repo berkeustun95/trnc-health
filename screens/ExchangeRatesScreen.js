@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, ActivityIndicator, ScrollView, StyleSheet, TextInput,
+  useWindowDimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -73,10 +74,38 @@ function todayStr() {
 }
 
 // ─── Converter helpers ───────────────────────────────────────────────────────
-// The cap: the result line is numberOfLines={1}, and past ~10M the converted lira
-// value stops fitting the row and would silently clip.
-const MAX_AMOUNT = 9999999.99
-const MAX_INT_DIGITS = String(Math.floor(MAX_AMOUNT)).length // 7
+// The cap is a domain limit, not a display one — the rows step their font size
+// down (see amountFontSize) rather than clip, so the ceiling is free to be as
+// large as the currency needs. TRY devalues continuously and it is the side that
+// needs the digits: 1,000,000 GBP is unrealistic, 1,000,000 TRY is about 20k.
+const MAX_AMOUNT = 999999999.99
+const MAX_INT_DIGITS = String(Math.floor(MAX_AMOUNT)).length // 9
+
+// Measured, not estimated: SFNS.ttf instanced at wght 700 / opsz 22 with the tnum
+// glyphs both rows select via fontVariant: ['tabular-nums'] — every digit advances
+// 0.6587em (1349/2048), separators 0.2915em. Roboto 700 (Android) is ~12% narrower
+// at 0.5737em, so sizing to SF Pro fits both platforms.
+const DIGIT_EM = 0.6587
+const SEP_EM = 0.2915
+
+// Everything horizontal between the screen edge and the number: bodyContent
+// paddingHorizontal 16x2, calcCard padding 16x2, calcField borderWidth 1.5x2,
+// calcField paddingHorizontal 14x2, calcFieldCurr minWidth 78, calcField gap 12.
+// Six terms; change any of them and change this with them. calcFieldCurr's own
+// gap: 8 is internal to its minWidth and is deliberately NOT counted again.
+const FIELD_CHROME = 185
+const SIZE_STEPS = [22, 20, 18, 17, 16, 15, 14]
+
+// Weighted by glyph, not by length: a 14-char result carries three separators and
+// is ~24dp narrower than 14 all-digit characters, so sizing on length alone either
+// wastes size or clips. adjustsFontSizeToFit is deliberately avoided — unreliable
+// on Android. The 2dp margin keeps the longest reachable result off a knife edge
+// (53,999,999,999.99 lands on 175.15dp at 18pt against 175dp available).
+function amountFontSize(str, avail) {
+  let w = 0
+  for (const ch of str) w += ch >= '0' && ch <= '9' ? DIGIT_EM : SEP_EM
+  return SIZE_STEPS.find(sz => w * sz <= avail - 2) ?? SIZE_STEPS[SIZE_STEPS.length - 1]
+}
 
 // Digits left of the separator, leading zeros ignored ("007" is one digit).
 function intDigits(v) {
@@ -143,6 +172,7 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
   const [calcCurrency, setCalcCurrency] = useState('USD')
   const [calcDir, setCalcDir]           = useState('toTry')  // 'toTry' | 'toForeign'
   const [amount, setAmount]             = useState('')
+  const { width: winWidth }             = useWindowDimensions()
 
   useEffect(() => {
     let cancelled = false
@@ -220,6 +250,14 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
     : (calcDir === 'toTry' ? calcAmt * calcRate : calcAmt / calcRate)
   const fromPair = calcDir === 'toTry' ? calcPair : TRY_PAIR
   const toPair   = calcDir === 'toTry' ? TRY_PAIR : calcPair
+
+  // Sized independently per row. A shared size would shrink a short input just
+  // because its result is long, which reads as a bug with nothing on screen to
+  // explain it. Two rows at different sizes is ordinary.
+  const resultText   = calcResult == null ? '—' : formatMoney(calcResult)
+  const fieldAvail   = winWidth - FIELD_CHROME
+  const inputFontSz  = amountFontSize(amount || '0', fieldAvail)
+  const resultFontSz = amountFontSize(resultText, fieldAvail)
 
   // Carry the plain fixed-point value, NOT formatMoney() — its thousands commas
   // would be re-read as decimal separators by sanitizeAmount. Routed through
@@ -328,7 +366,7 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
                 <Text style={s.calcFieldCode}>{fromPair.code}</Text>
               </View>
               <TextInput
-                style={s.calcInput}
+                style={[s.calcInput, { fontSize: inputFontSz }]}
                 value={amount}
                 onChangeText={v => setAmount(prev => nextAmount(prev, v))}
                 keyboardType="decimal-pad"
@@ -356,8 +394,8 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
                 <Text style={s.calcFieldFlag}>{toPair.flag}</Text>
                 <Text style={s.calcFieldCode}>{toPair.code}</Text>
               </View>
-              <Text style={s.calcResultValue} numberOfLines={1}>
-                {calcResult == null ? '—' : formatMoney(calcResult)}
+              <Text style={[s.calcResultValue, { fontSize: resultFontSz }]} numberOfLines={1}>
+                {resultText}
               </Text>
             </View>
 
