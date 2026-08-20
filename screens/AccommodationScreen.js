@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
   TextInput, ScrollView, Image, Dimensions, Modal, Pressable,
@@ -8,254 +8,366 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
+import PropertyDetailScreen from './PropertyDetailScreen'
 import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
+import { areaOptions, areaName } from '../constants/areas'
 
 const { width: SCREEN_W } = Dimensions.get('window')
-const CARD_IMAGE_H = 220
+const CARD_W  = SCREEN_W - 32
+// 2:1, not 16:9. At 16:9 on a 390pt-wide device the image alone is ~201pt and the whole
+// card ~387pt, so only 1.7 fit on screen — confirmed on device. The photo's job on a LIST
+// card is to convey property type and condition, which 2:1 still does; the extra 22pt of
+// height was not buying recognition. Paired with moving the price onto the image (below),
+// this brings the card to ~310pt and just over 2 per screen, with the third peeking so
+// the list still reads as scrollable.
+const CARD_IMAGE_H = Math.round(CARD_W / 2)
 
-const INTENTS    = ['all', 'rent', 'sale', 'short_term']
-const DISTRICTS  = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele']
+// Mirrors ReviewsScreen's PAGE. One pagination idiom in this repo, not two.
+const PAGE = 20
+
+// ─── LANDING TAB ─────────────────────────────────────────────────────────────
+// The 'all' tab cannot be coherently sorted: it interleaves intents (every £500/mo
+// rental outranks every £107,500 sale on a price sort), currencies (£107k vs ₺4.75m
+// is not a comparison — no FX by product decision) and rent periods (£6,000/year vs
+// £500/month). Landing on a SINGLE intent makes price sort mean something.
+//
+// Set to 'sale' by decision. NOTE the counter-argument, unresolved: every rent-specific
+// keyword in Oli's accommodation intent (kiralık, kiralamak, аренда, снять, miete,
+// location, alquiler, ايجار, اجاره) points at renting and there are zero purchase
+// keywords; oliMsgAccommodation says "a place to stay"; ADA is for newcomers. If the
+// real Novest inventory turns out rent-heavy, flip this one line —
+//   SELECT intent, count(*) FROM properties WHERE source IS NOT NULL GROUP BY intent;
+// settles it with data instead of intuition.
+const LANDING_INTENT = 'sale'
+
+// Landing intent first; 'all' last because it is the least coherent view.
+const INTENTS    = ['sale', 'rent', 'short_term', 'all']
 const PROP_TYPES = ['apartment', 'villa', 'studio', 'house', 'land', 'commercial']
-const CURRENCIES = { GBP: '£', TRY: '₺', EUR: '€' }
-const SORT_OPTS  = ['newest', 'popular', 'price_asc', 'price_desc']
+const BED_OPTS   = [1, 2, 3, 4]
+const PERIODS    = ['monthly', 'weekly', 'yearly', 'nightly']
+
+// Slice 1 widened properties_currency_check to exactly these four — the currencies
+// actually transacted in North Cyprus. A code with no symbol here renders raw
+// ("USD450,000"), which is the bug this map exists to prevent.
+const CURRENCIES = { GBP: '£', EUR: '€', USD: '$', TRY: '₺' }
+const CURRENCY_CODES = ['GBP', 'EUR', 'USD', 'TRY']
+
+// 'total' deliberately has no suffix. Every other period must have one, or a yearly
+// rent renders as a bare number and reads as a sale price.
+const PERIOD_SUFFIX_KEY = {
+  monthly: 'accomPerMonth',
+  weekly:  'accomPerWeek',
+  yearly:  'accomPerYear',
+  nightly: 'accomPerNight',
+}
+
+// ─── formatting ──────────────────────────────────────────────────────────────
+
+function priceDisplay(price, currency, period, lang) {
+  if (price == null) return null
+  const sym = CURRENCIES[currency] || currency
+  const formatted = Number(price).toLocaleString('en-GB', { maximumFractionDigits: 0 })
+  const key = PERIOD_SUFFIX_KEY[period]
+  return `${sym}${formatted}${key ? t(key, lang) : ''}`
+}
 
 function intentLabel(intent, lang) {
   if (intent === 'rent')       return t('accomRent', lang)
   if (intent === 'sale')       return t('accomSale', lang)
   if (intent === 'short_term') return t('accomShortTerm', lang)
+  if (intent === 'all')        return t('accomAll', lang)
   return intent
-}
-
-function districtLabel(d, lang) {
-  const map = {
-    nicosia:   t('accomDistrictNicosia', lang),
-    kyrenia:   t('accomDistrictKyrenia', lang),
-    famagusta: t('accomDistrictFamagusta', lang),
-    morphou:   t('accomDistrictMorphou', lang),
-    iskele:    t('accomDistrictIskele', lang),
-  }
-  return map[d] || d
 }
 
 function typeLabel(type, lang) {
   const map = {
-    apartment:  t('accomTypeApartment', lang),
-    villa:      t('accomTypeVilla', lang),
-    studio:     t('accomTypeStudio', lang),
-    house:      t('accomTypeHouse', lang),
-    land:       t('accomTypeLand', lang),
-    commercial: t('accomTypeCommercial', lang),
+    apartment:  t('accomTypeApartment', lang), villa: t('accomTypeVilla', lang),
+    studio:     t('accomTypeStudio', lang),    house: t('accomTypeHouse', lang),
+    land:       t('accomTypeLand', lang),      commercial: t('accomTypeCommercial', lang),
   }
   return map[type] || type
 }
 
-function priceDisplay(price, currency, period, lang) {
-  const sym = CURRENCIES[currency] || currency
-  const formatted = Number(price).toLocaleString('en-GB', { maximumFractionDigits: 0 })
-  if (period === 'monthly') return `${sym}${formatted}${t('accomPerMonth', lang)}`
-  if (period === 'nightly') return `${sym}${formatted}${t('accomPerNight', lang)}`
-  return `${sym}${formatted}`
-}
-
-// ─── Image Carousel ──────────────────────────────────────────────────────────
-
-function ImageCarousel({ images }) {
-  const [idx, setIdx] = useState(0)
-  if (!images || images.length === 0) {
-    return (
-      <View style={cs.imagePlaceholder}>
-        <Ionicons name="home-outline" size={48} color={colors.border} />
-      </View>
-    )
+function periodLabel(period, lang) {
+  const map = {
+    monthly: t('accomPropPeriodMonthly', lang), weekly: t('accomPropPeriodWeekly', lang),
+    yearly:  t('accomPropPeriodYearly', lang),  nightly: t('accomPropPeriodNightly', lang),
+    total:   t('accomPropPeriodTotal', lang),
   }
-  return (
-    <View>
-      <FlatList
-        data={images}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={i => i.id}
-        onMomentumScrollEnd={e => {
-          setIdx(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))
-        }}
-        renderItem={({ item }) => (
-          <Image source={{ uri: item.url }} style={cs.cardImage} resizeMode="cover" />
-        )}
-      />
-      {images.length > 1 && (
-        <View style={cs.dotRow}>
-          {images.map((_, i) => (
-            <View key={i} style={[cs.dot, i === idx && cs.dotActive]} />
-          ))}
-        </View>
-      )}
-    </View>
-  )
+  return map[period] || period
 }
 
-// ─── Property Card ───────────────────────────────────────────────────────────
+// Districts reuse the canonical 7-region set and its blDistrict* keys, which already
+// exist in all 9 locales. Slice 1 widened properties_district_check from 5 to these 7.
+const districtLabel = (d, lang) => (REGION_LABEL_KEY[d] ? t(REGION_LABEL_KEY[d], lang) : d)
+
+// "2+1" is how rooms are quoted in TRNC: bedrooms + living rooms. Fall back to a plain
+// bed count when living_rooms is unknown rather than inventing a "+0".
+function roomsLabel(beds, living, lang) {
+  if (beds != null && living != null) return `${beds}+${living}`
+  if (beds != null) return `${beds} ${t('accomBeds', lang)}`
+  return null
+}
+
+// is_primary wins; otherwise lowest sort_order. Slice 2 sets primaries — until then
+// every seeded/imported row falls through to the sort_order branch, so both paths
+// must work.
+function primaryImage(images) {
+  if (!images || images.length === 0) return null
+  const flagged = images.find(i => i.is_primary)
+  if (flagged) return flagged
+  return [...images].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0]
+}
+
+// ─── Property card ───────────────────────────────────────────────────────────
+// NO agent name, photo or phone anywhere — the product decision is that no
+// per-property agent is surfaced. The agency name is the only attribution shown.
 
 function PropertyCard({ item, lang, onPress }) {
-  const agent  = item.estate_agents
-  const agency = agent?.estate_agencies
+  const img     = primaryImage(item.property_images)
+  const count   = item.property_images?.length ?? 0
+  const agency  = item.estate_agencies?.name
+  const rooms   = roomsLabel(item.bedrooms, item.living_rooms, lang)
+  const place   = [districtLabel(item.district, lang), item.area ? areaName(item.area, item.district) : null]
+                    .filter(Boolean).join(' · ')
 
   return (
     <TouchableOpacity style={cs.card} onPress={onPress} activeOpacity={0.92}>
       <View>
-        <ImageCarousel images={item.property_images} />
-        {/* Intent badge */}
-        <View style={[cs.intentBadge, item.intent === 'sale' && cs.intentBadgeSale,
+        {img
+          ? <Image source={{ uri: img.url }} style={cs.cardImage} resizeMode="cover" />
+          : <View style={cs.imagePlaceholder}>
+              <Ionicons name="home-outline" size={44} color={colors.border} />
+            </View>}
+
+        <View style={[cs.intentBadge,
+          item.intent === 'sale' && cs.intentBadgeSale,
           item.intent === 'short_term' && cs.intentBadgeShort]}>
           <Text style={cs.intentBadgeText}>{intentLabel(item.intent, lang)}</Text>
         </View>
-        {/* Price badge */}
+
         <View style={cs.priceBadge}>
           <Text style={cs.priceBadgeText}>
             {priceDisplay(item.price, item.currency, item.price_period, lang)}
           </Text>
         </View>
-      </View>
 
-      {/* Agent row */}
-      <View style={cs.agentRow}>
-        <View style={cs.agentLogoWrap}>
-          {agency?.logo_url
-            ? <Image source={{ uri: agency.logo_url }} style={cs.agencyLogo} resizeMode="contain" />
-            : <View style={[cs.agencyLogo, cs.agencyLogoPlaceholder]}>
-                <Ionicons name="business-outline" size={18} color={colors.textSecondary} />
-              </View>
-          }
-        </View>
-        <View style={cs.agentCenter}>
-          <Text style={cs.agentName} numberOfLines={1}>{agent?.full_name || '—'}</Text>
-          {agency?.name && (
-            <Text style={cs.agencyName} numberOfLines={1}>{agency.name}</Text>
-          )}
-          {agent?.phone && (
-            <Text style={cs.agentPhone} numberOfLines={1}>{agent.phone}</Text>
-          )}
-        </View>
-        <View style={cs.agentPhotoWrap}>
-          {agent?.photo_url
-            ? <Image source={{ uri: agent.photo_url }} style={cs.agentPhoto} />
-            : <View style={[cs.agentPhoto, cs.agentPhotoPlaceholder]}>
-                <Ionicons name="person-outline" size={18} color={colors.textSecondary} />
-              </View>
-          }
-        </View>
-      </View>
-
-      {/* Specs row */}
-      <View style={cs.specsRow}>
-        <Text style={cs.propType}>{typeLabel(item.property_type, lang)}</Text>
-        {item.bedrooms != null && (
-          <View style={cs.specChip}><Text style={cs.specText}>{item.bedrooms} {t('accomBeds', lang)}</Text></View>
-        )}
-        {item.bathrooms != null && (
-          <View style={cs.specChip}><Text style={cs.specText}>{item.bathrooms} {t('accomBaths', lang)}</Text></View>
-        )}
-        {item.area_sqm != null && (
-          <View style={cs.specChip}><Text style={cs.specText}>{item.area_sqm}m²</Text></View>
-        )}
-        {item.furnished != null && (
-          <View style={cs.specChip}>
-            <Text style={cs.specText}>{item.furnished ? t('accomFurnished', lang) : t('accomUnfurnished', lang)}</Text>
+        {count > 1 && (
+          <View style={cs.imgCount}>
+            <Ionicons name="images-outline" size={12} color="#fff" />
+            <Text style={cs.imgCountText}>{count}</Text>
           </View>
         )}
       </View>
 
-      {/* Address row */}
-      {(item.district || item.address) && (
-        <View style={cs.addressRow}>
-          <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
-          <Text style={cs.addressText} numberOfLines={1}>
-            {[districtLabel(item.district, lang), item.address].filter(Boolean).join(' · ')}
-          </Text>
+      <View style={cs.cardBody}>
+        {/* Title keeps 2 lines: Turkish titles routinely wrap, and truncating to one
+            loses the deed/room information that leads most of them. */}
+        <Text style={cs.title} numberOfLines={2}>{item.title}</Text>
+
+        {/* Place and agency share a row. Two separate rows cost ~23pt for content that
+            reads fine side by side, and the agency is the only attribution shown. */}
+        {(!!place || !!agency) && (
+          <View style={cs.placeRow}>
+            {!!place && <>
+              <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+              <Text style={cs.placeText} numberOfLines={1}>{place}</Text>
+            </>}
+            {!!agency && <Text style={cs.agencyName} numberOfLines={1}>{agency}</Text>}
+          </View>
+        )}
+
+        {/* Every chip is `!= null`, never truthiness: floor 0 and bedrooms 0 are real
+            values that a truthy check would silently drop. */}
+        <View style={cs.specsRow}>
+          <Text style={cs.propType}>{typeLabel(item.property_type, lang)}</Text>
+          {rooms != null && <View style={cs.specChip}><Text style={cs.specText}>{rooms}</Text></View>}
+          {item.bathrooms != null && (
+            <View style={cs.specChip}><Text style={cs.specText}>{item.bathrooms} {t('accomBaths', lang)}</Text></View>
+          )}
+          {/* Built area if known; otherwise PLOT area. A land listing has area_sqm NULL
+              and plot_sqm set, so without this its spec row renders empty and the one
+              figure that matters for land is missing. Keyed on null-ness, not on
+              property_type, so a commercial (or any) listing with only a plot figure is
+              covered by the same branch. */}
+          {item.area_sqm != null ? (
+            <View style={cs.specChip}><Text style={cs.specText}>{item.area_sqm} m²</Text></View>
+          ) : item.plot_sqm != null ? (
+            <View style={cs.specChip}>
+              <Text style={cs.specText}>
+                {Number(item.plot_sqm).toLocaleString('en-GB')} m² {t('accomPlot', lang)}
+              </Text>
+            </View>
+          ) : null}
+          {item.furnished != null && (
+            <View style={cs.specChip}>
+              <Text style={cs.specText}>{item.furnished ? t('accomFurnished', lang) : t('accomUnfurnished', lang)}</Text>
+            </View>
+          )}
         </View>
-      )}
+      </View>
     </TouchableOpacity>
   )
 }
 
-// ─── Filter Pill ─────────────────────────────────────────────────────────────
-
-function FilterPill({ label, active, onPress }) {
+function FilterPill({ label, active, disabled, onPress }) {
   return (
-    <TouchableOpacity style={[cs.pill, active && cs.pillActive]} onPress={onPress} activeOpacity={0.75}>
-      <Text style={[cs.pillText, active && cs.pillTextActive]}>{label}</Text>
+    <TouchableOpacity
+      style={[cs.pill, active && cs.pillActive, disabled && cs.pillDisabled]}
+      onPress={onPress} disabled={disabled} activeOpacity={0.75}
+    >
+      <Text style={[cs.pillText, active && cs.pillTextActive, disabled && cs.pillTextDisabled]}>
+        {label}
+      </Text>
     </TouchableOpacity>
   )
 }
 
-// ─── Main Screen ─────────────────────────────────────────────────────────────
+// ─── Main screen ─────────────────────────────────────────────────────────────
 
-export default function AccommodationScreen({ lang, session, onClose, onBecomeAgent, onOpenProperty }) {
-  const [properties, setProperties]   = useState([])
-  const [agencies, setAgencies]       = useState([])
-  const [loading, setLoading]         = useState(true)
-  const [intent, setIntent]           = useState('all')
-  const [district, setDistrict]       = useState(null)
-  const [propType, setPropType]       = useState(null)
-  const [agencyId, setAgencyId]       = useState(null)
-  const [sort, setSort]               = useState('newest')
-  const [priceMin, setPriceMin]       = useState('')
-  const [priceMax, setPriceMax]       = useState('')
-  const [filterCurrency, setFilterCurrency] = useState(null)
-  const [showDistrictModal, setShowDistrictModal] = useState(false)
-  const [showTypeModal, setShowTypeModal]         = useState(false)
-  const [showAgencyModal, setShowAgencyModal]     = useState(false)
-  const [showSortModal, setShowSortModal]         = useState(false)
-  const [showPriceModal, setShowPriceModal]       = useState(false)
+// ─── WHY THE DETAIL IS AN OVERLAY, AND WHY ITS STATE LIVES IN App.js ─────────
+//
+// The detail used to render INSTEAD of this screen, from its own `else if` branch in
+// App.js's content chain. That unmounts the list: scroll position, page number, loaded
+// items and every filter were destroyed on open and rebuilt from page 0 on close.
+// Rendering it as an overlay INSIDE this screen keeps the FlatList mounted, so all of
+// that survives the round trip for free.
+//
+// The state (`selectedProperty`) deliberately stays in App.js rather than moving in here,
+// and that is the part that protects Android back. A child-registered BackHandler looks
+// like the obvious move but is racy: RN invokes handlers in REVERSE registration order,
+// React runs child effects BEFORE parent effects, and App.js re-registers its handler
+// whenever any of its ~35 dependencies change. So a parent re-render while the overlay is
+// open silently promotes App's handler above this screen's, and back closes the whole
+// module instead of the overlay — which is exactly the EventsScreen defect, reached by a
+// different route.
+//
+// Keeping the state where the back handler already lives removes the race entirely.
+// App.js:490 already reads `if (openedProperty) { setOpenedProperty(null); return true }`
+// BEFORE its showAccommodation line, so the correct two-step back — detail, then module —
+// is preserved by construction rather than by winning a registration race.
+export default function AccommodationScreen({ lang, onClose, onOpenProperty, selectedProperty, onCloseProperty }) {
+  const [items, setItems]           = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage]             = useState(0)
+  const [done, setDone]             = useState(false)
+  const [total, setTotal]           = useState(0)
 
-  const fetchProperties = useCallback(async () => {
-    setLoading(true)
+  const [intent, setIntent]     = useState(LANDING_INTENT)
+  const [district, setDistrict] = useState(null)
+  const [area, setArea]         = useState(null)
+  const [propType, setPropType] = useState(null)
+  const [beds, setBeds]         = useState(null)
+  const [priceMin, setPriceMin] = useState('')
+  const [priceMax, setPriceMax] = useState('')
+  const [currency, setCurrency] = useState(null)
+  const [plotMin, setPlotMin]   = useState('')       // sale only
+  const [furnished, setFurnished] = useState(null)   // rent only
+  const [period, setPeriod]     = useState(null)     // rent only
+
+  const [sheet, setSheet] = useState(null)           // which picker is open
+  const [pendingArea, setPendingArea] = useState(false)  // came via the area pill
+
+  const isSale = intent === 'sale'
+  const isRent = intent === 'rent' || intent === 'short_term'
+
+  // 'all' mixes intents, currencies and rent periods, so a price sort there is
+  // meaningless. Offer it only on a single-intent tab.
+  const sortOpts = intent === 'all' ? ['updated'] : ['price_asc', 'price_desc', 'updated']
+  const [sort, setSort] = useState('price_asc')
+  const effectiveSort = sortOpts.includes(sort) ? sort : 'updated'
+
+  const buildQuery = useCallback(() => {
+    // THE C2 FIX. The agency is embedded DIRECTLY via properties.agency_id. It used to
+    // hang off estate_agents(...), and a partner listing has agent_id NULL — so that
+    // embed returned null and the agency name, the one attribution the product requires,
+    // never rendered on a single feed row.
     let q = supabase
       .from('properties')
-      .select(`*, property_images(id, url, sort_order), estate_agents(id, full_name, phone, photo_url, estate_agencies(id, name, logo_url))`)
+      .select(
+        '*, estate_agencies(id, name, logo_url), property_images(id, url, sort_order, is_primary)',
+        { count: 'exact' },
+      )
       .eq('status', 'active')
 
-    if (intent !== 'all')  q = q.eq('intent', intent)
-    if (district)          q = q.eq('district', district)
-    if (propType)          q = q.eq('property_type', propType)
-    if (agencyId)          q = q.eq('agency_id', agencyId)
-    if (filterCurrency)    q = q.eq('currency', filterCurrency)
-    if (priceMin !== '')   q = q.gte('price', Number(priceMin))
-    if (priceMax !== '')   q = q.lte('price', Number(priceMax))
+    if (intent !== 'all') q = q.eq('intent', intent)
+    if (district)         q = q.eq('district', district)
+    if (area)             q = q.eq('area', area)
+    if (propType)         q = q.eq('property_type', propType)
+    if (beds != null)     q = beds >= 4 ? q.gte('bedrooms', 4) : q.eq('bedrooms', beds)
+    if (currency)         q = q.eq('currency', currency)
+    if (priceMin !== '')  q = q.gte('price', Number(priceMin))
+    if (priceMax !== '')  q = q.lte('price', Number(priceMax))
+    if (isSale && plotMin !== '') q = q.gte('plot_sqm', Number(plotMin))
+    if (isRent && furnished != null) q = q.eq('furnished', furnished)
+    if (isRent && period)            q = q.eq('price_period', period)
 
-    if (sort === 'newest')     q = q.order('created_at', { ascending: false })
-    if (sort === 'popular')    q = q.order('view_count', { ascending: false })
-    if (sort === 'price_asc')  q = q.order('price', { ascending: true })
-    if (sort === 'price_desc') q = q.order('price', { ascending: false })
+    // id is the tiebreaker on every sort: without it, rows sharing a price can shuffle
+    // between pages and pagination duplicates or drops them.
+    if (effectiveSort === 'price_asc')  q = q.order('price', { ascending: true }).order('id', { ascending: true })
+    if (effectiveSort === 'price_desc') q = q.order('price', { ascending: false }).order('id', { ascending: true })
+    if (effectiveSort === 'updated')    q = q.order('updated_at', { ascending: false, nullsFirst: false }).order('id', { ascending: true })
+    return q
+  }, [intent, district, area, propType, beds, currency, priceMin, priceMax,
+      plotMin, furnished, period, effectiveSort, isSale, isRent])
 
-    const { data, error } = await q
-    if (!error) {
-      setProperties((data || []).map(p => ({
-        ...p,
-        property_images: (p.property_images || []).sort((a, b) => a.sort_order - b.sort_order),
-      })))
+  const load = useCallback(async (pageNum = 0) => {
+    if (pageNum === 0) setLoading(true); else setLoadingMore(true)
+    const from = pageNum * PAGE
+    const { data, count, error } = await buildQuery().range(from, from + PAGE - 1)
+    if (!error && data) {
+      setItems(prev => (pageNum === 0 ? data : [...prev, ...data]))
+      setTotal(count ?? 0)
+      if (data.length < PAGE) setDone(true)
     }
-    setLoading(false)
-  }, [intent, district, propType, agencyId, sort, priceMin, priceMax, filterCurrency])
+    if (pageNum === 0) setLoading(false); else setLoadingMore(false)
+  }, [buildQuery])
 
-  const fetchAgencies = useCallback(async () => {
-    const { data } = await supabase.from('estate_agencies').select('id, name').eq('status', 'active')
-    setAgencies(data || [])
-  }, [])
+  // Any filter or sort change resets to page 0 and fetches ONE page — not the whole
+  // table, which is what this screen used to do on every keystroke.
+  useEffect(() => { setPage(0); setDone(false); load(0) }, [load])
 
-  useEffect(() => { fetchProperties() }, [fetchProperties])
-  useEffect(() => { fetchAgencies() }, [fetchAgencies])
+  function loadMore() {
+    if (loadingMore || done || loading) return
+    const next = page + 1
+    setPage(next)
+    load(next)
+  }
 
-  const activeFilters = [district, propType, agencyId, filterCurrency, priceMin || priceMax].filter(Boolean).length
+  // Leaving an intent clears the filters that no longer apply, so a stale rent filter
+  // cannot silently narrow a sale list.
+  function changeIntent(next) {
+    setIntent(next)
+    if (next !== 'sale') setPlotMin('')
+    if (next === 'sale' || next === 'all') { setFurnished(null); setPeriod(null) }
+    if (next === 'all' && sort !== 'updated') setSort('updated')
+    if (next !== 'all' && sort === 'updated') setSort('price_asc')
+  }
+
+  function clearAll() {
+    setDistrict(null); setArea(null); setPropType(null); setBeds(null)
+    setPriceMin(''); setPriceMax(''); setCurrency(null)
+    setPlotMin(''); setFurnished(null); setPeriod(null)
+    setSort(intent === 'all' ? 'updated' : 'price_asc')
+  }
+
+  // `furnished` can legitimately be false, so this counts on presence, not truthiness —
+  // the same trap as floor 0 on the card.
+  const activeCount = [
+    district, area, propType, beds, currency,
+    (priceMin || priceMax) || null, plotMin || null, furnished, period,
+  ].filter(v => v !== null && v !== undefined && v !== '').length
+
+  const areaChoices = useMemo(() => (district ? areaOptions(district) : []), [district])
 
   function sortLabel(s) {
-    if (s === 'newest')     return t('accomSortNewest', lang)
-    if (s === 'popular')    return t('accomSortPopular', lang)
     if (s === 'price_asc')  return t('accomSortPriceLow', lang)
     if (s === 'price_desc') return t('accomSortPriceHigh', lang)
-    return s
+    return t('accomSortUpdated', lang)
   }
 
   return (
@@ -263,178 +375,193 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
       <PageBackground topic="accommodation" />
       <ScreenHeader onBack={onClose} title={t('accomTitle', lang)} lang={lang} />
 
-      {/* Intent tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={cs.intentBar} contentContainerStyle={cs.intentBarContent}>
+      {/* flexShrink:0 — a fixed-height row above a scrolling list gets vertically
+          compressed once the list overflows, cropping its text top and bottom. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={cs.intentBar} contentContainerStyle={cs.intentBarContent}>
         {INTENTS.map(i => (
-          <TouchableOpacity key={i} style={[cs.intentTab, intent === i && cs.intentTabActive]} onPress={() => setIntent(i)}>
+          <TouchableOpacity key={i} style={[cs.intentTab, intent === i && cs.intentTabActive]}
+            onPress={() => changeIntent(i)}>
             <Text style={[cs.intentTabText, intent === i && cs.intentTabTextActive]}>
-              {i === 'all' ? t('accomAll', lang) : intentLabel(i, lang)}
+              {intentLabel(i, lang)}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* Filter pills */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={cs.pillBar} contentContainerStyle={cs.pillBarContent}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={cs.pillBar} contentContainerStyle={cs.pillBarContent}>
+        <FilterPill label={district ? districtLabel(district, lang) : t('accomFilterDistrict', lang)}
+          active={!!district} onPress={() => setSheet('district')} />
+        {/* Area depends on district — but a greyed-out pill that does nothing when tapped
+            reads as BROKEN, not as waiting. So it is always live: with no district chosen
+            it opens the district picker and then advances straight to areas, turning a
+            dead control into a two-step flow. */}
+        <FilterPill label={area ? areaName(area, district) : t('accomFilterArea', lang)}
+          active={!!area}
+          onPress={() => { if (district) { setSheet('area') } else { setPendingArea(true); setSheet('district') } }} />
+        <FilterPill label={propType ? typeLabel(propType, lang) : t('accomFilterType', lang)}
+          active={!!propType} onPress={() => setSheet('type')} />
+        <FilterPill label={beds != null ? (beds >= 4 ? '4+' : String(beds)) : t('accomFilterBeds', lang)}
+          active={beds != null} onPress={() => setSheet('beds')} />
         <FilterPill
-          label={district ? districtLabel(district, lang) : t('accomFilterDistrict', lang)}
-          active={!!district}
-          onPress={() => setShowDistrictModal(true)}
-        />
-        <FilterPill
-          label={propType ? typeLabel(propType, lang) : t('accomFilterType', lang)}
-          active={!!propType}
-          onPress={() => setShowTypeModal(true)}
-        />
-        <FilterPill
-          label={agencyId ? (agencies.find(a => a.id === agencyId)?.name || t('accomFilterAgency', lang)) : t('accomFilterAgency', lang)}
-          active={!!agencyId}
-          onPress={() => setShowAgencyModal(true)}
-        />
-        <FilterPill
-          label={(priceMin || priceMax || filterCurrency)
-            ? `${filterCurrency || ''}${priceMin ? ` >${priceMin}` : ''}${priceMax ? ` <${priceMax}` : ''}`.trim() || t('accomFilterPrice', lang)
+          label={(priceMin || priceMax || currency)
+            ? `${currency || ''}${priceMin ? ` >${priceMin}` : ''}${priceMax ? ` <${priceMax}` : ''}`.trim()
             : t('accomFilterPrice', lang)}
-          active={!!(priceMin || priceMax || filterCurrency)}
-          onPress={() => setShowPriceModal(true)}
-        />
-        <FilterPill
-          label={sortLabel(sort)}
-          active={sort !== 'newest'}
-          onPress={() => setShowSortModal(true)}
-        />
-        {activeFilters > 0 && (
-          <TouchableOpacity style={cs.clearPill} onPress={() => {
-            setDistrict(null); setPropType(null); setAgencyId(null)
-            setPriceMin(''); setPriceMax(''); setFilterCurrency(null); setSort('newest')
-          }}>
+          active={!!(priceMin || priceMax || currency)} onPress={() => setSheet('price')} />
+
+        {/* Listing-type-aware: a control that cannot apply is not rendered at all. */}
+        {isSale && (
+          <FilterPill label={plotMin ? `${t('accomFilterPlotMin', lang)} ${plotMin}` : t('accomFilterPlotMin', lang)}
+            active={!!plotMin} onPress={() => setSheet('plot')} />
+        )}
+        {isRent && (
+          <FilterPill
+            label={furnished == null ? t('accomFilterFurnished', lang)
+              : (furnished ? t('accomFurnished', lang) : t('accomUnfurnished', lang))}
+            active={furnished != null} onPress={() => setSheet('furnished')} />
+        )}
+        {isRent && (
+          <FilterPill label={period ? periodLabel(period, lang) : t('accomFilterPeriod', lang)}
+            active={!!period} onPress={() => setSheet('period')} />
+        )}
+
+        <FilterPill label={sortLabel(effectiveSort)} active onPress={() => setSheet('sort')} />
+
+        {activeCount > 0 && (
+          <TouchableOpacity style={cs.clearPill} onPress={clearAll}>
             <Feather name="x" size={14} color={colors.danger} />
             <Text style={cs.clearPillText}>{t('accomClear', lang)}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
 
-      {/* List */}
-      {loading
-        ? <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
-        : (
-          <FlatList
-            data={properties}
-            keyExtractor={i => i.id}
-            contentContainerStyle={cs.listContent}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={cs.emptyWrap}>
-                <View style={cs.emptyCard}>
-                  <Ionicons name="home-outline" size={48} color={colors.border} style={{ marginBottom: 10 }} />
-                  <Text style={cs.emptyTitle}>{t('accomNoResults', lang)}</Text>
-                  <Text style={cs.emptySub}>{t('accomNoResultsSub', lang)}</Text>
-                </View>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={i => i.id}
+          contentContainerStyle={cs.listContent}
+          showsVerticalScrollIndicator={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.3}
+          ListEmptyComponent={
+            <View style={cs.emptyWrap}>
+              <View style={cs.emptyCard}>
+                <Ionicons name="home-outline" size={44} color={colors.border} style={{ marginBottom: 10 }} />
+                <Text style={cs.emptyTitle}>{t('accomNoResults', lang)}</Text>
+                <Text style={cs.emptySub}>{t('accomNoResultsSub', lang)}</Text>
               </View>
-            }
-            ListFooterComponent={
-              <View style={cs.footer}>
-                <View style={cs.footerCard}>
-                  <Ionicons name="briefcase-outline" size={28} color={colors.primary} />
-                  <Text style={cs.footerTitle}>{t('accomBecomeAgent', lang)}</Text>
-                  <Text style={cs.footerSub}>{t('accomBecomeAgentSub', lang)}</Text>
-                  <TouchableOpacity style={cs.footerBtn} onPress={onBecomeAgent}>
-                    <Text style={cs.footerBtnText}>{t('accomBecomeAgent', lang)}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            }
-            renderItem={({ item }) => (
-              <PropertyCard item={item} lang={lang} onPress={() => onOpenProperty(item)} />
-            )}
-          />
-        )
-      }
+            </View>
+          }
+          ListFooterComponent={
+            loadingMore
+              ? <ActivityIndicator style={{ marginVertical: 20 }} color={colors.primary} />
+              : <View style={{ height: 24 }} />
+          }
+          renderItem={({ item }) => (
+            <PropertyCard item={item} lang={lang} onPress={() => onOpenProperty(item)} />
+          )}
+        />
+      )}
 
-      {/* District modal */}
-      <PickerModal
-        visible={showDistrictModal}
-        title={t('accomFilterDistrict', lang)}
-        options={DISTRICTS}
-        selected={district}
-        labelFn={d => districtLabel(d, lang)}
-        onSelect={v => { setDistrict(v === district ? null : v); setShowDistrictModal(false) }}
-        onClose={() => setShowDistrictModal(false)}
-      />
+      <PickerSheet visible={sheet === 'district'} title={t('accomFilterDistrict', lang)}
+        options={REGIONS} selected={district} labelFn={d => districtLabel(d, lang)}
+        onSelect={v => {
+          const n = v === district ? null : v
+          setDistrict(n); setArea(null)
+          // Chained from the area pill: hand straight over to areas rather than closing
+          // and making them tap again.
+          const chain = pendingArea && n
+          setPendingArea(false)
+          setSheet(chain ? 'area' : null)
+        }}
+        onClose={() => { setPendingArea(false); setSheet(null) }} />
 
-      {/* Type modal */}
-      <PickerModal
-        visible={showTypeModal}
-        title={t('accomFilterType', lang)}
-        options={PROP_TYPES}
-        selected={propType}
-        labelFn={tp => typeLabel(tp, lang)}
-        onSelect={v => { setPropType(v === propType ? null : v); setShowTypeModal(false) }}
-        onClose={() => setShowTypeModal(false)}
-      />
+      <PickerSheet visible={sheet === 'area'} title={t('accomFilterArea', lang)}
+        options={areaChoices.map(a => a.value)} selected={area}
+        labelFn={s => areaName(s, district)}
+        onSelect={v => { setArea(v === area ? null : v); setSheet(null) }}
+        onClose={() => setSheet(null)} />
 
-      {/* Agency modal */}
-      <PickerModal
-        visible={showAgencyModal}
-        title={t('accomFilterAgency', lang)}
-        options={agencies.map(a => a.id)}
-        selected={agencyId}
-        labelFn={id => agencies.find(a => a.id === id)?.name || id}
-        onSelect={v => { setAgencyId(v === agencyId ? null : v); setShowAgencyModal(false) }}
-        onClose={() => setShowAgencyModal(false)}
-      />
+      <PickerSheet visible={sheet === 'type'} title={t('accomFilterType', lang)}
+        options={PROP_TYPES} selected={propType} labelFn={tp => typeLabel(tp, lang)}
+        onSelect={v => { setPropType(v === propType ? null : v); setSheet(null) }}
+        onClose={() => setSheet(null)} />
 
-      {/* Sort modal */}
-      <PickerModal
-        visible={showSortModal}
-        title={t('accomFilterSort', lang)}
-        options={SORT_OPTS}
-        selected={sort}
-        labelFn={s => sortLabel(s)}
-        onSelect={v => { setSort(v); setShowSortModal(false) }}
-        onClose={() => setShowSortModal(false)}
-      />
+      <PickerSheet visible={sheet === 'beds'} title={t('accomFilterBeds', lang)}
+        options={BED_OPTS} selected={beds} labelFn={n => (n >= 4 ? '4+' : String(n))}
+        onSelect={v => { setBeds(v === beds ? null : v); setSheet(null) }}
+        onClose={() => setSheet(null)} />
 
-      {/* Price range modal */}
-      <Modal visible={showPriceModal} transparent animationType="slide">
+      <PickerSheet visible={sheet === 'period'} title={t('accomFilterPeriod', lang)}
+        options={PERIODS} selected={period} labelFn={p => periodLabel(p, lang)}
+        onSelect={v => { setPeriod(v === period ? null : v); setSheet(null) }}
+        onClose={() => setSheet(null)} />
+
+      <PickerSheet visible={sheet === 'furnished'} title={t('accomFilterFurnished', lang)}
+        options={[true, false]} selected={furnished}
+        labelFn={b => (b ? t('accomFurnished', lang) : t('accomUnfurnished', lang))}
+        onSelect={v => { setFurnished(v === furnished ? null : v); setSheet(null) }}
+        onClose={() => setSheet(null)} />
+
+      <PickerSheet visible={sheet === 'sort'} title={t('accomFilterSort', lang)}
+        options={sortOpts} selected={effectiveSort} labelFn={sortLabel}
+        onSelect={v => { setSort(v); setSheet(null) }}
+        onClose={() => setSheet(null)} />
+
+      {/* Price range + currency. Currency matters here beyond filtering: a price sort
+          across currencies is not a comparison, so narrowing to one makes it real. */}
+      <Modal visible={sheet === 'price'} transparent animationType="slide" onRequestClose={() => setSheet(null)}>
         <KeyboardAwareForm>
-        <Pressable style={cs.overlay} onPress={() => setShowPriceModal(false)}>
+        <Pressable style={cs.overlay} onPress={() => setSheet(null)}>
           <Pressable style={cs.sheet}>
             <Text style={cs.sheetTitle}>{t('accomFilterPriceRange', lang)}</Text>
-            {/* Currency selector */}
             <View style={cs.currencyChips}>
-              {['GBP', 'TRY', 'EUR'].map(c => (
-                <TouchableOpacity
-                  key={c}
-                  style={[cs.currencyChip, filterCurrency === c && cs.currencyChipActive]}
-                  onPress={() => setFilterCurrency(filterCurrency === c ? null : c)}
-                >
-                  <Text style={[cs.currencyChipText, filterCurrency === c && cs.currencyChipTextActive]}>
+              {CURRENCY_CODES.map(c => (
+                <TouchableOpacity key={c}
+                  style={[cs.currencyChip, currency === c && cs.currencyChipActive]}
+                  onPress={() => setCurrency(currency === c ? null : c)}>
+                  <Text style={[cs.currencyChipText, currency === c && cs.currencyChipTextActive]}>
                     {CURRENCIES[c]} {c}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
             <View style={cs.priceRow}>
-              <TextInput
-                style={[cs.input, { flex: 1 }]}
-                placeholder={t('accomMin', lang)}
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-                value={priceMin}
-                onChangeText={setPriceMin}
-              />
+              <TextInput style={[cs.input, { flex: 1 }]} placeholder={t('accomMin', lang)}
+                placeholderTextColor={colors.textSecondary} keyboardType="numeric"
+                value={priceMin} onChangeText={setPriceMin} />
               <Text style={cs.priceDash}>–</Text>
-              <TextInput
-                style={[cs.input, { flex: 1 }]}
-                placeholder={t('accomMax', lang)}
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-                value={priceMax}
-                onChangeText={setPriceMax}
-              />
+              <TextInput style={[cs.input, { flex: 1 }]} placeholder={t('accomMax', lang)}
+                placeholderTextColor={colors.textSecondary} keyboardType="numeric"
+                value={priceMax} onChangeText={setPriceMax} />
             </View>
-            <TouchableOpacity style={cs.applyBtn} onPress={() => setShowPriceModal(false)}>
+            <TouchableOpacity style={cs.applyBtn} onPress={() => setSheet(null)}>
+              <Text style={cs.applyBtnText}>{t('accomApply', lang)}</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+        </KeyboardAwareForm>
+      </Modal>
+
+      {/* Above everything, and the list beneath it is never unmounted. */}
+      {selectedProperty && (
+        <View style={cs.detailOverlay}>
+          <PropertyDetailScreen property={selectedProperty} lang={lang} onBack={onCloseProperty} />
+        </View>
+      )}
+
+      <Modal visible={sheet === 'plot'} transparent animationType="slide" onRequestClose={() => setSheet(null)}>
+        <KeyboardAwareForm>
+        <Pressable style={cs.overlay} onPress={() => setSheet(null)}>
+          <Pressable style={cs.sheet}>
+            <Text style={cs.sheetTitle}>{t('accomFilterPlotMin', lang)}</Text>
+            <TextInput style={cs.input} placeholder={t('accomMin', lang)}
+              placeholderTextColor={colors.textSecondary} keyboardType="numeric"
+              value={plotMin} onChangeText={setPlotMin} />
+            <TouchableOpacity style={[cs.applyBtn, { marginTop: 16 }]} onPress={() => setSheet(null)}>
               <Text style={cs.applyBtnText}>{t('accomApply', lang)}</Text>
             </TouchableOpacity>
           </Pressable>
@@ -445,100 +572,83 @@ export default function AccommodationScreen({ lang, session, onClose, onBecomeAg
   )
 }
 
-// ─── Generic picker bottom sheet ─────────────────────────────────────────────
-
-function PickerModal({ visible, title, options, selected, labelFn, onSelect, onClose }) {
+function PickerSheet({ visible, title, options, selected, labelFn, onSelect, onClose }) {
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={cs.overlay} onPress={onClose}>
         <Pressable style={cs.sheet}>
           <Text style={cs.sheetTitle}>{title}</Text>
-          {options.map(opt => (
-            <TouchableOpacity key={opt} style={cs.sheetOption} onPress={() => onSelect(opt)}>
-              <Text style={[cs.sheetOptionText, selected === opt && cs.sheetOptionTextActive]}>
-                {labelFn(opt)}
-              </Text>
-              {selected === opt && <Ionicons name="checkmark" size={18} color={colors.primary} />}
-            </TouchableOpacity>
-          ))}
+          <ScrollView style={{ maxHeight: 380 }}>
+            {options.map(opt => (
+              <TouchableOpacity key={String(opt)} style={cs.sheetOption} onPress={() => onSelect(opt)}>
+                <Text style={[cs.sheetOptionText, selected === opt && cs.sheetOptionTextActive]}>
+                  {labelFn(opt)}
+                </Text>
+                {selected === opt && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
   )
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
 const cs = StyleSheet.create({
   safe:                { flex: 1, backgroundColor: colors.bg },
+  detailOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bg, zIndex: 20 },
 
-  intentBar:           { flexGrow: 0 },
+  intentBar:           { flexGrow: 0, flexShrink: 0 },
   intentBarContent:    { paddingHorizontal: 16, gap: 8, paddingBottom: 10 },
   intentTab:           { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.cardBg },
   intentTabActive:     { backgroundColor: colors.primary },
   intentTabText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   intentTabTextActive: { fontFamily: 'Inter_700Bold', color: '#fff' },
 
-  pillBar:             { flexGrow: 0 },
+  pillBar:             { flexGrow: 0, flexShrink: 0 },
   pillBarContent:      { paddingHorizontal: 16, gap: 8, paddingBottom: 12 },
   pill:                { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
   pillActive:          { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  pillDisabled:        { opacity: 0.4 },
   pillText:            { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   pillTextActive:      { fontFamily: 'Inter_700Bold', color: colors.primary },
+  pillTextDisabled:    { color: colors.textSecondary },
   clearPill:           { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.dangerLight, backgroundColor: colors.dangerLight },
   clearPillText:       { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
 
-  listContent:         { paddingHorizontal: 16, paddingBottom: 40 },
+  listContent:         { paddingHorizontal: 16, paddingBottom: 24 },
 
   card:                { backgroundColor: colors.cardBg, borderRadius: 20, marginBottom: 16, overflow: 'hidden', ...shadow },
-  cardImage:           { width: SCREEN_W - 32, height: CARD_IMAGE_H },
-  imagePlaceholder:    { width: SCREEN_W - 32, height: CARD_IMAGE_H, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  cardImage:           { width: CARD_W, height: CARD_IMAGE_H },
+  imagePlaceholder:    { width: CARD_W, height: CARD_IMAGE_H, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
 
-  dotRow:              { position: 'absolute', bottom: 10, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
-  dot:                 { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
-  dotActive:           { backgroundColor: '#fff', width: 18 },
-
-  intentBadge:         { position: 'absolute', top: 12, right: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, backgroundColor: colors.primary },
+  intentBadge:         { position: 'absolute', top: 12, left: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, backgroundColor: colors.primary },
   intentBadgeSale:     { backgroundColor: colors.success },
   intentBadgeShort:    { backgroundColor: colors.accent },
   intentBadgeText:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  priceBadge:          { position: 'absolute', bottom: 12, left: 12, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.65)' },
-  priceBadgeText:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+  imgCount:            { position: 'absolute', bottom: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)' },
+  imgCountText:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff' },
 
-  agentRow:            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10, gap: 10 },
-  agentLogoWrap:       { width: 44, alignItems: 'flex-start' },
-  agencyLogo:          { width: 38, height: 38, borderRadius: 8 },
-  agencyLogoPlaceholder: { backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  agentCenter:         { flex: 1 },
-  agentName:           { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  agencyName:          { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.primary, marginTop: 1 },
-  agentPhone:          { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
-  agentPhotoWrap:      { width: 44, alignItems: 'flex-end' },
-  agentPhoto:          { width: 40, height: 40, borderRadius: 20 },
-  agentPhotoPlaceholder: { backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  cardBody:            { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12, gap: 5 },
+  title:               { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 19 },
+  placeRow:            { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  placeText:           { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  priceBadge:          { position: 'absolute', bottom: 10, left: 12, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.68)' },
+  priceBadgeText:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
 
-  specsRow:            { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', paddingHorizontal: 14, gap: 6, paddingBottom: 8 },
+  specsRow:            { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   propType:            { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.3 },
   specChip:            { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.surface },
   specText:            { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
-  addressRow:          { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingBottom: 14 },
-  addressText:         { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
+  agencyName:          { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary, maxWidth: '45%' },
 
   emptyWrap:           { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
   emptyCard:           { backgroundColor: colors.cardBg, borderRadius: 16, paddingHorizontal: 24, paddingVertical: 20, alignItems: 'center', ...shadow },
   emptyTitle:          { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 4 },
   emptySub:            { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
 
-  footer:              { paddingTop: 12, paddingBottom: 20 },
-  footerCard:          { backgroundColor: colors.primaryLight, borderRadius: 20, padding: 20, alignItems: 'center', gap: 8 },
-  footerTitle:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.primary },
-  footerSub:           { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.primary, textAlign: 'center', opacity: 0.8 },
-  footerBtn:           { marginTop: 4, paddingHorizontal: 24, paddingVertical: 11, borderRadius: 14, backgroundColor: colors.primary },
-  footerBtnText:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
-
-  // modals
   overlay:             { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:               { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40 },
   sheetTitle:          { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 },
@@ -546,10 +656,10 @@ const cs = StyleSheet.create({
   sheetOptionText:     { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   sheetOptionTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
-  currencyChips:       { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  currencyChips:       { flexDirection: 'row', gap: 8, marginBottom: 16 },
   currencyChip:        { flex: 1, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center' },
   currencyChipActive:  { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  currencyChipText:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  currencyChipText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   currencyChipTextActive: { color: colors.primary },
   priceRow:            { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   priceDash:           { fontSize: 18, color: colors.textSecondary },

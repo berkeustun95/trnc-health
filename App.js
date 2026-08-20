@@ -30,7 +30,6 @@ import DutyListScreen from './screens/DutyListScreen'
 import EventsScreen from './screens/EventsScreen'
 import OrganizerScreen from './screens/OrganizerScreen'
 import AccommodationScreen from './screens/AccommodationScreen'
-import PropertyDetailScreen from './screens/PropertyDetailScreen'
 import EstateAgentOnboardingScreen from './screens/EstateAgentOnboardingScreen'
 import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import HomeServiceDashboardScreen from './screens/HomeServiceDashboardScreen'
@@ -1032,6 +1031,17 @@ export default function App() {
     content = (MODULE_FLAGS.events || isAdmin)
       ? <EventsScreen lang={lang} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} initialDistrict={eventsDistrict} />
       : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} />
+  // PARKED, NOT DEAD. `showAgentOnboarding` is never set to true any more: the only
+  // caller was the "become an agent" CTA on AccommodationScreen, removed in Slice 3c
+  // because the self-serve marketplace is parked in favour of the partner feed.
+  //
+  // This branch is kept intact ON PURPOSE so reviving the flow is ONE line — restore
+  // the prop on <AccommodationScreen> above:
+  //     onBecomeAgent={() => { if (requireAccount('gateEstateAgent')) return
+  //                            setShowAccommodation(false); setShowAgentOnboarding(true) }}
+  // and re-add the footer CTA in AccommodationScreen. Do not "clean up" the state, the
+  // import, the back-handler line or this branch — deleting them turns a one-line
+  // revival into a ten-line archaeology exercise.
   } else if (showAgentOnboarding) {
     content = (
       <EstateAgentOnboardingScreen
@@ -1041,22 +1051,14 @@ export default function App() {
         onSubmitted={() => setShowAgentOnboarding(false)}
       />
     )
-  } else if (openedProperty) {
-    content = (
-      <PropertyDetailScreen
-        property={openedProperty}
-        lang={lang}
-        onClose={() => setOpenedProperty(null)}
-      />
-    )
   } else if (showAccommodation) {
     content = (MODULE_FLAGS.accommodation || isAdmin) ? (
       <AccommodationScreen
         lang={lang}
-        session={session}
         onClose={() => setShowAccommodation(false)}
-        onBecomeAgent={() => { if (requireAccount('gateEstateAgent')) return; setShowAccommodation(false); setShowAgentOnboarding(true) }}
         onOpenProperty={prop => setOpenedProperty(prop)}
+        selectedProperty={openedProperty}
+        onCloseProperty={() => setOpenedProperty(null)}
       />
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccommodations" session={session} onBack={() => setShowAccommodation(false)} />

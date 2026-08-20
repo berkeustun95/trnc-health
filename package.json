@@ -32,7 +32,11 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "check:flags": "node scripts/check-module-flags.mjs",
+    "ota": "node scripts/check-module-flags.mjs && eas update --channel production",
+    "setup:hooks": "git config core.hooksPath .githooks && echo 'hooks enabled (.githooks)'",
+    "eas-build-pre-install": "node scripts/check-module-flags.mjs"
   },
   "private": true,
   "devDependencies": {

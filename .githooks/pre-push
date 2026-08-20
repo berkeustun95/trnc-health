@@ -1,0 +1,11 @@
+#!/bin/sh
+# Dark-launch flag guard. Blocks a push that would ship a gated module.
+#
+# NOTE THE LIMIT, it matters: this fires on `git push` ONLY. It does NOT fire on
+# `eas update`, and eas update bundles the WORKING TREE — so an uncommitted flag flip
+# ships to production without ever touching git. Use `npm run ota`, which runs the same
+# guard before publishing. See scripts/check-module-flags.mjs.
+node scripts/check-module-flags.mjs || {
+  echo "  push blocked: revert the flag, or update the guard baseline if launching."
+  exit 1
+}

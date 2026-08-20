@@ -37,6 +37,15 @@ eas build --platform android --profile production
 
 **Never use** `process.env.EAS_BUILD` conditionals in `app.config.js` — it caused `checkAutomatically: 'NEVER'` to bake into a production build, breaking OTA entirely. Always hardcode `'ON_LOAD'`.
 
+**Publish OTA with `npm run ota`, NEVER `eas update` directly.** The wrapper runs
+`scripts/check-module-flags.mjs` first, which blocks the publish if a dark-launch flag is
+flipped. This matters because **`eas update` bundles the WORKING TREE, not git HEAD** — an
+uncommitted `MODULE_FLAGS.x: true` left over from previewing a gated screen ships to every
+user immediately, and no git hook can see it. EAS Update has no lifecycle hook, so the
+wrapper plus `npm run check:flags` is the only guard that exists. `git push` and
+`eas build` are covered automatically (`.githooks/pre-push`, `eas-build-pre-install`).
+Fresh clone: `npm run setup:hooks` once.
+
 **OTA only reaches the production build.** A preview APK (`eas build --profile preview`) does not have `channel: "production"` baked in and will never receive OTA updates. Always test OTA on the Play Store install, not a sideloaded APK.
 
 **EAS environment variables:** Use `eas env:create` (not `eas secret:create` — deprecated). `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is set for the production environment. Changes to env vars require a new native build to take effect.

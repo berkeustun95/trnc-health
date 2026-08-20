@@ -422,6 +422,14 @@ const translations = {
     accomDistrictNicosia: 'Nicosia', accomDistrictKyrenia: 'Kyrenia', accomDistrictFamagusta: 'Famagusta',
     accomDistrictMorphou: 'Morphou', accomDistrictIskele: 'Iskele',
     accomSortNewest: 'Newest', accomSortPopular: 'Most popular', accomSortPriceLow: 'Price ↑', accomSortPriceHigh: 'Price ↓',
+    // Slice 3 — list screen. Districts reuse REGION_LABEL_KEY -> blDistrict*, which
+    // already covers all 7 regions in all 9 locales; no accomDistrict* keys added.
+    accomSortUpdated: 'Recently updated', accomFilterBeds: 'Bedrooms', accomFilterArea: 'Area', accomFilterFurnished: 'Furnished', accomFilterPeriod: 'Rental period', accomFilterPlotMin: 'Min plot (m²)',
+    accomPlot: 'plot',
+    accomKeyFacts: 'Key facts', accomFeatures: 'Features', accomRefNo: 'Ref', accomRooms: 'Rooms', accomGrossArea: 'Gross area', accomNetArea: 'Net area', accomFloor: 'Floor', accomBuildingAge: 'Building age',
+    accomDeedType: 'Deed type', accomGated: 'Gated community', accomSwap: 'Swap', accomYes: 'Yes', accomNo: 'No', accomApproxArea: 'Approximate area', accomApproxAreaSub: 'Exact address is shared by the agency', accomTranslate: 'Translate',
+    accomTranslateNote: 'Machine-translated by the source', accomContactTitle: 'Contact', accomCall: 'Call', accomDeposit: 'Deposit', accomMinTerm: 'Minimum term', accomBills: 'Bills', accomEnsuite: 'En-suite', accomMonths: 'months',
+    accomPropPeriodWeekly: 'Weekly', accomPropPeriodYearly: 'Yearly', accomPerWeek: '/week', accomPerYear: '/year',
     accomFilterDistrict: 'District', accomFilterType: 'Type', accomFilterAgency: 'Agency', accomFilterSort: 'Sort',
     accomFilterPrice: 'Price', accomFilterPriceRange: 'Price range',
     accomPerMonth: '/mo', accomPerNight: '/night', accomTotal: 'total',
@@ -1935,6 +1943,14 @@ const translations = {
     accomDistrictNicosia: 'Lefkoşa', accomDistrictKyrenia: 'Girne', accomDistrictFamagusta: 'Gazimağusa',
     accomDistrictMorphou: 'Güzelyurt', accomDistrictIskele: 'İskele',
     accomSortNewest: 'En yeni', accomSortPopular: 'En popüler', accomSortPriceLow: 'Fiyat ↑', accomSortPriceHigh: 'Fiyat ↓',
+    // Slice 3 — list screen. Districts reuse REGION_LABEL_KEY -> blDistrict*, which
+    // already covers all 7 regions in all 9 locales; no accomDistrict* keys added.
+    accomSortUpdated: 'Son güncellenen', accomFilterBeds: 'Yatak odası', accomFilterArea: 'Bölge', accomFilterFurnished: 'Eşyalı', accomFilterPeriod: 'Kira dönemi', accomFilterPlotMin: 'Min. arsa (m²)',
+    accomPlot: 'arsa',
+    accomKeyFacts: 'Öne çıkanlar', accomFeatures: 'Özellikler', accomRefNo: 'Ref', accomRooms: 'Oda', accomGrossArea: 'Brüt alan', accomNetArea: 'Net alan', accomFloor: 'Kat', accomBuildingAge: 'Bina yaşı',
+    accomDeedType: 'Koçan türü', accomGated: 'Site içinde', accomSwap: 'Takas', accomYes: 'Evet', accomNo: 'Hayır', accomApproxArea: 'Yaklaşık bölge', accomApproxAreaSub: 'Kesin adres acente tarafından paylaşılır', accomTranslate: 'Çevir',
+    accomTranslateNote: 'Kaynak tarafından makine çevirisi', accomContactTitle: 'İletişim', accomCall: 'Ara', accomDeposit: 'Depozito', accomMinTerm: 'Asgari süre', accomBills: 'Faturalar', accomEnsuite: 'Ebeveyn banyosu', accomMonths: 'ay',
+    accomPropPeriodWeekly: 'Haftalık', accomPropPeriodYearly: 'Yıllık', accomPerWeek: '/hafta', accomPerYear: '/yıl',
     accomFilterDistrict: 'İlçe', accomFilterType: 'Tür', accomFilterAgency: 'Ajans', accomFilterSort: 'Sırala',
     accomFilterPrice: 'Fiyat', accomFilterPriceRange: 'Fiyat aralığı',
     accomPerMonth: '/ay', accomPerNight: '/gece', accomTotal: 'toplam',
@@ -2774,6 +2790,14 @@ const translations = {
     accomDistrictNicosia: 'نيقوسيا', accomDistrictKyrenia: 'كيرينيا', accomDistrictFamagusta: 'فاماغوستا',
     accomDistrictMorphou: 'مورفو', accomDistrictIskele: 'إسكيلي',
     accomSortNewest: 'الأحدث', accomSortPopular: 'الأكثر شعبية', accomSortPriceLow: 'السعر ↑', accomSortPriceHigh: 'السعر ↓',
+    // Slice 3 — list screen. Districts reuse REGION_LABEL_KEY -> blDistrict*, which
+    // already covers all 7 regions in all 9 locales; no accomDistrict* keys added.
+    accomSortUpdated: 'آخر تحديث', accomFilterBeds: 'غرف النوم', accomFilterArea: 'المنطقة', accomFilterFurnished: 'مفروش', accomFilterPeriod: 'مدة الإيجار', accomFilterPlotMin: 'أقل مساحة أرض (م²)',
+    accomPlot: 'أرض',
+    accomKeyFacts: 'المعلومات الأساسية', accomFeatures: 'المميزات', accomRefNo: 'المرجع', accomRooms: 'الغرف', accomGrossArea: 'المساحة الإجمالية', accomNetArea: 'المساحة الصافية', accomFloor: 'الطابق', accomBuildingAge: 'عمر المبنى',
+    accomDeedType: 'نوع سند الملكية', accomGated: 'مجمع مسور', accomSwap: 'مقايضة', accomYes: 'نعم', accomNo: 'لا', accomApproxArea: 'منطقة تقريبية', accomApproxAreaSub: 'يتم مشاركة العنوان الدقيق من قبل الوكالة', accomTranslate: 'ترجمة',
+    accomTranslateNote: 'ترجمة آلية من المصدر', accomContactTitle: 'اتصال', accomCall: 'اتصل', accomDeposit: 'التأمين', accomMinTerm: 'أقل مدة', accomBills: 'الفواتير', accomEnsuite: 'حمام داخلي', accomMonths: 'أشهر',
+    accomPropPeriodWeekly: 'أسبوعي', accomPropPeriodYearly: 'سنوي', accomPerWeek: '/أسبوع', accomPerYear: '/سنة',
     accomFilterDistrict: 'المنطقة', accomFilterType: 'النوع', accomFilterAgency: 'الوكالة', accomFilterSort: 'ترتيب',
     accomFilterPrice: 'السعر', accomFilterPriceRange: 'نطاق السعر',
     accomPerMonth: '/شهر', accomPerNight: '/ليلة', accomTotal: 'إجمالي',
@@ -3574,6 +3598,14 @@ const translations = {
     accomDistrictNicosia: 'Никосия', accomDistrictKyrenia: 'Кирения', accomDistrictFamagusta: 'Фамагуста',
     accomDistrictMorphou: 'Морфу', accomDistrictIskele: 'Искеле',
     accomSortNewest: 'Новые', accomSortPopular: 'Популярные', accomSortPriceLow: 'Цена ↑', accomSortPriceHigh: 'Цена ↓',
+    // Slice 3 — list screen. Districts reuse REGION_LABEL_KEY -> blDistrict*, which
+    // already covers all 7 regions in all 9 locales; no accomDistrict* keys added.
+    accomSortUpdated: 'Недавно обновлённые', accomFilterBeds: 'Спальни', accomFilterArea: 'Район', accomFilterFurnished: 'С мебелью', accomFilterPeriod: 'Срок аренды', accomFilterPlotMin: 'Мин. участок (м²)',
+    accomPlot: 'участок',
+    accomKeyFacts: 'Ключевые факты', accomFeatures: 'Особенности', accomRefNo: 'Номер', accomRooms: 'Комнаты', accomGrossArea: 'Общая площадь', accomNetArea: 'Полезная площадь', accomFloor: 'Этаж', accomBuildingAge: 'Возраст здания',
+    accomDeedType: 'Тип документа', accomGated: 'Закрытый комплекс', accomSwap: 'Обмен', accomYes: 'Да', accomNo: 'Нет', accomApproxArea: 'Приблизительный район', accomApproxAreaSub: 'Точный адрес сообщает агентство', accomTranslate: 'Перевести',
+    accomTranslateNote: 'Машинный перевод источника', accomContactTitle: 'Контакт', accomCall: 'Позвонить', accomDeposit: 'Депозит', accomMinTerm: 'Мин. срок', accomBills: 'Счета', accomEnsuite: 'Санузел в спальне', accomMonths: 'мес.',
+    accomPropPeriodWeekly: 'Еженедельно', accomPropPeriodYearly: 'Ежегодно', accomPerWeek: '/нед.', accomPerYear: '/год',
     accomFilterDistrict: 'Район', accomFilterType: 'Тип', accomFilterAgency: 'Агентство', accomFilterSort: 'Сортировка',
     accomFilterPrice: 'Цена', accomFilterPriceRange: 'Ценовой диапазон',
     accomPerMonth: '/мес', accomPerNight: '/ночь', accomTotal: 'итого',
@@ -4374,6 +4406,14 @@ const translations = {
     accomDistrictNicosia: 'Λευκωσία', accomDistrictKyrenia: 'Κερύνεια', accomDistrictFamagusta: 'Αμμόχωστος',
     accomDistrictMorphou: 'Μόρφου', accomDistrictIskele: 'Ισκελέ',
     accomSortNewest: 'Νεότερα', accomSortPopular: 'Δημοφιλέστερα', accomSortPriceLow: 'Τιμή ↑', accomSortPriceHigh: 'Τιμή ↓',
+    // Slice 3 — list screen. Districts reuse REGION_LABEL_KEY -> blDistrict*, which
+    // already covers all 7 regions in all 9 locales; no accomDistrict* keys added.
+    accomSortUpdated: 'Πρόσφατα ενημερωμένα', accomFilterBeds: 'Υπνοδωμάτια', accomFilterArea: 'Περιοχή', accomFilterFurnished: 'Επιπλωμένο', accomFilterPeriod: 'Περίοδος ενοικίασης', accomFilterPlotMin: 'Ελάχ. οικόπεδο (μ²)',
+    accomPlot: 'οικόπεδο',
+    accomKeyFacts: 'Βασικά στοιχεία', accomFeatures: 'Χαρακτηριστικά', accomRefNo: 'Κωδ.', accomRooms: 'Δωμάτια', accomGrossArea: 'Μικτό εμβαδόν', accomNetArea: 'Καθαρό εμβαδόν', accomFloor: 'Όροφος', accomBuildingAge: 'Ηλικία κτιρίου',
+    accomDeedType: 'Τύπος τίτλου', accomGated: 'Κλειστό συγκρότημα', accomSwap: 'Ανταλλαγή', accomYes: 'Ναι', accomNo: 'Όχι', accomApproxArea: 'Κατά προσέγγιση περιοχή', accomApproxAreaSub: 'Η ακριβής διεύθυνση δίνεται από το πρακτορείο', accomTranslate: 'Μετάφραση',
+    accomTranslateNote: 'Αυτόματη μετάφραση από την πηγή', accomContactTitle: 'Επικοινωνία', accomCall: 'Κλήση', accomDeposit: 'Εγγύηση', accomMinTerm: 'Ελάχ. διάρκεια', accomBills: 'Λογαριασμοί', accomEnsuite: 'Ιδιωτικό μπάνιο', accomMonths: 'μήνες',
+    accomPropPeriodWeekly: 'Εβδομαδιαία', accomPropPeriodYearly: 'Ετήσια', accomPerWeek: '/εβδ.', accomPerYear: '/έτος',
     accomFilterDistrict: 'Επαρχία', accomFilterType: 'Τύπος', accomFilterAgency: 'Πρακτορείο', accomFilterSort: 'Ταξινόμηση',
     accomFilterPrice: 'Τιμή', accomFilterPriceRange: 'Εύρος τιμών',
     accomPerMonth: '/μήνα', accomPerNight: '/νύχτα', accomTotal: 'σύνολο',
@@ -5174,6 +5214,14 @@ const translations = {
     accomDistrictNicosia: 'Nicosie', accomDistrictKyrenia: 'Kyrenia', accomDistrictFamagusta: 'Famagouste',
     accomDistrictMorphou: 'Morphou', accomDistrictIskele: 'İskele',
     accomSortNewest: 'Plus récent', accomSortPopular: 'Plus populaire', accomSortPriceLow: 'Prix ↑', accomSortPriceHigh: 'Prix ↓',
+    // Slice 3 — list screen. Districts reuse REGION_LABEL_KEY -> blDistrict*, which
+    // already covers all 7 regions in all 9 locales; no accomDistrict* keys added.
+    accomSortUpdated: 'Récemment mis à jour', accomFilterBeds: 'Chambres', accomFilterArea: 'Secteur', accomFilterFurnished: 'Meublé', accomFilterPeriod: 'Durée de location', accomFilterPlotMin: 'Terrain min. (m²)',
+    accomPlot: 'terrain',
+    accomKeyFacts: 'Informations clés', accomFeatures: 'Caractéristiques', accomRefNo: 'Réf', accomRooms: 'Pièces', accomGrossArea: 'Surface brute', accomNetArea: 'Surface nette', accomFloor: 'Étage', accomBuildingAge: 'Âge du bâtiment',
+    accomDeedType: 'Type de titre', accomGated: 'Résidence sécurisée', accomSwap: 'Échange', accomYes: 'Oui', accomNo: 'Non', accomApproxArea: 'Zone approximative', accomApproxAreaSub: 'L\'adresse exacte est communiquée par l\'agence', accomTranslate: 'Traduire',
+    accomTranslateNote: 'Traduction automatique de la source', accomContactTitle: 'Contact', accomCall: 'Appeler', accomDeposit: 'Caution', accomMinTerm: 'Durée minimale', accomBills: 'Charges', accomEnsuite: 'Salle de bain privative', accomMonths: 'mois',
+    accomPropPeriodWeekly: 'Hebdomadaire', accomPropPeriodYearly: 'Annuel', accomPerWeek: '/semaine', accomPerYear: '/an',
     accomFilterDistrict: 'District', accomFilterType: 'Type', accomFilterAgency: 'Agence', accomFilterSort: 'Trier',
     accomFilterPrice: 'Prix', accomFilterPriceRange: 'Fourchette de prix',
     accomPerMonth: '/mois', accomPerNight: '/nuit', accomTotal: 'total',
@@ -5974,6 +6022,14 @@ const translations = {
     accomDistrictNicosia: 'Nicosia', accomDistrictKyrenia: 'Kyrenia', accomDistrictFamagusta: 'Famagusta',
     accomDistrictMorphou: 'Morphou', accomDistrictIskele: 'İskele',
     accomSortNewest: 'Más nuevo', accomSortPopular: 'Más popular', accomSortPriceLow: 'Precio ↑', accomSortPriceHigh: 'Precio ↓',
+    // Slice 3 — list screen. Districts reuse REGION_LABEL_KEY -> blDistrict*, which
+    // already covers all 7 regions in all 9 locales; no accomDistrict* keys added.
+    accomSortUpdated: 'Actualizado recientemente', accomFilterBeds: 'Dormitorios', accomFilterArea: 'Zona', accomFilterFurnished: 'Amueblado', accomFilterPeriod: 'Periodo de alquiler', accomFilterPlotMin: 'Parcela mín. (m²)',
+    accomPlot: 'parcela',
+    accomKeyFacts: 'Datos clave', accomFeatures: 'Características', accomRefNo: 'Ref', accomRooms: 'Habitaciones', accomGrossArea: 'Superficie bruta', accomNetArea: 'Superficie neta', accomFloor: 'Planta', accomBuildingAge: 'Antigüedad',
+    accomDeedType: 'Tipo de escritura', accomGated: 'Urbanización cerrada', accomSwap: 'Permuta', accomYes: 'Sí', accomNo: 'No', accomApproxArea: 'Zona aproximada', accomApproxAreaSub: 'La dirección exacta la facilita la agencia', accomTranslate: 'Traducir',
+    accomTranslateNote: 'Traducción automática del origen', accomContactTitle: 'Contacto', accomCall: 'Llamar', accomDeposit: 'Fianza', accomMinTerm: 'Plazo mínimo', accomBills: 'Suministros', accomEnsuite: 'Baño en suite', accomMonths: 'meses',
+    accomPropPeriodWeekly: 'Semanal', accomPropPeriodYearly: 'Anual', accomPerWeek: '/semana', accomPerYear: '/año',
     accomFilterDistrict: 'Distrito', accomFilterType: 'Tipo', accomFilterAgency: 'Agencia', accomFilterSort: 'Ordenar',
     accomFilterPrice: 'Precio', accomFilterPriceRange: 'Rango de precio',
     accomPerMonth: '/mes', accomPerNight: '/noche', accomTotal: 'total',
@@ -6774,6 +6830,14 @@ const translations = {
     accomDistrictNicosia: 'Nikosia', accomDistrictKyrenia: 'Kyrenia', accomDistrictFamagusta: 'Famagusta',
     accomDistrictMorphou: 'Morphou', accomDistrictIskele: 'İskele',
     accomSortNewest: 'Neueste', accomSortPopular: 'Beliebteste', accomSortPriceLow: 'Preis ↑', accomSortPriceHigh: 'Preis ↓',
+    // Slice 3 — list screen. Districts reuse REGION_LABEL_KEY -> blDistrict*, which
+    // already covers all 7 regions in all 9 locales; no accomDistrict* keys added.
+    accomSortUpdated: 'Kürzlich aktualisiert', accomFilterBeds: 'Schlafzimmer', accomFilterArea: 'Gebiet', accomFilterFurnished: 'Möbliert', accomFilterPeriod: 'Mietdauer', accomFilterPlotMin: 'Min. Grundstück (m²)',
+    accomPlot: 'Grundstück',
+    accomKeyFacts: 'Eckdaten', accomFeatures: 'Ausstattung', accomRefNo: 'Ref', accomRooms: 'Zimmer', accomGrossArea: 'Bruttofläche', accomNetArea: 'Nettofläche', accomFloor: 'Etage', accomBuildingAge: 'Gebäudealter',
+    accomDeedType: 'Titelart', accomGated: 'Wohnanlage', accomSwap: 'Tausch', accomYes: 'Ja', accomNo: 'Nein', accomApproxArea: 'Ungefähres Gebiet', accomApproxAreaSub: 'Die genaue Adresse nennt die Agentur', accomTranslate: 'Übersetzen',
+    accomTranslateNote: 'Maschinell übersetzt', accomContactTitle: 'Kontakt', accomCall: 'Anrufen', accomDeposit: 'Kaution', accomMinTerm: 'Mindestlaufzeit', accomBills: 'Nebenkosten', accomEnsuite: 'Eigenes Bad', accomMonths: 'Monate',
+    accomPropPeriodWeekly: 'Wöchentlich', accomPropPeriodYearly: 'Jährlich', accomPerWeek: '/Woche', accomPerYear: '/Jahr',
     accomFilterDistrict: 'Bezirk', accomFilterType: 'Typ', accomFilterAgency: 'Agentur', accomFilterSort: 'Sortieren',
     accomFilterPrice: 'Preis', accomFilterPriceRange: 'Preisspanne',
     accomPerMonth: '/Monat', accomPerNight: '/Nacht', accomTotal: 'Gesamt',
@@ -7574,6 +7638,14 @@ const translations = {
     accomDistrictNicosia: 'نیکوزیا', accomDistrictKyrenia: 'کیرنیا', accomDistrictFamagusta: 'فاماگوستا',
     accomDistrictMorphou: 'مورفو', accomDistrictIskele: 'ایسکله',
     accomSortNewest: 'جدیدترین', accomSortPopular: 'پرطرفدارترین', accomSortPriceLow: 'قیمت ↑', accomSortPriceHigh: 'قیمت ↓',
+    // Slice 3 — list screen. Districts reuse REGION_LABEL_KEY -> blDistrict*, which
+    // already covers all 7 regions in all 9 locales; no accomDistrict* keys added.
+    accomSortUpdated: 'به‌روزرسانی اخیر', accomFilterBeds: 'اتاق خواب', accomFilterArea: 'منطقه', accomFilterFurnished: 'مبله', accomFilterPeriod: 'مدت اجاره', accomFilterPlotMin: 'حداقل زمین (م²)',
+    accomPlot: 'زمین',
+    accomKeyFacts: 'مشخصات کلیدی', accomFeatures: 'امکانات', accomRefNo: 'کد', accomRooms: 'اتاق‌ها', accomGrossArea: 'مساحت ناخالص', accomNetArea: 'مساحت خالص', accomFloor: 'طبقه', accomBuildingAge: 'سن ساختمان',
+    accomDeedType: 'نوع سند', accomGated: 'مجتمع محصور', accomSwap: 'معاوضه', accomYes: 'بله', accomNo: 'خیر', accomApproxArea: 'منطقه تقریبی', accomApproxAreaSub: 'آدرس دقیق توسط آژانس اعلام می‌شود', accomTranslate: 'ترجمه',
+    accomTranslateNote: 'ترجمه ماشینی از منبع', accomContactTitle: 'تماس', accomCall: 'تماس', accomDeposit: 'ودیعه', accomMinTerm: 'حداقل مدت', accomBills: 'قبوض', accomEnsuite: 'سرویس داخل اتاق', accomMonths: 'ماه',
+    accomPropPeriodWeekly: 'هفتگی', accomPropPeriodYearly: 'سالانه', accomPerWeek: '/هفته', accomPerYear: '/سال',
     accomFilterDistrict: 'ناحیه', accomFilterType: 'نوع', accomFilterAgency: 'آژانس', accomFilterSort: 'مرتب‌سازی',
     accomFilterPrice: 'قیمت', accomFilterPriceRange: 'بازه قیمتی',
     accomPerMonth: '/ماه', accomPerNight: '/شب', accomTotal: 'کل',
