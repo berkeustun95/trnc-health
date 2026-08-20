@@ -71,6 +71,15 @@ const files = [
   ...readdirSync(resolve(ROOT, 'supabase/migrations')).filter(f => f.endsWith('.sql')).sort()
     .map(f => `supabase/migrations/${f}`),
 ].filter(f => !/verify_schema|schema_drift_audit|_seed|dummy_listing/.test(f))
+ // Per-slice operational scripts live in supabase/ root next to the migration they
+ // serve, but they are NOT part of the schema the repo claims. rollback_*.sql in
+ // particular contains live DROP COLUMN / narrowed-CHECK DDL: replayed, it derives a
+ // model in which the slice never happened and reports every one of that slice's
+ // columns as live-only drift. Today it only loses by array ordering (root files are
+ // replayed before migrations) — which is luck, not a guarantee.
+ // PASTE_*.sql duplicates its migration's DDL; verify_*.sql creates temp tables.
+ // Same reasoning as the verify_schema exclusion above.
+ .filter(f => !/\/(PASTE|verify|rollback)_/.test(f))
 
 // ─── SQL text helpers ────────────────────────────────────────────────────────
 

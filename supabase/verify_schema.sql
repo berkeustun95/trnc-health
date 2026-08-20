@@ -73,8 +73,12 @@ WITH report AS (
     ('0712_ugc_moderation','profiles','ugc_banned_until'),
     ('0719_claim_evidence_and_guard','claim_requests','verified_by'),
     ('0719_claim_evidence_and_guard','claim_requests','verified_at'),
-    ('0719_claim_evidence_and_guard','claim_requests','kteb_confirmed'),
     ('0719_claim_rename_and_tax_no','claim_requests','tax_registration_no'),
+    -- DELIBERATELY ABSENT: claim_requests.kteb_confirmed and appointments.service_type.
+    -- Both columns were DROPPED on purpose by 0902_capture_schema_drift, so listing them
+    -- here reported MISSING forever. The H-version section already asserts their absence
+    -- as the PASSING state. Do not re-add them: a drift checker carrying known-false
+    -- positives teaches the reader to skim, and the next real MISSING gets skimmed too.
     ('0722_job_postings_business_paid_tier','job_postings','poster_type'),
     ('0722_job_postings_business_paid_tier','job_postings','payment_status'),
     ('0722_job_postings_business_paid_tier','job_postings','paid_at'),
@@ -84,7 +88,6 @@ WITH report AS (
     ('0725_grooming_directory','facilities','category'),
     ('0726_grooming_booking_lifecycle','appointments','reminded_at'),
     ('0731_garages_directory','facilities','service_types'),
-    ('0801_appointments_service_type','appointments','service_type'),
     ('0802_garage_booking_details','appointments','garage_booking_details'),
     ('0803_facility_report_moderation','facilities','hidden_at'),
     ('0803_facility_report_moderation','facilities','hidden_reason'),
@@ -101,7 +104,41 @@ WITH report AS (
     ('0825_places_column_guards','places','featured_requested_at'),
     ('0829_place_resubmit','places','resubmit_count'),
     ('0830_events_gisekibris_import','events','source_image_url'),
-    ('0830_events_gisekibris_import','events','description_i18n')
+    ('0830_events_gisekibris_import','events','description_i18n'),
+    -- ── Slice 1: accommodation partner feed ──
+    ('0904_accommodation_partner_feed','properties','source'),
+    ('0904_accommodation_partner_feed','properties','external_id'),
+    ('0904_accommodation_partner_feed','properties','source_url'),
+    ('0904_accommodation_partner_feed','properties','last_seen_at'),
+    ('0904_accommodation_partner_feed','properties','content_hash'),
+    ('0904_accommodation_partner_feed','properties','updated_at'),
+    ('0904_accommodation_partner_feed','properties','published_at'),
+    ('0904_accommodation_partner_feed','properties','deed_type'),
+    ('0904_accommodation_partner_feed','properties','net_area_sqm'),
+    ('0904_accommodation_partner_feed','properties','plot_sqm'),
+    ('0904_accommodation_partner_feed','properties','covered_area_sqm'),
+    ('0904_accommodation_partner_feed','properties','floor'),
+    ('0904_accommodation_partner_feed','properties','total_floors'),
+    ('0904_accommodation_partner_feed','properties','building_age_band'),
+    ('0904_accommodation_partner_feed','properties','living_rooms'),
+    ('0904_accommodation_partner_feed','properties','ensuite_count'),
+    ('0904_accommodation_partner_feed','properties','deposit'),
+    ('0904_accommodation_partner_feed','properties','deposit_currency'),
+    ('0904_accommodation_partner_feed','properties','min_term_months'),
+    ('0904_accommodation_partner_feed','properties','bills_included'),
+    ('0904_accommodation_partner_feed','properties','amenities'),
+    ('0904_accommodation_partner_feed','properties','area'),
+    ('0904_accommodation_partner_feed','properties','development_name'),
+    ('0904_accommodation_partner_feed','properties','swap_available'),
+    ('0904_accommodation_partner_feed','properties','gated_community'),
+    ('0904_accommodation_partner_feed','properties','location_precision'),
+    ('0904_accommodation_partner_feed','property_images','source_url'),
+    ('0904_accommodation_partner_feed','property_images','content_hash'),
+    ('0904_accommodation_partner_feed','property_images','is_primary'),
+    ('0904_accommodation_partner_feed','estate_agencies','contact_name'),
+    ('0904_accommodation_partner_feed','estate_agencies','contact_phone'),
+    ('0904_accommodation_partner_feed','estate_agencies','contact_whatsapp')
+
   ) e(m,t,c)
 
   UNION ALL
@@ -167,7 +204,9 @@ WITH report AS (
     ('0826_place_claims','place_claims_guard_insert'),
     ('0826_place_claims','approve_place_claim'),
     ('0827_places_featured_tier','request_featured_place'),
-    ('0829_place_resubmit','resubmit_place')
+    ('0829_place_resubmit','resubmit_place'),
+    ('0904_accommodation_partner_feed','properties_touch_updated_at')
+
   ) e(m,o)
 
   UNION ALL
@@ -207,7 +246,9 @@ WITH report AS (
     ('0824_place_moderation','check_place_content'),
     ('0825_places_column_guards','places_guard_insert'),
     ('0825_places_column_guards','places_guard_update'),
-    ('0826_place_claims','place_claims_guard_insert')
+    ('0826_place_claims','place_claims_guard_insert'),
+    ('0904_accommodation_partner_feed','properties_touch_updated_at')
+
   ) e(m,o)
 
   UNION ALL
@@ -237,7 +278,28 @@ WITH report AS (
     ('0822_places_consolidation','places_status_check'),
     ('0822_places_consolidation','places_access_type_check'),
     ('0826_place_claims','place_claims_status_check'),
-    ('0830_events_gisekibris_import','events_description_i18n_check')
+    ('0830_events_gisekibris_import','events_description_i18n_check'),
+    -- ── Slice 1. The XOR is a SECURITY control: props_select_public treats
+    --    source IS NOT NULL as a bypass of the agent-subscription paywall, and
+    --    this constraint is the only thing stopping an agent setting source on
+    --    their own row to buy it. If this reads MISSING, that bypass is OPEN.
+    ('0904_accommodation_partner_feed','properties_source_agent_xor_check'),
+    ('0904_accommodation_partner_feed','properties_deed_type_check'),
+    ('0904_accommodation_partner_feed','properties_deposit_currency_check'),
+    ('0904_accommodation_partner_feed','properties_amenities_shape_check'),
+    ('0904_accommodation_partner_feed','properties_structure_range_check'),
+    ('0904_accommodation_partner_feed','properties_location_precision_check'),
+    -- Coordinates may not exist without a declared precision. This is what makes an
+    -- 'area' centroid safe to store: no row can carry coordinates whose
+    -- trustworthiness is unstated. If MISSING, approximate pins read as exact.
+    ('0904_accommodation_partner_feed','properties_coords_precision_check'),
+    -- Forces every FEED row to declare 'area'. Without it a partner row that omits
+    -- location_precision inherits the 'exact' DEFAULT and lands as trustworthy.
+    ('0904_accommodation_partner_feed','properties_feed_precision_check'),
+    -- UNIQUE: correctness. The ON CONFLICT arbiter for the partner-feed upsert;
+    -- a partial index cannot serve that role (the 20260830 lesson).
+    ('0904_accommodation_partner_feed','properties_external_id_unique')
+
   ) e(m,o)
 
   UNION ALL
@@ -279,7 +341,14 @@ WITH report AS (
     ('0826_place_claims','idx_place_claims_requester_id'),
     -- UNIQUE: correctness. Replaces the partial index events_external_id_key
     -- (never registered here), which ON CONFLICT could not infer.
-    ('0830_events_gisekibris_import','events_external_id_unique')
+    ('0830_events_gisekibris_import','events_external_id_unique'),
+    -- ── Slice 1. Four only; every other Slice 3 filter column was argued down
+    --    for lack of evidence of use — see the migration header.
+    ('0904_accommodation_partner_feed','properties_browse_idx'),
+    ('0904_accommodation_partner_feed','property_images_property_id_idx'),
+    -- UNIQUE: correctness — at most one primary image per property.
+    ('0904_accommodation_partner_feed','property_images_primary_unique')
+
   ) e(m,o)
 
   UNION ALL
@@ -471,6 +540,93 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='places_guard_update'
           AND pg_get_functiondef(p.oid) ILIKE '%trusted_place_resubmit%')
+
+    -- ══ Slice 1: accommodation partner feed ═════════════════════════════════
+    -- The four widened CHECKs KEEP THEIR NAMES, so section E (existence by name)
+    -- cannot see the widening — a DB still on the old vocabulary reads as OK there.
+    -- Each token below asserts the NEW value is actually in the constraint body.
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties_status_check widened (+delisted)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_status_check'
+        AND pg_get_constraintdef(oid) ILIKE '%delisted%')
+    -- Without this, a partner listing priced in USD fails at INSERT time.
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties_currency_check widened (+USD)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_currency_check'
+        AND pg_get_constraintdef(oid) ILIKE '%USD%')
+    -- Was a LIVE BUG: the CHECK allowed 5 regions while constants/regions.js REGIONS
+    -- defines 7. A Novest listing in Lefke or Karpaz could not be inserted at all.
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties_district_check widened (+lefke,+karpaz)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_district_check'
+        AND pg_get_constraintdef(oid) ILIKE '%lefke%'
+        AND pg_get_constraintdef(oid) ILIKE '%karpaz%')
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties_price_period_check widened (+weekly,+yearly)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_price_period_check'
+        AND pg_get_constraintdef(oid) ILIKE '%weekly%'
+        AND pg_get_constraintdef(oid) ILIKE '%yearly%')
+
+    -- agent_id must be NULLABLE — a partner listing has no agent. Section B only
+    -- checks that a column EXISTS, so it is blind to the nullability change, and the
+    -- whole feed import fails at INSERT without it.
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties.agent_id is nullable',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='properties'
+          AND column_name='agent_id' AND is_nullable='YES')
+
+    -- ── POLICY BODIES. Q3 counts policies; it cannot see what one SAYS. ──
+    -- If this token is STALE, every partner listing is invisible to every user.
+    UNION ALL SELECT '0904_accommodation_partner_feed','props_select_public has the partner-feed branch',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='properties'
+        AND policyname='props_select_public' AND qual ILIKE '%source IS NOT NULL%')
+    -- The LEFT JOIN is load-bearing: the previous INNER JOIN to estate_agents discards
+    -- every feed row (agent_id IS NULL) BEFORE the source test runs. Mirroring the
+    -- condition without the join change yields zero visible images and a blank gallery.
+    UNION ALL SELECT '0904_accommodation_partner_feed','images_select_public uses LEFT JOIN (not INNER)',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='property_images'
+        AND policyname='images_select_public' AND qual ILIKE '%LEFT JOIN%')
+    -- Behaviour is identical with or without it (Postgres applies USING to the new row
+    -- when WITH CHECK is absent). Registered so the protection stops being IMPLICIT:
+    -- anyone later adding a WITH CHECK here for an unrelated reason would silently
+    -- remove the guard that rejects agent_id=NULL laundering.
+    UNION ALL SELECT '0904_accommodation_partner_feed','props_update_agent has an explicit WITH CHECK',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='properties'
+        AND policyname='props_update_agent' AND with_check IS NOT NULL)
+    -- Without this predicate ANY authenticated user can write under the partner/ prefix
+    -- that is supposed to be service_role-only.
+    UNION ALL SELECT '0904_accommodation_partner_feed','storage property_images_upload excludes partner/',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+        AND policyname='property_images_upload' AND with_check ILIKE '%partner%')
+
+    -- The trigger must IGNORE last_seen_at (stamped on every row every sync run) and
+    -- view_count. Section D only proves the trigger EXISTS; an unconditional body would
+    -- pass there while making updated_at meaningless.
+    -- building_age_band is a TEXT BAND ("6 - 10"), not an int — 101evler exposes a dropdown
+    -- of ranges. Section B only proves the column EXISTS, so an earlier int version
+    -- passes there while rejecting every real value the feed sends.
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties.building_age_band is text (a band, not a number)',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='properties'
+          AND column_name='building_age_band' AND data_type='text')
+    UNION ALL SELECT '0904_accommodation_partner_feed','structure_range_check excludes building_age_band',
+      NOT EXISTS(SELECT 1 FROM pg_constraint
+        WHERE conname='properties_structure_range_check'
+          AND pg_get_constraintdef(oid) ILIKE '%building_age_band%')
+    -- The DEFAULT is load-bearing twice over: it keeps the parked PropertySubmitScreen
+    -- INSERT legal, AND it is what makes properties_feed_precision_check bite on an
+    -- import that omits the column. If the default is missing, that trap never springs.
+    UNION ALL SELECT '0904_accommodation_partner_feed','location_precision DEFAULT is ''exact''',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='properties'
+          AND column_name='location_precision' AND column_default LIKE '%exact%')
+    -- NULL-SAFETY. `location_precision = ''area''` alone evaluates to UNKNOWN on a NULL,
+    -- and a CHECK PASSES on UNKNOWN — admitting the exact row it exists to reject. The
+    -- IS NOT NULL guard is what makes it bite; assert the guard is really in the body.
+    UNION ALL SELECT '0904_accommodation_partner_feed','feed_precision_check is NULL-safe',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_feed_precision_check'
+        AND pg_get_constraintdef(oid) ILIKE '%IS NOT NULL%')
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties_touch_updated_at is conditional',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='properties_touch_updated_at'
+          AND pg_get_functiondef(p.oid) ILIKE '%last_seen_at%'
+          AND pg_get_functiondef(p.oid) ILIKE '%view_count%')
   ) z
 
   UNION ALL
