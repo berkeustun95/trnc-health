@@ -77,7 +77,9 @@ const files = [
  // model in which the slice never happened and reports every one of that slice's
  // columns as live-only drift. Today it only loses by array ordering (root files are
  // replayed before migrations) — which is luck, not a guarantee.
- // PASTE_*.sql duplicates its migration's DDL; verify_*.sql creates temp tables.
+ // PASTE_*.sql is no longer generated (migrations now carry their own ledger stamp,
+ // so the migration file IS the paste-ready artefact) — the pattern is kept so a
+ // reintroduced one cannot silently rejoin the replay. verify_*.sql creates temp tables.
  // Same reasoning as the verify_schema exclusion above.
  .filter(f => !/\/(PASTE|verify|rollback)_/.test(f))
 
