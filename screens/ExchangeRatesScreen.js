@@ -73,16 +73,41 @@ function todayStr() {
 }
 
 // ─── Converter helpers ───────────────────────────────────────────────────────
+// The cap: the result line is numberOfLines={1}, and past ~10M the converted lira
+// value stops fitting the row and would silently clip.
+const MAX_AMOUNT = 9999999.99
+const MAX_INT_DIGITS = String(Math.floor(MAX_AMOUNT)).length // 7
+
+// Digits left of the separator, leading zeros ignored ("007" is one digit).
+function intDigits(v) {
+  return v.split('.')[0].replace(/^0+(?=\d)/, '').length
+}
+
 // A decimal-pad shows "," on Turkish/European devices and "." on others, so both
 // arrive here; normalise to "." and keep only the first one.
 function sanitizeAmount(raw) {
   let v = raw.replace(/,/g, '.').replace(/[^0-9.]/g, '')
   const first = v.indexOf('.')
   if (first !== -1) v = v.slice(0, first + 1) + v.slice(first + 1).replace(/\./g, '')
-  // 7 integer digits is the cap: the result line is numberOfLines={1}, and past
-  // ~10M the converted lira value stops fitting the row and would silently clip.
   const [int, dec] = v.split('.')
-  return dec === undefined ? int.slice(0, 7) : `${int.slice(0, 7)}.${dec.slice(0, 2)}`
+  v = dec === undefined ? int : `${int}.${dec.slice(0, 2)}`
+  // Clamp, never slice. Slicing an over-cap value drops it by a power of ten and
+  // the result still looks like a real number (399999960.00 -> 3999999.00).
+  const n = parseFloat(v)
+  return Number.isFinite(n) && n > MAX_AMOUNT ? MAX_AMOUNT.toFixed(2) : v
+}
+
+// Only an append at the cap is a no-op — once 7 integer digits are on screen the
+// next keystroke is dropped rather than rewriting the field to 9999999.99. A
+// replacing paste does not extend the previous value, so it clamps like any other
+// over-cap value. The at-cap test is what makes that split work: startsWith is
+// trivially true against an empty field, so without it a paste into a blank input
+// would read as an append and be swallowed.
+function nextAmount(prev, raw) {
+  const norm = raw.replace(/,/g, '.').replace(/[^0-9.]/g, '')
+  const overflow = intDigits(norm) > MAX_INT_DIGITS
+  const isAppend = norm.startsWith(prev) && norm.length > prev.length
+  return overflow && isAppend && intDigits(prev) >= MAX_INT_DIGITS ? prev : sanitizeAmount(raw)
 }
 
 // Dot decimal + comma grouping in every language, deliberately: the rates table
@@ -197,9 +222,11 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
   const toPair   = calcDir === 'toTry' ? TRY_PAIR : calcPair
 
   // Carry the plain fixed-point value, NOT formatMoney() — its thousands commas
-  // would be re-read as decimal separators by sanitizeAmount.
+  // would be re-read as decimal separators by sanitizeAmount. Routed through
+  // sanitizeAmount so an over-cap result clamps here, visibly, instead of sitting
+  // in the field until the next keystroke silently drops it by a power of ten.
   function swapDirection() {
-    setAmount(calcResult == null ? '' : calcResult.toFixed(2))
+    setAmount(Number.isFinite(calcResult) ? sanitizeAmount(calcResult.toFixed(2)) : '')
     setCalcDir(d => (d === 'toTry' ? 'toForeign' : 'toTry'))
   }
 
@@ -303,7 +330,7 @@ export default function ExchangeRatesScreen({ lang, onBack }) {
               <TextInput
                 style={s.calcInput}
                 value={amount}
-                onChangeText={v => setAmount(sanitizeAmount(v))}
+                onChangeText={v => setAmount(prev => nextAmount(prev, v))}
                 keyboardType="decimal-pad"
                 inputMode="decimal"
                 placeholder="0"
