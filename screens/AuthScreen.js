@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, Image, ImageBackground, TextInput, TouchableOpacity, StyleSheet,
-         ActivityIndicator, ScrollView } from 'react-native'
+         ActivityIndicator, ScrollView, BackHandler } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather } from '@expo/vector-icons'
@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
+import LegalScreen from './LegalScreen'
 
 const LANGUAGES = [
   { key: 'English', code: 'EN' }, { key: 'Turkish', code: 'TR' }, { key: 'Arabic', code: 'AR' },
@@ -30,6 +31,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
   const [showReset, setShowReset] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
+  const [legalTab, setLegalTab] = useState(null)
 
   function changeLang(l) { setLang(l); onLangChange?.(l) }
 
@@ -69,6 +71,19 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
     await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: 'ada://' })
     setResetLoading(false)
     setResetSent(true)
+  }
+
+  // Registered only while the legal sheet is open, so it runs before App.js's
+  // handler (RN fires listeners newest-first) and back closes the sheet instead
+  // of dropping the half-filled signup form.
+  useEffect(() => {
+    if (!legalTab) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setLegalTab(null); return true })
+    return () => sub.remove()
+  }, [legalTab])
+
+  if (legalTab) {
+    return <LegalScreen lang={lang} initialTab={legalTab} onBack={() => setLegalTab(null)} />
   }
 
   if (signupDone) {
@@ -285,6 +300,18 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
             }
           </TouchableOpacity>
 
+          {mode === 'signup' && (
+            <Text style={styles.legalNotice}>
+              {t('signupLegalNotice', lang).split(/(\{terms\}|\{privacy\})/).map((part, i) =>
+                part === '{terms}' ? (
+                  <Text key={i} style={styles.legalNoticeLink} onPress={() => setLegalTab('terms')}>{t('termsOfService', lang)}</Text>
+                ) : part === '{privacy}' ? (
+                  <Text key={i} style={styles.legalNoticeLink} onPress={() => setLegalTab('privacy')}>{t('privacyPolicy', lang)}</Text>
+                ) : part
+              )}
+            </Text>
+          )}
+
           <View style={styles.langRow}>
             {LANGUAGES.map(({ key, code }) => (
               <TouchableOpacity key={key} onPress={() => changeLang(key)} style={[styles.langChip, lang === key && styles.langChipActive]}>
@@ -339,6 +366,8 @@ const styles = StyleSheet.create({
   error:             { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 12, textAlign: 'center' },
   submit:            { backgroundColor: colors.primary, borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 4 },
   submitText:        { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.2 },
+  legalNotice:       { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, textAlign: 'center', marginTop: 14 },
+  legalNoticeLink:   { fontFamily: 'Inter_700Bold', color: colors.primary, textDecorationLine: 'underline' },
   langRow:           { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border },
   langChip:          { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, backgroundColor: 'transparent' },
   langChipActive:    { backgroundColor: colors.primaryLight },
