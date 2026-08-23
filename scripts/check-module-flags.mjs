@@ -91,6 +91,43 @@ for (const [k, want] of Object.entries(EXPECTED_SCALARS)) {
   }
 }
 
+// ─── NOTIFY-PATH AGREEMENT ───────────────────────────────────────────────────
+//
+// A module can accept "Notify me" signups the moment ComingSoonScreen is given its key
+// — module_waitlist's CHECK is only a shape guard (^[a-zA-Z]{2,40}$ since 20260814), so
+// ANY key is accepted. But notifying those people needs the key to ALSO be in two
+// hardcoded SQL lists inside notify_module_waitlist / module_notif_text.
+//
+// Nothing connected those three facts, and they drifted: explore, studentHub and towing
+// all collected signups for months while being un-notifiable. The failure is invisible
+// until the one moment it matters — the day you launch the module — and it surfaces as
+// either "unknown module" or, worse, a NOT NULL violation on notifications.title that
+// names nothing relevant.
+//
+// So the check is mechanical and runs wherever this script already runs: every push
+// (.githooks/pre-push), every `npm run ota`, every `eas build`. Add a module to
+// MODULE_FLAGS without adding it to the notify path and you cannot ship.
+const NOTIFY_SQL = 'supabase/migrations/20260909_notify_waitlist_add_modules.sql'
+try {
+  const sql = readFileSync(resolve(ROOT, NOTIFY_SQL), 'utf8')
+
+  // the RPC's guard list
+  const guard = sql.slice(sql.indexOf('p_module NOT IN'))
+  const whitelist = new Set([...guard.slice(0, 400).matchAll(/'([a-zA-Z]+)'/g)].map(m => m[1]))
+
+  // the English-fallback display-name list — the one whose absence yields a NULL title
+  const fbTail = sql.lastIndexOf('AS g(mod, nm)')
+  const fbHead = sql.lastIndexOf('(SELECT nm FROM (VALUES', fbTail)
+  const names = new Set([...sql.slice(fbHead, fbTail).matchAll(/\('([a-zA-Z]+)',/g)].map(m => m[1]))
+
+  for (const k of Object.keys(actualModules)) {
+    if (!whitelist.has(k)) problems.push(`MODULE_FLAGS.${k} is missing from the notify_module_waitlist whitelist in ${NOTIFY_SQL} — signups for it could never be notified`)
+    if (!names.has(k))     problems.push(`MODULE_FLAGS.${k} has no English display name in module_notif_text (${NOTIFY_SQL}) — a blast would abort on notifications.title NOT NULL`)
+  }
+} catch (e) {
+  problems.push(`could not read ${NOTIFY_SQL} to verify the notify path: ${e.message}`)
+}
+
 if (problems.length) {
   console.error('')
   console.error('  ┌─ FLAG GUARD FAILED ────────────────────────────────────────────┐')

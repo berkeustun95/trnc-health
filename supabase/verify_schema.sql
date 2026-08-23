@@ -648,6 +648,17 @@ WITH report AS (
     UNION ALL SELECT '0904_accommodation_partner_feed','feed_precision_check is NULL-safe',
       EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_feed_precision_check'
         AND pg_get_constraintdef(oid) ILIKE '%IS NOT NULL%')
+    -- The notify path must know every module that can collect signups. CREATE OR REPLACE
+    -- adds no named object, so only a body token can tell the new lists from the old.
+    -- If this goes red, a module's waitlist can be filled but never notified.
+    UNION ALL SELECT '0909_notify_waitlist_add_modules','notify path covers explore/studentHub/towing',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_module_waitlist'
+          AND pg_get_functiondef(p.oid) ILIKE '%studentHub%'
+          AND pg_get_functiondef(p.oid) ILIKE '%towing%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='module_notif_text'
+          AND pg_get_functiondef(p.oid) ILIKE '%Çekici%')
     -- towing_companies.is_active DEFAULTs to FALSE — a deliberate inversion (see the
     -- migration header). No new named object, so nothing but the default value itself
     -- can detect a revert. If this goes red, rows will start publishing themselves on
