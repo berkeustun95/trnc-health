@@ -76,6 +76,71 @@ ORDER BY first_call DESC;
 -- No rows = pg_net has already pruned that window. Not a failure signal.
 
 
+-- ── 4. WHY do 3 of 4 have no token? Three hypotheses, one query ─────────────
+--
+-- Measured on pets (2026-08-23): 4 notified, 1 push attempted, 3 in-app only.
+-- The three candidate explanations need different fixes, so separate them first:
+--   (a) anonymous GUEST sessions  → structural. App.js:697 never even asks, because
+--       profiles is anon-write-blocked (20260714) so the token write would be refused.
+--       No permission prompt can fix this; it needs an account or another channel.
+--   (b) signed-in, DECLINED the OS prompt → a consent/timing problem. Fixable by asking
+--       at a better moment (e.g. AT waitlist signup, when the value is obvious) rather
+--       than on cold start.
+--   (c) signed-in, NEVER ASKED → a bug. Should not happen: registerPushToken runs on
+--       every session change for non-guests. If this bucket is non-zero, find out why.
+--
+-- auth.users.is_anonymous separates (a) from (b)/(c) exactly.
+SELECT CASE WHEN u.is_anonymous THEN 'GUEST — can never hold a token'
+            ELSE 'signed-in account' END                       AS session_type,
+       count(*)                                                AS waitlist_rows,
+       count(DISTINCT w.user_id)                               AS people,
+       count(*) FILTER (WHERE p.push_token IS NOT NULL)        AS has_token,
+       count(*) FILTER (WHERE p.push_token IS NULL)            AS no_token
+FROM public.module_waitlist w
+JOIN auth.users u       ON u.id = w.user_id
+LEFT JOIN public.profiles p ON p.id = w.user_id
+GROUP BY 1
+ORDER BY 1;
+-- Reading it:
+--   rows under GUEST            → hypothesis (a). Unreachable by push, by construction.
+--   signed-in AND no_token > 0  → hypothesis (b) or (c). Worth a closer look.
+
+
+-- ── 5. Does the 1-in-4 hold across the WHOLE waitlist, or is pets unlucky? ───
+-- 23 rows total. If the ratio holds everywhere, that is the headline — not pets.
+SELECT w.module,
+       count(*)                                          AS signups,
+       count(*) FILTER (WHERE u.is_anonymous)            AS guests,
+       count(*) FILTER (WHERE p.push_token IS NOT NULL)  AS reachable_by_push,
+       round(100.0 * count(*) FILTER (WHERE p.push_token IS NOT NULL) / count(*), 0)
+                                                         AS pct_reachable
+FROM public.module_waitlist w
+JOIN auth.users u       ON u.id = w.user_id
+LEFT JOIN public.profiles p ON p.id = w.user_id
+GROUP BY w.module
+ORDER BY pct_reachable, w.module;
+
+-- Whole-table summary — the single number that decides the next slice:
+SELECT count(*)                                          AS all_signups,
+       count(*) FILTER (WHERE p.push_token IS NOT NULL)  AS reachable_by_push,
+       count(*) FILTER (WHERE u.is_anonymous)            AS guests_unreachable_structurally,
+       round(100.0 * count(*) FILTER (WHERE p.push_token IS NOT NULL) / count(*), 0)
+                                                         AS pct_reachable
+FROM public.module_waitlist w
+JOIN auth.users u       ON u.id = w.user_id
+LEFT JOIN public.profiles p ON p.id = w.user_id;
+
+
+-- ── 6. Context: token coverage across the whole user base ───────────────────
+-- Is the waitlist unusually unreachable, or is this just what ADA's population is?
+SELECT CASE WHEN u.is_anonymous THEN 'guest' ELSE 'signed-in' END AS session_type,
+       count(*)                                                   AS profiles,
+       count(*) FILTER (WHERE p.push_token IS NOT NULL)           AS with_token
+FROM public.profiles p
+JOIN auth.users u ON u.id = p.id
+GROUP BY 1;
+
+
 -- ─── RECOMMENDATION (not applied — Berke's call) ─────────────────────────────
 -- Every push in this project is `PERFORM net.http_post(...)`, in five separate
 -- processors, and every one throws away the request_id. That is why question 3 above
