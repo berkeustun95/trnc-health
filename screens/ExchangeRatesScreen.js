@@ -608,7 +608,10 @@ const s = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1.5,
     borderColor: colors.border,
-    backgroundColor: 'transparent',   // Android: radius+border can paint an opaque box
+    // Opaque fill, NOT transparent. The Android radius+border gotcha only requires that
+    // backgroundColor be set EXPLICITLY; 'transparent' let the PageBackground photo
+    // through and the unselected calculator chips read as floating text.
+    backgroundColor: colors.cardBg,
   },
   calcChipActive: {
     backgroundColor: colors.primaryLight,
