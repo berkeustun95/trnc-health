@@ -52,6 +52,7 @@ WITH report AS (
     ('0822_places_consolidation','places'),
     ('0826_place_claims','place_claims'),
     ('0905_towing_companies','towing_companies'),
+    ('0910_contact_events','contact_events'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -321,7 +322,14 @@ WITH report AS (
     ('0905_towing_companies','towing_starting_price_check'),
     ('0905_towing_companies','towing_opening_hours_check'),
     -- UNIQUE: correctness. slug is the stable external handle for a firm.
-    ('0905_towing_companies','towing_companies_slug_key')
+    ('0905_towing_companies','towing_companies_slug_key'),
+    -- contact_events. These CHECKs are not an anti-attacker measure — they catch typos
+    -- in OUR OWN call sites. Without the action one, 'whatsApp' inserts happily and a
+    -- firm's contacts split across two values that never add up, so the figure quoted
+    -- to that firm is quietly too low forever.
+    ('0910_contact_events','contact_events_module_check'),
+    ('0910_contact_events','contact_events_action_check'),
+    ('0910_contact_events','contact_events_region_check')
 
   ) e(m,o)
 
@@ -373,7 +381,10 @@ WITH report AS (
     ('0904_accommodation_partner_feed','property_images_primary_unique'),
     -- towing: ONE index by design. vehicle_classes is a two-value domain and can
     -- never be selective, so it deliberately has none — see the migration header.
-    ('0905_towing_companies','idx_towing_companies_coverage')
+    ('0905_towing_companies','idx_towing_companies_coverage'),
+    -- contact_events: taps for one firm over a date range — the only query that runs,
+    -- and what contact_events_monthly groups by.
+    ('0910_contact_events','idx_contact_events_module_entity_time')
 
   ) e(m,o)
 
@@ -678,6 +689,56 @@ WITH report AS (
         WHERE n.nspname='public' AND p.proname='properties_touch_updated_at'
           AND pg_get_functiondef(p.oid) ILIKE '%last_seen_at%'
           AND pg_get_functiondef(p.oid) ILIKE '%view_count%')
+    -- ── 0910 contact_events. FIVE tokens, because almost nothing that makes this
+    -- table safe is a named object: a view, a view OPTION, two absences and a
+    -- column-level grant. Sections A-I are blind to every one of them.
+    --
+    -- The reporting view. No section of this register covers views at all, so without
+    -- this token a DB that never got the migration reads as fully OK while the only
+    -- deduped, spam-resistant number in the system does not exist.
+    UNION ALL SELECT '0910_contact_events','contact_events_monthly view exists',
+      to_regclass('public.contact_events_monthly') IS NOT NULL
+    -- security_invoker=true is the ONLY thing stopping the view from leaking the whole
+    -- contact log to every signed-in customer: a view runs as its OWNER unless the
+    -- option is set, this one is owned by postgres, and postgres bypasses RLS. It is a
+    -- reloption, not an object — a CREATE OR REPLACE VIEW that drops it is invisible to
+    -- every other check here and produces no error at any point.
+    UNION ALL SELECT '0910_contact_events','contact_events_monthly is security_invoker',
+      COALESCE((SELECT reloptions FROM pg_class WHERE oid = to_regclass('public.contact_events_monthly'))
+               @> ARRAY['security_invoker=true'], false)
+    -- THE ANONYMITY CONTRACT, as an absence. No user_id / device id / session id / IP /
+    -- dedup key, ever — see the migration header on why a recurring key, not `region`,
+    -- is what would turn this counter into a log of individuals. An absence cannot be
+    -- expressed by any existence section, and adding such a column raises no error.
+    UNION ALL SELECT '0910_contact_events','contact_events carries NO identifier column',
+      to_regclass('public.contact_events') IS NOT NULL
+      AND NOT EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='contact_events'
+          AND column_name IN ('user_id','device_id','session_id','install_id','ip','ip_address','dedup_key'))
+    -- created_at is unforgeable ONLY because it is not in the column-level INSERT grant
+    -- — there is no trigger behind it. A stray `GRANT ALL ON contact_events TO anon`
+    -- (or a re-run of Supabase's default privileges) silently restores the ability to
+    -- backdate a tap into last month's invoice period. Also asserts anon has no read.
+    -- ⚠ The privilege calls take the table's OID from a subquery on to_regclass, NOT a
+    -- literal table name. has_column_privilege('anon','public.contact_events',...) RAISES
+    -- when the table is absent, and PostgreSQL does not promise AND evaluates left to
+    -- right — so a name-literal guard would turn this whole drift report into a hard
+    -- error on every DB that has not applied 0910 yet. No match here yields NULL, which
+    -- COALESCE turns into a normal STALE/MISSING row. Same class of trap as the
+    -- to_regclass-not-::regclass note in the 0902 tokens above.
+    UNION ALL SELECT '0910_contact_events','contact_events grants: created_at unwritable, anon unreadable',
+      COALESCE((SELECT has_column_privilege('anon', c.oid, 'module', 'INSERT')
+                   AND NOT has_column_privilege('anon', c.oid, 'created_at', 'INSERT')
+                   AND NOT has_column_privilege('authenticated', c.oid, 'created_at', 'INSERT')
+                   AND NOT has_table_privilege('anon', c.oid, 'SELECT')
+                FROM pg_class c WHERE c.oid = to_regclass('public.contact_events')), false)
+    -- No FK on entity_id, deliberately: the key is polymorphic (towing_companies.id
+    -- today, facilities.id / home_services.id later). An FK added later points at one
+    -- table and starts silently rejecting every other module's taps.
+    UNION ALL SELECT '0910_contact_events','contact_events.entity_id has NO foreign key',
+      to_regclass('public.contact_events') IS NOT NULL
+      AND NOT EXISTS(SELECT 1 FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events') AND contype='f')
   ) z
 
   UNION ALL
@@ -696,7 +757,12 @@ WITH report AS (
     'duty_list','duty_schedule','blocked_terms','bus_routes',
     -- admin-seeded directory: no user data, but public-read + admin-write only
     -- works solely because RLS is ON. OFF here = world-writable firm listings.
-    'towing_companies'
+    'towing_companies',
+    -- contact_events is world-INSERTABLE by design (the inverse of towing_companies).
+    -- RLS is the ONLY thing making it not also world-READABLE, and `authenticated`
+    -- holds a table-level SELECT grant so the future admin screen needs no migration.
+    -- OFF here = every customer can read the whole contact log.
+    'contact_events'
   )
 )
 SELECT * FROM report

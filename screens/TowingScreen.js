@@ -15,6 +15,7 @@ import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { VEHICLE_CLASSES, DEFAULT_VEHICLE_CLASS } from '../constants/towing'
 import { openState, sortTowingCompanies } from '../utils/towingHours'
+import { logContactEvent } from '../utils/logContactEvent'
 import { resolveRegion } from '../utils/resolveRegion'
 
 // Çekici & Yol Yardım — the list.
@@ -190,10 +191,21 @@ export default function TowingScreen({ lang, userLocation, onBack }) {
   const sorted = sortTowingCompanies(visible)
 
   // Numbers are stored E.164 with spaces for readability; tel: wants them stripped.
-  const dial     = useCallback(n => { if (n) Linking.openURL(`tel:${String(n).replace(/\s/g, '')}`) }, [])
+  //
+  // The tap is logged on the line BEFORE the link fires, and is never awaited — see
+  // utils/logContactEvent.js. `dial` takes the company and the action rather than
+  // deriving them, because the primary and secondary numbers are the same code path
+  // here and only the caller knows which one it just handed over.
+  const dial     = useCallback((n, company, action) => {
+    if (!n) return
+    logContactEvent('towing', company?.id, action, region)
+    Linking.openURL(`tel:${String(n).replace(/\s/g, '')}`)
+  }, [region])
   const whatsApp = useCallback(c => {
-    if (c.whatsapp) Linking.openURL(`https://wa.me/${String(c.whatsapp).replace(/\D/g, '')}`)
-  }, [])
+    if (!c.whatsapp) return
+    logContactEvent('towing', c.id, 'whatsapp', region)
+    Linking.openURL(`https://wa.me/${String(c.whatsapp).replace(/\D/g, '')}`)
+  }, [region])
 
   // Android hardware back closes the DETAIL first, not the whole module.
   //
@@ -212,6 +224,7 @@ export default function TowingScreen({ lang, userLocation, onBack }) {
       <TowingDetailScreen
         company={selected}
         lang={lang}
+        region={region}
         onBack={() => setSelected(null)}
       />
     )
@@ -319,8 +332,8 @@ export default function TowingScreen({ lang, userLocation, onBack }) {
               item={item}
               lang={lang}
               onPress={() => setSelected(item)}
-              onCall={() => dial(item.phone)}
-              onCallSecondary={() => dial(item.phone_secondary)}
+              onCall={() => dial(item.phone, item, 'call')}
+              onCallSecondary={() => dial(item.phone_secondary, item, 'call_secondary')}
               onWhatsApp={() => whatsApp(item)}
             />
           )}

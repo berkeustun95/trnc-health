@@ -11,6 +11,7 @@ import {
   VEHICLE_CLASSES, CAR_SUBTYPES, HEAVY_SUBTYPES, SERVICE_ORDER, serviceLabelKey,
 } from '../constants/towing'
 import { openState } from '../utils/towingHours'
+import { logContactEvent } from '../utils/logContactEvent'
 
 // Firm detail. Secondary to the list by design — the call button is already ON the card,
 // so nobody in an actual emergency needs to reach this screen. This is for the user who
@@ -31,7 +32,7 @@ function Block({ title, children }) {
   )
 }
 
-export default function TowingDetailScreen({ company, lang, onBack }) {
+export default function TowingDetailScreen({ company, lang, region, onBack }) {
   const insets = useSafeAreaInsets()
   const st = openState(company)
 
@@ -40,9 +41,20 @@ export default function TowingDetailScreen({ company, lang, onBack }) {
   const whatsapp  = company?.whatsapp
   // Stored E.164 with spaces for readability. tel: wants whitespace gone; wa.me wants
   // digits only (no '+').
-  const dial      = n => { if (n) Linking.openURL(`tel:${String(n).replace(/\s/g, '')}`) }
-  const call      = () => dial(phone)
-  const whatsApp  = () => { if (whatsapp) Linking.openURL(`https://wa.me/${String(whatsapp).replace(/\D/g, '')}`) }
+  // Every contact surface on this screen funnels through these two, so the tap is
+  // logged once, here, rather than at five onPress handlers. Logged BEFORE the link
+  // fires and never awaited — see utils/logContactEvent.js.
+  const dial      = (n, action) => {
+    if (!n) return
+    logContactEvent('towing', company?.id, action, region)
+    Linking.openURL(`tel:${String(n).replace(/\s/g, '')}`)
+  }
+  const call      = () => dial(phone, 'call')
+  const whatsApp  = () => {
+    if (!whatsapp) return
+    logContactEvent('towing', company?.id, 'whatsapp', region)
+    Linking.openURL(`https://wa.me/${String(whatsapp).replace(/\D/g, '')}`)
+  }
 
   const coverage = (company?.coverage_regions || []).filter(r => REGIONS.includes(r))
   const services = SERVICE_ORDER.filter(k => (company?.services || []).includes(k))
@@ -206,7 +218,7 @@ export default function TowingDetailScreen({ company, lang, onBack }) {
               row form tested too weak, and this is the number someone reaches for when
               the first one rings out — it has to look like an action. */}
           {!!phone2 && (
-            <TouchableOpacity style={s.secondNumBtn} onPress={() => dial(phone2)} activeOpacity={0.85}>
+            <TouchableOpacity style={s.secondNumBtn} onPress={() => dial(phone2, 'call_secondary')} activeOpacity={0.85}>
               <Ionicons name="call-outline" size={15} color={colors.primary} />
               <Text style={s.secondNumText} numberOfLines={1}>
                 {t('towingSecondNumberBtn', lang).replace('{number}', phone2)}
