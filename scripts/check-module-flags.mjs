@@ -44,6 +44,32 @@ const EXPECTED_MODULES = {
   explore:       false,
   towing:        true,   // live
 }
+// ─── GO-LIVE WAITLIST BLAST ──────────────────────────────────────────────────
+//
+// notify_module_waitlist() is never called by anything — no trigger, no cron, nothing in
+// the OTA path. It is a manual step, and a missed one is INVISIBLE: the people affected
+// keep waiting and never complain about a notification they do not know was due.
+//
+// pets proved it. Four people sat un-notified for SIXTEEN DAYS after the module went
+// live, and it only came to light because an unrelated towing error sent someone
+// looking at the table. Nothing was going to surface that on its own.
+//
+// So: a module listed live in EXPECTED_MODULES must also appear here, or the guard
+// fails. The day you flip a module on, you cannot push until you have answered the
+// question "and did I notify the people waiting for it?".
+//
+// ⚠ HONEST LIMIT — this is a forced ACKNOWLEDGEMENT, not proof of delivery. This script
+//   runs offline and cannot reach the database. It guarantees the question gets asked at
+//   the right moment and leaves the answer in git history; it cannot guarantee the blast
+//   actually sent. Pair it with supabase/audit_module_waitlist_owed.sql, which is the
+//   part that checks reality.
+const WAITLIST_BLAST_DONE = new Set([
+  'pets',    // 4 notified 2026-08-23, 16 days late — see the note above
+  'events',  // 1 signup
+  'towing',  // 0 signups: every entry point was flag-gated, so nobody could reach
+             // its Coming Soon screen to sign up. Nothing owed, ever.
+])
+
 const EXPECTED_SCALARS = {
   FEATURED_LIVE:         false,
   EXPLORE_FEATURED_LIVE: false,
@@ -88,6 +114,14 @@ for (const k of Object.keys(actualModules)) {
 for (const [k, want] of Object.entries(EXPECTED_SCALARS)) {
   if (k in actualScalars && actualScalars[k] !== want) {
     problems.push(`${k} is ${actualScalars[k]}, baseline says ${want}`)
+  }
+}
+
+// A live module with nobody having answered for its waitlist.
+for (const [k, live] of Object.entries(actualModules)) {
+  if (live && !WAITLIST_BLAST_DONE.has(k)) {
+    problems.push(`MODULE_FLAGS.${k} is LIVE but not listed in WAITLIST_BLAST_DONE — `
+      + `run supabase/audit_module_waitlist_owed.sql, send anything owed, then add '${k}' there`)
   }
 }
 

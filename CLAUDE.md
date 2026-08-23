@@ -112,6 +112,42 @@ went missing). Two mandatory rules:
   CRUD screen, a hand-typed row, an import script. Going live then has to be an explicit
   act. Register the default as an H-section token in `verify_schema.sql`; a reverted
   DEFAULT creates no named object and is otherwise undetectable.
+## Module go-live SOP (ordered — the order is the point)
+
+Flipping a module on is not one step, it is nine, and several of them are only correct
+in this sequence. Deviations that look harmless are how modules ship half-launched.
+
+1. **Seed inactive.** Rows land with the table's unpublished value (`is_active = false`).
+   Nothing is visible or searchable yet.
+2. **Verify the data while it is still invisible.** Dial every phone number. Check every
+   image URL returns bytes. This is the last moment a mistake is free.
+3. **Activate the rows.** This OPENS a window: the content is now publicly searchable
+   (`search_content` ignores `MODULE_FLAGS`) while the screen is still gated. Keep the
+   window short and never end a session inside it.
+4. **Spot-check in Turkish**, on device, with the flag flipped LOCALLY and uncommitted.
+   Turkish strings are longer than English and surface layout bugs nothing else does.
+   If you needed temporary fixtures to exercise states real data does not cover, this is
+   where they live.
+5. **Revert the fixtures.** Before anything else. Fake data outlives the session it was
+   created for otherwise.
+6. **Flip the flag in BOTH files, in ONE commit** — `constants/flags.js` and
+   `scripts/check-module-flags.mjs`. Either alone fails the guard, which is the design.
+7. **Stash check, then clean tree.** `eas update` bundles the WORKING TREE, not HEAD. A
+   long-lived stash is not a blocker and must stay stashed.
+8. **`npm run ota -- --message "..."`** — never `eas update` directly, and note the `--`:
+   the wrapper takes no message of its own and EAS errors without one non-interactively.
+   Args after `--` land past the `&&`, so the flag guard still runs.
+9. **Verify the OTA on device across two full open → wait → kill → reopen cycles**, on
+   the Play Store build. A preview APK has no production channel and never receives OTA.
+10. **THEN `notify_module_waitlist('<module>')`.** Last, and only after step 9 is
+    confirmed. Notifying before the OTA has landed sends people to a screen that has not
+    updated yet — the one thing worse than not notifying them. Then add the module to
+    `WAITLIST_BLAST_DONE` in `scripts/check-module-flags.mjs`; the guard blocks the next
+    push until you do.
+
+Steps 6 and 10 are enforced mechanically by `check-module-flags.mjs`. The rest are not,
+and rely on this list.
+
 - Always spot-check new UI in Turkish before declaring it done. Turkish labels are longer
   than English, so they routinely push lists past the viewport (hitting bugs like the one
   above) where English never did.
