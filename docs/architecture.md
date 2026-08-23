@@ -454,3 +454,140 @@ Supabase auth additionally uses AsyncStorage as its session store (`lib/supabase
 - **Read:** once on mount. Validates `edge ∈ {left, right}` and `Number.isFinite(y)`, then **re-clamps `y` to current bounds** before applying — so a stale entry (different device, changed insets, hand-edited value) falls back to the default instead of parking the button off-screen.
 - `x` is deliberately **not** stored: the button always snaps to an edge, so the edge plus a `y` is the whole state.
 - The button renders at `opacity: 0` (and `pointerEvents: 'none'`) until that read resolves, so a saved left-edge position doesn't flash in at bottom-right first. A `null` read (first launch) is the legacy bottom-right corner.
+
+## Contact-tap counting — `contact_events`
+
+Counts how many people tap through to contact a listed firm. Built for the featured
+tier: a slot cannot be sold on "we have an app", it can be sold on "at least 47 people
+tapped call on your listing last month". Towing is the pilot and the only writer today;
+the table is **app-wide by shape** — Garages, Home Services, Beauty and Transportation
+all have call buttons and adopting them is adding call sites, not a migration.
+
+Migration: `supabase/migrations/20260910_contact_events.sql`.
+Verification: `supabase/verify_contact_events.sql` (18 SQL blocks + a device pass).
+Client seam: `utils/logContactEvent.js`.
+
+### The number is a FLOOR, not a measurement
+
+**This is the most important line in this section.** The client fires the insert and does
+not wait for it, so an analytics write can never block a phone call on a roadside with
+one bar of signal, and there is deliberately **no offline retry queue** (a queue would
+mean storing taps on the device — a trace at rest, and a breach of the anonymity contract
+below). Taps made with no signal are therefore simply absent, and that bias falls hardest
+on exactly the roadside-at-night case towing exists for.
+
+**Say "at least 47" and it is always true. Say "47" and it is always wrong**, in the
+direction that under-sells us. Never put a bare figure on a rate card. The same paragraph
+is in the migration header and in `COMMENT ON` both objects, so it is readable from the
+database itself — a caveat that lives only in a commit message gets forgotten by the time
+somebody signs a contract.
+
+### No identifier, ever
+
+No `user_id`, no device id, no session id, no IP, **no dedup key of any kind**. Someone
+calling a tow truck at 3am is not a data point that should be attached to a person, and
+the metric wanted is a count, not a list.
+
+The consequence is that **per-person dedup is impossible** — nothing in a row can tell one
+person tapping three times from three people tapping once. Do not "just add" an install id
+to fix that; see the next section for what replaces it.
+
+The identifiability risk here lives in a **recurring key, not in `region`**. region +
+timestamp with no key is a fact about a place and a moment; region + timestamp + a key
+that recurs is a behavioural trace of a person. `region` is safe precisely because it does
+not recur. V1 of the verify file asserts the absence of seven identifier column names —
+an absence no existence check can express, and one that raises no error if reintroduced.
+
+### `tap_minutes`, not `taps`, is the number you sell
+
+`contact_events_monthly` reports both. `tap_minutes` counts **distinct minutes in which a
+firm was tapped at all** — not per-person dedup, per-minute-per-firm collapse. Its errors
+run in the safe direction (over-collapse undercounts; that is the safe way to be wrong
+about an invoiced figure).
+
+Two things fall out of it, and both are the reason it was chosen over a raw count:
+
+- **The gap between `taps` and `tap_minutes` is a firm-not-answering signal.** 90 taps over
+  31 tap_minutes means people tapped, nothing connected, they tapped again. Do not "clean
+  up" the view by dropping `taps`.
+- **It is the entire abuse answer.** An INSERT-only endpoint reached with the anon key that
+  ships inside the app bundle is spammable by construction and no RLS policy can change
+  that. `tap_minutes` is capped at 60/firm/hour *arithmetically*, so a flood moves the
+  sellable figure by at most 60 an hour and leaves a `taps/tap_minutes` ratio that is
+  visibly absurd — a detector with no threshold to tune. There is deliberately no rate
+  limit, no CHECK-based throttle and no captcha. If it is ever genuinely abused the fix is
+  an Edge Function with an IP bucket, not a policy.
+
+### RLS — the inverse of `towing_companies`
+
+- **INSERT: anyone.** Signed-out `anon`, guest, customer, provider, admin — identical.
+  There is deliberately **no `no_anon_insert` veto** here; guests writing is the point,
+  and V1 asserts that veto's absence so nobody "restores" it by pattern-matching other
+  tables. This is the one table in the schema where the guest write veto described in the
+  guest-access section is *intentionally* not applied.
+- **SELECT: admin only.** No public SELECT policy at all, so an `anon` session never
+  evaluates `is_admin()`.
+- **UPDATE / DELETE: nobody, including admin**, via RESTRICTIVE vetoes. Purge spam as
+  `postgres` / `service_role`, which bypass RLS.
+
+**`created_at` is unforgeable because of a column-level grant, not a trigger.**
+`GRANT INSERT (module, entity_id, action, region)` — `id` and `created_at` are simply not
+grantable to the client. A stray `GRANT ALL ... TO anon`, or a re-run of Supabase's default
+privileges, silently restores the ability to backdate a tap into last month's invoice
+period. An H-token in `verify_schema.sql` watches for exactly that.
+
+**The reporting view is `security_invoker = true`, and that is load-bearing.** A Postgres
+view runs as its OWNER unless the option is set; this one is owned by `postgres`, which
+bypasses RLS. Without it, granting the view to `authenticated` hands every signed-in
+customer the whole contact log even though the table itself is locked. It is a reloption,
+not a named object, so a `CREATE OR REPLACE VIEW` that drops it is invisible to every
+existence check and produces no error anywhere. Verify block V6d proves it behaviourally,
+not just by reading `reloptions`.
+
+### Polymorphic key — no FK on `entity_id`, and no `was_fallback`
+
+`(module, entity_id)` is polymorphic: `towing_companies.id` today, `facilities.id` /
+`home_services.id` later. **No foreign key** — one would point at a single table and start
+silently rejecting every other module's taps. A garbage uuid joins to nothing and
+contributes to no report, and an FK would buy no trust anyway: anyone who can insert a fake
+id can insert a real one.
+
+The `module` and `action` CHECKs are **not** an anti-attacker measure — they catch typos in
+our own call sites. Without the action CHECK, `'whatsApp'` inserts happily and one firm's
+contacts split across two values that never add up, so the figure quoted to that firm is
+quietly too low forever. `module` is pinned to the `MODULE_FLAGS` keys, the same vocabulary
+`module_waitlist` and the go-live RPC use; the core facilities directory and the duty list
+are deliberately absent (they are not modules — adding one is a one-line ALTER).
+
+There is no `was_fallback` column: whether the towing "nobody covers your region" fallback
+fired is **derivable** (`region IS NOT NULL AND region <> ALL(firm.coverage_regions)`).
+
+### Adding a module — the call-site contract
+
+1. `import { logContactEvent } from '../utils/logContactEvent'`.
+2. Call it on the line **before** `Linking.openURL`, never awaited.
+3. Log inside the screen's existing `dial` / `whatsApp` helper, not at each `onPress` —
+   towing has **eight** contact surfaces across two screens funnelling through two helpers.
+4. Thread the active region filter down to any detail screen. `TowingDetailScreen` has no
+   filter bar of its own; without the prop every detail tap loses its coverage-gap signal,
+   and the loss is invisible because `region` is legitimately nullable.
+5. Extend `contact_events_module_check` in the same migration that ships the module.
+
+**Three ways this silently logs nothing.** All three produce zero rows, no error, no crash
+— and the natural reading is "nobody taps call", which is indistinguishable from real low
+demand. None is theoretical:
+
+- **supabase-js query builders are lazy thenables.** `supabase.from(x).insert(y)` builds an
+  object and sends **nothing**; the fetch is constructed inside `.then()`. Dropping the
+  `.then()` turns the whole seam into an expensive no-op.
+- **Never chain `.select()`** onto the insert. It asks PostgREST to return the row, which
+  needs SELECT privilege the client deliberately does not have; the insert then fails and
+  fire-and-forget swallows it.
+- **A new table needs `NOTIFY pgrst, 'reload schema'`** or PostgREST 404s it (PGRST205)
+  against a table that demonstrably exists.
+
+`logContactEvent` also **cannot throw** — it runs on the line before `Linking.openURL`, so a
+synchronous throw would cost the phone call. The outer try/catch is not defensive padding.
+In `__DEV__` it warns on failure, which is what makes a broken call site visible before it
+reaches an OTA. **Rows in the table are the only proof it works** — smoke-test in Expo Go
+first, then run V10 on the Play Store build.
