@@ -11,6 +11,7 @@ import PageBackground from '../components/PageBackground'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { MODULE_FLAGS } from '../constants/flags'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
   haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherDesc, isAvailableToday, coarseCoord,
@@ -68,6 +69,7 @@ const MODULES = [
   { id: 'insurance',     icon: 'shield-checkmark-outline', tint: 'service', labelKey: 'menuInsurance' },
   { id: 'grooming',      icon: 'cut-outline',       tint: 'lifestyle', labelKey: 'menuGrooming' },
   { id: 'garages',       icon: 'car-sport-outline', tint: 'service',   labelKey: 'menuGarages' },
+  { id: 'towing',        icon: 'car-outline',       tint: 'urgent',    labelKey: 'menuTowing' },
   { id: 'esim',          icon: 'cellular-outline',  tint: 'service',   labelKey: 'menuEsim' },
   { id: 'municipal',     icon: 'business-outline',  tint: 'service',   labelKey: 'menuMunicipalities' },
 ]
@@ -80,6 +82,7 @@ const RESULT_META = {
   homeServices: { icon: 'hammer-outline',    tint: 'service'   },
   transport:    { icon: 'car-outline',       tint: 'service'   },
   jobPostings:  { icon: 'briefcase-outline', tint: 'service'   },
+  towing:       { icon: 'car-outline',       tint: 'urgent'    },
 }
 
 export default function HomeScreen({
@@ -115,6 +118,7 @@ export default function HomeScreen({
   onShowGrooming,
   onShowGarages,
   garagesTileVisible,
+  onShowTowing,
   onShowEsim,
   onShowEmergency,
   onShowMunicipal,
@@ -170,6 +174,10 @@ export default function HomeScreen({
       case 'homeServices': onShowHomeServices(); break
       case 'transport':    onShowTransport(); break
       case 'jobPostings':  onShowJobPostings(); break
+      // Routes through the App.js gate like every other module, so while
+      // MODULE_FLAGS.towing is false this lands on Coming Soon rather than the list —
+      // the same behaviour job_postings has had since it became searchable.
+      case 'towing':       onShowTowing(); break
       case 'beach':
       case 'landmark': {
         // search_content still returns 'beach'/'landmark' (its arms are deferred to the DROP
@@ -198,6 +206,7 @@ export default function HomeScreen({
     insurance:          onShowInsurance,
     grooming:           onShowGrooming,
     garages:            onShowGarages,
+    towing:             onShowTowing,
     esim:               onShowEsim,
     municipal:          onShowMunicipal,
     studentHub:         onShowStudentHub,
@@ -396,7 +405,8 @@ export default function HomeScreen({
           </View>
 
           <View style={s.moduleGrid}>
-            {MODULES.filter(mod => mod.id !== 'garages' || garagesTileVisible).map(mod => (
+            {MODULES.filter(mod => (mod.id !== 'garages' || garagesTileVisible)
+                                && (mod.id !== 'towing'  || MODULE_FLAGS.towing)).map(mod => (
               <TouchableOpacity
                 key={mod.id}
                 style={s.moduleCard}

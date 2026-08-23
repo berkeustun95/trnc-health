@@ -1,6 +1,10 @@
 export const colors = {
   primary:       '#0E7C7B',
   primaryLight:  '#E6F4F4',
+  // Deeper teal for TEXT sitting on primaryLight. `primary` on `primaryLight` is only
+  // 4.44:1 — it scrapes AA for body text and reads washed out when the tinted bar sits
+  // over a PageBackground photo. This is 6.71:1 on the same tint.
+  primaryDark:   '#0A5E5D',
   accent:        '#FF8552',
   accentLight:   '#FFF0EB',
   bg:            '#F7F8FA',
@@ -23,6 +27,14 @@ export const colors = {
   tintServiceFg:   '#0E7C7B',
   tintLifestyleBg: '#FFF0EB',
   tintLifestyleFg: '#C2410C',
+
+  // Warm neutral from the Çekici module's design. ADA's palette is otherwise cool
+  // (bg/border are blue-greys), so this is the ONE warm token — it exists because the
+  // coverage map needs an "uncovered region" fill that reads as land rather than as a
+  // disabled UI surface, and because the logo tile needs a backdrop that flatters mixed
+  // firm logos. Mirrored in scripts/generate-towing-map.mjs as SAND; if you change one,
+  // change both or the legend swatch stops matching the map.
+  sand:            '#EFEBE2',
 }
 
 export const typeColors = {

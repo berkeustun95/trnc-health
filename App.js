@@ -40,6 +40,7 @@ import TransportScreen from './screens/TransportScreen'
 import InsuranceScreen from './screens/InsuranceScreen'
 import GroomingScreen from './screens/GroomingScreen'
 import GaragesScreen from './screens/GaragesScreen'
+import TowingScreen from './screens/TowingScreen'
 import EsimScreen from './screens/EsimScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import ExploreScreen from './screens/ExploreScreen'
@@ -278,6 +279,7 @@ export default function App() {
   const [showLegal, setShowLegal] = useState(false)
   const [showGrooming, setShowGrooming] = useState(false)
   const [showGarages, setShowGarages] = useState(false)
+  const [showTowing, setShowTowing] = useState(false)
   const [showStudentHub, setShowStudentHub] = useState(false)
   const [showEsim, setShowEsim] = useState(false)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
@@ -500,6 +502,7 @@ export default function App() {
       if (showInsurance) { setShowInsurance(false); return true }
       if (showGrooming) { setShowGrooming(false); return true }
       if (showGarages) { setShowGarages(false); return true }
+      if (showTowing) { setShowTowing(false); return true }
       if (showStudentHub) { setShowStudentHub(false); return true }
       if (showEsim) { setShowEsim(false); return true }
       if (showLegal) { setShowLegal(false); return true }
@@ -516,7 +519,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
 
   useEffect(() => {
     Promise.all([
@@ -1261,8 +1264,12 @@ export default function App() {
       : <ComingSoonScreen lang={lang} moduleKey="grooming" titleKey="menuGrooming" session={session} onBack={() => setShowGrooming(false)} />
   } else if (showGarages) {
     content = (MODULE_FLAGS.garages || isAdmin || ownsGarage)
-      ? <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} onOpenFacility={setSelectedFacility} isAdmin={profile?.role === 'admin'} />
+      ? <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} onOpenFacility={setSelectedFacility} onShowTowing={() => { setShowGarages(false); setShowTowing(true) }} isAdmin={profile?.role === 'admin'} />
       : <ComingSoonScreen lang={lang} moduleKey="garages" titleKey="menuGarages" session={session} onBack={() => setShowGarages(false)} />
+  } else if (showTowing) {
+    content = (MODULE_FLAGS.towing || isAdmin)
+      ? <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} />
+      : <ComingSoonScreen lang={lang} moduleKey="towing" titleKey="menuTowing" session={session} onBack={() => setShowTowing(false)} />
   } else if (showStudentHub) {
     // No StudentHubScreen in main yet (it lives on the unmerged feat/student-hub
     // branch). Route ALL users — admins included — to Coming Soon; the flag exists
@@ -1323,6 +1330,7 @@ export default function App() {
             onShowInsurance={() => setShowInsurance(true)}
             onShowGrooming={() => setShowGrooming(true)}
             onShowGarages={() => setShowGarages(true)}
+            onShowTowing={() => setShowTowing(true)}
             garagesTileVisible={GARAGES_LIVE || profile?.role === 'admin' || ownsGarage}
             onShowStudentHub={() => setShowStudentHub(true)}
             onShowEsim={() => setShowEsim(true)}
@@ -1534,7 +1542,7 @@ export default function App() {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
-    setShowInsurance(false); setShowEsim(false)
+    setShowInsurance(false); setShowEsim(false); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
@@ -1551,6 +1559,7 @@ export default function App() {
       case 'newcomer':      setShowNewcomerEssentials(true); break
       case 'municipal':     setShowMunicipalModal(true); break
       case 'emergency':     setShowEmergencyModal(true); break
+      case 'towing':        setShowTowing(true); break
     }
   }
 
@@ -1562,7 +1571,7 @@ export default function App() {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
-    setShowInsurance(false); setShowEsim(false)
+    setShowInsurance(false); setShowEsim(false); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
@@ -1631,6 +1640,25 @@ export default function App() {
                 <Ionicons name="call" size={18} color={colors.danger} />
               </TouchableOpacity>
             ))}
+
+            {/* Towing sits AFTER the state emergency numbers, never among them: 155 /
+                112 / 199 / 158 are life-safety lines and nothing commercial may appear
+                above them. Flag-gated like the other two entry points. */}
+            {MODULE_FLAGS.towing && (
+              <TouchableOpacity
+                style={[styles.emergencyRow, { marginTop: 8 }]}
+                onPress={() => { setShowEmergencyModal(false); setShowTowing(true) }}
+              >
+                <View style={styles.emergencyIconWrap}>
+                  <Ionicons name="car-outline" size={20} color={colors.danger} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.emergencyEntryLabel}>{t('menuTowing', lang)}</Text>
+                  <Text style={styles.emergencySubLabel}>{t('towingFromEmergencySub', lang)}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
           </View>
         </SheetOverlay>
       )}

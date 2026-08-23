@@ -13,7 +13,7 @@ import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions } from '../constants/areas'
-import { FEATURED_LIVE, PRICE_COMPARE_LIVE } from '../constants/flags'
+import { FEATURED_LIVE, PRICE_COMPARE_LIVE, MODULE_FLAGS } from '../constants/flags'
 import { partitionFeatured, isFeatured } from '../utils/featured'
 import { pricedServices, formatPriceRange } from '../utils/servicePrices'
 import GarageOnboardingScreen from './GarageOnboardingScreen'
@@ -104,7 +104,7 @@ function GarageCard({ item, lang, onPress, showFeatured }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function GaragesScreen({ lang, session, onBack, onRequireAccount, onOpenFacility, isAdmin = false }) {
+export default function GaragesScreen({ lang, session, onBack, onRequireAccount, onOpenFacility, onShowTowing, isAdmin = false }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin
   // previewing the directory. Mirrors the GARAGES_LIVE tile-gate.
   const showFeatured = FEATURED_LIVE || isAdmin
@@ -203,6 +203,24 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
       <ScreenHeader onBack={onBack} backLabel={t('back', lang)} title={t('garagesTitle', lang)} lang={lang} />
 
       <View style={{ flex: 1 }}>
+        {/* Broken down vs. needs a repair is the SAME journey — someone whose car will
+            not start is as likely to open Garages as Towing. Gated on the module flag
+            alone (no isAdmin): admins never reach this screen through the customer
+            chain, so an isAdmin bypass here would be unreachable for them and hidden
+            from everyone else. Preview by flipping the flag locally. */}
+        {MODULE_FLAGS.towing && !!onShowTowing && (
+          <TouchableOpacity style={s.towingRow} onPress={onShowTowing} activeOpacity={0.85}>
+            <View style={s.towingIcon}>
+              <Ionicons name="car-outline" size={19} color={colors.danger} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.towingTitle}>{t('menuTowing', lang)}</Text>
+              <Text style={s.towingSub} numberOfLines={2}>{t('towingFromGaragesSub', lang)}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -359,6 +377,14 @@ const s = StyleSheet.create({
   safe:           { flex: 1, backgroundColor: colors.bg },
 
   // Category filter
+  towingRow:      { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 11,
+                    marginHorizontal: 16, marginTop: 10, padding: 12,
+                    backgroundColor: colors.cardBg, borderRadius: radius.md,
+                    borderWidth: 1, borderColor: colors.border, ...shadow },
+  towingIcon:     { width: 38, height: 38, borderRadius: 19, alignItems: 'center',
+                    justifyContent: 'center', backgroundColor: colors.dangerLight },
+  towingTitle:    { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  towingSub:      { fontSize: 12, color: colors.textSecondary, marginTop: 2, lineHeight: 16 },
   filterRow:      { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
   chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
                     backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },

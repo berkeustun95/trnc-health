@@ -42,6 +42,7 @@ const EXPECTED_MODULES = {
   accommodation: false,  // Slice 3 in progress — flip locally to review, NEVER commit
   studentHub:    false,
   explore:       false,
+  towing:        false,  // Slice 2 built dark; flips in Slice 3 with the real firms
 }
 const EXPECTED_SCALARS = {
   FEATURED_LIVE:         false,

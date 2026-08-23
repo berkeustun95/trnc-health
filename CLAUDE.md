@@ -96,6 +96,22 @@ went missing). Two mandatory rules:
   compressed when the list overflows, cropping its text top and bottom. It only
   reproduces once there are enough results to make the list scroll, so it is invisible
   with short or empty lists. (Not a lineHeight/font issue — that was a wrong early guess.)
+- **`MODULE_FLAGS` does not gate search.** `search_content` returns rows straight from
+  the tables, so a module flag only hides the SCREEN — anything a module's table exposes
+  publicly is findable through global search while the module is still dark. Any content
+  seeded before launch must therefore be seeded in whatever state its own RLS treats as
+  unpublished (`is_active = false`, `status <> 'active'`), and flipped to published in
+  the same step as the flag. A user who finds a real listing and lands on Coming Soon
+  learns that ADA cannot help with that thing — which is the opposite of what a
+  pre-launch seed is for.
+- **A pre-launch table should DEFAULT to unpublished.** `towing_companies.is_active`
+  DEFAULTs to `false` (`20260907`) — a deliberate inversion of the usual `true`, so an
+  INSERT that omits the column lands invisible instead of publishing itself. Prefer this
+  for any new admin-seeded directory: a banner in a seed file protects the one path
+  somebody wrote, while the default protects every path nobody has written yet — a future
+  CRUD screen, a hand-typed row, an import script. Going live then has to be an explicit
+  act. Register the default as an H-section token in `verify_schema.sql`; a reverted
+  DEFAULT creates no named object and is otherwise undetectable.
 - Always spot-check new UI in Turkish before declaring it done. Turkish labels are longer
   than English, so they routinely push lists past the viewport (hitting bugs like the one
   above) where English never did.

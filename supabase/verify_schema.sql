@@ -51,6 +51,7 @@ WITH report AS (
     ('0812_module_waitlist','module_waitlist'),
     ('0822_places_consolidation','places'),
     ('0826_place_claims','place_claims'),
+    ('0905_towing_companies','towing_companies'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -137,7 +138,10 @@ WITH report AS (
     ('0904_accommodation_partner_feed','property_images','is_primary'),
     ('0904_accommodation_partner_feed','estate_agencies','contact_name'),
     ('0904_accommodation_partner_feed','estate_agencies','contact_phone'),
-    ('0904_accommodation_partner_feed','estate_agencies','contact_whatsapp')
+    ('0904_accommodation_partner_feed','estate_agencies','contact_whatsapp'),
+    -- Fallback number for a towing firm. The list query selects *, so a missing column
+    -- here is not a cosmetic gap — PostgREST 42703s and the whole directory fails to load.
+    ('0908_towing_phone_secondary','towing_companies','phone_secondary')
 
   ) e(m,t,c)
 
@@ -205,7 +209,11 @@ WITH report AS (
     ('0826_place_claims','approve_place_claim'),
     ('0827_places_featured_tier','request_featured_place'),
     ('0829_place_resubmit','resubmit_place'),
-    ('0904_accommodation_partner_feed','properties_touch_updated_at')
+    ('0904_accommodation_partner_feed','properties_touch_updated_at'),
+    -- towing: hours validator is called from a CHECK, so if it goes missing every
+    -- INSERT on towing_companies fails outright, not just the malformed ones.
+    ('0905_towing_companies','towing_hours_valid'),
+    ('0905_towing_companies','towing_touch_updated_at')
 
   ) e(m,o)
 
@@ -247,7 +255,8 @@ WITH report AS (
     ('0825_places_column_guards','places_guard_insert'),
     ('0825_places_column_guards','places_guard_update'),
     ('0826_place_claims','place_claims_guard_insert'),
-    ('0904_accommodation_partner_feed','properties_touch_updated_at')
+    ('0904_accommodation_partner_feed','properties_touch_updated_at'),
+    ('0905_towing_companies','towing_touch_updated_at')
 
   ) e(m,o)
 
@@ -298,7 +307,21 @@ WITH report AS (
     ('0904_accommodation_partner_feed','properties_feed_precision_check'),
     -- UNIQUE: correctness. The ON CONFLICT arbiter for the partner-feed upsert;
     -- a partial index cannot serve that role (the 20260830 lesson).
-    ('0904_accommodation_partner_feed','properties_external_id_unique')
+    ('0904_accommodation_partner_feed','properties_external_id_unique'),
+    -- ── towing (0905). The region/domain checks are the load-bearing ones: they are
+    --    what keeps the seven canonical region keys and the TWO vehicle classes from
+    --    drifting away from constants/regions.js and the coverage-map polygon keys.
+    ('0905_towing_companies','towing_slug_check'),
+    ('0905_towing_companies','towing_base_region_check'),
+    ('0905_towing_companies','towing_coverage_regions_check'),
+    -- A firm that does not cover its own base region is invisible where it lives.
+    ('0905_towing_companies','towing_base_in_coverage_check'),
+    ('0905_towing_companies','towing_vehicle_classes_check'),
+    ('0905_towing_companies','towing_services_check'),
+    ('0905_towing_companies','towing_starting_price_check'),
+    ('0905_towing_companies','towing_opening_hours_check'),
+    -- UNIQUE: correctness. slug is the stable external handle for a firm.
+    ('0905_towing_companies','towing_companies_slug_key')
 
   ) e(m,o)
 
@@ -347,7 +370,10 @@ WITH report AS (
     ('0904_accommodation_partner_feed','properties_browse_idx'),
     ('0904_accommodation_partner_feed','property_images_property_id_idx'),
     -- UNIQUE: correctness — at most one primary image per property.
-    ('0904_accommodation_partner_feed','property_images_primary_unique')
+    ('0904_accommodation_partner_feed','property_images_primary_unique'),
+    -- towing: ONE index by design. vehicle_classes is a two-value domain and can
+    -- never be selective, so it deliberately has none — see the migration header.
+    ('0905_towing_companies','idx_towing_companies_coverage')
 
   ) e(m,o)
 
@@ -622,6 +648,20 @@ WITH report AS (
     UNION ALL SELECT '0904_accommodation_partner_feed','feed_precision_check is NULL-safe',
       EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_feed_precision_check'
         AND pg_get_constraintdef(oid) ILIKE '%IS NOT NULL%')
+    -- towing_companies.is_active DEFAULTs to FALSE — a deliberate inversion (see the
+    -- migration header). No new named object, so nothing but the default value itself
+    -- can detect a revert. If this goes red, rows will start publishing themselves on
+    -- omission and become publicly searchable before the module launches.
+    UNION ALL SELECT '0907_towing_is_active_default_false','towing_companies.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='towing_companies'
+          AND column_name='is_active' AND column_default = 'false')
+    -- search_content gained a towing_companies arm. CREATE OR REPLACE adds no new named
+    -- object, so only a body token can tell the new definition from the old one.
+    UNION ALL SELECT '0906_search_content_add_towing','search_content covers towing_companies',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='search_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%towing_companies%')
     UNION ALL SELECT '0904_accommodation_partner_feed','properties_touch_updated_at is conditional',
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='properties_touch_updated_at'
@@ -642,7 +682,10 @@ WITH report AS (
     -- directory / UGC tables (Slice 5 — user-writable rows, so RLS must be ON here too)
     'beaches','landmarks','places','place_claims','events','home_services','transport_providers',
     'estate_agencies','estate_agents','properties','property_images',
-    'duty_list','duty_schedule','blocked_terms','bus_routes'
+    'duty_list','duty_schedule','blocked_terms','bus_routes',
+    -- admin-seeded directory: no user data, but public-read + admin-write only
+    -- works solely because RLS is ON. OFF here = world-writable firm listings.
+    'towing_companies'
   )
 )
 SELECT * FROM report
@@ -688,10 +731,24 @@ GROUP BY tablename ORDER BY tablename;
 --                • public image buckets (avatars/facility-images/property-images/
 --                  event-images) keep their broad `USING (bucket_id=…)` SELECT —
 --                  known follow-up (anon object enumeration), not changed here.
+--                  ⚠ AND NOTE (measured 2026-08-23 against towing-logos): for a bucket
+--                  with public = true, Storage serves reads WITHOUT evaluating RLS at
+--                  all — a request with no apikey and no Authorization header still
+--                  returns 200 and the bytes. So those broad SELECT policies are not
+--                  what grants anon read, and TIGHTENING THEM WOULD NOT CLOSE THE
+--                  ENUMERATION FOLLOW-UP. Only flipping a bucket to private makes its
+--                  SELECT policy load-bearing. Do not mistake a green public-URL fetch
+--                  for evidence that a bucket's read policy works.
 --                • place-photos (0823): place_photos_public (SELECT, bucket-scoped) +
 --                  place_photos_upload (INSERT authenticated, bucket-scoped, anon-guarded) +
 --                  place_photos_delete (DELETE, foldername[1]=uid OR is_admin(), anon-guarded).
---                  Expect exactly these 3 (no UPDATE — uploads are upsert:false). ─────
+--                  Expect exactly these 3 (no UPDATE — uploads are upsert:false).
+--                • towing-logos (0905): towing_logos_public_read (SELECT, bucket-scoped)
+--                  + towing_logos_admin_{insert,update,delete} (authenticated, is_admin(),
+--                  anon-guarded). Expect exactly these 4. This bucket is created BY the
+--                  migration, not by hand — the provider-documents/estate-agent-documents
+--                  lesson was that a dashboard-made bucket with un-applied policies looks
+--                  identical to a working one until somebody tries to upload. ─────
 SELECT policyname, cmd, roles, qual, with_check
 FROM pg_policies
 WHERE schemaname='storage' AND tablename='objects'
