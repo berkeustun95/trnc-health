@@ -1126,6 +1126,7 @@ const translations = {
     termsAgreeContent: 'By posting you agree to our Terms. Objectionable content and abusive users are not tolerated, and reported content is removed within 24 hours.',
 
     // ─── Çekici & Yol Yardım (towing / roadside assistance) ───────────────
+    towingSecondNumberBtn: 'Second number · {number}',
     towingSecondNumber: 'Second number',
     towingHoursUnknownBadge: 'Hours unknown',
     towingFromGaragesSub: 'Broken down and not driveable? Find a towing firm that covers you.',
@@ -2311,6 +2312,7 @@ const translations = {
 
     towingSecondNumber: '2. numara',
     // ─── Çekici & Yol Yardım (towing / roadside assistance) ───────────────
+    towingSecondNumberBtn: '2. numara · {number}',
     towingHoursUnknownBadge: 'Saat bilgisi yok',
     towingFromGaragesSub: 'Aracınız yolda mı kaldı? Bölgenize hizmet veren çekici firmasını bulun.',
     towingFromEmergencySub: 'Çekici ve yol yardım firmaları',
@@ -3179,6 +3181,7 @@ const translations = {
     towingSecondNumber: 'رقم ثانٍ',
 
     // ─── Çekici & Yol Yardım (towing / roadside assistance) ───────────────
+    towingSecondNumberBtn: 'رقم ثانٍ · {number}',
     towingHoursUnknownBadge: 'ساعات غير معروفة',
     towingFromGaragesSub: 'تعطلت سيارتك ولا يمكن قيادتها؟ اعثر على شركة سحب تخدم منطقتك.',
     towingFromEmergencySub: 'شركات سحب السيارات والمساعدة على الطريق',
@@ -4047,6 +4050,7 @@ const translations = {
     fxCalcNote: 'Использует курс покупки, когда вы меняете валюту на лиры, и курс продажи, когда покупаете валюту — как в обменном пункте.',
 
     // ─── Çekici & Yol Yardım (towing / roadside assistance) ───────────────
+    towingSecondNumberBtn: 'Второй номер · {number}',
     towingHoursUnknownBadge: 'Часы неизвестны',
     towingFromGaragesSub: 'Машина сломалась и не едет? Найдите эвакуатор, который обслуживает ваш район.',
     towingFromEmergencySub: 'Эвакуаторы и помощь на дороге',
@@ -4915,6 +4919,7 @@ const translations = {
     fxCalcNote: 'Χρησιμοποιεί την τιμή αγοράς όταν μετατρέπετε ξένο νόμισμα σε λίρες και την τιμή πώλησης όταν αγοράζετε ξένο νόμισμα — όπως ένα ανταλλακτήριο.',
 
     // ─── Çekici & Yol Yardım (towing / roadside assistance) ───────────────
+    towingSecondNumberBtn: 'Δεύτερος αριθμός · {number}',
     towingHoursUnknownBadge: 'Άγνωστες ώρες',
     towingFromGaragesSub: 'Το όχημα δεν κινείται; Βρείτε οδική βοήθεια που εξυπηρετεί την περιοχή σας.',
     towingFromEmergencySub: 'Εταιρείες ρυμούλκησης και οδικής βοήθειας',
@@ -5783,6 +5788,7 @@ const translations = {
     fxCalcNote: 'Utilise le taux d’achat lorsque vous convertissez des devises en livres, et le taux de vente lorsque vous achetez des devises — comme un bureau de change.',
 
     // ─── Çekici & Yol Yardım (towing / roadside assistance) ───────────────
+    towingSecondNumberBtn: 'Second numéro · {number}',
     towingHoursUnknownBadge: 'Horaires inconnus',
     towingFromGaragesSub: 'En panne et immobilisé ? Trouvez un dépanneur qui dessert votre zone.',
     towingFromEmergencySub: 'Sociétés de dépannage et remorquage',
@@ -6651,6 +6657,7 @@ const translations = {
     fxCalcNote: 'Usa el tipo de compra cuando cambias divisa a liras y el tipo de venta cuando compras divisa — igual que una casa de cambio.',
 
     // ─── Çekici & Yol Yardım (towing / roadside assistance) ───────────────
+    towingSecondNumberBtn: 'Segundo número · {number}',
     towingHoursUnknownBadge: 'Horario desconocido',
     towingFromGaragesSub: '¿Averiado y sin poder circular? Encuentre una grúa que cubra su zona.',
     towingFromEmergencySub: 'Empresas de grúa y asistencia en carretera',
@@ -7519,6 +7526,7 @@ const translations = {
     fxCalcNote: 'Verwendet den Ankaufskurs, wenn Sie Fremdwährung in Lira wechseln, und den Verkaufskurs, wenn Sie Fremdwährung kaufen — genau wie eine Wechselstube.',
 
     // ─── Çekici & Yol Yardım (towing / roadside assistance) ───────────────
+    towingSecondNumberBtn: 'Zweite Nummer · {number}',
     towingHoursUnknownBadge: 'Zeiten unbekannt',
     towingFromGaragesSub: 'Panne und nicht mehr fahrbereit? Finden Sie einen Abschleppdienst für Ihr Gebiet.',
     towingFromEmergencySub: 'Abschlepp- und Pannenhilfedienste',
@@ -8387,6 +8395,7 @@ const translations = {
     fxCalcNote: 'هنگام تبدیل ارز خارجی به لیر از نرخ خرید و هنگام خرید ارز خارجی از نرخ فروش استفاده می‌کند — درست مانند یک صرافی.',
 
     // ─── Çekici & Yol Yardım (towing / roadside assistance) ───────────────
+    towingSecondNumberBtn: 'شماره دوم · {number}',
     towingHoursUnknownBadge: 'ساعت کاری نامشخص',
     towingFromGaragesSub: 'خودرو خراب شده و حرکت نمی‌کند؟ شرکت یدک‌کشی منطقه خود را پیدا کنید.',
     towingFromEmergencySub: 'شرکت‌های یدک‌کش و امداد جاده‌ای',

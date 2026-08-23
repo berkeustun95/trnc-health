@@ -191,15 +191,6 @@ export default function TowingDetailScreen({ company, lang, onBack }) {
             </View>
           </TouchableOpacity>
 
-          {!!phone2 && (
-            <TouchableOpacity style={s.row} onPress={() => dial(phone2)} activeOpacity={0.6}>
-              <Text style={s.rowLabel}>{t('towingSecondNumber', lang)}</Text>
-              <View style={s.rowRight}>
-                <Text style={[s.rowValue, s.rowValueLink]}>{phone2}</Text>
-                <Ionicons name="call-outline" size={15} color={colors.primary} />
-              </View>
-            </TouchableOpacity>
-          )}
 
           {!!whatsapp && (
             <TouchableOpacity style={s.row} onPress={whatsApp} activeOpacity={0.6}>
@@ -208,6 +199,18 @@ export default function TowingDetailScreen({ company, lang, onBack }) {
                 <Text style={[s.rowValue, s.rowValueLink]}>{whatsapp}</Text>
                 <Ionicons name="logo-whatsapp" size={15} color={colors.primary} />
               </View>
+            </TouchableOpacity>
+          )}
+
+          {/* Same treatment as the card: a full-width outlined button, not a row. The
+              row form tested too weak, and this is the number someone reaches for when
+              the first one rings out — it has to look like an action. */}
+          {!!phone2 && (
+            <TouchableOpacity style={s.secondNumBtn} onPress={() => dial(phone2)} activeOpacity={0.85}>
+              <Ionicons name="call-outline" size={15} color={colors.primary} />
+              <Text style={s.secondNumText} numberOfLines={1}>
+                {t('towingSecondNumberBtn', lang).replace('{number}', phone2)}
+              </Text>
             </TouchableOpacity>
           )}
         </Block>
@@ -276,6 +279,12 @@ const s = StyleSheet.create({
   rowLabel:    { fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
   rowValue:    { fontSize: 13, color: colors.textPrimary, fontWeight: '700' },
   rowRight:    { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  // Mirrors the card's button exactly. 'transparent' is safe here — this is inside the
+  // detail scroll on colors.bg, not over a PageBackground photo.
+  secondNumBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                   gap: 7, marginTop: 10, paddingVertical: 11, borderRadius: radius.sm,
+                   borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
+  secondNumText: { fontSize: 14, fontWeight: '700', color: colors.primary, flexShrink: 1 },
   rowValueLink:{ color: colors.primary },
   priceStamp:  { fontSize: 11.5, color: colors.textSecondary, marginTop: 6 },
 

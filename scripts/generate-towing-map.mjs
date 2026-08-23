@@ -17,6 +17,24 @@
 // So the polygons are rasterised here, at build time, into flat masks that CoverageMap
 // stacks as plain <Image>s. Renders offline, no tiles, no network, no native code.
 //
+// ─── SWAPPING IN A CORRECTED TRNC SHAPE ─────────────────────────────────────
+// The polygons currently in constants/towing.js were drawn freehand for the design
+// mockup. They are NOT real geography and are known to be wrong. A corrected shape is
+// being sourced. Do NOT redraw them by eye in the meantime — a plausible-looking wrong
+// coastline is harder to spot than an obviously schematic one.
+//
+// When the real shape arrives it is a DATA edit, not a code edit:
+//   1. Replace MAP_POLYGONS in constants/towing.js. Keep the same seven keys and keep
+//      MAP_VIEWBOX consistent with the new coordinate space.
+//   2. Move MAP_LABEL_ANCHORS to match — they are in the same viewBox space, and a new
+//      outline will put the old anchors in the wrong place or outside their region.
+//   3. node scripts/generate-towing-map.mjs      (rewrites all 8 PNGs)
+//   4. node scripts/generate-towing-map.mjs --check   (must be clean)
+//   5. Look at it on device. The drift guard checks KEYS, not geography — it cannot
+//      tell a correct coastline from a wrong one.
+// Verified reversible: regenerating from unchanged constants reproduces byte-identical
+// PNGs, so a bad shape can be reverted with `git checkout` plus one regenerate.
+//
 // LABELS ARE DELIBERATELY NOT BAKED IN. They are RN <Text> at runtime, positioned from
 // MAP_LABEL_ANCHORS and translated per locale. Baking them would (a) need 9 locales x 8
 // files and (b) hide exactly the drift this script exists to catch.

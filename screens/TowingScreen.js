@@ -110,22 +110,20 @@ function TowingCard({ item, lang, onPress, onCall, onCallSecondary, onWhatsApp }
         )}
       </View>
 
-      {/* Fallback number — a small text link, never a second button and never a chooser.
-          A tow firm's first line rings out often enough to be worth carrying, but at the
-          moment someone presses Ara they have nothing to choose between: two
-          identical-looking numbers and no basis for preferring either. A modal would tax
-          the majority whose first call connects in order to help the minority whose does
-          not. So: one tap to one number, with the fallback one more tap away and never
-          in the way. Renders only when phone_secondary is non-null. */}
+      {/* Fallback number — a full-width bordered button directly under Ara. It began
+          as a small text link and device testing showed that was too weak to read as an
+          action, so it now carries the same width, height and radius as Ara, outlined
+          rather than filled so the primary call stays visually dominant.
+          The number is IN the label: at the roadside, seeing which number you are about
+          to dial is worth more than a tidy label.
+          Still not a chooser — one tap to one number, the fallback one tap further.
+          Renders only when phone_secondary is non-null. */}
       {!!item.phone_secondary && (
-        <TouchableOpacity
-          style={s.secondNumBtn}
-          onPress={onCallSecondary}
-          activeOpacity={0.7}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-        >
-          <Ionicons name="call-outline" size={13} color={colors.textSecondary} />
-          <Text style={s.secondNumText}>{t('towingSecondNumber', lang)}</Text>
+        <TouchableOpacity style={s.secondNumBtn} onPress={onCallSecondary} activeOpacity={0.85}>
+          <Ionicons name="call-outline" size={15} color={colors.primary} />
+          <Text style={s.secondNumText} numberOfLines={1}>
+            {t('towingSecondNumberBtn', lang).replace('{number}', item.phone_secondary)}
+          </Text>
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -399,10 +397,13 @@ const s = StyleSheet.create({
                  borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
                  backgroundColor: 'transparent' },
 
+  // Same height/radius as callBtn, outlined instead of filled. 'transparent' is safe
+  // HERE (unlike the filter chips) because this sits inside an opaque cardBg card, not
+  // over the PageBackground photo — the card is what shows through.
   secondNumBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                   gap: 5, paddingTop: 9 },
-  secondNumText: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary,
-                   textDecorationLine: 'underline' },
+                   gap: 7, marginTop: 8, paddingVertical: 11, borderRadius: radius.sm,
+                   borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
+  secondNumText: { fontSize: 14, fontWeight: '700', color: colors.primary, flexShrink: 1 },
 
   emptyText:   { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
   disclaimer:  { fontSize: 11.5, lineHeight: 17, color: colors.textSecondary,
