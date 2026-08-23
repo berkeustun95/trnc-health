@@ -42,5 +42,5 @@ export const MODULE_FLAGS = {
   // Çekici & Yol Yardım (towing / roadside assistance). Admin-seeded directory, no
   // self-serve. Stays false until Slice 3 seeds real firms — an emergency screen with
   // an empty list is worse than no screen at all.
-  towing:       false,
+  towing:       true,
 }
