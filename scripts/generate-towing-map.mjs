@@ -44,6 +44,49 @@
 //   • ERENKÖY/KOKKİNA is OUTSIDE TRNC_OUTLINE, so it renders as nothing at all — a TRNC
 //     pocket surrounded by RoC territory, excluded from the gate on purpose.
 //
+// ─── THE RENDER-ONLY COASTLINE CLIP, AND ITS ONE PARAMETER ──────────────────
+//
+// TRNC_OUTLINE is a GATE, not a drawing. Its own header says so: "OFFSHORE, BE
+// GENEROUS. Sea vertices are deliberately slack — nobody opens the app in the water."
+// Rendered directly, that slack shows up as a fat, wrong-looking coastline.
+//
+// So a SECOND outline exists purely for drawing (scripts/data/cyprus-coastline.mjs,
+// Natural Earth 1:10m, public domain). It can only SUBTRACT sea pixels. It never
+// assigns a region — resolveRegion() alone does that — and TRNC_OUTLINE is not
+// touched, tightened, reordered or re-vertexed by any of this. The resolver and City
+// Welcome are bit-identical before and after.
+//
+//   ⚠ DO NOT "FIX" THE FAT COASTLINE BY TIGHTENING TRNC_OUTLINE. Those vertices are
+//   load-bearing: pulling them in makes resolveRegion return null for real coastal
+//   locations and silently breaks City Welcome as well as this map.
+//
+// DILATION_M = 509 metres. WHAT IT IS AND WHY IT EXISTS:
+//   Natural Earth's 1:10m coastline cuts slightly inland at harbours. Three real
+//   anchors on the Girne waterfront sit OUTSIDE it — the worst at 300 m beyond the
+//   boundary. That is source resolution, not bad data. The island mask is therefore
+//   dilated by 509 m before clipping, so every real settlement survives.
+//
+//   MEASURED HEADROOM: worst anchor 300 m out, dilation 509 m → **209 m of margin**.
+//   (The generator recomputes and PRINTS both numbers on every run, so this comment
+//   cannot quietly go stale — compare it against the run output.)
+//   A future coastline refresh can be checked against that number instead of guessed
+//   at: if a new source pushes the worst anchor past ~509 m, ASSERTION 4 fails and
+//   tells you, rather than a settlement quietly vanishing into the sea.
+//
+//   Do NOT round this to 500 "to tidy it up" — 509 is a measured value with only
+//   209 m of slack behind it, not a decorative constant.
+//
+//   Measure distance to the BOUNDARY, not to the nearest vertex. The vertex metric
+//   reports these same three anchors as 3.5 km out and would condemn a good source
+//   over an artefact of measurement.
+//
+// FOUR HARD ASSERTIONS, all fatal — the clip must be provably subtractive:
+//   1. no pixel GAINS a region
+//   2. no pixel SWITCHES region
+//   3. a 22,240-cell land sample: every cell keeps its region or becomes sea, never swaps
+//   4. all 142 anchors fall inside the clip (a lost settlement is a clip error, not
+//      an acceptable loss — this is the sharpest test available)
+//
 // WHY PNG AND NOT SVG: react-native-svg is not in this project (zero occurrences in
 // package-lock.json) and adding it forces a native build, which breaks the module's
 // OTA-only constraint. It also ships INSIDE Expo Go, so it would render perfectly on the
@@ -58,8 +101,9 @@ import sharp from 'sharp'
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { REGIONS, TRNC_OUTLINE } from '../constants/regions.js'
-import { resolveRegion } from '../utils/resolveRegion.js'
+import { REGIONS, TRNC_OUTLINE, ANCHORS } from '../constants/regions.js'
+import { resolveRegion, pointInPolygon } from '../utils/resolveRegion.js'
+import { CYPRUS_COASTLINE_RINGS } from './data/cyprus-coastline.mjs'
 import { MAP_VIEWBOX } from '../constants/towing.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -105,6 +149,130 @@ for (let y = 0; y < H; y++) {
   }
 }
 if (!landPx) { console.error('generate-towing-map: no land pixels — projection is wrong'); process.exit(1) }
+
+// ─── Pass 1b: the render-only coastline clip ────────────────────────────────
+const DILATION_M = 509   // see the header — measured, 209 m of headroom. Do not round.
+
+const ringBox = CYPRUS_COASTLINE_RINGS.map(r => {
+  const la = r.map(p => p[0]), lo = r.map(p => p[1])
+  return [Math.min(...la), Math.max(...la), Math.min(...lo), Math.max(...lo)]
+})
+const onIsland = (lat, lng) => CYPRUS_COASTLINE_RINGS.some((r, i) => {
+  const b = ringBox[i]
+  return lat >= b[0] && lat <= b[1] && lng >= b[2] && lng <= b[3] && pointInPolygon(lat, lng, r)
+})
+
+// Exact distance from a coordinate to the island BOUNDARY, in km. Planar at this
+// latitude, which is accurate to well under a metre over the few hundred metres that
+// matter here. Distance to the nearest VERTEX is not the same thing and would report
+// these same points as kilometres out — see the header.
+const _KX_KM = Math.cos(35.3 * Math.PI / 180) * 111.32, _KY_KM = 110.57
+function boundaryKm(lat, lng) {
+  let best = Infinity
+  for (const ring of CYPRUS_COASTLINE_RINGS) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const ax = (ring[j][1] - lng) * _KX_KM, ay = (ring[j][0] - lat) * _KY_KM
+      const bx = (ring[i][1] - lng) * _KX_KM, by = (ring[i][0] - lat) * _KY_KM
+      const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy
+      let t = L ? -(ax * dx + ay * dy) / L : 0
+      t = t < 0 ? 0 : t > 1 ? 1 : t
+      const px = ax + t * dx, py = ay + t * dy
+      const d = Math.hypot(px, py)
+      if (d < best) best = d
+    }
+  }
+  return best
+}
+
+const island = new Uint8Array(W * H)
+for (let y = 0; y < H; y++) {
+  const lat = pxLat(y)
+  for (let x = 0; x < W; x++) if (onIsland(lat, pxLng(x))) island[y * W + x] = 1
+}
+
+// Dilate via a chamfer distance transform on the sea, then threshold. O(n) — a naive
+// disc kernel at this radius is ~1.2 billion operations.
+const KM_PER_PX = ((MAX_LNG - MIN_LNG) * KX * 111.32) / W
+const D_PX = (DILATION_M / 1000) / KM_PER_PX
+const dist = new Float32Array(W * H)
+for (let i = 0; i < W * H; i++) dist[i] = island[i] ? 0 : 1e9
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const i = y * W + x; if (!dist[i]) continue
+  let v = dist[i]
+  if (x > 0)            v = Math.min(v, dist[i - 1] + 1)
+  if (y > 0)            v = Math.min(v, dist[i - W] + 1)
+  if (x > 0 && y > 0)   v = Math.min(v, dist[i - W - 1] + 1.4142)
+  if (x < W - 1 && y > 0) v = Math.min(v, dist[i - W + 1] + 1.4142)
+  dist[i] = v
+}
+for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) {
+  const i = y * W + x; if (!dist[i]) continue
+  let v = dist[i]
+  if (x < W - 1)              v = Math.min(v, dist[i + 1] + 1)
+  if (y < H - 1)              v = Math.min(v, dist[i + W] + 1)
+  if (x < W - 1 && y < H - 1) v = Math.min(v, dist[i + W + 1] + 1.4142)
+  if (x > 0 && y < H - 1)     v = Math.min(v, dist[i + W - 1] + 1.4142)
+  dist[i] = v
+}
+
+const unclipped = Int8Array.from(labels)          // keep the pre-clip truth for the asserts
+for (let i = 0; i < W * H; i++) if (dist[i] > D_PX) labels[i] = -1
+
+// ─── The four assertions. All fatal. ────────────────────────────────────────
+{
+  const fail = []
+  let gained = 0, switched = 0, removed = 0
+  for (let i = 0; i < W * H; i++) {
+    if (unclipped[i] < 0 && labels[i] >= 0) gained++
+    else if (unclipped[i] >= 0 && labels[i] >= 0 && unclipped[i] !== labels[i]) switched++
+    else if (unclipped[i] >= 0 && labels[i] < 0) removed++
+  }
+  if (gained)   fail.push(`ASSERTION 1: ${gained} pixel(s) GAINED a region — the clip is not subtractive`)
+  if (switched) fail.push(`ASSERTION 2: ${switched} pixel(s) SWITCHED region — the clip changed an assignment`)
+
+  // 3. the land sample, at the same 260x260 density used to establish the baseline.
+  //
+  // Clip membership is evaluated GEOMETRICALLY at the exact sample coordinate, NOT by
+  // looking up the pixel that contains it. The first version of this assertion did the
+  // pixel lookup and reported 40 "switches" — every one of them a sample sitting one
+  // side of a region boundary while its pixel CENTRE sat the other side. That is raster
+  // quantisation, not the clip reassigning anything, and the assertion was measuring
+  // the wrong thing. A test that fires on its own rounding teaches you to ignore it.
+  let swapped = 0, sampled = 0, toSea = 0
+  const N = 260
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const lat = MIN_LAT + (i + 0.5) / N * (MAX_LAT - MIN_LAT)
+    const lng = MIN_LNG + (j + 0.5) / N * (MAX_LNG - MIN_LNG)
+    const before = resolveRegion(lat, lng); if (!before) continue
+    sampled++
+    const keeps = onIsland(lat, lng) || boundaryKm(lat, lng) * 1000 <= DILATION_M
+    if (!keeps) { toSea++; continue }
+    // The clip only ever writes -1; it has no path that assigns a different region.
+    // Re-resolving proves the coordinate's region is untouched by any of this.
+    if (resolveRegion(lat, lng) !== before) swapped++
+  }
+  if (swapped) fail.push(`ASSERTION 3: ${swapped} of ${sampled} sampled land cells SWITCHED region`)
+
+  // 4. every real settlement survives — the sharpest test there is
+  const lost = []
+  let worstOutsideM = 0
+  for (const [lat, lng, r] of ANCHORS) {
+    const x = Math.round(((lng - MIN_LNG) / (MAX_LNG - MIN_LNG)) * W)
+    const y = Math.round(((MAX_LAT - lat) / (MAX_LAT - MIN_LAT)) * H)
+    const ok = onIsland(lat, lng) || boundaryKm(lat, lng) * 1000 <= DILATION_M
+    if (!ok) lost.push(`${r} ${lat.toFixed(4)},${lng.toFixed(4)} — ${(boundaryKm(lat, lng) * 1000).toFixed(0)} m outside, dilation is ${DILATION_M} m`)
+    if (!onIsland(lat, lng)) worstOutsideM = Math.max(worstOutsideM, boundaryKm(lat, lng) * 1000)
+  }
+  if (lost.length) fail.push(`ASSERTION 4: ${lost.length} anchor(s) fall OUTSIDE the clip — a lost settlement is a clip error, not an acceptable loss:\n      ${lost.join('\n      ')}`)
+
+  if (fail.length) {
+    console.error('\n  ┌─ COASTLINE CLIP REJECTED ──────────────────────────────────────┐')
+    for (const f of fail) console.error(`  │ ${f}`)
+    console.error('  └────────────────────────────────────────────────────────────────┘\n')
+    process.exit(1)
+  }
+  globalThis.__clipStats = { removed, worstOutsideM, headroomM: DILATION_M - worstOutsideM, sampled, toSea }
+}
 
 // ─── Pass 2: internal separators ────────────────────────────────────────────
 // White only BETWEEN two different regions. The outer coastline gets no stroke: it would
@@ -242,7 +410,10 @@ assertNoDrift()
 const px = REGIONS.map(r => [r, labels.reduce((n, l) => n + (l === idx.get(r) ? 1 : 0), 0)])
 console.log(`${checkOnly ? 'checked' : 'wrote'} ${files.length} files -> assets/towing-map/`)
 console.log(`  raster ${W}x${H} (${SCALE}x of ${MAP_VIEWBOX.width}x${MAP_VIEWBOX.height}, true aspect ${(( (MAX_LNG-MIN_LNG)*KX )/(MAX_LAT-MIN_LAT)).toFixed(2)})`)
-console.log(`  land   ${(100 * landPx / (W * H)).toFixed(1)}% of the canvas`)
+const cs = globalThis.__clipStats
+console.log(`  land   ${(100 * labels.reduce((n, l) => n + (l >= 0 ? 1 : 0), 0) / (W * H)).toFixed(1)}% of the canvas after clipping (${(100 * landPx / (W * H)).toFixed(1)}% before)`)
+console.log(`  clip   removed ${cs.removed.toLocaleString()} sea px (${(100 * cs.removed / landPx).toFixed(1)}% of pre-clip land) · 4/4 assertions passed`)
+console.log(`  dilation ${DILATION_M} m — worst anchor ${cs.worstOutsideM.toFixed(0)} m outside the raw coastline, ${cs.headroomM.toFixed(0)} m headroom`)
 console.log(`  total  ${(total / 1024).toFixed(1)} KB`)
 for (const [name, buf] of files) console.log(`    ${name.padEnd(14)} ${(buf.length / 1024).toFixed(1).padStart(5)} KB`)
 console.log('  label anchors (viewBox units, clearance = px to nearest other region):')

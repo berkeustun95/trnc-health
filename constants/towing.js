@@ -72,9 +72,9 @@ export const MAP_LABEL_ANCHORS = {
   kyrenia:    { x:  237, y: 255 },
   famagusta:  { x:  534, y: 348 },
   morphou:    { x:  174, y: 317 },
-  iskele:     { x:  633, y: 245 },
-  lefke:      { x:   66, y: 337 },
-  karpaz:     { x:  800, y: 127 },
+  iskele:     { x:  661, y: 195 },
+  lefke:      { x:   36, y: 370 },
+  karpaz:     { x:  722, y: 170 },
 }
 
 // ─── The drift guard the whole map design rests on ──────────────────────────
