@@ -51,30 +51,30 @@ export const serviceLabelKey = key => SERVICE_LABEL[key] || key
 // native build (see the module log). scripts/generate-towing-map.mjs rasterises these
 // into PNG masks at build time; CoverageMap stacks the masks. They live here so the
 // generator, the drift check and the label positions all read one source.
-export const MAP_VIEWBOX = { width: 1020, height: 360 }
+// 1020 x 436 is TRUE equirectangular aspect (2.34) for TRNC at lat 35.4°. The design
+// mockup used 1020 x 360 (2.83), which stretched the island horizontally by ~21% — a
+// distorted map of real roads, shown to people who drive them daily.
+export const MAP_VIEWBOX = { width: 1020, height: 436 }
 
-export const MAP_POLYGONS = {
-  lefke:     '40,215 120,150 150,160 160,250 100,250',
-  morphou:   '120,150 250,120 265,150 270,255 160,250 150,160',
-  kyrenia:   '250,120 330,95 430,105 520,140 500,185 400,175 300,170 265,150',
-  nicosia:   '265,150 300,170 400,175 500,185 490,255 380,290 300,265 270,255',
-  famagusta: '500,185 610,175 620,255 620,300 560,325 470,320 380,290 490,255',
-  iskele:    '610,175 700,190 740,235 660,250 620,255',
-  karpaz:    '700,190 790,140 870,85 950,35 985,60 900,140 820,200 740,235',
-}
-
+// NO POLYGONS. The coverage map is rendered per-pixel by evaluating resolveRegion()
+// itself (scripts/generate-towing-map.mjs), so the image IS the decision function rather
+// than a hand-drawn approximation of it. The freehand mockup polygons that used to live
+// here were never real geography and have been deleted rather than left to mislead.
+//
+// This also means the map and the region filter CANNOT disagree: there is one definition
+// (ANCHORS + TRNC_OUTLINE in constants/regions.js) and both read it.
 // Label anchor points, in the SAME viewBox space, from the mockup's <text> x/y.
 // CoverageMap converts these to percentages so the labels track the image at any width.
 // The mockup anchors text at its LEFT baseline; these are converted to CENTRES so an RN
 // <Text> can be centred on them regardless of how long the translated label is.
 export const MAP_LABEL_ANCHORS = {
-  lefke:     { x: 103, y: 207 },
-  morphou:   { x: 213, y: 195 },
-  kyrenia:   { x: 372, y: 137 },
-  nicosia:   { x: 378, y: 223 },
-  famagusta: { x: 505, y: 267 },
-  iskele:    { x: 668, y: 217 },
-  karpaz:    { x: 838, y: 145 },
+  nicosia:    { x:  383, y: 320 },
+  kyrenia:    { x:  237, y: 255 },
+  famagusta:  { x:  534, y: 348 },
+  morphou:    { x:  174, y: 317 },
+  iskele:     { x:  633, y: 245 },
+  lefke:      { x:   66, y: 337 },
+  karpaz:     { x:  800, y: 127 },
 }
 
 // ─── The drift guard the whole map design rests on ──────────────────────────
@@ -87,17 +87,11 @@ export const MAP_LABEL_ANCHORS = {
 // mask FILES both ways — a region with no mask, and a mask with no region. Verify
 // without rewriting: `node scripts/generate-towing-map.mjs --check`.
 export function assertMapKeysMatchRegions() {
-  const poly   = Object.keys(MAP_POLYGONS).sort()
   const labels = Object.keys(MAP_LABEL_ANCHORS).sort()
   const canon  = [...REGIONS].sort()
-  const problems = []
-  if (JSON.stringify(poly) !== JSON.stringify(canon)) {
-    problems.push(`MAP_POLYGONS keys [${poly}] != REGIONS [${canon}]`)
-  }
   if (JSON.stringify(labels) !== JSON.stringify(canon)) {
-    problems.push(`MAP_LABEL_ANCHORS keys [${labels}] != REGIONS [${canon}]`)
+    throw new Error(`towing coverage map drift: MAP_LABEL_ANCHORS keys [${labels}] != REGIONS [${canon}]`)
   }
-  if (problems.length) throw new Error(`towing coverage map drift:\n  ${problems.join('\n  ')}`)
   return true
 }
 
