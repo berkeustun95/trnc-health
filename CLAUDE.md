@@ -112,6 +112,23 @@ went missing). Two mandatory rules:
   CRUD screen, a hand-typed row, an import script. Going live then has to be an explicit
   act. Register the default as an H-section token in `verify_schema.sql`; a reverted
   DEFAULT creates no named object and is otherwise undetectable.
+- **A green check is only evidence if you have seen it go red.** A check you have never
+  watched fail is not a check, it is a decoration — and it is worse than nothing, because
+  it buys confidence it has not earned. Before trusting one, break the thing it guards and
+  confirm it complains, then put it back. Three checks written for the towing module were
+  each green while checking nothing: a seed validator that reported "all 4 rows valid"
+  having parsed **zero** rows (its slice ran to a terminator that appeared earlier in the
+  file); an i18n completeness checker that matched only literal `t('key')` and silently
+  skipped every key looked up through a variable; and a clip assertion that compared a
+  coordinate against the pixel *containing* it and so fired on its own rounding.
+  That last one is the instructive case — the tempting fix was to widen the tolerance
+  until it went green, which would have left a test that cries wolf, and a test that cries
+  wolf teaches you to ignore it. Fix what the test measures, not what it reports.
+- **Comments that cite a measured number must be regenerated, not remembered.** A header
+  saying "207 m of headroom" goes stale silently the moment the measurement changes. Where
+  it matters, have the tool print the real figure on every run so the comment can be
+  checked against it — and correct the comment when they disagree, even by 2 m.
+
 ## Module go-live SOP (ordered — the order is the point)
 
 Flipping a module on is not one step, it is nine, and several of them are only correct
