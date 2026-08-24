@@ -14,6 +14,14 @@ import BackButton from '../components/BackButton'
 const { width: W } = Dimensions.get('window')
 const GALLERY_H = Math.round(W * 3 / 4)   // 4:3 — the detail view can afford the height
 
+// Scroll distance after which the gallery no longer sits behind the floating back button.
+// Roughly the button's own height plus its top offset; exact to the pixel does not matter,
+// the glyph only has to change before the photo leaves rather than after.
+const CHEVRON_CLEAR = 110
+
+// Clears the contact bar, which is now two rows (name, then buttons) rather than one.
+const CONTACT_BAR_CLEARANCE = 150
+
 const CURRENCIES = { GBP: '£', EUR: '€', USD: '$', TRY: '₺' }
 const PERIOD_SUFFIX_KEY = {
   monthly: 'accomPerMonth', weekly: 'accomPerWeek',
@@ -81,6 +89,7 @@ function Fact({ label, value }) {
 }
 
 export default function PropertyDetailScreen({ property: prop, lang, onBack, onOpenMap }) {
+  const [overPhoto, setOverPhoto] = useState(true)
   const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
 
@@ -138,7 +147,17 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
   return (
     <SafeAreaView style={ds.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}>
+        scrollEventThrottle={16}
+        // The floating back button is WHITE (hero) because it sits over the gallery
+        // photo. Once the body scrolls under it that is white-on-white — see the note at
+        // the button itself. Flip to the dark `bare` glyph at the moment the photo stops
+        // being behind it. setState only on the transition, so this is two renders in the
+        // life of the screen, not one per frame.
+        onScroll={e => {
+          const over = e.nativeEvent.contentOffset.y < GALLERY_H - CHEVRON_CLEAR
+          setOverPhoto(prev => (prev === over ? prev : over))
+        }}
+        contentContainerStyle={{ paddingBottom: CONTACT_BAR_CLEARANCE }}>
 
         {images.length > 0 ? (
           <View>
@@ -281,14 +300,23 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
         </View>
       </ScrollView>
 
-      {/* AFTER the ScrollView, not before it. zIndex:10 alone did not hold: the gallery is
-          4:3 (~292pt) so nothing overlaps at rest, but once the body scrolls up the badge
-          row passes UNDER this floating button and was painting over the chevron — half
-          the tap target covered by an ARSA badge.
-          Sibling paint order is the reliable mechanism; zIndex among siblings across a
-          ScrollView boundary is not, because the scrolling content sits in its own
-          stacking context. Rendering it last needs no zIndex at all. */}
-      <BackButton variant="hero" lang={lang} onPress={onBack} style={[ds.backBtn, { top: insets.top + 8 }]} />
+      {/* ⚠ THE "BADGE DRAWN OVER THE CHEVRON" BUG WAS NEVER A Z-ORDER BUG.
+          It was diagnosed as one first, and rendering this after the ScrollView (instead
+          of before it, on zIndex:10) changed nothing visible — which is the evidence that
+          the diagnosis was wrong, not that the fix failed.
+          The real cause is COLOUR. `hero` draws a WHITE chevron with a soft dark halo,
+          which is correct over the gallery photo. But this button floats and the body
+          scrolls UNDER it, and the body is colors.bg #F7F8FA on a badge of colors.surface
+          #FFFFFF — so a white glyph lands on white. Contrast 1:1, with only a 0.55-alpha
+          blur to separate it. The badge reads crisp, the chevron reads as absent, and the
+          eye calls that "behind".
+          So it switches variant on scroll: `hero` (white, haloed) while the photo is
+          behind it, `bare` (colors.textPrimary, no halo) once it is not.
+          The paint-order form is kept because it is more robust than depending on zIndex
+          across a ScrollView boundary — but it fixed nothing, and saying so here is the
+          point. */}
+      <BackButton variant={overPhoto ? 'hero' : 'bare'} lang={lang} onPress={onBack}
+        style={[ds.backBtn, { top: insets.top + 8 }]} />
 
       {/* ── Fixed contact bar ────────────────────────────────────────────────
           Pinned, always present, and NEVER shows a per-property agent — the agency is
@@ -302,24 +330,37 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
           the empty state was built, shipped and verified on device while the populated
           state had never once run. The bug surfaced the moment real data arrived. */}
       <View style={[ds.contactBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={ds.contactLabel}>{t('accomContactTitle', lang)}</Text>
-          <Text style={ds.contactName} numberOfLines={1}>
-            {agency?.contact_name || agency?.name || '—'}
-          </Text>
+        {/* NAME ON ITS OWN ROW. Three fixed-width elements in one row is the wrong layout
+            for a variable-length value: "Hüseyin Kambur" is about the shortest plausible
+            Turkish name and it already clipped to "Hüseyin Kamb…". Any layout where the
+            name competes with two buttons for width fails on the next longer name, so the
+            fix is to stop it competing at all rather than to widen it.
+            The İLETİŞİM label is gone. It sat above the name explaining a row that
+            contains a phone icon and a WhatsApp icon — redundant, and it was costing the
+            line the name now uses. */}
+        <Text style={ds.contactName} numberOfLines={1}>
+          {agency?.contact_name || agency?.name || '—'}
+        </Text>
+
+        <View style={ds.contactBtnRow}>
+          {!!phone && (
+            // TONAL, not solid. WhatsApp's #25D366 is mandated by their brand guidelines
+            // and cannot be quietened, so two solid saturated buttons of equal weight sat
+            // at the bottom of every page fighting each other. Making Ara tonal — teal on
+            // a teal tint — settles the hierarchy without touching the colour we are not
+            // allowed to change. It is still unmistakably a button.
+            <TouchableOpacity style={[ds.contactBtn, ds.callBtn]} onPress={call}>
+              <Ionicons name="call-outline" size={17} color={colors.primaryDark} />
+              <Text style={[ds.contactBtnText, ds.callBtnText]}>{t('accomCall', lang)}</Text>
+            </TouchableOpacity>
+          )}
+          {!!whatsapp && (
+            <TouchableOpacity style={[ds.contactBtn, ds.waBtn]} onPress={whatsApp}>
+              <Ionicons name="logo-whatsapp" size={17} color="#fff" />
+              <Text style={[ds.contactBtnText, ds.waBtnText]}>{t('accomWhatsApp', lang)}</Text>
+            </TouchableOpacity>
+          )}
         </View>
-        {!!phone && (
-          <TouchableOpacity style={ds.callBtn} onPress={call}>
-            <Ionicons name="call-outline" size={17} color="#fff" />
-            <Text style={ds.callBtnText}>{t('accomCall', lang)}</Text>
-          </TouchableOpacity>
-        )}
-        {!!whatsapp && (
-          <TouchableOpacity style={ds.waBtn} onPress={whatsApp}>
-            <Ionicons name="logo-whatsapp" size={17} color="#fff" />
-            <Text style={ds.callBtnText}>{t('accomWhatsApp', lang)}</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </SafeAreaView>
   )
@@ -373,10 +414,20 @@ const ds = StyleSheet.create({
   mapBtn:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: colors.primary },
   mapBtnText:         { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
 
-  contactBar:         { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.border, ...shadow },
-  contactLabel:       { fontSize: 10, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
-  contactName:        { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 1 },
-  callBtn:            { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 12, backgroundColor: colors.primary },
-  waBtn:              { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 12, backgroundColor: '#25D366' },
-  callBtnText:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+  // Column, not row: the name gets a full line of its own and can never be squeezed by
+  // the buttons beside it.
+  contactBar:         { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 12, gap: 10, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.border, ...shadow },
+  contactName:        { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  contactBtnRow:      { flexDirection: 'row', gap: 10 },
+  // flex:1 on both so they split the width evenly and neither depends on its label
+  // length — Turkish 'Ara' and 'WhatsApp' are very different widths.
+  contactBtn:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12 },
+  contactBtnText:     { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  // primaryDark, NOT primary, for the glyph and label: theme.js measures `primary` on
+  // `primaryLight` at 4.44:1 — it scrapes AA and reads washed out. primaryDark is 6.71:1
+  // on the same tint. The BORDER stays `primary`; that is a shape, not text.
+  callBtn:            { backgroundColor: colors.primaryLight, borderWidth: 1.5, borderColor: colors.primary },
+  callBtnText:        { color: colors.primaryDark },
+  waBtn:              { backgroundColor: '#25D366' },
+  waBtnText:          { color: '#fff' },
 })
