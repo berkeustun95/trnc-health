@@ -330,17 +330,29 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
           the empty state was built, shipped and verified on device while the populated
           state had never once run. The bug surfaced the moment real data arrived. */}
       <View style={[ds.contactBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        {/* NAME ON ITS OWN ROW. Three fixed-width elements in one row is the wrong layout
-            for a variable-length value: "Hüseyin Kambur" is about the shortest plausible
-            Turkish name and it already clipped to "Hüseyin Kamb…". Any layout where the
-            name competes with two buttons for width fails on the next longer name, so the
-            fix is to stop it competing at all rather than to widen it.
-            The İLETİŞİM label is gone. It sat above the name explaining a row that
-            contains a phone icon and a WhatsApp icon — redundant, and it was costing the
-            line the name now uses. */}
-        <Text style={ds.contactName} numberOfLines={1}>
-          {agency?.contact_name || agency?.name || '—'}
-        </Text>
+        {/* THE AGENCY, NOT THE PERSON. Three reasons, in order of weight:
+            1. A named individual half-undoes C2. The product decision is that NO
+               per-property agent surfaces anywhere; a name pinned to the bottom of all 88
+               listings reads exactly like the agent for all 88.
+            2. A fixed string cannot truncate. The previous version showed contact_name and
+               clipped at "Hüseyin Kamb…" — about the SHORTEST plausible Turkish name — so
+               it was one staff change from clipping again. The agency name is ours and
+               does not vary.
+            3. The Coldwell Banker mark carries more credibility than a person's name.
+            contact_name STAYS in the database: it is who the number reaches, and it may be
+            wanted later. It is simply not rendered.
+
+            LOGO WITH A TEXT FALLBACK, and the fallback is not a placeholder — it is a
+            correct rendering of the same fact. logo_url is NULL today (the file is being
+            requested from Novest), so this ships showing the agency name as text and
+            starts showing the mark the moment the column is set, with no code change and
+            no OTA. resizeMode="contain" so a wordmark of any aspect fits its box. */}
+        {agency?.logo_url ? (
+          <Image source={{ uri: agency.logo_url }} style={ds.contactLogo} resizeMode="contain"
+            accessibilityLabel={agency?.name ?? ''} />
+        ) : (
+          <Text style={ds.contactName} numberOfLines={1}>{agency?.name || '—'}</Text>
+        )}
 
         <View style={ds.contactBtnRow}>
           {!!phone && (
@@ -418,6 +430,10 @@ const ds = StyleSheet.create({
   // the buttons beside it.
   contactBar:         { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 12, gap: 10, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.border, ...shadow },
   contactName:        { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  // Height fixed, width free: a wordmark is much wider than it is tall, and `contain`
+  // inside a fixed-height box gives every logo the same optical weight whatever its
+  // aspect. alignSelf keeps it left-aligned rather than stretching to the bar's width.
+  contactLogo:        { height: 26, width: '60%', alignSelf: 'flex-start' },
   contactBtnRow:      { flexDirection: 'row', gap: 10 },
   // flex:1 on both so they split the width evenly and neither depends on its label
   // length — Turkish 'Ara' and 'WhatsApp' are very different widths.

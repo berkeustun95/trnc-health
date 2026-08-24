@@ -69,8 +69,29 @@ export function areaSlug(name) {
 }
 
 // Dropdown options for a region: [{ value: slug, label: name }].
+// ALPHABETICAL, WITH THE 'tr' COLLATOR. Sorted here rather than at a call site so all six
+// consumers agree — AccommodationScreen's area filter, the Garage and Grooming onboarding
+// pickers, and the Garages / GaragePriceCompare / Grooming filter rows. An alphabetical
+// picker on one screen and a hand-ordered one on the next is worse than either alone.
+//
+// The SOURCE arrays above stay in their hand-written order on purpose: they are grouped
+// by hand for readability, and areaName() does a lookup, not a scan.
+//
+// WHY 'tr' AND NOT THE DEFAULT — measured against this list, not assumed:
+//   ü/ö      default: … Küçük Kaymaklı, Kumsal …   tr: … Kumsal, Küçük Kaymaklı …
+//            (Turkish sorts ü AFTER u, ö after o). This is the one that bites today.
+//   İ vs ı   default interleaves I and İ; tr groups all dotless first.
+//   Ç        NOT a factor. ICU's default collator already treats Ç as a C-variant —
+//            "Ç sorts after Z" is BYTE/ASCII sort, not JS default. Recorded because the
+//            wrong reason sends the next reader hunting a bug that does not exist.
+//
+// Safe to sort ONLY because area names are proper nouns, identical in all 9 locales. The
+// DISTRICT picker is deliberately NOT sorted: its labels are translated, so alphabetical
+// order would differ per locale and Girne would move when someone switched language.
 export function areaOptions(region) {
-  return (AREAS_BY_REGION[region] || []).map(name => ({ value: areaSlug(name), label: name }))
+  return (AREAS_BY_REGION[region] || [])
+    .map(name => ({ value: areaSlug(name), label: name }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'tr'))
 }
 
 // Resolve a stored slug back to its display name. Region-scoped when known (handles the

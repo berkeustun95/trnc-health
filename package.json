@@ -42,7 +42,8 @@
     "novest:import": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/import-novest-properties.mjs",
     "novest:images": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mirror-novest-images.mjs",
     "novest:verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-novest-import.mjs",
-    "novest:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-novest-staleness.mjs"
+    "novest:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-novest-staleness.mjs",
+    "novest:logo": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/upload-novest-logo.mjs"
   },
   "private": true,
   "devDependencies": {

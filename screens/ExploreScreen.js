@@ -282,8 +282,13 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
         uid ? supabase.from('places').select('id', { head: true, count: 'exact' }).eq('submitted_by', uid)
             : Promise.resolve({ count: 0 }),
       ])
+      // The sort KEY stays the English name deliberately: it keeps the order identical
+      // in all nine locales, so a place does not move when the user switches language.
+      // The COLLATOR is 'tr' because those English-field names are still Turkish proper
+      // nouns (Çatalköy, Gönyeli) and the default collator misorders ü/ö and ı/İ. Stable
+      // key, correct collation — the two are separate decisions.
       const sorted = (placesRes.data || []).sort((a, b) =>
-        placeName(a, 'en').localeCompare(placeName(b, 'en'))
+        placeName(a, 'en').localeCompare(placeName(b, 'en'), 'tr')
       )
       // Pin actively-featured places to the top (fair per-load shuffle among themselves),
       // gated on showFeatured. Filtering by group/category preserves the featured-first

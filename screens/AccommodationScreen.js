@@ -454,22 +454,8 @@ export default function AccommodationScreen({ lang, onClose, onOpenProperty, sel
     (priceMin || priceMax) || null, plotMin || null, furnished, period,
   ].filter(v => v !== null && v !== undefined && v !== '').length
 
-  // ALPHABETICAL, with the 'tr' collator — not the default one.
-  //
-  // Measured against the real list rather than assumed: default and Turkish collation
-  // DO differ here, and the current data already shows it —
-  //   default: … Küçük Kaymaklı, Kumsal …      (ü sorted as u)
-  //   tr     : … Kumsal, Küçük Kaymaklı …      (ü sorts AFTER u, correctly)
-  // ö behaves the same way (Ozanköy before Ödemiş only under 'tr'), and dotless ı sorts
-  // before dotted İ instead of interleaving with it.
-  //
-  // Scoped to this call site on purpose. areaOptions() is shared with five other screens
-  // (Garages, GaragePriceCompare, Grooming, and the two onboarding pickers) and sorting
-  // inside it would reorder all of them — a change beyond this module's remit.
-  const areaChoices = useMemo(
-    () => (district ? [...areaOptions(district)].sort((a, b) => a.label.localeCompare(b.label, 'tr')) : []),
-    [district],
-  )
+  // areaOptions() sorts with the 'tr' collator — see constants/areas.js.
+  const areaChoices = useMemo(() => (district ? areaOptions(district) : []), [district])
 
   function sortLabel(s) {
     if (s === 'price_asc')  return t('accomSortPriceLow', lang)

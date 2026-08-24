@@ -3562,7 +3562,9 @@ function PlacesTab() {
     if (filter !== 'all') q = q.eq('status', filter)
     const { data } = await q
     const places = (data ?? []).map(r => ({ ...r, _type: 'place', district: r.region, photo_urls: r.photos }))
-    setPlaces(places.sort((a, b) => placeAdminName(a).localeCompare(placeAdminName(b))))
+    // 'tr' collator — TRNC place names carry ü, ö, ç, ş, ğ and dotless ı, all of which
+    // the default collator orders as their bare Latin equivalents.
+    setPlaces(places.sort((a, b) => placeAdminName(a).localeCompare(placeAdminName(b), 'tr')))
     setLoading(false)
   }, [filter])
 

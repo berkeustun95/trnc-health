@@ -109,7 +109,10 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
 
       if (data && data.length > 0) {
         const map = {}
-        for (const row of [...data].sort((a, b) => a.name.localeCompare(b.name))) {
+        // 'tr' collator: these are Turkish pharmacy names, and the default one sorts
+        // ü as u and ö as o — so "Gülhan" and "Gunay" come out in the wrong order, and
+        // dotless ı interleaves with dotted İ instead of preceding it.
+        for (const row of [...data].sort((a, b) => a.name.localeCompare(b.name, 'tr'))) {
           if (!map[row.region]) map[row.region] = []
           map[row.region].push(row)
         }
