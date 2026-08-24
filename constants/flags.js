@@ -36,7 +36,7 @@ export const MODULE_FLAGS = {
   pets:         true,
   events:       true,
   jobs:         false,
-  accommodation: false,
+  accommodation: true,
   studentHub:   false,
   explore:      false,
   // Çekici & Yol Yardım (towing / roadside assistance). Admin-seeded directory, no

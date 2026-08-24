@@ -39,7 +39,7 @@ const EXPECTED_MODULES = {
   pets:          true,   // live
   events:        true,   // live
   jobs:          false,
-  accommodation: false,  // Slice 3 in progress — flip locally to review, NEVER commit
+  accommodation: true,   // live 2026-08-24 — Novest partner feed, 88 listings
   studentHub:    false,
   explore:       false,
   towing:        true,   // live
