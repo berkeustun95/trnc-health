@@ -1,0 +1,130 @@
+-- ─── Accommodation Slice 2 — the Novest agency row, and the seed teardown ────
+--
+-- DATA ONLY. No DDL, no constraints, no policies. Two steps, and THE ORDER IS THE
+-- POINT: the Slice 3 test rows come out before the real partner row goes in.
+--
+-- This is a MIGRATION and not a seed file on purpose. The importer cannot run without
+-- the agency row — Slice 3 embeds estate_agencies through properties.agency_id (the C2
+-- fix), so a listing whose agency_id is NULL renders with no agency name, which is the
+-- one attribution the product requires. A file that must be applied exactly once, whose
+-- absence silently degrades the product, belongs in the ledger. supabase/seed/ is not
+-- tracked and "never applied" is undetectable there — the facilities.area failure class.
+--
+-- ─── 1. TEARDOWN FIRST ──────────────────────────────────────────────────────
+--
+-- The 10 seed-slice3 rows are LIVE and anon-visible right now: props_select_public
+-- treats `source IS NOT NULL` as a bypass of the agent-subscription paywall, and the
+-- seed set source='seed-slice3' precisely so that branch would light up. They are
+-- invisible in the app only because MODULE_FLAGS.accommodation is false.
+--
+-- They are double-marked (source='seed-slice3' AND external_id LIKE 'SEED3-%'), so the
+-- delete keys on source alone and still cannot touch a real row: the importer writes
+-- source='novest'. That distinction was designed into the seed for this moment.
+--
+-- Seed images are Unsplash URLs, not mirrored objects, so nothing is orphaned in
+-- storage. property_images cascades on the properties delete.
+--
+-- ─── 2. THEN THE REAL AGENCY ────────────────────────────────────────────────
+--
+-- owner_id borrows the admin account. estate_agencies.owner_id is NOT NULL REFERENCES
+-- auth.users(id) and Novest has no ADA account, so there is nothing else it can be —
+-- the same shortcut supabase/dummy_listing.sql and the Slice 3 seed both take.
+--
+-- status MUST be 'active'. agencies_select_public hides any other status from anon, and
+-- an agency the reader cannot see is an agency name that does not render.
+--
+-- contact_name / contact_phone / contact_whatsapp are DELIBERATELY NULL. That is the
+-- true current state — we have not agreed a partner contact yet — and Slice 3 already
+-- handles it: the contact bar renders the agency name and no buttons.
+--
+-- ⚠ THE ID IS A FIXED LITERAL, NOT gen_random_uuid(). The importer sets agency_id on
+--   every row it writes and must be able to name this row without a lookup that could
+--   silently return zero rows and write NULL. A literal also makes re-running this file
+--   idempotent via ON CONFLICT (id).
+--
+-- EXECUTION: SQL editor, Role = postgres. Run the WHOLE FILE — one transaction ending
+-- in COMMIT. A block-at-a-time paste stops before COMMIT and applies nothing, which is
+-- exactly how the Slice 3 seed appeared to work and had not.
+
+SET ROLE postgres;
+
+BEGIN;
+
+-- ─── 1. Seed teardown ───────────────────────────────────────────────────────
+DELETE FROM public.properties      WHERE source = 'seed-slice3';
+DELETE FROM public.estate_agencies WHERE name   = 'SEED — Novest (test data)';
+
+DO $$
+DECLARE n_props int; n_agency int;
+BEGIN
+  SELECT count(*) INTO n_props  FROM public.properties      WHERE source = 'seed-slice3';
+  SELECT count(*) INTO n_agency FROM public.estate_agencies WHERE name   = 'SEED — Novest (test data)';
+  IF n_props <> 0 OR n_agency <> 0 THEN
+    RAISE EXCEPTION 'teardown incomplete: % seed listing(s), % seed agency row(s) remain', n_props, n_agency;
+  END IF;
+  -- Belt-and-braces on the other marker. If a row carries the SEED3- external_id but a
+  -- different source, somebody edited the seed and the source-keyed delete missed it.
+  SELECT count(*) INTO n_props FROM public.properties WHERE external_id LIKE 'SEED3-%';
+  IF n_props <> 0 THEN
+    RAISE EXCEPTION 'teardown incomplete: % row(s) still carry a SEED3- external_id', n_props;
+  END IF;
+END $$;
+
+-- ─── 2. The Novest agency ───────────────────────────────────────────────────
+INSERT INTO public.estate_agencies (id, owner_id, name, status, website, description)
+SELECT '00000000-0000-4000-9000-000000000002'::uuid,
+       p.id,
+       'Coldwell Banker Novest',
+       'active',
+       'https://coldwellbankernovest.com',
+       'Partner agency. Listings are mirrored one-way from the agency''s own site and are '
+       'not editable in ADA.'
+  FROM public.profiles p
+ WHERE p.role = 'admin'
+ ORDER BY p.id
+ LIMIT 1
+ON CONFLICT (id) DO UPDATE
+  SET name = excluded.name, status = excluded.status, website = excluded.website;
+
+DO $$
+DECLARE n int;
+BEGIN
+  SELECT count(*) INTO n FROM public.estate_agencies
+   WHERE id = '00000000-0000-4000-9000-000000000002'::uuid AND status = 'active';
+  IF n <> 1 THEN
+    RAISE EXCEPTION 'Novest agency row not created (found %). Is there an admin profile?', n;
+  END IF;
+END $$;
+
+-- ─── ledger:stamp:begin ──────────────────────────────────────────────
+-- Machine-generated by scripts/migration-ledger.mjs --stamp. Do not hand-edit.
+-- The checksum is of THIS FILE WITH THIS BLOCK STRIPPED, which is what lets the file
+-- carry its own stamp. Everything between the markers is excluded from the checksum
+-- but still runs — so it may contain NOTHING but this INSERT. See the note in the
+-- generator: anything else here would execute on paste while leaving no trace in the
+-- hash, and the ledger would be attesting a file it never actually verified.
+--
+-- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
+-- it, COMMIT is never reached and nothing applies.
+INSERT INTO public.schema_migrations_applied (filename, checksum)
+VALUES ('20260916_novest_agency_and_seed_teardown.sql', 'aedbb300e2e9087414a6f082ea4e040da30233c19b36badce697f2b61748336f')
+ON CONFLICT (filename) DO UPDATE
+  SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
+-- ─── ledger:stamp:end ────────────────────────────────────────────────
+COMMIT;
+
+RESET ROLE;
+
+-- ─── Verification ───────────────────────────────────────────────────────────
+--   SELECT count(*) FROM public.properties WHERE source = 'seed-slice3';   -- expect 0
+--   SELECT id, name, status, contact_phone FROM public.estate_agencies
+--    WHERE name = 'Coldwell Banker Novest';                                -- expect 1, active, NULL
+
+-- ─── Rollback ───────────────────────────────────────────────────────────────
+--   The seed rows are NOT restored — re-run supabase/seed/accommodation_slice3_seed.sql
+--   if they are wanted back, and expect them to collide with real novest rows in any
+--   query that filters on `source IS NOT NULL`.
+--   SET ROLE postgres; BEGIN;
+--   DELETE FROM public.estate_agencies WHERE id = '00000000-0000-4000-9000-000000000002';
+--   COMMIT; RESET ROLE;
+--   -- Will FAIL while any properties row references it. Delete those first, deliberately.

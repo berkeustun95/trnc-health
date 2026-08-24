@@ -25,6 +25,27 @@ const CARD_W  = SCREEN_W - 32
 // the list still reads as scrollable.
 const CARD_IMAGE_H = Math.round(CARD_W / 2)
 
+// ─── THE IN-CARD PAGER IS BOUNDED AT 5, AND THE BOUND IS THE POINT ──────────
+//
+// Listings carry a median of 8 images and a maximum of 28. Paging all of them would make
+// each card's memory ceiling depend on that outlier, and the mirrored images decode to
+// 3.1-4.1 MB EACH (1200x675 / 1200x900, ARGB8888) — the 83-181 KB on the wire is not the
+// number that matters.
+//
+// A horizontal FlatList defaults to initialNumToRender: 10. Naively nested inside the
+// outer list on ITS defaults (windowSize 21, ~45 cards retained), a 28-image listing
+// would have put 45 x 10 x ~3.5 MB in play. That is not slow scrolling, it is an OOM on a
+// mid-range Android — and it would never reproduce on a recent test device.
+//
+// Five is a FIXED ceiling: a listing with 28 images costs exactly what one with 6 costs.
+// The alternative was tuning windowing props precisely enough to survive the outlier,
+// where being wrong crashes rather than janks. Nobody pages 28 photos in a list view;
+// they page two or three and either tap in or scroll on.
+//
+// The counter still shows the REAL total ("3 / 28") — capping what is pageable must not
+// hide how many exist, because that count is what makes the tap worth making.
+const CARD_PAGER_MAX = 5
+
 // Mirrors ReviewsScreen's PAGE. One pagination idiom in this repo, not two.
 const PAGE = 20
 
@@ -115,11 +136,22 @@ function roomsLabel(beds, living, lang) {
 // is_primary wins; otherwise lowest sort_order. Slice 2 sets primaries — until then
 // every seeded/imported row falls through to the sort_order branch, so both paths
 // must work.
-function primaryImage(images) {
-  if (!images || images.length === 0) return null
-  const flagged = images.find(i => i.is_primary)
-  if (flagged) return flagged
-  return [...images].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0]
+// The first CARD_PAGER_MAX images, primary first then by sort_order.
+//
+// This REPLACES the old primaryImage(), which has been deleted rather than left beside
+// it: two functions choosing "the first image" by two sorts is how the card's first frame
+// and its counter drift apart. pages[0] is the primary, by construction.
+//
+// property_images_primary_unique guarantees at most one is_primary per property, and the
+// mirror's repair pass guarantees at least one wherever images exist — so the comparator
+// below never has to break a tie between two primaries.
+function cardImages(images) {
+  if (!images || images.length === 0) return []
+  return [...images]
+    .sort((a, b) => (a.is_primary === b.is_primary
+      ? (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      : (a.is_primary ? -1 : 1)))
+    .slice(0, CARD_PAGER_MAX)
 }
 
 // ─── Property card ───────────────────────────────────────────────────────────
@@ -127,46 +159,98 @@ function primaryImage(images) {
 // per-property agent is surfaced. The agency name is the only attribution shown.
 
 function PropertyCard({ item, lang, onPress }) {
-  const img     = primaryImage(item.property_images)
+  const pages   = cardImages(item.property_images)
   const count   = item.property_images?.length ?? 0
+  const [imgIdx, setImgIdx] = useState(0)
   const agency  = item.estate_agencies?.name
   const rooms   = roomsLabel(item.bedrooms, item.living_rooms, lang)
   const place   = [districtLabel(item.district, lang), item.area ? areaName(item.area, item.district) : null]
                     .filter(Boolean).join(' · ')
 
   return (
-    <TouchableOpacity style={cs.card} onPress={onPress} activeOpacity={0.92}>
+    // NOT a TouchableOpacity wrapping everything any more. The whole card used to be one
+    // press target; with a pager inside, the press and the pan compete for the same
+    // gesture and "usually cancels on movement" is not good enough — a card that opens
+    // when you meant to swipe is the failure. So: the image strip owns its own taps (one
+    // per page), the body is its own press target, and neither contains the other.
+    <View style={cs.card}>
       <View>
-        {img
-          ? <Image source={{ uri: img.url }} style={cs.cardImage} resizeMode="cover" />
-          : <View style={cs.imagePlaceholder}>
-              <Ionicons name="home-outline" size={44} color={colors.border} />
-            </View>}
+        {pages.length > 0 ? (
+          <FlatList
+            data={pages}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            // iOS: stops a mostly-vertical drag that begins on the image from being
+            // claimed by this list instead of the outer one. Android resolves by dominant
+            // axis already.
+            directionalLockEnabled
+            keyExtractor={i => i.id}
+            // Every page is exactly CARD_W, so the list never has to measure.
+            getItemLayout={(_, i) => ({ length: CARD_W, offset: CARD_W * i, index: i })}
+            // At most ~2 images decoded per card at any moment. With the 5-page cap above,
+            // this is what keeps a 28-image listing costing the same as a 6-image one.
+            initialNumToRender={1}
+            maxToRenderPerBatch={1}
+            windowSize={2}
+            // removeClippedSubviews is deliberately NOT set here, though it IS on the
+            // outer list. With at most 5 items, windowSize={2} already caps what is
+            // mounted, so it would buy almost nothing — and it has a history of blanking
+            // cells in a paging horizontal list, which would show as an empty photo the
+            // user has to swipe past twice. Not worth it for no measurable gain.
+            onMomentumScrollEnd={e => setImgIdx(Math.round(e.nativeEvent.contentOffset.x / CARD_W))}
+            renderItem={({ item: im }) => (
+              <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
+                <Image source={{ uri: im.url }} style={cs.cardImage} resizeMode="cover" />
+              </TouchableOpacity>
+            )}
+          />
+        ) : (
+          <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={cs.imagePlaceholder}>
+            <Ionicons name="home-outline" size={44} color={colors.border} />
+          </TouchableOpacity>
+        )}
 
-        <View style={[cs.intentBadge,
+        {/* pointerEvents="none" ON EVERY OVERLAY. These sit on top of the pager, and an
+            absolutely-positioned View with default pointerEvents swallows the pan that
+            starts underneath it — the swipe would simply die wherever a badge happens to
+            be. They were inert decoration before because the whole card was one press
+            target; they are in the gesture path now. */}
+        <View pointerEvents="none" style={[cs.intentBadge,
           item.intent === 'sale' && cs.intentBadgeSale,
           item.intent === 'short_term' && cs.intentBadgeShort]}>
           <Text style={cs.intentBadgeText}>{intentLabel(item.intent, lang)}</Text>
         </View>
 
-        <View style={cs.priceBadge}>
+        <View pointerEvents="none" style={cs.priceBadge}>
           <Text style={cs.priceBadgeText}>
             {priceDisplay(item.price, item.currency, item.price_period, lang)}
           </Text>
         </View>
 
+        {/* The detail screen's counter idiom, not dots: the median listing has 8 images
+            and the largest has 28, and 28 dots is noise. `count` is the REAL total, not
+            pages.length — the pager stops at 5 but the card must still say how many exist,
+            because that number is the reason to tap through. */}
         {count > 1 && (
-          <View style={cs.imgCount}>
+          <View pointerEvents="none" style={cs.imgCount}>
             <Ionicons name="images-outline" size={12} color="#fff" />
-            <Text style={cs.imgCountText}>{count}</Text>
+            <Text style={cs.imgCountText}>{Math.min(imgIdx + 1, count)} / {count}</Text>
           </View>
         )}
       </View>
 
-      <View style={cs.cardBody}>
-        {/* Title keeps 2 lines: Turkish titles routinely wrap, and truncating to one
-            loses the deed/room information that leads most of them. */}
-        <Text style={cs.title} numberOfLines={2}>{item.title}</Text>
+      <TouchableOpacity style={cs.cardBody} onPress={onPress} activeOpacity={0.92}>
+        {/* 3, not 2 — and it costs nothing on the 86 cards that do not need it, because
+            numberOfLines is a MAXIMUM and not a fixed height. Only the two titles that
+            actually overflow two lines grow, by one 19pt line each.
+            WHY IT WAS NEEDED: Turkish is head-final. English leads with the thing ("Corner
+            shop for sale in Alayköy…"); Turkish stacks the modifiers and puts the noun
+            LAST, so novest-19307 clamped to "…70 m2 Ofis Alanı v…" and dropped "Satılık
+            Köşe Dükkan" — you could not tell what was for sale. A two-line clamp on a
+            Turkish title keeps the adjectives and loses the noun, exactly reversed from
+            English, and invisible if you only ever test in English. */}
+        <Text style={cs.title} numberOfLines={3}>{item.title}</Text>
 
         {/* Place and agency share a row. Two separate rows cost ~23pt for content that
             reads fine side by side, and the agency is the only attribution shown. */}
@@ -208,8 +292,8 @@ function PropertyCard({ item, lang, onPress }) {
             </View>
           )}
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   )
 }
 
@@ -446,6 +530,24 @@ export default function AccommodationScreen({ lang, onClose, onOpenProperty, sel
           showsVerticalScrollIndicator={false}
           onEndReached={loadMore}
           onEndReachedThreshold={0.3}
+          // ─── WINDOWING, SET EXPLICITLY ──────────────────────────────────────
+          // This list ran on defaults: windowSize 21, initialNumToRender 10, no
+          // removeClippedSubviews. At ~2.1 cards per screen that retains roughly 45
+          // cards — loose already at one image each, and untenable once each card can
+          // hold a pager.
+          //
+          // windowSize 5 -> ~11 cards retained. With the inner pager capped at 5 pages
+          // and windowed to ~2 decoded, that is ~22 images in play against ~45 before.
+          // The pager makes the list cheaper than it was, not dearer, which is the only
+          // reason it is safe to add one.
+          //
+          // No getItemLayout: card height varies (282-320pt, and now a little more where
+          // a Turkish title takes a third line), so any fixed estimate would be wrong and
+          // wrong scroll offsets are worse than unmeasured ones.
+          windowSize={5}
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
+          removeClippedSubviews
           ListEmptyComponent={
             <View style={cs.emptyWrap}>
               <View style={cs.emptyCard}>

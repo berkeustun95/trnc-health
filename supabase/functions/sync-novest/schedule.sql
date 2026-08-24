@@ -1,0 +1,115 @@
+-- ─── sync-novest cron ────────────────────────────────────────────────────────
+--
+-- Second scheduled Edge Function in ADA, after send-duty-notification. Same mechanism:
+-- pg_cron calls net.http_post against the function's URL.
+--
+-- ⚠ NOT APPLIED AUTOMATICALLY. Run these by hand in the SQL editor after
+--   `supabase functions deploy sync-novest`, substituting the real URL and key.
+--   Verify with: SELECT jobname, schedule, active FROM cron.job WHERE jobname LIKE '%novest%';
+--
+-- All times UTC. TRNC is UTC+3.
+--   05:00 UTC = 08:00 TRNC — before the working day, so overnight price edits are live
+--   15:00 UTC = 18:00 TRNC — after it, so the day's edits do not wait until morning
+--
+-- TWICE DAILY, NOT HOURLY. The staleness banner trips at 36h, so two runs a day leaves
+-- more than a full cycle of margin before a single missed run raises an alarm — which is
+-- what stops the banner crying wolf over one transient outage. Hourly would fetch 640 KB
+-- from a partner's shared LiteSpeed host 24 times a day to catch price edits that happen
+-- weekly. Being a good citizen is a design constraint here, not an afterthought.
+--
+-- ⚠ DO NOT PASTE THE service_role KEY INTO THIS FILE.
+--
+--   It happened once already: the placeholders below were replaced with the live project
+--   ref and the real service_role JWT, and the file sat one `git add` away from being
+--   committed to a repo. It was caught while untracked, so nothing was published — but
+--   the only reason is that nobody ran `git add supabase/functions/` that day.
+--
+--   CLAUDE.md is unambiguous: the service_role key never goes in app code. It lives in
+--   the macOS Keychain (`ada-supabase-service-role`) for local tooling, and in the Edge
+--   Function's own environment for the deployed function.
+--
+-- ─── AND DO NOT PUT IT IN THE CRON JOB EITHER ───────────────────────────────
+--
+--   Inlining the key in the `headers` literal below ALSO writes it, in plaintext, into
+--   `cron.job.command` — a table any Postgres role with read access can select from. The
+--   file is the obvious leak; the cron table is the quiet one, and it survives long after
+--   the file is cleaned.
+--
+--   So the key goes in Vault ONCE, and the job references it. Run this a single time,
+--   pasting the key at the prompt rather than into a file:
+--
+--     select vault.create_secret('<paste service_role key>', 'novest_sync_key');
+--
+--   Verify it landed and then never select it again:
+--     select name, created_at from vault.secrets where name = 'novest_sync_key';
+--
+-- ─── THE JOBS ───────────────────────────────────────────────────────────────
+--
+-- Substitute <project-ref> only. There is no key in this block, which is the point —
+-- and it is short enough to retype if a copy-paste ever mangles a quote.
+--
+-- select cron.schedule('sync-novest-morning', '0 5 * * *', $$
+--   select net.http_post(
+--     url     := 'https://<project-ref>.supabase.co/functions/v1/sync-novest',
+--     headers := jsonb_build_object(
+--                  'Content-Type', 'application/json',
+--                  'Authorization', 'Bearer ' || (select decrypted_secret
+--                                                   from vault.decrypted_secrets
+--                                                  where name = 'novest_sync_key')),
+--     body    := '{}'::jsonb
+--   );
+-- $$);
+--
+-- select cron.schedule('sync-novest-evening', '0 15 * * *', $$
+--   select net.http_post(
+--     url     := 'https://<project-ref>.supabase.co/functions/v1/sync-novest',
+--     headers := jsonb_build_object(
+--                  'Content-Type', 'application/json',
+--                  'Authorization', 'Bearer ' || (select decrypted_secret
+--                                                   from vault.decrypted_secrets
+--                                                  where name = 'novest_sync_key')),
+--     body    := '{}'::jsonb
+--   );
+-- $$);
+--
+-- ⚠ THE TWO JOBS ALREADY REGISTERED (jobid 9, 10) CARRY THE KEY INLINE. Replacing them
+--   is not optional — the key is readable in cron.job.command until you do:
+--     select cron.unschedule('sync-novest-morning');
+--     select cron.unschedule('sync-novest-evening');
+--   then re-create them with the Vault form above, and confirm:
+--     select jobid, jobname, command like '%eyJ%' as has_inline_key from cron.job
+--      where jobname like '%novest%';   -- has_inline_key must be false for both
+--
+-- ─── WHY THE CRON IS THE THING THAT NEEDS WATCHING, NOT THE FUNCTION ─────────
+--
+-- A function that works but is never invoked looks EXACTLY like everything being fine.
+-- There is no failed invocation in the logs, no error, no 500 — there is nothing at all,
+-- and nothing is what success also looks like from the outside.
+--
+-- net.http_post is FIRE AND FORGET. It queues the request and returns immediately; the
+-- cron job succeeds whether the function 200s, 500s or is never reachable. So
+-- cron.job_run_details showing 'succeeded' means THE POST WAS QUEUED, not that the sync
+-- ran. Do not read it as a health signal — it is the single most misleading thing on
+-- this page.
+--
+-- The only signal that cannot lie is the one the sync itself writes:
+--
+--     SELECT max(last_seen_at) FROM properties WHERE source = 'novest';
+--
+-- It is stamped on every row on every run, as the LAST write the function makes. Stale
+-- means the sync did not complete, whatever the cause — cron disabled, URL wrong, key
+-- rotated, function crashed, their site down, mass-delist guard aborted. One symptom
+-- covers every failure mode, which is why it is the alarm and the 500 is not.
+--
+-- AdminScreen renders that as a banner at 36h. See scripts/check-novest-staleness.mjs
+-- for the same query outside the app.
+--
+-- ─── TO PROVE THE ALARM WORKS ───────────────────────────────────────────────
+-- Break the URL, wait for the banner, then put it back. A green light nobody has watched
+-- go red is not evidence.
+--
+--   select cron.unschedule('sync-novest-morning');
+--   select cron.unschedule('sync-novest-evening');
+--   -- then, to see it now rather than in 36h:
+--   update properties set last_seen_at = now() - interval '40 hours' where source = 'novest';
+--   -- open AdminScreen: the banner must appear. Then re-run the sync to clear it.

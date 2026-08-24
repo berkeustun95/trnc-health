@@ -9,3 +9,15 @@ node scripts/check-module-flags.mjs || {
   echo "  push blocked: revert the flag, or update the guard baseline if launching."
   exit 1
 }
+
+# Secret guard. Blocks a push that would publish a service_role key, a Supabase secret
+# key, or a connection string with a password. Added after a live service_role JWT was
+# pasted into supabase/functions/sync-novest/schedule.sql while substituting the cron
+# placeholders — it was caught only because that file happened to be untracked.
+#
+# The anon key is deliberately NOT flagged: it is bound by RLS and ships in the bundle by
+# design. The rule matches the service_role payload, not the JWT shape.
+node scripts/check-secrets.mjs || {
+  echo "  push blocked: remove the credential, then ROTATE it."
+  exit 1
+}

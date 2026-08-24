@@ -255,6 +255,50 @@ function fmtExpiry(expiresAt) {
   return { label: `Active until ${dateStr}`, color: colors.success }
 }
 
+// ─── Partner-feed health ────────────────────────────────────────────────────
+//
+// THE ONLY ALARM THE NOVEST SYNC HAS, and it is deliberately the cheapest one that works.
+//
+// The failure that matters is not "the sync errored" — that leaves a 500 in the Edge
+// Function logs and is easy to see. It is "THE CRON NEVER FIRED", which leaves nothing at
+// all, and nothing is also what success looks like from the outside. net.http_post is
+// fire-and-forget, so cron.job_run_details reports 'succeeded' for a queued request that
+// never reached anything; it is the most misleading signal available and must not be read
+// as health.
+//
+// last_seen_at is stamped on EVERY novest row on EVERY run, as the last write the sync
+// makes. So one symptom — a stale maximum — covers every failure mode there is: cron
+// disabled, URL wrong, key rotated, function crashed, their site down, mass-delist guard
+// aborted. That is why it is the alarm and the 500 is not.
+//
+// 36h, against a twice-daily schedule: more than a full cycle of margin, so a single
+// missed run does not raise it. A banner that cries wolf is a banner nobody reads.
+const NOVEST_STALE_HOURS = 36
+
+function FeedHealthBanner({ lastSeenAt }) {
+  // Never synced at all => the module is not set up yet, which is not a failure.
+  // Rows are never deleted (missing from the feed means status='delisted'), so the only
+  // way to have zero rows is to have never run the import.
+  if (!lastSeenAt) return null
+
+  const hours = (Date.now() - new Date(lastSeenAt).getTime()) / 36e5
+  if (hours < NOVEST_STALE_HOURS) return null
+
+  const age = hours < 48 ? `${Math.floor(hours)} hours` : `${Math.floor(hours / 24)} days`
+  return (
+    <View style={s.feedAlarmBox}>
+      <Ionicons name="warning" size={20} color={colors.danger} />
+      <View style={{ flex: 1 }}>
+        <Text style={s.feedAlarmTitle}>Novest sync is stale</Text>
+        <Text style={s.feedAlarmBody}>
+          Last successful run was {age} ago. Prices and availability shown to users may be
+          out of date. Check the sync-novest cron and Edge Function logs.
+        </Text>
+      </View>
+    </View>
+  )
+}
+
 // ─── Dashboard Tab ──────────────────────────────────────────────────────────
 
 function DashboardTab({ onNavigate }) {
@@ -284,6 +328,7 @@ function DashboardTab({ onNavigate }) {
         { count: esimTotal },
         { count: esimTourist },
         { count: esimStudent },
+        { data: novestSeen },
       ] = await Promise.all([
         supabase.from('facilities').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -306,9 +351,13 @@ function DashboardTab({ onNavigate }) {
         supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }),
         supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }).eq('audience', 'tourist'),
         supabase.from('esim_waitlist').select('*', { count: 'exact', head: true }).eq('audience', 'student'),
+        // PostgREST exposes no max(), so: newest first, take one. head:false and a single
+        // column keeps it to one small row.
+        supabase.from('properties').select('last_seen_at')
+          .eq('source', 'novest').order('last_seen_at', { ascending: false }).limit(1),
       ])
       const pendingPlaces = pendingPlacesCount ?? 0
-      setStats({ facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingReports, esimTotal, esimTourist, esimStudent })
+      setStats({ novestLastSeen: novestSeen?.[0]?.last_seen_at ?? null, facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingReports, esimTotal, esimTourist, esimStudent })
     }
     load()
   }, [])
@@ -336,6 +385,7 @@ function DashboardTab({ onNavigate }) {
 
   return (
     <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
+      <FeedHealthBanner lastSeenAt={stats.novestLastSeen} />
       <View style={s.statsGrid}>
         <StatCard label="Facilities" value={stats.facilities} />
         <StatCard label="Users" value={stats.users} />
@@ -854,8 +904,14 @@ function FacilitiesTab() {
                 <Text style={s.cardTitle} numberOfLines={1}>{item.name}</Text>
                 <Text style={s.cardSub}>{item.type} · {item.address}</Text>
                 <View style={[s.cardRow, { marginTop: 6, gap: 6 }]}>
+                  {/* Draft first: this list is unfiltered (`select('*')`), so seeded
+                      public-health rows sit in it looking exactly like live listings.
+                      Without this pill the only way to tell a draft from an active
+                      facility is to open the editor. */}
+                  {item.status === 'draft' && <View style={s.pillGrey}><Text style={s.pillText}>Draft</Text></View>}
+                  {item.sector === 'public' && <View style={s.pillPurple}><Text style={s.pillText}>State</Text></View>}
                   {item.verified && <View style={s.pillGreen}><Text style={s.pillText}>Verified</Text></View>}
-                  {item.is_public && <View style={s.pillBlue}><Text style={s.pillText}>Public</Text></View>}
+                  {item.is_public && <View style={s.pillBlue}><Text style={s.pillText}>Listed</Text></View>}
                   {!item.verified && <View style={s.pillOrange}><Text style={s.pillText}>Unverified</Text></View>}
                 </View>
               </TouchableOpacity>
@@ -919,8 +975,11 @@ function FacilitiesTab() {
                 <TextInput style={s.input} value={form.provider_id} onChangeText={set('provider_id')} autoCapitalize="none" placeholder="Leave blank if none" placeholderTextColor={colors.textSecondary} />
               </Field>
 
+              {/* Was "Public facility", which collided with the new `sector` axis:
+                  a state hospital is sector='public' AND is_public=false. This switch
+                  has only ever meant directory visibility. */}
               <View style={s.switchRow}>
-                <Text style={s.fieldLabel}>Public facility</Text>
+                <Text style={s.fieldLabel}>Listed in directory</Text>
                 <Switch value={form.is_public} onValueChange={set('is_public')} trackColor={{ true: colors.primary }} thumbColor="#fff" />
               </View>
               <View style={s.switchRow}>
@@ -1428,6 +1487,14 @@ function ProvidersTab() {
     const dm = (docsData ?? []).reduce((acc, d) => { if (!acc[d.facility_id]) acc[d.facility_id] = []; acc[d.facility_id].push(d); return acc }, {})
     const enriched = rows.map(r => ({ ...r, _profile: pm[r.provider_id], _docs: dm[r.id] ?? [] }))
     setPending(enriched.filter(f => f.status === 'pending'))
+    // WRITTEN BY EXCLUSION, AND ITS CORRECTNESS LIVES IN ANOTHER FILE.
+    // `!== 'pending'` means a 'draft' row (20260911, public health facilities) counts as
+    // ACTIVE here. That is currently harmless ONLY because the query above is scoped
+    // `.not('provider_id','is',null)` and public rows are unclaimable — which is enforced
+    // by the sector branch in claim_requests_guard_insert(), not by anything on this
+    // screen. If that guard is ever relaxed, ~36 draft state facilities silently appear
+    // in the admin's ACTIVE providers list and nothing here points back to why.
+    // Change this to an inclusion list before touching that guard.
     setActive(enriched.filter(f => f.status !== 'pending'))
     setLoading(false)
   }, [])
@@ -4253,6 +4320,9 @@ const s = StyleSheet.create({
   urgencyLabel:       { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   urgencyBadge:       { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, minWidth: 24, alignItems: 'center' },
   urgencyCount:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#fff' },
+  feedAlarmBox:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: colors.dangerBg ?? 'rgba(220,38,38,0.08)', borderWidth: 1.5, borderColor: colors.danger, borderRadius: 14, padding: 14, marginBottom: 16 },
+  feedAlarmTitle:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.danger, marginBottom: 3 },
+  feedAlarmBody:      { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17 },
   allClearBox:        { alignItems: 'center', gap: 10, marginTop: 40 },
   allClearText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 

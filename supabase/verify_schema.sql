@@ -99,6 +99,14 @@ WITH report AS (
     ('0808_facility_featured_tier','facilities','featured_requested_at'),
     ('0809_featured_expiry_reminder','facilities','featured_reminded_at'),
     ('0811_facilities_service_prices','facilities','service_prices'),
+    -- ── Slice 1: public health facilities. `sector` is the one that matters most
+    --    here: facilities_public_type_sector_check and the claim guard both read it,
+    --    so if it reads MISSING the guard is silently passing every claim.
+    ('0911_facilities_public_health','facilities','sector'),
+    ('0911_facilities_public_health','facilities','public_facility_type'),
+    ('0911_facilities_public_health','facilities','tier'),
+    ('0911_facilities_public_health','facilities','parent_facility_id'),
+    ('0911_facilities_public_health','facilities','name_official'),
     ('0812_module_waitlist','module_waitlist','notified_at'),
     ('0824_place_moderation','places','hidden_at'),
     ('0824_place_moderation','places','hidden_reason'),
@@ -214,8 +222,13 @@ WITH report AS (
     -- towing: hours validator is called from a CHECK, so if it goes missing every
     -- INSERT on towing_companies fails outright, not just the malformed ones.
     ('0905_towing_companies','towing_hours_valid'),
-    ('0905_towing_companies','towing_touch_updated_at')
-
+    ('0905_towing_companies','towing_touch_updated_at'),
+    -- Search tokeniser. These three are not decoration: search_content calls all of them
+    -- from every arm, so a missing one is a hard error on EVERY global search, for every
+    -- user, signed in or not.
+    ('0912_search_tokenised','search_fold'),
+    ('0912_search_tokenised','search_all_tokens'),
+    ('0912_search_tokenised','search_token_hits')
   ) e(m,o)
 
   UNION ALL
@@ -275,6 +288,13 @@ WITH report AS (
     -- 0804_grooming_multi_category (grooming moved to service_types[]; grooming rows
     -- now have category=NULL). Its absence is correct — do NOT re-add it.
     ('0805_facilities_city','facilities_city_check'),
+    ('0911_facilities_public_health','facilities_sector_check'),
+    ('0911_facilities_public_health','facilities_public_facility_type_check'),
+    ('0911_facilities_public_health','facilities_public_type_sector_check'),
+    ('0911_facilities_public_health','facilities_tier_check'),
+    ('0911_facilities_public_health','facilities_public_tier_required_check'),
+    ('0911_facilities_public_health','facilities_parent_not_self_check'),
+    ('0911_facilities_public_health','facilities_parent_facility_id_fkey'),
     ('0724_events_category','events_category_check'),
     ('0701_security_fixes','reviews_customer_facility_unique'),
     ('capture_2','facilities_status_check'),
@@ -347,6 +367,7 @@ WITH report AS (
     ('0712_ugc_moderation','reviews_customer_id_idx'),
     ('0723_insurance_companies','idx_insurance_companies_owner_id'),
     ('0719_add_missing_indexes','idx_facilities_provider_id'),
+    ('0911_facilities_public_health','idx_facilities_parent_facility_id'),
     ('0719_add_missing_indexes','idx_appointments_customer_id'),
     ('0719_add_missing_indexes','idx_appointments_facility_id'),
     ('0719_add_missing_indexes','idx_claim_requests_facility_id'),
@@ -409,7 +430,13 @@ WITH report AS (
     ('0819_get_customer_contacts_rpc','get_customer_contacts'),
     ('0824_place_moderation','explore_category_counts'),  -- also GRANTed to anon (public tile counts)
     ('0826_place_claims','approve_place_claim'),
-    ('0829_place_resubmit','resubmit_place')
+    ('0829_place_resubmit','resubmit_place'),
+    -- search_content is SECURITY INVOKER, so a signed-out visitor's call is permission-
+    -- checked against these three too. Without the grants the RPC exists and every
+    -- search returns a permission error, with nothing in the app to explain it.
+    ('0912_search_tokenised','search_fold'),
+    ('0912_search_tokenised','search_all_tokens'),
+    ('0912_search_tokenised','search_token_hits')
   ) e(m,o)
 
   UNION ALL
@@ -473,6 +500,158 @@ WITH report AS (
     UNION ALL SELECT '0731_garages_directory','facilities_type_check allows garage',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='facilities_type_check'
         AND pg_get_constraintdef(c.oid) ILIKE '%garage%')
+    -- ── 0911 public health facilities. THREE tokens, all for the same reason: each
+    -- one is a same-name DROP/ADD or a behaviour-only CREATE OR REPLACE, so the
+    -- E-constraint and C-function sections see the NAME and cannot see the CHANGE.
+    -- Without these, a database that never received this migration reads 100% OK.
+    --
+    -- (1) The 'draft' value. If this is missing, every seeded public-health row was
+    -- rejected on insert — or, worse, somebody "fixed" the rejection by seeding
+    -- 'pending' instead and quietly parked ~36 rows on the admin approval badge.
+    UNION ALL SELECT '0911_facilities_public_health','facilities_status_check allows draft',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='facilities_status_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%draft%')
+    -- (2) The claim guard's sector branch. A public facility has no owner to verify and
+    -- nothing to sell; this is the only thing standing between a provider account with a
+    -- tax number and ownership of Dr. Burhan Nalbantoğlu Devlet Hastanesi. It is invisible
+    -- to the D-trigger section, which only checks that a trigger of that NAME exists.
+    UNION ALL SELECT '0911_facilities_public_health','claim_requests_guard_insert refuses sector=public',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='claim_requests_guard_insert'
+          AND pg_get_functiondef(p.oid) ILIKE '%public health facilities cannot be claimed%')
+    -- (3) search_content matching name_official. Nobody local types the eponym, but the
+    -- eponym is what is on the building and on the paperwork a newcomer is holding. If
+    -- this reads false, searching "Dr Engin Arkan" returns nothing and the facility
+    -- looks absent from ADA. Note this ALSO catches the towing arm being clobbered: a
+    -- re-apply of the pre-0906 body would drop both at once.
+    UNION ALL SELECT '0911_facilities_public_health','search_content matches facilities.name_official',
+      (SELECT pg_get_functiondef('public.search_content(text,double precision,double precision)'::regprocedure)
+         ILIKE '%f.name_official%')
+    -- (4) The update guard's five new locks. facilities_guard_update is a DENY-LIST, so
+    -- a new column is owner-writable the moment it is added. If this reads false, any
+    -- provider can UPDATE their own row to sector='public' + a tier and become, as far
+    -- as the routing screen is concerned, a state health facility. `sector` is checked
+    -- as the sentinel — the five branches ship and are reverted together.
+    UNION ALL SELECT '0911_facilities_public_health','facilities_guard_update locks sector/tier/parent/name_official',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='facilities_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%sector is admin-only%'
+          AND pg_get_functiondef(p.oid) ILIKE '%parent_facility_id is admin-only%')
+    -- And that the 0809 reminder lock SURVIVED the 0911 rewrite — the clobber this
+    -- register exists to catch. Duplicated deliberately: 0809 has no token of its own.
+    UNION ALL SELECT '0911_facilities_public_health','facilities_guard_update still locks featured_reminded_at',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='facilities_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%featured_reminded_at is admin-only%')
+    -- (6) The seven live state hospitals are sector='public'. A DATA fact, not a schema
+    -- one, so no existence section can see it — and it is the one that closes a hole that
+    -- was open in production: all seven are status='active' with provider_id NULL, i.e.
+    -- claimable by any provider account until claim_requests_guard_insert had a `sector`
+    -- to key on. If this reads MISSING, section 6b of the migration never ran (or the
+    -- rows were renamed) and TRNC's state hospitals are claim targets again.
+    UNION ALL SELECT '0911_facilities_public_health','7 live state hospitals carry sector=public',
+      (SELECT count(*) = 7 FROM public.facilities WHERE sector = 'public'
+        AND name IN ('Dr. Burhan Nalbantoğlu Devlet Hastanesi','Gazimağusa Devlet Hastanesi',
+                     'Girne Dr. Akçiçek Devlet Hastanesi','Girne Devlet Hastanesi',
+                     'Lefke Cengiz Topel Hastanesi','Barış Ruh ve Sinir Hastalıkları Hastanesi',
+                     'Acil Durum Hastanesi'))
+    -- (7) The tier guarantee is exempted for ONE named row, not relaxed for all. Acil
+    -- Durum Hastanesi has no published basamak (ministry page carries only a link; the
+    -- hospital's own site states none), so its tier is honestly NULL. The exemption is
+    -- written into the constraint definition as a literal id, which makes it visible to
+    -- anyone reading \d facilities. If the `id = ` clause is gone while `tier IS NOT
+    -- NULL` remains, someone either supplied the tier (fine — retire this token) or
+    -- dropped the exemption and the row (not fine). If BOTH are gone, the guarantee was
+    -- relaxed globally and every future public row may be tierless.
+    -- (7) The tier enum carries 'unknown'. Acil Durum Hastanesi has no published basamak
+    -- (ministry page carries only a link; the hospital's own site states none), so it is
+    -- stored as a REAL value rather than NULL — NULL would be ambiguous between "never
+    -- set", "not applicable" and "genuinely unknown", and this column feeds tier routing.
+    -- A row-scoped CHECK exemption naming its uuid was considered and REJECTED: it would
+    -- encode a data accident in the schema.
+    UNION ALL SELECT '0911_facilities_public_health','facilities_tier_check allows unknown',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_tier_check'
+        AND pg_get_constraintdef(oid) ILIKE '%unknown%')
+    -- (8) …and the half-coupling stayed GLOBAL. If a literal id ever appears in this
+    -- constraint, the rejected carve-out idea came back.
+    UNION ALL SELECT '0911_facilities_public_health','public tier requirement is global, no uuid carve-out',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_public_tier_required_check'
+        AND pg_get_constraintdef(oid) ILIKE '%tier IS NOT NULL%'
+        AND pg_get_constraintdef(oid) NOT ILIKE '%id =%')
+    -- (9) 'unknown' has not spread. EXACTLY ONE row may carry it, and Slice 2 reconciles
+    -- ten more hospital-tier rows for which it is the easiest thing to type. No CHECK can
+    -- express "at most one"; this token is the only thing that will notice.
+    UNION ALL SELECT '0911_facilities_public_health','tier=unknown is still a one-off (exactly 1 row)',
+      (SELECT count(*) = 1 FROM public.facilities WHERE tier = 'unknown')
+    -- (10) The Girne duplicate stays HIDDEN. 91338177 and 7a1c598d are the same hospital;
+    -- the duplicate is status='draft' (invisible, unclaimable, nothing destroyed) pending
+    -- its own reviewed merge slice. If this reads false, two Girne hospitals are rendering
+    -- in the directory again — or the row was deleted, which was explicitly not the plan.
+    UNION ALL SELECT '0911_facilities_public_health','Girne duplicate 91338177 is still draft',
+      (SELECT count(*) = 1 FROM public.facilities
+        WHERE id = '91338177-85d8-4f38-8b0f-2c395638d2d4' AND status = 'draft')
+    -- ── 0912 tokenised search + Slice 2. Same-name DROP/ADD and behaviour-only
+    -- CREATE OR REPLACE throughout, so section E and C see the NAMES and not the CHANGES.
+    UNION ALL SELECT '0912_search_tokenised','facilities_tier_check allows not_applicable',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_tier_check'
+        AND pg_get_constraintdef(oid) ILIKE '%not_applicable%')
+    -- THE alarm for this slice. If search_content reverted to substring matching, the
+    -- function still exists, still runs, still returns rows — and quietly stops finding
+    -- "Girne Devlet Hastanesi" and "Lefkoşa Devlet Hastanesi" again. Nothing else notices.
+    UNION ALL SELECT '0912_search_tokenised','search_content matches by TOKEN, not substring',
+      (SELECT pg_get_functiondef('public.search_content(text,double precision,double precision)'::regprocedure)
+         ILIKE '%search_all_tokens%')
+    -- Title-first ordering. Without it a pharmacy 49 km away outranks every hospital in
+    -- the country, because unplaced rows sort last under distance-first.
+    UNION ALL SELECT '0912_search_tokenised','search_content ranks title relevance above distance',
+      (SELECT pg_get_functiondef('public.search_content(text,double precision,double precision)'::regprocedure)
+         ILIKE '%search_token_hits(title, query) DESC%')
+    -- The Turkish fold must cover the circumflex letters too (kâğıt, âlem) or the server
+    -- and the client disagree on ordinary Turkish words.
+    UNION ALL SELECT '0912_search_tokenised','search_fold covers Â Î Û as well as the base set',
+      (SELECT public.search_fold('Kâğıt Îhsan Ûlker Çağla Gökçe İzmir ılık')
+              = 'kagit ihsan ulker cagla gokce izmir ilik')
+    -- Both placeholder tiers are one-offs. No CHECK can express "at most one row"; Slices
+    -- 3 and 4 reconcile ~27 more rows for which both values are the easiest thing to type.
+    UNION ALL SELECT '0912_search_tokenised','tier=not_applicable is still exactly 1 row (Kronik)',
+      (SELECT count(*) = 1 FROM public.facilities
+        WHERE tier = 'not_applicable' AND id = 'a1b2c3d4-0001-4000-8000-000000000003')
+    -- The two BNDH units keep their parent. If parent_facility_id is ever nulled they
+    -- render as two more standalone hospitals in every list.
+    UNION ALL SELECT '0912_search_tokenised','Thalassaemia + Radyasyon Onkoloji are parented to BNDH',
+      (SELECT count(*) = 2 FROM public.facilities
+        WHERE parent_facility_id = 'e83f3d1d-c0c0-4e68-993c-03a8164286c1')
+    -- ── 0915 deed_type comment. A COMMENT creates no named object, so EVERY other
+    -- section of this script is blind to it — this token is the only thing that can see
+    -- whether the migration ran. It matters because the SUPERSEDED text tells the reader
+    -- that parsing deed_type is "heuristic and unreliable", which was true of 101evler
+    -- and is false of the Novest feed. A stale comment here does not fail loudly; it
+    -- quietly talks the next person out of a rule that works.
+    UNION ALL SELECT '0915_properties_deed_type_comment','properties.deed_type comment documents the anchored rule',
+      (SELECT col_description(c.oid, a.attnum) ILIKE '%ANCHORED WHOLE-<li> MATCH%'
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_attribute a ON a.attrelid = c.oid
+        WHERE n.nspname = 'public' AND c.relname = 'properties'
+          AND a.attname = 'deed_type' AND NOT a.attisdropped)
+    -- ── 0916 Novest agency + seed teardown. Pure data: no named object anywhere, so
+    -- nothing else in this script can see whether it ran. Two tokens because the two
+    -- halves fail differently and both are silent.
+    --
+    -- (1) The agency row. If it is missing, the importer either aborts or writes
+    -- agency_id NULL on all 88 rows — and a NULL agency_id renders a listing with no
+    -- agency name, which is the one attribution the partner relationship requires.
+    UNION ALL SELECT '0916_novest_agency_and_seed_teardown','Coldwell Banker Novest agency row exists and is active',
+      (SELECT count(*) = 1 FROM public.estate_agencies
+        WHERE id = '00000000-0000-4000-9000-000000000002' AND status = 'active')
+    -- (2) The teardown. Seed rows carry source='seed-slice3', which props_select_public
+    -- treats as a partner-feed bypass of the subscription paywall — so a surviving seed
+    -- row is PUBLICLY READABLE fake data sitting alongside real listings, and it is
+    -- invisible today only because the module flag is false. If this ever reads false
+    -- after the flag flips, ten Unsplash listings are live in the app.
+    UNION ALL SELECT '0916_novest_agency_and_seed_teardown','zero seed-slice3 listings remain',
+      NOT EXISTS(SELECT 1 FROM public.properties
+        WHERE source = 'seed-slice3' OR external_id LIKE 'SEED3-%')
     UNION ALL SELECT '0804_grooming_multi_category','service_types_values_check has grooming arm',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='facilities_service_types_values_check'
         AND pg_get_constraintdef(c.oid) ILIKE '%grooming%')
