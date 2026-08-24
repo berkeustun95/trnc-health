@@ -373,7 +373,15 @@ export default function AccommodationScreen({ lang, onClose, onOpenProperty, sel
     let q = supabase
       .from('properties')
       .select(
-        '*, estate_agencies(id, name, logo_url), property_images(id, url, sort_order, is_primary)',
+        // contact_name / contact_phone / contact_whatsapp ARE NOT OPTIONAL HERE.
+        // PropertyDetailScreen takes `property` as a prop and never re-queries, so this
+        // embed is the ONLY source of the contact bar's data. They were missing for the
+        // whole of Slice 3 and nobody noticed, because the columns were NULL the entire
+        // time — the empty state was built, shipped and verified on device, and the
+        // populated state had never once run. See the note in the slice-2 log.
+        // agencies_select_public already exposes these to anon for an active agency;
+        // Slice 1 signed that widening off knowingly. Three short strings per page.
+        '*, estate_agencies(id, name, logo_url, contact_name, contact_phone, contact_whatsapp), property_images(id, url, sort_order, is_primary)',
         { count: 'exact' },
       )
       .eq('status', 'active')

@@ -137,8 +137,6 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
 
   return (
     <SafeAreaView style={ds.safe} edges={['top']}>
-      <BackButton variant="hero" lang={lang} onPress={onBack} style={[ds.backBtn, { top: insets.top + 8 }]} />
-
       <ScrollView showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}>
 
@@ -283,12 +281,26 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
         </View>
       </ScrollView>
 
+      {/* AFTER the ScrollView, not before it. zIndex:10 alone did not hold: the gallery is
+          4:3 (~292pt) so nothing overlaps at rest, but once the body scrolls up the badge
+          row passes UNDER this floating button and was painting over the chevron — half
+          the tap target covered by an ARSA badge.
+          Sibling paint order is the reliable mechanism; zIndex among siblings across a
+          ScrollView boundary is not, because the scrolling content sits in its own
+          stacking context. Rendering it last needs no zIndex at all. */}
+      <BackButton variant="hero" lang={lang} onPress={onBack} style={[ds.backBtn, { top: insets.top + 8 }]} />
+
       {/* ── Fixed contact bar ────────────────────────────────────────────────
-          Pinned, always present, and NEVER shows a per-property agent. The agency
-          name always renders; Call and WhatsApp appear only when their column is
-          non-NULL — which today is never, since the real contact details are not set
-          yet. So the honest current state is a bar naming the agency and offering
-          nothing, rather than a dead button. */}
+          Pinned, always present, and NEVER shows a per-property agent — the agency is
+          the only attribution the product surfaces. Call and WhatsApp render only when
+          their column is non-NULL, so an agency with no details shows its name and no
+          dead buttons.
+          ⚠ THE POPULATED BRANCH WENT UNEXERCISED FOR A WHOLE SLICE. These fields are
+          fed by AccommodationScreen's estate_agencies embed — this screen receives
+          `property` as a prop and never re-queries — and that embed did not select the
+          three contact columns. It was invisible because the columns were NULL anyway:
+          the empty state was built, shipped and verified on device while the populated
+          state had never once run. The bug surfaced the moment real data arrived. */}
       <View style={[ds.contactBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={{ flex: 1 }}>
           <Text style={ds.contactLabel}>{t('accomContactTitle', lang)}</Text>
