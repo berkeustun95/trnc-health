@@ -15,15 +15,25 @@ export const AREAS_BY_REGION = {
     'Yenişehir', 'Marmara', 'Hamitköy', 'Gönyeli', 'Haspolat',
     'Taşkınköy', 'Metehan', 'Dereboyu', 'Köşklüçiftlik', 'Yenikent',
     'Alayköy', 'Değirmenlik',
+    // Added 2026-08-24 from the Novest feed: each is the `property_city` term on a real
+    // listing whose `property_state` is Lefkoşa, so the district assignment is the
+    // agency's own, not a guess.
+    'Kermiya', 'Meriç', 'Balıkesir', 'Kanlıköy', 'Cihangir', 'Batıkent', 'Demirhan',
   ],
   kyrenia: [   // Girne
     'Merkez', 'Karakum', 'Zeytinlik', 'Ozanköy', 'Çatalköy',
     'Alsancak', 'Lapta', 'Karaoğlanoğlu', 'Beylerbeyi', 'Esentepe',
     'Karşıyaka', 'Karaman', 'Çamlıbel', 'Tatlısu', 'Bahçeli',
+    // Added 2026-08-24 from the Novest feed. NOTE 'Boğaz': İskele has one too, and both
+    // slug to 'bogaz'. That is fine and already the established pattern — 'Merkez'
+    // recurs across all seven regions — because areaName() resolves slug WITHIN a region.
+    // Anything reading a bare slug without its region was already wrong before this.
+    'Kozan', 'Yukarı Girne', 'Boğaz', 'Dikmen', 'Ağırdağ',
   ],
   famagusta: [ // Gazimağusa
     'Merkez', 'Sakarya', 'Baykal', 'Çanakkale', 'Yeni Boğaziçi',
     'Tuzla', 'Mutluyaka', 'Geçitkale', 'Vadili', 'Beyarmudu',
+    'Maraş',   // added 2026-08-24 from the Novest feed
   ],
   morphou: [   // Güzelyurt
     'Merkez', 'Bostancı', 'Kalkanlı', 'Yayla', 'Zümrütköy',

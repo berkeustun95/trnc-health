@@ -223,7 +223,24 @@ Deno.serve(async () => {
       location_precision: 'area',   // properties_feed_precision_check demands it
       last_seen_at: now,
     }))
-    const updatePayload = updates.map(r => ({ ...r }))
+    // ⚠ source / agency_id / location_precision ARE IN THE UPDATE PAYLOAD, AND MUST BE.
+    //
+    // They are immutable for a feed row, so including them looks redundant. It is not.
+    // PostgREST's upsert is INSERT ... ON CONFLICT DO UPDATE, and Postgres validates CHECK
+    // constraints against the PROPOSED INSERT ROW before it ever detects the conflict. A
+    // payload without them proposes a row with source NULL and agent_id NULL, which fails
+    // properties_source_agent_xor_check (both NULL satisfies neither branch), and without
+    // location_precision it inherits the 'exact' DEFAULT and fails
+    // properties_feed_precision_check. The existing row is never reached.
+    //
+    // FOUND THE HARD WAY, AND LATE: run 1 was 88 inserts and run 2 was 88 content_hash
+    // matches, so the update path had not executed once. It failed on the first real content
+    // change — and the cron function carries the same shape, so it would have failed there
+    // on the first price edit Novest made. Third instance this slice of a branch that was
+    // written, shipped and never run.
+    const updatePayload = updates.map(r => ({
+      ...r, source: SOURCE, agency_id: AGENCY_ID, location_precision: 'area',
+    }))
 
     assertHomogeneous('insert', insertPayload)
     assertHomogeneous('update', updatePayload)
