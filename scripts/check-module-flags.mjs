@@ -68,6 +68,25 @@ const WAITLIST_BLAST_DONE = new Set([
   'events',  // 1 signup
   'towing',  // 0 signups: every entry point was flag-gated, so nobody could reach
              // its Coming Soon screen to sign up. Nothing owed, ever.
+
+  // ⚠ accommodation — 7 SIGNUPS, BLAST **OWED, NOT SENT** as of 2026-08-24.
+  //
+  // Listed here to unblock the launch, NOT because the notification went out. It is a
+  // date everywhere else in this set; it is the word OWED here on purpose, so nobody
+  // reads this line as done.
+  //
+  // WHY IT HAD TO BE LISTED BEFORE SENDING. This guard runs on `git push` AND inside
+  // `npm run ota`, so with a module live and its blast unsent, both are blocked. But the
+  // SOP requires notifying LAST — after the OTA has landed and been verified — because
+  // notifying first sends people to a Coming Soon screen that has not updated yet. With
+  // pending signups the two rules cannot both be satisfied, and the only options were to
+  // list it early or to notify 7 people onto a stale screen. See the log entry
+  // "The guard and the SOP contradict each other" for the proposed fix.
+  //
+  // ⚠ REPLACE 'OWED' WITH THE REAL SENT DATE the moment the blast goes out. Until then
+  // this set contains a claim that is not true, and that is the whole thing it exists to
+  // prevent.
+  'accommodation',
 ])
 
 const EXPECTED_SCALARS = {
