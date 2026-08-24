@@ -19,8 +19,22 @@ const GALLERY_H = Math.round(W * 3 / 4)   // 4:3 — the detail view can afford 
 // the glyph only has to change before the photo leaves rather than after.
 const CHEVRON_CLEAR = 110
 
-// Clears the contact bar, which is now two rows (name, then buttons) rather than one.
-const CONTACT_BAR_CLEARANCE = 150
+// ─── Contact bar geometry ───────────────────────────────────────────────────
+// The logo's aspect, measured from the optimised asset (427x180). If the file is ever
+// replaced at a different shape, change this one number — `contain` will letterbox
+// inside the box rather than distort, so a stale value degrades quietly, not badly.
+const LOGO_ASPECT = 427 / 180
+// 54pt tall -> 128pt wide. The ceiling for a crisp 3x render from a 427px-wide source is
+// 142x60; this sits inside it with ~10% margin so rounding on any density cannot soften
+// it. 26pt was too small for the "NOVEST GAYRİMENKUL" sub-line, which is roughly a fifth
+// of the mark's height — about 5pt at the old size, ~11pt at this one.
+const LOGO_H = 54
+
+// DERIVED, not a magic number. The bar is paddingTop + logo + gap + buttons + a bottom
+// inset that differs per device, so a single constant is wrong on one of them: at the old
+// fixed 150 the bar came to 156pt on an iPhone and the last content sat underneath it.
+// The caller adds Math.max(insets.bottom, 12).
+const CONTACT_BAR_BASE = 12 + LOGO_H + 10 + 46 + 24   // pads + logo + gap + buttons + breathing
 
 const CURRENCIES = { GBP: '£', EUR: '€', USD: '$', TRY: '₺' }
 const PERIOD_SUFFIX_KEY = {
@@ -157,7 +171,7 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
           const over = e.nativeEvent.contentOffset.y < GALLERY_H - CHEVRON_CLEAR
           setOverPhoto(prev => (prev === over ? prev : over))
         }}
-        contentContainerStyle={{ paddingBottom: CONTACT_BAR_CLEARANCE }}>
+        contentContainerStyle={{ paddingBottom: CONTACT_BAR_BASE + Math.max(insets.bottom, 12) }}>
 
         {images.length > 0 ? (
           <View>
@@ -343,10 +357,19 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
             wanted later. It is simply not rendered.
 
             LOGO WITH A TEXT FALLBACK, and the fallback is not a placeholder — it is a
-            correct rendering of the same fact. logo_url is NULL today (the file is being
-            requested from Novest), so this ships showing the agency name as text and
-            starts showing the mark the moment the column is set, with no code change and
-            no OTA. resizeMode="contain" so a wordmark of any aspect fits its box. */}
+            correct rendering of the same fact, so the module never waited on the file.
+
+            ⚠ THE LOGO KEEPS ITS OWN ROW, and inline-beside-the-buttons was considered and
+            REJECTED. Inline would recover ~64pt of vertical space and works fine for an
+            image — but not for the TEXT fallback: "Coldwell Banker Novest" is ~165pt at
+            15pt bold, which leaves ~85pt per button against the ~109pt "WhatsApp" needs.
+            It would truncate, which is the exact bug this row was built to fix.
+            The alternative — inline when there is a logo, own-row when there is not — is
+            a layout that changes shape with the data, and the fallback branch would then
+            NEVER RUN once logo_url is set. This slice has already shipped three paths
+            that were never executed; deliberately creating a fourth, in the branch that
+            only appears when something has gone wrong, is the worst place for it.
+            One layout, correct either way. The vertical cost is the price of that. */}
         {agency?.logo_url ? (
           <Image source={{ uri: agency.logo_url }} style={ds.contactLogo} resizeMode="contain"
             accessibilityLabel={agency?.name ?? ''} />
@@ -430,10 +453,12 @@ const ds = StyleSheet.create({
   // the buttons beside it.
   contactBar:         { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 12, gap: 10, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.border, ...shadow },
   contactName:        { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  // Height fixed, width free: a wordmark is much wider than it is tall, and `contain`
-  // inside a fixed-height box gives every logo the same optical weight whatever its
-  // aspect. alignSelf keeps it left-aligned rather than stretching to the bar's width.
-  contactLogo:        { height: 26, width: '60%', alignSelf: 'flex-start' },
+  // aspectRatio, NOT a percentage width. `width: '60%'` was the bug: `contain` centres the
+  // image INSIDE its box, so a 62pt-wide mark sat in the middle of a 214pt box with ~76pt
+  // of dead space on each side — it read as "small and centred" when it was actually
+  // "correctly sized inside a box far too wide". Giving the box the mark's own aspect
+  // means the image fills it exactly and alignSelf can left-align the whole thing.
+  contactLogo:        { height: LOGO_H, aspectRatio: LOGO_ASPECT, alignSelf: 'flex-start' },
   contactBtnRow:      { flexDirection: 'row', gap: 10 },
   // flex:1 on both so they split the width evenly and neither depends on its label
   // length — Turkish 'Ara' and 'WhatsApp' are very different widths.

@@ -32,11 +32,17 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUCKET = 'property-images'
 const PREFIX = 'partner/novest'
 
-// The bar renders it at height 26 in a 60%-width box, `contain`. 3x for the densest
-// screens plus headroom = 600x180 is comfortably more than enough, and a wordmark that
-// large is still only a few KB as PNG.
-const MAX_W = 600
-const MAX_H = 180
+// ⚠ THE OLD MAX_H OF 180 IS WHAT CAPPED THE FIRST UPLOAD AT 427x180.
+// That was an arbitrary number chosen against a 26pt render, and it silently became the
+// ceiling on how large the mark could be drawn — 142pt wide at 3x, which was only just
+// enough once the sub-line had to be legible. The constraint was mine, not the partner's
+// file.
+//
+// Raised so the asset is never the limit again. A wordmark PNG at this size is still only
+// a few KB, and `fit: 'inside'` + `withoutEnlargement` means a smaller source is passed
+// through untouched rather than upscaled — so this cannot make anything worse.
+const MAX_W = 900
+const MAX_H = 400
 
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 
@@ -83,6 +89,11 @@ console.log(`\n  source     ${meta.width}x${meta.height} ${meta.format}  ${(src.
 console.log(`  alpha      ${keepAlpha ? 'REAL — kept as PNG so it sits on the bar, not in a white slab'
                                       : 'none/opaque — flattened to JPEG'}`)
 console.log(`  optimised  ${out.width}x${out.height} ${ext}  ${(buffer.length / 1024).toFixed(1)} KB`)
+// The number that actually matters, printed every run so the comment in
+// PropertyDetailScreen can be checked against reality rather than remembered.
+console.log(`  largest CRISP render at 3x: ${(out.width / 3).toFixed(0)}pt x ${(out.height / 3).toFixed(0)}pt`)
+console.log(`  the bar draws it at 54pt tall (${(54 * out.width / out.height).toFixed(0)}pt wide) -> ` +
+  (out.height >= 54 * 3 ? 'CRISP' : '⚠ SOFT — this source is too small for that render'))
 console.log(`  path       ${BUCKET}/${path}`)
 
 if (dry) { console.log('\n  (dry) nothing uploaded, logo_url unchanged.\n'); process.exit(0) }
