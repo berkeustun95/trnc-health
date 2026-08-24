@@ -74,11 +74,49 @@ export const OLI_INTENTS = [
   },
   {
     id: 'accommodation', msgKey: 'oliMsgAccommodation',
+    // ─── Vocabulary taken from the SOURCE TAXONOMY, not invented ─────────────
+    // The second block below is derived from Novest's own 21 `property_type` terms
+    // (Arsa, Arazi, Tarla, Dükkan, İşyeri, Depo, Mağaza, Ofis, Ticari, Villa, Müstakil
+    // Ev, Penthouse, Stüdyo, Dubleks, Apartman, Zemin Kat Daire, Bungalow, İkiz Villa,
+    // Konut) plus our own six property_type values. Every word here corresponds to
+    // something a user can actually find.
+    //
+    // WHY IT MATTERED: the module is a QUARTER land — 22 of 88 listings are Arsa or
+    // Arazi — and "arsa" matched nothing at all. Someone searching for the single most
+    // common non-residential thing in the feed got Oli's no-match fallback.
+    //
+    // ⚠ 'otel' / 'hotel' / 'ξενοδοχείο' ARE DELIBERATELY ABSENT. The taxonomy has an
+    // Otel term but its count is ZERO, and the coach body was rewritten in the same pass
+    // to stop promising hotels. Routing a hotel search into a module with no hotels is a
+    // worse answer than no match, because no match is honest.
+    //
+    // ⚠ normalize() folds Turkish diacritics to ASCII, so these are written naturally
+    // (işyeri, dükkan, stüdyo) and matched folded. Keywords of 4 chars or fewer match
+    // WHOLE WORDS ONLY — 'arsa', 'ofis', 'depo' and 'land' will not fire inside a longer
+    // word, so "arsada" does not hit. That is the existing trade-off in keywordHits(),
+    // not something introduced here.
     keywords: ['rent', 'house', 'apartment', 'flat', 'accommodation', 'stay', 'room', 'property', 'lodging',
       'kiralik', 'ev', 'daire', 'konaklama', 'oda', 'emlak', 'kiralamak',
       'аренда', 'квартира', 'жилье', 'снять', 'miete', 'wohnung', 'unterkunft',
       'location', 'appartement', 'logement', 'alquiler', 'apartamento', 'alojamiento',
-      'ايجار', 'شقة', 'سكن', 'اجاره', 'آپارتمان', 'مسکن', 'خانه'],
+      'ايجار', 'شقة', 'سكن', 'اجاره', 'آپارتمان', 'مسکن', 'خانه',
+
+      // land / plot / field — 22 of 88 listings, and previously unmatchable
+      'land', 'plot', 'arsa', 'arazi', 'tarla', 'satilik',
+      'участок', 'земля', 'grundstuck', 'terrain', 'terreno', 'parcela',
+      'أرض', 'قطعة', 'زمین', 'οικοπεδο',
+      // commercial: shop, office, warehouse, business premises
+      'shop', 'store', 'office', 'commercial', 'warehouse', 'premises',
+      'dukkan', 'isyeri', 'ofis', 'magaza', 'ticari', 'depo',
+      'магазин', 'офис', 'склад', 'laden', 'buro', 'gewerbe', 'lager',
+      'bureau', 'boutique', 'commerce', 'tienda', 'oficina', 'local',
+      'محل', 'مكتب', 'مستودع', 'تجاري', 'مغازه', 'دفتر', 'انبار',
+      'καταστημα', 'γραφειο', 'εμπορικο',
+      // residential shapes the feed actually carries
+      'villa', 'studio', 'penthouse', 'duplex', 'detached', 'bungalow',
+      'studyo', 'dubleks', 'mustakil', 'konut', 'apartman', 'zemin kat',
+      'вилла', 'студия', 'haus', 'maison', 'casa',
+      'فيلا', 'استوديو', 'ویلا', 'διαμερισμα', 'κατοικια', 'ακινητα'],
   },
   {
     id: 'pets', msgKey: 'oliMsgPets',
