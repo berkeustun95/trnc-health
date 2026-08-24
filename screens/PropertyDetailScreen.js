@@ -20,14 +20,15 @@ const GALLERY_H = Math.round(W * 3 / 4)   // 4:3 — the detail view can afford 
 const CHEVRON_CLEAR = 110
 
 // ─── Contact bar geometry ───────────────────────────────────────────────────
-// The logo's aspect, measured from the optimised asset (427x180). If the file is ever
+// The logo's aspect, measured from the optimised asset (688x290). If the file is ever
 // replaced at a different shape, change this one number — `contain` will letterbox
 // inside the box rather than distort, so a stale value degrades quietly, not badly.
-const LOGO_ASPECT = 427 / 180
-// 54pt tall -> 128pt wide. The ceiling for a crisp 3x render from a 427px-wide source is
-// 142x60; this sits inside it with ~10% margin so rounding on any density cannot soften
-// it. 26pt was too small for the "NOVEST GAYRİMENKUL" sub-line, which is roughly a fifth
-// of the mark's height — about 5pt at the old size, ~11pt at this one.
+// scripts/upload-novest-logo.mjs prints the real dimensions on every run.
+const LOGO_ASPECT = 688 / 290
+// 54pt tall -> 128pt wide. The 688x290 asset is crisp up to 229x97 at 3x, so this renders
+// with 79% headroom and stays sharp even at 4x (xxxhdpi Android). 26pt was too small for
+// the "NOVEST GAYRİMENKUL" sub-line — roughly a fifth of the mark's height, so ~5pt then
+// and ~11pt now.
 const LOGO_H = 54
 
 // DERIVED, not a magic number. The bar is paddingTop + logo + gap + buttons + a bottom
