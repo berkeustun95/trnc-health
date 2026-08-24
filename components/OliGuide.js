@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Text, Image, TouchableOpacity, Modal, TextInput, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, useWindowDimensions, Platform, Keyboard } from 'react-native'
+import { View, Text, Image, TouchableOpacity, BackHandler, TextInput, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, useWindowDimensions, Platform, Keyboard } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -32,7 +32,7 @@ const CHIPS = [
   { id: 'newcomer',     labelKey: 'oliChipNewcomer' },
 ]
 
-export default function OliGuide({ lang, onNavigate }) {
+export default function OliGuide({ lang, onNavigate, onOpenChange, closeRef }) {
   const insets = useSafeAreaInsets()
   const { width, height } = useWindowDimensions()
   const [open, setOpen] = useState(false)
@@ -41,30 +41,67 @@ export default function OliGuide({ lang, onNavigate }) {
   const translateY = useRef(new Animated.Value(SCREEN_H)).current
   const backdrop = useRef(new Animated.Value(0)).current
 
-  // Composer keyboard avoidance (OTA, RN-core): animate the input bar's bottom
-  // padding to the keyboard height so the input row rises above the keyboard on
-  // BOTH platforms. This is layout-only and never touches the sheet's translateY
-  // entrance animation. Listeners are scoped to `open` and removed on cleanup.
+  // Composer keyboard avoidance (OTA, RN-core): animate the input bar's bottom padding
+  // so the input row rises above the keyboard. Layout-only — it never touches the
+  // sheet's translateY entrance animation. Listeners are scoped to `open`.
+  //
+  // ANDROID needs `+ insets.bottom`. RN reports endCoordinates.height as
+  // `imeInsets.bottom - barInsets.bottom` (ReactRootView.checkForKeyboardEvents) — the
+  // keyboard height MINUS the navigation bar — while safe-area's insets.bottom IS that
+  // navigation bar (SafeAreaUtils.getRootWindowInsetsCompatR). Lifting by the reported
+  // height alone left the composer exactly one nav bar too low, i.e. behind the
+  // keyboard. iOS reports the full keyboard frame and must NOT get the extra term.
   const kbPad = useRef(new Animated.Value(insets.bottom + 10)).current
+  const kbOpen = useRef(false)
+  const scrollRef = useRef(null)
   useEffect(() => {
     if (!open) return
     const base = insets.bottom + 10
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
-    const onShow = e => Animated.timing(kbPad, {
-      toValue: (e.endCoordinates?.height ?? 0) + 10,
-      duration: e.duration || 220,
-      useNativeDriver: false,
-    }).start()
-    const onHide = e => Animated.timing(kbPad, {
-      toValue: base,
-      duration: e?.duration || 220,
-      useNativeDriver: false,
-    }).start()
+    const onShow = e => {
+      kbOpen.current = true
+      const lift = (e.endCoordinates?.height ?? 0) + (Platform.OS === 'android' ? insets.bottom : 0)
+      // Scroll on COMPLETION, not on the next frame: the ScrollView only reaches its
+      // final (shrunken) height once this padding animation lands, so an earlier
+      // scrollToEnd stops short of the real end by whatever is left of the lift.
+      Animated.timing(kbPad, {
+        toValue: lift + 10,
+        duration: e.duration || 220,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished && kbOpen.current) scrollRef.current?.scrollToEnd({ animated: true })
+      })
+    }
+    const onHide = e => {
+      kbOpen.current = false
+      Animated.timing(kbPad, {
+        toValue: base,
+        duration: e?.duration || 220,
+        useNativeDriver: false,
+      }).start()
+    }
     const subShow = Keyboard.addListener(showEvt, onShow)
     const subHide = Keyboard.addListener(hideEvt, onHide)
-    return () => { subShow.remove(); subHide.remove(); kbPad.setValue(base) }
+    return () => { subShow.remove(); subHide.remove(); kbOpen.current = false; kbPad.setValue(base) }
   }, [open, insets.bottom])
+
+  // The sheet is a root overlay now, so the two things <Modal> gave for free are ours:
+  // hardware back (no onRequestClose) and hiding the app content from the a11y tree.
+  // Both are scoped to `open` — the subscription goes on close, not just on unmount.
+  useEffect(() => {
+    if (!open) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { closeSheet(); return true })
+    return () => sub.remove()
+  }, [open])
+
+  useEffect(() => {
+    onOpenChange?.(open)
+    return () => onOpenChange?.(false)
+  }, [open])
+
+  // Re-assigned every render so the root's back handler always calls the live closure.
+  if (closeRef) closeRef.current = () => closeSheet()
 
   // --- Draggable floating button -------------------------------------------
   const minX = EDGE_MARGIN
@@ -184,6 +221,10 @@ export default function OliGuide({ lang, onNavigate }) {
   }
 
   const closeSheet = () => {
+    // <Modal> used to take the keyboard down with its window. An overlay does not, and
+    // relying on the unmounting TextInput to blur leaves the keyboard up over Home for a
+    // beat on Android. Dismiss it explicitly, before the exit animation.
+    Keyboard.dismiss()
     Animated.parallel([
       Animated.timing(translateY, { toValue: SCREEN_H, duration: 220, useNativeDriver: true }),
       Animated.timing(backdrop, { toValue: 0, duration: 220, useNativeDriver: true }),
@@ -225,7 +266,8 @@ export default function OliGuide({ lang, onNavigate }) {
     <>
       <Animated.View
         {...drag.panHandlers}
-        pointerEvents={hydrated ? 'auto' : 'none'}
+        pointerEvents={hydrated && !open ? 'auto' : 'none'}
+        importantForAccessibility={open ? 'no-hide-descendants' : 'auto'}
         style={[s.fab, { opacity, transform: [...pos.getTranslateTransform(), { scale }] }]}
         accessible
         accessibilityRole="button"
@@ -235,7 +277,8 @@ export default function OliGuide({ lang, onNavigate }) {
         <Image source={require('../assets/oli-button.png')} style={s.fabImg} resizeMode="cover" fadeDuration={0} />
       </Animated.View>
 
-      <Modal visible={open} transparent animationType="none" onRequestClose={closeSheet} statusBarTranslucent>
+      {open && (
+      <View style={s.overlay} accessibilityViewIsModal>
         <Animated.View style={[s.backdrop, { opacity: backdrop }]}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={closeSheet} />
         </Animated.View>
@@ -254,6 +297,8 @@ export default function OliGuide({ lang, onNavigate }) {
           </View>
 
           <ScrollView
+            ref={scrollRef}
+            onContentSizeChange={() => { if (kbOpen.current) scrollRef.current?.scrollToEnd({ animated: true }) }}
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24 }}
             keyboardShouldPersistTaps="handled"
@@ -307,7 +352,8 @@ export default function OliGuide({ lang, onNavigate }) {
             </TouchableOpacity>
           </Animated.View>
         </Animated.View>
-      </Modal>
+      </View>
+      )}
     </>
   )
 }
@@ -324,6 +370,10 @@ const s = StyleSheet.create({
   },
   // Gentle zoom so Oli's head/face fills the circle naturally. Tune scale to taste.
   fabImg: { width: '100%', height: '100%', transform: [{ scale: 1.35 }] },
+  // Root overlay in place of <Modal>. zIndex orders it against its root siblings;
+  // elevation must clear the FAB's 24 because Android can draw by elevation instead of
+  // by order — at SheetOverlay's 12 the FAB would punch through this backdrop.
+  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 300, elevation: 25 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   sheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, top: 0,

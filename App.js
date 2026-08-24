@@ -290,6 +290,10 @@ export default function App() {
   const [openedProperty, setOpenedProperty] = useState(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
+  // Ask Oli's sheet is a root overlay now, not a <Modal>: the root has to know it is
+  // up (to hide the app content from the a11y tree) and how to close it (hardware back).
+  const [oliSheetOpen, setOliSheetOpen] = useState(false)
+  const oliCloseRef = useRef(null)
   const [showCoachMarks, setShowCoachMarks] = useState(false)
   const [coachSteps, setCoachSteps]         = useState([])
   const hamburgerRef       = useRef(null)
@@ -479,8 +483,12 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS !== 'android') return
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      // These two are root overlays, not <Modal>s, so there is no onRequestClose
-      // to catch the hardware back button. They are topmost, so they go first.
+      // These are root overlays, not <Modal>s, so there is no onRequestClose to catch
+      // the hardware back button. They are topmost, so they go first — Oli's sheet above
+      // the other two. OliGuide registers its own handler while open (which wins, being
+      // the newest), but this effect re-registers on any of its 30+ deps and would then
+      // fall through to `return false` and EXIT THE APP with the sheet still up.
+      if (oliSheetOpen) { oliCloseRef.current?.(); return true }
       if (showMunicipalModal) { setShowMunicipalModal(false); return true }
       if (showEmergencyModal) { setShowEmergencyModal(false); return true }
       if (showMenu) { closeMenu(); return true }
@@ -519,7 +527,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -1608,8 +1616,12 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      {content}
-      {oliVisible && <OliGuide lang={lang} onNavigate={oliNavigate} />}
+      <View style={styles.rootFill} importantForAccessibility={oliSheetOpen ? 'no-hide-descendants' : 'auto'}>
+        {content}
+      </View>
+      {oliVisible && (
+        <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} />
+      )}
 
       {showEmergencyModal && (
         <SheetOverlay onDismiss={() => setShowEmergencyModal(false)}>
@@ -1768,6 +1780,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safe:             { flex: 1, backgroundColor: colors.bg },
+  rootFill:         { flex: 1 },
   container:        { flex: 1, paddingHorizontal: 16 },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   header:           { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', paddingTop: 16, paddingBottom: 12, position: 'relative' },
