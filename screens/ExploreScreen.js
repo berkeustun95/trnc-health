@@ -21,10 +21,7 @@ import {
   EXPLORE_GROUPS, GROUP_ORDER, GROUP_META, CATEGORY_LABEL_KEY,
   categoryToGroup, groupVisible,
 } from '../constants/exploreCategories'
-
-// Whole-island framing, shared with ExploreMapScreen so the two map surfaces cannot
-// drift to different default views.
-export const TRNC_CENTER = { latitude: 35.2, longitude: 33.5, latitudeDelta: 0.9, longitudeDelta: 0.9 }
+import { TRNC_CENTER } from '../constants/mapSources'
 
 // name_i18n[lang] if present, else fall through to the plain `name` column (never '').
 function extractI18n(obj, lang) {

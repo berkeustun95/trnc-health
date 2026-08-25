@@ -38,6 +38,7 @@
 
 import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
+  TRNC_CENTER,
 } from '../constants/mapSources.js'
 import { MODULE_FLAGS } from '../constants/flags.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
@@ -190,6 +191,45 @@ for (const key of CHIP_KEYS) {
 }
 check('no chip label renders as a raw key', raw, [])
 
+console.log('\ndefault viewport frames every pin')
+// A default map view is wrong for months without anyone filing it: you cannot tell a map
+// that is MISSING content from a map of a region that HAS no content. The old framing
+// (centre 33.5, delta 0.9 x 0.9) cut nine of the 49 pins — all of Karpaz and all of
+// Lefke/Güzelyurt — and it shipped that way on the live beaches map.
+//
+// These are the REAL extreme coordinates, measured 2026-08-25, not invented fixtures.
+// Re-derive with:  node scripts/validate-map-sources.mjs --live
+const EDGE_PINS = [
+  { name: 'Vuni Sarayı  (W)',                 lng: 32.7731, lat: 35.1588 },
+  { name: 'Apostolos Andreas Manastırı (E,N)', lng: 34.5695, lat: 35.6557 },
+  { name: 'Lefke Maden Müzesi  (S)',          lng: 32.8496, lat: 35.1135 },
+  { name: 'Altın Kumsal  (Karpaz beach)',     lng: 34.5423, lat: 35.6412 },
+]
+const BOX = {
+  w: TRNC_CENTER.longitude - TRNC_CENTER.longitudeDelta / 2,
+  e: TRNC_CENTER.longitude + TRNC_CENTER.longitudeDelta / 2,
+  s: TRNC_CENTER.latitude  - TRNC_CENTER.latitudeDelta  / 2,
+  n: TRNC_CENTER.latitude  + TRNC_CENTER.latitudeDelta  / 2,
+}
+const inBox = p => p.lng >= BOX.w && p.lng <= BOX.e && p.lat >= BOX.s && p.lat <= BOX.n
+check('every known edge pin is inside the default region',
+  EDGE_PINS.filter(p => !inBox(p)).map(p => p.name), [])
+
+// The margin is PRINTED, not asserted at a fixed value, and not left to a comment that
+// goes stale silently — CLAUDE.md's rule about measured numbers. A shrinking margin is
+// visible here before it becomes a cut-off pin.
+const margins = {
+  W: Math.min(...EDGE_PINS.map(p => p.lng - BOX.w)),
+  E: Math.min(...EDGE_PINS.map(p => BOX.e - p.lng)),
+  S: Math.min(...EDGE_PINS.map(p => p.lat - BOX.s)),
+  N: Math.min(...EDGE_PINS.map(p => BOX.n - p.lat)),
+}
+console.log(`    region lng ${BOX.w.toFixed(2)}..${BOX.e.toFixed(2)}  lat ${BOX.s.toFixed(2)}..${BOX.n.toFixed(2)}`)
+console.log(`    margin  W ${margins.W.toFixed(3)}  E ${margins.E.toFixed(3)}  S ${margins.S.toFixed(3)}  N ${margins.N.toFixed(3)}  (degrees)`)
+// ⚠ HONEST LIMIT: this checks the extremes KNOWN on 2026-08-25. A newly added place
+//   beyond them is not caught offline — `--live` is what actually checks every row.
+check('no margin has gone negative', Object.values(margins).every(m => m > 0), true)
+
 console.log('\nduty pharmacy')
 const duty = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: 'pha-0', isAdmin: false })
 check('duty pin is unreachable until pharmacies are geocoded',
@@ -204,3 +244,39 @@ if (problems.length) {
 
 console.log(`\nmap source gate: OK — ${dark.reduce((n, s) => n + s.pins.length, 0)} pinnable committed, `
   + `${live.reduce((n, s) => n + s.pins.length, 0)} with explore flipped locally\n`)
+
+// ─── --live: assert EVERY pinnable row, not just the known extremes ──────────
+//
+// Opt-in and network-dependent, so it is NOT in the pre-push chain — a guard that needs
+// the internet is a guard that blocks a push on a train. Run it before flipping
+// EXPLORE_MAP_LIVE, and any time places gains rows in a new corner of the island.
+//
+//   node scripts/validate-map-sources.mjs --live
+if (process.argv.includes('--live')) {
+  const U = process.env.EXPO_PUBLIC_SUPABASE_URL
+  const K = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+  if (!U || !K) {
+    console.error('\n  --live needs EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.\n')
+    process.exit(1)
+  }
+  const get = async q => (await fetch(`${U}/rest/v1/${q}`, { headers: { apikey: K } })).json()
+  const [facilities, places] = await Promise.all([
+    get('facilities?select=*&limit=2000'),
+    get('places?select=id,category,name,name_i18n,latitude,longitude&status=eq.active&limit=2000'),
+  ])
+  // isAdmin:true measures the set the map must frame ONCE EXPLORE IS LIVE, not today's
+  // gated subset. Measuring the dark set would size the viewport to 11 pins and re-cut
+  // Karpaz the day the flag flips — which is exactly the mistake this check exists for.
+  const livePins = selectedPins(
+    buildMapSources({ facilities, places, dutyFacilityId: null, isAdmin: true }), new Set())
+  const outside = livePins.filter(p => !inBox({ lng: p.lng, lat: p.lat }))
+  console.log(`\nLIVE — ${livePins.length} pinnable rows fetched`)
+  for (const p of outside) {
+    console.log(`  ✗ OUTSIDE  ${(p.row.name_i18n?.tr || p.row.name)}  ${p.lng.toFixed(4)}, ${p.lat.toFixed(4)}`)
+  }
+  if (outside.length) {
+    console.error(`\n  ${outside.length} live pin(s) fall outside the default region — widen TRNC_CENTER.\n`)
+    process.exit(1)
+  }
+  console.log(`  ✓ all ${livePins.length} live pins inside the default region`)
+}

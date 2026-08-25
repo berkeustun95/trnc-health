@@ -34,6 +34,30 @@ import {
   categoryToGroup, groupVisible,
 } from './exploreCategories.js'
 
+// Default map framing: the WHOLE island, used by both map surfaces whenever there is no
+// userLocation to centre on.
+//
+// IT LIVES HERE, NOT IN A SCREEN, so scripts/validate-map-sources.mjs can import it in
+// plain Node and assert real coordinates fall inside it. A default view is exactly the
+// kind of thing that is wrong for months without anyone filing it — you cannot tell a map
+// that is missing content from a map of a region with no content.
+//
+// ⚠ longitudeDelta 2.0 IS THE LOAD-BEARING NUMBER, and it is not padding. The content
+//   spans 1.796° of longitude (Vuni Sarayı 32.7731 → Apostolos Andreas 34.5695) against
+//   only 0.542° of latitude, so longitude is what binds and latitudeDelta is slack that
+//   the map expands anyway to match the viewport aspect. The previous value — centre
+//   33.5, delta 0.9 × 0.9 — framed 50% of the island and silently cut NINE of the 49
+//   pins: the entire Karpaz peninsula in the east (Apostolos Andreas, Altın Kumsal,
+//   Ay Trias) and all of Lefke/Güzelyurt in the west (Vuni, Soli, St. Mamas, and two
+//   museums). Do not shrink it back to "tidy" equal deltas; equal deltas are what caused
+//   this. The validator prints the real margin on every run — check it against this text.
+export const TRNC_CENTER = {
+  latitude:      35.40,
+  longitude:     33.71,
+  latitudeDelta:  0.9,
+  longitudeDelta: 2.0,
+}
+
 // Explore is REACHABLE — the outer gate App.js applies before rendering ExploreScreen.
 export function exploreReachable(isAdmin) {
   return MODULE_FLAGS.explore || isAdmin

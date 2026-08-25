@@ -21,9 +21,10 @@ import MapView, { Marker } from 'react-native-maps'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import Supercluster from 'supercluster'
 import { supabase } from '../lib/supabase'
-import { BROWSE_COLS, TRNC_CENTER, placeName } from './ExploreScreen'
+import { BROWSE_COLS, placeName } from './ExploreScreen'
 import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
+  TRNC_CENTER,
 } from '../constants/mapSources'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
