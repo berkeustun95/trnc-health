@@ -1,0 +1,145 @@
+{
+  "_readme": [
+    "Explore photo + attribution backfill. Consumed by scripts/seed-explore-photos.mjs.",
+    "",
+    "THIS FILE ADDS NO ROWS. Every entry UPDATEs an existing active `places` row by its",
+    "real UUID. The directory already holds 42 active places (38 landmarks, 4 beaches)",
+    "backfilled by 20260822_places_consolidation; 41 of them have no photo. The gap was",
+    "never missing places, it was missing photographs.",
+    "",
+    "NO BEACHES HERE, DELIBERATELY. Beaches are live in production today (the Home",
+    "Beaches tile at App.js:1099 is NOT behind MODULE_FLAGS.explore), so a beach photo",
+    "renders immediately under the shipped credit-only renderer, which cannot show a",
+    "licence notice or link. Beach photos are therefore restricted to Unsplash/Pexels/own",
+    "— and no such photo exists: Unsplash and Pexels identify no named TRNC beach, and",
+    "every named-beach photo on Wikimedia Commons is CC BY-SA. Beaches wait for the",
+    "attribution renderer to reach production. The seed script enforces this as a hard",
+    "error, so re-adding a beach here fails the run rather than publishing quietly.",
+    "",
+    "Landmarks ARE reachable in production today (search_content's landmark arm reads the",
+    "legacy `landmarks` table and HomeScreen.js:186 resolves the hit into this screen), so",
+    "the derived photo_credits string carries creator + licence + licence URI, not just a",
+    "name. See utils/photoAttribution.js legacyCreditString().",
+    "",
+    "Per photo: credit, license, license_url, source_url are ALL required. The single",
+    "exemption is source:'own', which requires credit + license and whose source_url MUST",
+    "be null — and 'own' with a non-null source_url is equally an error, so the exemption",
+    "cannot be used to smuggle a photo past the check."
+  ],
+
+  "places": [
+    {
+      "id": "7ecf2c84-2192-45c9-b075-a2ce115f842c",
+      "name": "Kyrenia Castle", "category": "castle_fortress", "region": "kyrenia",
+      "_note": "The ONLY row that already has a photo. It is preserved, not replaced, and its missing photo_attribution entry is backfilled. Provenance verified: the bucket file Kyrenia_Fortress_2.jpeg is Commons File:Kyrenia Fortress 2.JPG, and its artist + licence match the photo_credits string already stored on the row.",
+      "photos": [
+        {
+          "existing": true,
+          "url": "https://jeihxnwqytnxtytgkzgf.supabase.co/storage/v1/object/public/place-photos/Kyrenia_Fortress_2.jpeg",
+          "credit": "Julian Nyča", "license": "CC BY-SA 3.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_Fortress_2.JPG",
+          "source": "commons"
+        },
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/1/1e/Kyrenia_Castle%2C_Kyrenia%2C_Northen_Cyprus_05.jpg",
+          "credit": "Michal Klajban", "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_Castle,_Kyrenia,_Northen_Cyprus_05.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "d773e658-95ac-48ba-ae53-5936374a976f",
+      "name": "St. Hilarion Castle", "category": "castle_fortress", "region": "kyrenia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/a/af/Kyrenia_-_Girne_Burg_St._Hilarion_2.jpg",
+          "credit": "Zairon", "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_-_Girne_Burg_St._Hilarion_2.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "d1d9761c-a9e8-4f62-8b3b-4c0b6b8fdf7c",
+      "name": "Bellapais Abbey", "category": "religious_site", "region": "kyrenia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/5/5b/Bellapais_Abbey_1.jpg",
+          "credit": "Jorge-11", "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Bellapais_Abbey_1.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "9abee5c9-0d44-4a34-abef-04e3260151d1",
+      "name": "Othello Castle", "category": "castle_fortress", "region": "famagusta",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/3/39/Othello_Castle_Inside_1.jpg",
+          "credit": "Blcksprt", "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Othello_Castle_Inside_1.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "28f69a7c-48f1-4a51-b84e-37beda5e29b8",
+      "name": "Salamis Ancient City", "category": "ancient_ruins", "region": "famagusta",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Ruins_of_Salamis%2C_Cyprus_%2827409306078%29.jpg",
+          "credit": "Mike McBey", "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Ruins_of_Salamis,_Cyprus_(27409306078).jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "1100ad4c-a412-4528-b96d-c2543fd23b25",
+      "name": "Büyük Han (Great Inn)", "category": "monument", "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/a/a7/B%C3%BCy%C3%BCk_Han_Cyprus_%2841914047980%29.jpg",
+          "credit": "dronepicr", "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:B%C3%BCy%C3%BCk_Han_Cyprus_(41914047980).jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "aa7c1674-fd80-4d41-b242-ff41da225990",
+      "name": "Selimiye Mosque", "category": "religious_site", "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Selimiye_mosque_Nicosia_%2829852320938%29.jpg",
+          "credit": "dronepicr", "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Selimiye_mosque_Nicosia_(29852320938).jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "88def13a-3ee3-4c3b-bb7b-56bf15f27f33",
+      "name": "Kantara Castle", "category": "castle_fortress", "region": "iskele",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/e/eb/Kantara_Castle_%2844105075700%29.jpg",
+          "credit": "Mike McBey", "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0/",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Kantara_Castle_(44105075700).jpg",
+          "source": "commons"
+        }
+      ]
+    }
+  ]
+}

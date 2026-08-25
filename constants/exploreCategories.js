@@ -7,7 +7,7 @@
 // group labels use exploreCat* / exploreGroup* keys (constants/i18n.js). Every category and
 // group has a label — none fall back to a raw slug.
 
-import { placeColors } from './theme'
+import { placeColors } from './theme.js'
 
 // group -> ordered category slugs
 export const EXPLORE_GROUPS = {
