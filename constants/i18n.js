@@ -1184,6 +1184,15 @@ const translations = {
     towingDaySun: 'Sunday',
     towingMapLegendOn: 'Serves this area',
     towingMapLegendOff: 'Does not serve',
+
+    // ── Photo attribution (Explore). Rendered under the gallery on the place
+    //    detail screen. Licences ("CC BY-SA 4.0") and platform names (Wikimedia
+    //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
+    //    only the surrounding words are.
+    photoCreditPrefix: "Photo",
+    photoSourceOwn: "ADA original photo",
+    photoLicenseA11y: "Open the license terms",
+    photoSourceA11y: "Open the photo source page",
   },
   tr: {
     // Ask Oli guide
@@ -2369,6 +2378,15 @@ const translations = {
     towingDaySun: 'Pazar',
     towingMapLegendOn: 'Hizmet veriyor',
     towingMapLegendOff: 'Hizmet vermiyor',
+
+    // ── Photo attribution (Explore). Rendered under the gallery on the place
+    //    detail screen. Licences ("CC BY-SA 4.0") and platform names (Wikimedia
+    //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
+    //    only the surrounding words are.
+    photoCreditPrefix: "Fotoğraf",
+    photoSourceOwn: "ADA özgün fotoğrafı",
+    photoLicenseA11y: "Lisans koşullarını aç",
+    photoSourceA11y: "Fotoğrafın kaynak sayfasını aç",
   },
   ar: {
     // Ask Oli guide
@@ -3238,6 +3256,15 @@ const translations = {
     towingDaySun: 'الأحد',
     towingMapLegendOn: 'يخدم هذه المنطقة',
     towingMapLegendOff: 'لا يخدمها',
+
+    // ── Photo attribution (Explore). Rendered under the gallery on the place
+    //    detail screen. Licences ("CC BY-SA 4.0") and platform names (Wikimedia
+    //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
+    //    only the surrounding words are.
+    photoCreditPrefix: "صورة",
+    photoSourceOwn: "صورة أصلية من ADA",
+    photoLicenseA11y: "فتح شروط الترخيص",
+    photoSourceA11y: "فتح صفحة مصدر الصورة",
   },
   ru: {
     // Ask Oli guide
@@ -4107,6 +4134,15 @@ const translations = {
     towingDaySun: 'Воскресенье',
     towingMapLegendOn: 'Обслуживает',
     towingMapLegendOff: 'Не обслуживает',
+
+    // ── Photo attribution (Explore). Rendered under the gallery on the place
+    //    detail screen. Licences ("CC BY-SA 4.0") and platform names (Wikimedia
+    //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
+    //    only the surrounding words are.
+    photoCreditPrefix: "Фото",
+    photoSourceOwn: "Собственное фото ADA",
+    photoLicenseA11y: "Открыть условия лицензии",
+    photoSourceA11y: "Открыть страницу источника фото",
   },
   el: {
     // Ask Oli guide
@@ -4976,6 +5012,15 @@ const translations = {
     towingDaySun: 'Κυριακή',
     towingMapLegendOn: 'Εξυπηρετεί',
     towingMapLegendOff: 'Δεν εξυπηρετεί',
+
+    // ── Photo attribution (Explore). Rendered under the gallery on the place
+    //    detail screen. Licences ("CC BY-SA 4.0") and platform names (Wikimedia
+    //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
+    //    only the surrounding words are.
+    photoCreditPrefix: "Φωτογραφία",
+    photoSourceOwn: "Πρωτότυπη φωτογραφία ADA",
+    photoLicenseA11y: "Άνοιγμα των όρων της άδειας",
+    photoSourceA11y: "Άνοιγμα της σελίδας προέλευσης",
   },
   fr: {
     // Ask Oli guide
@@ -5845,6 +5890,15 @@ const translations = {
     towingDaySun: 'Dimanche',
     towingMapLegendOn: 'Dessert cette zone',
     towingMapLegendOff: 'Ne dessert pas',
+
+    // ── Photo attribution (Explore). Rendered under the gallery on the place
+    //    detail screen. Licences ("CC BY-SA 4.0") and platform names (Wikimedia
+    //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
+    //    only the surrounding words are.
+    photoCreditPrefix: "Photo",
+    photoSourceOwn: "Photo originale ADA",
+    photoLicenseA11y: "Ouvrir les conditions de la licence",
+    photoSourceA11y: "Ouvrir la page source de la photo",
   },
   es: {
     // Ask Oli guide
@@ -6714,6 +6768,15 @@ const translations = {
     towingDaySun: 'Domingo',
     towingMapLegendOn: 'Da servicio',
     towingMapLegendOff: 'No da servicio',
+
+    // ── Photo attribution (Explore). Rendered under the gallery on the place
+    //    detail screen. Licences ("CC BY-SA 4.0") and platform names (Wikimedia
+    //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
+    //    only the surrounding words are.
+    photoCreditPrefix: "Foto",
+    photoSourceOwn: "Foto original de ADA",
+    photoLicenseA11y: "Abrir los términos de la licencia",
+    photoSourceA11y: "Abrir la página de origen de la foto",
   },
   de: {
     // Ask Oli guide
@@ -7583,6 +7646,15 @@ const translations = {
     towingDaySun: 'Sonntag',
     towingMapLegendOn: 'Bedient dieses Gebiet',
     towingMapLegendOff: 'Bedient nicht',
+
+    // ── Photo attribution (Explore). Rendered under the gallery on the place
+    //    detail screen. Licences ("CC BY-SA 4.0") and platform names (Wikimedia
+    //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
+    //    only the surrounding words are.
+    photoCreditPrefix: "Foto",
+    photoSourceOwn: "ADA-Originalfoto",
+    photoLicenseA11y: "Lizenzbedingungen öffnen",
+    photoSourceA11y: "Quellseite des Fotos öffnen",
   },
   fa: {
     // Ask Oli guide
@@ -8452,6 +8524,15 @@ const translations = {
     towingDaySun: 'یکشنبه',
     towingMapLegendOn: 'خدمات می‌دهد',
     towingMapLegendOff: 'خدمات نمی‌دهد',
+
+    // ── Photo attribution (Explore). Rendered under the gallery on the place
+    //    detail screen. Licences ("CC BY-SA 4.0") and platform names (Wikimedia
+    //    Commons, Unsplash, Pexels) are proper nouns and are NOT translated —
+    //    only the surrounding words are.
+    photoCreditPrefix: "عکس",
+    photoSourceOwn: "عکس اختصاصی ADA",
+    photoLicenseA11y: "باز کردن شرایط مجوز",
+    photoSourceA11y: "باز کردن صفحهٔ منبع عکس",
   },
 }
 
