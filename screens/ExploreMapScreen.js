@@ -15,14 +15,16 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
-  ActivityIndicator, useWindowDimensions,
+  ActivityIndicator, ScrollView, useWindowDimensions,
 } from 'react-native'
 import MapView, { Marker } from 'react-native-maps'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons, Feather } from '@expo/vector-icons'
 import Supercluster from 'supercluster'
 import { supabase } from '../lib/supabase'
 import { BROWSE_COLS, TRNC_CENTER, placeName } from './ExploreScreen'
-import { buildMapSources, mapFetchCategories } from '../constants/mapSources'
+import {
+  buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
+} from '../constants/mapSources'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { colors, shadow } from '../constants/theme'
@@ -78,6 +80,75 @@ function ClusterMarker({ cluster, onPress }) {
         <Text style={cl.count}>{count}</Text>
       </View>
     </Marker>
+  )
+}
+
+// ─── Filter chips ─────────────────────────────────────────────────────────────
+//
+// The chips RENDER buildMapSources()'s output; they do not decide it. A dark module has
+// no source, so it can draw no chip and contribute no pin — there is no chip-level gate
+// to keep in sync with the pin-level one, because there is only one gate.
+//
+// Every chip carries a dot in its pin's colour so the legend and the map read as one
+// thing. Counts are shown because "Kültürel Miras 38" is the single most useful fact on
+// this screen for someone deciding where to look.
+
+function Chip({ label, count, color, colorBg, active, icon, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[ch.chip, active && { backgroundColor: colorBg, borderColor: color }]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      {icon
+        ? <Feather name={icon} size={13} color={active ? color : colors.textSecondary} />
+        : color ? <View style={[ch.dot, { backgroundColor: color }]} /> : null}
+      <Text style={[ch.label, active && { color }]} numberOfLines={1}>{label}</Text>
+      {count != null && (
+        <Text style={[ch.count, active && { color }]}>{count}</Text>
+      )}
+    </TouchableOpacity>
+  )
+}
+
+function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, onOpenNow, lang }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={ch.bar}
+      contentContainerStyle={ch.barContent}
+    >
+      <Chip
+        label={t('all', lang)}
+        active={selectedKeys.size === 0}
+        color={colors.primary}
+        colorBg={colors.primaryLight}
+        onPress={onAll}
+      />
+      {/* Hidden while no facility has parseable hours — see openNowApplicable(). */}
+      {canOpenNow && (
+        <Chip
+          label={t('openNow', lang)}
+          icon="clock"
+          active={openNow}
+          color={colors.success}
+          colorBg={colors.successLight}
+          onPress={onOpenNow}
+        />
+      )}
+      {sources.map(src => (
+        <Chip
+          key={src.key}
+          label={t(src.labelKey, lang)}
+          count={src.pins.length}
+          color={src.color}
+          colorBg={src.colorBg}
+          active={selectedKeys.has(src.key)}
+          onPress={() => onToggle(src.key)}
+        />
+      ))}
+    </ScrollView>
   )
 }
 
@@ -142,6 +213,11 @@ export default function ExploreMapScreen({
   const [places, setPlaces]   = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
+  // Empty set = "All". See selectedPins(): All is the UNION OF VISIBLE SOURCES, never a
+  // bypass of the gate — the default path is the one nearly every user takes, so it is
+  // the path that most needs the gate on it.
+  const [selectedKeys, setSelectedKeys] = useState(() => new Set())
+  const [openNow, setOpenNow] = useState(false)
 
   const initialRegion = useMemo(() => (
     userLocation
@@ -178,7 +254,27 @@ export default function ExploreMapScreen({
     [facilities, places, dutyFacilityId, isAdmin]
   )
 
-  const pins = useMemo(() => sources.flatMap(src => src.pins), [sources])
+  // Applicability is computed over ALL pins, not the current selection, so the Open-now
+  // chip does not appear and vanish as the user changes chips.
+  const canOpenNow = useMemo(() => openNowApplicable(sources.flatMap(s => s.pins)), [sources])
+
+  // Filtering happens HERE, before the index is built — not on the rendered clusters.
+  // Cluster a superset and the bubbles count content the user has filtered out, so a
+  // cluster reading "12" opens onto 4 pins.
+  const pins = useMemo(
+    () => applyOpenNow(selectedPins(sources, selectedKeys), openNow && canOpenNow),
+    [sources, selectedKeys, openNow, canOpenNow]
+  )
+
+  const toggleSource = useCallback(key => {
+    setSelected(null)
+    setSelectedKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   const index = useMemo(() => {
     const idx = new Supercluster(CLUSTER_OPTS)
@@ -237,6 +333,17 @@ export default function ExploreMapScreen({
         })}
       </MapView>
 
+      <ChipRow
+        sources={sources}
+        selectedKeys={selectedKeys}
+        onToggle={toggleSource}
+        onAll={() => { setSelected(null); setSelectedKeys(new Set()) }}
+        openNow={openNow}
+        canOpenNow={canOpenNow}
+        onOpenNow={() => { setSelected(null); setOpenNow(v => !v) }}
+        lang={lang}
+      />
+
       {loading && (
         <View style={s.loading} pointerEvents="none">
           <ActivityIndicator color={colors.primary} />
@@ -263,6 +370,15 @@ export default function ExploreMapScreen({
   )
 }
 
+const ch = StyleSheet.create({
+  bar:        { position: 'absolute', top: 12, left: 0, right: 0, zIndex: 10, maxHeight: 44 },
+  barContent: { paddingHorizontal: 12, gap: 8, flexDirection: 'row', alignItems: 'center' },
+  chip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1.5, borderColor: colors.border, ...shadow },
+  dot:        { width: 8, height: 8, borderRadius: 4 },
+  label:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  count:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+})
+
 const cl = StyleSheet.create({
   bubble: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderWidth: 2.5, borderColor: '#fff', ...shadow },
   count:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
@@ -271,7 +387,7 @@ const cl = StyleSheet.create({
 const s = StyleSheet.create({
   container:     { flex: 1 },
   map:           { flex: 1 },
-  loading:       { position: 'absolute', top: 16, alignSelf: 'center', backgroundColor: colors.cardBg, borderRadius: 20, padding: 10, ...shadow },
+  loading:       { position: 'absolute', top: 66, alignSelf: 'center', backgroundColor: colors.cardBg, borderRadius: 20, padding: 10, ...shadow },
   card:          { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: colors.cardBg, borderRadius: 20, padding: 16, ...shadow },
   cardRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   thumb:         { width: 52, height: 52, borderRadius: 14, flexShrink: 0 },

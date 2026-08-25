@@ -27,6 +27,7 @@
 // module and exercise the real gate against the real constants. Metro resolves both forms.
 import { MODULE_FLAGS } from './flags.js'
 import { HEALTH_TYPES } from './facilityTypes.js'
+import { parseIsOpen } from '../utils/facilityUtils.js'
 import { typeColors, placeColors } from './theme.js'
 import {
   EXPLORE_GROUPS, GROUP_ORDER, GROUP_META, LIVE_TILE_GROUPS,
@@ -107,6 +108,7 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
     key:      `health:${type}`,
     labelKey: type,
     color:    (typeColors[type] || typeColors.clinic).text,
+    colorBg:  (typeColors[type] || typeColors.clinic).bg,
     pins:     health.filter(p => p.row.type === type),
   }))
 
@@ -119,6 +121,18 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
   const reachable = exploreReachable(isAdmin)
   for (const g of GROUP_ORDER) {
     const pins = byGroup[g] || []
+    // ⚠ DO NOT "SIMPLIFY" THIS TO `groupVisible(g, pins.length, isAdmin)` ALONE.
+    //   That looks like the correct move — reuse the real function instead of a copy —
+    //   and it is WRONG, because groupVisible answers the INNER question only: "given
+    //   that the user can reach Explore, does this group earn a tile?" It has no idea
+    //   whether the user can reach Explore at all; ExploreScreen never has to ask,
+    //   because App.js already answered it upstream (`MODULE_FLAGS.explore || isAdmin`).
+    //   There is no upstream here. And the inner answer for heritage is TRUE on the row
+    //   count alone — groupVisible('heritage', 38, false) === true, since 38 >= 8 — so
+    //   the "simplification" silently publishes 38 pins of a module that is still dark,
+    //   with the flag still reading false and nothing on screen to say otherwise.
+    //   scripts/validate-map-sources.mjs fails on exactly this edit. Keep both arms.
+    //
     // The count fed to groupVisible is the PINNABLE count, not the tile grid's RPC count
     // (active incl. hidden). The map can only ever draw rows that have coordinates, so a
     // group counted on rows it cannot plot would earn a chip that filters to nothing.
@@ -128,9 +142,62 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
       key:      `explore:${g}`,
       labelKey: GROUP_META[g]?.labelKey,
       color:    (GROUP_META[g]?.colorToken || placeColors.landmark).text,
+      colorBg:  (GROUP_META[g]?.colorToken || placeColors.landmark).bg,
       pins,
     })
   }
 
   return sources.filter(s => s.pins.length > 0)
+}
+
+// ─── USER FILTERS ────────────────────────────────────────────────────────────
+//
+// Everything above this line is the GATE: it decides what a user is ALLOWED to see, and
+// getting it wrong leaks a dark module. Everything below is PRESENTATION: it decides what
+// the user has ASKED to see out of that allowed set. The two must never be conflated —
+// a presentation helper that can widen the set is a gate bug wearing a filter's clothes.
+
+// The pins for the current chip selection. An empty (or absent) selection is "All", and
+// "All" means THE UNION OF THE VISIBLE SOURCES — never "skip filtering".
+//
+// That distinction is the whole ballgame. `sources` is the gated output of
+// buildMapSources(); a default path that instead reached past it for "every pin we
+// fetched" would look identical on screen today and would republish every dark-module row
+// the moment one exists. The gate must sit on the DEFAULT path, not only on the
+// explicitly-filtered one — the default is the path almost every user takes.
+export function selectedPins(sources, selectedKeys) {
+  const active = (!selectedKeys || selectedKeys.size === 0)
+    ? sources
+    : sources.filter(s => selectedKeys.has(s.key))
+  return active.flatMap(s => s.pins)
+}
+
+// Should the "Open now" chip render at all?
+//
+// ⚠ THIS IS FALSE FOR THE ENTIRE LIVE DATABASE TODAY, AND THAT IS THE POINT. 393 of 394
+//   facilities have opening_hours NULL, and the one that does not holds JSON text written
+//   by HoursPicker, which parseIsOpen (a legacy "Mon-Fri 09:00-18:00" parser) cannot read.
+//   So parseIsOpen returns null for every facility that exists, and an Open-now chip would
+//   filter the map to zero pins every single time it was tapped.
+//
+//   Rendering it anyway is the dead-chip failure: the user reads an empty map as a broken
+//   app rather than as missing data. So the chip is carried, correct, and hidden until
+//   at least one facility has hours that actually parse. Do not delete this as unused.
+//
+//   (The same silence affects the SHIPPED HomeScreen and MapScreen "Open now" filters,
+//   which call parseIsOpen unguarded. Pre-existing, out of scope here, logged.)
+export function openNowApplicable(pins) {
+  return pins.some(p => p.kind === 'health' && parseIsOpen(p.row.opening_hours) !== null)
+}
+
+// Open-now is structurally HEALTH-ONLY: BROWSE_COLS does not select opening_hours, so a
+// place pin carries no hours to test. That is deliberate and must stay that way — widening
+// or narrowing that select on a whim is precisely how photo attribution silently broke.
+//
+// Non-health pins pass through UNFILTERED rather than being hidden. A beach has no opening
+// hours to be open or closed against; dropping it would turn a modifier into a mode and
+// leave the user staring at an empty map wondering which chip did it.
+export function applyOpenNow(pins, on) {
+  if (!on) return pins
+  return pins.filter(p => p.kind !== 'health' || parseIsOpen(p.row.opening_hours) === true)
 }
