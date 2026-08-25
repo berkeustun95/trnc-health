@@ -26,23 +26,68 @@
     "be null — and 'own' with a non-null source_url is equally an error, so the exemption",
     "cannot be used to smuggle a photo past the check."
   ],
-
-  "places": [
+  "_pass2_readme": [
+    "PASS 2 (2026-08-25) — 21 more places, one photo each. 8 -> 29 of 42 photographed.",
+    "",
+    "WHY `places` HOLDS ONLY THIS PASS, AND PASS 1 SITS IN `_previous_pass`:",
+    "the seed script UPDATEs every row in `places`, so leaving pass 1 there would re-mirror",
+    "photos that are already correct — 60+ MB re-pulled from Commons for no change, and",
+    "worse, Kyrenia Castle photo 1 whose `src` is OUR OWN bucket object would be fetched,",
+    "re-encoded at q80 and re-uploaded: a second generation of JPEG loss on a file that is",
+    "already optimised. `_previous_pass` is ignored by the script (it reads manifest.places)",
+    "and exists so this file stays the full record of what was seeded and under what licence.",
+    "Pass 1 rollback lives in ~/ObsidianVault/10-ada/rollback/explore-photo-seed-20260825.sql.",
+    "",
+    "ORDER IS LOAD-BEARING AT INDEX 2. validate-explore-seed.mjs builds its network-backed",
+    "ceiling fixtures from places[2] (`m.places = [m.places[2]]`), so that entry should be a",
+    "SMALL source or the harness spends its time downloading. St. Mamas (0.7 MB) is there on",
+    "purpose. Do not reorder without re-running npm run explore:validate.",
+    "",
+    "EVERY PHOTO WAS LOOKED AT, not just read from extmetadata. See the log entry: metadata",
+    "alone ranked an empty hillside top for Buffavento, a site information board for Enkomi,",
+    "and an entire Cretan archaeological site for Karpaz’s Ayios Trias. None of that is",
+    "visible in a licence field.",
+    "",
+    "SEVEN PLACES WERE DELIBERATELY LEFT UNPHOTOGRAPHED — no usable free record exists:",
+    "  Ayios Trias Basilica    every Commons hit is Agia Triada in CRETE (name collision)",
+    "  Royal Tombs             only museum artefacts, never the necropolis itself",
+    "  Lusignan House          display cases only (a table of Super Kola signs, a vitrine)",
+    "  Peace and Freedom Mus.  interior panels and framed portraits only",
+    "  Lefke Mining Museum     hits are the Miners’ Strike Monument and a loading pier",
+    "  Cyprus House & Carob    zero Commons results",
+    "  Taşkent Martyrs’ Mus.   zero Commons results",
+    "Plus two held back on resolution: Vouni Palace (1200x800) and Saçaklı House (1024x768).",
+    "Both mirror BELOW the 2000px standard and would read soft beside their neighbours.",
+    "That list is the ask for the Ministry of Tourism, not a backlog item.",
+    "",
+    "license_url is extmetadata VERBATIM apart from one normalisation: http -> https on the",
+    "identical creativecommons.org host and path. Commons returns the CC0 deed over plain",
+    "http; the licence link is tappable in the app, so it should not be.",
+    "",
+    "src is the canonical upload.wikimedia.org path with NO query string. The imageinfo API",
+    "now appends ?utm_source=...&utm_campaign=imageinfo to ii.url; those are campaign",
+    "analytics parameters, not part of the file address, and pass 1 predates them. Stripped."
+  ],
+  "_previous_pass": [
     {
       "id": "7ecf2c84-2192-45c9-b075-a2ce115f842c",
-      "name": "Kyrenia Castle", "category": "castle_fortress", "region": "kyrenia",
+      "name": "Kyrenia Castle",
+      "category": "castle_fortress",
+      "region": "kyrenia",
       "_note": "Provenance verified: the bucket file Kyrenia_Fortress_2.jpeg is Commons File:Kyrenia Fortress 2.JPG, and its artist + licence matched the photo_credits string already stored on the row. It was PRESERVED unresized in the first apply (2026-08-25) and re-mirrored immediately after, because at 2.4 MB it was ~5x the largest optimised photo and the only unoptimised image in the set. Its `src` is therefore OUR OWN bucket object, not Commons: the pixels are already ours, so re-fetching from Commons would be a pointless round trip. Kyrenia_Fortress_2.jpeg is NOT deleted — the saved rollback block for the first apply references it and must keep resolving. source_url still points at the Commons file page, which is where the licence and creator live.",
       "photos": [
         {
           "src": "https://jeihxnwqytnxtytgkzgf.supabase.co/storage/v1/object/public/place-photos/Kyrenia_Fortress_2.jpeg",
-          "credit": "Julian Nyča", "license": "CC BY-SA 3.0",
+          "credit": "Julian Nyča",
+          "license": "CC BY-SA 3.0",
           "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
           "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_Fortress_2.JPG",
           "source": "commons"
         },
         {
           "src": "https://upload.wikimedia.org/wikipedia/commons/1/1e/Kyrenia_Castle%2C_Kyrenia%2C_Northen_Cyprus_05.jpg",
-          "credit": "Michal Klajban", "license": "CC BY-SA 4.0",
+          "credit": "Michal Klajban",
+          "license": "CC BY-SA 4.0",
           "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
           "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_Castle,_Kyrenia,_Northen_Cyprus_05.jpg",
           "source": "commons"
@@ -51,11 +96,14 @@
     },
     {
       "id": "d773e658-95ac-48ba-ae53-5936374a976f",
-      "name": "St. Hilarion Castle", "category": "castle_fortress", "region": "kyrenia",
+      "name": "St. Hilarion Castle",
+      "category": "castle_fortress",
+      "region": "kyrenia",
       "photos": [
         {
           "src": "https://upload.wikimedia.org/wikipedia/commons/a/af/Kyrenia_-_Girne_Burg_St._Hilarion_2.jpg",
-          "credit": "Zairon", "license": "CC BY-SA 4.0",
+          "credit": "Zairon",
+          "license": "CC BY-SA 4.0",
           "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
           "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_-_Girne_Burg_St._Hilarion_2.jpg",
           "source": "commons"
@@ -64,11 +112,14 @@
     },
     {
       "id": "d1d9761c-a9e8-4f62-8b3b-4c0b6b8fdf7c",
-      "name": "Bellapais Abbey", "category": "religious_site", "region": "kyrenia",
+      "name": "Bellapais Abbey",
+      "category": "religious_site",
+      "region": "kyrenia",
       "photos": [
         {
           "src": "https://upload.wikimedia.org/wikipedia/commons/5/5b/Bellapais_Abbey_1.jpg",
-          "credit": "Jorge-11", "license": "CC BY 2.0",
+          "credit": "Jorge-11",
+          "license": "CC BY 2.0",
           "license_url": "https://creativecommons.org/licenses/by/2.0/",
           "source_url": "https://commons.wikimedia.org/wiki/File:Bellapais_Abbey_1.jpg",
           "source": "commons"
@@ -77,11 +128,14 @@
     },
     {
       "id": "9abee5c9-0d44-4a34-abef-04e3260151d1",
-      "name": "Othello Castle", "category": "castle_fortress", "region": "famagusta",
+      "name": "Othello Castle",
+      "category": "castle_fortress",
+      "region": "famagusta",
       "photos": [
         {
           "src": "https://upload.wikimedia.org/wikipedia/commons/3/39/Othello_Castle_Inside_1.jpg",
-          "credit": "Blcksprt", "license": "CC BY-SA 4.0",
+          "credit": "Blcksprt",
+          "license": "CC BY-SA 4.0",
           "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
           "source_url": "https://commons.wikimedia.org/wiki/File:Othello_Castle_Inside_1.jpg",
           "source": "commons"
@@ -90,11 +144,14 @@
     },
     {
       "id": "28f69a7c-48f1-4a51-b84e-37beda5e29b8",
-      "name": "Salamis Ancient City", "category": "ancient_ruins", "region": "famagusta",
+      "name": "Salamis Ancient City",
+      "category": "ancient_ruins",
+      "region": "famagusta",
       "photos": [
         {
           "src": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Ruins_of_Salamis%2C_Cyprus_%2827409306078%29.jpg",
-          "credit": "Mike McBey", "license": "CC BY 2.0",
+          "credit": "Mike McBey",
+          "license": "CC BY 2.0",
           "license_url": "https://creativecommons.org/licenses/by/2.0/",
           "source_url": "https://commons.wikimedia.org/wiki/File:Ruins_of_Salamis,_Cyprus_(27409306078).jpg",
           "source": "commons"
@@ -103,11 +160,14 @@
     },
     {
       "id": "1100ad4c-a412-4528-b96d-c2543fd23b25",
-      "name": "Büyük Han (Great Inn)", "category": "monument", "region": "nicosia",
+      "name": "Büyük Han (Great Inn)",
+      "category": "monument",
+      "region": "nicosia",
       "photos": [
         {
           "src": "https://upload.wikimedia.org/wikipedia/commons/a/a7/B%C3%BCy%C3%BCk_Han_Cyprus_%2841914047980%29.jpg",
-          "credit": "dronepicr", "license": "CC BY 2.0",
+          "credit": "dronepicr",
+          "license": "CC BY 2.0",
           "license_url": "https://creativecommons.org/licenses/by/2.0/",
           "source_url": "https://commons.wikimedia.org/wiki/File:B%C3%BCy%C3%BCk_Han_Cyprus_(41914047980).jpg",
           "source": "commons"
@@ -116,11 +176,14 @@
     },
     {
       "id": "aa7c1674-fd80-4d41-b242-ff41da225990",
-      "name": "Selimiye Mosque", "category": "religious_site", "region": "nicosia",
+      "name": "Selimiye Mosque",
+      "category": "religious_site",
+      "region": "nicosia",
       "photos": [
         {
           "src": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Selimiye_mosque_Nicosia_%2829852320938%29.jpg",
-          "credit": "dronepicr", "license": "CC BY 2.0",
+          "credit": "dronepicr",
+          "license": "CC BY 2.0",
           "license_url": "https://creativecommons.org/licenses/by/2.0/",
           "source_url": "https://commons.wikimedia.org/wiki/File:Selimiye_mosque_Nicosia_(29852320938).jpg",
           "source": "commons"
@@ -129,13 +192,357 @@
     },
     {
       "id": "88def13a-3ee3-4c3b-bb7b-56bf15f27f33",
-      "name": "Kantara Castle", "category": "castle_fortress", "region": "iskele",
+      "name": "Kantara Castle",
+      "category": "castle_fortress",
+      "region": "iskele",
       "photos": [
         {
           "src": "https://upload.wikimedia.org/wikipedia/commons/e/eb/Kantara_Castle_%2844105075700%29.jpg",
-          "credit": "Mike McBey", "license": "CC BY 2.0",
+          "credit": "Mike McBey",
+          "license": "CC BY 2.0",
           "license_url": "https://creativecommons.org/licenses/by/2.0/",
           "source_url": "https://commons.wikimedia.org/wiki/File:Kantara_Castle_(44105075700).jpg",
+          "source": "commons"
+        }
+      ]
+    }
+  ],
+  "places": [
+    {
+      "id": "2392247c-9cd3-446a-8eeb-588fdd9ea50a",
+      "name": "Apostolos Andreas Monastery",
+      "category": "religious_site",
+      "region": "karpaz",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Apostolos_Andreas_Monastery%2C_Karpas_Peninsula%2C_Cyprus_01.jpg",
+          "credit": "Ugiadam08",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Apostolos_Andreas_Monastery,_Karpas_Peninsula,_Cyprus_01.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "1ed9139d-453c-4eba-948b-b8431487c9f0",
+      "name": "St. Barnabas Monastery",
+      "category": "religious_site",
+      "region": "famagusta",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/9/9b/MONASTERY_OF_ST._BARNABAS%2C_CYPRUS.jpg",
+          "credit": "JERRYE AND ROY KLOTZ MD",
+          "license": "CC BY-SA 3.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:MONASTERY_OF_ST._BARNABAS,_CYPRUS.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "9f14da0c-e9a2-4489-81e2-20973b662942",
+      "name": "St. Mamas Church & Güzelyurt Museum",
+      "category": "museum",
+      "region": "morphou",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/4/42/Agios_Mamas_%28Morphou%29_01.jpg",
+          "credit": "Xxlstier",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Agios_Mamas_(Morphou)_01.jpg",
+          "source": "commons"
+        }
+      ],
+      "_note": "INDEX 2 IS LOAD-BEARING. validate-explore-seed.mjs builds its network-backed ceiling fixtures from places[2] (m.places = [m.places[2]]), so this slot wants a SMALL source or the harness spends its time downloading. This is the smallest in the pass (674 KB). Do not reorder without re-running npm run explore:validate."
+    },
+    {
+      "id": "39e93795-834b-4ced-bc6d-7890ad96a6a5",
+      "name": "Buffavento Castle",
+      "category": "castle_fortress",
+      "region": "kyrenia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/2/23/Buffavento_castle_1.JPG",
+          "credit": "Dickelbers",
+          "license": "CC BY-SA 3.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Buffavento_castle_1.JPG",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "328fad9c-9da7-4273-a638-1682de89da39",
+      "name": "Soli Ruins",
+      "category": "ancient_ruins",
+      "region": "lefke",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/c/cd/Theatre_%2832478836806%29.jpg",
+          "credit": "Amanda Slater from Coventry, West Midlands, UK",
+          "license": "CC BY-SA 2.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/2.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Theatre_(32478836806).jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "204d484c-8297-46e3-8306-38bfe0beb3c2",
+      "name": "Enkomi (Alasia)",
+      "category": "ancient_ruins",
+      "region": "famagusta",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/0/05/%D0%90lasia07.jpg",
+          "credit": "O.Mustafin",
+          "license": "CC0",
+          "license_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source_url": "https://commons.wikimedia.org/wiki/File:%D0%90lasia07.jpg",
+          "source": "commons"
+        }
+      ],
+      "_note": "MIRRORED AT AN 800 KB CEILING, NOT THE STANDARD 600 KB. Applied alone: node scripts/seed-explore-photos.mjs --apply --only \"Enkomi\" --max-kb 800. WHY, because an exception nobody can see is an exception nobody can review: this photo resizes to 783 KB, and the ceiling exists to stop UNOPTIMISED images reaching mobile users. 783 KB here is already optimised — grass-and-rubble ruins are the worst case for JPEG, not a file someone forgot to compress. The alternative was not a smaller photo of Enkomi; every other usable frame in the set (Alasia03 808 KB, Alasia05 835 KB) is LARGER, and the only one under the ceiling (Alasia01, 456 KB) is a photograph of a site information board, which is worse than an empty card. --only scopes the exception to this row and leaves the global ceiling untouched. If this photo is ever replaced, drop this note and the override with it."
+    },
+    {
+      "id": "7c4b6683-85aa-4449-b066-bae7ad7306d2",
+      "name": "Kyrenia Gate",
+      "category": "monument",
+      "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/b/b1/Kyrenia_Gate%2C_Nicosia%2C_Cyprus.jpg",
+          "credit": "Michal Klajban",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_Gate,_Nicosia,_Cyprus.jpg",
+          "source": "commons"
+        }
+      ],
+      "_note": "Swapped during the pass-2 dry run. The first pick (ToprakM, 6120x8160) resized to 620 KB, over the 600 KB ceiling. This one is both SMALLER (469 KB) and a better photograph — a straight-on frontal of the gate rather than an oblique with a lamppost across it. No rule was bent to fit it."
+    },
+    {
+      "id": "927c7f65-1fd4-43b0-b87c-b77206435e4d",
+      "name": "Bedesten",
+      "category": "religious_site",
+      "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/6/61/Bedestan_Nicosia_St._Nicolas_Church_%2841913982430%29.jpg",
+          "credit": "dronepicr",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Bedestan_Nicosia_St._Nicolas_Church_(41913982430).jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "975f0204-4007-421a-9dce-d85d7ad9b5be",
+      "name": "Antiphonitis Church",
+      "category": "religious_site",
+      "region": "kyrenia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/d/d7/Antiphonitis_church_Cyprus.jpeg",
+          "credit": "Sp!ros",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Antiphonitis_church_Cyprus.jpeg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "e4b80e27-45fc-47e1-85d5-97da373cfd11",
+      "name": "Mevlevi Tekke Museum",
+      "category": "museum",
+      "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/9/90/Mevlevi_Tekke_Museum.jpg",
+          "credit": "Pemav",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Mevlevi_Tekke_Museum.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "bba0d5cb-001a-405f-ab9d-9913d83e10a3",
+      "name": "Museum of Barbarism",
+      "category": "museum",
+      "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/4/40/Barbarl%C4%B1k_M%C3%BCzesi.jpg",
+          "credit": "ToprakM",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Barbarl%C4%B1k_M%C3%BCzesi.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "2c20f82e-1ee1-4c9b-9fdc-f59be72da470",
+      "name": "İskele Icon Museum (Panagia Theotokos)",
+      "category": "religious_site",
+      "region": "iskele",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/d/d0/Church_of_Panagia_Theotokos_in_Iskele_Cyprus.jpg",
+          "credit": "Nikolay Kazak",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Church_of_Panagia_Theotokos_in_Iskele_Cyprus.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "a95ec495-c1a0-4732-b3dd-55dee1d73351",
+      "name": "Archangelos Michael Icon Museum",
+      "category": "religious_site",
+      "region": "kyrenia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/0/07/Archangelos_Church_and_Icon_Museum.jpg",
+          "credit": "Antrugeon",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Archangelos_Church_and_Icon_Museum.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "6169028b-2497-4d86-8ed1-7b4598af0122",
+      "name": "Güzelyurt Railway Station Museum",
+      "category": "museum",
+      "region": "morphou",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/0/0e/G%C3%BCzelyurt_Tren_%C4%B0stasyonu_M%C3%BCzesi.jpg",
+          "credit": "ToprakM",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:G%C3%BCzelyurt_Tren_%C4%B0stasyonu_M%C3%BCzesi.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "fe916273-78d3-4280-ae1d-8a72eb5cd09c",
+      "name": "National Struggle Museum",
+      "category": "museum",
+      "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/0/01/Cyprus_Turkish_History_and_National_Struggle_Museum_2025_03.jpg",
+          "credit": "İlo04",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Cyprus_Turkish_History_and_National_Struggle_Museum_2025_03.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "2532c8db-14ec-4aa7-a949-abfa7c49e735",
+      "name": "Akkule (Ravelin Bastion)",
+      "category": "monument",
+      "region": "famagusta",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/8/8b/Old_Land_Gate%2C_Famagusta.JPG",
+          "credit": "Alaexis",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Old_Land_Gate,_Famagusta.JPG",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "8283f858-f93f-4419-9f8d-a88fc99602cd",
+      "name": "Canbulat Museum",
+      "category": "museum",
+      "region": "famagusta",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/3/32/Canbulat_Museum_03.jpg",
+          "credit": "Biologg",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Canbulat_Museum_03.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "e78e6e44-c9d0-4090-ab15-02cb63b9d36c",
+      "name": "Namık Kemal Museum & Dungeon",
+      "category": "museum",
+      "region": "famagusta",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/c/cc/Nam%C4%B1k_Kemal_Dungeon_and_Museum_02.jpg",
+          "credit": "Biologg",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Nam%C4%B1k_Kemal_Dungeon_and_Museum_02.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "af3e1e9d-8563-4087-a00e-58a8905a631c",
+      "name": "Dervish Pasha Mansion",
+      "category": "museum",
+      "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/e/ef/Dervish_Pasha_Mansion_Ethnographic_Museum_04.jpg",
+          "credit": "Biologg",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Dervish_Pasha_Mansion_Ethnographic_Museum_04.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "5c0d21e5-2f1b-4ea9-8a3d-3c9f67dd7d57",
+      "name": "Lapidary Museum",
+      "category": "museum",
+      "region": "nicosia",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/3/33/Lapidary_Museum_North_Cyprus_06.jpg",
+          "credit": "Biologg",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Lapidary_Museum_North_Cyprus_06.jpg",
+          "source": "commons"
+        }
+      ]
+    },
+    {
+      "id": "d2403dda-2a30-4e96-bb3a-b1f90249284b",
+      "name": "İskele Archaeological Museum",
+      "category": "museum",
+      "region": "iskele",
+      "photos": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/2/26/Trikomo_Archaeology_Museum_31.jpg",
+          "credit": "Biologg",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Trikomo_Archaeology_Museum_31.jpg",
           "source": "commons"
         }
       ]

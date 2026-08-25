@@ -77,8 +77,20 @@ function accepts(name, mutate, net = false, extra = []) {
   }
 }
 
-console.log('\n— the manifest as committed must pass —')
-accepts('the real manifest (with live reachability)', null, true)
+console.log('\n— the manifest as committed must pass, AS IT IS ACTUALLY APPLIED —')
+// Two assertions, not one, because the manifest is applied by TWO commands and a single
+// `accepts(default ceiling)` would be asserting something false: Enkomi (Alasia) resizes
+// to 783 KB and is applied deliberately at a raised ceiling (see its _note in the
+// manifest). Asserting the whole manifest at 600 KB would fail on a place that is not
+// broken, and the tempting "fix" — raising the default — would silently lift the ceiling
+// for all 21.
+//
+// So the harness verifies the two real commands. If the exception is ever removed, the
+// second assertion fails and points at itself.
+accepts('the 20 at the standard ceiling  (--except Enkomi)',
+  null, true, ['--except', 'Enkomi'])
+accepts('the Enkomi exception at its documented ceiling  (--only Enkomi --max-kb 800)',
+  null, true, ['--only', 'Enkomi', '--max-kb', '800'])
 
 console.log('\n— requirement: credit, license and source_url are all mandatory —')
 rejects('a missing credit',     m => { delete m.places[1].photos[0].credit },     'missing "credit"')
@@ -135,6 +147,20 @@ rejects('a photo over the post-resize ceiling',
   'over the 1 KB ceiling', true, ['--max-kb', '1'])
 accepts('the same photo under a sane ceiling',
   m => { m.places = [m.places[2]] }, true, ['--max-kb', '600'])
+
+console.log('\n— --except must scope the run, and refuse anything ambiguous —')
+// --except carries a deliberate ceiling exception: the excluded place is applied
+// separately at a raised --max-kb. Every failure mode here ends the same way — the held-
+// back place silently going through at the STANDARD ceiling, which is the one outcome the
+// flag exists to prevent, arriving disguised as a successful run.
+rejects('an --except needle that matches nothing',
+  () => {}, 'matched no place in the manifest', false, ['--except', 'NoSuchPlaceXyz'])
+rejects('an --except that excludes every place',
+  m => { m.places = [m.places[1]] }, 'excluded every place', false,
+  ['--except', 'a'])
+rejects('--only and --except together',
+  () => {}, 'mutually exclusive', false, ['--only', 'Bedesten', '--except', 'Enkomi'])
+accepts('a valid --except run', null, false, ['--except', 'Enkomi'])
 
 console.log('\n— --apply must refuse to run against an arbitrary manifest —')
 {

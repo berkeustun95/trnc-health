@@ -47,6 +47,27 @@
 // The mirrored file is a TECHNICAL DERIVATIVE, not a new source. source_url keeps
 // pointing at the Commons file page, which is where the licence and the creator live.
 //
+// ─── `src` MUST BE A CANONICAL upload.wikimedia.org PATH, NO QUERY STRING ───
+//
+// The Commons imageinfo API now returns ii.url with campaign analytics appended:
+//     ...Alasia07.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&...
+// Anything building a manifest entry from ii.url must strip the query string first.
+// Pass 1 predates the change and its URLs are clean; pass 2 was written from a tainted
+// ii.url and had all 21 stripped before the apply.
+//
+// TWO REASONS, and NEITHER is the one that first comes to mind:
+//   1. `src` is the provenance record — the answer to "where did this file come from".
+//      A tracking parameter is not part of a file's address, and it dates the entry to
+//      whatever the API happened to append that week.
+//   2. It is also the FETCH address, so leaving it in reports every re-mirror into
+//      someone else's campaign analytics.
+//
+// ⚠ It is NOT an attribution-key problem, though that is the intuitive fear and it is
+//   worth writing down so nobody re-derives it wrongly: photo_attribution is keyed by the
+//   MIRRORED bucket URL (see buildRow — `urls[i]` is publicUrl(path)), never by `src`.
+//   A tainted src therefore cannot desynchronise a key from its photo. The keys carry
+//   their own hazard, documented at buildRow, and it is a different one.
+//
 // CREDENTIALS — macOS Keychain, never .env (house convention):
 //   security add-generic-password -a "$USER" -s ada-supabase-service-role -w
 // service_role is required: these rows have provider_id NULL and no RLS role may write
@@ -100,6 +121,26 @@ const APPLY = process.argv.includes('--apply')
 // quietly doing nothing.
 const onlyIdx = process.argv.indexOf('--only')
 const ONLY = onlyIdx !== -1 ? (process.argv[onlyIdx + 1] ?? '').trim() : null
+
+// --except <uuid|name substring> is --only's inverse: run everything BUT the named place.
+//
+// It exists for the deliberate-exception case. A photo that legitimately needs a raised
+// --max-kb has to be applied on its own, or the raise applies to all of them and the
+// ceiling stops being a ceiling. Without --except there is no way to say "the other
+// twenty at the normal ceiling" — the alternative was editing the manifest between two
+// applies, which means the committed file differs from what the dry run validated and a
+// forgotten step leaves a place silently unwritten.
+//
+// The command then carries its own explanation:
+//     --apply --except "Enkomi"                 the 20, at 600 KB
+//     --apply --only "Enkomi" --max-kb 800      the 1, deliberately
+const exceptIdx = process.argv.indexOf('--except')
+const EXCEPT = exceptIdx !== -1 ? (process.argv[exceptIdx + 1] ?? '').trim() : null
+
+if (ONLY && EXCEPT) {
+  console.error('\x1b[31m--only and --except are mutually exclusive — they are two ways to scope the same run, and combining them hides which one did the scoping.\x1b[0m')
+  process.exit(1)
+}
 
 if (APPLY && mIdx !== -1) {
   console.error('\x1b[31m--apply and --manifest are mutually exclusive. --manifest is for exercising the refusal paths against broken fixtures, never for writing.\x1b[0m')
@@ -173,6 +214,22 @@ if (ONLY) {
       '', 'Manifest contains:', ...(manifest.places ?? []).map(p => `  ${p.id}  ${p.name}`))
   }
   console.log(`\x1b[33m--only ${ONLY} → ${places.length} of ${manifest.places.length} place(s): ${places.map(p => p.name).join(', ')}\x1b[0m`)
+}
+
+if (EXCEPT) {
+  const needle = EXCEPT.toLowerCase()
+  const hit = p => p.id === EXCEPT || p.name.toLowerCase().includes(needle)
+  const excluded = places.filter(hit)
+  // A needle that matches NOTHING must stop the run. Silently excluding nothing would
+  // apply the standard ceiling to a place that was meant to be held back — the exact
+  // failure --except exists to prevent, arriving as a success.
+  if (!excluded.length) {
+    fail(`--except ${JSON.stringify(EXCEPT)} matched no place in the manifest.`,
+      '', 'Manifest contains:', ...(manifest.places ?? []).map(p => `  ${p.id}  ${p.name}`))
+  }
+  places = places.filter(p => !hit(p))
+  if (!places.length) fail(`--except ${JSON.stringify(EXCEPT)} excluded every place — nothing left to do.`)
+  console.log(`\x1b[33m--except ${EXCEPT} → excluding ${excluded.length}: ${excluded.map(p => p.name).join(', ')} (${places.length} remain)\x1b[0m`)
 }
 
 function validatePhoto(place, photo, i) {
@@ -265,8 +322,30 @@ const nap = ms => new Promise(r => setTimeout(r, ms))
 // guard assertions went red with "not reachable as an image" against URLs that are
 // perfectly fine. The first instinct was to relax the assertion; that would have left a
 // check that cries wolf. The defect was here.
-const HEAD_SPACING_MS = 120
-const HEAD_RETRIES = 3
+//
+// RAISED 2026-08-25, THE THIRD TIME THIS BIT. 120ms/3 was tuned against a 9-photo
+// manifest. At 21 photos it is marginal in the worst way: one run returned six 429s,
+// the next returned none, same manifest and same code. An INTERMITTENT guard failure is
+// worse than a consistent one — it teaches you to re-run until it passes, which is
+// exactly how a genuinely dead link gets waved through. 350ms costs ~7s over 21 photos
+// instead of ~2.5s. That is not a cost. Fix the cause, never the assertion.
+//
+// 350 WAS STILL NOT ENOUGH AT 20 PHOTOS, and the reason is more specific than "too fast".
+// MEASURED, same run, same URLs: 19/20 HEADs succeeded and 1 got a 429 — while ALL 20
+// GETs of those identical URLs succeeded moments later, pulling 133.6 MB without a
+// single rejection. It was a different URL each attempt. upload.wikimedia.org limits
+// HEAD far more aggressively than it limits GET.
+//
+// So this stage is rate-limited for making CHEAP requests, while the expensive ones sail
+// through. 1000ms costs ~20s over 20 photos, which is still nothing next to the download
+// that follows it.
+//
+// ⚠ THE PROPER FIX IS A DIFFERENT VERB, NOT A BIGGER NUMBER: on a 429, retry as
+//   GET with `Range: bytes=0-0`, which returns the same content-type and size headers,
+//   is one byte on the wire, and is not subject to whatever is throttling HEAD. Left
+//   undone deliberately rather than slipped in — see the log entry.
+const HEAD_SPACING_MS = 1000
+const HEAD_RETRIES = 4
 
 async function head(url) {
   let last = { ok: false, status: 0, ct: '', bytes: null, transient: false }
