@@ -18,18 +18,34 @@
 // the run refuses if any of them is missing. `places` already holds 42 active rows;
 // inserting would have produced duplicate landmarks.
 //
-// ─── RESIZE ONLY. NEVER CROP. ───────────────────────────────────────────────
+// ─── RESIZE ONLY. NEVER CROP. THE LICENCE BASIS. ────────────────────────────
 //
-// CC 4.0 treats technical modification and format-shifting as NOT producing Adapted
-// Material, so downscaling and re-encoding are permitted for CC BY-SA photos without
-// triggering ShareAlike. CROPPING IS AN ADAPTATION and would. The pipeline below passes
-// `width` only, with no `height` and no `fit`, which is an aspect-preserving downscale —
-// the same discipline as mirror-novest-images.mjs, which rejected a variant precisely
-// because its aspect ratio revealed it to be a crop.
+// CC 4.0 §2(a)(4) authorises the licensee to make "technical modifications necessary to
+// exercise the Licensed Rights in Other Media and Formats", and states that
+// modifications made under that section NEVER produce Adapted Material. Downscaling and
+// re-encoding for a mobile client fall squarely inside it, so they do not trigger
+// ShareAlike and do not change the attribution owed.
+//
+// CROPPING IS NOT A TECHNICAL MODIFICATION. It is an adaptation, it produces Adapted
+// Material, and for a CC BY-SA photo it drags the ShareAlike obligation onto whatever it
+// is embedded in. That is the whole reason this distinction is written down here.
+//
+// WHAT THAT MEANS FOR THE PIPELINE — precisely, because sharp's fit modes are easy to
+// get wrong and only one of them is safe:
+//     fit: 'inside'   scales down to fit the box, aspect preserved, NO crop, NO padding.
+//                     ← the only one used here.
+//     fit: 'cover'    CROPS to fill.            FORBIDDEN — sharp's DEFAULT, so an
+//                                                omitted `fit` is the dangerous case.
+//     fit: 'fill'     distorts the aspect.      FORBIDDEN.
+//     fit: 'contain'  letterboxes with bars.    not a crop, but not wanted either.
+//     .extract()      an explicit crop.         FORBIDDEN.
 //
 // If a photo ever needs to fill a fixed frame, do it at RENDER time with contain, never
-// here. Adding `height`, `fit: 'cover'`, or `.extract()` to this file silently converts
-// every CC BY-SA photo in the module into an Adapted Material problem.
+// here. mirror-novest-images.mjs learned the same lesson from the other end: it rejected
+// a ready-made WordPress variant because its aspect ratio revealed it to be a crop.
+//
+// The mirrored file is a TECHNICAL DERIVATIVE, not a new source. source_url keeps
+// pointing at the Commons file page, which is where the licence and the creator live.
 //
 // CREDENTIALS — macOS Keychain, never .env (house convention):
 //   security add-generic-password -a "$USER" -s ada-supabase-service-role -w
@@ -57,9 +73,22 @@ const mIdx = process.argv.indexOf('--manifest')
 const MANIFEST = mIdx !== -1
   ? resolve(process.cwd(), process.argv[mIdx + 1] ?? '')
   : resolve(ROOT, 'scripts/data/explore-photo-manifest.json')
-const BUCKET   = 'place-photos'
-const MAX_WIDTH = 1600
-const JPEG_QUALITY = 82
+const BUCKET = 'place-photos'
+
+// Longest edge, not width: a portrait original constrained only on width would still
+// come through enormous on its height. 2000px is comfortably above any render size the
+// app asks for (the gallery is device-width at 280pt tall), so the downscale is
+// invisible on screen and the saving is not.
+const MAX_EDGE = 2000
+const JPEG_QUALITY = 80
+
+// Hard ceiling on the MIRRORED bytes, checked AFTER the resize. The 9 originals total
+// ~77 MB — Othello alone is 18.2 MB — and every one of those bytes would be paid for on
+// mobile data and in Supabase egress, forever, on a live surface, for no visual gain.
+// Target is 300-500 KB; this is the refuse-to-write line above it, not the target.
+// Override with --max-kb <n> if a genuinely detailed photo needs headroom, deliberately.
+const kbIdx = process.argv.indexOf('--max-kb')
+const MAX_BYTES = (kbIdx !== -1 ? Number(process.argv[kbIdx + 1]) : 600) * 1024
 const UA = 'ADA-TRNC-Health/1.0 (berke.ustun95@gmail.com) explore-photo-mirror'
 
 const APPLY = process.argv.includes('--apply')
@@ -332,6 +361,58 @@ function rollbackSQL() {
 const publicUrl = path =>
   `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`
 
+// Downloading ~75 MB from one host in a burst gets rate-limited, exactly as the HEAD
+// stage did. Found the same way and it must not be tolerated in a different form: the
+// FIRST run of the resize probe silently dropped three photos to 429s and reported a
+// total of 44 MB across 5 photos as though that were the whole set. A dry run that
+// quietly covers part of the work is worse than one that fails, because the number it
+// prints looks like an answer.
+async function getWithRetry(url, tries = 4) {
+  let last
+  for (let a = 0; a < tries; a++) {
+    if (a) await nap(600 * 2 ** a)
+    try {
+      const r = await fetch(url, { headers: { 'User-Agent': UA } })
+      if (r.ok) return Buffer.from(await r.arrayBuffer())
+      last = `HTTP ${r.status}`
+      if (r.status !== 429 && r.status < 500) break     // permanent — stop retrying
+    } catch (e) { last = e.message }
+  }
+  throw new Error(last ?? 'unknown fetch failure')
+}
+
+// THE ONE PLACE PIXELS ARE TOUCHED. fit:'inside' + withoutEnlargement is an
+// aspect-preserving downscale and nothing else — see the licence note in the header
+// before changing any argument here.
+async function shrink(body) {
+  return sharp(body, { failOn: 'none' })
+    .rotate()                                            // EXIF orientation only
+    .resize({ width: MAX_EDGE, height: MAX_EDGE, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+    .toBuffer()
+}
+
+// The ceiling, in one place, so the dry-run probe and the real mirror cannot disagree
+// about what is too big. Throws — a photo over the line stops the run.
+function assertSize(place, i, bytes) {
+  if (bytes <= MAX_BYTES) return
+  throw new Error(
+    `${place.name} #${i + 1}: still ${kb(bytes)} after resize, over the ${kb(MAX_BYTES)} ceiling. ` +
+    `Lower JPEG_QUALITY, or raise it deliberately with --max-kb.`)
+}
+
+const kb = b => b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`
+
+// Fetch + resize WITHOUT uploading, so a dry run can report the real mirrored size
+// rather than a prediction. Also where the ceiling is enforced: a photo that is still
+// too big after the resize must stop the run, not be quietly published.
+async function probe(photo) {
+  const body = await getWithRetry(photo.src)
+  const out  = await shrink(body)
+  const meta = await sharp(out).metadata()
+  return { before: body.length, after: out.length, w: meta.width, h: meta.height, buffer: out }
+}
+
 // Deterministic, keyed on the place UUID and the photo's position IN THE MANIFEST, so a
 // re-run overwrites itself rather than accumulating copies.
 //
@@ -345,17 +426,10 @@ const publicUrl = path =>
 const mirrorPath = (placeId, i) => `places/${placeId}/${i + 1}.jpg`
 
 async function mirror(place, photo, i) {
-  const res = await fetch(photo.src, { headers: { 'User-Agent': UA } })
-  if (!res.ok) throw new Error(`fetch ${res.status}`)
-  const body = Buffer.from(await res.arrayBuffer())
+  const body = await getWithRetry(photo.src)
 
-  // width only: no height, no fit, no extract. See the header — this must stay a
-  // downscale, because a crop would make an Adapted Material out of a CC BY-SA photo.
-  const buffer = await sharp(body, { failOn: 'none' })
-    .rotate()                                        // apply EXIF orientation
-    .resize({ width: MAX_WIDTH, withoutEnlargement: true })
-    .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
-    .toBuffer()
+  const buffer = await shrink(body)
+  assertSize(place, i, buffer.length)
 
   const path = mirrorPath(place.id, i)
   const { error } = await supabase.storage.from(BUCKET)
@@ -399,17 +473,46 @@ function buildRow(place, urls) {
 // ─── 7. Report ───────────────────────────────────────────────────────────────
 
 console.log(c.b('\n─── What will be written ──────────────────────────────────────'))
+let totalBefore = 0, totalAfter = 0
 for (const p of places) {
   const row = byId.get(p.id)
   console.log(`\n  ${c.b(p.name)} ${c.d(`${p.category} · ${p.region}`)}`)
   console.log(c.d(`    now: ${(row.photos ?? []).length} photo(s), attribution ${row.photo_attribution ? 'set' : 'NULL'}`))
-  p.photos.forEach((ph, i) => {
+  for (const [i, ph] of p.photos.entries()) {
     const tag = ph.existing ? c.y('keep') : c.g('new ')
     console.log(`    ${tag} ${ph.credit} / ${ph.license}`)
     console.log(c.d(`         legacy credit → ${legacyCreditString(ph, 'tr')}`))
     console.log(c.d(`         source        → ${ph.source_url ?? '(own photography — no source page)'}`))
-    if (!ph.existing) console.log(c.d(`         mirror to     → ${mirrorPath(p.id, i)}`))
-  })
+
+    if (ph.existing) {
+      // Berke's instruction: the file already in the bucket is left alone. It is not
+      // re-fetched, not re-encoded, and not size-checked — only its credit string changes.
+      console.log(c.d(`         bucket file   → untouched (only its credit string changes)`))
+      continue
+    }
+    if (SKIP_REACH) { console.log(c.d(`         mirror to     → ${mirrorPath(p.id, i)}`)); continue }
+
+    // Actually download and resize, so the number below is measured, not predicted.
+    try {
+      const r = await probe(ph)
+      await nap(HEAD_SPACING_MS)
+      totalBefore += r.before; totalAfter += r.after
+      // The SAME assertSize() the real mirror calls — not a second comparison against
+      // MAX_BYTES. Two spellings of one rule is how a dry run comes to disagree with the
+      // run it is supposed to predict.
+      let over = null
+      try { assertSize(p, i, r.after) } catch (e) { over = e.message }
+      console.log(c.d(`         mirror to     → ${mirrorPath(p.id, i)}`))
+      console.log(`         ${over ? c.r('resize') : c.g('resize')}        → ${kb(r.before)} → ${c.b(kb(r.after))}  ${c.d(`${r.w}x${r.h}`)}${over ? c.r('  OVER CEILING') : ''}`)
+      if (over) errors.push(over)
+    } catch (e) {
+      console.log(`         ${c.r('resize')}        → ${c.r(`FAILED — ${e.message}`)}`)
+      errors.push(`${p.name} #${i + 1}: resize probe failed — ${e.message}`)
+    }
+  }
+}
+if (totalAfter) {
+  console.log(c.b(`\n  mirrored total: ${kb(totalBefore)} → ${c.g(kb(totalAfter))}  ${c.d(`(${Math.round(100 - totalAfter / totalBefore * 100)}% smaller, ceiling ${kb(MAX_BYTES)}/photo)`)}`))
 }
 
 if (warns.length) {

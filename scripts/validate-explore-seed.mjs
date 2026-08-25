@@ -14,6 +14,14 @@
 //
 // The fixtures are generated from the REAL manifest and mutated in memory, so they never
 // drift from the shape the script actually parses, and nothing broken is left on disk.
+//
+// ⚠ WATCHED RED, TWICE, ON PURPOSE:
+//     • removing the beach-licence branch  → the two beach assertions fail
+//     • `assertSize` short-circuited to always pass → 16/17, the ceiling assertion fails
+//   And it caught two real defects rather than merely passing: the HEAD stage had no
+//   throttle (429s read as dead links), and then the resize probe had the same hole —
+//   its first run silently dropped three photos and printed a 5-photo total as if it
+//   were the whole set. Both fixed at the source, not by loosening the assertion.
 
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -30,12 +38,12 @@ const base = () => JSON.parse(readFileSync(REAL, 'utf8'))
 let pass = 0, fail = 0
 
 // Runs the real script against a fixture. Returns {code, out}.
-function run(manifest, net = false) {
+function run(manifest, net = false, extra = []) {
   const path = join(tmp, `m-${Math.abs(JSON.stringify(manifest).length)}-${pass + fail}.json`)
   writeFileSync(path, JSON.stringify(manifest, null, 2))
   try {
     const out = execFileSync(process.execPath,
-      ['--disable-warning=MODULE_TYPELESS_PACKAGE_JSON', SEED, '--manifest', path, ...(net ? [] : ['--skip-reachability'])],
+      ['--disable-warning=MODULE_TYPELESS_PACKAGE_JSON', SEED, '--manifest', path, ...(net ? [] : ['--skip-reachability']), ...extra],
       { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
     return { code: 0, out }
   } catch (e) {
@@ -45,9 +53,9 @@ function run(manifest, net = false) {
 
 // A guard passes only if the run FAILED and said why. A non-zero exit with the wrong
 // message would mean something else broke, which is not evidence the guard works.
-function rejects(name, mutate, expect, net = false) {
+function rejects(name, mutate, expect, net = false, extra = []) {
   const m = base(); mutate(m)
-  const { code, out } = run(m, net)
+  const { code, out } = run(m, net, extra)
   const clean = out.replace(/\x1b\[[0-9;]*m/g, '')
   if (code !== 0 && clean.includes(expect)) { pass++; console.log(`  ok   rejects ${name}`) }
   else {
@@ -58,9 +66,9 @@ function rejects(name, mutate, expect, net = false) {
   }
 }
 
-function accepts(name, mutate, net = false) {
+function accepts(name, mutate, net = false, extra = []) {
   const m = base(); if (mutate) mutate(m)
-  const { code, out } = run(m, net)
+  const { code, out } = run(m, net, extra)
   if (code === 0) { pass++; console.log(`  ok   accepts ${name}`) }
   else {
     fail++
@@ -116,6 +124,17 @@ console.log('\n— a photo that is not reachable as an image —')
 rejects('a 404 photo url', m => {
   m.places[1].photos[0].src = 'https://upload.wikimedia.org/wikipedia/commons/0/00/ADA_no_such_file_xyz.jpg'
 }, 'not reachable as an image', true)
+
+console.log('\n— the post-resize byte ceiling must refuse an oversized photo —')
+// --max-kb 1 is a ceiling nothing can meet, so this asserts the CHECK fires, not that a
+// particular photo is big. Needs the network: the size is measured after a real resize,
+// which is the whole point — a ceiling checked against the SOURCE bytes would pass
+// anything that compresses well and fail things that are fine.
+rejects('a photo over the post-resize ceiling',
+  m => { m.places = [m.places[2]] },              // Bellapais: smallest source, 264 KB out
+  'over the 1 KB ceiling', true, ['--max-kb', '1'])
+accepts('the same photo under a sane ceiling',
+  m => { m.places = [m.places[2]] }, true, ['--max-kb', '600'])
 
 console.log('\n— --apply must refuse to run against an arbitrary manifest —')
 {
