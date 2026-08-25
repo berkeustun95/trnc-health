@@ -19,6 +19,7 @@
 //     • resolveAttribution returning {credit:''} instead of null → 7 fail (null-safety)
 //     • legacyCreditString dropping the license-URI clause       → 3 fail (en, tr, round-trip)
 //     • photo_attribution ignored so photo_credits wins          → 2 fail (url-key precedence)
+//     • photo_attribution dropped from BROWSE_COLS                → 1 fail (select coverage)
 //   A fourth "break" was attempted first and is worth recording: the sed that was
 //   supposed to apply break 2 silently did not match, the suite printed 18/18, and that
 //   green was almost written down as proof. A break that does not break proves nothing —
@@ -87,6 +88,40 @@ const e = { credit: 'Mike McBey', license: 'CC BY 2.0' }
 is('derived string re-parses to its source entry',
   resolveAttribution({ photo_credits: [legacyCreditString(e, 'tr')] }, U, 0),
   { credit: 'Mike McBey', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0', sourceUrl: null, source: null })
+
+
+// ─── The column must actually be SELECTED, or none of the above ever runs ────
+//
+// ExploreProfileScreen takes `place` as a PROP and never re-queries, so the attribution
+// renderer can only see what the feeding select asked for. Omit photo_attribution and
+// every code path above still passes while the app silently renders the legacy fallback
+// and drops the source link — a populated branch that is never once executed.
+//
+// This is not hypothetical. It is what happened to PropertyDetailScreen's contact bar:
+// built, shipped and verified against an embed that selected none of its columns. The
+// bug surfaced only when real data arrived. Asserting the select text is crude, but it
+// is the difference between a guard and a hope.
+import { readFileSync as _read } from 'node:fs'
+import { resolve as _resolve, dirname as _dirname } from 'node:path'
+import { fileURLToPath as _url } from 'node:url'
+
+const _root = _resolve(_dirname(_url(import.meta.url)), '..')
+console.log('\n— photo_attribution must be in every select that feeds the detail screen —')
+for (const [file, marker] of [
+  ['screens/ExploreScreen.js', 'BROWSE_COLS'],
+  ['screens/HomeScreen.js', "supabase.from('places')"],
+]) {
+  const src = _read(_resolve(_root, file), 'utf8')
+  const i = src.indexOf(marker)
+  const window = i === -1 ? '' : src.slice(i, i + 1400)
+  const ok = i !== -1 && /photo_credits/.test(window) && /photo_attribution/.test(window)
+  if (ok) { pass++; console.log(`  ok   ${file} selects photo_attribution`) }
+  else {
+    fail++
+    console.log(`  FAIL ${file} — ${i === -1 ? `marker ${marker} not found` : 'select omits photo_attribution'}`)
+    console.log('       The detail screen never re-queries; an omitted column can never render.')
+  }
+}
 
 console.log(`\n${pass} passed, ${fail} failed\n`)
 process.exit(fail ? 1 : 0)

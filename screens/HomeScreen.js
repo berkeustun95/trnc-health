@@ -184,7 +184,11 @@ export default function HomeScreen({
         // migration), but both resolve against `places` by their preserved UUID → ExploreProfileScreen.
         // A miss (id not an active/visible place) is a graceful no-op, never a crash.
         const { data } = await supabase.from('places')
-          .select('id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, blue_flag, access_type, amenities, provider_id, featured_until')
+          // Mirrors ExploreScreen's BROWSE_COLS — photo_attribution INCLUDED. This is the
+          // production path to a landmark's detail screen (search_content's landmark arm
+          // reads the legacy table and resolves the hit here), so an omission would drop
+          // the attribution source link on the one route real users take today.
+          .select('id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until')
           .eq('id', result.id).eq('status', 'active').maybeSingle()
         if (data) onSelectExplorePlace(data)
         break

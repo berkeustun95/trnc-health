@@ -334,6 +334,14 @@ const publicUrl = path =>
 
 // Deterministic, keyed on the place UUID and the photo's position IN THE MANIFEST, so a
 // re-run overwrites itself rather than accumulating copies.
+//
+// ⚠ POSITION-KEYED, which is the scheme mirror-novest-images.mjs explicitly REJECTED —
+//   there, a gallery reorder shifts every path and re-uploads everything after the
+//   insertion point, so it keys on the partner's stable media id instead. Accepted here
+//   deliberately: this is a one-shot backfill of 9 hand-curated photos, there is no
+//   upstream id to key on (a Commons file page is not a media id we control), and the
+//   rollback block captures the exact prior URLs. If this ever becomes a repeating sync,
+//   revisit it — do not assume the difference was an oversight.
 const mirrorPath = (placeId, i) => `places/${placeId}/${i + 1}.jpg`
 
 async function mirror(place, photo, i) {

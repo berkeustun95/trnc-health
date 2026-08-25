@@ -244,9 +244,16 @@ function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
 // (and the moderation backend columns) never reach the client. featured_until IS included:
 // the derived isFeatured() pin/badge needs it. Covers PlaceCard, the map card, and the
 // passed-through ExploreProfileScreen. (area re-enters when the Slice-5 area filter ships.)
+// photo_attribution is HERE, not only in a detail-screen query, because there is no
+// detail-screen query: ExploreProfileScreen receives `place` as a prop and never
+// re-fetches. A column missing from this list is a column the attribution renderer can
+// never see — it would silently fall back to parsing photo_credits and drop the source
+// link, with nothing on screen to say why. That is the PropertyDetailScreen contact-bar
+// bug exactly (its populated branch was built, shipped and verified while the embed
+// feeding it selected none of the columns it needed).
 const BROWSE_COLS =
   'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
-  'cover_image_url, photos, photo_credits, blue_flag, access_type, amenities, provider_id, featured_until'
+  'cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until'
 
 export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, placeFavorites, onTogglePlaceFavorite, isAdmin = false, initialCategory = null, initialRegion = null }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin previewing.
