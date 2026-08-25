@@ -128,6 +128,23 @@ went missing). Two mandatory rules:
   saying "207 m of headroom" goes stale silently the moment the measurement changes. Where
   it matters, have the tool print the real figure on every run so the comment can be
   checked against it — and correct the comment when they disagree, even by 2 m.
+- **When a retry-tuned fix stops working, check whether you are tuning the wrong verb.**
+  A number you keep raising is a number that is not the answer. `seed-explore-photos.mjs`
+  hit Wikimedia 429s five times; the spacing went 120 → 350 → 1000 ms and each raise was
+  reasoned, plausible and wrong. The measurement that ended it was free and already in the
+  output: **19 of 20 HEAD requests succeeded and one 429'd, while ALL 20 GETs of those
+  identical URLs succeeded in the same run, pulling 133 MB without a single rejection** —
+  a different URL failing each attempt. upload.wikimedia.org throttles HEAD far harder
+  than GET. The stage was being rate-limited for making CHEAP requests while the expensive
+  ones sailed through, and no amount of backoff addresses that.
+  Generalises past this script: before tuning a retry, get the measurement that says
+  *which* request is being rejected and *why*. Compare the failing call against a
+  neighbouring call that succeeds — different verb, different endpoint, different header —
+  because "it fails sometimes" and "it fails when we use HEAD" look identical from a
+  distance and only one of them tells you what to change. Related, and the reason this
+  matters at all: **an intermittent guard failure is worse than a consistent one** — it
+  teaches you to re-run until it passes, which is exactly how a genuinely dead link gets
+  waved through.
 
 ## Module go-live SOP (ordered — the order is the point)
 
