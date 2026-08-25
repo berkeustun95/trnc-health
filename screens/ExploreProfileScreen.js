@@ -15,6 +15,7 @@ import { isFeatured } from '../utils/featured'
 import { resolveAttribution } from '../utils/photoAttribution'
 import ContentReportMenu from '../components/ContentReportMenu'
 import BackButton from '../components/BackButton'
+import ComingSoonScreen from '../components/ComingSoonScreen'
 
 const { width: W } = Dimensions.get('window')
 const GALLERY_H    = 280
@@ -123,6 +124,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
   const group   = categoryToGroup(place.category)
   const pc      = GROUP_META[group]?.colorToken || placeColors.landmark
   const isBeach = place.category === 'beach'
+  const hasCoords = place.latitude != null && place.longitude != null
   const photos  = place.photos || []
 
   // Owner affordances. provider_id is threaded via BROWSE_COLS (D1). featured_requested_at is
@@ -140,6 +142,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
   const [claimed,   setClaimed]   = useState(false)   // local: submitted this session
   const [featBusy,  setFeatBusy]  = useState(false)
   const [featSent,  setFeatSent]  = useState(false)
+  const [showCheckin, setShowCheckin] = useState(false)
 
   const showClaim   = isUnclaimed && !claimed
   const showFeature = isOwner && EXPLORE_FEATURED_LIVE && !featuredNow && !featSent
@@ -170,6 +173,25 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
     const { error } = await supabase.rpc('request_featured_place', { p_place_id: place.id })
     setFeatBusy(false)
     if (!error) setFeatSent(true)
+  }
+
+  // Same shape as ExploreScreen's showSubmit branch: the sub-screen replaces this one
+  // rather than stacking a modal, so it must sit AFTER every hook above.
+  //
+  // ⚠ Android back closes the whole PROFILE from here, not just this screen — App.js's
+  //   BackHandler pops `selectedExplorePlace` and knows nothing about local sub-screen
+  //   state. Same known limitation as ExploreScreen's submit flow and the events detail
+  //   overlay; the in-screen back button works correctly.
+  if (showCheckin) {
+    return (
+      <ComingSoonScreen
+        lang={lang}
+        moduleKey="checkins"
+        titleKey="checkinCta"
+        session={session}
+        onBack={() => setShowCheckin(false)}
+      />
+    )
   }
 
   return (
@@ -320,15 +342,31 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
         </View>
       </ScrollView>
 
-      {/* Fixed footer */}
-      {place.latitude != null && place.longitude != null && (
-        <View style={s.footer}>
-          <TouchableOpacity style={s.directionsBtn} onPress={openDirections} activeOpacity={0.85}>
-            <Ionicons name="navigate-outline" size={18} color="#fff" />
-            <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
+      {/* Fixed footer. Check-in is ALWAYS offered; directions needs coordinates, so the
+          footer itself is no longer gated on them and Check-in takes the full width when
+          a place has none. (Every place has coordinates today — this is about the button
+          not silently disappearing with the one next to it if that ever stops being true.) */}
+      <View style={s.footer}>
+        <View style={s.footerRow}>
+          {hasCoords && (
+            <TouchableOpacity style={[s.directionsBtn, { flex: 1 }]} onPress={openDirections} activeOpacity={0.85}>
+              <Ionicons name="navigate-outline" size={18} color="#fff" />
+              <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
+            </TouchableOpacity>
+          )}
+          {/* Coming Soon + waitlist capture ONLY. No check-in row is written, no location
+              is read, no user position is stored — and none of that may be added here
+              without being its own decision. See MODULE_FLAGS.checkins. */}
+          <TouchableOpacity
+            style={[s.checkinBtn, !hasCoords && { flex: 1 }]}
+            onPress={() => setShowCheckin(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="location-outline" size={18} color={colors.primaryDark} />
+            <Text style={s.checkinBtnText}>{t('checkinCta', lang)}</Text>
           </TouchableOpacity>
         </View>
-      )}
+      </View>
 
       {/* Claim modal — optional evidence note → insert place_claims (guard: unclaimed + no dup) */}
       <Modal visible={claimOpen} transparent animationType="fade" onRequestClose={() => setClaimOpen(false)}>
@@ -435,6 +473,13 @@ const s = StyleSheet.create({
                    paddingVertical: 15, flexDirection: 'row',
                    alignItems: 'center', justifyContent: 'center', gap: 8 },
   directionsBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+  footerRow:     { flexDirection: 'row', gap: 10 },
+  checkinBtn:    { backgroundColor: colors.primaryLight, borderRadius: radius.md,
+                   borderWidth: 1.5, borderColor: colors.primary,
+                   paddingVertical: 15, paddingHorizontal: 18, flexDirection: 'row',
+                   alignItems: 'center', justifyContent: 'center', gap: 8 },
+  // primaryDark, not primary: primary on primaryLight is only 4.44:1 (see theme.js).
+  checkinBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
 
   // Owner affordances (claim / featured)
   ownerCard:      { backgroundColor: colors.cardBg, borderRadius: radius.card, borderWidth: 1,

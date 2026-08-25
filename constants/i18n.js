@@ -831,6 +831,13 @@ const translations = {
     // Explore module (Slice 5)
     exploreTitle: 'Explore', menuExplore: 'Explore', menuBeaches: 'Beaches',
     exploreSavedTitle: 'Saved places',
+    // Check-ins. ONE key on purpose: it labels the button on a place profile AND titles
+    // the Coming Soon screen that button opens, and those must read as the same thing.
+    // ⚠ SEVEN LOCALES STILL MISSING (Slice 6). t() falls back to ENGLISH before it falls
+    //   back to the raw key, so an ar/ru/el/fr/es/de/fa user sees "Check in" — not a raw
+    //   slug, but English text on an RTL surface. This key sits on a LIVE screen (the
+    //   beaches path), so it is an OTA blocker, not a nice-to-have.
+    checkinCta: 'Check in',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'My submissions', exploreEditResubmit: 'Edit & resubmit', exploreEditTitle: 'Edit & resubmit', exploreResubmitBtn: 'Resubmit',
     placeStatusPending: 'Under review', placeStatusActive: 'Published', placeStatusRejected: 'Rejected', placeRejectedReason: 'Reason: {reason}',
@@ -1965,6 +1972,9 @@ const translations = {
     // Explore module (Slice 5)
     exploreTitle: 'Keşfet', menuExplore: 'Keşfet', menuBeaches: 'Plajlar',
     exploreSavedTitle: 'Kaydedilenler',
+    // "I'm here" — a status, not a transaction, which is what a check-in is.
+    // Not 'Giriş yap' (collides with log-in) and not 'Check-in yap' (half-English).
+    checkinCta: 'Buradayım',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Gönderilerim', exploreEditResubmit: 'Düzenle ve yeniden gönder', exploreEditTitle: 'Düzenle ve yeniden gönder', exploreResubmitBtn: 'Yeniden gönder',
     placeStatusPending: 'İnceleniyor', placeStatusActive: 'Yayında', placeStatusRejected: 'Reddedildi', placeRejectedReason: 'Sebep: {reason}',

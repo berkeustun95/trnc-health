@@ -844,6 +844,22 @@ WITH report AS (
     UNION ALL SELECT '0904_accommodation_partner_feed','feed_precision_check is NULL-safe',
       EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_feed_precision_check'
         AND pg_get_constraintdef(oid) ILIKE '%IS NOT NULL%')
+    -- checkins joined the notify path. Its ENTRY POINT is ungated (the Check-in button
+    -- sits on a live place profile), so signups accumulate from the next OTA onward
+    -- whether or not this migration was ever applied — the module_waitlist CHECK is only
+    -- a shape guard. If this goes red, those signups are silently un-notifiable, and the
+    -- failure surfaces on the one day it matters: launch day.
+    UNION ALL SELECT '0918_notify_waitlist_add_checkins','notify path covers checkins',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_module_waitlist'
+          AND pg_get_functiondef(p.oid) ILIKE '%checkins%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='module_notif_text'
+          -- BOTH tables, deliberately: the whitelist alone yields a NULL title and a blast
+          -- that dies on notifications.title NOT NULL. Buradayım proves the per-language
+          -- row, Check-ins proves the English fallback the other 7 locales resolve to.
+          AND pg_get_functiondef(p.oid) ILIKE '%Buradayım%'
+          AND pg_get_functiondef(p.oid) ILIKE '%Check-ins%')
     -- The notify path must know every module that can collect signups. CREATE OR REPLACE
     -- adds no named object, so only a body token can tell the new lists from the old.
     -- If this goes red, a module's waitlist can be filled but never notified.

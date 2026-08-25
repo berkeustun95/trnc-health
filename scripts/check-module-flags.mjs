@@ -43,6 +43,7 @@ const EXPECTED_MODULES = {
   studentHub:    false,
   explore:       false,
   towing:        true,   // live
+  checkins:      false,
 }
 // ─── GO-LIVE WAITLIST BLAST ──────────────────────────────────────────────────
 //
@@ -166,7 +167,12 @@ for (const [k, live] of Object.entries(actualModules)) {
 // So the check is mechanical and runs wherever this script already runs: every push
 // (.githooks/pre-push), every `npm run ota`, every `eas build`. Add a module to
 // MODULE_FLAGS without adding it to the notify path and you cannot ship.
-const NOTIFY_SQL = 'supabase/migrations/20260909_notify_waitlist_add_modules.sql'
+// ⚠ POINTS AT THE MIGRATION THAT MOST RECENTLY REDEFINED THESE TWO FUNCTIONS, not at a
+// fixed historical file. CREATE OR REPLACE means the newest definition is the only true
+// one, so a migration that adds a module to the notify path MUST repoint this constant in
+// the same commit — otherwise the guard reads a superseded file and blocks every push
+// complaining about a module the database already knows about.
+const NOTIFY_SQL = 'supabase/migrations/20260918_notify_waitlist_add_checkins.sql'
 try {
   const sql = readFileSync(resolve(ROOT, NOTIFY_SQL), 'utf8')
 
