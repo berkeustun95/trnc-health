@@ -4,29 +4,12 @@ import MapView, { Marker } from 'react-native-maps'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { parseIsOpen } from '../utils/facilityUtils'
 
 const LEFKOSA    = { latitude: 35.1856, longitude: 33.3823, latitudeDelta: 0.08, longitudeDelta: 0.08 }
 const PIN_COLORS = { pharmacy: '#7C3AED', clinic: '#0E7C7B', hospital: '#D1495B', dentist: '#2E9E5B' }
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
-const DAY_INDEX = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 }
-
-function parseIsOpen(hours) {
-  if (!hours) return null
-  if (hours.trim() === '24/7') return true
-  const match = hours.match(/^([A-Z][a-z]+)-([A-Z][a-z]+)\s+(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/)
-  if (!match) return null
-  const [, startDay, endDay, startTime, endTime] = match
-  const dayStart = DAY_INDEX[startDay]
-  const dayEnd   = DAY_INDEX[endDay]
-  if (dayStart == null || dayEnd == null || dayStart > dayEnd) return null
-  const now = new Date()
-  const day = now.getDay()
-  if (day < dayStart || day > dayEnd) return false
-  const toMins = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m }
-  const nowMins = now.getHours() * 60 + now.getMinutes()
-  return nowMins >= toMins(startTime) && nowMins < toMins(endTime)
-}
 
 export default function MapScreen({ facilities, dutyFacilityId, userLocation, onSelectFacility, onSelectUnclaimed, lang = 'en' }) {
   const [selectedPin, setSelectedPin] = useState(null)

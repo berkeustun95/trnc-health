@@ -83,6 +83,10 @@ const EXPECTED_SCALARS = {
   FEATURED_LIVE:         false,
   EXPLORE_FEATURED_LIVE: false,
   PRICE_COMPARE_LIVE:    false,
+  // Swaps the bottom-nav map tab from the health MapScreen to the Explore map. Unlike the
+  // others this does not gate NEW content — it replaces a surface users already have, so
+  // an accidental flip is a downgrade for every user, not merely an early reveal.
+  EXPLORE_MAP_LIVE:      false,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')
@@ -120,8 +124,20 @@ for (const [k, want] of Object.entries(EXPECTED_MODULES)) {
 for (const k of Object.keys(actualModules)) {
   if (!(k in EXPECTED_MODULES)) problems.push(`MODULE_FLAGS.${k} is new and not in this guard's baseline — add it`)
 }
+// A scalar the baseline knows about that is NOT DECLARED in flags.js is a failure, not a
+// skip. The old `if (k in actualScalars && ...)` form passed silently when the export was
+// missing entirely — caught for real when a `git checkout -- constants/flags.js` (reverting
+// a preview flip) also discarded a newly-added declaration: the guard reported OK, while
+// App.js imported EXPLORE_MAP_LIVE from a file that no longer exported it. It resolves to
+// undefined, which is falsy, so the app looks correct and the flag has silently ceased to
+// exist. The one state a flag guard must never report OK is "the flag is gone".
 for (const [k, want] of Object.entries(EXPECTED_SCALARS)) {
-  if (k in actualScalars && actualScalars[k] !== want) {
+  if (!(k in actualScalars)) {
+    problems.push(`${k} is in this guard's baseline but is not declared in ${FLAGS_FILE} — `
+      + `importers get undefined (falsy), so the gate silently defaults open-or-closed with nothing to say it went missing`)
+    continue
+  }
+  if (actualScalars[k] !== want) {
     problems.push(`${k} is ${actualScalars[k]}, baseline says ${want}`)
   }
 }

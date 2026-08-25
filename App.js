@@ -17,13 +17,14 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t } from './constants/i18n'
 import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
-import { MODULE_FLAGS } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE } from './constants/flags'
 import AuthScreen from './screens/AuthScreen'
 import BookingScreen from './screens/BookingScreen'
 import FacilityProfileScreen from './screens/FacilityProfileScreen'
 import ProviderScreen from './screens/ProviderScreen'
 import ProviderOnboardingScreen from './screens/ProviderOnboardingScreen'
 import MapScreen from './screens/MapScreen'
+import ExploreMapScreen from './screens/ExploreMapScreen'
 import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import DutyListScreen from './screens/DutyListScreen'
@@ -111,9 +112,18 @@ const LANGUAGES = [
   { key: 'Persian', label: 'فارسی' },
 ]
 
+// The `map` tab's identity follows EXPLORE_MAP_LIVE, label AND icon together. A tab
+// reading "Keşfet" under a folded-map icon is half-swapped, and half-swapped reads as a
+// bug rather than a feature. Evaluated once at module load — the flag is a build-time
+// constant, so there is nothing to re-render.
 const TAB_ITEMS = [
   { key: 'home',       iconOff: 'home-outline',   iconOn: 'home',    labelKey: 'tabHome' },
-  { key: 'map',        iconOff: 'map-outline',     iconOn: 'map',     labelKey: 'map' },
+  {
+    key:      'map',
+    iconOff:  EXPLORE_MAP_LIVE ? 'compass-outline' : 'map-outline',
+    iconOn:   EXPLORE_MAP_LIVE ? 'compass'         : 'map',
+    labelKey: EXPLORE_MAP_LIVE ? 'menuExplore'     : 'map',
+  },
   { key: 'favourites', iconOff: 'heart-outline',   iconOn: 'heart',   labelKey: 'tabSaved' },
   { key: 'profile',    iconOff: 'person-outline',  iconOn: 'person',  labelKey: 'tabProfile' },
 ]
@@ -1354,14 +1364,34 @@ export default function App() {
 
         {activeTab === 'map' && (
           <SafeAreaView style={styles.safe} edges={['top']}>
-            <MapScreen
-              facilities={facilities}
-              dutyFacilityId={dutyFacilityId}
-              userLocation={userLocation}
-              onSelectFacility={setSelectedFacility}
-              onSelectUnclaimed={setUnclaimedFacility}
-              lang={lang}
-            />
+            {/* MapScreen is NOT dead code and must not be deleted — it is the committed
+                behaviour of this tab and the thing users have today. EXPLORE_MAP_LIVE
+                chooses between the two; both branches ship in every bundle. */}
+            {EXPLORE_MAP_LIVE ? (
+              <ExploreMapScreen
+                facilities={facilities}
+                dutyFacilityId={dutyFacilityId}
+                userLocation={userLocation}
+                // Structurally FALSE here: the content selector is role-first, so an admin
+                // short-circuits to AdminScreen and never reaches the tab shell. Passed
+                // anyway so the component needs no change if an AdminScreen preview entry
+                // is ever added, and so its Explore gate reads one variable, not two.
+                isAdmin={isAdmin}
+                onSelectFacility={setSelectedFacility}
+                onSelectUnclaimed={setUnclaimedFacility}
+                onSelectPlace={setSelectedExplorePlace}
+                lang={lang}
+              />
+            ) : (
+              <MapScreen
+                facilities={facilities}
+                dutyFacilityId={dutyFacilityId}
+                userLocation={userLocation}
+                onSelectFacility={setSelectedFacility}
+                onSelectUnclaimed={setUnclaimedFacility}
+                lang={lang}
+              />
+            )}
           </SafeAreaView>
         )}
 

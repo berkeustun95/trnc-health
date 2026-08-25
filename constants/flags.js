@@ -20,6 +20,28 @@ export const EXPLORE_FEATURED_LIVE = false
 // in. Flip to true once enough garages have published prices. Mirrors FEATURED_LIVE.
 export const PRICE_COMPARE_LIVE = false
 
+// Explore map on the bottom-nav "map" tab. false = the tab keeps the health-only
+// MapScreen and its "Harita" label; true = it becomes ExploreMapScreen, all ADA content
+// on one clustered map, labelled "Keşfet".
+//
+// THIS IS NOT A DARK-LAUNCH FLAG FOR NEW CONTENT — it guards a SWAP OF SOMETHING USERS
+// ALREADY HAVE. The map tab is ungated and has shipped since launch. Flipping this
+// exchanges a labelled health map for an 11-pin "Keşfet", because 387 of 394 facilities
+// still have NULL coordinates. That trade is a downgrade until the pharmacies are
+// geocoded, so the swap must be a deliberate act on a chosen day, not a dormant payload
+// riding out on whatever the next unrelated OTA happens to be.
+//
+// Preconditions for flipping (all of them, in this order):
+//   1. pharmacies geocoded properly — NOT seed_pharmacies_geocoded.sql, whose 387 rows
+//      carry 142 distinct points with 28 stacked on one coordinate
+//   2. Slice 6 — the seven remaining locales for any keys the map introduced
+//   3. coachMapTitle/coachMapBody still say "see all facilities on a map"; a tab renamed
+//      Keşfet with that tutorial copy is a polish bug nobody will assign
+//
+// Flipping it locally is how the map is previewed and demoed. check-module-flags.mjs
+// carries the baseline, so a flip left in the working tree cannot reach `eas update`.
+export const EXPLORE_MAP_LIVE = false
+
 // Marketplace module gating. Each key is a module that is empty in prod today, so
 // it renders a "Coming soon" screen (with one-tap Notify me) instead of an empty
 // list that reads as broken. false = gated (Coming Soon); flip to true via OTA to
