@@ -31,11 +31,10 @@
     {
       "id": "7ecf2c84-2192-45c9-b075-a2ce115f842c",
       "name": "Kyrenia Castle", "category": "castle_fortress", "region": "kyrenia",
-      "_note": "The ONLY row that already has a photo. It is preserved, not replaced, and its missing photo_attribution entry is backfilled. Provenance verified: the bucket file Kyrenia_Fortress_2.jpeg is Commons File:Kyrenia Fortress 2.JPG, and its artist + licence match the photo_credits string already stored on the row.",
+      "_note": "Provenance verified: the bucket file Kyrenia_Fortress_2.jpeg is Commons File:Kyrenia Fortress 2.JPG, and its artist + licence matched the photo_credits string already stored on the row. It was PRESERVED unresized in the first apply (2026-08-25) and re-mirrored immediately after, because at 2.4 MB it was ~5x the largest optimised photo and the only unoptimised image in the set. Its `src` is therefore OUR OWN bucket object, not Commons: the pixels are already ours, so re-fetching from Commons would be a pointless round trip. Kyrenia_Fortress_2.jpeg is NOT deleted — the saved rollback block for the first apply references it and must keep resolving. source_url still points at the Commons file page, which is where the licence and creator live.",
       "photos": [
         {
-          "existing": true,
-          "url": "https://jeihxnwqytnxtytgkzgf.supabase.co/storage/v1/object/public/place-photos/Kyrenia_Fortress_2.jpeg",
+          "src": "https://jeihxnwqytnxtytgkzgf.supabase.co/storage/v1/object/public/place-photos/Kyrenia_Fortress_2.jpeg",
           "credit": "Julian Nyča", "license": "CC BY-SA 3.0",
           "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
           "source_url": "https://commons.wikimedia.org/wiki/File:Kyrenia_Fortress_2.JPG",

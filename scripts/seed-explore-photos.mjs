@@ -93,6 +93,14 @@ const UA = 'ADA-TRNC-Health/1.0 (berke.ustun95@gmail.com) explore-photo-mirror'
 
 const APPLY = process.argv.includes('--apply')
 
+// --only <uuid|name substring> narrows the run to one place. Everything downstream —
+// validation, the probe, the rollback block — then covers exactly what was written and
+// nothing else, which is what makes a single-row fix safe to re-apply. Matching is done
+// AFTER the manifest is parsed, so a typo that matches nothing stops the run rather than
+// quietly doing nothing.
+const onlyIdx = process.argv.indexOf('--only')
+const ONLY = onlyIdx !== -1 ? (process.argv[onlyIdx + 1] ?? '').trim() : null
+
 if (APPLY && mIdx !== -1) {
   console.error('\x1b[31m--apply and --manifest are mutually exclusive. --manifest is for exercising the refusal paths against broken fixtures, never for writing.\x1b[0m')
   process.exit(1)
@@ -155,7 +163,17 @@ const supabase = createClient(
 // ─── 1. Manifest validation — refuse rather than write something wrong ───────
 
 const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
-const places = manifest.places ?? []
+let places = manifest.places ?? []
+
+if (ONLY) {
+  const needle = ONLY.toLowerCase()
+  places = places.filter(p => p.id === ONLY || p.name.toLowerCase().includes(needle))
+  if (!places.length) {
+    fail(`--only ${JSON.stringify(ONLY)} matched no place in the manifest.`,
+      '', 'Manifest contains:', ...(manifest.places ?? []).map(p => `  ${p.id}  ${p.name}`))
+  }
+  console.log(`\x1b[33m--only ${ONLY} → ${places.length} of ${manifest.places.length} place(s): ${places.map(p => p.name).join(', ')}\x1b[0m`)
+}
 
 function validatePhoto(place, photo, i) {
   const at = `${place.name} [photo ${i + 1}]`
