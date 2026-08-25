@@ -29,3 +29,11 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-map-sources
   echo "  push blocked: the Explore map would publish gated content."
   exit 1
 }
+
+# i18n coverage. Blocks a push where a locale silently renders ENGLISH — which is what
+# happens when a key is missing, because t() falls back to English BEFORE it falls back
+# to the key. No existence check can see that; only a value comparison can.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-i18n-coverage.mjs || {
+  echo "  push blocked: a locale would render English text."
+  exit 1
+}

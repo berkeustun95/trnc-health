@@ -1,0 +1,170 @@
+#!/usr/bin/env node
+// ─── i18n coverage — a locale value that is silently English ─────────────────
+//
+//   node scripts/validate-i18n-coverage.mjs
+//
+// ─── WHY A RAW-KEY CHECK WOULD BE A DECORATION ──────────────────────────────
+//
+// The obvious check is "does every key resolve in every locale". It is worthless here,
+// and worse than worthless because it is permanently green: t() falls back to
+// translations.en[key] BEFORE it falls back to the key itself (constants/i18n.js).
+// A key missing from Arabic does not render `checkinCta`; it renders "Check in".
+// So the user-visible failure is ENGLISH ON AN RTL SCREEN, and no existence check can
+// see it. The only check with teeth compares each locale's VALUE against English.
+//
+// ─── WHICH MEANS THE ALLOWLIST IS THE WHOLE DESIGN ──────────────────────────
+//
+// Comparing against English fires on correct data: `hospital` really is "Hospital" in
+// Spanish, `Café` really is "Café" in French. A check that fires on correct data teaches
+// you to ignore it, so every legitimate collision is DECLARED below with a reason.
+// "Deliberately identical" then becomes a visible decision someone made, and anything
+// new that matches English fails until a human either translates it or consciously
+// adds a line here.
+//
+// ─── SCOPE: 63 OF 1135 KEYS, DELIBERATELY ───────────────────────────────────
+//
+// This guards only the keys reachable from the Explore map + check-in surfaces. That is
+// not laziness, it is the only scope at which the design works: app-wide there are 329
+// colliding keys across 2081 key×locale pairs, and a 2081-entry allowlist could only be
+// GENERATED, never reviewed. A generated allowlist is a rubber stamp — it looks like
+// coverage while being read by nobody, which is worse than no guard at all.
+//
+// Widen this deliberately, one surface at a time, when another surface earns the same
+// treatment. Do not widen it by regenerating the allowlist.
+//
+// ─── THE SCOPE IS DERIVED, NOT LISTED ───────────────────────────────────────
+//
+// Keys come from reading the surface files AND from the key maps those files index into
+// at runtime. Hardcoding a list would go stale the first time someone adds a key, and
+// reading only literal t('x') would miss every key looked up through a variable —
+// t(src.labelKey, lang), t(CATEGORY_LABEL_KEY[cat], lang) — which is exactly the blind
+// spot that let the previous i18n checker pass while covering almost nothing.
+
+import { readFileSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { t, LANG_CODES } from '../constants/i18n.js'
+import { HEALTH_TYPES } from '../constants/facilityTypes.js'
+import { GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories.js'
+import { REGION_LABEL_KEY } from '../constants/regions.js'
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+
+// The surfaces this guard covers. Adding a file here widens the scope deliberately.
+const SURFACES = [
+  'screens/ExploreMapScreen.js',
+  'screens/ExploreProfileScreen.js',
+  'components/ComingSoonScreen.js',
+]
+
+// ─── ALLOWLIST — one line per key×locale, with the reason ────────────────────
+//
+// A pair listed here is asserting: this locale's value is identical to English ON
+// PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
+// question; adding one should feel like a decision, because it is.
+const SAME_AS_ENGLISH = {
+  // Place names. The English strings are already the local exonyms the app uses, so a
+  // locale "translating" them would be inventing a name the signage does not use.
+  'blDistrictIskele':     { Turkish: 'the English value IS the Turkish name',
+                            French: 'no French exonym in use', Spanish: 'no Spanish exonym in use',
+                            German: 'no German exonym in use' },
+  'blDistrictKarpaz':     { Turkish: 'the English value IS the Turkish name',
+                            French: 'no French exonym in use', Spanish: 'no Spanish exonym in use',
+                            German: 'no German exonym in use' },
+  'blDistrictLefke':      { Turkish: 'the English value IS the Turkish name',
+                            French: 'no French exonym in use', Spanish: 'no Spanish exonym in use',
+                            German: 'no German exonym in use' },
+  'blDistrictKyrenia':    { French: 'Kyrenia is used in French alongside Kérynia',
+                            Spanish: 'Kyrenia is the form in Spanish use',
+                            German: 'Kyrenia is the form in German use' },
+  'blDistrictMorphou':    { French: 'Morphou is the French form',
+                            Spanish: 'Morphou is the form in Spanish use',
+                            German: 'Morphou is the form in German use' },
+  // Note French correctly carries Famagouste and Nicosie — those locales are ABSENT
+  // here on purpose, and if either ever collides the guard should fire.
+  'blDistrictFamagusta':  { Spanish: 'Famagusta is the Spanish form',
+                            German: 'Famagusta is the German form' },
+  'blDistrictNicosia':    { Spanish: 'Nicosia is the Spanish form' },
+
+  // Loanwords and shared Latin roots. Identical because the word IS the word.
+  'exploreCatCafe':       { French: 'Café is French', German: 'Café is used in German' },
+  'exploreCatRestaurant': { French: 'Restaurant is French', German: 'Restaurant is German' },
+  'blCatMonument':        { French: 'Monument is French' },
+  'blCatMuseum':          { German: 'Museum is German' },
+  'exploreGroupNature':   { French: 'Nature is French' },
+  'exploreGroupServices': { French: 'Services is French' },
+  'blAccessPublic':       { French: 'Public is French' },
+  'photoCreditPrefix':    { French: 'Photo is French' },
+  'hospital':             { Spanish: 'Hospital is Spanish' },
+}
+
+// ─── Scope derivation ────────────────────────────────────────────────────────
+
+const literal = new Set()
+for (const f of SURFACES) {
+  const src = readFileSync(resolve(ROOT, f), 'utf8')
+  // The negative lookbehind matters: without it this also matches inside identifiers
+  // that merely END in t, and `.select('user_id')` is read as t('user_id').
+  for (const m of src.matchAll(/(?<![A-Za-z0-9_])t\('([a-zA-Z][a-zA-Z0-9_]*)'/g)) literal.add(m[1])
+}
+
+// Keys these surfaces reach THROUGH A VARIABLE. Pulled from the same maps the screens
+// index into, so a new category or group is covered the moment it is added.
+const viaVariable = [
+  ...HEALTH_TYPES,
+  ...Object.values(GROUP_META).map(m => m.labelKey),
+  ...Object.values(CATEGORY_LABEL_KEY),
+  ...Object.values(REGION_LABEL_KEY),
+]
+
+const KEYS = [...new Set([...literal, ...viaVariable])].filter(Boolean).sort()
+const LANGS = Object.keys(LANG_CODES).filter(l => l !== 'English')
+
+// ─── Check ───────────────────────────────────────────────────────────────────
+
+const problems = []
+const usedAllowances = new Set()
+
+for (const key of KEYS) {
+  const en = t(key, 'English')
+  if (en === key) { problems.push(`${key}: not present in English at all — every locale falls back to the raw key`); continue }
+  for (const lang of LANGS) {
+    if (t(key, lang) !== en) continue
+    const reason = SAME_AS_ENGLISH[key]?.[lang]
+    if (reason) { usedAllowances.add(`${key}/${lang}`); continue }
+    problems.push(`${key} / ${lang} is identical to English (${JSON.stringify(en)}) — `
+      + `translate it, or declare it in SAME_AS_ENGLISH with a reason`)
+  }
+}
+
+// A stale allowance is a silent hole: the key gets translated, the line stays, and the
+// next collision on that pair passes unnoticed. Report it rather than fail — it is a
+// tidiness problem, not a correctness one, and failing a push over it would be noise.
+const stale = []
+for (const [key, langs] of Object.entries(SAME_AS_ENGLISH)) {
+  for (const lang of Object.keys(langs)) {
+    if (!usedAllowances.has(`${key}/${lang}`)) stale.push(`${key}/${lang}`)
+  }
+}
+
+const allowanceCount = Object.values(SAME_AS_ENGLISH).reduce((n, o) => n + Object.keys(o).length, 0)
+
+if (problems.length) {
+  console.error('\n  ┌─ i18n COVERAGE FAILED ─────────────────────────────────────────┐')
+  for (const p of problems) console.error(`  │ ${p}`)
+  console.error('  └────────────────────────────────────────────────────────────────┘')
+  console.error(`\n  ${problems.length} problem(s) across ${KEYS.length} key(s) × ${LANGS.length} locale(s).`)
+  console.error('  A locale that matches English renders ENGLISH to that user — on ar/fa,')
+  console.error('  English text on an RTL screen. It never renders a raw key, which is why')
+  console.error('  an existence check cannot see this.\n')
+  process.exit(1)
+}
+
+if (stale.length) {
+  console.log(`i18n coverage: ${stale.length} STALE allowance(s) — now translated, safe to delete:`)
+  for (const s of stale) console.log(`  · ${s}`)
+}
+
+console.log(`i18n coverage: OK — ${KEYS.length} key(s) × ${LANGS.length} locale(s), `
+  + `${allowanceCount} declared same-as-English (scope: the Explore map + check-in surfaces, `
+  + `not the whole 1135-key table — see the header)`)

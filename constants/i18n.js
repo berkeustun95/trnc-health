@@ -2896,6 +2896,9 @@ const translations = {
     // Explore module (Slice 5)
     exploreTitle: 'استكشاف', menuExplore: 'استكشاف', menuBeaches: 'الشواطئ',
     exploreSavedTitle: 'الأماكن المحفوظة',
+    // "I am here" — a status. NOT تسجيل الوصول ("register arrival"), the
+    // transactional framing rejected in Turkish.
+    checkinCta: 'أنا هنا',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'إرسالاتي', exploreEditResubmit: 'تعديل وإعادة الإرسال', exploreEditTitle: 'تعديل وإعادة الإرسال', exploreResubmitBtn: 'إعادة الإرسال',
     placeStatusPending: 'قيد المراجعة', placeStatusActive: 'منشور', placeStatusRejected: 'مرفوض', placeRejectedReason: 'السبب: {reason}',
@@ -3774,6 +3777,8 @@ const translations = {
     // Explore module (Slice 5)
     exploreTitle: 'Обзор', menuExplore: 'Обзор', menuBeaches: 'Пляжи',
     exploreSavedTitle: 'Сохранённые места',
+    // "I am here" — a status, matching Buradayım.
+    checkinCta: 'Я здесь',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Мои материалы', exploreEditResubmit: 'Изменить и отправить снова', exploreEditTitle: 'Изменить и отправить снова', exploreResubmitBtn: 'Отправить снова',
     placeStatusPending: 'На проверке', placeStatusActive: 'Опубликовано', placeStatusRejected: 'Отклонено', placeRejectedReason: 'Причина: {reason}',
@@ -4652,6 +4657,8 @@ const translations = {
     // Explore module (Slice 5)
     exploreTitle: 'Εξερεύνηση', menuExplore: 'Εξερεύνηση', menuBeaches: 'Παραλίες',
     exploreSavedTitle: 'Αποθηκευμένα μέρη',
+    // "I am here" — a status, matching Buradayım.
+    checkinCta: 'Είμαι εδώ',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Οι υποβολές μου', exploreEditResubmit: 'Επεξεργασία και επανυποβολή', exploreEditTitle: 'Επεξεργασία και επανυποβολή', exploreResubmitBtn: 'Επανυποβολή',
     placeStatusPending: 'Υπό έλεγχο', placeStatusActive: 'Δημοσιευμένο', placeStatusRejected: 'Απορρίφθηκε', placeRejectedReason: 'Αιτία: {reason}',
@@ -5530,6 +5537,9 @@ const translations = {
     // Explore module (Slice 5)
     exploreTitle: 'Explorer', menuExplore: 'Explorer', menuBeaches: 'Plages',
     exploreSavedTitle: 'Lieux enregistrés',
+    // "I am here". NOT « Je suis là » — colloquially commoner, but « là »
+    // also means "there", and that ambiguity is wrong on a presence button.
+    checkinCta: 'Je suis ici',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Mes contributions', exploreEditResubmit: 'Modifier et renvoyer', exploreEditTitle: 'Modifier et renvoyer', exploreResubmitBtn: 'Renvoyer',
     placeStatusPending: 'En cours de révision', placeStatusActive: 'Publié', placeStatusRejected: 'Refusé', placeRejectedReason: 'Motif : {reason}',
@@ -6408,6 +6418,8 @@ const translations = {
     // Explore module (Slice 5)
     exploreTitle: 'Explorar', menuExplore: 'Explorar', menuBeaches: 'Playas',
     exploreSavedTitle: 'Lugares guardados',
+    // "I am here" — a status, matching Buradayım.
+    checkinCta: 'Estoy aquí',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Mis envíos', exploreEditResubmit: 'Editar y reenviar', exploreEditTitle: 'Editar y reenviar', exploreResubmitBtn: 'Reenviar',
     placeStatusPending: 'En revisión', placeStatusActive: 'Publicado', placeStatusRejected: 'Rechazado', placeRejectedReason: 'Motivo: {reason}',
@@ -7286,6 +7298,9 @@ const translations = {
     // Explore module (Slice 5)
     exploreTitle: 'Entdecken', menuExplore: 'Entdecken', menuBeaches: 'Strände',
     exploreSavedTitle: 'Gespeicherte Orte',
+    // "I am here". NOT "Einchecken" — the transactional framing rejected
+    // in Turkish.
+    checkinCta: 'Ich bin hier',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'Meine Beiträge', exploreEditResubmit: 'Bearbeiten und erneut senden', exploreEditTitle: 'Bearbeiten und erneut senden', exploreResubmitBtn: 'Erneut senden',
     placeStatusPending: 'In Prüfung', placeStatusActive: 'Veröffentlicht', placeStatusRejected: 'Abgelehnt', placeRejectedReason: 'Grund: {reason}',
@@ -8164,6 +8179,8 @@ const translations = {
     // Explore module (Slice 5)
     exploreTitle: 'کاوش', menuExplore: 'کاوش', menuBeaches: 'سواحل',
     exploreSavedTitle: 'مکان‌های ذخیره‌شده',
+    // "I am here", pronoun dropped — natural and shorter for a button.
+    checkinCta: 'اینجا هستم',
     // My submissions + resubmit (Slice 5 D2)
     exploreMySubmissions: 'ارسال‌های من', exploreEditResubmit: 'ویرایش و ارسال دوباره', exploreEditTitle: 'ویرایش و ارسال دوباره', exploreResubmitBtn: 'ارسال دوباره',
     placeStatusPending: 'در حال بررسی', placeStatusActive: 'منتشرشده', placeStatusRejected: 'رد شد', placeRejectedReason: 'دلیل: {reason}',
