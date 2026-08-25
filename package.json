@@ -26,6 +26,7 @@
     "react-native-maps": "1.20.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-url-polyfill": "^3.0.0",
+    "supercluster": "^9.0.0",
     "zustand": "^5.0.14"
   },
   "scripts": {
@@ -45,7 +46,8 @@
     "novest:images": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mirror-novest-images.mjs",
     "novest:verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-novest-import.mjs",
     "novest:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-novest-staleness.mjs",
-    "novest:logo": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/upload-novest-logo.mjs"
+    "novest:logo": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/upload-novest-logo.mjs",
+    "map:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-map-sources.mjs"
   },
   "private": true,
   "devDependencies": {

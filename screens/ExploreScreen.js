@@ -22,7 +22,9 @@ import {
   categoryToGroup, groupVisible,
 } from '../constants/exploreCategories'
 
-const TRNC_CENTER = { latitude: 35.2, longitude: 33.5, latitudeDelta: 0.9, longitudeDelta: 0.9 }
+// Whole-island framing, shared with ExploreMapScreen so the two map surfaces cannot
+// drift to different default views.
+export const TRNC_CENTER = { latitude: 35.2, longitude: 33.5, latitudeDelta: 0.9, longitudeDelta: 0.9 }
 
 // name_i18n[lang] if present, else fall through to the plain `name` column (never '').
 function extractI18n(obj, lang) {
@@ -35,7 +37,7 @@ function extractI18n(obj, lang) {
   }
   return result != null ? String(result) : ''
 }
-function placeName(p, lang) { return extractI18n(p.name_i18n, lang) || p.name || '' }
+export function placeName(p, lang) { return extractI18n(p.name_i18n, lang) || p.name || '' }
 function placeDesc(p, lang) { return extractI18n(p.description_i18n, lang) }
 
 function regionLabel(region, lang) {
@@ -251,7 +253,7 @@ function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
 // link, with nothing on screen to say why. That is the PropertyDetailScreen contact-bar
 // bug exactly (its populated branch was built, shipped and verified while the embed
 // feeding it selected none of the columns it needed).
-const BROWSE_COLS =
+export const BROWSE_COLS =
   'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
   'cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until'
 

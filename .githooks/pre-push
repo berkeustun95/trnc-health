@@ -21,3 +21,11 @@ node scripts/check-secrets.mjs || {
   echo "  push blocked: remove the credential, then ROTATE it."
   exit 1
 }
+
+# Explore map pin-source gate. Blocks a push where the map would draw a dark module's
+# content — a leak no flag guard sees, because the flag is still false and only the
+# CONSUMER of it is wrong. See the header of scripts/validate-map-sources.mjs.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-map-sources.mjs || {
+  echo "  push blocked: the Explore map would publish gated content."
+  exit 1
+}
