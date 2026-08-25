@@ -38,6 +38,7 @@
     "setup:hooks": "git config core.hooksPath .githooks && echo 'hooks enabled (.githooks)'",
     "eas-build-pre-install": "node scripts/check-module-flags.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
+    "explore:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-photo-attribution.mjs",
     "novest:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-novest-mapping.mjs --self",
     "novest:import": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/import-novest-properties.mjs",
     "novest:images": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mirror-novest-images.mjs",
