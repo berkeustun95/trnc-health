@@ -107,6 +107,12 @@ WITH report AS (
     ('0911_facilities_public_health','facilities','tier'),
     ('0911_facilities_public_health','facilities','parent_facility_id'),
     ('0911_facilities_public_health','facilities','name_official'),
+    -- ── Explore photo attribution. The column was applied BY HAND before its migration
+    --    file existed, which is exactly the `area`-class failure this section is for:
+    --    unregistered, so invisible to the check. Registered retroactively by 0917.
+    ('0917_place_photo_attribution','places','photo_attribution'),
+    ('0917_place_photo_attribution','beaches','photo_attribution'),
+    ('0917_place_photo_attribution','landmarks','photo_attribution'),
     ('0812_module_waitlist','module_waitlist','notified_at'),
     ('0824_place_moderation','places','hidden_at'),
     ('0824_place_moderation','places','hidden_reason'),
