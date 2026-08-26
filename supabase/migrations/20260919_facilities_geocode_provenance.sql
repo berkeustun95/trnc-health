@@ -56,7 +56,13 @@
 --   1  OSM name match corroborated by the address town — two independent sources agree
 --   2  Google Places, accepted ONLY when it agrees with the address town and, where the
 --      number is a landline on a >=90%-pure exchange, with the phone prefix
---   3  placed by hand on satellite imagery
+--   3  placed by hand on satellite imagery — and visual_satellite corroboration is
+--      MANDATORY here, not sampled. This is the ONLY tier in practice now: ordinary
+--      pharmacies are not map content (that would be free promotion for businesses with
+--      no commercial relationship with ADA), so coordinates are written one at a time as
+--      a facility subscribes. One at a time means no batch, no pipeline and no reviewer —
+--      exactly the conditions in which a rushed coordinate gets written and nothing
+--      catches it. The constraint below is the only thing standing there.
 --   NULL  provenance recorded but no tier claimed (e.g. provider-supplied)
 --
 -- Apply by hand: SQL editor, Role = postgres. Then `node scripts/migration-ledger.mjs`
@@ -76,7 +82,7 @@ COMMENT ON COLUMN public.facilities.geocode_source IS
 COMMENT ON COLUMN public.facilities.geocode_tier IS
   '1 = OSM name match + address-town agreement. 2 = Google Places, corroborated by town and (landline only) phone exchange. 3 = hand-placed on satellite. NULL = provenance recorded, no tier claimed.';
 COMMENT ON COLUMN public.facilities.geocode_corroboration IS
-  'What INDEPENDENTLY agreed with this coordinate: address_town, phone_exchange, region_audit, google_places, osm, visual_satellite. Empty/NULL means nothing did — which is a fact worth storing, not a gap to hide.';
+  'What INDEPENDENTLY agreed with this coordinate: address_town, phone_exchange, region_audit, google_places, osm, visual_satellite. Empty/NULL means nothing did — a fact worth storing, not a gap to hide. FOR A HAND-PLACED PIN, visual_satellite IS MANDATORY, NOT SAMPLED: placements happen one at a time during business work, so there is no batch and no reviewer, and looking at one pin on satellite costs thirty seconds. resolveRegion() cannot substitute — its anchors derive from the same coarse geocoding it would be checking, so it confirms a town and never a street, and a wrong street is what makes someone drive to the wrong place.';
 COMMENT ON COLUMN public.facilities.geocoded_at IS
   'When the coordinate was established. Lets a later pass find everything placed before a method was known to be faulty.';
 
@@ -141,7 +147,7 @@ ALTER TABLE public.facilities
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20260919_facilities_geocode_provenance.sql', '291f52ee0b3f03dd8c25a4c260038366a682a895df8a7069045b7784822a587b')
+VALUES ('20260919_facilities_geocode_provenance.sql', '9a19cd36db709437bb270b0aa7605732be0f855de39c04d6d74d305e27995683')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

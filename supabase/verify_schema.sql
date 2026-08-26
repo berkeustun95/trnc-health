@@ -848,6 +848,11 @@ WITH report AS (
     UNION ALL SELECT '0904_accommodation_partner_feed','feed_precision_check is NULL-safe',
       EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_feed_precision_check'
         AND pg_get_constraintdef(oid) ILIKE '%IS NOT NULL%')
+    -- duty_list's natural key. Without it a chunked year-sized load (~5,100 rows) that
+    -- gets re-run duplicates a year of health data SILENTLY, and duplicates render as
+    -- separate pharmacies. If this goes red, the next roster load is unsafe to repeat.
+    UNION ALL SELECT '0920_duty_list_idempotent_load','duty_list (duty_date, name) unique',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='duty_list_date_name_unique')
     -- Coordinates may not exist without recorded provenance. This is the "unverified
     -- stays NULL" rule made structural, so a tired hand cannot write shaky coordinates
     -- "to be tidied later". If it goes red, pins can be written from nowhere again —

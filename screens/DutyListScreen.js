@@ -82,10 +82,22 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
             <Text style={s.callBtnText}>{item.phone}</Text>
           </TouchableOpacity>
         ) : null}
+        {/* NAME + ADDRESS + country, not name alone. "HAZAL REİS ECZANESİ" on its own is
+            unscoped — not even constrained to Cyprus. duty_list carries an address on
+            100% of rows, so this costs nothing and is markedly more precise. Same
+            fallback shape as HomeScreen.js:739-742.
+
+            ⚠ AND THIS IS WHY IT NEEDS NO COORDINATES. A stored wrong pin is SILENT —
+            the user drives to it. A search result is visible at the moment of
+            navigating, so a bad match is something they can see and correct before
+            setting off. It also hands the geocoding to a far better geocoder than the
+            one that produced 142 distinct points for 387 pharmacies. */}
         <TouchableOpacity
           style={s.directionsBtn}
           onPress={() => Linking.openURL(
-            `https://maps.google.com/?q=${encodeURIComponent(item.name)}`
+            `https://maps.google.com/?q=${encodeURIComponent(
+              [item.name, item.address, 'Kuzey Kıbrıs'].filter(Boolean).join(', ')
+            )}`
           )}
           activeOpacity={0.7}
         >

@@ -128,6 +128,18 @@ went missing). Two mandatory rules:
   saying "207 m of headroom" goes stale silently the moment the measurement changes. Where
   it matters, have the tool print the real figure on every run so the comment can be
   checked against it — and correct the comment when they disagree, even by 2 m.
+- **Check whether the grouping you chose is the one the domain uses.** 387 pharmacies with
+  NULL coordinates looked like an obvious data gap, and a bulk geocoding project was
+  scoped to close it. Grouped by `type` it read as 387 missing rows. Grouped by
+  **commercial relationship** — the axis the policy was actually written on — not one row
+  contradicted it: every facility with coordinates is either public infrastructure (6
+  state hospitals) or a subscriber who placed their own pin (1 clinic, `provider_id` set),
+  and every facility without them is a private business with no relationship to ADA.
+  Nothing had drifted; the policy was working.
+  **A policy and an omission are indistinguishable until you find the axis the policy was
+  written on.** So when data looks uniformly missing along one axis, group it along a
+  different one before proposing to fill it — and prefer the axis the business uses
+  (who pays, who is public, who signed) over the one the schema happens to offer.
 - **Every check here asks whether a column EXISTS. None asked whether the content is
   CURRENT — and that is the failure that reached users.** `verify_schema.sql`,
   `schema_drift_audit.sql` and `migration_ledger_check.sql` all verify *shape*. The duty

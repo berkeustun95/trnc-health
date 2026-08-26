@@ -583,6 +583,10 @@ const translations = {
     coachFiltersTitle: 'Filters', coachFiltersBody: "Toggle open-now facilities or tap the sliders icon to filter by facility type.",
     coachDutyTitle: 'Duty Pharmacy', coachDutyBody: "Shows today's on-duty pharmacy — tap to open the full regional duty list.",
     coachMapTitle: 'Map View', coachMapBody: 'See all facilities on an interactive map and find the ones closest to you.',
+    // Explore-map variant, selected by EXPLORE_MAP_LIVE alongside the tab label.
+    // The coach mark points AT the tab, so copy and label must flip together —
+    // a tab reading Keşfet with a tutorial about health facilities is half-swapped.
+    coachExploreTitle: 'Explore the map', coachExploreBody: 'Health facilities, beaches and historic places on one map. Filter by category and tap a pin to open it.',
     coachPetsTitle: 'Pets & Animals', coachPetsBody: 'Find vet clinics, pet shops, and animal services across TRNC.',
     coachHomeServicesTitle: 'Home Services', coachHomeServicesBody: 'Book tradespeople for plumbing, electrical, cleaning, and more — delivered to your door.',
     coachBeachesTitle: 'Beaches & Landmarks', coachBeachesBody: "Discover TRNC's beaches and historic sites with locations, descriptions, and directions.",
@@ -1716,6 +1720,10 @@ const translations = {
     coachFiltersTitle: 'Filtreler', coachFiltersBody: 'Şu an açık olanları göster veya tür bazında filtrelemek için kaydırıcı simgesine dokun.',
     coachDutyTitle: 'Nöbetçi Eczane', coachDutyBody: 'Bugüne ait nöbetçi eczaneyi gösterir — tam bölgesel listeyi açmak için dokun.',
     coachMapTitle: 'Harita', coachMapBody: 'Tüm sağlık kuruluşlarını interaktif haritada gör ve en yakınını bul.',
+    // Explore-map variant, selected by EXPLORE_MAP_LIVE alongside the tab label.
+    // The coach mark points AT the tab, so copy and label must flip together —
+    // a tab reading Keşfet with a tutorial about health facilities is half-swapped.
+    coachExploreTitle: 'Haritada keşfet', coachExploreBody: 'Sağlık kuruluşları, plajlar ve tarihi yerler tek haritada. Kategoriye göre süz, açmak için işarete dokun.',
     coachPetsTitle: 'Evcil Hayvanlar', coachPetsBody: 'KKTC genelinde veteriner klinikler, evcil hayvan mağazaları ve hayvan hizmetleri bul.',
     coachHomeServicesTitle: 'Ev Hizmetleri', coachHomeServicesBody: 'Tesisatçı, elektrikçi, temizlikçi ve daha fazlası için usta bul — kapına kadar gelsin.',
     coachBeachesTitle: 'Plajlar & Mekânlar', coachBeachesBody: "KKTC'nin plajlarını ve tarihi mekânlarını konum, açıklama ve yönlendirmelerle keşfet.",
@@ -3094,6 +3102,10 @@ const translations = {
     coachFiltersTitle: 'الفلاتر', coachFiltersBody: 'فعّل عرض الخدمات المفتوحة الآن أو اضغط على أيقونة الفلاتر للتصفية حسب النوع.',
     coachDutyTitle: 'صيدلية النوبة', coachDutyBody: 'تعرض صيدلية نوبة اليوم — اضغط لفتح قائمة النوبات الكاملة حسب المنطقة.',
     coachMapTitle: 'عرض الخريطة', coachMapBody: 'اطلع على جميع الخدمات على خريطة تفاعلية وابحث عن الأقرب إليك.',
+    // Explore-map variant, selected by EXPLORE_MAP_LIVE alongside the tab label.
+    // The coach mark points AT the tab, so copy and label must flip together —
+    // a tab reading Keşfet with a tutorial about health facilities is half-swapped.
+    coachExploreTitle: 'استكشف الخريطة', coachExploreBody: 'المرافق الصحية والشواطئ والأماكن التاريخية على خريطة واحدة. صنّف حسب الفئة واضغط على العلامة لفتحها.',
     coachPetsTitle: 'الحيوانات الأليفة', coachPetsBody: 'ابحث عن عيادات بيطرية ومحلات حيوانات وخدمات حيوانات في شمال قبرص.',
     coachHomeServicesTitle: 'خدمات المنزل', coachHomeServicesBody: 'احجز حرفيين للسباكة والكهرباء والتنظيف والمزيد — إلى باب منزلك.',
     coachBeachesTitle: 'الشواطئ والمعالم', coachBeachesBody: 'اكتشف شواطئ ومعالم شمال قبرص مع المواقع والأوصاف والاتجاهات.',
@@ -3985,6 +3997,10 @@ const translations = {
     coachFiltersTitle: 'Фильтры', coachFiltersBody: 'Включите «Открыто сейчас» или нажмите значок фильтров для сортировки по типу учреждения.',
     coachDutyTitle: 'Дежурная аптека', coachDutyBody: 'Показывает дежурную аптеку на сегодня — нажмите, чтобы открыть полный список по регионам.',
     coachMapTitle: 'Карта', coachMapBody: 'Смотрите все учреждения на интерактивной карте и найдите ближайшие к вам.',
+    // Explore-map variant, selected by EXPLORE_MAP_LIVE alongside the tab label.
+    // The coach mark points AT the tab, so copy and label must flip together —
+    // a tab reading Keşfet with a tutorial about health facilities is half-swapped.
+    coachExploreTitle: 'Исследуйте карту', coachExploreBody: 'Медучреждения, пляжи и исторические места на одной карте. Фильтруйте по категории и нажмите на метку.',
     coachPetsTitle: 'Животные', coachPetsBody: 'Найдите ветеринарные клиники, зоомагазины и услуги для животных по всему Северному Кипру.',
     coachHomeServicesTitle: 'Бытовые услуги', coachHomeServicesBody: 'Закажите мастеров по сантехнике, электрике, уборке и многому другому — прямо к вашей двери.',
     coachBeachesTitle: 'Пляжи и достопримечательности', coachBeachesBody: 'Откройте пляжи и достопримечательности Северного Кипра с описаниями и маршрутами.',
@@ -4876,6 +4892,10 @@ const translations = {
     coachFiltersTitle: 'Φίλτρα', coachFiltersBody: 'Ενεργοποιήστε τα ανοιχτά τώρα ή πατήστε το εικονίδιο φίλτρων για φιλτράρισμα ανά τύπο.',
     coachDutyTitle: 'Εφημερεύον Φαρμακείο', coachDutyBody: 'Εμφανίζει το εφημερεύον φαρμακείο σήμερα — πατήστε για την πλήρη λίστα ανά περιοχή.',
     coachMapTitle: 'Χάρτης', coachMapBody: 'Δείτε όλες τις εγκαταστάσεις σε διαδραστικό χάρτη και βρείτε τις πιο κοντινές σας.',
+    // Explore-map variant, selected by EXPLORE_MAP_LIVE alongside the tab label.
+    // The coach mark points AT the tab, so copy and label must flip together —
+    // a tab reading Keşfet with a tutorial about health facilities is half-swapped.
+    coachExploreTitle: 'Εξερευνήστε τον χάρτη', coachExploreBody: 'Υγειονομικές μονάδες, παραλίες και ιστορικοί χώροι σε έναν χάρτη. Φιλτράρετε ανά κατηγορία και πατήστε μια πινέζα.',
     coachPetsTitle: 'Κατοικίδια & Ζώα', coachPetsBody: 'Βρείτε κτηνιατρεία, pet shop και υπηρεσίες ζώων σε όλη την ΤΔΒΚ.',
     coachHomeServicesTitle: 'Υπηρεσίες Σπιτιού', coachHomeServicesBody: 'Κλείστε τεχνίτες για υδραυλικά, ηλεκτρολόγους, καθαριστές και άλλα — απευθείας στο σπίτι σας.',
     coachBeachesTitle: 'Παραλίες & Αξιοθέατα', coachBeachesBody: 'Ανακαλύψτε παραλίες και αξιοθέατα της ΤΔΒΚ με τοποθεσίες, περιγραφές και οδηγίες.',
@@ -5770,6 +5790,10 @@ const translations = {
     coachFiltersTitle: 'Filtres', coachFiltersBody: "Activez les établissements ouverts maintenant ou appuyez sur l'icône des filtres pour filtrer par type.",
     coachDutyTitle: 'Pharmacie de garde', coachDutyBody: "Affiche la pharmacie de garde aujourd'hui — appuyez pour ouvrir la liste complète par région.",
     coachMapTitle: 'Carte', coachMapBody: 'Consultez tous les établissements sur une carte interactive et trouvez les plus proches de vous.',
+    // Explore-map variant, selected by EXPLORE_MAP_LIVE alongside the tab label.
+    // The coach mark points AT the tab, so copy and label must flip together —
+    // a tab reading Keşfet with a tutorial about health facilities is half-swapped.
+    coachExploreTitle: 'Explorer la carte', coachExploreBody: 'Établissements de santé, plages et sites historiques sur une seule carte. Filtrez par catégorie et touchez un repère.',
     coachPetsTitle: 'Animaux', coachPetsBody: 'Trouvez des cliniques vétérinaires, animaleries et services pour animaux dans tout le TRNC.',
     coachHomeServicesTitle: 'Services à domicile', coachHomeServicesBody: "Réservez des artisans pour la plomberie, l'électricité, le ménage et plus — livrés à votre porte.",
     coachBeachesTitle: 'Plages & Sites', coachBeachesBody: 'Découvrez les plages et sites historiques du TRNC avec emplacements, descriptions et itinéraires.',
@@ -6661,6 +6685,10 @@ const translations = {
     coachFiltersTitle: 'Filtros', coachFiltersBody: 'Activa los establecimientos abiertos ahora o pulsa el icono de filtros para filtrar por tipo.',
     coachDutyTitle: 'Farmacia de Guardia', coachDutyBody: 'Muestra la farmacia de guardia hoy — pulsa para abrir la lista completa por región.',
     coachMapTitle: 'Mapa', coachMapBody: 'Ve todos los establecimientos en un mapa interactivo y encuentra los más cercanos a ti.',
+    // Explore-map variant, selected by EXPLORE_MAP_LIVE alongside the tab label.
+    // The coach mark points AT the tab, so copy and label must flip together —
+    // a tab reading Keşfet with a tutorial about health facilities is half-swapped.
+    coachExploreTitle: 'Explora el mapa', coachExploreBody: 'Centros de salud, playas y lugares históricos en un solo mapa. Filtra por categoría y toca un marcador.',
     coachPetsTitle: 'Mascotas & Animales', coachPetsBody: 'Encuentra clínicas veterinarias, tiendas de animales y servicios para mascotas en todo TRNC.',
     coachHomeServicesTitle: 'Servicios del Hogar', coachHomeServicesBody: 'Reserva profesionales para fontanería, electricidad, limpieza y más — a domicilio.',
     coachBeachesTitle: 'Playas & Monumentos', coachBeachesBody: 'Descubre las playas y monumentos del TRNC con ubicaciones, descripciones e indicaciones.',
@@ -7553,6 +7581,10 @@ const translations = {
     coachFiltersTitle: 'Filter', coachFiltersBody: 'Zeige nur jetzt geöffnete Einrichtungen oder tippe auf das Filter-Symbol, um nach Typ zu filtern.',
     coachDutyTitle: 'Notdienstapotheke', coachDutyBody: 'Zeigt die Notdienstapotheke für heute — tippe für die vollständige Liste nach Region.',
     coachMapTitle: 'Karte', coachMapBody: 'Sieh alle Einrichtungen auf einer interaktiven Karte und finde die nächstgelegenen.',
+    // Explore-map variant, selected by EXPLORE_MAP_LIVE alongside the tab label.
+    // The coach mark points AT the tab, so copy and label must flip together —
+    // a tab reading Keşfet with a tutorial about health facilities is half-swapped.
+    coachExploreTitle: 'Karte entdecken', coachExploreBody: 'Gesundheitseinrichtungen, Strände und historische Orte auf einer Karte. Nach Kategorie filtern und auf eine Markierung tippen.',
     coachPetsTitle: 'Haustiere & Tiere', coachPetsBody: 'Finde Tierarztkliniken, Zoohandlungen und Tierdienste im ganzen TRNC.',
     coachHomeServicesTitle: 'Haushaltsdienste', coachHomeServicesBody: 'Buche Handwerker für Klempnerei, Elektrik, Reinigung und mehr — direkt zu dir nach Hause.',
     coachBeachesTitle: 'Strände & Sehenswürdigkeiten', coachBeachesBody: 'Entdecke Strände und Sehenswürdigkeiten im TRNC mit Standorten, Beschreibungen und Wegbeschreibungen.',
@@ -8444,6 +8476,10 @@ const translations = {
     coachFiltersTitle: 'فیلترها', coachFiltersBody: 'مراکز باز الان را نمایش دهید یا روی آیکون فیلتر ضربه بزنید تا بر اساس نوع فیلتر کنید.',
     coachDutyTitle: 'داروخانه کشیک', coachDutyBody: 'داروخانه کشیک امروز را نشان می‌دهد — برای لیست کامل بر اساس منطقه ضربه بزنید.',
     coachMapTitle: 'نقشه', coachMapBody: 'همه مراکز را روی نقشه تعاملی ببینید و نزدیک‌ترین‌ها را پیدا کنید.',
+    // Explore-map variant, selected by EXPLORE_MAP_LIVE alongside the tab label.
+    // The coach mark points AT the tab, so copy and label must flip together —
+    // a tab reading Keşfet with a tutorial about health facilities is half-swapped.
+    coachExploreTitle: 'نقشه را کاوش کنید', coachExploreBody: 'مراکز درمانی، سواحل و مکان‌های تاریخی روی یک نقشه. بر اساس دسته فیلتر کنید و روی نشانگر ضربه بزنید.',
     coachPetsTitle: 'حیوانات خانگی', coachPetsBody: 'کلینیک‌های دامپزشکی، فروشگاه‌های حیوانات و خدمات حیوانات را در سراسر قبرس شمالی پیدا کنید.',
     coachHomeServicesTitle: 'خدمات منزل', coachHomeServicesBody: 'برای لوله‌کشی، برق، نظافت و موارد دیگر متخصص رزرو کنید — درب منزل شما.',
     coachBeachesTitle: 'سواحل و جاذبه‌ها', coachBeachesBody: 'سواحل و جاذبه‌های قبرس شمالی را با موقعیت، توضیحات و مسیریابی کشف کنید.',

@@ -1,3 +1,24 @@
+-- ⚠⚠ THIS IS A TEST FIXTURE. IT IS NOT A SEED. NEVER APPLY IT. ⚠⚠
+--
+-- Written as a seed, kept ONLY as labelled ground truth for the region classifier: 387
+-- coordinates each carrying a district in its address, which scripts/validate-regions.mjs
+-- uses for leave-one-out validation of constants/regions.js. That is the bulk of what
+-- gates the classifier, so the data is worth keeping even though the seed is not.
+--
+-- AS PHARMACY COORDINATES IT IS BOTH WRONG AND UNWANTED:
+--   * 387 rows land on 142 distinct points -- 28 pharmacies share a single coordinate.
+--   * 16 rows sit >15 km from the town named in their own address, up to 38 km.
+--   * Ordinary pharmacies are not map content at all. Putting them on the map would be
+--     free promotion for businesses with no commercial relationship with ADA. Subscribed
+--     pharmacies are placed BY HAND, one at a time, as they sign.
+--
+-- Applying it is blocked by facilities_coords_need_provenance (migration 20260919), which
+-- refuses any coordinate with no recorded source -- this file carries none for anything.
+-- Moved out of the repo root and renamed so it stops looking like something to run.
+--
+-- Original header follows.
+-- ============================================================================
+
 -- 387 pharmacies from KTEB official list — geocoded via Nominatim/OSM
 -- Run in Supabase SQL editor
 INSERT INTO facilities (name, type, address, phone, is_public, provider_id, contact_person, latitude, longitude) VALUES

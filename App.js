@@ -356,7 +356,10 @@ export default function App() {
     if (menuBtn) steps.push({ ...menuBtn, title: t('coachMenuTitle', lang), body: t('coachMenuBody', lang) })
     if (search)  steps.push({ ...search,  title: t('coachSearchTitle', lang),  body: t('coachSearchBody', lang) })
     if (duty)    steps.push({ ...duty,    title: t('coachDutyTitle', lang),    body: t('coachDutyBody', lang) })
-    if (map)     steps.push({ ...map,     title: t('coachMapTitle', lang),     body: t('coachMapBody', lang) })
+    // Copy follows EXPLORE_MAP_LIVE with the tab label and icon. The coach mark points
+    // AT that tab; describing health facilities while it reads Keşfet is half-swapped.
+    if (map)     steps.push({ ...map,     title: t(EXPLORE_MAP_LIVE ? 'coachExploreTitle' : 'coachMapTitle', lang),
+                                          body:  t(EXPLORE_MAP_LIVE ? 'coachExploreBody'  : 'coachMapBody',  lang) })
     if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
   }
 

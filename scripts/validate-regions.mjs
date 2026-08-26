@@ -58,7 +58,11 @@ const ROC_CONTROLS = [
 ]
 
 function parsePharmacies() {
-  const sql = readFileSync(join(ROOT, 'seed_pharmacies_geocoded.sql'), 'utf8')
+  // Renamed 2026-08-26 from seed_pharmacies_geocoded.sql in the repo root. It is a
+  // FIXTURE, not a seed: the coordinates are too coarse to publish (142 distinct points
+  // for 387 rows) and pharmacies are not map content anyway — but as labelled
+  // coordinate→district pairs they are still the best ground truth this classifier has.
+  const sql = readFileSync(join(ROOT, 'scripts/data/region-groundtruth-pharmacies.sql'), 'utf8')
   const re = /^\('((?:[^']|'')*)',\s*'pharmacy',\s*'((?:[^']|'')*)',\s*'(?:(?:[^']|'')*)',\s*\w+,\s*\w+,\s*(?:'(?:(?:[^']|'')*)'|null),\s*(-?[\d.]+),\s*(-?[\d.]+)\)[,;]?\s*$/gm
   const rows = []
   let m

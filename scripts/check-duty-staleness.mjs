@@ -49,6 +49,19 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // days of cover, so roughly a fortnight of quiet before it starts asking.
 const WARN_DAYS = 14
 
+// ─── The SOFT horizon, for a year-sized roster ──────────────────────────────
+//
+// 14 days is the right number when a refill is one month transcribed from KTEB's
+// publication. It is the WRONG number for a full-year load: nobody transcribes ~5,100
+// rows, or negotiates a feed, on a fortnight's notice. By the time 14 days is the answer,
+// the only options left are bad ones.
+//
+// 60 days is two clear months — enough to place the call, wait for a reply, agree a
+// format and do the work, with slack for a holiday. It does NOT fail: a soft horizon that
+// exits 1 is just an earlier hard horizon, and one that blocks a workflow gets silenced.
+// It prints, and the printing is the point.
+const SOFT_WARN_DAYS = 60
+
 const c = { r: s => `\x1b[31m${s}\x1b[0m`, g: s => `\x1b[32m${s}\x1b[0m`,
             y: s => `\x1b[33m${s}\x1b[0m`, d: s => `\x1b[2m${s}\x1b[0m` }
 
@@ -81,8 +94,17 @@ if (process.argv.includes('--self')) {
   if (!warns) bad++
   const plenty = dutyDaysRemaining({ maxDate: '2026-10-31', today })
   const quiet = plenty >= WARN_DAYS
-  console.log(`  ${quiet ? c.g('ok  ') : c.r('FAIL')} ${'66 days left must stay quiet'.padEnd(38)} ${plenty} >= ${WARN_DAYS} → ${quiet}`)
+  console.log(`  ${quiet ? c.g('ok  ') : c.r('FAIL')} ${'66 days left must not FAIL'.padEnd(38)} ${plenty} >= ${WARN_DAYS} → ${quiet}`)
   if (!quiet) bad++
+  // The soft horizon must speak where the hard one is silent — otherwise it is decoration.
+  const soft = dutyDaysRemaining({ maxDate: '2026-10-10', today })
+  const softSpeaks = soft >= WARN_DAYS && soft < SOFT_WARN_DAYS
+  console.log(`  ${softSpeaks ? c.g('ok  ') : c.r('FAIL')} ${'45 days: soft warns, hard silent'.padEnd(38)} ${WARN_DAYS} <= ${soft} < ${SOFT_WARN_DAYS} → ${softSpeaks}`)
+  if (!softSpeaks) bad++
+  const wayOut = dutyDaysRemaining({ maxDate: '2027-08-26', today })
+  const fullyQuiet = wayOut >= SOFT_WARN_DAYS
+  console.log(`  ${fullyQuiet ? c.g('ok  ') : c.r('FAIL')} ${'a full year must be fully quiet'.padEnd(38)} ${wayOut} >= ${SOFT_WARN_DAYS} → ${fullyQuiet}`)
+  if (!fullyQuiet) bad++
   console.log(bad ? c.r(`\n  ${bad} self-check(s) FAILED\n`) : c.g('\n  self-check: all thresholds fire correctly\n'))
   process.exit(bad ? 1 : 0)
 }
@@ -141,6 +163,14 @@ if (left < WARN_DAYS) {
   console.error(c.d(`  Last covered day is ${maxDate}. Refilling needs a call to KTEB and`))
   console.error(c.d('  transcription, so start now rather than on the day it empties.\n'))
   process.exit(1)
+}
+
+if (left < SOFT_WARN_DAYS) {
+  console.log(c.y(`  ${left} day(s) of cover remaining — start the next roster soon `
+    + `(soft horizon ${SOFT_WARN_DAYS}d, hard ${WARN_DAYS}d).`))
+  console.log(c.d('  A year-sized load is not a fortnight of work; this is the notice that'))
+  console.log(c.d('  assumes it is not. Not a failure — exit 0.\n'))
+  process.exit(0)
 }
 
 console.log(c.g(`  ${left} day(s) of cover remaining — OK\n`))
