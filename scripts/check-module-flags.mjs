@@ -79,13 +79,20 @@ const WAITLIST_BLAST_DONE = new Set([
   // launches.
   'accommodation',
 
-  // 2 owed as of 2026-08-26 — NOT yet sent, blast after OTA verification.
+  // 2 notified 2026-08-26, same day as launch. The OTA published (update group
+  // 1dcf02a2), was verified on the Play Store build across two full open/kill/reopen
+  // cycles, and the blast went out immediately after. Both had been waiting since
+  // 2026-08-17.
   //
-  // The guard wants this entry at PUSH time; the go-live SOP notifies at step 10, AFTER
-  // the OTA is verified on device. Both cannot be first, and that deadlock is recorded
-  // as unfixed. The resolution is that this Set is an ACKNOWLEDGEMENT, not a delivery
-  // claim — so it carries the honest state instead of a false one. A follow-up commit
-  // replaces this comment with the sent date, as 'accommodation' above did.
+  // ⚠ THE DEADLOCK ABOVE NOW HAS A RESOLUTION — use it for the next six launches.
+  //   accommodation records it as unfixed: this guard demands the entry at PUSH time,
+  //   the SOP notifies at step 10 AFTER device verification, and both cannot be first.
+  //   The way through is to stop treating the Set as a delivery claim. It is an
+  //   ACKNOWLEDGEMENT that the question was asked. So the entry lands at push time
+  //   carrying the HONEST state — "N owed as of DATE — NOT yet sent, blast after OTA
+  //   verification" — and a follow-up commit replaces it with the sent date once the
+  //   blast has actually run. Two commits, one truthful git record at every point, and
+  //   nothing blocked. Do not go back to writing a date before sending one.
   'explore',
 ])
 
