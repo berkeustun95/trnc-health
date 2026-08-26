@@ -244,7 +244,31 @@ export default function HomeScreen({
       if (b._dist == null) return -1
       return a._dist - b._dist
     })
-    .filter(f => searchText.trim() || showAll || !!f.provider_id)
+    // Default view = ADA members PLUS public infrastructure.
+    //
+    // provider_id alone conflated "has a commercial relationship with ADA" with "should
+    // be listed by default". For a private pharmacy that is the right distinction. For a
+    // state hospital it is a category error: claim_requests_guard_insert() refuses
+    // public-sector claims outright, so it can NEVER hold a provider_id and could never
+    // appear by default, no matter what anyone did.
+    //
+    // ⚠ THIS IS DOWNSTREAM OF MODERATION, WHICH IS WHAT MAKES IT SAFE. status/hidden_at
+    //   are filtered ABOVE, so this clause cannot resurrect a draft or a hidden row —
+    //   including the Girne duplicate (91338177…), which 20260911 set to status='draft'
+    //   deliberately and which must stay invisible until the merge slice.
+    //
+    // ⚠ NOT hospital-scoped. sector='public' covers hospital, health_centre, polyclinic
+    //   and health_room. Six rows today; ~36 more are seeded draft, so activating them
+    //   grows this list by roughly 7x. That is a monetisation-visible change and wants a
+    //   conversation BEFORE those drafts go active — not a reason to scope this narrower,
+    //   because narrowing it would just hide the same question behind a type check.
+    .filter(f => searchText.trim() || showAll || !!f.provider_id || f.sector === 'public')
+    // Units inside another facility (Thalassaemia, Radyasyon Onkoloji inside BNDH) are
+    // not separate destinations. 20260911 already decided this for the map — "two more
+    // markers on one roof is noise, not precision" — and a list row is the same argument.
+    // Zero rows today, which is exactly why it is decided now rather than when three
+    // hospitals suddenly appear in Lefkoşa.
+    .filter(f => !f.parent_facility_id)
     .filter(f => !activeType || f.type === activeType)
     .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)
     .filter(f => !activeSpecialty || (Array.isArray(f.specialty) ? f.specialty.includes(activeSpecialty) : f.specialty === activeSpecialty))
