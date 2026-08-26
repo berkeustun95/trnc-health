@@ -76,6 +76,50 @@ export const SUBMITTABLE_CATEGORIES = [
   'barber', 'print_shop', 'laundry',
 ]
 
+// ─── Ownership scope ─────────────────────────────────────────────────────────
+//
+// Nobody owns Salamis, and nobody owns a public beach. The claim flow asks "Buranın
+// sahibi misiniz?" — a question with no possible honest answer for a ruin, a monument or
+// a stretch of coast, and it was rendering on 100% of places because the only categories
+// with rows are exactly these.
+//
+// The real test is the one claim_requests_guard_insert() already applies to public
+// hospitals: is there an owner who could produce evidence, and do they have something to
+// sell? Category is a PROXY for that. It is exact for beaches and heritage. It is
+// imperfect at the edges — a municipal pool stays claimable here, and is caught at admin
+// approval instead, which was a deliberate call.
+//
+// ─── BOTH LISTS ARE EXPLICIT, AND THAT IS THE POINT ─────────────────────────
+//
+// A block list alone would mean a NEW category defaults to CLAIMABLE: add `national_park`
+// next year and it silently becomes ownable, with nothing failing. That is the inverse of
+// the towing.is_active DEFAULT false lesson — the default has to protect the path nobody
+// has written yet.
+//
+// So both sets are declared, isClaimableCategory() reads the ALLOW list (a new category
+// is non-claimable until someone says otherwise), and validate-map-sources.mjs asserts
+// every category in EXPLORE_GROUPS appears in exactly one of them. Adding a category
+// without deciding fails the push rather than defaulting to the permissive answer.
+export const NON_CLAIMABLE_CATEGORIES = [
+  'beach', 'nature_scenic',
+  'castle_fortress', 'ancient_ruins', 'museum', 'religious_site', 'monument',
+]
+
+// museum and religious_site are here deliberately and reversibly: most TRNC museums are
+// state-run and a mosque has no commercial owner, but a private collection or a mosque
+// foundation may later want listing control. Moving one across is a one-line change plus
+// the guard in 20260921 — not a schema change.
+export const CLAIMABLE_CATEGORIES = [
+  'cafe', 'restaurant', 'bakery',
+  'gym', 'sports_facility', 'pool',
+  'barber', 'print_shop', 'laundry',
+]
+
+// Allow-list semantics on purpose — an unknown category is NOT claimable.
+export function isClaimableCategory(category) {
+  return CLAIMABLE_CATEGORIES.includes(category)
+}
+
 // ─── Threshold gating ────────────────────────────────────────────────────────
 export const GROUP_TILE_THRESHOLD = 8
 

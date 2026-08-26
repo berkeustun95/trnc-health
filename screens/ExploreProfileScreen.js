@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
-import { categoryToGroup, GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
+import { categoryToGroup, GROUP_META, CATEGORY_LABEL_KEY, isClaimableCategory } from '../constants/exploreCategories'
 import { EXPLORE_FEATURED_LIVE } from '../constants/flags'
 import { isFeatured } from '../utils/featured'
 import { resolveAttribution } from '../utils/photoAttribution'
@@ -144,7 +144,12 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
   const [featSent,  setFeatSent]  = useState(false)
   const [showCheckin, setShowCheckin] = useState(false)
 
-  const showClaim   = isUnclaimed && !claimed
+  // Category gate: a ruin, a monument or a beach has no owner who could produce
+  // evidence, so the question is never askable there. Mirrors the sector branch that
+  // already refuses public-hospital claims in claim_requests_guard_insert(), and is
+  // backed by the same refusal at the database in place_claims_guard_insert() — this
+  // hides the button, the trigger closes the path.
+  const showClaim   = isUnclaimed && !claimed && isClaimableCategory(place.category)
   const showFeature = isOwner && EXPLORE_FEATURED_LIVE && !featuredNow && !featSent
 
   function openDirections() {

@@ -36,14 +36,20 @@
 // numbers are the real ones and a data change shows up as a diff to explain, not a
 // silent drift.
 
+import { readFileSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   TRNC_CENTER,
 } from '../constants/mapSources.js'
 import { MODULE_FLAGS } from '../constants/flags.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
-import { GROUP_META } from '../constants/exploreCategories.js'
+import { GROUP_META, EXPLORE_GROUPS,
+         NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES } from '../constants/exploreCategories.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 // ─── Fixtures — live shape as of 2026-08-25 ─────────────────────────────────
 // facilities: 6 public hospitals + 1 private clinic carry coordinates. All 387
@@ -232,6 +238,43 @@ console.log(`    margin  W ${margins.W.toFixed(3)}  E ${margins.E.toFixed(3)}  S
 // ⚠ HONEST LIMIT: this checks the extremes KNOWN on 2026-08-25. A newly added place
 //   beyond them is not caught offline — `--live` is what actually checks every row.
 check('no margin has gone negative', Object.values(margins).every(m => m > 0), true)
+
+console.log('\nownership scope — every category must be decided, not defaulted')
+// A block list alone lets a NEW category default to CLAIMABLE: add `national_park` and it
+// silently becomes ownable with nothing failing. That is the inverse of the
+// towing.is_active DEFAULT false lesson — the default must protect the path nobody has
+// written yet. So both lists are explicit and this asserts they PARTITION the taxonomy.
+// Adding a category without deciding fails the push.
+const allCats = [...new Set(Object.values(EXPLORE_GROUPS).flat())]
+const undecided = allCats.filter(c => !NON_CLAIMABLE_CATEGORIES.includes(c) && !CLAIMABLE_CATEGORIES.includes(c))
+const both      = allCats.filter(c =>  NON_CLAIMABLE_CATEGORIES.includes(c) &&  CLAIMABLE_CATEGORIES.includes(c))
+check('every category is in exactly one ownership list', undecided, [])
+check('no category is in both lists', both, [])
+// And nothing may be listed that is not a real category — a typo in either list would
+// otherwise sit there looking decided while gating nothing.
+const ghosts = [...NON_CLAIMABLE_CATEGORIES, ...CLAIMABLE_CATEGORIES].filter(c => !allCats.includes(c))
+check('neither list names a category that does not exist', ghosts, [])
+
+console.log('\nownership scope — the JS list and the SQL guard must agree')
+// The same seven categories are declared twice, once per language, because a Postgres
+// trigger cannot import from JS. Same shape as check-module-flags.mjs reading NOTIFY_SQL,
+// and same reason: a comment saying KEEP IN SYNC is not a mechanism.
+//
+// The failure is ASYMMETRIC, which is why this is worth a guard rather than a habit:
+//   blocked in SQL, not JS  -> the button shows, the insert 500s. Loud. Fixed in a day.
+//   blocked in JS, not SQL  -> the button is hidden and the path is OPEN. Silent. Nothing
+//                              surfaces it, because nothing is trying to file the claim.
+// This asserts the second cannot happen unnoticed.
+const GUARD_SQL = 'supabase/migrations/20260921_place_claims_category_guard.sql'
+try {
+  const sql = readFileSync(resolve(ROOT, GUARD_SQL), 'utf8')
+  const start = sql.indexOf('IF target_category = ANY')
+  const body  = sql.slice(start, sql.indexOf('THEN', start))
+  const inSql = [...body.matchAll(/'([a-z_]+)'::text/g)].map(m => m[1]).sort()
+  check('SQL guard blocks exactly the JS non-claimable list', inSql, [...NON_CLAIMABLE_CATEGORIES].sort())
+} catch (e) {
+  check(`could not read ${GUARD_SQL} to compare the lists`, e.message, null)
+}
 
 console.log('\nduty pharmacy')
 const duty = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: 'pha-0', isAdmin: false })

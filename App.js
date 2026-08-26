@@ -1222,8 +1222,15 @@ export default function App() {
                 {t(unclaimedFacility.type, lang)}
               </Text>
             </View>
+            {/* CONDITIONAL, not a replacement. This screen is reached by 393 unowned
+                facilities — 387 private pharmacies and 6 public hospitals. For the 387,
+                "hasn't joined ADA yet" is TRUE and stays. For a state hospital it is
+                false: it cannot join, because claim_requests_guard_insert() refuses
+                public-sector claims outright. */}
             <View style={styles.notOnAdaBadge}>
-              <Text style={styles.notOnAdaBadgeText}>{t('notOnAda', lang)}</Text>
+              <Text style={styles.notOnAdaBadgeText}>
+                {t(unclaimedFacility.sector === 'public' ? 'publicFacilityBadge' : 'notOnAda', lang)}
+              </Text>
             </View>
           </View>
           {unclaimedFacility.address ? (
@@ -1240,7 +1247,9 @@ export default function App() {
           ) : null}
           <View style={styles.unclaimedNotice}>
             <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
-            <Text style={styles.unclaimedNoticeText}>{t('notOnAdaDesc', lang)}</Text>
+            <Text style={styles.unclaimedNoticeText}>
+              {t(unclaimedFacility.sector === 'public' ? 'publicFacilityDesc' : 'notOnAdaDesc', lang)}
+            </Text>
           </View>
           <View style={styles.unclaimedActions}>
             {unclaimedFacility.phone ? (

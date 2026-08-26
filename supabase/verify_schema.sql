@@ -848,6 +848,14 @@ WITH report AS (
     UNION ALL SELECT '0904_accommodation_partner_feed','feed_precision_check is NULL-safe',
       EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_feed_precision_check'
         AND pg_get_constraintdef(oid) ILIKE '%IS NOT NULL%')
+    -- Nature and heritage places cannot be claimed. CREATE OR REPLACE adds no named
+    -- object, so only a body token distinguishes the new definition from 20260826's.
+    -- If this goes red the DB path is open again while the button stays hidden — the
+    -- silent half of the asymmetry, which is the one that does not get reported.
+    UNION ALL SELECT '0921_place_claims_category_guard','place claims refuse nature/heritage',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='place_claims_guard_insert'
+          AND pg_get_functiondef(p.oid) ILIKE '%nature and heritage places cannot be claimed%')
     -- duty_list's natural key. Without it a chunked year-sized load (~5,100 rows) that
     -- gets re-run duplicates a year of health data SILENTLY, and duplicates render as
     -- separate pharmacies. If this goes red, the next roster load is unsafe to repeat.
