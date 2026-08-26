@@ -128,6 +128,23 @@ went missing). Two mandatory rules:
   saying "207 m of headroom" goes stale silently the moment the measurement changes. Where
   it matters, have the tool print the real figure on every run so the comment can be
   checked against it — and correct the comment when they disagree, even by 2 m.
+- **Every check here asks whether a column EXISTS. None asked whether the content is
+  CURRENT — and that is the failure that reached users.** `verify_schema.sql`,
+  `schema_drift_audit.sql` and `migration_ledger_check.sql` all verify *shape*. The duty
+  pharmacy roster (`duty_list`) ran out on 2026-06-30 and nobody noticed for two months,
+  while passing every one of them, because an empty table has a perfectly correct schema.
+  It reached users as the worst possible form: the app told people there was no duty
+  pharmacy tonight, when the truth was that we had lost the list. There is ALWAYS a duty
+  pharmacy in the TRNC, so that message was never describing the world.
+  Schema drift was the failure class we had tooling for. **Content expiry was not.**
+  So: any feature backed by content that EXPIRES — a roster, a schedule, a feed, a seasonal
+  list — needs a staleness check as a matter of course, written at the same time as the
+  feature, not after it fails. `check-novest-staleness.mjs` and `check-duty-staleness.mjs`
+  are the pattern: ask a CONTENT question, exit 1, run by hand or by cron.
+  Not in pre-push — a push must not be blocked because a roster is running low; that is
+  data operations, and a guard that blocks unrelated work gets disabled.
+  Corollary for the UI: if a table can legitimately be empty, say so; **if it cannot, an
+  empty result is an ERROR STATE and must not be rendered as a normal one.**
 - **When a retry-tuned fix stops working, check whether you are tuning the wrong verb.**
   A number you keep raising is a number that is not the answer. `seed-explore-photos.mjs`
   hit Wikimedia 429s five times; the spacing went 120 → 350 → 1000 ms and each raise was
