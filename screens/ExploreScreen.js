@@ -164,6 +164,22 @@ function BottomPinCard({ item, lang, onClose, onViewProfile }) {
 }
 
 // ─── Map view ─────────────────────────────────────────────────────────────────
+//
+// ⚠ THIS IS NOT A DUPLICATE OF ExploreMapScreen, AND THE DIFFERENCE IS THE POINT.
+//
+// It maps `filtered` — the CURRENT drill-down: activeGroup, optionally narrowed to one
+// category and one region. So it answers "museums in Girne, on a map". The Keşfet tab
+// cannot: its chips are GROUP-level (Kültürel Miras, not Müze) and it has no region
+// filter at all. One is a map of what you are browsing; the other is the map of
+// everything, and they are different questions.
+//
+// It also deliberately lacks what the tab has: clustering (unnecessary on a filtered
+// subset) and health facilities (not what you came here for).
+//
+// KEEP OR REMOVE DELIBERATELY, NOT BY ACCIDENT. The honest long-term answer is that the
+// tab absorbs region + category chips and this toggle then becomes genuinely redundant —
+// at which point delete it on purpose. Until then, deleting it as "duplicate map code"
+// silently removes the only way to filter a map by category or region.
 
 function PlacesMapView({ places, userLocation, lang, onSelectPlace }) {
   const [selectedPin, setSelectedPin] = useState(null)

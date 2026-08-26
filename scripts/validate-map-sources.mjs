@@ -96,15 +96,18 @@ function summarise(sources) {
 // The suite asserts the DARK case against the committed flag, so if explore is ever
 // launched for real this script fails loudly and has to be updated deliberately rather
 // than quietly asserting the wrong world.
-if (MODULE_FLAGS.explore !== false) {
-  console.error('\n  MODULE_FLAGS.explore is TRUE. If that is a local preview flip, revert it '
-    + '(git checkout -- constants/flags.js). If explore genuinely launched, update the '
-    + 'DARK expectations in this file deliberately.\n')
-  process.exit(1)
-}
+// EXPLORE WENT LIVE 2026-08-26. Before that this file refused to run whenever the flag
+// was true, so a local preview flip could not quietly re-baseline it. That guard has done
+// its job and is retired — but the assertions it protected are NOT, because
+// buildMapSources now takes an explicit `exploreLive` and both worlds stay testable.
+//
+// Keeping the dark case matters after launch, not less: it is the only thing asserting
+// that a group which is neither reachable nor exempt contributes nothing. The next dark
+// module to reach this map inherits that protection for free.
+console.log(`\nMODULE_FLAGS.explore is currently ${MODULE_FLAGS.explore} (live since 2026-08-26)`)
 
-console.log('\nexplore DARK (committed state)')
-const dark = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false })
+console.log('\nexplore DARK (simulated — the pre-launch world, still asserted)')
+const dark = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false })
 const darkCounts = summarise(dark)
 
 check('sources are exactly clinic, hospital, nature', Object.keys(darkCounts),
@@ -115,11 +118,11 @@ check('pharmacy earns no chip (0 geocoded)', darkCounts['health:pharmacy'] ?? 0,
 check('dentist earns no chip (0 rows)', darkCounts['health:dentist'] ?? 0, 0)
 check('hidden + pending facilities excluded', darkCounts['health:hospital'], 6)
 check('TOTAL PINNABLE = 11', dark.reduce((n, s) => n + s.pins.length, 0), 11)
-check('fetch narrows to the nature categories', mapFetchCategories(false), ['beach', 'nature_scenic'])
+check('fetch narrows to the nature categories', mapFetchCategories(false, false), ['beach', 'nature_scenic'])
 
-console.log('\nexplore REACHABLE (local preview flip / admin)')
-// isAdmin drives the same outer gate a local `explore: true` flip does, so this exercises
-// the demo configuration without editing the committed flag.
+console.log('\nexplore REACHABLE (the live world since 2026-08-26)')
+// isAdmin forces the outer gate open regardless of the flag, so this arm asserts the
+// same thing before and after launch.
 const live = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true })
 const liveCounts = summarise(live)
 
@@ -242,8 +245,8 @@ if (problems.length) {
   process.exit(1)
 }
 
-console.log(`\nmap source gate: OK — ${dark.reduce((n, s) => n + s.pins.length, 0)} pinnable committed, `
-  + `${live.reduce((n, s) => n + s.pins.length, 0)} with explore flipped locally\n`)
+console.log(`\nmap source gate: OK — ${live.reduce((n, s) => n + s.pins.length, 0)} pinnable LIVE, `
+  + `${dark.reduce((n, s) => n + s.pins.length, 0)} in the simulated dark world\n`)
 
 // ─── --live: assert EVERY pinnable row, not just the known extremes ──────────
 //

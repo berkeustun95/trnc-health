@@ -60,6 +60,13 @@ const SURFACES = [
   // Free coverage on the highest-stakes copy in the app.
   'screens/DutyListScreen.js',
   'screens/HomeScreen.js',
+  // Widened 2026-08-26 in the explore go-live commit. These three become reachable to
+  // real users the moment MODULE_FLAGS.explore is true, so they must be guarded BEFORE
+  // the flip, not after. A hand measurement is true the day it is taken and stale the
+  // moment somebody adds a key.
+  'screens/ExploreScreen.js',
+  'screens/ExploreSubmitScreen.js',
+  'screens/ExploreMySubmissionsScreen.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
@@ -117,6 +124,12 @@ const SAME_AS_ENGLISH = {
   // locale table rather than left absent, so this line records a decision and not the
   // oversight it was in the other six locales until 2026-08-26.
   'menuGarages':          { French: 'Garage is the French word for an auto repair shop' },
+
+  // Submission-form labels. Short nouns that are genuinely the same word.
+  'blSubmitType':         { French: 'Type is French' },
+  'blSubmitName':         { German: 'Name is German' },
+  'blSubmitDistrict':     { French: 'District is French' },
+  'blSubmitDesc':         { French: 'Description is French' },
 }
 
 // ─── Scope derivation ────────────────────────────────────────────────────────

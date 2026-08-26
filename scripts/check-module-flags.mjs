@@ -41,7 +41,7 @@ const EXPECTED_MODULES = {
   jobs:          false,
   accommodation: true,   // live 2026-08-24 — Novest partner feed, 88 listings
   studentHub:    false,
-  explore:       false,
+  explore:       true,   // live 2026-08-26 — Explore module + map tab
   towing:        true,   // live
   checkins:      false,
 }
@@ -78,6 +78,15 @@ const WAITLIST_BLAST_DONE = new Set([
   // the SOP contradict each other" — that deadlock is unfixed and will hit the next six
   // launches.
   'accommodation',
+
+  // 2 owed as of 2026-08-26 — NOT yet sent, blast after OTA verification.
+  //
+  // The guard wants this entry at PUSH time; the go-live SOP notifies at step 10, AFTER
+  // the OTA is verified on device. Both cannot be first, and that deadlock is recorded
+  // as unfixed. The resolution is that this Set is an ACKNOWLEDGEMENT, not a delivery
+  // claim — so it carries the honest state instead of a false one. A follow-up commit
+  // replaces this comment with the sent date, as 'accommodation' above did.
+  'explore',
 ])
 
 const EXPECTED_SCALARS = {
@@ -87,7 +96,7 @@ const EXPECTED_SCALARS = {
   // Swaps the bottom-nav map tab from the health MapScreen to the Explore map. Unlike the
   // others this does not gate NEW content — it replaces a surface users already have, so
   // an accidental flip is a downgrade for every user, not merely an early reveal.
-  EXPLORE_MAP_LIVE:      false,
+  EXPLORE_MAP_LIVE:      true,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

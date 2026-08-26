@@ -59,8 +59,13 @@ export const TRNC_CENTER = {
 }
 
 // Explore is REACHABLE — the outer gate App.js applies before rendering ExploreScreen.
-export function exploreReachable(isAdmin) {
-  return MODULE_FLAGS.explore || isAdmin
+// `live` defaults to the real flag. It is an explicit parameter ONLY so the guard can
+// assert BOTH worlds after launch — without it, the day explore went live the
+// "heritage must not leak while dark" assertion would have had to be deleted, and that
+// is the single most valuable check in scripts/validate-map-sources.mjs. A flag flip
+// should not cost you the test that guards the flag.
+export function exploreReachable(isAdmin, live = MODULE_FLAGS.explore) {
+  return live || isAdmin
 }
 
 // The `places.category` allow-list to FETCH. Used to narrow the query server-side while
@@ -68,8 +73,8 @@ export function exploreReachable(isAdmin) {
 // about applying it before the fetch. When explore is reachable we cannot pre-narrow —
 // groupVisible's threshold arm needs the counts the fetch itself produces — so we take
 // every active row and gate in JS below.
-export function mapFetchCategories(isAdmin) {
-  if (exploreReachable(isAdmin)) return null   // null = no .in() filter, fetch all active
+export function mapFetchCategories(isAdmin, live = MODULE_FLAGS.explore) {
+  if (exploreReachable(isAdmin, live)) return null   // null = no .in() filter, fetch all active
   return LIVE_TILE_GROUPS.flatMap(g => EXPLORE_GROUPS[g] || [])
 }
 
@@ -126,7 +131,8 @@ function placePins(places) {
 // of an empty module instead of an empty list. Today that silently drops Pharmacy and
 // Dentist (no geocoded rows) alongside Accommodation (88 rows, latitude NULL by privacy
 // design in 20260904) and Events (no approved rows).
-export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = false }) {
+export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = false,
+                                 exploreLive = MODULE_FLAGS.explore }) {
   const health = healthPins(facilities, dutyFacilityId)
   const sources = HEALTH_TYPES.map(type => ({
     key:      `health:${type}`,
@@ -142,7 +148,7 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
     return acc
   }, {})
 
-  const reachable = exploreReachable(isAdmin)
+  const reachable = exploreReachable(isAdmin, exploreLive)
   for (const g of GROUP_ORDER) {
     const pins = byGroup[g] || []
     // ⚠ DO NOT "SIMPLIFY" THIS TO `groupVisible(g, pins.length, isAdmin)` ALONE.

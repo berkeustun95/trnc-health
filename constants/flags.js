@@ -40,7 +40,7 @@ export const PRICE_COMPARE_LIVE = false
 //
 // Flipping it locally is how the map is previewed and demoed. check-module-flags.mjs
 // carries the baseline, so a flip left in the working tree cannot reach `eas update`.
-export const EXPLORE_MAP_LIVE = false
+export const EXPLORE_MAP_LIVE = true
 
 // Marketplace module gating. Each key is a module that is empty in prod today, so
 // it renders a "Coming soon" screen (with one-tap Notify me) instead of an empty
@@ -60,7 +60,7 @@ export const MODULE_FLAGS = {
   jobs:         false,
   accommodation: true,
   studentHub:   false,
-  explore:      false,
+  explore:      true,   // live 2026-08-26 — 42 places, nature + heritage tiles
   // Çekici & Yol Yardım (towing / roadside assistance). Admin-seeded directory, no
   // self-serve. Stays false until Slice 3 seeds real firms — an emergency screen with
   // an empty list is worse than no screen at all.

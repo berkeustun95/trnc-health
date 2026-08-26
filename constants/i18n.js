@@ -847,6 +847,12 @@ const translations = {
     blCatMonument: 'Monument', blCatNatureScenic: 'Nature & Scenic',
     // Explore module (Slice 5)
     exploreTitle: 'Explore', menuExplore: 'Explore', menuBeaches: 'Beaches',
+    // The Home TILE's label, distinct from the bottom-nav tab's menuExplore. Both were
+    // 'Keşfet' until the map tab went live, which shipped two identically-named entry
+    // points to two different screens — and, worse, to two different maps of the same
+    // 42 places. The tile is the browsable DIRECTORY; the tab is the map. Naming them
+    // apart is what makes that a choice the user can make rather than a coin flip.
+    menuPlaces: 'Places to Visit',
     exploreSavedTitle: 'Saved places',
     // Check-ins. ONE key on purpose: it labels the button on a place profile AND titles
     // the Coming Soon screen that button opens, and those must read as the same thing.
@@ -2002,6 +2008,12 @@ const translations = {
     blCatMonument: 'Anıt', blCatNatureScenic: 'Doğa & Manzara',
     // Explore module (Slice 5)
     exploreTitle: 'Keşfet', menuExplore: 'Keşfet', menuBeaches: 'Plajlar',
+    // The Home TILE's label, distinct from the bottom-nav tab's menuExplore. Both were
+    // 'Keşfet' until the map tab went live, which shipped two identically-named entry
+    // points to two different screens — and, worse, to two different maps of the same
+    // 42 places. The tile is the browsable DIRECTORY; the tab is the map. Naming them
+    // apart is what makes that a choice the user can make rather than a coin flip.
+    menuPlaces: 'Gezilecek Yerler',
     exploreSavedTitle: 'Kaydedilenler',
     // "I'm here" — a status, not a transaction, which is what a check-in is.
     // Not 'Giriş yap' (collides with log-in) and not 'Check-in yap' (half-English).
@@ -2937,6 +2949,12 @@ const translations = {
     blCatMonument: 'نصب تذكاري', blCatNatureScenic: 'طبيعة ومناظر',
     // Explore module (Slice 5)
     exploreTitle: 'استكشاف', menuExplore: 'استكشاف', menuBeaches: 'الشواطئ',
+    // The Home TILE's label, distinct from the bottom-nav tab's menuExplore. Both were
+    // 'Keşfet' until the map tab went live, which shipped two identically-named entry
+    // points to two different screens — and, worse, to two different maps of the same
+    // 42 places. The tile is the browsable DIRECTORY; the tab is the map. Naming them
+    // apart is what makes that a choice the user can make rather than a coin flip.
+    menuPlaces: 'أماكن للزيارة',
     exploreSavedTitle: 'الأماكن المحفوظة',
     // "I am here" — a status. NOT تسجيل الوصول ("register arrival"), the
     // transactional framing rejected in Turkish.
@@ -3833,6 +3851,12 @@ const translations = {
     blCatMonument: 'Памятник', blCatNatureScenic: 'Природа и пейзажи',
     // Explore module (Slice 5)
     exploreTitle: 'Обзор', menuExplore: 'Обзор', menuBeaches: 'Пляжи',
+    // The Home TILE's label, distinct from the bottom-nav tab's menuExplore. Both were
+    // 'Keşfet' until the map tab went live, which shipped two identically-named entry
+    // points to two different screens — and, worse, to two different maps of the same
+    // 42 places. The tile is the browsable DIRECTORY; the tab is the map. Naming them
+    // apart is what makes that a choice the user can make rather than a coin flip.
+    menuPlaces: 'Места для посещения',
     exploreSavedTitle: 'Сохранённые места',
     // "I am here" — a status, matching Buradayım.
     checkinCta: 'Я здесь',
@@ -4728,6 +4752,12 @@ const translations = {
     blCatMonument: 'Μνημείο', blCatNatureScenic: 'Φύση & Τοπίο',
     // Explore module (Slice 5)
     exploreTitle: 'Εξερεύνηση', menuExplore: 'Εξερεύνηση', menuBeaches: 'Παραλίες',
+    // The Home TILE's label, distinct from the bottom-nav tab's menuExplore. Both were
+    // 'Keşfet' until the map tab went live, which shipped two identically-named entry
+    // points to two different screens — and, worse, to two different maps of the same
+    // 42 places. The tile is the browsable DIRECTORY; the tab is the map. Naming them
+    // apart is what makes that a choice the user can make rather than a coin flip.
+    menuPlaces: 'Μέρη για επίσκεψη',
     exploreSavedTitle: 'Αποθηκευμένα μέρη',
     // "I am here" — a status, matching Buradayım.
     checkinCta: 'Είμαι εδώ',
@@ -5625,6 +5655,12 @@ const translations = {
     blCatMonument: 'Monument', blCatNatureScenic: 'Nature & Paysage',
     // Explore module (Slice 5)
     exploreTitle: 'Explorer', menuExplore: 'Explorer', menuBeaches: 'Plages',
+    // The Home TILE's label, distinct from the bottom-nav tab's menuExplore. Both were
+    // 'Keşfet' until the map tab went live, which shipped two identically-named entry
+    // points to two different screens — and, worse, to two different maps of the same
+    // 42 places. The tile is the browsable DIRECTORY; the tab is the map. Naming them
+    // apart is what makes that a choice the user can make rather than a coin flip.
+    menuPlaces: 'Lieux à visiter',
     exploreSavedTitle: 'Lieux enregistrés',
     // "I am here". NOT « Je suis là » — colloquially commoner, but « là »
     // also means "there", and that ambiguity is wrong on a presence button.
@@ -6521,6 +6557,12 @@ const translations = {
     blCatMonument: 'Monumento', blCatNatureScenic: 'Naturaleza y Paisaje',
     // Explore module (Slice 5)
     exploreTitle: 'Explorar', menuExplore: 'Explorar', menuBeaches: 'Playas',
+    // The Home TILE's label, distinct from the bottom-nav tab's menuExplore. Both were
+    // 'Keşfet' until the map tab went live, which shipped two identically-named entry
+    // points to two different screens — and, worse, to two different maps of the same
+    // 42 places. The tile is the browsable DIRECTORY; the tab is the map. Naming them
+    // apart is what makes that a choice the user can make rather than a coin flip.
+    menuPlaces: 'Lugares para visitar',
     exploreSavedTitle: 'Lugares guardados',
     // "I am here" — a status, matching Buradayım.
     checkinCta: 'Estoy aquí',
@@ -7416,6 +7458,12 @@ const translations = {
     blCatMonument: 'Denkmal', blCatNatureScenic: 'Natur & Landschaft',
     // Explore module (Slice 5)
     exploreTitle: 'Entdecken', menuExplore: 'Entdecken', menuBeaches: 'Strände',
+    // The Home TILE's label, distinct from the bottom-nav tab's menuExplore. Both were
+    // 'Keşfet' until the map tab went live, which shipped two identically-named entry
+    // points to two different screens — and, worse, to two different maps of the same
+    // 42 places. The tile is the browsable DIRECTORY; the tab is the map. Naming them
+    // apart is what makes that a choice the user can make rather than a coin flip.
+    menuPlaces: 'Sehenswürdigkeiten',
     exploreSavedTitle: 'Gespeicherte Orte',
     // "I am here". NOT "Einchecken" — the transactional framing rejected
     // in Turkish.
@@ -8312,6 +8360,12 @@ const translations = {
     blCatMonument: 'بنای یادبود', blCatNatureScenic: 'طبیعت و مناظر',
     // Explore module (Slice 5)
     exploreTitle: 'کاوش', menuExplore: 'کاوش', menuBeaches: 'سواحل',
+    // The Home TILE's label, distinct from the bottom-nav tab's menuExplore. Both were
+    // 'Keşfet' until the map tab went live, which shipped two identically-named entry
+    // points to two different screens — and, worse, to two different maps of the same
+    // 42 places. The tile is the browsable DIRECTORY; the tab is the map. Naming them
+    // apart is what makes that a choice the user can make rather than a coin flip.
+    menuPlaces: 'مکان‌های دیدنی',
     exploreSavedTitle: 'مکان‌های ذخیره‌شده',
     // "I am here", pronoun dropped — natural and shorter for a button.
     checkinCta: 'اینجا هستم',

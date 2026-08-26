@@ -64,7 +64,12 @@ const MODULES = [
   { id: 'homeServices',  icon: 'hammer-outline',    tint: 'service',   labelKey: 'menuHomeServices' },
   { id: 'jobPostings',  icon: 'briefcase-outline', tint: 'service',   labelKey: 'menuJobPostings' },
   { id: 'beaches',       icon: 'umbrella-outline',  tint: 'lifestyle', labelKey: 'menuBeaches' },
-  { id: 'explore',       icon: 'map-outline',       tint: 'lifestyle', labelKey: 'menuExplore' },
+  // menuPlaces, NOT menuExplore: the bottom-nav tab owns 'Keşfet' once EXPLORE_MAP_LIVE
+  // is true. This tile opens the browsable DIRECTORY (group tiles → list), the one
+  // thing the map tab does not offer.
+  // ⚠ Icon must not be compass-outline either — that is the tab's icon when live.
+  //   albums-outline reads as a collection, which is what this is.
+  { id: 'explore',       icon: 'albums-outline',    tint: 'lifestyle', labelKey: 'menuPlaces' },
   { id: 'transport',     icon: 'car-outline',       tint: 'service',   labelKey: 'menuTransportation' },
   { id: 'insurance',     icon: 'shield-checkmark-outline', tint: 'service', labelKey: 'menuInsurance' },
   { id: 'grooming',      icon: 'cut-outline',       tint: 'lifestyle', labelKey: 'menuGrooming' },
