@@ -111,6 +111,10 @@ WITH report AS (
     --    file existed, which is exactly the `area`-class failure this section is for:
     --    unregistered, so invisible to the check. Registered retroactively by 0917.
     ('0917_place_photo_attribution','places','photo_attribution'),
+    ('0919_facilities_geocode_provenance','facilities','geocode_source'),
+    ('0919_facilities_geocode_provenance','facilities','geocode_tier'),
+    ('0919_facilities_geocode_provenance','facilities','geocode_corroboration'),
+    ('0919_facilities_geocode_provenance','facilities','geocoded_at'),
     ('0917_place_photo_attribution','beaches','photo_attribution'),
     ('0917_place_photo_attribution','landmarks','photo_attribution'),
     ('0812_module_waitlist','module_waitlist','notified_at'),
@@ -844,6 +848,13 @@ WITH report AS (
     UNION ALL SELECT '0904_accommodation_partner_feed','feed_precision_check is NULL-safe',
       EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_feed_precision_check'
         AND pg_get_constraintdef(oid) ILIKE '%IS NOT NULL%')
+    -- Coordinates may not exist without recorded provenance. This is the "unverified
+    -- stays NULL" rule made structural, so a tired hand cannot write shaky coordinates
+    -- "to be tidied later". If it goes red, pins can be written from nowhere again —
+    -- and the 387-row Nominatim seed becomes appliable, which is the whole hazard.
+    UNION ALL SELECT '0919_facilities_geocode_provenance','coords require provenance',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_coords_need_provenance')
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_coords_both_or_neither')
     -- checkins joined the notify path. Its ENTRY POINT is ungated (the Check-in button
     -- sits on a live place profile), so signups accumulate from the next OTA onward
     -- whether or not this migration was ever applied — the module_waitlist CHECK is only
