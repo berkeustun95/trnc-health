@@ -21,9 +21,9 @@
 // new that matches English fails until a human either translates it or consciously
 // adds a line here.
 //
-// ─── SCOPE: 63 OF 1135 KEYS, DELIBERATELY ───────────────────────────────────
+// ─── SCOPE: 115 OF 1135 KEYS, DELIBERATELY ──────────────────────────────────
 //
-// This guards only the keys reachable from the Explore map + check-in surfaces. That is
+// This guards only the keys reachable from the surfaces listed in SURFACES. That is
 // not laziness, it is the only scope at which the design works: app-wide there are 329
 // colliding keys across 2081 key×locale pairs, and a 2081-entry allowlist could only be
 // GENERATED, never reviewed. A generated allowlist is a rubber stamp — it looks like
@@ -55,7 +55,19 @@ const SURFACES = [
   'screens/ExploreMapScreen.js',
   'screens/ExploreProfileScreen.js',
   'components/ComingSoonScreen.js',
+  // Widened 2026-08-26 for the duty-roster error state. Measured before widening: these
+  // two add 34 keys and ZERO new allowlist entries — both were already fully translated.
+  // Free coverage on the highest-stakes copy in the app.
+  'screens/DutyListScreen.js',
+  'screens/HomeScreen.js',
 ]
+
+// HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
+// so a literal scan cannot see them. Reading them out of the file is what turned up
+// menuGarages sitting untranslated in seven locales.
+const HOME_TILE_LABEL_KEYS = [...new Set(
+  [...readFileSync(resolve(ROOT, 'screens/HomeScreen.js'), 'utf8')
+     .matchAll(/labelKey:\s*'([a-zA-Z][a-zA-Z0-9_]*)'/g)].map(m => m[1]))]
 
 // ─── ALLOWLIST — one line per key×locale, with the reason ────────────────────
 //
@@ -96,6 +108,15 @@ const SAME_AS_ENGLISH = {
   'blAccessPublic':       { French: 'Public is French' },
   'photoCreditPrefix':    { French: 'Photo is French' },
   'hospital':             { Spanish: 'Hospital is Spanish' },
+
+  // Brand / technical terms that are the same word everywhere by design.
+  'menuEsim':             { Turkish: 'eSIM is the technical term worldwide', Arabic: 'eSIM worldwide',
+                            Russian: 'eSIM worldwide', Greek: 'eSIM worldwide', French: 'eSIM worldwide',
+                            Spanish: 'eSIM worldwide', German: 'eSIM worldwide', Persian: 'eSIM worldwide' },
+  // 'Garage' IS the French word for an auto repair shop. Declared explicitly in the
+  // locale table rather than left absent, so this line records a decision and not the
+  // oversight it was in the other six locales until 2026-08-26.
+  'menuGarages':          { French: 'Garage is the French word for an auto repair shop' },
 }
 
 // ─── Scope derivation ────────────────────────────────────────────────────────
@@ -111,6 +132,7 @@ for (const f of SURFACES) {
 // Keys these surfaces reach THROUGH A VARIABLE. Pulled from the same maps the screens
 // index into, so a new category or group is covered the moment it is added.
 const viaVariable = [
+  ...HOME_TILE_LABEL_KEYS,
   ...HEALTH_TYPES,
   ...Object.values(GROUP_META).map(m => m.labelKey),
   ...Object.values(CATEGORY_LABEL_KEY),
@@ -166,5 +188,5 @@ if (stale.length) {
 }
 
 console.log(`i18n coverage: OK — ${KEYS.length} key(s) × ${LANGS.length} locale(s), `
-  + `${allowanceCount} declared same-as-English (scope: the Explore map + check-in surfaces, `
-  + `not the whole 1135-key table — see the header)`)
+  + `${allowanceCount} declared same-as-English (scope: Explore map, check-in, `
+  + `duty roster and Home — not the whole 1135-key table, see the header)`)

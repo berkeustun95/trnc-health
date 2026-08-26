@@ -89,6 +89,7 @@ export default function HomeScreen({
   lang,
   facilities,
   dutyFacilityId,
+  dutyRosterStatus = 'fresh',
   userLocation,
   facilityRatings,
   favorites,
@@ -571,18 +572,38 @@ export default function HomeScreen({
           </ScrollView>
         )}
 
-        <TouchableOpacity style={s.dutyBanner} onPress={onShowDutyList} activeOpacity={0.8}>
-          <View style={s.dutyBannerLeft}>
-            <View style={s.dutyBannerIconWrap}>
-              <Ionicons name="medical-outline" size={20} color={colors.accent} />
-            </View>
-            <View>
-              <Text style={s.dutyBannerTitle}>{t('tonightDuty', lang)}</Text>
-              <Text style={s.dutyBannerSub}>{t('allRegions', lang)}</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.accent} />
-        </TouchableOpacity>
+        {/* The banner was UNCONDITIONAL, which was worse than silence: with an empty
+            roster it invited the user in and the next screen denied them. It now tells
+            the truth up front and still opens the list, where the KTEB fallback lives. */}
+        {(() => {
+          const rosterOk = dutyRosterStatus === 'fresh'
+          return (
+            <TouchableOpacity
+              style={[s.dutyBanner, !rosterOk && s.dutyBannerStale]}
+              onPress={onShowDutyList}
+              activeOpacity={0.8}
+            >
+              <View style={s.dutyBannerLeft}>
+                <View style={[s.dutyBannerIconWrap, !rosterOk && s.dutyBannerIconWrapStale]}>
+                  <Ionicons
+                    name={rosterOk ? 'medical-outline' : 'alert-circle-outline'}
+                    size={20}
+                    color={rosterOk ? colors.accent : colors.danger}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.dutyBannerTitle, !rosterOk && { color: colors.danger }]}>
+                    {t(rosterOk ? 'tonightDuty' : 'dutyBannerStaleTitle', lang)}
+                  </Text>
+                  <Text style={s.dutyBannerSub}>
+                    {t(rosterOk ? 'allRegions' : 'dutyBannerStaleSub', lang)}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={rosterOk ? colors.accent : colors.danger} />
+            </TouchableOpacity>
+          )
+        })()}
 
         {facilityLoadError && (
           <View style={s.errorRow}>
@@ -862,6 +883,8 @@ const s = StyleSheet.create({
 
   // Duty banner (in facility list view)
   dutyBanner:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.accentLight, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.accent + '30' },
+  dutyBannerStale: { borderColor: colors.danger, backgroundColor: colors.dangerLight },
+  dutyBannerIconWrapStale: { backgroundColor: '#fff' },
   dutyBannerLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   dutyBannerIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.accent + '20', justifyContent: 'center', alignItems: 'center' },
   dutyBannerTitle:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.accent, marginBottom: 2 },

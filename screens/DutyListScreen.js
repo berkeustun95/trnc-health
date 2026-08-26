@@ -8,6 +8,13 @@ import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGION_TO_DUTY } from '../constants/regions'
+import { dutyStatus, localDateKey, DUTY_FRESH } from '../utils/dutyStatus'
+
+// KTEB publish the roster and are the fallback we send people to. Their number is the
+// office line; the page shows TODAY's list for every region.
+// ⚠ Not a decoration — at 2am a phone number that works beats a message that does not.
+const KTEB_TEL = '+903922280622'
+const KTEB_URL = 'https://www.kteb.org/dp/?lang=tr'
 
 
 const REGION_TO_BL_KEY = {
@@ -97,15 +104,24 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
 export default function DutyListScreen({ onBack, lang, userLocation, locationDenied, initialRegion = null }) {
   const [sections, setSections] = useState([])
   const [loading, setLoading] = useState(true)
+  // 'fresh' | 'stale' | 'absent' — see utils/dutyStatus.js. Only 'fresh' is a good state.
+  const [status, setStatus] = useState(DUTY_FRESH)
 
   useEffect(() => {
     async function load() {
-      const d = new Date()
-      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      const { data } = await supabase
-        .from('duty_list')
-        .select('id, name, address, phone, open_from, open_until, region')
-        .eq('duty_date', today)
+      // localDateKey(), not toISOString(): TRNC is UTC+2/+3, so between local midnight
+      // and 03:00 the UTC date is still YESTERDAY — precisely the hours someone is
+      // hunting for a duty pharmacy.
+      const today = localDateKey()
+      // The newest duty_date is what separates "we never had this" from "it ran out",
+      // and the two need different words even though they share a card.
+      const [{ data }, { data: newest }] = await Promise.all([
+        supabase.from('duty_list')
+          .select('id, name, address, phone, open_from, open_until, region')
+          .eq('duty_date', today),
+        supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
+      ])
+      setStatus(dutyStatus({ todayCount: data?.length ?? 0, maxDate: newest?.[0]?.duty_date ?? null }))
 
       if (data && data.length > 0) {
         const map = {}
@@ -147,12 +163,37 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
         {loading ? (
           <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
         ) : sections.length === 0 ? (
+          /* NOT an empty state — an ERROR state. There is always a duty pharmacy in the
+             TRNC, so zero rows never describes the world, only our missing data. 'stale'
+             and 'absent' share this card deliberately: the user does not care which of
+             our failures it was, they care where to go now. */
           <View style={s.center}>
             <View style={s.emptyCard}>
-              <View style={s.emptyIconWrap}>
-                <Ionicons name="medical-outline" size={32} color={colors.textSecondary} />
+              <View style={s.errorIconWrap}>
+                <Ionicons name="alert-circle-outline" size={32} color={colors.danger} />
               </View>
-              <Text style={s.emptyText}>{t('noDutyToday', lang)}</Text>
+              <Text style={s.errorTitle}>{t('dutyUnavailableTitle', lang)}</Text>
+              <Text style={s.emptyText}>{t('dutyUnavailableBody', lang)}</Text>
+
+              <TouchableOpacity
+                style={s.ktebCallBtn}
+                onPress={() => Linking.openURL(`tel:${KTEB_TEL}`)}
+                activeOpacity={0.85}
+              >
+                <Feather name="phone" size={16} color="#fff" />
+                <Text style={s.ktebCallText}>{t('dutyCallKteb', lang)}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={s.ktebLinkBtn}
+                onPress={() => Linking.openURL(KTEB_URL)}
+                activeOpacity={0.85}
+              >
+                <Feather name="external-link" size={15} color={colors.primaryDark} />
+                <Text style={s.ktebLinkText}>{t('dutyOpenKteb', lang)}</Text>
+              </TouchableOpacity>
+
+              <Text style={s.ktebAttribution}>{t('dutyKtebAttribution', lang)}</Text>
             </View>
           </View>
         ) : (
@@ -187,6 +228,13 @@ const s = StyleSheet.create({
   emptyCard:    { backgroundColor: colors.cardBg, borderRadius: 16, padding: 24, alignItems: 'center', ...shadow },
   emptyIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   emptyText:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
+  errorIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.dangerLight, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  errorTitle:   { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
+  ktebCallBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, alignSelf: 'stretch', backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, marginTop: 20 },
+  ktebCallText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+  ktebLinkBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, alignSelf: 'stretch', backgroundColor: colors.primaryLight, borderRadius: 14, borderWidth: 1.5, borderColor: colors.primary, paddingVertical: 13, marginTop: 10 },
+  ktebLinkText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
+  ktebAttribution: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 16, lineHeight: 17 },
   listContent:  { paddingBottom: 40 },
 
   regionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8, backgroundColor: colors.cardBg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },

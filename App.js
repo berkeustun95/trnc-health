@@ -66,6 +66,7 @@ import MemoryMatchScreen from './screens/games/MemoryMatchScreen'
 import Game2048Screen from './screens/games/Game2048Screen'
 import SudokuScreen from './screens/games/SudokuScreen'
 import { haversineKm, parseIsOpen, coarseCoord } from './utils/facilityUtils'
+import { dutyStatus, localDateKey, DUTY_FRESH } from './utils/dutyStatus'
 import {
   evaluateCityWelcome, markWelcomeShown, setCityWelcomeEnabled,
   loadCityWelcomeState, shouldAskHomeCity, markAskShown, setHomeCity,
@@ -234,6 +235,10 @@ export default function App() {
   const [userLocation, setUserLocation] = useState(null)
   const [locationDenied, setLocationDenied] = useState(false)
   const [dutyFacilityId, setDutyFacilityId] = useState(null)
+  // Roster health for the Home banner. Read from duty_list — the table DutyListScreen
+  // already depends on — so the banner can stop promising a list that is not there.
+  // This does NOT settle which table is authoritative; that decision is still open.
+  const [dutyRosterStatus, setDutyRosterStatus] = useState(DUTY_FRESH)
   // City welcome: the pending decision, plus the region each deep-linked screen
   // should open pre-filtered to. Cleared on that screen's back, so a later manual
   // open is not still filtered to a city the user has since left.
@@ -774,11 +779,23 @@ export default function App() {
       if (error) setFacilityLoadError(true)
       else setFacilities(data ?? [])
 
-      const d = new Date()
-      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      // localDateKey(), not toISOString(): TRNC is UTC+2/+3, so between local midnight
+      // and 03:00 the UTC date is still YESTERDAY — exactly the hours someone needs this.
+      const today = localDateKey()
       const { data: duty } = await supabase
         .from('duty_schedule').select('facility_id').eq('date', today).maybeSingle()
       if (duty) setDutyFacilityId(duty.facility_id)
+
+      // Roster health, from duty_list. Two cheap reads: is today covered, and what is the
+      // newest day we hold. The second separates "never seeded" from "ran out".
+      const [{ count: dutyToday }, { data: dutyNewest }] = await Promise.all([
+        supabase.from('duty_list').select('id', { head: true, count: 'exact' }).eq('duty_date', today),
+        supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
+      ])
+      setDutyRosterStatus(dutyStatus({
+        todayCount: dutyToday ?? 0,
+        maxDate: dutyNewest?.[0]?.duty_date ?? null,
+      }))
 
 
       // TODO: replace with a computed avg_rating + review_count column on facilities
@@ -1319,6 +1336,7 @@ export default function App() {
             lang={lang}
             facilities={facilities}
             dutyFacilityId={dutyFacilityId}
+            dutyRosterStatus={dutyRosterStatus}
             userLocation={userLocation}
             facilityRatings={facilityRatings}
             favorites={favorites}

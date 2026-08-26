@@ -70,6 +70,19 @@ const translations = {
     signOut: 'Sign out',
     dutyPharmacies: 'Duty Pharmacies',
     noDutyToday: 'No duty pharmacies listed for today.',
+    // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
+    // a duty pharmacy in the TRNC — so this copy must never imply there is none. It owns
+    // the fault ('our list isn't current') and hands the user KTEB, who publish it.
+    dutyUnavailableTitle: "We can't show tonight's duty pharmacies",
+    dutyUnavailableBody: "There is always a duty pharmacy in North Cyprus — our list just isn't current. You can get today's list from the Cyprus Turkish Pharmacists Association.",
+    dutyCallKteb: 'Call KTEB',
+    dutyOpenKteb: 'Open kteb.org',
+    dutyKtebAttribution: 'The duty roster is published by the Cyprus Turkish Pharmacists Association.',
+    dutyBannerStaleTitle: "Duty list isn't current",
+    dutyBannerStaleSub: 'Tap for the current list',
+    // 'Garage' IS the French word for an auto repair shop. Declared explicitly rather
+    // than left absent, so the guard's allowlist records a decision, not an oversight.
+    menuGarages: 'Garages',
     tonightDuty: "Today's duty pharmacies",
     allRegions: 'All on-call pharmacies by region',
     getStarted: 'Get started',
@@ -1261,6 +1274,16 @@ const translations = {
     signOut: 'Çıkış yap',
     dutyPharmacies: 'Nöbetçi Eczaneler',
     noDutyToday: 'Bugün için nöbetçi eczane listelenmemiş.',
+    // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
+    // a duty pharmacy in the TRNC — so this copy must never imply there is none. It owns
+    // the fault ('our list isn't current') and hands the user KTEB, who publish it.
+    dutyUnavailableTitle: 'Nöbetçi eczane listesi şu anda gösterilemiyor',
+    dutyUnavailableBody: "KKTC'de her gece nöbetçi eczane vardır — bu liste bizde güncel değil. Güncel listeye Kıbrıs Türk Eczacılar Birliği'nden ulaşabilirsin.",
+    dutyCallKteb: "KTEB'i ara",
+    dutyOpenKteb: "kteb.org'da aç",
+    dutyKtebAttribution: 'Nöbet listesi Kıbrıs Türk Eczacılar Birliği tarafından yayımlanır.',
+    dutyBannerStaleTitle: 'Nöbet listesi güncel değil',
+    dutyBannerStaleSub: 'Güncel liste için dokun',
     tonightDuty: 'Bugünkü nöbetçi eczaneler',
     allRegions: 'Bölgeye göre tüm nöbetçi eczaneler',
     getStarted: 'Başla',
@@ -2492,6 +2515,17 @@ const translations = {
     signOut: 'تسجيل الخروج',
     dutyPharmacies: 'صيدليات المناوبة',
     noDutyToday: 'لا توجد صيدليات مناوبة مدرجة اليوم.',
+    // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
+    // a duty pharmacy in the TRNC — so this copy must never imply there is none. It owns
+    // the fault ('our list isn't current') and hands the user KTEB, who publish it.
+    dutyUnavailableTitle: 'لا يمكننا عرض قائمة صيدليات المناوبة الآن',
+    dutyUnavailableBody: 'توجد دائمًا صيدلية مناوبة في شمال قبرص — لكن قائمتنا ليست محدّثة. يمكنك الحصول على قائمة اليوم من نقابة الصيادلة القبارصة الأتراك.',
+    dutyCallKteb: 'اتصل بـ KTEB',
+    dutyOpenKteb: 'افتح kteb.org',
+    dutyKtebAttribution: 'قائمة المناوبة تصدر عن نقابة الصيادلة القبارصة الأتراك.',
+    dutyBannerStaleTitle: 'قائمة المناوبة غير محدّثة',
+    dutyBannerStaleSub: 'اضغط للحصول على القائمة الحالية',
+    menuGarages: 'ورش السيارات',
     tonightDuty: 'صيدليات المناوبة اليوم',
     allRegions: 'جميع الصيدليات المناوبة حسب المنطقة',
     getStarted: 'ابدأ الآن',
@@ -3373,6 +3407,17 @@ const translations = {
     signOut: 'Выйти',
     dutyPharmacies: 'Дежурные аптеки',
     noDutyToday: 'Дежурных аптек на сегодня нет.',
+    // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
+    // a duty pharmacy in the TRNC — so this copy must never imply there is none. It owns
+    // the fault ('our list isn't current') and hands the user KTEB, who publish it.
+    dutyUnavailableTitle: 'Сейчас мы не можем показать список дежурных аптек',
+    dutyUnavailableBody: 'На Северном Кипре дежурная аптека есть всегда — просто наш список неактуален. Актуальный список можно получить в Ассоциации турко-кипрских фармацевтов.',
+    dutyCallKteb: 'Позвонить в KTEB',
+    dutyOpenKteb: 'Открыть kteb.org',
+    dutyKtebAttribution: 'График дежурств публикует Ассоциация турко-кипрских фармацевтов.',
+    dutyBannerStaleTitle: 'Список дежурств неактуален',
+    dutyBannerStaleSub: 'Нажмите, чтобы получить актуальный список',
+    menuGarages: 'Автосервис',
     tonightDuty: 'Дежурные аптеки сегодня',
     allRegions: 'Все дежурные аптеки по районам',
     getStarted: 'Начать',
@@ -4253,6 +4298,17 @@ const translations = {
     signOut: 'Αποσύνδεση',
     dutyPharmacies: 'Εφημερεύοντα Φαρμακεία',
     noDutyToday: 'Δεν υπάρχουν εφημερεύοντα φαρμακεία σήμερα.',
+    // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
+    // a duty pharmacy in the TRNC — so this copy must never imply there is none. It owns
+    // the fault ('our list isn't current') and hands the user KTEB, who publish it.
+    dutyUnavailableTitle: 'Δεν μπορούμε να εμφανίσουμε τη λίστα εφημερευόντων φαρμακείων',
+    dutyUnavailableBody: 'Στη Βόρεια Κύπρο υπάρχει πάντα εφημερεύον φαρμακείο — απλώς η λίστα μας δεν είναι ενημερωμένη. Μπορείτε να δείτε τη σημερινή λίστα από τον Σύλλογο Τουρκοκυπρίων Φαρμακοποιών.',
+    dutyCallKteb: 'Κλήση KTEB',
+    dutyOpenKteb: 'Άνοιγμα kteb.org',
+    dutyKtebAttribution: 'Ο κατάλογος εφημεριών δημοσιεύεται από τον Σύλλογο Τουρκοκυπρίων Φαρμακοποιών.',
+    dutyBannerStaleTitle: 'Η λίστα εφημεριών δεν είναι ενημερωμένη',
+    dutyBannerStaleSub: 'Πατήστε για την τρέχουσα λίστα',
+    menuGarages: 'Συνεργεία αυτοκινήτων',
     tonightDuty: 'Εφημερεύοντα φαρμακεία σήμερα',
     allRegions: 'Όλα τα εφημερεύοντα φαρμακεία ανά περιοχή',
     getStarted: 'Ξεκινήστε',
@@ -5133,6 +5189,19 @@ const translations = {
     signOut: 'Se déconnecter',
     dutyPharmacies: 'Pharmacies de garde',
     noDutyToday: "Aucune pharmacie de garde répertoriée aujourd'hui.",
+    // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
+    // a duty pharmacy in the TRNC — so this copy must never imply there is none. It owns
+    // the fault ('our list isn't current') and hands the user KTEB, who publish it.
+    dutyUnavailableTitle: "Impossible d'afficher la liste des pharmacies de garde",
+    dutyUnavailableBody: "Il y a toujours une pharmacie de garde à Chypre du Nord — c'est notre liste qui n'est pas à jour. Vous pouvez obtenir la liste du jour auprès de l'Association des pharmaciens chypriotes turcs.",
+    dutyCallKteb: 'Appeler KTEB',
+    dutyOpenKteb: 'Ouvrir kteb.org',
+    dutyKtebAttribution: "La liste de garde est publiée par l'Association des pharmaciens chypriotes turcs.",
+    dutyBannerStaleTitle: 'Liste de garde non à jour',
+    dutyBannerStaleSub: 'Touchez pour la liste du jour',
+    // 'Garage' IS the French word for an auto repair shop. Declared explicitly rather
+    // than left absent, so the guard's allowlist records a decision, not an oversight.
+    menuGarages: 'Garages',
     tonightDuty: "Pharmacies de garde aujourd'hui",
     allRegions: 'Toutes les pharmacies de garde par région',
     getStarted: 'Commencer',
@@ -6014,6 +6083,17 @@ const translations = {
     signOut: 'Cerrar sesión',
     dutyPharmacies: 'Farmacias de guardia',
     noDutyToday: 'No hay farmacias de guardia registradas hoy.',
+    // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
+    // a duty pharmacy in the TRNC — so this copy must never imply there is none. It owns
+    // the fault ('our list isn't current') and hands the user KTEB, who publish it.
+    dutyUnavailableTitle: 'No podemos mostrar la lista de farmacias de guardia',
+    dutyUnavailableBody: 'Siempre hay una farmacia de guardia en el Norte de Chipre — es nuestra lista la que no está actualizada. Puedes consultar la lista de hoy en la Asociación de Farmacéuticos Turcochipriotas.',
+    dutyCallKteb: 'Llamar a KTEB',
+    dutyOpenKteb: 'Abrir kteb.org',
+    dutyKtebAttribution: 'La lista de guardia la publica la Asociación de Farmacéuticos Turcochipriotas.',
+    dutyBannerStaleTitle: 'La lista de guardia no está actualizada',
+    dutyBannerStaleSub: 'Toca para ver la lista actual',
+    menuGarages: 'Talleres mecánicos',
     tonightDuty: 'Farmacias de guardia hoy',
     allRegions: 'Todas las farmacias de guardia por región',
     getStarted: 'Empezar',
@@ -6894,6 +6974,17 @@ const translations = {
     signOut: 'Abmelden',
     dutyPharmacies: 'Apotheken-Bereitschaftsdienst',
     noDutyToday: 'Heute keine Bereitschaftsapotheken eingetragen.',
+    // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
+    // a duty pharmacy in the TRNC — so this copy must never imply there is none. It owns
+    // the fault ('our list isn't current') and hands the user KTEB, who publish it.
+    dutyUnavailableTitle: 'Wir können die Liste der Notdienst-Apotheken gerade nicht anzeigen',
+    dutyUnavailableBody: 'In Nordzypern gibt es immer eine Notdienst-Apotheke — nur unsere Liste ist nicht aktuell. Die aktuelle Liste erhältst du beim Verband der türkisch-zyprischen Apotheker.',
+    dutyCallKteb: 'KTEB anrufen',
+    dutyOpenKteb: 'kteb.org öffnen',
+    dutyKtebAttribution: 'Der Notdienstplan wird vom Verband der türkisch-zyprischen Apotheker veröffentlicht.',
+    dutyBannerStaleTitle: 'Notdienstliste nicht aktuell',
+    dutyBannerStaleSub: 'Für die aktuelle Liste tippen',
+    menuGarages: 'Autowerkstätten',
     tonightDuty: 'Bereitschaftsapotheken heute',
     allRegions: 'Alle Bereitschaftsapotheken nach Region',
     getStarted: 'Loslegen',
@@ -7775,6 +7866,17 @@ const translations = {
     signOut: 'خروج',
     dutyPharmacies: 'داروخانه‌های نوبت‌دار',
     noDutyToday: 'هیچ داروخانه نوبت‌داری برای امروز ثبت نشده است.',
+    // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
+    // a duty pharmacy in the TRNC — so this copy must never imply there is none. It owns
+    // the fault ('our list isn't current') and hands the user KTEB, who publish it.
+    dutyUnavailableTitle: 'در حال حاضر نمی‌توانیم فهرست داروخانه‌های کشیک را نشان دهیم',
+    dutyUnavailableBody: 'در قبرس شمالی همیشه یک داروخانه کشیک وجود دارد — فقط فهرست ما به‌روز نیست. فهرست امروز را می‌توانید از انجمن داروسازان ترک قبرسی دریافت کنید.',
+    dutyCallKteb: 'تماس با KTEB',
+    dutyOpenKteb: 'باز کردن kteb.org',
+    dutyKtebAttribution: 'فهرست کشیک توسط انجمن داروسازان ترک قبرسی منتشر می‌شود.',
+    dutyBannerStaleTitle: 'فهرست کشیک به‌روز نیست',
+    dutyBannerStaleSub: 'برای فهرست امروز ضربه بزنید',
+    menuGarages: 'تعمیرگاه خودرو',
     tonightDuty: 'داروخانه‌های نوبت‌دار امروز',
     allRegions: 'همه داروخانه‌های نوبت‌دار بر اساس منطقه',
     getStarted: 'شروع کنید',
