@@ -8,6 +8,7 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
+import { notifyAdmins } from '../utils/notify'
 import { t } from '../constants/i18n'
 import { colors, shadow } from '../constants/theme'
 import HoursPicker from '../components/HoursPicker'
@@ -33,15 +34,6 @@ function decode(base64) {
     if (p < bufLen) out[p++] = ((c & 3) << 6) | d
   }
   return buf
-}
-
-async function sendPushNotification(token, title, body) {
-  try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ to: token, title, body, sound: 'default' }),
-    })
-  } catch {}
 }
 
 const TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
@@ -132,23 +124,24 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
   }
 
   // Notify admins the submission is ready for review, then leave the screen.
-  async function finalizeSubmission(facilityName) {
-    try {
-      const { data: admins } = await supabase.from('profiles').select('id, push_token').eq('role', 'admin')
-      const title = mode === 'claim' ? 'New facility claim' : 'New provider application'
-      const body = `${facilityName || 'A facility'} submitted for review.`
-      for (const admin of admins ?? []) {
-        if (admin.push_token) await sendPushNotification(admin.push_token, title, body)
-        await supabase.from('notifications').insert({ user_id: admin.id, title, body })
-      }
-    } catch {}
+  //
+  // This used to read admin profiles here for push tokens. RLS gives a non-admin zero
+  // rows, so the loop ran ZERO times and neither the push nor the notifications row was
+  // written — no admin has been alerted to a provider application since this shipped.
+  // notify_admins() (20260923) resolves admins and sends server-side, authorized by the
+  // caller's own claim_requests row (written by create_facility_claim in both the claim
+  // and the new-application flow, which is why one predicate covers both modes).
+  //
+  // Takes the facility ID, not the name: the server reads the name itself, so the copy
+  // is not something a client can choose.
+  async function finalizeSubmission(facilityId) {
+    await notifyAdmins('facility_submission', facilityId)
     onDone()
   }
 
   async function submit() {
     setSaving(true)
     setError(null)
-    const facilityName = mode === 'claim' ? selectedFacility?.name : form.name.trim()
 
     // Retry path: the facility/claim row already exists from a previous attempt
     // whose document upload failed. Skip re-creating it and retry ONLY the upload,
@@ -214,7 +207,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
 
     setSubmittedFacilityId(null)
     setSaving(false)
-    await finalizeSubmission(facilityName)
+    await finalizeSubmission(facilityId)
   }
 
   // ── Step 1: Welcome ────────────────────────────────────────────────────────

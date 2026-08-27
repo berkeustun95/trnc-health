@@ -14,7 +14,7 @@ import ContentReportMenu from '../components/ContentReportMenu'
 import { formatHoursDisplay } from '../components/HoursPicker'
 import { pricedServices, formatPriceRange } from '../utils/servicePrices'
 import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
-import { notifyProvider } from '../utils/notify'
+import { notifyFacilityOwner } from '../utils/notify'
 import { HEALTH_TYPES } from '../constants/facilityTypes'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
 import BackButton from '../components/BackButton'
@@ -95,7 +95,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
     if (!error) {
       setNewQ('')
       await loadQuestions()
-      notifyProvider(facility, 'notifNewQuestionTitle', 'notifNewQuestionBody')
+      notifyFacilityOwner(facility, 'question')
     } else {
       const key = moderationErrorKey(error)
       setQError(key ? t(key, lang) : t('questionSubmitError', lang))

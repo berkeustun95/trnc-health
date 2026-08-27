@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import { notifyAdmins } from '../utils/notify'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import KeyboardAwareForm from './KeyboardAwareForm'
@@ -14,31 +15,18 @@ const REASONS = [
   { key: 'other',      label: 'reasonOther' },
 ]
 
-async function sendPushNotification(token, title, body) {
-  try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: token, sound: 'default', title, body, data: { screen: 'admin' } }),
-    })
-  } catch {}
-}
-
 // A report is worthless if it sits unseen — the 24h commitment depends on the
-// admin being pushed, not on them opening the dashboard. Same pattern as
-// ProviderOnboardingScreen's new-application alert.
-async function notifyAdmins(contentType) {
-  try {
-    const { data: admins } = await supabase.from('profiles').select('id, push_token').eq('role', 'admin')
-    const label = contentType === 'facility' ? 'business listing' : contentType
-    const title = 'Content reported'
-    const body  = `A ${label} was reported and is awaiting review.`
-    for (const admin of admins ?? []) {
-      if (admin.push_token) await sendPushNotification(admin.push_token, title, body)
-      await supabase.from('notifications').insert({ user_id: admin.id, title, body })
-    }
-  } catch {}
-}
+// admin being pushed, not on them opening the dashboard.
+//
+// This used to read admin profiles here for their push tokens. RLS gives a non-admin
+// zero rows, so `admins` was always empty and the `for` loop ran ZERO times — meaning
+// neither the push nor the notifications row was ever written. No admin had been
+// alerted to a report since this shipped, and nothing surfaced it, because an empty
+// list is what a genuinely admin-less database would also produce.
+//
+// notify_admins() (20260923) resolves admins, composes the copy and sends the push
+// server-side. It authorizes against the caller's OWN content_reports row, so it also
+// cannot be used to spam admins about a report nobody filed.
 
 export default function ContentReportMenu({ contentType, contentId, lang = 'English', style, onBlocked, onRequireAccount }) {
   const [open, setOpen]       = useState(false)
@@ -106,7 +94,7 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
     }
 
     setStep('done')
-    notifyAdmins(contentType)
+    notifyAdmins('content_report', contentId)
   }
 
   return (

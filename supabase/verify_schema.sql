@@ -53,6 +53,7 @@ WITH report AS (
     ('0826_place_claims','place_claims'),
     ('0905_towing_companies','towing_companies'),
     ('0910_contact_events','contact_events'),
+    ('0923_server_side_notifications','push_log'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -238,7 +239,13 @@ WITH report AS (
     -- user, signed in or not.
     ('0912_search_tokenised','search_fold'),
     ('0912_search_tokenised','search_all_tokens'),
-    ('0912_search_tokenised','search_token_hits')
+    ('0912_search_tokenised','search_token_hits'),
+    -- Provider/admin notifications. notify_facility_owner is the ONLY path that tells a
+    -- provider a booking or question arrived; if it goes MISSING the client's rpc() call
+    -- errors into a bare catch{} and providers go silent again, exactly as before 0923.
+    ('0923_server_side_notifications','notify_owner_text'),
+    ('0923_server_side_notifications','notify_facility_owner'),
+    ('0923_server_side_notifications','notify_admins')
   ) e(m,o)
 
   UNION ALL
@@ -415,7 +422,9 @@ WITH report AS (
     ('0905_towing_companies','idx_towing_companies_coverage'),
     -- contact_events: taps for one firm over a date range — the only query that runs,
     -- and what contact_events_monthly groups by.
-    ('0910_contact_events','idx_contact_events_module_entity_time')
+    ('0910_contact_events','idx_contact_events_module_entity_time'),
+    ('0923_server_side_notifications','idx_push_log_sent_at'),
+    ('0923_server_side_notifications','idx_push_log_user_kind')
 
   ) e(m,o)
 
@@ -446,7 +455,12 @@ WITH report AS (
     -- search returns a permission error, with nothing in the app to explain it.
     ('0912_search_tokenised','search_fold'),
     ('0912_search_tokenised','search_all_tokens'),
-    ('0912_search_tokenised','search_token_hits')
+    ('0912_search_tokenised','search_token_hits'),
+    -- Without these grants the functions exist and every booking/question notification
+    -- fails with a permission error the client swallows — indistinguishable from the
+    -- silent failure 0923 exists to end.
+    ('0923_server_side_notifications','notify_facility_owner'),
+    ('0923_server_side_notifications','notify_admins')
   ) e(m,o)
 
   UNION ALL
@@ -728,6 +742,78 @@ WITH report AS (
     UNION ALL SELECT '0821_drop_providers_read_customer','profiles over-share policy removed (providers use get_customer_contacts RPC)',
       NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles'
                 AND policyname='providers read customer push token')
+    UNION ALL SELECT '0922_drop_grooming_profile_overshare','profiles grooming over-share policy removed (twin of 0821; full-row read for any facility owner)',
+      NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles'
+                AND policyname='owner read booking customer profile')
+    -- DERIVED, not a name list. The 0821 drop shipped with a verification comment naming
+    -- three expected SELECT policies when there were four, so the fourth (the grooming
+    -- over-share) survived unnoticed for six weeks and was still live when found.
+    -- Verified green 2026-08-27, immediately after 20260922 was applied: the live set is
+    -- exactly owner read / admin read all / admin read profiles. Before the drop this
+    -- token read 4 and went red, so it has been WATCHED failing and passing on real data —
+    -- it is a check, not a decoration.
+    -- A name check only ever catches the
+    -- policy you already thought of; this counts what is actually there, so ANY new or
+    -- returning SELECT policy on profiles fails the check and has to be looked at.
+    -- Expected set: owner read, admin read all, admin read profiles.
+    -- If you add a legitimate fourth, bump this number IN THE SAME COMMIT and say why.
+    UNION ALL SELECT '0922_drop_grooming_profile_overshare','profiles has exactly 3 SELECT policies (derived count, not a name list)',
+      (SELECT count(*) FROM pg_policies
+        WHERE schemaname='public' AND tablename='profiles' AND cmd='SELECT') = 3
+    -- ── 0923 server-side notifications. FOUR tokens. The functions' EXISTENCE is section
+    -- C's job; none of what makes them SAFE is visible there.
+    --
+    -- (1) THE INJECTION CLOSURE, as a signature assertion. This is the point of 0923:
+    -- insert_notification takes client-written p_title/p_body, so a customer with one
+    -- appointment could write "ADA: your account is suspended, tap here" into a provider's
+    -- inbox. notify_facility_owner takes an ENUM the server interprets. If anyone ever
+    -- "helpfully" adds a p_title/p_body overload for flexibility, the channel reopens and
+    -- every other check here still reads OK.
+    UNION ALL SELECT '0923_server_side_notifications','notify_facility_owner takes p_kind, NOT client title/body',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_facility_owner'
+          AND pg_get_function_arguments(p.oid) ILIKE '%p_kind%')
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_facility_owner'
+          AND pg_get_function_arguments(p.oid) ILIKE '%p_title%')
+    -- (2) The nine locales are real. A VALUES table of nine English rows would pass every
+    -- existence check and silently un-localise every provider notification — which is
+    -- exactly bug 3 (the client's dead read always fell back to English) coming back by
+    -- another route. Two languages sampled, plus the unknown-language fallback.
+    -- ⚠ Asserted by reading the function BODY, not by CALLING it. A direct
+    -- `public.notify_owner_text(...)` here is resolved at parse time, so on any database
+    -- that has not applied 0923 the whole of QUERY 1 dies with 42883 and every other
+    -- migration's status becomes unreadable — while the likeliest run order is exactly
+    -- "run verify_schema, see what is missing, then apply it." Same trap the 0910 tokens
+    -- above document for has_column_privilege. The live call-and-compare version of this
+    -- test lives in the migration's own verification block, which only ever runs after
+    -- the apply, where it is safe.
+    UNION ALL SELECT '0923_server_side_notifications','notify_owner_text is really localised (not English x9)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_owner_text'
+          AND pg_get_functiondef(p.oid) ILIKE '%Yeni Randevu Talebi%'
+          AND pg_get_functiondef(p.oid) ILIKE '%Neue Frage%'
+          AND pg_get_functiondef(p.oid) ILIKE '%Νέα Ερώτηση%')
+    -- (3) push_log is admin-read-only and has NO write policy — writes come only from the
+    -- DEFINER functions, which bypass RLS. A stray INSERT policy would let any client
+    -- forge delivery evidence, which is worse than having no log at all.
+    UNION ALL SELECT '0923_server_side_notifications','push_log: RLS on, exactly 1 policy, admin SELECT only',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.push_log')), false)
+      AND (SELECT count(*) FROM pg_policies
+            WHERE schemaname='public' AND tablename='push_log') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies
+            WHERE schemaname='public' AND tablename='push_log'
+              AND cmd='SELECT' AND qual ILIKE '%is_admin%')
+    -- (4) The senders actually RECORD. push_log is what check-notify-health.mjs and any
+    -- future delivery join read; a body that pushes without logging leaves the same blind
+    -- spot 0923 exists to close, while sections A/C/F all still read OK.
+    UNION ALL SELECT '0923_server_side_notifications','notify_facility_owner + notify_admins write push_log',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_facility_owner'
+          AND pg_get_functiondef(p.oid) ILIKE '%INSERT INTO push_log%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_admins'
+          AND pg_get_functiondef(p.oid) ILIKE '%INSERT INTO push_log%')
     UNION ALL SELECT '0824_place_moderation','content_reports_content_type_check admits place',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='content_reports_content_type_check'
         AND pg_get_constraintdef(c.oid) ILIKE '%place%')
@@ -983,6 +1069,10 @@ WITH report AS (
     -- admin-seeded directory: no user data, but public-read + admin-write only
     -- works solely because RLS is ON. OFF here = world-writable firm listings.
     'towing_companies',
+    -- push_log records who we tried to push to. RLS is the only thing keeping that
+    -- delivery history off every signed-in customer. OFF here = a readable log of
+    -- which providers got which alerts and when.
+    'push_log',
     -- contact_events is world-INSERTABLE by design (the inverse of towing_companies).
     -- RLS is the ONLY thing making it not also world-READABLE, and `authenticated`
     -- holds a table-level SELECT grant so the future admin screen needs no migration.

@@ -11,7 +11,7 @@ import { t } from '../constants/i18n'
 import ReviewsScreen from './ReviewsScreen'
 import { ReviewSkeleton, SlotGridSkeleton } from '../components/Skeleton'
 import ContentReportMenu from '../components/ContentReportMenu'
-import { notifyProvider } from '../utils/notify'
+import { notifyFacilityOwner } from '../utils/notify'
 import { HEALTH_TYPES } from '../constants/facilityTypes'
 import BackButton from '../components/BackButton'
 
@@ -149,7 +149,7 @@ export default function BookingScreen({ facility, session, lang, blockedUntil, o
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setDone(true)
-      notifyProvider(facility, 'notifNewApptTitle', 'notifNewApptBody')
+      notifyFacilityOwner(facility, 'appointment')
     }
     setLoading(false)
   }

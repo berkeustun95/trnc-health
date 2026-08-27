@@ -1,29 +1,46 @@
 import { supabase } from '../lib/supabase'
-import { t } from '../constants/i18n'
 
-// Push + in-app notification to a facility's owning provider. Looks up the
-// provider's preferred language so the title/body are localized to the
-// recipient, not the sender. Silent on any failure — a notification must never
-// block the user action that triggered it (booking, question). Shared by
-// BookingScreen (new appointment) and FacilityProfileScreen (new question).
-export async function notifyProvider(facility, titleKey, bodyKey) {
-  if (!facility.provider_id) return
+// Notify a facility's owning provider that a booking or question arrived.
+//
+// EVERYTHING happens server-side, in notify_facility_owner() (20260923): the recipient
+// is derived from the facility, authorization is derived from the appointments/questions
+// tables, the strings come from notify_owner_text() in the RECIPIENT's language, and the
+// push is sent from Postgres via net.http_post. This client passes an id and a kind.
+//
+// WHY IT LOOKS LIKE THIS NOW. The previous version read the provider's profile from the
+// client for a push_token. No RLS policy has ever permitted a customer to read a
+// provider's row, so that read returned null, `prov?.push_token` was always undefined,
+// and the push was never even attempted — for 70 days, silently, because "no rows" and
+// "this provider has no token" are indistinguishable from here. It also meant `lang`
+// always fell back to English, against a comment promising the recipient's language.
+//
+// The fix is not "read it with more permission" — that would put another user's push
+// token in the client. It is: the client should never have known the token at all.
+//
+// CALL ORDER IS LOAD-BEARING: insert the appointment/question FIRST, then call this.
+// The RPC authorizes by looking for that row; called before the insert it raises.
+//
+// Still swallowed: a notification must never block the booking that triggered it. What
+// changed is that the failure is now COUNTED — push_log records every attempt, and
+// scripts/check-notify-health.mjs reads it. Silence is no longer invisible.
+export async function notifyFacilityOwner(facility, kind) {
+  if (!facility?.id) return
   try {
-    const { data: prov } = await supabase
-      .from('profiles')
-      .select('push_token, preferred_language')
-      .eq('id', facility.provider_id)
-      .maybeSingle()
-    const lang = prov?.preferred_language || 'English'
-    const title = t(titleKey, lang)
-    const body = t(bodyKey, lang).replace('{name}', facility.name)
-    if (prov?.push_token) {
-      await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ to: prov.push_token, title, body, sound: 'default' }),
-      })
-    }
-    await supabase.rpc('insert_notification', { p_user_id: facility.provider_id, p_title: title, p_body: body })
-  } catch {}
+    await supabase.rpc('notify_facility_owner', { p_facility_id: facility.id, p_kind: kind })
+  } catch { /* non-critical — see above */ }
+}
+
+// Alert every admin. Same story: the client used to read admin profiles for push tokens,
+// which RLS empties for a non-admin, so the `for` loop ran zero times and neither the
+// push NOR the in-app row was written. No admin had been alerted to a content report or
+// a provider application since those screens shipped.
+//
+// p_ref_id is the content id (content_report) or the facility id (facility_submission);
+// notify_admins() authorizes against the caller's own report/claim row and composes the
+// text itself.
+export async function notifyAdmins(kind, refId) {
+  if (!refId) return
+  try {
+    await supabase.rpc('notify_admins', { p_kind: kind, p_ref_id: refId })
+  } catch { /* non-critical */ }
 }

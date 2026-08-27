@@ -124,6 +124,84 @@ went missing). Two mandatory rules:
   That last one is the instructive case — the tempting fix was to widen the tolerance
   until it went green, which would have left a test that cries wolf, and a test that cries
   wolf teaches you to ignore it. Fix what the test measures, not what it reports.
+- **A verification block must DERIVE what it asserts, never hardcode a set it did not query.**
+  `20260821` dropped one of the two `profiles` over-share policies and shipped this
+  verification comment: *"Remaining SELECT policies: owner read, admin read all, admin read
+  profiles."* **There were four.** The fourth — `owner read booking customer profile`
+  (`20260726`) — has the same EXISTS predicate, lacks the `get_my_role() = 'provider'`
+  prefix so it is WIDER, and granted every facility owner the full profile row (phone,
+  nationality, push_token, strikes, ban timestamps) of anyone who booked with them. It
+  survived six weeks unnoticed and was still LIVE in production when found (confirmed via
+  `pg_policies`, 2026-08-27). Dropped by `20260922`, applied and verified the same day.
+  The list was written from what the author had in mind, not from `pg_policies`. **A check
+  that hardcodes an expected set cannot fail correctly**: it goes green when the one thing
+  it names is absent and stays silent about everything it forgot to name — so it is
+  strictly worse than no check, because it certifies the blind spot. Sibling of the green-
+  check rule above, and the sharper form of it: that rule says watch a check go red; this
+  one says a check phrased as a remembered list has no red to go to.
+  So: assert `count(*) = 3` and PRINT the rows, not `NOT EXISTS(policyname = 'the one I
+  remember')`. Register the count, not the name. If a legitimate new object takes the count
+  to 4, bump it in the same commit and say why — that edit is the review moment the name
+  list never creates. Applies to any enumerable set a migration touches: policies, triggers,
+  constraints, grants, cron jobs.
+  Corollary, learned the same day: **when you re-verify a claim, state which surfaces you
+  actually covered.** "Nothing reads it" from a client-code grep is not the same claim as
+  "nothing reads it" — RPCs, SECURITY INVOKER functions, views and edge functions each obey
+  RLS differently (DEFINER and service_role bypass it; INVOKER does not), and only the
+  INVOKER surfaces can be load-bearing for a policy. Name the surfaces or the claim is
+  unfalsifiable.
+
+- **A migration file is not evidence of what the database does. Assert against `pg_proc`
+  and `pg_policies`, never against the file that claims to have created them.** The rule
+  above covers derived COUNTS; this is the same rule for BEHAVIOUR, and it was learned the
+  expensive way — one investigation, three conclusions, two of them wrong:
+    * `20260821`'s verification **comment** said three SELECT policies remained on
+      `profiles`. There were four. The fourth was a live full-row over-share
+      (phone, nationality, push_token, strikes, ban timestamps) that survived six weeks.
+    * `20260726`'s **file** says branch 3 of `insert_notification` makes new appointments
+      notify their provider. I read it and repeated it as fact in an audit.
+  A migration is a statement of INTENT. Between intent and the database sit a manual paste,
+  a partial selection, a later `CREATE OR REPLACE`, and a ledger row that may only say
+  `baseline` — which asserts in bulk and verifies nothing. `pg_get_functiondef`,
+  `pg_get_constraintdef`, `pg_policies` and `information_schema` are the authority. Quote
+  them, not the file, and say which one you read.
+  **And the correction has its own failure mode, which is the third wrong conclusion:**
+  having caught the file lying twice, I then declared a code path dead on the strength of
+  **two** production rows — both at a junk test facility, one of them a self-booking. A
+  sample is only an authority when it is big enough and clean enough to be one; two rows
+  of somebody's test data is not a measurement, it is an anecdote with a timestamp.
+  **Before a sample overturns anything, look at what the rows actually ARE** — who created
+  them, at which facility, in what state. The structural proof (no policy permits this
+  read) needed no sample at all and was right the whole time; reach for that first, and use
+  data to size a problem rather than to discover one.
+  Practical test when behaviour is in question: impersonate inside a transaction and roll
+  back — `BEGIN; SET LOCAL role authenticated; SET LOCAL request.jwt.claims = '{"sub":…}';
+  <call>; ROLLBACK;`. It answers against the live database and writes nothing.
+
+- **Before trusting a probe, ask what it would return if the thing under test were
+  PERFECT. If the answer is the same, it is not a probe.** Third face of the two rules
+  above: they say a check must derive what it asserts and assert against the database
+  rather than the file. This one says the check itself can be the thing that is broken —
+  and a broken instrument does not look broken, it looks like a result. Three in one night:
+    * **`overpass.osm.ch` returned `200 OK` and `total: 0` for all of Cyprus.** It is a
+      Switzerland-only extract. The headline would have been "OSM has zero TRNC coverage."
+    * **A `.limit(5000)` truncation guard testing `rows >= 5000`.** The server's `max-rows`
+      is 1000 and OVERRIDES a larger client limit, so the guard could never fire — a
+      truncation guard defeated by truncation. Fixed by asking for `count: 'exact'` and
+      comparing the total to what arrived, which works at any cap.
+    * **A write verified by a count run under the policy that forbids seeing the write.**
+      `SET LOCAL role authenticated` as the CUSTOMER, then counting a notification
+      addressed to the PROVIDER, under `users read own notifications
+      USING (user_id = auth.uid())`. Structurally pinned to 0 whether or not the insert
+      happened. It read as a silent no-op in the function; the function was fine.
+  The cheap defence is one question asked BEFORE the run, not after a surprising result:
+  *what does a healthy system print here?* Then make sure a broken one prints something
+  else. Where it costs nothing, run the positive control too — a dense-area query on a
+  new Overpass mirror, a known-good row through the same path — because a zero from a
+  working instrument and a zero from a dead one are the same character on the screen.
+  Corollary for RLS specifically: **never verify a write from inside the role that is not
+  allowed to read it.** `RESET ROLE` before counting, or count as `postgres`.
+
 - **Comments that cite a measured number must be regenerated, not remembered.** A header
   saying "207 m of headroom" goes stale silently the moment the measurement changes. Where
   it matters, have the tool print the real figure on every run so the comment can be
@@ -140,6 +218,23 @@ went missing). Two mandatory rules:
   written on.** So when data looks uniformly missing along one axis, group it along a
   different one before proposing to fill it — and prefer the axis the business uses
   (who pays, who is public, who signed) over the one the schema happens to offer.
+  **Second instance, 2026-08-27, and it generalises past grouping to any DENOMINATOR.**
+  `check-notify-health.mjs` scored "was this provider notified?" using
+  `facilities.provider_id` — which is who owns a facility **now**. The question needed who
+  owned it **then**: `notifyProvider` returns early when `provider_id` is null, so a booking
+  at a then-unclaimed facility is CORRECTLY silent, and scoring it as a miss blames the code
+  for behaving properly. It reported 10% and nearly convicted a working code path. Of 5
+  facilities carrying a `provider_id`, only 2 had a `claim_requests` row — the rest were
+  claimed by hand, so their ownership date is unknowable and those events must be EXCLUDED
+  and the exclusion PRINTED, not scored.
+  The schema offers a current-state column; the question is almost always about state at an
+  event time. **Before a column becomes a denominator, ask whether it is a fact about now or
+  a fact about then**, and whether anything in the database dates it. If nothing does, the
+  honest answer is "unverifiable", not a percentage.
+  Related code-reading correction from the same session: **`maybeSingle()` returns
+  `{data: null, error: null}` on zero rows — it does NOT throw.** An RLS-emptied read
+  therefore does not abort the function around it; execution continues with `null`. Do not
+  reason about a control flow without checking which call actually raises.
 - **Every check here asks whether a column EXISTS. None asked whether the content is
   CURRENT — and that is the failure that reached users.** `verify_schema.sql`,
   `schema_drift_audit.sql` and `migration_ledger_check.sql` all verify *shape*. The duty

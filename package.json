@@ -49,7 +49,8 @@
     "novest:logo": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/upload-novest-logo.mjs",
     "map:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-map-sources.mjs",
     "i18n:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-i18n-coverage.mjs",
-    "duty:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duty-staleness.mjs"
+    "duty:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duty-staleness.mjs",
+    "notify:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-notify-health.mjs"
   },
   "private": true,
   "devDependencies": {
