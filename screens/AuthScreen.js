@@ -23,8 +23,6 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [role, setRole] = useState('customer')
-  const [facilityType, setFacilityType] = useState('pharmacy')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [signupDone, setSignupDone] = useState(false)
@@ -52,9 +50,8 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
     }
     setLoading(true)
     setError(null)
-    const signupMeta = role === 'provider' ? { role, facilityType } : { role }
     const { error } = mode === 'signup'
-      ? await supabase.auth.signUp({ email: trimmedEmail, password, options: { data: signupMeta, emailRedirectTo: 'ada://' } })
+      ? await supabase.auth.signUp({ email: trimmedEmail, password, options: { emailRedirectTo: 'ada://' } })
       : await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
     if (error) setError(error.message)
     else if (mode === 'signup') setSignupDone(true)
@@ -255,42 +252,6 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
             </View>
           </View>
 
-          {mode === 'signup' && (
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>{t('iAmA', lang)}</Text>
-              <View style={styles.roleStack}>
-                {[['customer', t('roleCustomer', lang)], ['provider', t('roleProvider', lang)], ['organizer', t('roleOrganizer', lang)]].map(([r, label]) => (
-                  <TouchableOpacity
-                    key={r}
-                    style={[styles.roleOption, role === r && styles.roleOptionActive]}
-                    onPress={() => setRole(r)}
-                  >
-                    <View style={[styles.radioCircle, role === r && styles.radioCircleActive]}>
-                      {role === r && <View style={styles.radioInner} />}
-                    </View>
-                    <Text style={[styles.roleOptionText, role === r && styles.roleOptionTextActive]}>{label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {role === 'provider' && (
-                <View style={{ marginTop: 12 }}>
-                  <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>{t('selectFacilityType', lang)}</Text>
-                  <View style={styles.facilityGrid}>
-                    {[['pharmacy', t('facilityPharmacy', lang)], ['clinic', t('facilityClinic', lang)], ['hospital', t('facilityHospital', lang)], ['dentist', t('facilityDentist', lang)]].map(([ft, label]) => (
-                      <TouchableOpacity
-                        key={ft}
-                        style={[styles.facilityBtn, facilityType === ft && styles.roleBtnActive]}
-                        onPress={() => setFacilityType(ft)}
-                      >
-                        <Text style={[styles.roleBtnText, facilityType === ft && styles.roleBtnTextActive]}>{label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
-
           {error && <Text style={styles.error}>{error}</Text>}
 
           <TouchableOpacity style={styles.submit} onPress={submit} disabled={loading}>
@@ -350,19 +311,6 @@ const styles = StyleSheet.create({
   passwordWrap:      { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface },
   passwordInput:     { flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   eyeBtn:            { paddingHorizontal: 14 },
-  roleStack:            { gap: 8 },
-  roleOption:           { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, backgroundColor: colors.surface },
-  roleOptionActive:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  radioCircle:          { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  radioCircleActive:    { borderColor: colors.primary },
-  radioInner:           { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
-  roleOptionText:       { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  roleOptionTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
-  facilityGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  facilityBtn:          { width: '47%', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  roleBtnActive:        { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  roleBtnText:          { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
-  roleBtnTextActive:    { fontFamily: 'Inter_700Bold', color: colors.primary },
   error:             { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 12, textAlign: 'center' },
   submit:            { backgroundColor: colors.primary, borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 4 },
   submitText:        { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.2 },

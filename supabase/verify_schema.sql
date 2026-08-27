@@ -721,10 +721,29 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='update_pharmacist_score'
           AND array_to_string(p.proconfig,',') ILIKE '%search_path%')
-    UNION ALL SELECT '0719_fix_signup','handle_new_user sanitizes signup role to allow-list (NOT IN customer/provider/organizer)',
+    -- Signup is customer-only (0827). Supersedes the 0719 allow-list token, which asserted
+    -- ILIKE '%not in%organizer%' — that allow-list no longer exists, so it was permanently
+    -- red against a function whose behaviour is exactly right.
+    --
+    -- ⚠ THESE CLAUSES SEE THE COMMENTS TOO. pg_get_functiondef() returns the ENTIRE
+    -- definition, prose included, so a NOT ILIKE here forbids a word from the function's
+    -- COMMENTS as much as from its code. The first version of 20260827 explained itself by
+    -- naming the allow-list it replaced, putting "organizer" and "raw_user_meta_data" in its
+    -- prose while both were absent from its code — and both clauses below read false on a
+    -- correct function. It was re-applied with prose that avoids both words. If this token
+    -- ever goes red, read the BODY before assuming the behaviour regressed: a reworded
+    -- comment fails it identically to a reverted allow-list.
+    --
+    -- Three clauses, because no one of them is sufficient: 'customer' alone was true of the
+    -- old version too; the absence of 'organizer' alone would pass on an empty function.
+    -- Together they say: still writes customer, no longer knows the old roles, no longer
+    -- reads client metadata at all.
+    UNION ALL SELECT '0827_signup_customer_only','handle_new_user always inserts customer; role metadata is ignored entirely',
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='handle_new_user'
-          AND pg_get_functiondef(p.oid) ILIKE '%not in%organizer%')
+          AND pg_get_functiondef(p.oid) ILIKE '%''customer''%'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%organizer%'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%raw_user_meta_data%')
     UNION ALL SELECT '0819_record_no_show_time_guard','record_no_show requires requested_time < now()',
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='record_no_show'
