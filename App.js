@@ -946,10 +946,20 @@ export default function App() {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.container}>
-          <View style={styles.header}>
-            <Skeleton width={72} height={32} borderRadius={10} />
-            <Skeleton width={40} height={40} borderRadius={20} />
-            <Skeleton width={64} height={32} borderRadius={10} />
+          {/* Mimics HomeScreen's real top bar, which is a CENTRED logo (absolutely
+              positioned) plus a right-hand pair. The old version was three flat children
+              in a flex-end row, so all three bunched against the right edge and none of
+              them matched the thing they stand in for — wrong sizes, wrong places. Here
+              flex-end is CORRECT, exactly as it is on HomeScreen: the logo is absolute,
+              so the only child in the flow is the right-hand group. */}
+          <View style={styles.skeletonHeader}>
+            <View style={styles.skeletonLogoWrap} pointerEvents="none">
+              <Skeleton width={110} height={54} borderRadius={10} />
+            </View>
+            <View style={styles.skeletonHeaderRight}>
+              <Skeleton width={34} height={34} borderRadius={17} />
+              <Skeleton width={34} height={34} borderRadius={10} />
+            </View>
           </View>
           <Skeleton width="100%" height={44} borderRadius={12} style={{ marginBottom: 10 }} />
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
@@ -1208,7 +1218,14 @@ export default function App() {
   } else if (unclaimedFacility) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.header}>
+        {/* NOT styles.header — that one is justifyContent:'flex-end' (it dresses the
+            HomeScreen top bar, whose children ARE right-aligned). With a lone BackButton
+            it pushed the control to the top-RIGHT, flush against the screen edge with no
+            horizontal padding at all. Every other back header in the app is left-aligned
+            and shares its screen's content inset: LegalScreen 16, FacilityProfile 16,
+            Notifications 20. 24 here matches unclaimedWrap directly below, so the chevron
+            lines up with the facility name instead of floating opposite it. */}
+        <View style={styles.unclaimedHeader}>
           <BackButton lang={lang} onPress={() => setUnclaimedFacility(null)} />
         </View>
         <View style={styles.unclaimedWrap}>
@@ -1427,7 +1444,8 @@ export default function App() {
 
         {activeTab === 'favourites' && (
           <SafeAreaView style={styles.safe} edges={['top']}>
-            <View style={[styles.header, { paddingHorizontal: 16, paddingBottom: 16 }]}>
+            {/* Was styles.header (flex-end), which right-aligned a lone screen title. */}
+            <View style={styles.favHeader}>
               <Text style={styles.favScreenTitle}>{t('favourites', lang)}</Text>
             </View>
             {favList.length === 0 ? (
@@ -1933,6 +1951,20 @@ const styles = StyleSheet.create({
   verifiedBadgeText:{ fontSize: 10, fontFamily: 'Inter_700Bold', color: '#fff' },
   bookableBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.primaryLight },
   bookableBadgeText:{ fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
+  // paddingHorizontal matches unclaimedWrap so the back chevron aligns with the content
+  // it heads. justifyContent is the default flex-start — stated explicitly because the
+  // bug this replaces was an inherited flex-end nobody meant to apply here.
+  unclaimedHeader:  { flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 },
+  // Screen titles are left-aligned everywhere else in the app; this one inherited
+  // styles.header's flex-end and was the only right-aligned title.
+  favHeader:        { flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
+  // Traced from HomeScreen: container inset 16, logo 110x54 absolutely CENTRED,
+  // right pair 34x34 (circle r17 = notifications, r10 = hamburger) with gap 8.
+  // A skeleton that does not match the shape it replaces produces a visible jump on
+  // first paint, which is the one moment every new user sees.
+  skeletonHeader:      { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', paddingTop: 16, paddingBottom: 12, position: 'relative' },
+  skeletonLogoWrap:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },
+  skeletonHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   unclaimedWrap:    { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
   unclaimedIconWrap:{ width: 72, height: 72, borderRadius: 22, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
   unclaimedEmoji:   { fontSize: 36 },
