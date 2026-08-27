@@ -540,9 +540,12 @@ const translations = {
     termsOfService: 'Terms of Service',
     signupLegalNotice: 'By creating an account you agree to our {terms} and {privacy}.',
     // Unclaimed facility sheet
-    // PUBLIC-SECTOR variant. notOnAda/notOnAdaDesc above stay for the 387 private
-    // facilities, where "hasn't joined ADA yet" is TRUE. A state hospital cannot join:
-    // claim_requests_guard_insert() refuses public-sector claims outright.
+    // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
+    // locales when unclaimed pharmacies stopped appearing in the browse list, search,
+    // map pins and favourites: every facility that can still reach the unclaimed sheet
+    // is sector='public', so the badge no longer has a case to choose between. A state
+    // facility cannot join anyway — claim_requests_guard_insert() refuses public-sector
+    // claims outright.
     // ⚠ THE HEALTH-SPECIFIC WORDING IS COUPLED TO A DATABASE CONSTRAINT.
     //   facilities_public_facility_type_check permits ONLY hospital, health_centre,
     //   polyclinic, health_room, and facilities_public_type_sector_check makes one
@@ -550,8 +553,6 @@ const translations = {
     //   non-health public facility and this string becomes wrong — revisit it there.
     publicFacilityBadge: 'State facility',
     publicFacilityDesc: 'This is a state health facility. It is listed for information — you can reach them directly below.',
-    notOnAda: 'Not yet on ADA',
-    notOnAdaDesc: 'This facility hasn\'t joined ADA yet. You can still reach them directly.',
     // Claim pending screen
     claimPending: 'Claim Under Review',
     taxRegistrationNo: 'Tax Registration Number',
@@ -581,6 +582,7 @@ const translations = {
     goToProfile: 'Go to Profile',
     callToBook: 'Call to book',
     pharmacies: 'Pharmacies', clinics: 'Clinics', hospitals: 'Hospitals', dentists: 'Dentists',
+    chipDutyPharmacies: 'Duty pharmacies',
     verified: 'Verified',
     uvIndex: 'UV Index', uvSunscreen: "Don't forget your sunscreen!",
     uvLow: 'Low', uvModerate: 'Moderate', uvHigh: 'High', uvVeryHigh: 'Very High', uvExtreme: 'Extreme',
@@ -1697,9 +1699,12 @@ const translations = {
     privacyPolicy: 'Gizlilik Politikası',
     termsOfService: 'Kullanım Koşulları',
     signupLegalNotice: 'Hesap oluşturarak {terms} ve {privacy} belgelerimizi kabul etmiş olursunuz.',
-    // PUBLIC-SECTOR variant. notOnAda/notOnAdaDesc above stay for the 387 private
-    // facilities, where "hasn't joined ADA yet" is TRUE. A state hospital cannot join:
-    // claim_requests_guard_insert() refuses public-sector claims outright.
+    // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
+    // locales when unclaimed pharmacies stopped appearing in the browse list, search,
+    // map pins and favourites: every facility that can still reach the unclaimed sheet
+    // is sector='public', so the badge no longer has a case to choose between. A state
+    // facility cannot join anyway — claim_requests_guard_insert() refuses public-sector
+    // claims outright.
     // ⚠ THE HEALTH-SPECIFIC WORDING IS COUPLED TO A DATABASE CONSTRAINT.
     //   facilities_public_facility_type_check permits ONLY hospital, health_centre,
     //   polyclinic, health_room, and facilities_public_type_sector_check makes one
@@ -1707,8 +1712,6 @@ const translations = {
     //   non-health public facility and this string becomes wrong — revisit it there.
     publicFacilityBadge: 'Devlet kuruluşu',
     publicFacilityDesc: 'Bu bir devlet sağlık kuruluşudur. Bilgi amacıyla listelenmiştir, aşağıdan doğrudan ulaşabilirsin.',
-    notOnAda: 'Henüz ADA\'da değil',
-    notOnAdaDesc: 'Bu tesis henüz ADA\'ya katılmamış. Yine de onlara doğrudan ulaşabilirsiniz.',
     claimPending: 'Talep İnceleniyor',
     taxRegistrationNo: 'Vergi Sicil Numarası',
     taxRegistrationNoRequired: 'Vergi Sicil Numarası gereklidir.',
@@ -1734,6 +1737,7 @@ const translations = {
     goToProfile: 'Profile Git',
     callToBook: 'Aramak için ara',
     pharmacies: 'Eczaneler', clinics: 'Klinikler', hospitals: 'Hastaneler', dentists: 'Diş Hekimleri',
+    chipDutyPharmacies: 'Nöbetçi eczaneler',
     verified: 'Onaylı',
     uvIndex: 'UV İndeksi', uvSunscreen: 'Güneş kremini unutma!',
     uvLow: 'Düşük', uvModerate: 'Orta', uvHigh: 'Yüksek', uvVeryHigh: 'Çok Yüksek', uvExtreme: 'Aşırı',
@@ -2842,9 +2846,12 @@ const translations = {
     privacyPolicy: 'سياسة الخصوصية',
     termsOfService: 'شروط الخدمة',
     signupLegalNotice: 'بإنشاء حساب فإنك توافق على {terms} و{privacy} الخاصة بنا.',
-    // PUBLIC-SECTOR variant. notOnAda/notOnAdaDesc above stay for the 387 private
-    // facilities, where "hasn't joined ADA yet" is TRUE. A state hospital cannot join:
-    // claim_requests_guard_insert() refuses public-sector claims outright.
+    // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
+    // locales when unclaimed pharmacies stopped appearing in the browse list, search,
+    // map pins and favourites: every facility that can still reach the unclaimed sheet
+    // is sector='public', so the badge no longer has a case to choose between. A state
+    // facility cannot join anyway — claim_requests_guard_insert() refuses public-sector
+    // claims outright.
     // ⚠ THE HEALTH-SPECIFIC WORDING IS COUPLED TO A DATABASE CONSTRAINT.
     //   facilities_public_facility_type_check permits ONLY hospital, health_centre,
     //   polyclinic, health_room, and facilities_public_type_sector_check makes one
@@ -2852,8 +2859,6 @@ const translations = {
     //   non-health public facility and this string becomes wrong — revisit it there.
     publicFacilityBadge: 'مؤسسة حكومية',
     publicFacilityDesc: 'هذه مؤسسة صحية حكومية، مُدرجة لغرض المعلومات. يمكنك التواصل معها مباشرة أدناه.',
-    notOnAda: 'غير مسجّل في ADA بعد',
-    notOnAdaDesc: 'لم تنضم هذه المنشأة إلى ADA بعد. لا يزال بإمكانك الوصول إليها مباشرةً.',
     claimPending: 'الطلب قيد المراجعة',
     taxRegistrationNo: 'رقم التسجيل الضريبي',
     taxRegistrationNoRequired: 'رقم التسجيل الضريبي مطلوب.',
@@ -2878,6 +2883,7 @@ const translations = {
     completeProfileTip: 'أكمل ملفك الشخصي وحدّد أوقات توفّرك لبدء تلقّي طلبات المواعيد.',
     goToProfile: 'الذهاب إلى الملف الشخصي',
     pharmacies: 'الصيدليات',
+    chipDutyPharmacies: 'صيدليات المناوبة',
     clinics: 'العيادات',
     hospitals: 'المستشفيات',
     dentists: 'أطباء الأسنان',
@@ -3754,9 +3760,12 @@ const translations = {
     privacyPolicy: 'Политика конфиденциальности',
     termsOfService: 'Условия использования',
     signupLegalNotice: 'Создавая аккаунт, вы соглашаетесь с нашими {terms} и {privacy}.',
-    // PUBLIC-SECTOR variant. notOnAda/notOnAdaDesc above stay for the 387 private
-    // facilities, where "hasn't joined ADA yet" is TRUE. A state hospital cannot join:
-    // claim_requests_guard_insert() refuses public-sector claims outright.
+    // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
+    // locales when unclaimed pharmacies stopped appearing in the browse list, search,
+    // map pins and favourites: every facility that can still reach the unclaimed sheet
+    // is sector='public', so the badge no longer has a case to choose between. A state
+    // facility cannot join anyway — claim_requests_guard_insert() refuses public-sector
+    // claims outright.
     // ⚠ THE HEALTH-SPECIFIC WORDING IS COUPLED TO A DATABASE CONSTRAINT.
     //   facilities_public_facility_type_check permits ONLY hospital, health_centre,
     //   polyclinic, health_room, and facilities_public_type_sector_check makes one
@@ -3764,8 +3773,6 @@ const translations = {
     //   non-health public facility and this string becomes wrong — revisit it there.
     publicFacilityBadge: 'Государственное учреждение',
     publicFacilityDesc: 'Это государственное медицинское учреждение. Указано для информации — связаться можно напрямую ниже.',
-    notOnAda: 'Ещё нет в ADA',
-    notOnAdaDesc: 'Это учреждение ещё не присоединилось к ADA. Вы можете связаться с ними напрямую.',
     claimPending: 'Заявка на проверке',
     taxRegistrationNo: 'Налоговый регистрационный номер',
     taxRegistrationNoRequired: 'Налоговый регистрационный номер обязателен.',
@@ -3790,6 +3797,7 @@ const translations = {
     completeProfileTip: 'Заполните профиль и укажите доступность, чтобы начать получать запросы на запись.',
     goToProfile: 'Перейти в профиль',
     pharmacies: 'Аптеки',
+    chipDutyPharmacies: 'Дежурные аптеки',
     clinics: 'Клиники',
     hospitals: 'Больницы',
     dentists: 'Стоматологи',
@@ -4665,9 +4673,12 @@ const translations = {
     privacyPolicy: 'Πολιτική Απορρήτου',
     termsOfService: 'Όροι Χρήσης',
     signupLegalNotice: 'Δημιουργώντας λογαριασμό, αποδέχεστε τους {terms} και την {privacy} μας.',
-    // PUBLIC-SECTOR variant. notOnAda/notOnAdaDesc above stay for the 387 private
-    // facilities, where "hasn't joined ADA yet" is TRUE. A state hospital cannot join:
-    // claim_requests_guard_insert() refuses public-sector claims outright.
+    // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
+    // locales when unclaimed pharmacies stopped appearing in the browse list, search,
+    // map pins and favourites: every facility that can still reach the unclaimed sheet
+    // is sector='public', so the badge no longer has a case to choose between. A state
+    // facility cannot join anyway — claim_requests_guard_insert() refuses public-sector
+    // claims outright.
     // ⚠ THE HEALTH-SPECIFIC WORDING IS COUPLED TO A DATABASE CONSTRAINT.
     //   facilities_public_facility_type_check permits ONLY hospital, health_centre,
     //   polyclinic, health_room, and facilities_public_type_sector_check makes one
@@ -4675,8 +4686,6 @@ const translations = {
     //   non-health public facility and this string becomes wrong — revisit it there.
     publicFacilityBadge: 'Κρατικός φορέας',
     publicFacilityDesc: 'Πρόκειται για κρατική μονάδα υγείας, καταχωρημένη για ενημέρωση. Μπορείτε να επικοινωνήσετε απευθείας παρακάτω.',
-    notOnAda: 'Δεν είναι ακόμα στο ADA',
-    notOnAdaDesc: 'Αυτή η εγκατάσταση δεν έχει ενταχθεί ακόμα στο ADA. Μπορείτε να επικοινωνήσετε μαζί τους απευθείας.',
     claimPending: 'Αίτηση υπό εξέταση',
     taxRegistrationNo: 'Αριθμός Φορολογικού Μητρώου',
     taxRegistrationNoRequired: 'Ο αριθμός φορολογικού μητρώου είναι υποχρεωτικός.',
@@ -4701,6 +4710,7 @@ const translations = {
     completeProfileTip: 'Συμπληρώστε το προφίλ σας και ορίστε τη διαθεσιμότητά σας για να αρχίσετε να λαμβάνετε αιτήματα για ραντεβού.',
     goToProfile: 'Μετάβαση στο προφίλ',
     pharmacies: 'Φαρμακεία',
+    chipDutyPharmacies: 'Εφημερεύοντα φαρμακεία',
     clinics: 'Κλινικές',
     hospitals: 'Νοσοκομεία',
     dentists: 'Οδοντίατροι',
@@ -5578,9 +5588,12 @@ const translations = {
     privacyPolicy: 'Politique de confidentialité',
     termsOfService: 'Conditions d\'utilisation',
     signupLegalNotice: 'En créant un compte, vous acceptez nos {terms} et notre {privacy}.',
-    // PUBLIC-SECTOR variant. notOnAda/notOnAdaDesc above stay for the 387 private
-    // facilities, where "hasn't joined ADA yet" is TRUE. A state hospital cannot join:
-    // claim_requests_guard_insert() refuses public-sector claims outright.
+    // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
+    // locales when unclaimed pharmacies stopped appearing in the browse list, search,
+    // map pins and favourites: every facility that can still reach the unclaimed sheet
+    // is sector='public', so the badge no longer has a case to choose between. A state
+    // facility cannot join anyway — claim_requests_guard_insert() refuses public-sector
+    // claims outright.
     // ⚠ THE HEALTH-SPECIFIC WORDING IS COUPLED TO A DATABASE CONSTRAINT.
     //   facilities_public_facility_type_check permits ONLY hospital, health_centre,
     //   polyclinic, health_room, and facilities_public_type_sector_check makes one
@@ -5588,8 +5601,6 @@ const translations = {
     //   non-health public facility and this string becomes wrong — revisit it there.
     publicFacilityBadge: 'Établissement public',
     publicFacilityDesc: "Il s'agit d'un établissement de santé public, répertorié à titre d'information. Vous pouvez les contacter directement ci-dessous.",
-    notOnAda: 'Pas encore sur ADA',
-    notOnAdaDesc: 'Cet établissement n\'a pas encore rejoint ADA. Vous pouvez toujours le contacter directement.',
     claimPending: 'Demande en cours d\'examen',
     taxRegistrationNo: 'Numéro d\'immatriculation fiscale',
     taxRegistrationNoRequired: 'Le numéro d\'immatriculation fiscale est requis.',
@@ -5614,6 +5625,7 @@ const translations = {
     completeProfileTip: 'Complétez votre profil et indiquez vos disponibilités pour commencer à recevoir des demandes de rendez-vous.',
     goToProfile: 'Aller au profil',
     pharmacies: 'Pharmacies',
+    chipDutyPharmacies: 'Pharmacies de garde',
     clinics: 'Cliniques',
     hospitals: 'Hôpitaux',
     dentists: 'Dentistes',
@@ -6490,9 +6502,12 @@ const translations = {
     privacyPolicy: 'Política de privacidad',
     termsOfService: 'Términos de uso',
     signupLegalNotice: 'Al crear una cuenta aceptas nuestros {terms} y nuestra {privacy}.',
-    // PUBLIC-SECTOR variant. notOnAda/notOnAdaDesc above stay for the 387 private
-    // facilities, where "hasn't joined ADA yet" is TRUE. A state hospital cannot join:
-    // claim_requests_guard_insert() refuses public-sector claims outright.
+    // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
+    // locales when unclaimed pharmacies stopped appearing in the browse list, search,
+    // map pins and favourites: every facility that can still reach the unclaimed sheet
+    // is sector='public', so the badge no longer has a case to choose between. A state
+    // facility cannot join anyway — claim_requests_guard_insert() refuses public-sector
+    // claims outright.
     // ⚠ THE HEALTH-SPECIFIC WORDING IS COUPLED TO A DATABASE CONSTRAINT.
     //   facilities_public_facility_type_check permits ONLY hospital, health_centre,
     //   polyclinic, health_room, and facilities_public_type_sector_check makes one
@@ -6500,8 +6515,6 @@ const translations = {
     //   non-health public facility and this string becomes wrong — revisit it there.
     publicFacilityBadge: 'Centro público',
     publicFacilityDesc: 'Es un centro de salud público, incluido a título informativo. Puedes contactarlos directamente abajo.',
-    notOnAda: 'Aún no está en ADA',
-    notOnAdaDesc: 'Este centro aún no se ha unido a ADA. Puedes contactarlo directamente.',
     claimPending: 'Solicitud en revisión',
     taxRegistrationNo: 'Número de registro fiscal',
     taxRegistrationNoRequired: 'El número de registro fiscal es obligatorio.',
@@ -6526,6 +6539,7 @@ const translations = {
     completeProfileTip: 'Completa tu perfil y configura tu disponibilidad para empezar a recibir solicitudes de cita.',
     goToProfile: 'Ir al perfil',
     pharmacies: 'Farmacias',
+    chipDutyPharmacies: 'Farmacias de guardia',
     clinics: 'Clínicas',
     hospitals: 'Hospitales',
     dentists: 'Dentistas',
@@ -7401,9 +7415,12 @@ const translations = {
     privacyPolicy: 'Datenschutzrichtlinie',
     termsOfService: 'Nutzungsbedingungen',
     signupLegalNotice: 'Mit der Erstellung eines Kontos stimmst du unseren {terms} und unserer {privacy} zu.',
-    // PUBLIC-SECTOR variant. notOnAda/notOnAdaDesc above stay for the 387 private
-    // facilities, where "hasn't joined ADA yet" is TRUE. A state hospital cannot join:
-    // claim_requests_guard_insert() refuses public-sector claims outright.
+    // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
+    // locales when unclaimed pharmacies stopped appearing in the browse list, search,
+    // map pins and favourites: every facility that can still reach the unclaimed sheet
+    // is sector='public', so the badge no longer has a case to choose between. A state
+    // facility cannot join anyway — claim_requests_guard_insert() refuses public-sector
+    // claims outright.
     // ⚠ THE HEALTH-SPECIFIC WORDING IS COUPLED TO A DATABASE CONSTRAINT.
     //   facilities_public_facility_type_check permits ONLY hospital, health_centre,
     //   polyclinic, health_room, and facilities_public_type_sector_check makes one
@@ -7411,8 +7428,6 @@ const translations = {
     //   non-health public facility and this string becomes wrong — revisit it there.
     publicFacilityBadge: 'Staatliche Einrichtung',
     publicFacilityDesc: 'Dies ist eine staatliche Gesundheitseinrichtung, zur Information gelistet. Du kannst sie unten direkt erreichen.',
-    notOnAda: 'Noch nicht auf ADA',
-    notOnAdaDesc: 'Diese Einrichtung ist noch nicht bei ADA. Du kannst sie trotzdem direkt kontaktieren.',
     claimPending: 'Anfrage wird geprüft',
     taxRegistrationNo: 'Steuernummer',
     taxRegistrationNoRequired: 'Steuernummer ist erforderlich.',
@@ -7437,6 +7452,7 @@ const translations = {
     completeProfileTip: 'Vervollständige dein Profil und lege deine Verfügbarkeit fest, um Terminanfragen zu erhalten.',
     goToProfile: 'Zum Profil',
     pharmacies: 'Apotheken',
+    chipDutyPharmacies: 'Bereitschaftsapotheken',
     clinics: 'Kliniken',
     hospitals: 'Krankenhäuser',
     dentists: 'Zahnärzte',
@@ -8313,9 +8329,12 @@ const translations = {
     privacyPolicy: 'سیاست حریم خصوصی',
     termsOfService: 'شرایط استفاده',
     signupLegalNotice: 'با ایجاد حساب کاربری، {terms} و {privacy} ما را می‌پذیرید.',
-    // PUBLIC-SECTOR variant. notOnAda/notOnAdaDesc above stay for the 387 private
-    // facilities, where "hasn't joined ADA yet" is TRUE. A state hospital cannot join:
-    // claim_requests_guard_insert() refuses public-sector claims outright.
+    // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
+    // locales when unclaimed pharmacies stopped appearing in the browse list, search,
+    // map pins and favourites: every facility that can still reach the unclaimed sheet
+    // is sector='public', so the badge no longer has a case to choose between. A state
+    // facility cannot join anyway — claim_requests_guard_insert() refuses public-sector
+    // claims outright.
     // ⚠ THE HEALTH-SPECIFIC WORDING IS COUPLED TO A DATABASE CONSTRAINT.
     //   facilities_public_facility_type_check permits ONLY hospital, health_centre,
     //   polyclinic, health_room, and facilities_public_type_sector_check makes one
@@ -8323,8 +8342,6 @@ const translations = {
     //   non-health public facility and this string becomes wrong — revisit it there.
     publicFacilityBadge: 'مرکز دولتی',
     publicFacilityDesc: 'این یک مرکز درمانی دولتی است که برای اطلاع‌رسانی فهرست شده. می‌توانید مستقیماً از پایین تماس بگیرید.',
-    notOnAda: 'هنوز در ADA نیست',
-    notOnAdaDesc: 'این مرکز هنوز به ADA نپیوسته. می‌توانید مستقیماً با آن‌ها تماس بگیرید.',
     claimPending: 'درخواست در حال بررسی',
     taxRegistrationNo: 'شماره ثبت مالیاتی',
     taxRegistrationNoRequired: 'شماره ثبت مالیاتی الزامی است.',
@@ -8349,6 +8366,7 @@ const translations = {
     completeProfileTip: 'برای دریافت درخواست‌های نوبت، نمایه خود را کامل کنید و زمان‌های در دسترس بودنتان را تعیین کنید.',
     goToProfile: 'رفتن به نمایه',
     pharmacies: 'داروخانه‌ها',
+    chipDutyPharmacies: 'داروخانه‌های نوبت‌دار',
     clinics: 'کلینیک‌ها',
     hospitals: 'بیمارستان‌ها',
     dentists: 'دندان‌پزشکان',

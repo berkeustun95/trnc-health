@@ -24,6 +24,15 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
     .filter(f => FACILITY_TYPES.includes(f.type))
     .filter(f => (f.status === 'active' || f.status === 'trial') && !f.hidden_at)  // moderation (defense-in-depth; RLS 20260820 is the gate)
     .filter(f => f.latitude != null && f.longitude != null)
+    // Unclaimed pharmacies are not directory content (2026-08-28), same predicate as
+    // HomeScreen's browse list and the search_content facilities arm.
+    // ⚠ NO BEHAVIOURAL CHANGE TODAY — this is durability, not live logic. All 387
+    //   unclaimed pharmacies have NULL latitude/longitude, so the coordinate filter
+    //   already drops every one of them and this line removes nothing. It matters only
+    //   if a pharmacy ever acquires coordinates (e.g. 20260919 applied and a geocoding
+    //   pass run), at which point the omission would put unclaimed pins back on the map
+    //   with nothing else to stop them.
+    .filter(f => !(f.type === 'pharmacy' && !f.provider_id))
     .filter(f => filterType == null || f.type === filterType)
     .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)
 

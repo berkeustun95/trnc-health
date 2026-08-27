@@ -1239,14 +1239,18 @@ export default function App() {
                 {t(unclaimedFacility.type, lang)}
               </Text>
             </View>
-            {/* CONDITIONAL, not a replacement. This screen is reached by 393 unowned
-                facilities — 387 private pharmacies and 6 public hospitals. For the 387,
-                "hasn't joined ADA yet" is TRUE and stays. For a state hospital it is
-                false: it cannot join, because claim_requests_guard_insert() refuses
-                public-sector claims outright. */}
+            {/* UNCONDITIONAL as of 2026-08-28. This screen used to be reached by 393
+                unowned facilities — 387 private pharmacies plus 6 public hospitals — so
+                the badge had to choose between "hasn't joined ADA yet" and "State
+                facility". The 387 no longer reach any surface that leads here: the browse
+                list, search, map pins and favourites all exclude them. Every remaining
+                visitor is sector='public', so the choice is gone.
+                ⚠ The favourites filter in this file is what guarantees that. If it is
+                ever removed, restore the ternary in the same change, or an unclaimed
+                pharmacy will be labelled "State facility". */}
             <View style={styles.notOnAdaBadge}>
               <Text style={styles.notOnAdaBadgeText}>
-                {t(unclaimedFacility.sector === 'public' ? 'publicFacilityBadge' : 'notOnAda', lang)}
+                {t('publicFacilityBadge', lang)}
               </Text>
             </View>
           </View>
@@ -1265,7 +1269,7 @@ export default function App() {
           <View style={styles.unclaimedNotice}>
             <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
             <Text style={styles.unclaimedNoticeText}>
-              {t(unclaimedFacility.sector === 'public' ? 'publicFacilityDesc' : 'notOnAdaDesc', lang)}
+              {t('publicFacilityDesc', lang)}
             </Text>
           </View>
           <View style={styles.unclaimedActions}>
@@ -1342,7 +1346,17 @@ export default function App() {
     content = <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
   } else {
     inTabShell = true
-    const favList = facilities.filter(f => favorites.has(f.id))
+    // Same exclusion as HomeScreen's browse list (2026-08-28): an unclaimed pharmacy is
+    // not directory content anywhere. A previously-favourited one therefore DISAPPEARS
+    // from this tab — a deliberate call, not an oversight.
+    //
+    // ⚠ AND IT IS LOAD-BEARING FOR THE UNCLAIMED SCREEN ABOVE. Collapsing that screen's
+    //   badge/description to the publicFacility* strings is only correct because every
+    //   facility that can still reach it is sector='public'. This filter is what makes
+    //   that true. The two changes ship together or neither does.
+    const favList = facilities
+      .filter(f => !(f.type === 'pharmacy' && !f.provider_id))
+      .filter(f => favorites.has(f.id))
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
     // drawer holds settings & app options. `dividerBefore` opens a visual group.
     const drawerItems = [

@@ -1010,6 +1010,20 @@ WITH report AS (
           AND column_name='is_active' AND column_default = 'false')
     -- search_content gained a towing_companies arm. CREATE OR REPLACE adds no new named
     -- object, so only a body token can tell the new definition from the old one.
+    -- Unclaimed pharmacies leave the search index (0924). CREATE OR REPLACE adds no named
+    -- object, so section C sees the NAME and cannot see the CHANGE — and the failure is the
+    -- silent kind: search_content keeps existing, keeps running, keeps returning rows, and
+    -- quietly starts returning all 387 unclaimed pharmacies again while the client still
+    -- hides them from every list. That asymmetry is the whole thing this slice removed.
+    --
+    -- POSITIVE ILIKE, deliberately. `provider_id` appeared ZERO times in the pre-0924 body,
+    -- so its presence is a clean signal that the new definition is deployed. A NOT ILIKE
+    -- companion is NOT added here on purpose: pg_get_functiondef() returns the comments too
+    -- (see the 0827 token), and the predicate's own explanatory comment names the words a
+    -- negative clause would forbid. Assert what must BE there, not what must be absent.
+    UNION ALL SELECT '0924_search_content_hide_unclaimed_pharmacies','search_content excludes unclaimed pharmacies',
+      (SELECT pg_get_functiondef('public.search_content(text,double precision,double precision)'::regprocedure)
+         ILIKE '%provider_id%')
     UNION ALL SELECT '0906_search_content_add_towing','search_content covers towing_companies',
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='search_content'

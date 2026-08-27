@@ -139,7 +139,6 @@ export default function HomeScreen({
   const [activeType, setActiveType]             = useState(null)
   const [activeSpecialty, setActiveSpecialty]   = useState(null)
   const [openOnly, setOpenOnly]                 = useState(false)
-  const [showAll, setShowAll]                   = useState(false)
   const [langFilter, setLangFilter]             = useState(false)
   const [showFilters, setShowFilters]           = useState(false)
   const [weatherExpanded, setWeatherExpanded]   = useState(false)
@@ -227,6 +226,23 @@ export default function HomeScreen({
     // Defense-in-depth for moderation (the RLS gate in 20260820 is the real fix):
     // keep suspended/pending/hidden listings out of the browse list, incl. own.
     .filter(f => (f.status === 'active' || f.status === 'trial') && !f.hidden_at)
+    // ── UNCLAIMED PHARMACIES ARE NOT DIRECTORY CONTENT (2026-08-28) ───────────
+    //
+    // 387 of the 394 visible rows are pharmacies with no provider_id — the whole KTEB
+    // list, none of which has any relationship with ADA. Listing them is free promotion
+    // for businesses that never joined, and it buries the 7 rows that ARE the product.
+    // A pharmacy WITH a provider_id is a subscriber and keeps full visibility; a state
+    // facility (sector='public') keeps it too. Only the unclaimed-pharmacy pair goes.
+    //
+    // ⚠ THIS MUST STAY ITS OWN .filter(), ABOVE the default-view clause below. That
+    //   clause short-circuits on `searchText.trim()`, so folding this predicate into it
+    //   would re-admit all 387 on the first keystroke — visible in the list the moment
+    //   somebody types, which is the exact thing this removes.
+    //
+    // ADA still serves pharmacies, through the ONE surface where the data is real and
+    // actionable: the duty roster. DutyListScreen reads duty_list, which has no join to
+    // facilities and no facility_id, so it is untouched by this and by anything downstream.
+    .filter(f => !(f.type === 'pharmacy' && !f.provider_id))
     .map(f => ({
       ...f,
       _dist: userLocation && f.latitude != null && f.longitude != null
@@ -262,7 +278,7 @@ export default function HomeScreen({
     //   grows this list by roughly 7x. That is a monetisation-visible change and wants a
     //   conversation BEFORE those drafts go active — not a reason to scope this narrower,
     //   because narrowing it would just hide the same question behind a type check.
-    .filter(f => searchText.trim() || showAll || !!f.provider_id || f.sector === 'public')
+    .filter(f => searchText.trim() || !!f.provider_id || f.sector === 'public')
     // Units inside another facility (Thalassaemia, Radyasyon Onkoloji inside BNDH) are
     // not separate destinations. 20260911 already decided this for the map — "two more
     // markers on one roof is noise, not precision" — and a list row is the same argument.
@@ -514,12 +530,6 @@ export default function HomeScreen({
                 <Feather name="x" size={10} color={colors.primary} />
               </TouchableOpacity>
             )}
-            {showAll && (
-              <TouchableOpacity style={s.activeFilterPill} onPress={() => setShowAll(false)}>
-                <Text style={s.activeFilterPillText}>{t('allFacilities', lang)}</Text>
-                <Feather name="x" size={10} color={colors.primary} />
-              </TouchableOpacity>
-            )}
             {langFilter && (
               <TouchableOpacity style={s.activeFilterPill} onPress={() => setLangFilter(false)}>
                 <Ionicons name="language-outline" size={11} color={colors.primary} />
@@ -528,12 +538,6 @@ export default function HomeScreen({
               </TouchableOpacity>
             )}
           </ScrollView>
-          {!showAll && !searchText.trim() && facilities.some(f => !f.provider_id && (!activeType || f.type === activeType)) && (
-            <TouchableOpacity style={s.hiddenFacHint} onPress={() => setShowAll(true)} activeOpacity={0.75}>
-              <Ionicons name="eye-off-outline" size={11} color={colors.textSecondary} />
-              <Text style={s.hiddenFacHintText} numberOfLines={1}>{t('hiddenFacilitiesHint', lang)}</Text>
-            </TouchableOpacity>
-          )}
           <TouchableOpacity
             style={[s.filterToggleBtn, showFilters && s.filterToggleBtnActive]}
             onPress={() => setShowFilters(v => !v)}
@@ -549,34 +553,43 @@ export default function HomeScreen({
             style={s.typeRow}
             contentContainerStyle={s.typeRowContent}
           >
-            {[null, 'pharmacy', 'clinic', 'hospital', 'dentist'].map(type => (
-              <TouchableOpacity
-                key={type ?? 'all'}
-                style={[s.typeChip, activeType === type && s.typeChipActive]}
-                onPress={() => { setActiveType(activeType === type ? null : type); setActiveSpecialty(null) }}
-              >
-                {type
-                  ? <TypeSVGIcon type={type} size={14} color={activeType === type ? '#fff' : colors.textSecondary} />
-                  : <Ionicons name="apps-outline" size={14} color={activeType === type ? '#fff' : colors.textSecondary} />
-                }
-                <Text style={[s.typeChipText, activeType === type && s.typeChipTextActive]}>
+            {/* The pharmacy chip NAVIGATES; every other chip FILTERS (2026-08-28).
+                Unclaimed pharmacies left the directory, so filtering by 'pharmacy' would
+                now match 0 rows — an empty list under a chip the user just deliberately
+                tapped, which reads as broken. ADA's pharmacy offering IS the duty roster,
+                so the chip goes there and is labelled for what it opens rather than what
+                it would have filtered. It never takes the active/selected style: it is
+                not a filter state, so it must not look like one. */}
+            {[null, 'pharmacy', 'clinic', 'hospital', 'dentist'].map(type => {
+              const isDuty   = type === 'pharmacy'
+              const selected = !isDuty && activeType === type
+              return (
+                <TouchableOpacity
+                  key={type ?? 'all'}
+                  style={[s.typeChip, selected && s.typeChipActive]}
+                  onPress={() => {
+                    if (isDuty) { onShowDutyList?.(); return }
+                    setActiveType(activeType === type ? null : type)
+                    setActiveSpecialty(null)
+                  }}
+                >
                   {type
-                    ? t({ pharmacy: 'pharmacies', clinic: 'clinics', hospital: 'hospitals', dentist: 'dentists' }[type] || type, lang)
-                    : t('all', lang)
+                    ? <TypeSVGIcon type={type} size={14} color={selected ? '#fff' : colors.textSecondary} />
+                    : <Ionicons name="apps-outline" size={14} color={selected ? '#fff' : colors.textSecondary} />
                   }
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text style={[s.typeChipText, selected && s.typeChipTextActive]}>
+                    {isDuty
+                      ? t('chipDutyPharmacies', lang)
+                      : type
+                        ? t({ clinic: 'clinics', hospital: 'hospitals', dentist: 'dentists' }[type] || type, lang)
+                        : t('all', lang)
+                    }
+                  </Text>
+                  {isDuty && <Ionicons name="chevron-forward" size={12} color={colors.textSecondary} />}
+                </TouchableOpacity>
+              )
+            })}
             <View style={s.chipDivider} />
-            <TouchableOpacity
-              style={[s.toggleChip, showAll && s.toggleChipShowAll]}
-              onPress={() => setShowAll(v => !v)}
-            >
-              <Ionicons name={showAll ? 'eye' : 'eye-outline'} size={12} color={showAll ? colors.primary : colors.textSecondary} />
-              <Text style={[s.toggleChipText, showAll && { color: colors.primary }]}>
-                {showAll ? t('adaOnly', lang) : t('showAll', lang)}
-              </Text>
-            </TouchableOpacity>
             <TouchableOpacity
               style={[s.toggleChip, langFilter && s.toggleChipLang]}
               onPress={() => setLangFilter(v => !v)}
@@ -715,17 +728,16 @@ export default function HomeScreen({
                             <Text style={s.verifiedBadgeText}>{t('verified', lang)}</Text>
                           </View>
                         )}
-                        {item.provider_id ? (
-                          isOpen != null && (
-                            <View style={[s.statusBadge, isOpen ? s.openBadge : s.closedBadge]}>
-                              <Text style={[s.statusText, isOpen ? s.openText : s.closedText]}>
-                                {isOpen ? t('open', lang) : t('closed', lang)}
-                              </Text>
-                            </View>
-                          )
-                        ) : (
-                          <View style={s.notOnAdaBadge}>
-                            <Text style={s.notOnAdaBadgeText}>{t('notOnAda', lang)}</Text>
+                        {/* "Not yet on ADA" retired 2026-08-28. Every row that still
+                            reaches this list is a subscriber (provider_id) or a state
+                            facility (sector='public'), so the badge described nothing.
+                            A public hospital simply shows no badge — it has no
+                            opening_hours, so isOpen is null. */}
+                        {isOpen != null && (
+                          <View style={[s.statusBadge, isOpen ? s.openBadge : s.closedBadge]}>
+                            <Text style={[s.statusText, isOpen ? s.openText : s.closedText]}>
+                              {isOpen ? t('open', lang) : t('closed', lang)}
+                            </Text>
                           </View>
                         )}
                         {isAvailableToday(item.availability) && (
@@ -889,12 +901,9 @@ const s = StyleSheet.create({
   activeFilterPillText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
   filterToggleBtn:    { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginLeft: 6, flexShrink: 0 },
   filterToggleBtnActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  hiddenFacHint:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, marginHorizontal: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.05)', flexShrink: 1, maxWidth: 180 },
-  hiddenFacHintText:  { fontSize: 10, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flexShrink: 1 },
   toggleChip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.cardBg },
   toggleChipText:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   toggleChipOpen:     { borderColor: colors.success, backgroundColor: colors.successLight },
-  toggleChipShowAll:  { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   toggleChipLang:     { borderColor: colors.accent, backgroundColor: colors.accentLight },
   typeRow:            { flexGrow: 0, marginBottom: 10 },
   typeRowContent:     { gap: 6, paddingRight: 4, alignItems: 'center' },
@@ -959,8 +968,6 @@ const s = StyleSheet.create({
   ratingRow:        { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   ratingText:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   cardUnclaimed:    { opacity: 1 },
-  notOnAdaBadge:    { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.border },
-  notOnAdaBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   verifiedBadge:    { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: colors.primary },
   verifiedBadgeText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#fff' },
   bookableBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.primaryLight },
