@@ -6,37 +6,76 @@ import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 
-const PRIVACY = `Last updated: July 2026
+const PRIVACY = `Last updated: August 2026
 
-ADA ("we", "our", "the app") helps newcomers settle into life in North Cyprus (TRNC) — pharmacies and health services, transport, events, accommodation, jobs, and other everyday essentials. This policy explains what data we collect, why, and how we protect it.
+ADA ("we", "our", "the app") is a directory and services app for residents of and newcomers to Northern Cyprus (TRNC) — healthcare facilities and duty pharmacies, local places and points of interest, events, accommodation, vehicle services and roadside assistance, and other local services. This policy explains what data we collect, why, and how we protect it.
 
 1. DATA WE COLLECT
-• Account data: email address, password (hashed by Supabase Auth — we never see it), and the role you choose (customer or provider).
-• Profile data you provide: full name, phone number, nationality, preferred language.
-• Push notification token: stored to send you duty pharmacy alerts. You can disable this in your device settings at any time.
+• Account data: email address, password (hashed by Supabase Auth — we never see it), and your account role.
+• Profile data. Each field is listed with what it is for. Where a field is marked "not used yet", that is literal: we collect it for the stated purpose and nothing in the app reads it today.
+  · First and last name — your real name. A provider you book an appointment with is shown your name, so they know who is coming.
+  · Display name — a name you choose, 3 to 20 characters. It does not have to be your real name. This is the name shown next to reviews and questions you post, and it is the only name other users see. Not used yet — no part of the app displays it today.
+  · Date of birth — to confirm you are 13 or over. This is checked when you enter it and the account cannot be completed without it. We also intend to use it to keep age-restricted features and content away from accounts that should not see them; that second use is not built yet.
+  · Nationality — so that we can tell which residency, permit and paperwork information applies to you, and which languages to offer first. Not used yet — nothing in the app reads it.
+  · Phone number — held on your account so that we can contact you about your account or a booking. It is not shown to other users and is not given to providers. Not used yet — nothing in the app reads it, and we have not contacted anyone using it.
+  · Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Not used yet — nothing in the app reads it.
+  · Resident status — student, working here, newly arrived, resident, or visiting — and, if you are a student, your study level and, for university and postgraduate study, your institution. This is intended to decide which parts of ADA are put in front of you, because someone who has just arrived needs different things from someone who has lived here ten years. Not used yet — nothing in the app reads it.
+  · Preferred language — to show the app, and the notifications we send you, in your language.
+• Push notification token: stored to send you duty pharmacy alerts and updates about your bookings. You can disable this in your device settings at any time.
 • Appointment records: facility, requested time, and status.
 • Reviews and questions you submit.
 • Moderation data: content you report, and users you block. Your block list is private and is never shown to the user you blocked.
+• Rejected submissions: if text you submit is rejected by our content filter, we keep a record of it, linked to your account, for 30 days. Section 5 describes it in full.
 • Usage data: we do not use analytics SDKs or third-party trackers.
 
-2. HOW WE USE YOUR DATA
+2. WHAT IS PUBLIC AND WHAT IS NOT
+Most of what we ask for is never seen by anyone but you.
+
+Other users can see:
+• Your display name, next to reviews, questions and answers you post.
+• The content of the reviews, questions and answers you post, and the ratings you give.
+
+Other users cannot see: your first and last name, your date of birth, your nationality, your phone number, your region, your resident status, your study level or institution, or your email address.
+
+A provider you book with is shown your full name and the content of your request, so that they can identify your booking. They are not shown your date of birth, phone number, region, resident status, or any of your other bookings.
+
+One exception, and it is one you type yourself. Some booking forms — vehicle servicing, for example — ask for a contact number for that specific booking. A number you enter there is sent to that business along with the booking. It is separate from the phone number on your profile, which is never shared.
+
+Our administrators can see the data on your account. This is necessary to operate the service, investigate reports, and respond to your requests.
+
+3. HOW WE USE YOUR DATA
 • To operate the app: show you relevant facilities, manage appointments, send notifications.
 • To personalise your experience: display content in your preferred language.
+• To screen text you post against our list of prohibited terms, so that abusive content does not reach other users.
+• To review submissions the filter rejected, so that we can find rejections that were wrong and correct them.
 • We do not sell, rent, or share your personal data with third parties for marketing.
 
-3. DATA STORAGE
+4. DATA STORAGE
 All data is stored on Supabase (EU region). Row-Level Security (RLS) policies ensure you can only access your own records. Your data is never visible to other customers.
 
-4. YOUR RIGHTS
-You may request deletion of your account and all associated data at any time by emailing us. We will process deletion within 30 days.
+5. DATA RETENTION
+Different data is kept for different lengths of time.
 
-5. CHILDREN
-ADA is not directed at children under 13. We do not knowingly collect data from minors.
+Your account: we retain the data on your account for as long as your account is active. If you request account deletion, we will delete your personal data within 30 days, except where retention is required by applicable law.
 
-6. CHANGES
+Rejected submissions — 30 days: if a submission is rejected by our content filter, we keep the rejected text, the term that triggered the rejection, and the time it happened, so that we can find and correct rejections that were wrong and improve the filter. These records are linked to your account, are visible only to our administrators, are deleted automatically after 30 days, and are not used for any other purpose.
+
+Content we have removed: content removed for breaching our community standards is retained internally so that we can identify repeat breaches by the same account. It is no longer visible to other users.
+
+6. YOUR RIGHTS
+You can see and correct the data on your account in your profile settings at any time. You may request deletion of your account and all associated data at any time by emailing us. We will process deletion within 30 days.
+
+7. AGE AND CHILDREN
+ADA is for people aged 13 and over, and is not directed at children under 13.
+
+When you set up your profile we ask for your date of birth. If the date you enter shows that you are under 13, we do not store that date. We record only that the account is not eligible, and the account cannot be used.
+
+If you believe a child under 13 has provided us with personal data, please contact us and we will delete it promptly.
+
+8. CHANGES
 We may update this policy. Continued use of the app after changes means you accept the updated policy.
 
-7. CONTACT
+9. CONTACT
 For privacy questions or deletion requests: getadaapp@gmail.com`
 
 const TERMS = `Last updated: August 2026
@@ -97,7 +136,7 @@ Text you submit in reviews, questions, answers, facility and place listings, and
 
 Automated screening is a first line of defence only. It does not cover every type of content or every language, and no automated filter catches everything. The reporting and blocking tools described below apply to all user content, whether or not it was automatically screened.
 
-If a submission is rejected by this screening, we keep the rejected text, the term that triggered the rejection, and the time it happened, so that we can find and correct rejections that were wrong and improve the filter. These records are visible only to our administrators, are deleted automatically after 30 days, and are not used for any other purpose.
+If a submission is rejected by this screening, we keep the rejected text, the term that triggered the rejection, and the time it happened, so that we can find and correct rejections that were wrong and improve the filter. These records are linked to your account, are visible only to our administrators, are deleted automatically after 30 days, and are not used for any other purpose.
 
 8.3 REPORTING OBJECTIONABLE CONTENT
 Every review, question, and answer in ADA carries a Report action. Open the menu on the item you want to report, choose a reason, and submit it — you do not need to contact us separately, and the author is not told who reported them.
