@@ -21,6 +21,7 @@ ADA ("we", "our", "the app") is a directory and services app for residents of an
   · Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Not used yet — nothing in the app reads it.
   · Resident status — student, working here, newly arrived, resident, or visiting — and, if you are a student, your study level and, for university and postgraduate study, your institution. This is intended to decide which parts of ADA are put in front of you, because someone who has just arrived needs different things from someone who has lived here ten years. Not used yet — nothing in the app reads it.
   · Preferred language — to show the app, and the notifications we send you, in your language.
+• Profile picture: optional. Either a preset avatar you choose, or an image you upload, which is stored in our file storage.
 • Push notification token: stored to send you duty pharmacy alerts and updates about your bookings. You can disable this in your device settings at any time.
 • Appointment records: facility, requested time, and status.
 • Reviews and questions you submit.

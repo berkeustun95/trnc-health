@@ -26,9 +26,11 @@
 //   routes (exactly two, no wildcard)
 //       The Worker owns ONLY /privacy and /support. Everything else on the
 //       zone — including /logo.png, which both pages reference — never reaches
-//       the Worker and is served by Vercel (ada-web). Adding a wildcard route
-//       would change that, and web/logo.png (a stale 80957 B artifact) would
-//       start SHADOWING Vercel's real 242933 B logo on both pages.
+//       the Worker and is served by Vercel (ada-web), 242933 B, verified live.
+//       web/logo.png — a stale 80957 B DIFFERENT image — was DELETED on 2026-08-30
+//       rather than guarded: with no file there is nothing for a future wildcard
+//       route to shadow. The no-wildcard assertion stays anyway, because it
+//       protects every other Vercel-served path too, not just that one.
 //
 //   not_found_handling: "none"
 //       An unmatched path falls THROUGH to Vercel instead of the Worker

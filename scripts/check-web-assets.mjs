@@ -131,8 +131,9 @@ function check({ cfg, pages }, log = console.log) {
   }
 
   // ── routes: DERIVED, not a name lookup. Print what is there and count it, so a
-  //    THIRD route (a wildcard, say) fails just as loudly as a missing one — a
-  //    wildcard would pull /logo.png into the Worker and shadow Vercel's real logo.
+  //    THIRD route (a wildcard, say) fails just as loudly as a missing one: a
+  //    wildcard pulls every Vercel-served path on the zone into the Worker, and the
+  //    Worker would answer 404 for each one it has no asset for.
   const routes = (cfg.routes ?? []).map(r => (typeof r === 'string' ? r : r.pattern))
   log(`    · routes declared (${routes.length}): ${routes.join(', ') || '(none)'}`)
   const wanted = REQUIRED_PAGES.map(p => p.route)

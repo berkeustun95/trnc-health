@@ -49,3 +49,14 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitme
   echo "  push blocked: the Terms promise 24h removal that the database cannot deliver."
   exit 1
 }
+
+# Privacy parity — WARN ONLY, deliberately. Three copies of one privacy document publish
+# by three different actions: docs/ on this push, web/ via `npm run web:deploy`, the
+# LegalScreen const via `npm run ota`. A push therefore publishes ONE of the three, and
+# the in-app copy sitting committed-but-unshipped is a NORMAL state, not drift. Blocking
+# on it would make this hook red on a correct repo, and a hook that cries wolf gets
+# disabled — which costs more than the check is worth.
+#
+# It FAILS (exit 1) inside web:deploy and ota, where drift becomes visible to a user.
+# Note what it can and cannot see: it compares the three FILES, never the three URLs.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs --warn

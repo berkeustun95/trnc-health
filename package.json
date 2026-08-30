@@ -35,7 +35,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "check:flags": "node scripts/check-module-flags.mjs",
-    "ota": "node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs && eas update --channel production",
+    "ota": "node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs && eas update --channel production",
     "setup:hooks": "git config core.hooksPath .githooks && echo 'hooks enabled (.githooks)'",
     "eas-build-pre-install": "node scripts/check-module-flags.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
@@ -56,7 +56,8 @@
     "moderation:log": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-moderation-log.mjs",
     "profile:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-profile-gate.mjs",
     "web:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-web-assets.mjs",
-    "web:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-web-assets.mjs && npx wrangler deploy"
+    "web:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-web-assets.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs && npx wrangler deploy",
+    "privacy:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs"
   },
   "private": true,
   "devDependencies": {
