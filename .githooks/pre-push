@@ -37,3 +37,15 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-i18n-covera
   echo "  push blocked: a locale would render English text."
   exit 1
 }
+
+# Terms 24h-commitment guard. Blocks a push where either copy of the Terms promises
+# removal within 24 hours while no migration granting admins a real UPDATE path on
+# reviews/questions/answers has been written. docs/ publishes via GitHub Pages ON PUSH,
+# so `git push` IS the publish action for the hosted copy — and the in-app copy was
+# already making the promise unbacked for weeks before anything compared the two.
+# Checks COMMITTED, not APPLIED: only the anon key exists here, so pg_policies is out of
+# reach. verify_schema.sql owns the applied half. See the script header.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs || {
+  echo "  push blocked: the Terms promise 24h removal that the database cannot deliver."
+  exit 1
+}

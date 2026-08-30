@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, ScrollView, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Modal, StyleSheet, Linking, Dimensions } from 'react-native'
+import { View, Text, Image, ScrollView, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Modal, StyleSheet, Linking, Dimensions, Alert } from 'react-native'
 import MapView, { Marker } from 'react-native-maps'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
@@ -65,7 +65,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
     try {
       const { data, error } = await supabase
         .from('questions')
-        .select('id, body, created_at, answers(id, body, created_at)')
+        .select('id, body, created_at, customer_id, answers(id, body, created_at)')
         .eq('facility_id', facility.id)
         .order('created_at', { ascending: false })
       if (!error && data) setQuestions(data)
@@ -87,6 +87,27 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
       return
     }
 
+  // Soft delete. .select() is mandatory: an UPDATE that RLS filters out matches zero rows
+  // and returns NO error, so without it a failed delete would vanish from this list and
+  // stay live for the facility's provider.
+  function deleteQuestion(questionId) {
+    Alert.alert('', t('deleteQuestionConfirm', lang), [
+      { text: t('cancel', lang), style: 'cancel' },
+      {
+        text: t('deleteQuestion', lang),
+        style: 'destructive',
+        onPress: async () => {
+          const { data, error } = await supabase.from('questions')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', questionId)
+            .select('id')
+          if (error || !data?.length) { Alert.alert('', t('deleteFailed', lang)); return }
+          setQuestions(prev => prev.filter(q => q.id !== questionId))
+        },
+      },
+    ])
+  }
+
     const { error } = await supabase.from('questions').insert({
       facility_id: facility.id,
       customer_id: session.user.id,
@@ -97,7 +118,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
       await loadQuestions()
       notifyFacilityOwner(facility, 'question')
     } else {
-      const key = moderationErrorKey(error)
+      const key = moderationErrorKey(error, { contentType: 'question', text: body })
       setQError(key ? t(key, lang) : t('questionSubmitError', lang))
     }
     setSubmittingQ(false)
@@ -481,6 +502,17 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
                       </View>
                     ) : (
                       <Text style={s.noAnswer}>{t('awaitingAnswer', lang)}</Text>
+                    )}
+                    {q.customer_id && q.customer_id === session?.user?.id && (
+                      <TouchableOpacity
+                        onPress={() => deleteQuestion(q.id)}
+                        style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                        accessibilityRole="button"
+                      >
+                        <Text style={{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger }}>
+                          {t('deleteQuestion', lang)}
+                        </Text>
+                      </TouchableOpacity>
                     )}
                   </View>
                 ))

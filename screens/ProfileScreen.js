@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, FlatList, ActivityIndicator, Platform, Linking,
-  Modal, LayoutAnimation, UIManager,
+  Modal, LayoutAnimation, UIManager, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
@@ -114,7 +114,7 @@ const TYPE_COLORS = {
   dentist:  { bg: '#E8F5EE', text: '#2E9E5B' },
 }
 
-function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue, ratingComment, reviewError, onRatingChange, onCommentChange, onSubmitReview, onCancelBooking, onOpenTerms, onBack }) {
+function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue, ratingComment, reviewError, onRatingChange, onCommentChange, onSubmitReview, onDeleteReview, onCancelBooking, onOpenTerms, onBack }) {
   const f           = booking.facilities ?? {}
   const isPending   = booking.status === 'pending'
   const isConfirmed = booking.status === 'confirmed'
@@ -249,6 +249,15 @@ function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue
                 ))}
               </View>
               {review.comment ? <Text style={s.detailReviewComment}>{review.comment}</Text> : null}
+              <TouchableOpacity
+                onPress={() => onDeleteReview(review.id)}
+                style={{ alignSelf: 'flex-start', marginTop: 10 }}
+                accessibilityRole="button"
+              >
+                <Text style={{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger }}>
+                  {t('deleteReview', lang)}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </ScrollView>
@@ -336,11 +345,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
     async function loadReviews() {
       const { data } = await supabase.from('reviews')
-        .select('appointment_id, rating, comment')
+        .select('id, appointment_id, rating, comment')
         .eq('customer_id', session.user.id)
       if (data) {
         setReviewedIds(new Set(data.map(r => r.appointment_id)))
-        setReviewsMap(new Map(data.map(r => [r.appointment_id, { rating: r.rating, comment: r.comment }])))
+        setReviewsMap(new Map(data.map(r => [r.appointment_id, { id: r.id, rating: r.rating, comment: r.comment }])))
       }
     }
 
@@ -404,9 +413,32 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       setRatingValue(0)
       setRatingComment('')
     } else {
-      const key = moderationErrorKey(error)
+      const key = moderationErrorKey(error, { contentType: 'review', text: ratingComment })
       setReviewError(key ? t(key, lang) : error.message)
     }
+  }
+
+  // Soft delete: the row stays as the evidence trail, `deleted_at` takes it out of every
+  // read policy — including this customer's own. .select() is not optional: an UPDATE
+  // that RLS filters out matches zero rows and returns NO error, so without it a failed
+  // delete would clear the review from the UI and leave it live for everyone else.
+  function deleteReview(reviewId) {
+    Alert.alert('', t('deleteReviewConfirm', lang), [
+      { text: t('cancel', lang), style: 'cancel' },
+      {
+        text: t('deleteReview', lang),
+        style: 'destructive',
+        onPress: async () => {
+          const { data, error } = await supabase.from('reviews')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', reviewId)
+            .select('id')
+          if (error || !data?.length) { Alert.alert('', t('deleteFailed', lang)); return }
+          setReviewedIds(prev => { const n = new Set(prev); for (const [aid, r] of reviewsMap) if (r.id === reviewId) n.delete(aid); return n })
+          setReviewsMap(prev => { const n = new Map(prev); for (const [aid, r] of prev) if (r.id === reviewId) n.delete(aid); return n })
+        },
+      },
+    ])
   }
 
   async function savePresetAvatar(id) {
@@ -537,6 +569,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       <AppointmentDetail
         booking={selectedBooking}
         lang={lang}
+        onDeleteReview={deleteReview}
         reviewedIds={reviewedIds}
         reviewsMap={reviewsMap}
         ratingValue={ratingValue}

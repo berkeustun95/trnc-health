@@ -35,7 +35,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "check:flags": "node scripts/check-module-flags.mjs",
-    "ota": "node scripts/check-module-flags.mjs && eas update --channel production",
+    "ota": "node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs && eas update --channel production",
     "setup:hooks": "git config core.hooksPath .githooks && echo 'hooks enabled (.githooks)'",
     "eas-build-pre-install": "node scripts/check-module-flags.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
@@ -50,7 +50,10 @@
     "map:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-map-sources.mjs",
     "i18n:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-i18n-coverage.mjs",
     "duty:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duty-staleness.mjs",
-    "notify:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-notify-health.mjs"
+    "notify:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-notify-health.mjs",
+    "terms:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs",
+    "moderation:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-moderation-normalization.mjs",
+    "moderation:log": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-moderation-log.mjs"
   },
   "private": true,
   "devDependencies": {

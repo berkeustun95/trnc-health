@@ -10,6 +10,8 @@ import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { storageObjectPath } from '../utils/facilityUtils'
+import { invalidateBlockedTerms } from '../utils/profanity'
+import { normalizeForModeration } from '../utils/moderationNormalize'
 import GaragesScreen from './GaragesScreen'
 
 // Mint a 60s signed URL on tap and open it. Never store the result — signed URLs
@@ -25,10 +27,36 @@ async function openSignedDoc(bucket, storedValue) {
   Linking.openURL(data.signedUrl)
 }
 
+// A PostgREST UPDATE that RLS filters out matches ZERO ROWS and returns NO ERROR:
+// supabase-js `.update()` without `.select()` yields {data: null, error: null}, which is
+// indistinguishable from success. That property hid a six-week outage — reviews,
+// questions and answers had no permissive UPDATE policy at all, so admin Remove,
+// Restore and Ban-and-hide were silent no-ops while the UI reported success and the
+// Terms promised removal within 24 hours (fixed by 20260927).
+//
+// The policy restored the capability. This restores the REPORTING, which is the half
+// that would have caught it: `.select('id')` forces the affected rows back, so zero rows
+// becomes visible and can be raised. Every admin write whose success matters goes through
+// here — a write that silently does nothing is worse than one that fails loudly, because
+// the queue gets cleared either way and only one of them tells you.
+async function updateOrAlert(table, patch, id, label) {
+  const { data, error } = await supabase.from(table).update(patch).eq('id', id).select('id')
+  if (error || !data?.length) {
+    Alert.alert(
+      `${label} failed`,
+      error?.message ??
+        'The database accepted the request but changed 0 rows — most likely an RLS policy. ' +
+        'Nothing was changed and the report has been left open.',
+    )
+    return false
+  }
+  return true
+}
+
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings']
+const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Moderation']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -530,9 +558,14 @@ function ReportsTab({ session }) {
 
   async function removeContent(g) {
     setBusy(g.key)
-    await supabase.from(CONTENT_TABLE[g.contentType])
-      .update({ hidden_at: new Date().toISOString(), hidden_reason: 'admin_removed' })
-      .eq('id', g.contentId)
+    // Bail BEFORE resolveReports. A failed hide that still cleared the queue is the
+    // exact shape of the six-week bug: the report disappears and the content stays up.
+    // Leaving the report open is recoverable; clearing it is not.
+    const wrote = await updateOrAlert(
+      CONTENT_TABLE[g.contentType],
+      { hidden_at: new Date().toISOString(), hidden_reason: 'admin_removed' },
+      g.contentId, 'Remove')
+    if (!wrote) { setBusy(null); load(); return }
     await resolveReports(g, 'actioned')
     // Facilities are HIDDEN (recoverable), not deleted — say so, matching the owner
     // "listing hidden" banner. review/question/answer keep the "removed" wording.
@@ -546,9 +579,11 @@ function ReportsTab({ session }) {
 
   async function restoreContent(g) {
     setBusy(g.key)
-    await supabase.from(CONTENT_TABLE[g.contentType])
-      .update({ hidden_at: null, hidden_reason: null })
-      .eq('id', g.contentId)
+    const wrote = await updateOrAlert(
+      CONTENT_TABLE[g.contentType],
+      { hidden_at: null, hidden_reason: null },
+      g.contentId, 'Restore')
+    if (!wrote) { setBusy(null); load(); return }
     await resolveReports(g, 'dismissed')
     // Only facilities get a restore push — the owner saw the "hidden" banner and
     // should learn it's back. review/question/answer restores stay silent (unchanged).
@@ -569,10 +604,18 @@ function ReportsTab({ session }) {
   async function applyBan(g, authorId, days) {
     setBusy(g.key)
     const until = days ? new Date(Date.now() + days * 86400000) : new Date('2999-01-01')
-    await supabase.from('profiles').update({ ugc_banned_until: until.toISOString() }).eq('id', authorId)
-    await supabase.from(CONTENT_TABLE[g.contentType])
-      .update({ hidden_at: new Date().toISOString(), hidden_reason: 'admin_removed' })
-      .eq('id', g.contentId)
+    // Content FIRST, then the ban. If only one can land, hiding the content is the half
+    // that protects users and honours the 24h promise; an unbanned author who can no
+    // longer see their post is a smaller failure than a banned author whose content is
+    // still up. Both are checked, and neither clears the queue on its own.
+    const hid = await updateOrAlert(
+      CONTENT_TABLE[g.contentType],
+      { hidden_at: new Date().toISOString(), hidden_reason: 'admin_removed' },
+      g.contentId, 'Remove')
+    if (!hid) { setBusy(null); load(); return }
+    const banned = await updateOrAlert(
+      'profiles', { ugc_banned_until: until.toISOString() }, authorId, 'Ban')
+    if (!banned) { setBusy(null); load(); return }
     await resolveReports(g, 'actioned')
     await notifyAuthor(
       g,
@@ -4158,6 +4201,191 @@ function FeaturedTab() {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
+// ─── Moderation ──────────────────────────────────────────────────────────────
+// The workflow this screen exists for is: a user says "it won't let me post" →
+// find what matched → remove it. Search is therefore the primary control, not a
+// convenience: at ~510 terms across 9 scripts, scrolling is not a way to find anything.
+//
+// Terms are sorted by hit_count DESC by default. That ordering IS the false-positive
+// detector — an ordinary word wrongly on the list fires constantly, and a genuine slur
+// almost never does. A term at the top with a big number is the thing to look at.
+function ModerationTab() {
+  const [view, setView]           = useState('terms')
+  const [terms, setTerms]         = useState([])
+  const [rejections, setRejections] = useState([])
+  const [query, setQuery]         = useState('')
+  const [newTerm, setNewTerm]     = useState('')
+  const [loading, setLoading]     = useState(true)
+  const [busy, setBusy]           = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [tRes, rRes] = await Promise.all([
+      supabase.from('blocked_terms').select('term, hit_count, last_hit_at')
+        .order('hit_count', { ascending: false }).order('term'),
+      supabase.from('moderation_rejections')
+        .select('id, content_type, matched_term, content_text, created_at')
+        .order('created_at', { ascending: false }).limit(200),
+    ])
+    setTerms(tRes.data ?? [])
+    setRejections(rRes.data ?? [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function addTerm() {
+    const raw = newTerm.trim()
+    if (!raw) return
+    // Run the same normalization the matcher runs. A term pasted from a web page can
+    // carry a zero-width joiner or Arabic tashkeel; stored as typed it would be born
+    // dead, matching nothing, forever, while looking perfectly correct in this list.
+    const normalized = normalizeForModeration(raw)
+    if (!normalized) { Alert.alert('Not a usable term', 'That normalizes to nothing.'); return }
+    const proceed = async () => {
+      setBusy(true)
+      const { error } = await supabase.from('blocked_terms').insert({ term: normalized })
+      setBusy(false)
+      if (error) { Alert.alert('Could not add', error.message); return }
+      setNewTerm('')
+      invalidateBlockedTerms()
+      load()
+    }
+    if (normalized !== raw.toLowerCase()) {
+      Alert.alert(
+        'Cleaned up',
+        `Storing "${normalized}" — the text you pasted carried invisible or non-semantic characters that would have stopped it matching anything.`,
+        [{ text: 'Cancel', style: 'cancel' }, { text: 'Add', onPress: proceed }]
+      )
+    } else {
+      proceed()
+    }
+  }
+
+  function removeTerm(term) {
+    Alert.alert(
+      `Remove "${term}"?`,
+      'It stops blocking immediately. Other devices catch up within 5 minutes. Its rejection records are deleted with it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true)
+            const { error } = await supabase.from('blocked_terms').delete().eq('term', term)
+            setBusy(false)
+            if (error) { Alert.alert('Could not remove', error.message); return }
+            // Only clears THIS device. Every other client converges on its own 5-minute
+            // TTL — there is no push channel for the term list, and inventing one for a
+            // list that changes a few times a year would be the wrong trade.
+            invalidateBlockedTerms()
+            load()
+          },
+        },
+      ]
+    )
+  }
+
+  const q = normalizeForModeration(query)
+  const shown = q ? terms.filter(t2 => normalizeForModeration(t2.term).includes(q)) : terms
+
+  if (loading) return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={[s.chipRow, { marginBottom: 12 }]}>
+        {[['terms', `Terms (${terms.length})`], ['log', `Rejections (${rejections.length})`]].map(([k, label]) => (
+          <TouchableOpacity key={k} style={[s.chip, view === k && s.chipActive]} onPress={() => setView(k)}>
+            <Text style={[s.chipText, view === k && s.chipTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {view === 'terms' ? (
+        <>
+          <TextInput
+            style={[s.input, { marginBottom: 8 }]}
+            placeholder="Search terms…"
+            placeholderTextColor={colors.textSecondary}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+            <TextInput
+              style={[s.input, { flex: 1 }]}
+              placeholder="Add a term…"
+              placeholderTextColor={colors.textSecondary}
+              value={newTerm}
+              onChangeText={setNewTerm}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={[s.primaryBtn, { marginBottom: 0, paddingHorizontal: 18, justifyContent: 'center' }, (busy || !newTerm.trim()) && s.primaryBtnDisabled]}
+              disabled={busy || !newTerm.trim()}
+              onPress={addTerm}
+            >
+              <Text style={s.primaryBtnText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+
+          <FlatList
+            data={shown}
+            keyExtractor={item => item.term}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<SectionEmpty text={query ? `No term matches "${query}".` : 'No blocked terms.'} />}
+            renderItem={({ item }) => (
+              <View style={s.card}>
+                <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.cardTitle}>{item.term}</Text>
+                    <Text style={s.cardSub}>
+                      {item.hit_count > 0
+                        ? `${item.hit_count} rejection${item.hit_count === 1 ? '' : 's'}${item.last_hit_at ? ` · last ${new Date(item.last_hit_at).toLocaleDateString()}` : ''}`
+                        : 'never triggered'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={s.dangerGhostBtn} onPress={() => removeTerm(item.term)}>
+                    <Text style={s.dangerGhostText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          />
+        </>
+      ) : (
+        <FlatList
+          data={rejections}
+          keyExtractor={item => item.id}
+          contentContainerStyle={s.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<SectionEmpty text="No rejections recorded in the last 30 days." />}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={s.card}
+              onPress={() => { setQuery(item.matched_term); setView('terms') }}
+            >
+              <View style={[s.cardRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
+                <Text style={s.cardTitle}>{item.matched_term}</Text>
+                <View style={s.pillGrey}><Text style={s.pillText}>{item.content_type}</Text></View>
+              </View>
+              {/* The full submitted text, not a window around the match. A false positive
+                  is only recognisable in context — the ZWNJ "therapist" case reads as
+                  obviously wrong in a sentence and as a fair block in isolation. */}
+              <Text style={[s.cardSub, { marginTop: 6, color: colors.textPrimary }]}>{item.content_text}</Text>
+              <Text style={[s.cardSub, { marginTop: 6 }]}>{new Date(item.created_at).toLocaleString()}</Text>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </View>
+  )
+}
+
 export default function AdminScreen({ session, lang, onShowExplore }) {
   const [tab, setTab] = useState('Dashboard')
   const navigateTo = t => setTab(t)
@@ -4223,6 +4451,7 @@ export default function AdminScreen({ session, lang, onShowExplore }) {
           {tab === 'Places'        && <PlacesTab />}
           {tab === 'PlaceClaims'   && <PlaceClaimsTab session={session} />}
           {tab === 'JobPostings'   && <JobPostingsTab />}
+          {tab === 'Moderation'    && <ModerationTab />}
         </View>
       </View>
     </SafeAreaView>

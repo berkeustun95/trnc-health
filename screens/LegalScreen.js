@@ -39,52 +39,103 @@ We may update this policy. Continued use of the app after changes means you acce
 7. CONTACT
 For privacy questions or deletion requests: getadaapp@gmail.com`
 
-const TERMS = `Last updated: July 2026
+const TERMS = `Last updated: August 2026
 
-These Terms of Service govern your use of the ADA app. By using ADA you agree to these terms.
+These Terms of Service govern your use of the ADA app. By creating an account or using ADA you agree to these terms. If you do not agree, do not use the app.
 
 1. WHAT ADA IS
-ADA helps newcomers settle into life in North Cyprus (TRNC) — from pharmacies and health services to transport, events, accommodation, jobs, and other everyday essentials. ADA is a directory and information tool: we help you find providers and contact them directly. We are not a medical provider, insurer, or emergency service, and we are not party to any arrangement you make with a provider you find through the app.
+ADA is a directory and services app for residents of and newcomers to Northern Cyprus (TRNC). It includes listings and tools covering healthcare facilities and duty pharmacies, local places and points of interest, events, accommodation, vehicle services and roadside assistance, and other local services. Features vary by region and may change over time.
+
+ADA is not a medical provider, insurer, telehealth service, emergency service, estate agent, travel agent, or employer. We connect you with third parties; we are not a party to any transaction, booking, or agreement you enter into with them.
 
 2. NOT MEDICAL ADVICE
-Some of what ADA lists is health-related — pharmacies, clinics, hospitals, and dentists. Nothing in ADA constitutes medical advice. Always consult a qualified healthcare professional for medical decisions. In an emergency, call 112.
+Some of what ADA lists is health-related — pharmacies, clinics, hospitals, and dentists. Nothing in ADA constitutes medical advice, diagnosis, or treatment. Facility listings, opening hours, and other information are provided for reference only. Always consult a qualified healthcare professional for medical decisions. In an emergency, call 112.
 
 3. FACILITY INFORMATION
-Facility details (hours, addresses, phone numbers) are provided by registered providers and may not always be current. Verify critical information directly with the facility before visiting.
+Facility details — including hours, addresses, phone numbers, and services — are provided by registered providers and may not always be current or complete. Verify critical information directly with the facility before visiting.
 
 4. ACCOUNTS
-You are responsible for keeping your account credentials secure. Notify us immediately if you suspect unauthorised access.
+You are responsible for maintaining the confidentiality of your account credentials. You agree to notify us immediately at getadaapp@gmail.com if you suspect unauthorised access to your account.
+
+4.1 MINIMUM AGE
+You must be at least 13 years old to create an ADA account. By creating an account you confirm that you are 13 or older. Some parts of ADA can be browsed without an account.
+
+If we become aware that an account has been created by someone under 13, we will close it and delete the associated personal data.
 
 5. PROVIDER ACCOUNTS
-Providers are responsible for keeping their facility information accurate and up to date. Listing on ADA does not constitute an endorsement by us.
+Providers are responsible for keeping their facility information accurate and up to date. Listing on ADA does not constitute an endorsement by us. We reserve the right to suspend or remove any listing that contains inaccurate, misleading, or inappropriate content.
 
 6. APPOINTMENTS
-ADA facilitates appointment requests between customers and providers. We are not party to the appointment and bear no responsibility for missed, cancelled, or unsatisfactory appointments.
+ADA facilitates appointment requests between customers and providers. We are not party to the appointment and bear no responsibility for missed, cancelled, delayed, or unsatisfactory appointments. Any disputes regarding appointments are between the customer and the provider.
 
 7. PROHIBITED USE
-You may not use ADA to: submit false information, harass other users, attempt to gain unauthorised access, or use the app for any unlawful purpose.
+You may not use ADA to:
+• Submit false, misleading, or fraudulent information.
+• Harass, abuse, or harm other users or providers.
+• Attempt to gain unauthorised access to any part of the app or its infrastructure.
+• Scrape, copy, or redistribute app content without permission.
+• Use the app for any unlawful purpose under TRNC or applicable law.
 
-8. USER CONTENT — ZERO TOLERANCE FOR OBJECTIONABLE CONTENT
-ADA lets you post reviews and questions. You are solely responsible for the content you post.
+8. USER CONTENT AND COMMUNITY STANDARDS
+ADA lets you post content — including reviews, questions, answers, and in some parts of the app listings and other submissions. You are solely responsible for the content you post, and you must have the right to post it.
 
-There is ZERO TOLERANCE for objectionable content and abusive users. You may not post content that is offensive, abusive, harassing, hateful, threatening, obscene, sexually explicit, defamatory, discriminatory, or that promotes violence or illegal activity. You may not impersonate another person, post spam, or post another person's private information.
+8.1 ZERO TOLERANCE FOR OBJECTIONABLE CONTENT
+There is ZERO TOLERANCE for objectionable content and abusive users. You may not post content that:
+• Is unlawful, defamatory, fraudulent, or misleading.
+• Harasses, threatens, bullies, or intimidates any person.
+• Promotes hatred against, or discrimination towards, any person or group on the basis of race, ethnicity, national origin, religion, disability, sex, gender identity, sexual orientation, or age.
+• Is sexually explicit, or sexualises any person.
+• Depicts, promotes, or glorifies violence, self-harm, or illegal activity.
+• Impersonates another person, a business, a public authority, or ADA itself.
+• Discloses another person's private information without their consent.
+• Is spam, or solicits payment or contact outside the app in order to avoid these rules.
 
-To enforce this, ADA provides:
-• An automatic filter that rejects submissions containing objectionable language.
-• A Report action on every review, question, and answer, so any user can flag content for review.
-• A Block action, so you can stop seeing content from any user you choose. Blocking is private — the blocked user is not notified.
-• Human review of every report. We remove violating content and eject the users who post it within 24 hours of a report.
+This list is illustrative, not exhaustive. Content that is not listed here may still be removed if it breaches the spirit of these standards.
 
-By posting content you agree to these rules. If you violate them, your content will be removed and your ability to post may be suspended or permanently revoked, without notice and at our sole discretion.
+8.2 CONTENT FILTERING
+Text you submit in reviews, questions, answers, facility and place listings, and listing change requests is automatically screened at the moment you submit it against a list of prohibited terms, currently maintained in English and Turkish.
 
-9. LIMITATION OF LIABILITY
-To the maximum extent permitted by law, ADA is provided "as is" without warranty of any kind. We are not liable for any indirect, incidental, or consequential damages arising from your use of the app.
+Automated screening is a first line of defence only. It does not cover every type of content or every language, and no automated filter catches everything. The reporting and blocking tools described below apply to all user content, whether or not it was automatically screened.
 
-10. GOVERNING LAW
+If a submission is rejected by this screening, we keep the rejected text, the term that triggered the rejection, and the time it happened, so that we can find and correct rejections that were wrong and improve the filter. These records are visible only to our administrators, are deleted automatically after 30 days, and are not used for any other purpose.
+
+8.3 REPORTING OBJECTIONABLE CONTENT
+Every review, question, and answer in ADA carries a Report action. Open the menu on the item you want to report, choose a reason, and submit it — you do not need to contact us separately, and the author is not told who reported them.
+
+We review reported content and remove content that breaches these standards within 24 hours of the report.
+
+Content reported by several independent users may be hidden automatically, pending our review, before a person has looked at it. Automatic hiding is a safeguard and not a finding against the author; content hidden this way can be restored if our review finds no breach.
+
+Content we remove is retained internally so that we can identify repeat breaches by the same account. It is no longer visible to other users.
+
+8.4 BLOCKING ANOTHER USER
+You can block another user from any review they have posted. Blocking hides that user's reviews and comments from you wherever community content appears. Blocking is private: the blocked user is not notified and cannot tell that you have blocked them. You can see and reverse your blocks at any time in your profile settings.
+
+8.5 CONSEQUENCES OF BREACHING THESE STANDARDS
+If you breach these standards we may, at our discretion and depending on severity: remove the content; temporarily suspend your ability to post reviews, questions, and answers; or permanently terminate your account and your access to ADA. Where a breach is serious, we may act without prior notice.
+
+8.6 CONTACTING US ABOUT CONTENT
+To report objectionable content, an abusive user, or a decision we have taken, contact us at getadaapp@gmail.com. We aim to respond within 24 hours.
+
+9. INTELLECTUAL PROPERTY
+All content, design, and code in ADA is owned by or licensed to us. You may not reproduce, distribute, or create derivative works without our written permission.
+
+10. LIMITATION OF LIABILITY
+To the maximum extent permitted by applicable law, ADA is provided "as is" without warranty of any kind, express or implied. We are not liable for any indirect, incidental, special, or consequential damages arising from your use of or inability to use the app, including but not limited to damages resulting from reliance on facility information.
+
+11. TERMINATION
+We reserve the right to suspend or terminate your account at any time if you breach these terms or if we determine, in our sole discretion, that your use of the app is harmful to other users or to ADA.
+
+12. CHANGES TO THESE TERMS
+We may update these terms from time to time. Continued use of the app after changes constitutes acceptance of the updated terms. The "Last updated" date above always reflects the current version.
+
+13. GOVERNING LAW AND LANGUAGE
 These terms are governed by the laws of the Turkish Republic of Northern Cyprus (TRNC).
 
-11. CONTACT
-Questions about these terms, or to report objectionable content: getadaapp@gmail.com`
+These terms are published in English. If we make a translation available for convenience, the English version governs in the event of any inconsistency.
+
+14. CONTACT
+Questions about these terms, or to report objectionable content? Contact us at getadaapp@gmail.com.`
 
 export default function LegalScreen({ onBack, lang, initialTab = 'privacy' }) {
   const [tab, setTab] = useState(initialTab)

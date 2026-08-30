@@ -54,6 +54,7 @@ WITH report AS (
     ('0905_towing_companies','towing_companies'),
     ('0910_contact_events','contact_events'),
     ('0923_server_side_notifications','push_log'),
+    ('0926_moderation_rejection_log','moderation_rejections'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -74,6 +75,10 @@ WITH report AS (
     ('0712_ugc_moderation','questions','hidden_at'),
     ('0712_ugc_moderation','answers','hidden_at'),
     ('0712_ugc_moderation','profiles','ugc_banned_until'),
+    ('0926_moderation_rejection_log','blocked_terms','hit_count'),
+    ('0928_ugc_soft_delete','reviews','deleted_at'),
+    ('0928_ugc_soft_delete','questions','deleted_at'),
+    ('0926_moderation_rejection_log','blocked_terms','last_hit_at'),
     ('0719_claim_evidence_and_guard','claim_requests','verified_by'),
     ('0719_claim_evidence_and_guard','claim_requests','verified_at'),
     ('0719_claim_rename_and_tax_no','claim_requests','tax_registration_no'),
@@ -182,6 +187,10 @@ WITH report AS (
     ('capture_3_functions','check_report_rate_limit'),
     ('capture_3_functions','check_ugc_on_insert'),
     ('capture_3_functions','contains_blocked_term'),
+    ('0925_moderation_normalization','normalize_for_moderation'),
+    ('0926_moderation_rejection_log','blocked_term_hit'),
+    ('0928_ugc_soft_delete','guard_owner_soft_delete'),
+    ('0926_moderation_rejection_log','record_moderation_rejection'),
     ('capture_3_functions','delete_own_account'),
     ('capture_3_functions','ev_guard_write'),
     ('capture_3_functions','expire_job_postings'),
@@ -261,6 +270,9 @@ WITH report AS (
     ('capture_4/0712','guard_review_moderation'),
     ('capture_4/0712','guard_question_moderation'),
     ('capture_4/0712','guard_answer_moderation'),
+    ('0926_moderation_rejection_log','record_moderation_rejection'),
+    ('0928_ugc_soft_delete','guard_review_soft_delete'),
+    ('0928_ugc_soft_delete','guard_question_soft_delete'),
     ('capture_4/0712','check_review_content'),
     ('capture_4/0712','check_question_content'),
     ('capture_4/0712','check_answer_content'),
@@ -313,7 +325,9 @@ WITH report AS (
     ('0911_facilities_public_health','facilities_parent_not_self_check'),
     ('0911_facilities_public_health','facilities_parent_facility_id_fkey'),
     ('0724_events_category','events_category_check'),
-    ('0701_security_fixes','reviews_customer_facility_unique'),
+    -- reviews_customer_facility_unique was REMOVED here by 0928: it is no longer a
+    -- constraint but a PARTIAL UNIQUE INDEX, and its absence as a constraint is
+    -- asserted in H. Listing it here would report MISSING forever.
     ('capture_2','facilities_status_check'),
     ('capture_2','facilities_membership_tier_check'),
     ('0719_fix_signup','profiles_role_check'),
@@ -1083,6 +1097,165 @@ WITH report AS (
       to_regclass('public.contact_events') IS NOT NULL
       AND NOT EXISTS(SELECT 1 FROM pg_constraint
         WHERE conrelid = to_regclass('public.contact_events') AND contype='f')
+    -- ── 0925 moderation normalization. Behaviour-only CREATE OR REPLACE on
+    -- contains_blocked_term(), so section C sees the NAME and cannot see the CHANGE.
+    -- Without these tokens a database still on the old body reads 100% OK while the
+    -- word filter is walked around by typing in Turkish capitals — measured live on
+    -- 2026-08-29: contains_blocked_term('SİKİK') returned false.
+    --
+    -- (1) The matcher calls the normalizer at all. If this is false, the whole slice
+    -- never ran, and — worse than not running — utils/moderationNormalize.js on the
+    -- client DID ship, so the inline preview now blocks text the server accepts and
+    -- accepts text the server blocks. Divergence, in both directions at once.
+    -- Either function may hold the call: 0925 put it in contains_blocked_term, and 0926
+    -- moved the lookup into blocked_term_hit and left a thin wrapper behind. Naming only
+    -- the first would report STALE forever the moment 0926 applied — a drift checker
+    -- carrying a known-false positive teaches the reader to skim, and the next real
+    -- MISSING gets skimmed with it.
+    UNION ALL SELECT '0925_moderation_normalization','the matcher normalizes before matching',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname IN ('contains_blocked_term','blocked_term_hit')
+          AND pg_get_functiondef(p.oid) ILIKE '%normalize_for_moderation%')
+    -- (2) The normalizer's body is the FULL one. A partial paste, or an older draft,
+    -- can define the function and cover only some of the class — which is invisible to
+    -- (1) and to section C alike. Assert the three characters that each stand for one
+    -- of the three separate defects, and the NFC that keeps accents intact.
+    -- Asserted through pg_get_functiondef, not by reading the migration file: a
+    -- migration is a statement of intent, and between it and the database sit a manual
+    -- paste and a later CREATE OR REPLACE.
+    UNION ALL SELECT '0925_moderation_normalization','normalize_for_moderation covers İ + zero-width + tatweel',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='normalize_for_moderation'
+          AND pg_get_functiondef(p.oid) LIKE '%0130%'        -- Turkish capital İ
+          AND pg_get_functiondef(p.oid) LIKE '%200B%'        -- zero-width range
+          AND pg_get_functiondef(p.oid) LIKE '%0640%'        -- Arabic tatweel
+          AND pg_get_functiondef(p.oid) ILIKE '%NFC%')       -- NOT NFD/NFKD: no accent folding
+    -- (3) Still not an RPC. Every public function is exposed by PostgREST unless EXECUTE
+    -- is revoked, and the standing constraint on this work is that no new RPC appears.
+    -- A later GRANT, or a restore that reinstated the default PUBLIC execute, is
+    -- otherwise undetectable — the function keeps working either way.
+    -- aclexplode, NOT has_function_privilege(): the latter RAISES on a function that does
+    -- not exist, and absence is precisely the state this token has to be able to REPORT.
+    -- A never-applied migration would otherwise turn the whole drift check into a hard
+    -- error — the same trap the to_regclass note above records.
+    -- proacl IS NOT NULL is load-bearing: a NULL ACL means DEFAULT privileges, and the
+    -- default for a function is EXECUTE to PUBLIC. Here, no ACL is the FAILING state.
+    UNION ALL SELECT '0925_moderation_normalization','normalize_for_moderation is NOT callable by anon/authenticated',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='normalize_for_moderation'
+          AND p.proacl IS NOT NULL
+          AND NOT EXISTS(SELECT 1 FROM aclexplode(p.proacl) a
+                         LEFT JOIN pg_roles r ON r.oid = a.grantee
+                         WHERE a.privilege_type='EXECUTE'
+                           AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated'))))
+    -- (4) The one assertion here about CONTENT rather than shape. Every term must still
+    -- match itself; normalization that quietly broke `piç` or `şerefsiz` would leave
+    -- tokens 1-3 green and the filter half dead. DERIVED — it counts the rows that fail,
+    -- so it cannot go green by forgetting one, and it keeps working as Phase C grows the
+    -- table from 54 rows to ~510.
+    UNION ALL SELECT '0925_moderation_normalization','every blocked_terms row still matches itself',
+      NOT EXISTS(SELECT 1 FROM public.blocked_terms WHERE NOT public.contains_blocked_term(term))
+    -- ── 0926 rejection log. contains_blocked_term was REDEFINED again (into a wrapper),
+    -- so 0925's token above stays true while saying nothing about this slice.
+    --
+    -- (1) The wrapper is installed. If false, the six triggers still work but nothing is
+    -- ever logged — and the AdminScreen Moderation tab reads an empty table and reports
+    -- "no false positives", which is the most confident wrong answer available.
+    UNION ALL SELECT '0926_moderation_rejection_log','contains_blocked_term delegates to blocked_term_hit',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='contains_blocked_term'
+          AND pg_get_functiondef(p.oid) ILIKE '%blocked_term_hit%')
+    -- (2) The breadcrumb. This is the ONLY record of a rejection from a client that does
+    -- not self-report, and it is one line in a function body — trivially lost to a later
+    -- CREATE OR REPLACE by someone who did not know it was load-bearing.
+    UNION ALL SELECT '0926_moderation_rejection_log','blocked_term_hit still writes the RAISE LOG breadcrumb',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='blocked_term_hit'
+          AND pg_get_functiondef(p.oid) ILIKE '%RAISE LOG%')
+    -- (3) All four trigger functions still route through contains_blocked_term. The claim
+    -- "one change reaches all six surfaces" is only true while this holds; if someone
+    -- inlines the matcher into one of them, that surface silently stops logging while
+    -- every other token here stays green. DERIVED count of the four, not a spot check.
+    UNION ALL SELECT '0926_moderation_rejection_log','all 4 content-filter trigger functions still route through the matcher',
+      (SELECT count(*) = 4 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public'
+          AND p.proname IN ('check_ugc_on_insert','check_facility_content',
+                            'check_change_request_content','check_place_content')
+          AND pg_get_functiondef(p.oid) ILIKE '%contains_blocked_term%')
+    -- (4) EXACTLY two policies. Counted, not named. A third would most likely be an author
+    -- SELECT added in sympathy for a confused user — which hands back the oracle this
+    -- design spends its whole budget denying. If a third is ever legitimate, bump the
+    -- number here in the same commit and say why; that edit is the review moment.
+    UNION ALL SELECT '0926_moderation_rejection_log','moderation_rejections has EXACTLY 2 policies (no author SELECT)',
+      (SELECT count(*) = 2 FROM pg_policies
+        WHERE schemaname='public' AND tablename='moderation_rejections')
+    -- ── 0927 Tier 1. The applied-side half of check-terms-commitment.mjs, which can only
+    -- see COMMITTED migrations. Both terms copies promise removal within 24 hours; before
+    -- 0927 every admin UPDATE on these three tables was denied by RLS and supabase-js
+    -- reported success anyway. Reproduced in production 2026-08-30: report actioned,
+    -- hidden_at NULL, review still served to a signed-out visitor.
+    --
+    -- DERIVED count, 5 -> 6 per table, exactly as the 2026-08-29 journal specified. A
+    -- name check would go green while a RESTRICTIVE-only or 2-of-3 fix sat in place.
+    -- If this reads false, do NOT bump the number: find the extra or missing policy.
+    UNION ALL SELECT '0927_admin_ugc_update_policies','reviews/questions/answers carry 6 policies each (5 + admin UPDATE)',
+      (SELECT count(*) = 3 FROM (
+         SELECT tablename FROM pg_policies
+          WHERE schemaname='public' AND tablename IN ('reviews','questions','answers')
+          GROUP BY tablename HAVING count(*) = 6) t)
+    -- And that the sixth is PERMISSIVE. A restrictive UPDATE policy grants nothing, so the
+    -- count above would be satisfied by a policy that leaves admin Remove exactly as
+    -- broken as it was — the count and the kind have to be asserted separately.
+    UNION ALL SELECT '0927_admin_ugc_update_policies','all 3 have a PERMISSIVE UPDATE policy (a RESTRICTIVE one grants nothing)',
+      (SELECT count(DISTINCT tablename) = 3 FROM pg_policies
+        WHERE schemaname='public' AND tablename IN ('reviews','questions','answers')
+          AND cmd='UPDATE' AND permissive='PERMISSIVE')
+    -- ── 0928/0929/0930 soft delete + answer gates.
+    -- (1) Counts move 6/6/6 -> 7/7/6. answers only has its SELECT policy REPLACED, so it
+    -- must STAY at 6: a 7 there means the DROP missed and two SELECT policies now OR
+    -- together — the more permissive wins and hidden answers become readable again.
+    UNION ALL SELECT '0928_ugc_soft_delete','policy counts are 7 / 7 / 6 on reviews / questions / answers',
+      (SELECT count(*) = 7 FROM pg_policies WHERE schemaname='public' AND tablename='reviews')
+      AND (SELECT count(*) = 7 FROM pg_policies WHERE schemaname='public' AND tablename='questions')
+      AND (SELECT count(*) = 6 FROM pg_policies WHERE schemaname='public' AND tablename='answers')
+    -- (2) The guard must still IGNORE the moderation columns. "Tighten" it to reject every
+    -- non-deleted_at change and auto_hide_reported_content's UPDATE starts raising — and
+    -- because that trigger is AFTER INSERT on content_reports, the failure lands on the
+    -- REPORT. Every third report would be lost, and the symptom points nowhere near here.
+    UNION ALL SELECT '0928_ugc_soft_delete','guard_owner_soft_delete still ignores hidden_at (auto-hide would break)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='guard_owner_soft_delete'
+          AND pg_get_functiondef(p.oid) ILIKE '%hidden_at%'
+          AND pg_get_functiondef(p.oid) ILIKE '%hidden_reason%')
+    -- (3) Both read policies gained the gate. These were drop-and-recreate of names that
+    -- already existed, so policy EXISTENCE says nothing about the change.
+    UNION ALL SELECT '0928_ugc_soft_delete','public read reviews + read questions both filter deleted_at',
+      (SELECT count(*) = 2 FROM pg_policies
+        WHERE schemaname='public' AND cmd='SELECT' AND qual ILIKE '%deleted_at%'
+          AND ((tablename='reviews' AND policyname='public read reviews')
+            OR (tablename='questions' AND policyname='read questions')))
+    -- (4) ABSENCE of the old constraint AND the index being PARTIAL. A plain unique index
+    -- passes existence while permanently barring anyone who deletes a review from ever
+    -- reviewing that facility again.
+    UNION ALL SELECT '0928_ugc_soft_delete','reviews_customer_facility_unique is GONE, replaced by a PARTIAL index',
+      NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='reviews_customer_facility_unique')
+      AND EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+                  AND indexname='reviews_customer_facility_live_uniq'
+                  AND indexdef ILIKE '%deleted_at IS NULL%')
+    -- (5) The SECOND unique. 0929 is an OPTIONAL widening — if it was deliberately not
+    -- applied this reads STALE/MISSING, which is the correct signal rather than a false
+    -- alarm: without it, re-reviewing after a delete fails with a raw 23505.
+    UNION ALL SELECT '0929_reviews_appointment_unique_partial','reviews_appointment_id_key is GONE, replaced by a PARTIAL index',
+      NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='reviews_appointment_id_key')
+      AND EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+                  AND indexname='reviews_appointment_live_uniq'
+                  AND indexdef ILIKE '%deleted_at IS NULL%')
+    -- (6) BOTH gates on answers. One without the other is the more dangerous half-fix:
+    -- gating the answer but not the parent leaves a removed thread's replies readable.
+    UNION ALL SELECT '0930_answers_read_gates','read answers gates on its own hidden_at AND the parent question',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='answers'
+              AND policyname='read answers'
+              AND qual ILIKE '%hidden_at%' AND qual ILIKE '%deleted_at%')
   ) z
 
   UNION ALL
@@ -1094,6 +1267,7 @@ WITH report AS (
     'profiles','facilities','appointments','reviews','questions','answers',
     'notifications','claim_requests','facility_change_requests','job_postings',
     'content_reports','blocks','insurance_companies','esim_waitlist','module_waitlist',
+    'moderation_rejections',
     'provider_documents','provider_credentials','quiz_submissions','pharmacist_scores',
     -- directory / UGC tables (Slice 5 — user-writable rows, so RLS must be ON here too)
     'beaches','landmarks','places','place_claims','events','home_services','transport_providers',
@@ -1120,14 +1294,21 @@ ORDER BY (status IN ('OK','ON')) ASC, section, migration, object;   -- problems 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ═══ QUERY 2 / 4 — CRON JOBS — run alone ═══
 -- ═══════════════════════════════════════════════════════════════════════════
--- Errors if pg_cron isn't installed (itself the finding). Expect 4 rows present.
+-- Errors if pg_cron isn't installed (itself the finding). Expect 5 rows present.
+-- Existence is NOT enough: cron.job.active can be false, and a disabled job looks
+-- identical to a healthy one from the application's side. purge-moderation-rejections
+-- backs a 30-day retention promise published in BOTH terms copies (§8.2), so silently
+-- inactive there is a broken written commitment, not a nagging warning.
 SELECT e.m migration, e.o job,
-       CASE WHEN EXISTS (SELECT 1 FROM cron.job WHERE jobname=e.o) THEN 'OK' ELSE 'MISSING' END status
+       CASE WHEN EXISTS (SELECT 1 FROM cron.job WHERE jobname=e.o AND active) THEN 'OK'
+            WHEN EXISTS (SELECT 1 FROM cron.job WHERE jobname=e.o)            THEN 'INACTIVE ← FIX'
+            ELSE 'MISSING' END status
 FROM (VALUES
   ('0705_job_postings_auto_expire','expire-job-postings'),
   ('0726_grooming_booking_lifecycle','grooming-pending-processor'),
   ('0803_garage_booking_lifecycle','garage-pending-processor'),
-  ('0809_featured_expiry_reminder','featured-expiry-reminder')
+  ('0809_featured_expiry_reminder','featured-expiry-reminder'),
+  ('0926_moderation_rejection_log','purge-moderation-rejections')
 ) e(m,o)
 ORDER BY status ASC, migration;
 

@@ -270,6 +270,80 @@ went missing). Two mandatory rules:
   teaches you to re-run until it passes, which is exactly how a genuinely dead link gets
   waved through.
 
+- **The word filter has two halves and they must agree character-for-character.**
+  `contains_blocked_term()` in the database is the boundary; `utils/profanity.js` is an
+  inline preview that runs the SAME matcher client-side via `utils/moderationNormalize.js`.
+  Change one, change the other **in the same commit**, then run `npm run moderation:check`
+  — it puts every case through both and fails on any disagreement. Drift is not a cosmetic
+  bug: the user is told "looks fine" as they type and rejected on submit, and because the
+  error names no term (Phase B), the rejection is indistinguishable from the app being
+  broken. `20260925_moderation_normalization.sql` is the SQL half.
+  What that normalization does, and the three live defects it closed — all measured
+  through `/rpc/contains_blocked_term`, not read off a migration file:
+  Turkish capital **İ** lowercases to `i` + U+0307, a combining mark, so `SİKİK` and `PİÇ`
+  matched nothing at all — the filter was defeated by the shift key. **Zero-width and
+  format characters** (ZWNJ/ZWJ/soft hyphen) split a word into two tokens, so `f<ZWNJ>uck`
+  passed AND `the<ZWNJ>rapist` was blocked as `rapist`. **Arabic tatweel** (U+0640) is a
+  *word* character, so `كـس` was simply a different string from `كس`.
+  Two things it deliberately does NOT do, both of which are tempting and both of which
+  block ordinary words: no accent folding (NFC only — folding `ö→o` makes the Turkish term
+  `göt` match the English "got"), and no `ı→i` folding (it makes `sık sık`, "often", match
+  `sik`). Turkish's two i's are different letters, not a case pair.
+
+- **`terms:check` passing means A MIGRATION FILE EXISTS — not that it has been applied.**
+  `scripts/check-terms-commitment.mjs` scans `supabase/migrations/` as TEXT. It cannot see
+  git and it cannot see the database: only the anon key is in the repo and `pg_policies` is
+  unreachable through PostgREST as `anon`. So the guard answers *"has the fix been
+  written"*, and the moment a file with a permissive `FOR UPDATE` on all three UGC tables
+  lands on disk, exit 1 becomes exit 0 and the pre-push block lifts — applied or not,
+  committed or not, correct or not.
+  That is deliberate (a repo-side guard has nothing better to check), and it is a real gap,
+  because the thing being gated is a commitment published to users in both terms copies.
+  **`supabase/verify_schema.sql` is the only thing that closes it — and only if somebody
+  runs it.** Nothing automated bridges the two, and this repo's own history is the argument
+  for why that is not theoretical: `facilities.area` was committed and never applied, and
+  `20260802`'s `DROP COLUMN` half-applied without anything noticing.
+  So when a guard goes green, say which question it answered. "The Tier 1 migration is
+  written" and "admin Remove works in production" are different claims, and only the second
+  one is what the Terms promise. Applies to every repo-side guard here, not just this one.
+
+- **You cannot log a rejection from the transaction you are about to abort.** The obvious
+  design for "record which blocked term matched" is a table written by the trigger. It
+  cannot work: `RAISE EXCEPTION` aborts the transaction and takes the log row with it —
+  always, not usually. The result is a logger that looks correct, runs on every rejection,
+  and is empty forever, which is *worse* than having none, because an empty table reads as
+  "no false positives" rather than "no instrumentation". Same family as the green-check and
+  hardcoded-set rules: the thing reporting the answer is the thing that is broken.
+  Postgres has exactly one rollback-surviving sink without an extension — the **server
+  log** (`RAISE LOG`); a table, `pg_net`'s queue and `LISTEN/NOTIFY` are all transactional
+  and die with the abort. `dblink` would give a true autonomous transaction and on Supabase
+  needs a stored database password, which is not a price worth paying for logging.
+  So `20260926` splits it: a `RAISE LOG` breadcrumb that always fires (term + user, never
+  the text — the server log is outside RLS), plus `moderation_rejections`, **self-reported
+  by the client in a second transaction that commits**. Self-report misses evaders, and
+  that is fine — the log exists to find FALSE POSITIVES, and those happen to honest users
+  running our own client.
+  Generalises: **before designing any "record what happened when we rejected it", ask
+  which transaction the write lands in.** Audit trails for refusals, failed-validation
+  logs, quota-denial records — all have this shape, and all fail silently.
+  Corollary for verifying one: `moderation_rejections` denies SELECT to its own author, so
+  reading the row back as the submitting user returns 0 whether or not the insert worked —
+  pinned by RLS, not by truth. `check-moderation-log.mjs` proves the write through
+  `blocked_terms.hit_count` instead, a surface it is allowed to read.
+
+- **`utils/profanity.js` reads the WHOLE `blocked_terms` table, and PostgREST caps a
+  response at `max-rows` = 1000.** Past that cap the client filters against a partial list
+  and the body looks completely normal — a short, valid array, no error, no flag. The
+  count is in the `Content-Range` header and nowhere else. Both the loader and
+  `check-moderation-normalization.mjs` now ask for `count: 'exact'` and compare the total
+  against what arrived, which is the only form of the check that works **at any cap**;
+  testing `rows >= 1000` is a truncation guard defeated by truncation, and this repo has
+  already shipped that exact bug once. The table is 54 rows today and the curated
+  9-language import takes it to roughly 510, so the headroom is real but finite — and it
+  is the kind of limit that is crossed by someone adding words through an admin screen,
+  not by anyone thinking about PostgREST. The probe prints the live figure on every run;
+  trust the printed number, not this sentence.
+
 ## Module go-live SOP (ordered — the order is the point)
 
 Flipping a module on is not one step, it is nine, and several of them are only correct

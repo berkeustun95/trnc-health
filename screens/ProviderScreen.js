@@ -237,7 +237,7 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
       setReplyTexts(prev => ({ ...prev, [questionId]: '' }))
       await loadQuestions()
     } else {
-      const key = moderationErrorKey(error)
+      const key = moderationErrorKey(error, { contentType: 'answer', text: body })
       if (key) Alert.alert('', t(key, lang))
     }
     setSubmittingReply(null)
