@@ -46,6 +46,22 @@ wrapper plus `npm run check:flags` is the only guard that exists. `git push` and
 `eas build` are covered automatically (`.githooks/pre-push`, `eas-build-pre-install`).
 Fresh clone: `npm run setup:hooks` once.
 
+**`web/` PUBLISHES NOW. This reversed on 2026-08-30 — do not trust an older note.**
+`web/privacy.html` and `web/support.html` are the LIVE assets behind
+`getadaapp.com/privacy` and `getadaapp.com/support`, served by the Cloudflare
+static-assets Worker `getadaapp` (root `wrangler.jsonc`). **Both URLs are registered with
+the app stores** — /privacy is the Privacy URL, /support is the Support URL.
+Publish with **`npm run web:deploy`, never `npx wrangler deploy`**: the wrapper runs
+`scripts/check-web-assets.mjs` first, and like `eas update`, `wrangler deploy` bundles the
+WORKING TREE and has no lifecycle hook, so the wrapper is the only place a guard can stand.
+It is worse than the OTA case in one respect — **`wrangler deploy` REPLACES the asset
+manifest rather than merging it**, so deploying a `web/` that is missing `support.html`
+silently drops that page, and `not_found_handling: "none"` makes it fall through to Vercel
+and 404. A store-listing outage that looks like an ordinary 404.
+Until 2026-08-30 this folder deployed nothing and was documented as inert; it lived in
+`~/ada-worker-support`, on one laptop, with no git — which is how it became unfindable.
+`git push` does NOT publish it (that is `docs/`, via GitHub Pages).
+
 **OTA only reaches the production build.** A preview APK (`eas build --profile preview`) does not have `channel: "production"` baked in and will never receive OTA updates. Always test OTA on the Play Store install, not a sideloaded APK.
 
 **EAS environment variables:** Use `eas env:create` (not `eas secret:create` — deprecated). `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is set for the production environment. Changes to env vars require a new native build to take effect.

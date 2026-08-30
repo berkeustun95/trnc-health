@@ -1,0 +1,57 @@
+// ─── getadaapp.com/privacy + /support — Cloudflare static-assets Worker ──────
+//
+// ⚠ THIS FILE MAKES `web/` PUBLISH. It did not, until 2026-08-30.
+//   `npm run web:deploy` uploads EVERYTHING in ./web as the Worker's asset
+//   manifest and serves it at the two routes below. Both are registered with
+//   the app stores: /privacy is the Privacy URL, /support is the Support URL.
+//
+// ─── WHY THIS LIVES HERE NOW ────────────────────────────────────────────────
+//
+// It used to live in ~/ada-worker-support — one laptop, no git, no remote —
+// and became unfindable. Tracking it down took a header trace (x-vercel-id
+// present on `/`, absent on `/privacy`) because the vault note that should have
+// answered it said "No Worker exists", which was wrong.
+//
+// Folding it in removes a COPY rather than adding process on top of three:
+// web/privacy.html used to be a dead mirror of the deployed file, and is now
+// the deployed file itself. Copies of one document drifting apart is the whole
+// failure class here — docs/privacy.html, the LegalScreen const and this page
+// sat at June 2026 / July 2026 / July 11 2026 simultaneously.
+//
+// ─── DO NOT CHANGE THE THREE ASSET SETTINGS WITHOUT MEASURING FIRST ─────────
+//
+// Each one has an observable consequence in production, verified by curl
+// against the live site on 2026-08-30 BEFORE this file moved:
+//
+//   routes (exactly two, no wildcard)
+//       The Worker owns ONLY /privacy and /support. Everything else on the
+//       zone — including /logo.png, which both pages reference — never reaches
+//       the Worker and is served by Vercel (ada-web). Adding a wildcard route
+//       would change that, and web/logo.png (a stale 80957 B artifact) would
+//       start SHADOWING Vercel's real 242933 B logo on both pages.
+//
+//   not_found_handling: "none"
+//       An unmatched path falls THROUGH to Vercel instead of the Worker
+//       serving a 404. This is why /privacyzz returns a Next.js 404.
+//       Change it to "404-page" or "single-page-application" and the fall-
+//       through stops.
+//
+//   html_handling: "auto-trailing-slash"
+//       /privacy/ → 308 → /privacy. Both stores hold the extensionless URL.
+//
+// Preserved character-for-character from ~/ada-worker-support/wrangler.jsonc
+// (deployed 2026-07-12, version dc33bcb5). Only `directory` changed: ./public → ./web.
+{
+  "name": "getadaapp",
+  "account_id": "76f3dd64113159c180309aeb2b8583c4",
+  "compatibility_date": "2026-06-19",
+  "assets": {
+    "directory": "./web",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  },
+  "routes": [
+    { "pattern": "getadaapp.com/support", "zone_name": "getadaapp.com" },
+    { "pattern": "getadaapp.com/privacy", "zone_name": "getadaapp.com" }
+  ]
+}

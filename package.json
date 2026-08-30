@@ -53,7 +53,10 @@
     "notify:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-notify-health.mjs",
     "terms:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs",
     "moderation:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-moderation-normalization.mjs",
-    "moderation:log": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-moderation-log.mjs"
+    "moderation:log": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-moderation-log.mjs",
+    "profile:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-profile-gate.mjs",
+    "web:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-web-assets.mjs",
+    "web:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-web-assets.mjs && npx wrangler deploy"
   },
   "private": true,
   "devDependencies": {
