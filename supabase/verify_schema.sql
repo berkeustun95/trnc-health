@@ -1396,8 +1396,11 @@ WITH report AS (
               AND t.tgname='check_review_content' AND NOT t.tgisinternal
               AND t.tgenabled='O'
               AND pg_get_triggerdef(t.oid) LIKE '%check_ugc_on_insert(''comment'')%')
-    -- ── 20261004 appointments removed. FOUR tokens; three are ABSENCES, which no
-    -- existence section can express, and the fourth guards a function that survived.
+    -- ── 20261004 appointments removed. SIX tokens. Four until 2026-09-02, when the
+    -- single three-function body token was split into one per function so that a red
+    -- NAMES the function it is about. Two are pure ABSENCES, which no existence section
+    -- can express; three pair an absence with a positive; the last guards a function
+    -- that survived.
     UNION ALL SELECT '1004_appointments_removal','public.appointments is GONE',
       to_regclass('public.appointments') IS NULL
     -- DERIVED count, not six name checks: a count cannot go green by forgetting one.
@@ -1413,11 +1416,66 @@ WITH report AS (
     -- dropped — delete_own_account is the account-deletion path and a store commitment —
     -- so section C still sees all three NAMES and cannot see whether the edit happened.
     -- A body still saying FROM appointments raises at runtime, mid account-deletion.
-    UNION ALL SELECT '1004_appointments_removal','delete_own_account / insert_notification / notify_facility_owner no longer query appointments',
-      (SELECT count(*) = 3 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-        WHERE n.nspname='public'
-          AND p.proname IN ('delete_own_account','insert_notification','notify_facility_owner')
-          AND pg_get_functiondef(p.oid) NOT ILIKE '%appointments%')
+    --
+    -- ⚠ REWRITTEN 2026-09-02, AND THE FUNCTIONS WERE NEVER WRONG. The first version was
+    -- ONE token asserting NOT ILIKE '%appointments%' over a count(*) = 3, and it read
+    -- STALE/MISSING against three bodies that are exactly right. pg_get_functiondef()
+    -- returns the PROSE — the same trap the 0827 token above documents — and all three
+    -- replacements explain in a comment which appointment branch they lost:
+    -- insert_notification says "keyed on appointments", the other two say
+    -- "removed 20261004". The bare word is therefore present in every CORRECT body, and
+    -- the only way to satisfy that token was to delete the comments that tell the next
+    -- reader why the branches went and not to re-add one. The comment is the valuable
+    -- half. IF ONE OF THESE GOES RED, READ THE BODY BEFORE ASSUMING A REGRESSION.
+    --
+    -- Three changes, each with a reason:
+    -- (1) THE NEGATIVE IS CODE-SHAPED: 'FROM appointments' — the anchor 20261004's own
+    --     pre-guards and its section 9(e) used. It matches `DELETE FROM appointments`
+    --     and `FROM appointments a`, and it matches none of the three live comments.
+    --     Verified 2026-09-02 against pasted pg_get_functiondef output, NOT against the
+    --     migration file. The residual cost is real and is the price of any text check:
+    --     prose in these three bodies must never contain that exact phrase.
+    -- (2) ONE TOKEN PER FUNCTION. count(*) = 3 went red as a single anonymous row for
+    --     any of the three, so the report named a slice instead of a function.
+    -- (3) A POSITIVE BESIDE EACH NEGATIVE, because an absence passes on a function that
+    --     is empty, truncated or half-replaced — the 0827 trio logic. Be honest about
+    --     what each positive does: delete_own_account and insert_notification are the
+    --     OLD body MINUS lines, so no marker tells new from old there and the negative
+    --     carries the whole claim; those positives are emptiness guards only.
+    --     notify_facility_owner is the exception — its narrowed enum literal cannot
+    --     occur in the old, longer one, so there the positive discriminates too.
+    -- COUNT THE NAME, MATCH THE BODY — two separate clauses, and the split is not
+    -- pedantry. `count(*) = 1` with the markers inside the WHERE counts only the
+    -- functions that MATCH, so a resurrected overload still querying appointments is
+    -- excluded by the very negative meant to catch it and the count reads 1: green,
+    -- beside a live function pointing at a dropped table. Exactly the EXISTS blindness
+    -- the split was supposed to remove. So: count every function of that NAME, and
+    -- require bool_and over their bodies. Two overloads go red whichever one matches.
+    -- coalesce(..., false) because bool_and over zero rows is NULL, and a NULL assertion
+    -- does not fire — the 20261001 lesson. One signature each, confirmed 2026-09-02.
+    -- Dry-run before commit, and the surfaces are NOT the same one: the three predicates
+    -- are TRUE against the 20261004 bodies as applied — each marker independently
+    -- confirmed in pasted live pg_get_functiondef output, 2026-09-02 — and FALSE against
+    -- the pre-1004 bodies in git (20260718 / 20260726 / 20260923).
+    UNION ALL SELECT '1004_appointments_removal','delete_own_account no longer queries appointments (and still ends at auth.users)',
+      (SELECT count(*) = 1 AND coalesce(bool_and(
+                  pg_get_functiondef(p.oid) ILIKE '%DELETE FROM auth.users%'
+              AND pg_get_functiondef(p.oid) NOT ILIKE '%FROM appointments%'), false)
+         FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='delete_own_account')
+    UNION ALL SELECT '1004_appointments_removal','insert_notification no longer queries appointments (still inserts, still denies)',
+      (SELECT count(*) = 1 AND coalesce(bool_and(
+                  pg_get_functiondef(p.oid) ILIKE '%INSERT INTO notifications%'
+              AND pg_get_functiondef(p.oid) ILIKE '%RAISE EXCEPTION%'
+              AND pg_get_functiondef(p.oid) NOT ILIKE '%FROM appointments%'), false)
+         FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='insert_notification')
+    UNION ALL SELECT '1004_appointments_removal','notify_facility_owner takes only ''question'' and no longer queries appointments',
+      (SELECT count(*) = 1 AND coalesce(bool_and(
+                  pg_get_functiondef(p.oid) ILIKE '%p_kind NOT IN (''question'')%'
+              AND pg_get_functiondef(p.oid) NOT ILIKE '%FROM appointments%'), false)
+         FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_facility_owner')
     -- is_customer_blocked SURVIVES but is now PERMANENTLY FALSE: record_no_show was its
     -- only writer, so profiles.blocked_until can never be set again. Kept only because
     -- the questions INSERT policy references it and would break without it. Registered

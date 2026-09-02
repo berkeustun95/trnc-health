@@ -414,8 +414,9 @@ went missing). Two mandatory rules:
   in `)`.
 
 - **THE CHECK AND THE THING CHECKED MUST BE IN THE SAME FRAME OF REFERENCE. This is now
-  one standing hazard, not a shelf of anecdotes — four instances on 2026-08-30/31 alone,
-  every one of them a check that was WRONG while the thing it checked was RIGHT.**
+  one standing hazard, not a shelf of anecdotes — five instances between 2026-08-30 and
+  2026-09-02, every one of them a check that was WRONG while the thing it checked was
+  RIGHT.**
     * **A `sed` break that never landed.** Written against one file's indentation, run
       against another's. The probe then printed no failure and the honest-looking
       conclusion was "that check is dead". The check was fine; the *break* was.
@@ -431,7 +432,19 @@ went missing). Two mandatory rules:
       NULL-TERMINATED arguments, so `::text` renders `\x636f6d6d656e7400`. The literal
       substring `comment` is not in a hex string and never will be. It aborted a
       migration whose trigger was perfect.
-  **They look like four different bugs and they are one.** In each case the check reads
+    * **`NOT ILIKE '%appointments%'` over `pg_get_functiondef()`.** `pg_get_functiondef`
+      returns the COMMENTS, so a token asserting three functions no longer query a
+      dropped table was in fact forbidding the WORD from their prose — and all three
+      correct bodies carry a comment saying which appointment branch they lost. The only
+      way to make it green was to delete the comments that tell the next reader not to
+      re-add a branch. **This one is the sharpest of the five, because the tempting fix
+      was to edit the SYSTEM.** The other four merely wasted time; this one would have
+      destroyed the most valuable thing in the function. And the file that carried the
+      token documents this exact trap twice, in the 0827 note and the 0924 note, which
+      is the real lesson: a hazard written down is not a hazard defended against.
+      Fixed by anchoring the negative to a code SHAPE (`FROM appointments`, which no
+      comment contains) and pairing it with a positive per function.
+  **They look like five different bugs and they are one.** In each case the check reads
   the value in one frame and compares it in another — a different file, a different URL,
   a different encoding, or (worst) the same value on both sides. The *system* is never
   what these tests report on; the *instrument* is. And an instrument that is broken does
@@ -447,8 +460,10 @@ went missing). Two mandatory rules:
   wrong was inside its own error. An assertion that fails without showing what it read is
   a dead end, and you will suspect the system before you suspect the test.
   **(2) When a check fails, the FIRST hypothesis is the check.** Not the system. Three of
-  the four above cost real time to a wrong first hypothesis, and one of them nearly caused
-  an unnecessary production rollback. Reach for the system only once the instrument has
+  the five above cost real time to a wrong first hypothesis, one of them nearly caused
+  an unnecessary production rollback, and the fifth nearly deleted a load-bearing comment
+  to satisfy an instrument. **Ask what the check would forbid a CORRECT system from
+  doing** — that question catches the whole family before it costs anything. Reach for the system only once the instrument has
   been cleared.
   **And prefer the reading that needs no decoding at all.** `pg_get_triggerdef()` renders
   canonical SQL; decoding `tgargs` by hand means `encode(...,'escape')` plus stripping a

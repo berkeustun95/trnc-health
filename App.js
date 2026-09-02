@@ -24,7 +24,6 @@ import {
 import { REGIONS } from './constants/regions'
 import { resolveRegion } from './utils/resolveRegion'
 import AuthScreen from './screens/AuthScreen'
-import BookingScreen from './screens/BookingScreen'
 import FacilityProfileScreen from './screens/FacilityProfileScreen'
 import ProviderScreen from './screens/ProviderScreen'
 import ProviderOnboardingScreen from './screens/ProviderOnboardingScreen'
@@ -111,7 +110,7 @@ function TypeSVGIcon({ type, size, color }) {
 // profile_completed_at and profile_schema_version, so a column present in the initial
 // load but missing from the post-wizard refetch would leave the gate reading `undefined`
 // and firing forever.
-const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, blocked_until, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, institution_id, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible'
+const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, institution_id, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible'
 
 const LANGUAGES = [
   { key: 'English', label: 'English' },
@@ -262,7 +261,6 @@ export default function App() {
   const [showHomeCityAsk, setShowHomeCityAsk] = useState(false)
   const [showCitySettings, setShowCitySettings] = useState(false)
   const [selectedFacility, setSelectedFacility] = useState(null)
-  const [bookingFacility, setBookingFacility] = useState(null)
   const [profile, setProfile] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
   const [showDutyList, setShowDutyList] = useState(false)
@@ -411,11 +409,12 @@ export default function App() {
   // dropped straight into FacilityProfileScreen's onRequireAccount prop. That screen
   // already routes ask-a-question, write-a-review and report-content through that one
   // prop, so swapping the handler makes the exempt directory read-only with no change to
-  // it at all. Booking is not routed through it — and is not passed by the gate block.
-  // Targeted refetch after the wizard completes. Deliberately NOT a re-run of the
-  // session effect: that effect also schedules reminders, starts coach marks and decides
-  // the home-city question, none of which should fire again because somebody finished a
-  // form.
+  // it at all. Since 20261004 that prop covers EVERY write the screen has — booking was
+  // the one path that bypassed it, and it no longer exists.
+
+  // Targeted refetch after the wizard completes. Deliberately NOT a re-run of the session
+  // effect: that effect also starts coach marks and decides the home-city question,
+  // neither of which should fire again because somebody finished a form.
   async function reloadProfile() {
     if (!session) return
     const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', session.user.id).single()
@@ -562,8 +561,7 @@ export default function App() {
       if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
       if (showAccommodation) { setShowAccommodation(false); return true }
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
-      if (bookingFacility) { setBookingFacility(null); return true }
-      if (selectedFacility) { setSelectedFacility(null); setBookingFacility(null); return true }
+      if (selectedFacility) { setSelectedFacility(null); return true }
       if (petsSubScreen) { setPetsSubScreen(null); return true }
       if (showPets) { setShowPets(false); return true }
       if (showHomeServices) { setShowHomeServices(false); return true }
@@ -589,7 +587,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -683,7 +681,6 @@ export default function App() {
         if (data?.role === 'provider') {
           loadProviderFacility()
         } else if (!data?.role || data?.role === 'customer') {
-          scheduleAppointmentReminders(session.user.id, effectiveLang)
           AsyncStorage.getItem('@trnc_coach_v2').then(async shown => {
             // First run is already spending its attention on the carousel, the
             // entry screen and the coach marks. The home-city question waits for
@@ -733,50 +730,6 @@ export default function App() {
     }).catch(() => {})
     return () => { cancelled = true }
   }, [userLocation])
-
-  async function scheduleAppointmentReminders(userId, currentLang) {
-    try {
-      const now = new Date()
-      const { data } = await supabase
-        .from('appointments')
-        .select('id, requested_time, facilities(name)')
-        .eq('customer_id', userId)
-        .eq('status', 'confirmed')
-        .gt('requested_time', now.toISOString())
-        .order('requested_time', { ascending: true })
-        .limit(10)
-      if (!data) return
-      for (const appt of data) {
-        const apptTime = new Date(appt.requested_time)
-        const reminderTime = new Date(apptTime.getTime() - 60 * 60 * 1000)
-        const reviewTime   = new Date(apptTime.getTime() + 60 * 60 * 1000)
-        if (reminderTime > now) {
-          await Notifications.scheduleNotificationAsync({
-            identifier: `appt-reminder-${appt.id}`,
-            content: {
-              title: t('apptReminderTitle', currentLang),
-              body: t('apptReminderBody', currentLang).replace('{name}', appt.facilities?.name ?? ''),
-              data: { screen: 'notifications' },
-            },
-            trigger: { date: reminderTime },
-          })
-        }
-        if (reviewTime > now) {
-          await Notifications.scheduleNotificationAsync({
-            identifier: `appt-review-${appt.id}`,
-            content: {
-              title: t('reviewPromptTitle', currentLang),
-              body: t('reviewPromptBody', currentLang).replace('{name}', appt.facilities?.name ?? ''),
-              data: { screen: 'profile' },
-            },
-            trigger: { date: reviewTime },
-          })
-        }
-      }
-    } catch (e) {
-      if (__DEV__) console.log('Schedule reminders error:', e.message)
-    }
-  }
 
   useEffect(() => {
     // Guests can't hold a push token (the profiles write is refused by RLS), so don't
@@ -977,7 +930,7 @@ export default function App() {
     !!session && !!profile &&
     !['admin', 'provider', 'estate_agent', 'organizer', 'home_service_provider', 'insurance_provider'].includes(profile.role) &&
     !showMenu && !showCoachMarks &&
-    !selectedFacility && !bookingFacility
+    !selectedFacility
 
   // The question outranks the card: if we do not yet know where they live, we
   // must not be welcoming them anywhere. (decideWelcome already guarantees this
@@ -1090,9 +1043,9 @@ export default function App() {
     // rather than by a special case. Back from any of these returns to the wizard.
     //
     // All READ-ONLY: requireProfileCompletion replaces the guest sheet on the one prop
-    // FacilityProfileScreen routes every write through, and onBook is deliberately NOT
-    // passed. Booking is hidden for health types anyway ("directory only"), so the two
-    // together leave no write path open.
+    // FacilityProfileScreen routes every write through — questions, reports and, since
+    // 20261004, reviews. There is no second path to close: booking was the only write
+    // that did not go through onRequireAccount, and it is gone.
     if (showDutyList) {
       content = <DutyListScreen onBack={() => { setShowDutyList(false); setDutyRegion(null) }} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
     } else if (showTowing) {
@@ -1481,8 +1434,6 @@ export default function App() {
         </View>
       </SafeAreaView>
     )
-  } else if (bookingFacility) {
-    content = <BookingScreen facility={bookingFacility} session={session} lang={lang} blockedUntil={profile?.blocked_until} onBack={() => setBookingFacility(null)} />
   } else if (selectedFacility) {
     content = <FacilityProfileScreen
       facility={selectedFacility}
@@ -1490,7 +1441,6 @@ export default function App() {
       session={session}
       isFavorite={favorites.has(selectedFacility.id)}
       onToggleFavorite={() => toggleFavorite(selectedFacility.id)}
-      onBook={() => { if (requireAccount('gateBooking')) return; setBookingFacility(selectedFacility) }}
       onRequireAccount={requireAccount}
       onBack={() => setSelectedFacility(null)}
     />

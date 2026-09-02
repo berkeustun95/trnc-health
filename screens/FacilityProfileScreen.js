@@ -29,11 +29,15 @@ const TODAY_KEY    = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
-export default function FacilityProfileScreen({ facility, lang, session, isFavorite, onToggleFavorite, onBook, onBack, onRequireAccount }) {
+export default function FacilityProfileScreen({ facility, lang, session, isFavorite, onToggleFavorite, onBack, onRequireAccount }) {
   // Any signed-in viewer who is NOT the listing's owner may report it. Logged-out
   // taps fall through to onRequireAccount inside ContentReportMenu. Unclaimed
   // health facilities (provider_id null) are reportable by anyone signed in.
   const canReport = facility.provider_id !== session?.user?.id
+  // Both sides must be real before this is an ownership claim: for a signed-out viewer
+  // `session?.user?.id` and a missing `provider_id` are both undefined, and undefined ===
+  // undefined would hide the composer from every guest.
+  const isOwner = !!session?.user?.id && facility.provider_id === session.user.id
   const [reviews, setReviews]           = useState([])
   const [reviewTotal, setReviewTotal]   = useState(0)
   const [reviewAvg, setReviewAvg]       = useState(null)
@@ -46,6 +50,11 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
   const [newQ, setNewQ]                     = useState('')
   const [qError, setQError]                 = useState(null)
   const [submittingQ, setSubmittingQ]       = useState(false)
+  const [myReview, setMyReview]             = useState(null)
+  const [ratingValue, setRatingValue]       = useState(0)
+  const [ratingComment, setRatingComment]   = useState('')
+  const [reviewError, setReviewError]       = useState(null)
+  const [submittingReview, setSubmittingReview] = useState(false)
 
   const reloadReviews = async () => {
     const [{ data, count }, { data: allRatings }] = await Promise.all([
@@ -58,6 +67,79 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
     setReviewAvg(allRatings?.length
       ? (allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length).toFixed(1)
       : null)
+  }
+
+  // The viewer's own live review, which switches the composer to a read-only card.
+  // maybeSingle() returns {data: null, error: null} on zero rows — it does not throw.
+  // A soft-deleted review is invisible to its own author under the read policy, so
+  // deleting one correctly puts the composer back.
+  async function loadMyReview() {
+    if (!session?.user?.id) { setMyReview(null); return }
+    const { data } = await supabase.from('reviews')
+      .select('id, rating, comment')
+      .eq('facility_id', facility.id)
+      .eq('customer_id', session.user.id)
+      .maybeSingle()
+    setMyReview(data ?? null)
+  }
+
+  // THE APP'S ONLY REVIEW-WRITE PATH as of 20261004. It used to sit behind an appointment
+  // in ProfileScreen, which is why removing bookings would otherwise have left reviews
+  // readable and unwritable. Keyed on facility_id now (20261003 dropped appointment_id);
+  // reviews_customer_facility_live_uniq already enforces one live review per customer per
+  // facility, so the partial index — not this screen — is the boundary.
+  async function submitReview() {
+    if (onRequireAccount?.('gateReview')) return
+    if (!ratingValue || submittingReview) return
+    setSubmittingReview(true)
+    setReviewError(null)
+    const comment = ratingComment.trim()
+
+    // Inline preview of the same matcher the DB trigger runs. The trigger is the real
+    // boundary; this only saves the user a round trip.
+    if (comment && await containsBlockedTerm(comment)) {
+      setReviewError(t('contentBlockedTerm', lang))
+      setSubmittingReview(false)
+      return
+    }
+
+    const { error } = await supabase.from('reviews').insert({
+      customer_id: session.user.id,
+      facility_id: facility.id,
+      rating:      ratingValue,
+      comment:     comment || null,
+    })
+    if (!error) {
+      setRatingValue(0)
+      setRatingComment('')
+      await Promise.all([loadMyReview(), reloadReviews()])
+    } else {
+      const key = moderationErrorKey(error, { contentType: 'review', text: comment })
+      setReviewError(key ? t(key, lang) : error.message)
+    }
+    setSubmittingReview(false)
+  }
+
+  // Soft delete. .select() is mandatory: an UPDATE that RLS filters out matches zero rows
+  // and returns NO error, so without it a failed delete would clear the card here and
+  // leave the review live for everyone else.
+  function deleteReview(reviewId) {
+    Alert.alert('', t('deleteReviewConfirm', lang), [
+      { text: t('cancel', lang), style: 'cancel' },
+      {
+        text: t('deleteReview', lang),
+        style: 'destructive',
+        onPress: async () => {
+          const { data, error } = await supabase.from('reviews')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', reviewId)
+            .select('id')
+          if (error || !data?.length) { Alert.alert('', t('deleteFailed', lang)); return }
+          setMyReview(null)
+          await reloadReviews()
+        },
+      },
+    ])
   }
 
   async function loadQuestions() {
@@ -87,6 +169,22 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
       return
     }
 
+    const { error } = await supabase.from('questions').insert({
+      facility_id: facility.id,
+      customer_id: session.user.id,
+      body,
+    })
+    if (!error) {
+      setNewQ('')
+      await loadQuestions()
+      notifyFacilityOwner(facility, 'question')
+    } else {
+      const key = moderationErrorKey(error, { contentType: 'question', text: body })
+      setQError(key ? t(key, lang) : t('questionSubmitError', lang))
+    }
+    setSubmittingQ(false)
+  }
+
   // Soft delete. .select() is mandatory: an UPDATE that RLS filters out matches zero rows
   // and returns NO error, so without it a failed delete would vanish from this list and
   // stay live for the facility's provider.
@@ -106,22 +204,6 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
         },
       },
     ])
-  }
-
-    const { error } = await supabase.from('questions').insert({
-      facility_id: facility.id,
-      customer_id: session.user.id,
-      body,
-    })
-    if (!error) {
-      setNewQ('')
-      await loadQuestions()
-      notifyFacilityOwner(facility, 'question')
-    } else {
-      const key = moderationErrorKey(error, { contentType: 'question', text: body })
-      setQError(key ? t(key, lang) : t('questionSubmitError', lang))
-    }
-    setSubmittingQ(false)
   }
 
   useEffect(() => {
@@ -150,6 +232,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
     }
     loadData()
     loadQuestions()
+    loadMyReview()
   }, [facility.id])
 
   if (showAllReviews) {
@@ -168,7 +251,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: isHealthType ? 40 : (!facility.availability && facility.phone ? 160 : 108) }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
           {/* Nav bar */}
           <View style={s.navBar}>
@@ -413,6 +496,63 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
             {/* Reviews */}
             <View style={s.section}>
               <Text style={s.sectionLabel}>{t('tabReviews', lang)}</Text>
+
+              {/* Write / show your own review. A provider does not review their own
+                  listing; a signed-out viewer sees the stars and is gated on tap. */}
+              {!reviewsLoading && !isOwner && (myReview ? (
+                <View style={s.myReviewBox}>
+                  <Text style={s.myReviewLabel}>{t('yourReview', lang)}</Text>
+                  <View style={s.starsRow}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Text key={star} style={[s.star, myReview.rating >= star && s.starActive]}>★</Text>
+                    ))}
+                  </View>
+                  {myReview.comment ? <Text style={s.myReviewComment}>{myReview.comment}</Text> : null}
+                  <TouchableOpacity onPress={() => deleteReview(myReview.id)} style={{ alignSelf: 'flex-start' }} accessibilityRole="button">
+                    <Text style={s.deleteReviewText}>{t('deleteReview', lang)}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={s.myReviewBox}>
+                  <Text style={s.myReviewLabel}>{t('rateVisit', lang)}</Text>
+                  <View style={s.starsRow}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <TouchableOpacity
+                        key={star}
+                        onPress={() => { if (onRequireAccount?.('gateReview')) return; setRatingValue(star) }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[s.star, ratingValue >= star && s.starActive]}>★</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {ratingValue > 0 && (
+                    <>
+                      <TextInput
+                        style={s.commentInput}
+                        value={ratingComment}
+                        onChangeText={setRatingComment}
+                        placeholder={t('commentOptional', lang)}
+                        placeholderTextColor={colors.textSecondary}
+                        multiline
+                        maxLength={500}
+                      />
+                      {reviewError ? <Text style={s.error}>{reviewError}</Text> : null}
+                      <TouchableOpacity
+                        style={[s.submitReviewBtn, submittingReview && { opacity: 0.4 }]}
+                        onPress={submitReview}
+                        disabled={submittingReview}
+                      >
+                        {submittingReview
+                          ? <ActivityIndicator color="#fff" size="small" />
+                          : <Text style={s.submitReviewText}>{t('save', lang)}</Text>}
+                      </TouchableOpacity>
+                      <Text style={s.termsNotice}>{t('termsAgreeContent', lang)}</Text>
+                    </>
+                  )}
+                </View>
+              ))}
+
               {reviewsLoading ? (
                 <>{[0, 1].map(i => <ReviewSkeleton key={i} />)}</>
               ) : reviews.length === 0 ? (
@@ -533,16 +673,6 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
           </TouchableOpacity>
         </Modal>
 
-        {/* Sticky Book CTA — hidden for health types (directory only) */}
-        {!isHealthType && (
-          <View style={s.ctaWrap}>
-            <TouchableOpacity style={s.ctaBtn} onPress={onBook} activeOpacity={0.85}>
-              <Text style={s.ctaText}>
-                {facility.availability ? t('requestAppointment', lang) : t('requestAppointment', lang)}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     </SafeAreaView>
   )
@@ -623,12 +753,19 @@ const s = StyleSheet.create({
   lightboxBg:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' },
   lightboxClose:     { position: 'absolute', top: 52, right: 20, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
   lightboxImg:       { width: SW, height: SW * 0.75 },
+  myReviewBox:       { borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, marginBottom: 16, gap: 12, backgroundColor: 'transparent' },
+  myReviewLabel:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  myReviewComment:   { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20, fontStyle: 'italic' },
+  deleteReviewText:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
+  starsRow:          { flexDirection: 'row', gap: 8 },
+  star:              { fontSize: 28, color: colors.border },
+  starActive:        { color: '#F5A623' },
+  commentInput:      { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, padding: 10, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface, maxHeight: 80 },
+  submitReviewBtn:   { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  submitReviewText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   noReviewsWrap:     { alignItems: 'center', paddingVertical: 20 },
   noReviewsTitle:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6, textAlign: 'center' },
   noReviewsSub:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },
-  ctaWrap:           { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingBottom: 28, paddingTop: 12, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border, gap: 10 },
-  ctaBtn:            { backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 17, alignItems: 'center', ...shadow },
-  ctaText:           { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.2 },
   ctaSecondary:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 16, paddingVertical: 14 },
   ctaSecondaryText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
 })

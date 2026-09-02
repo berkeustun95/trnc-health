@@ -1,21 +1,19 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, FlatList, ActivityIndicator, Platform, Linking,
-  Modal, LayoutAnimation, UIManager, Alert,
+  ScrollView, FlatList, ActivityIndicator, Platform,
+  Modal, LayoutAnimation, UIManager,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import * as Notifications from 'expo-notifications'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { getNatLabel, NATIONALITIES } from '../constants/nationalityTranslations'
 import { COUNTRY_CODES } from '../constants/countryCodes'
 import LegalScreen from './LegalScreen'
-import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { PRESET_AVATARS, getPreset } from '../constants/avatars'
 import BackButton from '../components/BackButton'
 
@@ -66,165 +64,6 @@ function AvatarDisplay({ avatarUrl, initials, size = 72, textSize = 26 }) {
 
 
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
-const TYPE_COLORS = {
-  pharmacy: { bg: '#F3E8FF', text: '#7C3AED' },
-  clinic:   { bg: '#E6F7F7', text: '#0E7C7B' },
-  hospital: { bg: '#FDE8EC', text: '#D1495B' },
-  dentist:  { bg: '#E8F5EE', text: '#2E9E5B' },
-}
-
-function AppointmentDetail({ booking, lang, reviewedIds, reviewsMap, ratingValue, ratingComment, reviewError, onRatingChange, onCommentChange, onSubmitReview, onDeleteReview, onCancelBooking, onOpenTerms, onBack }) {
-  const f           = booking.facilities ?? {}
-  const isPending   = booking.status === 'pending'
-  const isConfirmed = booking.status === 'confirmed'
-  const isCompleted = booking.status === 'completed'
-  const reviewed    = reviewedIds.has(booking.id)
-  const review      = reviewsMap.get(booking.id)
-  const tc          = TYPE_COLORS[f.type] ?? TYPE_COLORS.clinic
-
-  const pendingLabel    = f.type === 'grooming' ? t('groomStatusRequested', lang) : t('statusPending', lang)
-  const statusLabel     = isConfirmed ? t('statusConfirmed', lang) : isPending ? pendingLabel : isCompleted ? t('statusCompleted', lang) : t('statusCancelled', lang)
-  const statusPillStyle = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : isCompleted ? s.pillGreen : s.pillRed
-  const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : isCompleted ? s.pillTextGreen : s.pillTextRed
-
-  function openMaps() {
-    Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(f.address || f.name || '')}`)
-  }
-
-  return (
-    <SafeAreaView style={s.safe} edges={['top']}>
-      <KeyboardAwareForm>
-        <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <View style={s.header}>
-            <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
-            <Text style={s.title}>{t('bookingDetail', lang)}</Text>
-            <View style={statusPillStyle}>
-              <Text style={statusTextStyle}>{statusLabel}</Text>
-            </View>
-          </View>
-
-          <View style={s.detailFacilityCard}>
-            <View style={[s.detailTypeIcon, { backgroundColor: tc.bg }]}>
-              <Text style={s.detailTypeIconText}>{TYPE_ICONS[f.type] ?? '🏥'}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.detailFacilityName}>{f.name}</Text>
-              <View style={[s.typeBadgeSmall, { backgroundColor: tc.bg }]}>
-                <Text style={[s.typeBadgeSmallText, { color: tc.text }]}>{t(f.type, lang)}</Text>
-              </View>
-            </View>
-          </View>
-
-          {f.address ? (
-            <View style={s.detailInfoRow}>
-              <Feather name="map-pin" size={15} color={colors.textSecondary} style={s.detailInfoIcon} />
-              <Text style={s.detailInfoText} numberOfLines={2}>{f.address}</Text>
-              <TouchableOpacity onPress={openMaps} style={s.detailInfoBtn}>
-                <Text style={s.detailInfoBtnText}>{t('getDirections', lang)}</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-
-          {f.phone ? (
-            <View style={s.detailInfoRow}>
-              <Feather name="phone" size={15} color={colors.textSecondary} style={s.detailInfoIcon} />
-              <Text style={s.detailInfoText}>{f.phone}</Text>
-              <TouchableOpacity onPress={() => Linking.openURL(`tel:${f.phone}`)} style={s.detailInfoBtn}>
-                <Text style={s.detailInfoBtnText}>{t('call', lang)}</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-
-          {f.opening_hours ? (
-            <View style={s.detailInfoRow}>
-              <Feather name="clock" size={15} color={colors.textSecondary} style={s.detailInfoIcon} />
-              <Text style={s.detailInfoText}>{f.opening_hours}</Text>
-            </View>
-          ) : null}
-
-          <View style={s.detailDivider} />
-
-          <Text style={s.detailSectionLabel}>{t('requestedTime', lang)}</Text>
-          <Text style={s.detailApptTime}>
-            {new Date(booking.requested_time).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}
-          </Text>
-          <Text style={s.bookingRef}>{t('bookingRef', lang)}: {booking.id.slice(0, 8).toUpperCase()}</Text>
-
-          {(isPending || isConfirmed) && (() => {
-            const canCancel = new Date(booking.requested_time) > new Date(Date.now() + 24 * 60 * 60 * 1000)
-            if (canCancel) return (
-              <TouchableOpacity style={[s.cancelBtn, { marginTop: 16 }]} onPress={() => onCancelBooking(booking.id)}>
-                <Text style={s.cancelBtnText}>{t('cancelAppt', lang)}</Text>
-              </TouchableOpacity>
-            )
-            if (isConfirmed) return (
-              <View style={[s.cancelLateBox, { marginTop: 16 }]}>
-                <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} style={{ marginTop: 1 }} />
-                <Text style={s.cancelLateText}>{t('cancelLate', lang)}</Text>
-              </View>
-            )
-            return null
-          })()}
-
-          {(isConfirmed || isCompleted) && !reviewed && (
-            <View style={s.detailReviewSection}>
-              <Text style={s.detailSectionLabel}>{t('rateVisit', lang)}</Text>
-              <View style={s.starsRow}>
-                {[1,2,3,4,5].map(star => (
-                  <TouchableOpacity key={star} onPress={() => onRatingChange(star)} activeOpacity={0.7}>
-                    <Text style={[s.star, ratingValue >= star && s.starActive]}>★</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TextInput
-                style={s.commentInput}
-                value={ratingComment}
-                onChangeText={onCommentChange}
-                placeholder={t('commentOptional', lang)}
-                placeholderTextColor={colors.textSecondary}
-                multiline
-              />
-              {reviewError ? <Text style={s.reviewErrorText}>{reviewError}</Text> : null}
-              <TouchableOpacity
-                style={[s.submitReviewBtn, !ratingValue && { opacity: 0.4 }]}
-                onPress={onSubmitReview}
-                disabled={!ratingValue}
-              >
-                <Text style={s.submitReviewText}>{t('save', lang)}</Text>
-              </TouchableOpacity>
-              <Text style={s.termsNotice}>
-                {t('termsAgreeContent', lang)}{' '}
-                <Text style={s.termsNoticeLink} onPress={onOpenTerms}>{t('termsOfService', lang)}</Text>
-              </Text>
-            </View>
-          )}
-
-          {(isConfirmed || isCompleted) && reviewed && review && (
-            <View style={s.detailReviewSection}>
-              <Text style={s.detailSectionLabel}>{t('yourReview', lang)}</Text>
-              <View style={s.starsRow}>
-                {[1,2,3,4,5].map(star => (
-                  <Text key={star} style={[s.star, review.rating >= star && s.starActive]}>★</Text>
-                ))}
-              </View>
-              {review.comment ? <Text style={s.detailReviewComment}>{review.comment}</Text> : null}
-              <TouchableOpacity
-                onPress={() => onDeleteReview(review.id)}
-                style={{ alignSelf: 'flex-start', marginTop: 10 }}
-                accessibilityRole="button"
-              >
-                <Text style={{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger }}>
-                  {t('deleteReview', lang)}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </ScrollView>
-      </KeyboardAwareForm>
-    </SafeAreaView>
-  )
-}
-
 export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange }) {
   const [profile, setProfile]               = useState(null)
   const [form, setForm]                     = useState({ full_name: '', phone: '', nationality: '', preferred_language: 'English' })
@@ -235,13 +74,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [saving, setSaving]                 = useState(false)
   const [saved, setSaved]                   = useState(false)
   const [error, setError]                   = useState(null)
-  const [bookings, setBookings]             = useState([])
-  const [reviewedIds, setReviewedIds]       = useState(new Set())
-  const [reviewsMap, setReviewsMap]         = useState(new Map())
-  const [selectedBooking, setSelectedBooking] = useState(null)
-  const [ratingValue, setRatingValue]       = useState(0)
-  const [ratingComment, setRatingComment]   = useState('')
-  const [reviewError, setReviewError]       = useState(null)
   const [legalTab, setLegalTab]             = useState(null)
   const [blocks, setBlocks]                 = useState([])
   const [avatarUrl, setAvatarUrl]           = useState(null)
@@ -251,7 +83,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false)
   const [deleting, setDeleting]                 = useState(false)
   const [deleteError, setDeleteError]           = useState(null)
-  const [bookingsOpen, setBookingsOpen]         = useState(false)
   const [selectedCC, setSelectedCC]             = useState('+90')
   const [showCCPicker, setShowCCPicker]         = useState(false)
   const [showNatPicker, setShowNatPicker]       = useState(false)
@@ -293,28 +124,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       }
     }
 
-    async function loadBookings() {
-      const { data } = await supabase.from('appointments')
-        .select('id, requested_time, status, facility_id, facilities(name, address, phone, type, opening_hours)')
-        .eq('customer_id', session.user.id)
-        .order('requested_time', { ascending: false })
-        .limit(20)
-      if (data) setBookings(data)
-    }
-
-    async function loadReviews() {
-      const { data } = await supabase.from('reviews')
-        .select('id, appointment_id, rating, comment')
-        .eq('customer_id', session.user.id)
-      if (data) {
-        setReviewedIds(new Set(data.map(r => r.appointment_id)))
-        setReviewsMap(new Map(data.map(r => [r.appointment_id, { id: r.id, rating: r.rating, comment: r.comment }])))
-      }
-    }
-
     loadProfile()
-    loadBookings()
-    loadReviews()
     loadBlocks()
   }, [])
 
@@ -332,72 +142,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       .eq('blocker_id', session.user.id)
       .eq('blocked_id', blockedId)
     if (!error) setBlocks(prev => prev.filter(b => b.blocked_id !== blockedId))
-  }
-
-  async function cancelBooking(bookingId) {
-    const { error } = await supabase
-      .from('appointments')
-      .update({ status: 'cancelled' })
-      .eq('id', bookingId)
-      .eq('customer_id', session.user.id)
-    if (!error) {
-      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b))
-      setSelectedBooking(prev => prev?.id === bookingId ? { ...prev, status: 'cancelled' } : prev)
-      Notifications.cancelScheduledNotificationAsync(`appt-reminder-${bookingId}`).catch(() => {})
-      Notifications.cancelScheduledNotificationAsync(`appt-review-${bookingId}`).catch(() => {})
-    }
-  }
-
-  async function submitReview(booking) {
-    if (!ratingValue) return
-    setReviewError(null)
-
-    // Pre-check for instant feedback; the DB trigger is the real boundary and is
-    // re-checked below in case the cached term list is stale.
-    if (await containsBlockedTerm(ratingComment)) {
-      setReviewError(t('contentBlockedTerm', lang))
-      return
-    }
-
-    const { error } = await supabase.from('reviews').insert({
-      customer_id: session.user.id,
-      facility_id: booking.facility_id,
-      appointment_id: booking.id,
-      rating: ratingValue,
-      comment: ratingComment.trim() || null,
-    })
-    if (!error) {
-      setReviewedIds(prev => new Set([...prev, booking.id]))
-      setReviewsMap(prev => new Map([...prev, [booking.id, { rating: ratingValue, comment: ratingComment.trim() || null }]]))
-      setRatingValue(0)
-      setRatingComment('')
-    } else {
-      const key = moderationErrorKey(error, { contentType: 'review', text: ratingComment })
-      setReviewError(key ? t(key, lang) : error.message)
-    }
-  }
-
-  // Soft delete: the row stays as the evidence trail, `deleted_at` takes it out of every
-  // read policy — including this customer's own. .select() is not optional: an UPDATE
-  // that RLS filters out matches zero rows and returns NO error, so without it a failed
-  // delete would clear the review from the UI and leave it live for everyone else.
-  function deleteReview(reviewId) {
-    Alert.alert('', t('deleteReviewConfirm', lang), [
-      { text: t('cancel', lang), style: 'cancel' },
-      {
-        text: t('deleteReview', lang),
-        style: 'destructive',
-        onPress: async () => {
-          const { data, error } = await supabase.from('reviews')
-            .update({ deleted_at: new Date().toISOString() })
-            .eq('id', reviewId)
-            .select('id')
-          if (error || !data?.length) { Alert.alert('', t('deleteFailed', lang)); return }
-          setReviewedIds(prev => { const n = new Set(prev); for (const [aid, r] of reviewsMap) if (r.id === reviewId) n.delete(aid); return n })
-          setReviewsMap(prev => { const n = new Map(prev); for (const [aid, r] of prev) if (r.id === reviewId) n.delete(aid); return n })
-        },
-      },
-    ])
   }
 
   async function savePresetAvatar(id) {
@@ -523,27 +267,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     return <LegalScreen onBack={() => setLegalTab(null)} lang={lang} initialTab={legalTab} />
   }
 
-  if (selectedBooking) {
-    return (
-      <AppointmentDetail
-        booking={selectedBooking}
-        lang={lang}
-        onDeleteReview={deleteReview}
-        reviewedIds={reviewedIds}
-        reviewsMap={reviewsMap}
-        ratingValue={ratingValue}
-        ratingComment={ratingComment}
-        reviewError={reviewError}
-        onOpenTerms={() => setLegalTab('terms')}
-        onRatingChange={setRatingValue}
-        onCommentChange={setRatingComment}
-        onSubmitReview={() => submitReview(selectedBooking)}
-        onCancelBooking={cancelBooking}
-        onBack={() => setSelectedBooking(null)}
-      />
-    )
-  }
-
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <KeyboardAwareForm>
@@ -627,71 +350,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             </View>
             <Text style={s.memberSub}>{t('discountQrSoon', lang)}</Text>
           </View>
-
-          <TouchableOpacity style={s.accordionHeader} onPress={() => toggleSection(setBookingsOpen)} activeOpacity={0.7}>
-            <Text style={s.accordionTitle}>{t('myBookings', lang)}</Text>
-            <Ionicons name={bookingsOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-          {bookingsOpen && (() => {
-            const now = new Date()
-            const upcoming = bookings.filter(b =>
-              (b.status === 'pending' || b.status === 'confirmed') && new Date(b.requested_time) > now
-            ).sort((a, b) => new Date(a.requested_time) - new Date(b.requested_time))
-            const past = bookings.filter(b =>
-              b.status === 'completed' || b.status === 'cancelled' || new Date(b.requested_time) <= now
-            ).sort((a, b) => new Date(b.requested_time) - new Date(a.requested_time))
-
-            function BookingCard({ b }) {
-              const isPending   = b.status === 'pending'
-              const isConfirmed = b.status === 'confirmed'
-              const isCompleted = b.status === 'completed'
-              const statusLabel = isConfirmed ? t('statusConfirmed', lang)
-                : isPending ? (b.facilities?.type === 'grooming' ? t('groomStatusRequested', lang) : t('statusPending', lang))
-                : isCompleted ? t('statusCompleted', lang)
-                : t('statusCancelled', lang)
-              const statusStyle     = isConfirmed ? s.pillGreen : isPending ? s.pillOrange : isCompleted ? s.pillGreen : s.pillRed
-              const statusTextStyle = isConfirmed ? s.pillTextGreen : isPending ? s.pillTextOrange : isCompleted ? s.pillTextGreen : s.pillTextRed
-              return (
-                <TouchableOpacity
-                  style={s.bookingCard}
-                  activeOpacity={0.75}
-                  onPress={() => { setRatingValue(0); setRatingComment(''); setReviewError(null); setSelectedBooking(b) }}
-                >
-                  <View style={s.bookingTop}>
-                    <Text style={s.bookingFacility} numberOfLines={1}>{b.facilities?.name ?? '—'}</Text>
-                    <View style={statusStyle}>
-                      <Text style={statusTextStyle}>{statusLabel}</Text>
-                    </View>
-                  </View>
-                  <Text style={s.bookingTime}>
-                    {new Date(b.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                  </Text>
-                  <Text style={s.bookingRef}>{t('bookingRef', lang)}: {b.id.slice(0, 8).toUpperCase()}</Text>
-                  {(isConfirmed || isCompleted) && reviewedIds.has(b.id) && (
-                    <Text style={s.reviewedBadge}>{t('reviewDone', lang)} ★</Text>
-                  )}
-                </TouchableOpacity>
-              )
-            }
-
-            if (bookings.length === 0) {
-              return <Text style={s.noBookingsText}>{t('noBookings', lang)}</Text>
-            }
-            return (
-              <View>
-                <Text style={s.bookingSectionLabel}>{t('upcoming', lang)}</Text>
-                {upcoming.length === 0
-                  ? <Text style={s.noBookingsText}>{t('noUpcomingAppt', lang)}</Text>
-                  : upcoming.map(b => <BookingCard key={b.id} b={b} />)
-                }
-                <Text style={[s.bookingSectionLabel, { marginTop: 16 }]}>{t('pastAppt', lang)}</Text>
-                {past.length === 0
-                  ? <Text style={s.noBookingsText}>{t('noPastAppt', lang)}</Text>
-                  : past.map(b => <BookingCard key={b.id} b={b} />)
-                }
-              </View>
-            )
-          })()}
 
           <TouchableOpacity style={s.accordionHeader} onPress={() => toggleSection(setPersonalOpen)} activeOpacity={0.7}>
             <Text style={s.accordionTitle}>{t('personalInfo', lang)}</Text>
@@ -894,33 +552,6 @@ const s = StyleSheet.create({
   pickerBtnText:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   pickerBtnPlaceholder: { color: colors.border },
 
-  noBookingsText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 12, marginTop: 2 },
-  bookingSectionLabel:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
-  bookingCard:      { backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, marginBottom: 10, ...shadow },
-  bookingTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 },
-  bookingFacility:  { flex: 1, fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  bookingTime:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 4 },
-  bookingRef:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5 },
-  pillGreen:        { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, backgroundColor: colors.successLight },
-  pillOrange:       { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, backgroundColor: colors.accentLight },
-  pillRed:          { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, backgroundColor: colors.dangerLight },
-  pillTextGreen:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.success },
-  pillTextOrange:   { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent },
-  pillTextRed:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.danger },
-  cancelBtn:        { alignSelf: 'flex-start', backgroundColor: colors.dangerLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  cancelBtnText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
-  cancelLateBox:    { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: colors.cardBg, borderRadius: 8, padding: 10 },
-  cancelLateText:   { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17 },
-  reviewedBadge:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.success, marginTop: 8 },
-  starsRow:         { flexDirection: 'row', gap: 8 },
-  star:             { fontSize: 28, color: colors.border },
-  starActive:       { color: '#F5A623' },
-  commentInput:     { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, padding: 10, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface, maxHeight: 80 },
-  submitReviewBtn:  { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  submitReviewText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
-  reviewErrorText:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.danger },
-  termsNotice:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 16, marginTop: 10, textAlign: 'center' },
-  termsNoticeLink:  { fontFamily: 'Inter_700Bold', color: colors.primary, textDecorationLine: 'underline' },
   blockedSection:   { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, marginTop: 8, marginBottom: 16 },
   blockedRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
   blockedLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
@@ -976,21 +607,4 @@ const s = StyleSheet.create({
   presetEmoji:      { fontSize: 30 },
   presetCheck:      { position: 'absolute', bottom: -2, right: -2, backgroundColor: colors.bg, borderRadius: 10 },
 
-  // Appointment detail view
-  detailFacilityCard:  { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4, backgroundColor: colors.cardBg, borderRadius: 16, padding: 14, ...shadow },
-  detailTypeIcon:      { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  detailTypeIconText:  { fontSize: 24 },
-  detailFacilityName:  { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6 },
-  typeBadgeSmall:      { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20 },
-  typeBadgeSmallText:  { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  detailInfoRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  detailInfoIcon:      { width: 22, textAlign: 'center' },
-  detailInfoText:      { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
-  detailInfoBtn:       { backgroundColor: colors.primaryLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
-  detailInfoBtnText:   { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
-  detailDivider:       { height: 1, backgroundColor: colors.border, marginVertical: 20 },
-  detailSectionLabel:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
-  detailApptTime:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6 },
-  detailReviewSection: { marginTop: 24, gap: 12 },
-  detailReviewComment: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 20, fontStyle: 'italic' },
 })
