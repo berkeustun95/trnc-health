@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, SectionList } from 'react-native'
+import { useState, useEffect, useMemo } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, SectionList, FlatList } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -8,7 +8,8 @@ import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGION_TO_DUTY } from '../constants/regions'
-import { dutyStatus, localDateKey, DUTY_FRESH } from '../utils/dutyStatus'
+import { dutyStatus, localDateKey, DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
+import { buildFacilityIndex, matchDutyRow } from '../utils/dutyFacilityMatch'
 
 // KTEB publish the roster and are the fallback we send people to. Their number is the
 // office line; the page shows TODAY's list for every region.
@@ -48,6 +49,26 @@ function regionLabel(region, lang) {
   return key ? t(key, lang) : (region ?? '')
 }
 
+// Restored verbatim from ee28b42, which a76ee97 removed on 2026-06-29. a76ee97's objection
+// was NOT to this function — it was that duty_list has no per-pharmacy coordinates, so the
+// old caller measured to a district CENTROID and produced the same distance for every
+// pharmacy in a region. Its commit message set the condition for bringing it back: "once a
+// roster-keyed coords lookup table is available". facilities is that lookup, joined by name.
+//
+// ⚠ NO CENTROID FALLBACK, EVER. A row with no matched facility, or a matched facility with
+//   no coordinates, gets _dist = null and renders exactly as it does today. A plausible
+//   wrong number is worse than no number: it is the lie a76ee97 deleted.
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 
 function PharmacyCard({ item, showRegionBadge, lang }) {
   return (
@@ -58,11 +79,22 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
           <Text style={s.hoursText}>{item.open_from}–{item.open_until}</Text>
         </View>
       </View>
-      {showRegionBadge && item.region ? (
+      {(showRegionBadge && item.region) || item._dist != null ? (
         <View style={s.metaRow}>
-          <View style={s.regionInlineBadge}>
-            <Text style={s.regionInlineText}>{regionLabel(item.region, lang)}</Text>
-          </View>
+          {showRegionBadge && item.region ? (
+            <View style={s.regionInlineBadge}>
+              <Text style={s.regionInlineText}>{regionLabel(item.region, lang)}</Text>
+            </View>
+          ) : null}
+          {/* Labelled STRAIGHT-LINE, in every language. Haversine is not a driving
+              distance and must never be read as one — 3 km across the Girne range is a
+              half-hour drive. Rendered only when _dist is non-null; a row without a
+              matched coordinate shows nothing at all, no placeholder and no zero. */}
+          {item._dist != null ? (
+            <Text style={s.distanceText}>
+              {item._dist.toFixed(1)} km · {t('dutyStraightLine', lang)}
+            </Text>
+          ) : null}
         </View>
       ) : null}
       {item.address ? (
@@ -114,10 +146,16 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
 // and SectionList.scrollToLocation throws when the index is out of range — which
 // it would be on any day that region has no duty pharmacy.
 export default function DutyListScreen({ onBack, lang, userLocation, locationDenied, initialRegion = null }) {
-  const [sections, setSections] = useState([])
+  const [rows, setRows] = useState([])
+  const [facIndex, setFacIndex] = useState(() => new Map())
   const [loading, setLoading] = useState(true)
   // 'fresh' | 'stale' | 'absent' — see utils/dutyStatus.js. Only 'fresh' is a good state.
   const [status, setStatus] = useState(DUTY_FRESH)
+
+  // ee28b42's condition, restored unchanged: distance sorting is on only when we actually
+  // have a fix. locationDenied is checked separately from userLocation because a denied
+  // permission leaves userLocation null too, and the two mean different things.
+  const sortByDistance = !!userLocation && !locationDenied
 
   useEffect(() => {
     async function load() {
@@ -127,41 +165,85 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
       const today = localDateKey()
       // The newest duty_date is what separates "we never had this" from "it ran out",
       // and the two need different words even though they share a card.
-      const [{ data }, { data: newest }] = await Promise.all([
+      // Pharmacies WITH coordinates only. A match to a coordinate-less facility yields no
+      // distance anyway, so fetching them would cost bandwidth to change nothing. 315 of
+      // 387 carry coordinates today; the count guard below is what notices when that
+      // crosses PostgREST's max-rows cap, which a plain .limit() cannot.
+      const [{ data }, { data: newest }, { data: facs, count: facCount }] = await Promise.all([
         supabase.from('duty_list')
           .select('id, name, address, phone, open_from, open_until, region')
           .eq('duty_date', today),
         supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
+        supabase.from('facilities')
+          .select('name, latitude, longitude', { count: 'exact' })
+          .eq('type', 'pharmacy')
+          .not('latitude', 'is', null),
       ])
-      setStatus(dutyStatus({ todayCount: data?.length ?? 0, maxDate: newest?.[0]?.duty_date ?? null }))
+      // District coverage, not row count — see the threshold note in utils/dutyStatus.js.
+      setStatus(dutyStatus({
+        todayCount: data?.length ?? 0,
+        todayDistricts: new Set((data ?? []).map(r => r.region)).size,
+        maxDate: newest?.[0]?.duty_date ?? null,
+      }))
 
-      if (data && data.length > 0) {
-        const map = {}
-        // 'tr' collator: these are Turkish pharmacy names, and the default one sorts
-        // ü as u and ö as o — so "Gülhan" and "Gunay" come out in the wrong order, and
-        // dotless ı interleaves with dotted İ instead of preceding it.
-        for (const row of [...data].sort((a, b) => a.name.localeCompare(b.name, 'tr'))) {
-          if (!map[row.region]) map[row.region] = []
-          map[row.region].push(row)
-        }
-        const knownSet = new Set(DISTRICT_ORDER)
-        const sorted = [
-          ...DISTRICT_ORDER.filter(d => map[d]).map(d => ({ title: d, data: map[d] })),
-          ...Object.entries(map).filter(([k]) => !knownSet.has(k)).map(([k, v]) => ({ title: k, data: v })),
-        ]
-
-        // Arrived from a city-welcome card: float that city's sections to the top,
-        // keeping DISTRICT_ORDER within each group so the rest of the list is
-        // untouched.
-        const hoist = new Set(REGION_TO_DUTY[initialRegion] ?? [])
-        setSections(hoist.size
-          ? [...sorted.filter(x => hoist.has(x.title)), ...sorted.filter(x => !hoist.has(x.title))]
-          : sorted)
+      // A truncated read would silently drop distances for the pharmacies past the cap and
+      // look completely normal — a short valid array, no error. Comparing the exact count
+      // against what arrived is the only form of this check that works at any cap.
+      if (facs && facCount != null && facs.length < facCount) {
+        console.warn(`duty: facility coords truncated (${facs.length} of ${facCount}) — some distances will be missing`)
       }
+      setFacIndex(buildFacilityIndex(facs))
+      setRows(data ?? [])
       setLoading(false)
     }
     load()
-  }, [initialRegion])
+  }, [])
+
+  // Distances are DERIVED, not stored: userLocation resolves asynchronously in App.js and
+  // can land after this screen mounts, so computing them in the fetch would leave a list
+  // that never gains distances on a slow fix.
+  const decorated = useMemo(() => rows.map(row => {
+    const fac = matchDutyRow(row, facIndex)
+    const dist = (sortByDistance && fac && fac.latitude != null && fac.longitude != null)
+      ? haversineKm(userLocation.latitude, userLocation.longitude, fac.latitude, fac.longitude)
+      : null
+    return { ...row, _dist: dist }
+  }), [rows, facIndex, sortByDistance, userLocation?.latitude, userLocation?.longitude])
+
+  // District SectionList — the shape when location is unavailable, unchanged from today.
+  const sections = useMemo(() => {
+    if (!decorated.length) return []
+    const map = {}
+    // 'tr' collator: these are Turkish pharmacy names, and the default one sorts
+    // ü as u and ö as o — so "Gülhan" and "Gunay" come out in the wrong order, and
+    // dotless ı interleaves with dotted İ instead of preceding it.
+    for (const row of [...decorated].sort((a, b) => a.name.localeCompare(b.name, 'tr'))) {
+      if (!map[row.region]) map[row.region] = []
+      map[row.region].push(row)
+    }
+    const knownSet = new Set(DISTRICT_ORDER)
+    const sorted = [
+      ...DISTRICT_ORDER.filter(d => map[d]).map(d => ({ title: d, data: map[d] })),
+      ...Object.entries(map).filter(([k]) => !knownSet.has(k)).map(([k, v]) => ({ title: k, data: v })),
+    ]
+    // Arrived from a city-welcome card: float that city's sections to the top,
+    // keeping DISTRICT_ORDER within each group so the rest of the list is
+    // untouched.
+    const hoist = new Set(REGION_TO_DUTY[initialRegion] ?? [])
+    return hoist.size
+      ? [...sorted.filter(x => hoist.has(x.title)), ...sorted.filter(x => !hoist.has(x.title))]
+      : sorted
+  }, [decorated, initialRegion])
+
+  // Flat nearest-first — ee28b42's shape, including its null-last tiebreak. Rows with no
+  // matched coordinate keep their place at the END rather than being dropped: an unmatched
+  // duty pharmacy is still a duty pharmacy, and at 2am it is still where someone can go.
+  const nearest = useMemo(() => [...decorated].sort((a, b) => {
+    if (a._dist == null && b._dist == null) return a.name.localeCompare(b.name, 'tr')
+    if (a._dist == null) return 1
+    if (b._dist == null) return -1
+    return a._dist - b._dist
+  }), [decorated])
 
   const d = new Date()
   const dateLabel = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -172,9 +254,46 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
       <ScreenHeader onBack={onBack} title={t('dutyPharmacies', lang)} subtitle={dateLabel} lang={lang} />
       <View style={s.container}>
 
+        {/* PARTIAL: rows exist but cover too few districts to be the whole roster.
+            The rows STAY — one real pharmacy at 2am is worth having — but the list must
+            not read as complete, which is exactly what it did on 28/29 Eylül 2026: a
+            single Karpaz/İskele pharmacy under a green banner, so a user in Girne
+            concluded that was the truth. Same KTEB escape as the zero-row card.
+
+            ⚠ flexShrink: 0 on the notice. A fixed-height View above a scrollable list in
+            a flex:1 column gets vertically compressed once the list overflows, cropping
+            its text top and bottom — and it only reproduces with enough rows to scroll,
+            so it is invisible on exactly the short lists this state produces. */}
+        {!loading && status === DUTY_PARTIAL ? (
+          <View style={s.partialNotice}>
+            <View style={s.partialRow}>
+              <Ionicons name="alert-circle-outline" size={18} color={colors.danger} />
+              <Text style={s.partialText}>{t('dutyIncompleteNotice', lang)}</Text>
+            </View>
+            <View style={s.partialActions}>
+              <TouchableOpacity
+                style={s.partialCallBtn}
+                onPress={() => Linking.openURL(`tel:${KTEB_TEL}`)}
+                activeOpacity={0.85}
+              >
+                <Feather name="phone" size={13} color="#fff" />
+                <Text style={s.partialCallText}>{t('dutyCallKteb', lang)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.partialLinkBtn}
+                onPress={() => Linking.openURL(KTEB_URL)}
+                activeOpacity={0.85}
+              >
+                <Feather name="external-link" size={13} color={colors.primaryDark} />
+                <Text style={s.partialLinkText}>{t('dutyOpenKteb', lang)}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
         {loading ? (
           <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
-        ) : sections.length === 0 ? (
+        ) : (sortByDistance ? nearest : sections).length === 0 ? (
           /* NOT an empty state — an ERROR state. There is always a duty pharmacy in the
              TRNC, so zero rows never describes the world, only our missing data. 'stale'
              and 'absent' share this card deliberately: the user does not care which of
@@ -208,6 +327,20 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
               <Text style={s.ktebAttribution}>{t('dutyKtebAttribution', lang)}</Text>
             </View>
           </View>
+        ) : sortByDistance ? (
+          /* Located: one flat nearest-first list. The district grouping is dropped on
+             purpose — when the question is "which is closest", section headers put a
+             40 km Karpaz pharmacy above a 2 km one. The region badge moves onto the card
+             so the district is still visible. */
+          <FlatList
+            data={nearest}
+            keyExtractor={item => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={s.listContent}
+            renderItem={({ item }) => (
+              <PharmacyCard item={item} showRegionBadge lang={lang} />
+            )}
+          />
         ) : (
           <SectionList
             sections={sections}
@@ -254,7 +387,16 @@ const s = StyleSheet.create({
   regionBadge:  { backgroundColor: colors.border, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
   regionCount:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 
-  metaRow:           { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  metaRow:           { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' },
+  partialNotice:     { flexShrink: 0, backgroundColor: colors.dangerLight, borderRadius: 14, padding: 14, marginBottom: 12 },
+  partialRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  partialText:       { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
+  partialActions:    { flexDirection: 'row', gap: 8, marginTop: 12 },
+  partialCallBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flex: 1, backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 10 },
+  partialCallText:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
+  partialLinkBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flex: 1, backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primaryDark, borderRadius: 10, paddingVertical: 10 },
+  partialLinkText:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
+  distanceText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   regionInlineBadge: { backgroundColor: colors.primaryLight, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   regionInlineText:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
 

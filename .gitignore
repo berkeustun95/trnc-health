@@ -46,3 +46,9 @@ google-play-service-account.json
 
 # dev-only test tooling (not part of the app bundle)
 scripts/send-test-duty-push.js
+
+# Tier-2 geocoder output. Timestamped per run and regenerated on every dry run, so it is
+# working output, never a source of truth — the authoritative list of pharmacies still
+# needing a pin is `facilities WHERE latitude IS NULL`. The untimestamped legacy name is
+# matched too: it predates the timestamping and was overwritten by every run.
+hand-place-queue*.csv

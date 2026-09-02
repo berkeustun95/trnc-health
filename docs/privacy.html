@@ -109,8 +109,8 @@
       <em>not used yet</em>, that is literal: we collect it for the stated purpose and
       nothing in the app reads it today.
         <ul>
-          <li><strong>First and last name</strong> — your real name. A provider you book an
-          appointment with is shown your name, so they know who is coming.</li>
+          <li><strong>First and last name</strong> — your real name. Held on your account;
+          section 2 explains who can see it.</li>
           <li><strong>Display name</strong> — a name you choose, 3 to 20 characters. It does
           not have to be your real name. This is the name shown next to reviews and questions
           you post, and it is the only name other users see. <em>Not used yet</em> — no part
@@ -123,7 +123,7 @@
           paperwork information applies to you, and which languages to offer first.
           <em>Not used yet</em> — nothing in the app reads it.</li>
           <li><strong>Phone number</strong> — held on your account so that we can contact you
-          about your account or a booking. It is not shown to other users and is not given to
+          about your account. It is not shown to other users and is not given to
           providers. <em>Not used yet</em> — nothing in the app reads it, and we have not
           contacted anyone using it.</li>
           <li><strong>Region within the TRNC</strong> — so that listings, duty pharmacy rotas
@@ -142,8 +142,8 @@
       <li><strong>Profile picture</strong> — optional. Either a preset avatar you choose, or
       an image you upload, which is stored in our file storage.</li>
       <li><strong>Location data</strong> — your device location, used only in-session to sort nearby facilities. We do not store your location history.</li>
-      <li><strong>Push notification token</strong> — a device token used to deliver appointment confirmations and relevant health alerts. Stored in your profile record.</li>
-      <li><strong>Booking &amp; interaction data</strong> — appointment requests, questions you submit to facilities, and ratings/reviews you leave.</li>
+      <li><strong>Push notification token</strong> — a device token used to deliver duty pharmacy alerts and replies to questions you have asked. Stored in your profile record.</li>
+      <li><strong>Interaction data</strong> — questions you submit to facilities, and ratings/reviews you leave.</li>
       <li><strong>Rejected submissions</strong> — if text you submit is rejected by our
       content filter, we keep a record of it. That record is linked to your account and is
       deleted after 30 days. Section 5 describes it in full.</li>
@@ -158,15 +158,13 @@
       <li>The <strong>content</strong> of the reviews, questions and answers you post, and the ratings you give.</li>
     </ul>
     <p style="margin-top:10px;"><strong>Other users cannot see</strong> your first and last name, your date of birth, your nationality, your phone number, your region, your resident status, your study level or institution, or your email address.</p>
-    <p style="margin-top:10px;"><strong>A provider you book with</strong> is shown your full name and the content of your request, so that they can identify your booking. They are not shown your date of birth, phone number, region, resident status, or any of your other bookings.</p>
-    <p style="margin-top:10px;"><strong>One exception, and it is one you type yourself.</strong> Some booking forms — vehicle servicing, for example — ask for a contact number for that specific booking. A number you enter there is sent to that business along with the booking. It is separate from the phone number on your profile, which is never shared.</p>
+    <p style="margin-top:10px;"><strong>Providers are not shown any of your personal data.</strong> When you ask a question on a facility's page, the provider sees the question and your display name — not your real name, your date of birth, your phone number, your region or your resident status.</p>
     <p style="margin-top:10px;"><strong>Our administrators</strong> can see the data on your account. This is necessary to operate the service, investigate reports, and respond to your requests.</p>
 
     <h2>3. How we use your data</h2>
     <ul>
       <li>To display nearby health facilities relevant to your location.</li>
-      <li>To process and manage appointment requests between you and a provider.</li>
-      <li>To send you push notifications about your bookings or duty pharmacy updates.</li>
+      <li>To send you push notifications about duty pharmacy updates and replies to your questions.</li>
       <li>To identify you across sessions via your account.</li>
       <li>To improve app reliability and debug issues.</li>
       <li>To screen text you post against our list of prohibited terms, so that abusive content does not reach other users.</li>
@@ -178,8 +176,8 @@
     <p>We share data only in the following limited cases:</p>
     <ul>
       <li><strong>Supabase</strong> — our database, authentication, and storage provider. Data is stored on Supabase-managed infrastructure (AWS EU region). See <a href="https://supabase.com/privacy" target="_blank">supabase.com/privacy</a>.</li>
-      <li><strong>Expo / FCM / APNs</strong> — push notification delivery services used to send booking confirmations to your device.</li>
-      <li><strong>Health facility providers</strong> — when you submit a booking or question, the relevant provider can see your name and the content of your request. They cannot see your full profile or other interactions.</li>
+      <li><strong>Expo / FCM / APNs</strong> — push notification delivery services used to send alerts to your device.</li>
+      <li><strong>Facility providers</strong> — when you submit a question, the relevant provider can see the question and your display name. They cannot see your real name, your full profile, or your other interactions.</li>
     </ul>
 
     <h2>5. Data retention</h2>

@@ -214,6 +214,55 @@ const TRANSLATIONS = {
   },
 }
 
+// ─── The list itself ─────────────────────────────────────────────────────────
+// DERIVED from the translation table's keys, not maintained as a second array. The
+// picker's list and this map were separate copies of the same 80 English names until
+// 2026-08-30; they happened to agree, which is luck rather than a guarantee. Deriving
+// makes agreement structural: a country added to the table is in the picker, and a
+// country in the picker necessarily has a translation entry.
+export const NATIONALITIES = Object.keys(TRANSLATIONS.tr)
+
+// ─── English label -> ISO 3166-1 alpha-2 ─────────────────────────────────────
+// The profile wizard writes BOTH profiles.nationality (this English label, which
+// getNatLabel above renders from) and profiles.nationality_code (this code). The label
+// column stays because ProfileScreen and every existing row depend on it.
+//
+// ⚠ 'XN' FOR NORTHERN CYPRUS IS NOT AN ISO CODE. The TRNC has none, and it is this
+//   app's single most relevant nationality. XN sits in the ISO user-assigned range
+//   XA-XZ, which exists for exactly this purpose. Do NOT "correct" it to CY — that is
+//   the Republic of Cyprus, which is a different country and, here, a political claim.
+//
+// ⚠ HISTORICAL NOTE, because it will come up again. Between 2026-05-31 and 2026-06-24
+//   this field was a free-text TextInput placeholdered "e.g. British, Turkish, Iranian",
+//   so rows written in that window hold ARBITRARY strings in any language — production
+//   carries one, 'Kıbrıslı Türk'. Such values are deliberately left unmapped rather than
+//   guessed at: "Turkish Cypriot" is an ethnonym, and inferring a NATIONALITY from it is
+//   a claim about a real person that this table has no business making. The wizard asks
+//   them instead.
+export const NATIONALITY_CODES = {
+  'Afghanistan': 'AF', 'Albania': 'AL', 'Algeria': 'DZ', 'Argentina': 'AR',
+  'Armenia': 'AM', 'Australia': 'AU', 'Austria': 'AT', 'Azerbaijan': 'AZ',
+  'Bahrain': 'BH', 'Bangladesh': 'BD', 'Belarus': 'BY', 'Belgium': 'BE',
+  'Bosnia & Herzegovina': 'BA', 'Brazil': 'BR', 'Bulgaria': 'BG', 'Canada': 'CA',
+  'China': 'CN', 'Croatia': 'HR', 'Cuba': 'CU', 'Czech Republic': 'CZ',
+  'Denmark': 'DK', 'Egypt': 'EG', 'Finland': 'FI', 'France': 'FR',
+  'Georgia': 'GE', 'Germany': 'DE', 'Ghana': 'GH', 'Greece': 'GR',
+  'Hungary': 'HU', 'India': 'IN', 'Indonesia': 'ID', 'Iran': 'IR',
+  'Iraq': 'IQ', 'Ireland': 'IE', 'Israel': 'IL', 'Italy': 'IT',
+  'Jordan': 'JO', 'Kazakhstan': 'KZ', 'Kenya': 'KE', 'Kuwait': 'KW',
+  'Lebanon': 'LB', 'Libya': 'LY', 'Malaysia': 'MY', 'Malta': 'MT',
+  'Mexico': 'MX', 'Morocco': 'MA', 'Netherlands': 'NL', 'Nigeria': 'NG',
+  'Norway': 'NO', 'Pakistan': 'PK', 'Palestine': 'PS', 'Philippines': 'PH',
+  'Poland': 'PL', 'Portugal': 'PT', 'Qatar': 'QA', 'Romania': 'RO',
+  'Russia': 'RU', 'Saudi Arabia': 'SA', 'Serbia': 'RS', 'Singapore': 'SG',
+  'South Africa': 'ZA', 'South Korea': 'KR', 'Spain': 'ES', 'Sri Lanka': 'LK',
+  'Sweden': 'SE', 'Switzerland': 'CH', 'Syria': 'SY', 'Thailand': 'TH',
+  'Tunisia': 'TN', 'Turkey': 'TR', 'Northern Cyprus': 'XN', 'Ukraine': 'UA',
+  'United Arab Emirates': 'AE', 'United Kingdom': 'GB', 'United States': 'US',
+  'Uzbekistan': 'UZ', 'Venezuela': 'VE', 'Vietnam': 'VN', 'Yemen': 'YE',
+  'Zimbabwe': 'ZW',
+}
+
 export function getNatLabel(englishName, lang) {
   if (!englishName) return ''
   const code = LANG_TO_CODE[lang] || 'en'

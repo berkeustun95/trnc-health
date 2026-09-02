@@ -42,6 +42,21 @@ export const PRICE_COMPARE_LIVE = false
 // carries the baseline, so a flip left in the working tree cannot reach `eas update`.
 export const EXPLORE_MAP_LIVE = true
 
+// Profile completion gate (Slice 2). false = the gate never fires and the wizard is
+// unreachable; the schema, the lookup tables and the availability RPC from Slice 1 are
+// all live either way and harmless on their own.
+//
+// NOT a MODULE_FLAGS key, deliberately: this gates a BLOCK, not a module. Every
+// MODULE_FLAGS entry answers "is this content ready to show"; this one answers "does
+// every customer get stopped at the door". Putting it in that map would let a future
+// loop over MODULE_FLAGS switch it on as though it were a directory.
+//
+// ⚠ FLIPPING THIS IS NOT AN ORDINARY GO-LIVE. It hard-blocks every existing customer
+//   account on next open, and it collects four new categories of personal data — so
+//   docs/terms.html and screens/LegalScreen.js need their clause FIRST, and neither
+//   copy may carry it alone. See the Slice 2 journal entry.
+export const PROFILE_GATE_LIVE = false
+
 // Marketplace module gating. Each key is a module that is empty in prod today, so
 // it renders a "Coming soon" screen (with one-tap Notify me) instead of an empty
 // list that reads as broken. false = gated (Coming Soon); flip to true via OTA to

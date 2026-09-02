@@ -19,14 +19,47 @@
 // and hand the user a way through — never as a neutral "no duty pharmacy tonight", which
 // is both false and, at 2am, dangerous.
 
-export const DUTY_FRESH  = 'fresh'   // rows exist for today — the only good state
-export const DUTY_STALE  = 'stale'   // rows exist, but none for today: the roster ran out or has a gap
-export const DUTY_ABSENT = 'absent'  // no rows at all: never seeded, or wiped
+export const DUTY_FRESH   = 'fresh'   // rows for today across a plausible spread of districts
+export const DUTY_PARTIAL = 'partial' // rows for today, but so few districts the roster is broken
+export const DUTY_STALE   = 'stale'   // rows exist, but none for today: the roster ran out or has a gap
+export const DUTY_ABSENT  = 'absent'  // no rows at all: never seeded, or wiped
 
-// todayCount: number of duty_list rows whose duty_date === today
-// maxDate:    the newest duty_date in the table, or null when the table is empty
-export function dutyStatus({ todayCount, maxDate }) {
-  if (todayCount > 0) return DUTY_FRESH
+// ─── THE COVERAGE THRESHOLD, MEASURED — NOT GUESSED ─────────────────────────
+//
+// All 121 days in duty_list, grouped by date, read 2026-09-02:
+//
+//     13 rows / 6 districts -> 17 days        1 row / 1 district -> 2 days
+//     13 rows / 7 districts -> 50 days
+//     15 rows / 6 districts -> 14 days
+//     15 rows / 8 districts -> 38 days
+//
+// 119 normal days sit at 13-15 rows across 6-8 districts; the 2 broken days sit at
+// 1 row / 1 district. NOTHING lies between 1 district and 6, so any threshold inside
+// that gap separates the populations cleanly. 3 leaves ~2 districts of slack each side.
+//
+// DISTRICTS, NOT ROW COUNT, and the difference decides a real case. A count is
+// confounded twice: a district legitimately carries 1-3 duty pharmacies a night, and a
+// roster of 13 rows ALL IN ONE DISTRICT — an import that parsed one district's page
+// repeatedly — passes a count test while being exactly the failure this state exists to
+// catch. Coverage cannot be fooled that way, and it measures what actually harms
+// someone: whether their own district appears at all. 28/29 Eylül 2026 are the live
+// case — one pharmacy each, in Karpaz and İskele, so a user anywhere else saw a
+// confident list containing nothing they could reach.
+export const PARTIAL_MAX_DISTRICTS = 3
+
+// todayCount:     number of duty_list rows whose duty_date === today
+// todayDistricts: distinct `region` values among those rows
+// maxDate:        the newest duty_date in the table, or null when the table is empty
+//
+// ⚠ OMITTING todayDistricts DISABLES THE COVERAGE CHECK, yielding the old two-state
+//   behaviour. Deliberate — inventing a verdict from an absent input is worse than
+//   declining to judge — but it means a caller that forgets it silently loses the guard.
+//   All three callers pass it. A fourth must too.
+export function dutyStatus({ todayCount, maxDate, todayDistricts }) {
+  if (todayCount > 0) {
+    if (todayDistricts != null && todayDistricts <= PARTIAL_MAX_DISTRICTS) return DUTY_PARTIAL
+    return DUTY_FRESH
+  }
   return maxDate ? DUTY_STALE : DUTY_ABSENT
 }
 

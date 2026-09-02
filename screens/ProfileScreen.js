@@ -12,55 +12,14 @@ import * as Notifications from 'expo-notifications'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { getNatLabel } from '../constants/nationalityTranslations'
+import { getNatLabel, NATIONALITIES } from '../constants/nationalityTranslations'
+import { COUNTRY_CODES } from '../constants/countryCodes'
 import LegalScreen from './LegalScreen'
 import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { PRESET_AVATARS, getPreset } from '../constants/avatars'
 import BackButton from '../components/BackButton'
 
-const NATIONALITIES = [
-  'Afghanistan', 'Albania', 'Algeria', 'Argentina', 'Armenia', 'Australia', 'Austria',
-  'Azerbaijan', 'Bahrain', 'Bangladesh', 'Belarus', 'Belgium', 'Bosnia & Herzegovina',
-  'Brazil', 'Bulgaria', 'Canada', 'China', 'Croatia', 'Cuba', 'Czech Republic',
-  'Denmark', 'Egypt', 'Finland', 'France', 'Georgia', 'Germany', 'Ghana', 'Greece',
-  'Hungary', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
-  'Jordan', 'Kazakhstan', 'Kenya', 'Kuwait', 'Lebanon', 'Libya', 'Malaysia', 'Malta',
-  'Mexico', 'Morocco', 'Netherlands', 'Nigeria', 'Norway', 'Pakistan', 'Palestine',
-  'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Saudi Arabia',
-  'Serbia', 'Singapore', 'South Africa', 'South Korea', 'Spain', 'Sri Lanka', 'Sweden',
-  'Switzerland', 'Syria', 'Thailand', 'Tunisia', 'Turkey', 'Northern Cyprus', 'Ukraine',
-  'United Arab Emirates', 'United Kingdom', 'United States', 'Uzbekistan', 'Venezuela',
-  'Vietnam', 'Yemen', 'Zimbabwe',
-]
 
-const COUNTRY_CODES = [
-  { code: '+90',  label: 'Turkey' },
-  { code: '+357', label: 'Cyprus' },
-  { code: '+44',  label: 'United Kingdom' },
-  { code: '+1',   label: 'USA / Canada' },
-  { code: '+49',  label: 'Germany' },
-  { code: '+33',  label: 'France' },
-  { code: '+31',  label: 'Netherlands' },
-  { code: '+46',  label: 'Sweden' },
-  { code: '+39',  label: 'Italy' },
-  { code: '+34',  label: 'Spain' },
-  { code: '+30',  label: 'Greece' },
-  { code: '+7',   label: 'Russia' },
-  { code: '+98',  label: 'Iran' },
-  { code: '+966', label: 'Saudi Arabia' },
-  { code: '+971', label: 'UAE' },
-  { code: '+962', label: 'Jordan' },
-  { code: '+970', label: 'Palestine' },
-  { code: '+964', label: 'Iraq' },
-  { code: '+963', label: 'Syria' },
-  { code: '+961', label: 'Lebanon' },
-  { code: '+20',  label: 'Egypt' },
-  { code: '+91',  label: 'India' },
-  { code: '+86',  label: 'China' },
-  { code: '+82',  label: 'South Korea' },
-  { code: '+81',  label: 'Japan' },
-  { code: '+61',  label: 'Australia' },
-]
 
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'

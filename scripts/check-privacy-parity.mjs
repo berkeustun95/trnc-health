@@ -63,10 +63,16 @@ const MARKERS = [
     why: 'the age rule; overclaiming or omitting it are both wrong' },
   { key: 'public/not-public',   re: /what is public and what is not/i,
     why: 'the section users actually care about' },
-  { key: 'provider sees name',  re: /provider you book with is shown your full name/i,
-    why: 'the one disclosure that is live today, via get_customer_contacts' },
-  { key: 'booking-form phone',  re: /separate from the phone number on your profile/i,
-    why: 'without it, "never shared" is false for garage bookings' },
+  // Both of these markers changed on 2026-08-31 with 20261004. They used to assert
+  // "a provider you book with is shown your full name" and the garage booking-form
+  // phone exception. Appointments were removed, get_customer_contacts was DROPPED,
+  // and providers now see no customer data at all — so the OLD markers describe text
+  // that must NOT be there any more. Updated here rather than deleted: the fact is
+  // still worth asserting, it just inverted.
+  { key: 'providers see nothing', re: /providers are not shown any of your personal data/i,
+    why: 'inverted 20261004 — the old text promised providers your full name' },
+  { key: 'question attribution',  re: /sees the question and your display name/i,
+    why: 'what a provider CAN see now, and the only thing they can' },
 ]
 
 // ── The field list is DERIVED from App.js PROFILE_COLUMNS, not typed here. A column

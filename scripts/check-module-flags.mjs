@@ -100,6 +100,7 @@ const EXPECTED_SCALARS = {
   FEATURED_LIVE:         false,
   EXPLORE_FEATURED_LIVE: false,
   PRICE_COMPARE_LIVE:    false,
+  PROFILE_GATE_LIVE:     false,
   // Swaps the bottom-nav map tab from the health MapScreen to the Explore map. Unlike the
   // others this does not gate NEW content — it replaces a surface users already have, so
   // an accidental flip is a downgrade for every user, not merely an early reveal.

@@ -6,7 +6,16 @@ import { t } from '../constants/i18n'
 // Shown when a guest taps an action that needs a real account. `messageKey` is an
 // i18n key so each call site explains what signing up unlocks, rather than one
 // generic string.
-export default function AccountRequiredSheet({ visible, messageKey, lang, onSignUp, onClose }) {
+//
+// The three optional keys below let the PROFILE COMPLETION GATE reuse this sheet for a
+// different refusal: a signed-in user with an incomplete profile browsing the read-only
+// emergency directory. Same shape, different words — telling them to "sign up" when they
+// already have an account is the kind of copy that makes people think the app is broken.
+// All three default to the guest wording, so every existing call site is untouched.
+export default function AccountRequiredSheet({
+  visible, messageKey, lang, onSignUp, onClose,
+  titleKey = 'gateTitle', ctaKey = 'signup', icon = 'person-add-outline',
+}) {
   if (!messageKey) return null
 
   return (
@@ -16,14 +25,14 @@ export default function AccountRequiredSheet({ visible, messageKey, lang, onSign
           <View style={s.grabber} />
 
           <View style={s.iconWrap}>
-            <Ionicons name="person-add-outline" size={26} color={colors.primary} />
+            <Ionicons name={icon} size={26} color={colors.primary} />
           </View>
 
-          <Text style={s.title}>{t('gateTitle', lang)}</Text>
+          <Text style={s.title}>{t(titleKey, lang)}</Text>
           <Text style={s.message}>{t(messageKey, lang)}</Text>
 
           <TouchableOpacity style={s.primaryBtn} onPress={onSignUp} activeOpacity={0.85}>
-            <Text style={s.primaryBtnText}>{t('signup', lang)}</Text>
+            <Text style={s.primaryBtnText}>{t(ctaKey, lang)}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={s.dismissBtn} onPress={onClose} activeOpacity={0.7}>

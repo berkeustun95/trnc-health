@@ -32,7 +32,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
-import { dutyStatus, dutyDaysRemaining, localDateKey, DUTY_FRESH, DUTY_STALE } from '../utils/dutyStatus.js'
+import { dutyStatus, dutyDaysRemaining, localDateKey, DUTY_FRESH, DUTY_STALE, DUTY_PARTIAL, PARTIAL_MAX_DISTRICTS } from '../utils/dutyStatus.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -73,7 +73,12 @@ const c = { r: s => `\x1b[31m${s}\x1b[0m`, g: s => `\x1b[32m${s}\x1b[0m`,
 if (process.argv.includes('--self')) {
   const today = '2026-08-26'
   const cases = [
-    ['rows for today',            { todayCount: 13, maxDate: '2026-09-30' }, DUTY_FRESH,  35],
+    ['rows for today',            { todayCount: 13, todayDistricts: 7, maxDate: '2026-09-30' }, DUTY_FRESH,  35],
+    // The 28/29 Eylül 2026 shape, plus the count-fooling shape a row-count threshold
+    // would have waved through, plus the edge just above the threshold.
+    ['1 pharmacy, 1 district',    { todayCount: 1,  todayDistricts: 1, maxDate: '2026-09-30' }, DUTY_PARTIAL, 35],
+    ['13 rows ALL one district',  { todayCount: 13, todayDistricts: 1, maxDate: '2026-09-30' }, DUTY_PARTIAL, 35],
+    ['4 districts is fine',       { todayCount: 8,  todayDistricts: 4, maxDate: '2026-09-30' }, DUTY_FRESH,  35],
     ['roster ran out in June',    { todayCount: 0,  maxDate: '2026-06-30' }, DUTY_STALE,  -57],
     ['table completely empty',    { todayCount: 0,  maxDate: null },         'absent',    null],
     ['gap: today missing, future present', { todayCount: 0, maxDate: '2026-09-10' }, DUTY_STALE, 15],
@@ -123,36 +128,124 @@ if (!URL || !KEY) {
   console.error(c.r('EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY missing — expected in .env'))
   process.exit(1)
 }
-// The ANON key on purpose: duty_list is world-readable ("Anyone can read duty_list"), and
-// this check should see exactly what a user's app sees. A service-role read could succeed
-// where the app fails and report health that users do not have.
+// ─── READ AS THE APP READS, NOT AS THE ANON KEY ─────────────────────────────
+//
+// ⚠ THIS SCRIPT WAS BROKEN FROM THE DAY IT WAS WRITTEN, AND THE COMMENT THAT USED TO SIT
+//   HERE IS WHY. It said the anon key was safe "because duty_list is world-readable
+//   (\"Anyone can read duty_list\")" — which is the POLICY'S NAME, not its grant. The
+//   policy is:
+//
+//       CREATE POLICY "Anyone can read duty_list" ON public.duty_list
+//         FOR SELECT TO authenticated USING (true);
+//
+//   TO authenticated. Not anon. So a bare anon key sees ZERO rows no matter what the
+//   table holds — measured 2026-09-01: anon 0, authenticated 1653.
+//
+//   That made this monitor STRUCTURALLY INCAPABLE OF PASSING. It reported "table is
+//   empty / DUTY ROSTER FAILING USERS RIGHT NOW" against a healthy 1,653-row roster, and
+//   would have reported exactly the same thing against a genuinely empty one. A probe
+//   that returns the same answer whether the system is perfect or broken is not a probe.
+//   It went unnoticed because it was written WHILE the roster was genuinely empty: the
+//   broken instrument and the true answer agreed, so its first run looked like a success.
+//   --self did not catch it either — that mode feeds fixtures straight to dutyStatus(),
+//   so it tests the CLASSIFIER and never touches the network.
+//
+// A LONG-LIVED TEST ACCOUNT, not signInAnonymously(). Both give role=authenticated and
+// both satisfy the policy; the difference is that every anonymous sign-in leaves a row in
+// auth.users, which on a cron accumulates forever. Same credentials as
+// check-moderation-log.mjs, so this adds no new secret.
+//
+// ⚠ RESIDUAL GAP, AND IT IS THE ONE THIS SCRIPT CANNOT SEE. A signed-in account is a
+//   STRONGER role than a guest. duty_list's policy is `TO authenticated USING (true)`
+//   with no per-user predicate, so the two are equivalent TODAY — measured 2026-09-01,
+//   guest 1653 / signed-in 1653. But if the policy is ever narrowed against anonymous
+//   sessions (`AND NOT is_anonymous_session()`, the shape 20260714 uses on writes), this
+//   monitor goes green while every guest sees an empty roster. Nothing here can detect
+//   that; it needs a policy review, not a probe. Re-check if duty_list's policy changes.
 const supabase = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 
-const today = localDateKey()
-
-const [{ count: todayCount, error: e1 }, { data: newest, error: e2 }] = await Promise.all([
-  supabase.from('duty_list').select('id', { head: true, count: 'exact' }).eq('duty_date', today),
-  supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
-])
-if (e1 || e2) {
-  console.error(c.r(`duty_list unreadable: ${(e1 || e2).message}`))
+const TEST_EMAIL = process.env.ADA_TEST_EMAIL
+const TEST_PASSWORD = process.env.ADA_TEST_PASSWORD
+if (!TEST_EMAIL || !TEST_PASSWORD) {
+  console.error(c.r('\n  ADA_TEST_EMAIL / ADA_TEST_PASSWORD missing.'))
+  console.error(c.d('  duty_list is readable only TO authenticated, so without them this'))
+  console.error(c.d('  script can only read as anon — which returns 0 rows whatever the'))
+  console.error(c.d('  table holds. Refusing to report roster health rather than lie.'))
+  console.error(c.d('  Local: they are in .env. Cron: put them in the job environment.\n'))
   process.exit(1)
 }
 
+const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+  email: TEST_EMAIL, password: TEST_PASSWORD,
+})
+if (authErr) {
+  console.error(c.r(`\n  sign-in failed: ${authErr.message}`))
+  console.error(c.d('  Cannot read duty_list as a user does, so any count here would be'))
+  console.error(c.d('  meaningless. Refusing to report roster health.\n'))
+  process.exit(1)
+}
+
+// POSITIVE CONTROL #1 — assert the ROLE, because the role is the thing that broke.
+// If sign-in ever silently degrades to an anon-level token, every count below returns 0
+// and reads as an empty roster. Checking the claim directly is the only thing that
+// distinguishes "no rows" from "no permission", since both look like 0.
+const claims = JSON.parse(
+  Buffer.from(authData.session.access_token.split('.')[1], 'base64').toString('utf8'))
+if (claims.role !== 'authenticated') {
+  console.error(c.r(`\n  session role is '${claims.role}', expected 'authenticated'.`))
+  console.error(c.d('  duty_list is readable only TO authenticated, so this reader is blind'))
+  console.error(c.d('  and would report an empty roster regardless of the truth.\n'))
+  process.exit(1)
+}
+
+const today = localDateKey()
+
+const [{ data: todayRows, error: e1 }, { data: newest, error: e2 }, { count: totalCount, error: e3 }] =
+  await Promise.all([
+    supabase.from('duty_list').select('region').eq('duty_date', today),
+    supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
+    // POSITIVE CONTROL #2 — the whole-table count, printed on every run. "0 of 1653" and
+    // "0 of 0" are different emergencies, and the old output could not tell them apart.
+    supabase.from('duty_list').select('id', { head: true, count: 'exact' }),
+  ])
+if (e1 || e2 || e3) {
+  console.error(c.r(`duty_list unreadable: ${(e1 || e2 || e3).message}`))
+  process.exit(1)
+}
+
+const todayCount = todayRows?.length ?? 0
 const maxDate = newest?.[0]?.duty_date ?? null
-const status  = dutyStatus({ todayCount: todayCount ?? 0, maxDate })
+const todayDistricts = new Set((todayRows ?? []).map(r => r.region)).size
+const status  = dutyStatus({ todayCount: todayCount ?? 0, todayDistricts, maxDate })
 const left    = dutyDaysRemaining({ maxDate, today })
 
 console.log(`\nduty roster — ${today}`)
-console.log(`  rows for today : ${todayCount ?? 0}`)
+console.log(`  read as        : ${c.d(`role=${claims.role} (${TEST_EMAIL})`)}`)
+console.log(`  rows in table  : ${totalCount ?? 0}${totalCount ? '' : c.r('  ← see note below')}`)
+console.log(`  rows for today : ${todayCount ?? 0} across ${todayDistricts} district(s)`)
 console.log(`  last day covered: ${maxDate ?? c.d('(table is empty)')}`)
 console.log(`  status         : ${status === DUTY_FRESH ? c.g(status) : c.r(status)}`)
+
+if (status === DUTY_PARTIAL) {
+  // Distinct copy from the zero-row case: rows DO exist here, so "no duty pharmacies are
+  // listed" would be false, and a monitor that misdescribes the fault sends whoever reads
+  // it looking for the wrong thing.
+  console.error(c.r('\n  ┌─ DUTY ROSTER INCOMPLETE ───────────────────────────────────────┐'))
+  console.error(c.r(`  │ ${todayCount} row(s) today across only ${todayDistricts} district(s) `
+    + `(threshold ${PARTIAL_MAX_DISTRICTS}).`))
+  console.error(c.r('  │ A normal day covers 6-8. Users outside those districts see a'))
+  console.error(c.r('  │ list with nothing they can reach, and it does NOT look broken.'))
+  console.error(c.r('  └────────────────────────────────────────────────────────────────┘'))
+  console.error(c.d('  Refill: KTEB info@kteb.org / +90 392 228 06 22 — they publish the roster.\n'))
+  process.exit(1)
+}
 
 if (status !== DUTY_FRESH) {
   console.error(c.r('\n  ┌─ DUTY ROSTER FAILING USERS RIGHT NOW ──────────────────────────┐'))
   console.error(c.r(`  │ status: ${status}. No duty pharmacies are listed for today.`))
   console.error(c.r('  │ There is ALWAYS a duty pharmacy in the TRNC, so this is our'))
   console.error(c.r('  │ missing data, not a quiet night. Users see an empty list.'))
+  console.error(c.r(`  │ Whole table: ${totalCount ?? 0} row(s), read as role=${claims.role}.`))
   console.error(c.r('  └────────────────────────────────────────────────────────────────┘'))
   console.error(c.d('  Refill: KTEB info@kteb.org / +90 392 228 06 22 — they publish the roster.\n'))
   process.exit(1)

@@ -47,6 +47,7 @@ import { t, LANG_CODES } from '../constants/i18n.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories.js'
 import { REGION_LABEL_KEY } from '../constants/regions.js'
+import { RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY } from '../constants/profileGate.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -67,6 +68,11 @@ const SURFACES = [
   'screens/ExploreScreen.js',
   'screens/ExploreSubmitScreen.js',
   'screens/ExploreMySubmissionsScreen.js',
+  // Widened 2026-08-30 for the profile completion gate. This is the ONLY screen in the
+  // app EVERY user is forced through, in whatever language they picked, with no way past
+  // it — so an untranslated key here renders English on an RTL screen to someone who
+  // cannot skip. It is guarded BEFORE PROFILE_GATE_LIVE flips, not after.
+  'screens/ProfileSetupScreen.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
@@ -134,6 +140,12 @@ const SAME_AS_ENGLISH = {
 
 // ─── Scope derivation ────────────────────────────────────────────────────────
 
+// ⚠ THIS SCAN READS COMMENTS TOO. It is a regex over the file, not a parse, so a call
+// written out inside a /* */ or // comment registers as a real key — a comment in
+// ProfileSetupScreen explaining the scan itself once registered a phantom key literally
+// called "key", and the check failed with "not present in English at all". Same family
+// as the pg_get_functiondef note in CLAUDE.md: the matcher sees prose as readily as code.
+// If a comment needs to show the call shape, describe it instead of writing it.
 const literal = new Set()
 for (const f of SURFACES) {
   const src = readFileSync(resolve(ROOT, f), 'utf8')
@@ -148,6 +160,12 @@ const viaVariable = [
   ...HOME_TILE_LABEL_KEYS,
   ...HEALTH_TYPES,
   ...Object.values(GROUP_META).map(m => m.labelKey),
+  // The wizard's two single-select groups. Reached as t(MAP[value]), invisible to the
+  // literal scan — the exact blind spot this file's header describes.
+  ...Object.values(RESIDENT_STATUS_LABEL_KEY),
+  ...Object.values(STUDENT_LEVEL_LABEL_KEY),
+  ...Object.values(STEP_TITLE_KEY),
+  ...Object.values(HELP_ROW_LABEL_KEY),
   ...Object.values(CATEGORY_LABEL_KEY),
   ...Object.values(REGION_LABEL_KEY),
 ]

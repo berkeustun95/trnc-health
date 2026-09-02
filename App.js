@@ -17,7 +17,12 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t } from './constants/i18n'
 import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE } from './constants/flags'
+import {
+  CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
+} from './constants/profileGate'
+import { REGIONS } from './constants/regions'
+import { resolveRegion } from './utils/resolveRegion'
 import AuthScreen from './screens/AuthScreen'
 import BookingScreen from './screens/BookingScreen'
 import FacilityProfileScreen from './screens/FacilityProfileScreen'
@@ -27,6 +32,7 @@ import MapScreen from './screens/MapScreen'
 import ExploreMapScreen from './screens/ExploreMapScreen'
 import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
+import ProfileSetupScreen from './screens/ProfileSetupScreen'
 import DutyListScreen from './screens/DutyListScreen'
 import EventsScreen from './screens/EventsScreen'
 import OrganizerScreen from './screens/OrganizerScreen'
@@ -100,6 +106,12 @@ function TypeSVGIcon({ type, size, color }) {
   if (cfg.lib === 'mci') return <MaterialCommunityIcons name={cfg.name} size={size} color={color} />
   return <Ionicons name={cfg.name} size={size} color={color} />
 }
+
+// The columns every profile read needs. ONE list: the gate compares
+// profile_completed_at and profile_schema_version, so a column present in the initial
+// load but missing from the post-wizard refetch would leave the gate reading `undefined`
+// and firing forever.
+const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, blocked_until, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, institution_id, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible'
 
 const LANGUAGES = [
   { key: 'English', label: 'English' },
@@ -269,6 +281,12 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(true)
   const [authMode, setAuthMode] = useState('login')
   const [gateKey, setGateKey] = useState(null)
+  // Profile completion gate. `gateHealthList` is the read-only health directory reached
+  // from the wizard's emergency button; `profileGateKey` drives the sheet shown when a
+  // gated user taps a write action on one of the exempt screens.
+  const [gateHealthList, setGateHealthList] = useState(false)
+  const [profileGateKey, setProfileGateKey] = useState(null)
+  const [gatePrefillRegion, setGatePrefillRegion] = useState(null)
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
@@ -386,6 +404,26 @@ export default function App() {
   function requireAccount(messageKey) {
     if (!isGuest(session)) return false
     setGateKey(messageKey)
+    return true
+  }
+
+  // The profile-gate twin of requireAccount above, with the SAME SIGNATURE so it can be
+  // dropped straight into FacilityProfileScreen's onRequireAccount prop. That screen
+  // already routes ask-a-question, write-a-review and report-content through that one
+  // prop, so swapping the handler makes the exempt directory read-only with no change to
+  // it at all. Booking is not routed through it — and is not passed by the gate block.
+  // Targeted refetch after the wizard completes. Deliberately NOT a re-run of the
+  // session effect: that effect also schedules reminders, starts coach marks and decides
+  // the home-city question, none of which should fire again because somebody finished a
+  // form.
+  async function reloadProfile() {
+    if (!session) return
+    const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', session.user.id).single()
+    if (data) setProfile(data)
+  }
+
+  function requireProfileCompletion(messageKey) {
+    setProfileGateKey(messageKey || 'pgReadOnlyNotice')
     return true
   }
 
@@ -513,6 +551,12 @@ export default function App() {
       if (showPasswordReset) { setShowPasswordReset(false); return true }
       if (showNotifs) { setShowNotifs(false); return true }
       if (showDutyList) { setShowDutyList(false); return true }
+      // Gated read-only directory. Sits with the other exempt surfaces so back returns to
+      // the wizard; on the wizard itself nothing here matches and the chain falls through
+      // to `return false`, which closes the app. That is deliberate and is NOT a skip —
+      // the profile is still incomplete and the gate is there again next launch. A back
+      // button that does nothing at all reads as a frozen screen.
+      if (gateHealthList) { setGateHealthList(false); return true }
       if (showEvents) { setShowEvents(false); return true }
       if (openedProperty) { setOpenedProperty(null); return true }
       if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
@@ -545,7 +589,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, bookingFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -614,7 +658,7 @@ export default function App() {
     if (!session) {
       setProfile(null); setNotifications([]); setProviderFacility(undefined); setPendingClaim(undefined); setOwnsGarage(false); return
     }
-    supabase.from('profiles').select('role, preferred_language, avatar_url, blocked_until').eq('id', session.user.id).single()
+    supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', session.user.id).single()
       .then(async ({ data }) => {
         setProfile(data ?? null)
 
@@ -672,6 +716,23 @@ export default function App() {
       setOwnsGarage(false)
     }
   }, [session])
+
+  // Slice 1's backfill deliberately left profiles.region NULL for everyone: the City
+  // Welcome home city is DEVICE-LOCAL AsyncStorage and SQL cannot read it. This is the
+  // other half — the prefill runs where the data actually lives.
+  useEffect(() => {
+    if (!PROFILE_GATE_LIVE) return
+    let cancelled = false
+    loadCityWelcomeState().then(st => {
+      if (cancelled) return
+      if (st?.home && REGIONS.includes(st.home)) { setGatePrefillRegion(st.home); return }
+      if (userLocation) {
+        const r = resolveRegion(userLocation.latitude, userLocation.longitude)
+        if (r) setGatePrefillRegion(r)
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [userLocation])
 
   async function scheduleAppointmentReminders(userId, currentLang) {
     try {
@@ -789,17 +850,6 @@ export default function App() {
         .from('duty_schedule').select('facility_id').eq('date', today).maybeSingle()
       if (duty) setDutyFacilityId(duty.facility_id)
 
-      // Roster health, from duty_list. Two cheap reads: is today covered, and what is the
-      // newest day we hold. The second separates "never seeded" from "ran out".
-      const [{ count: dutyToday }, { data: dutyNewest }] = await Promise.all([
-        supabase.from('duty_list').select('id', { head: true, count: 'exact' }).eq('duty_date', today),
-        supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
-      ])
-      setDutyRosterStatus(dutyStatus({
-        todayCount: dutyToday ?? 0,
-        maxDate: dutyNewest?.[0]?.duty_date ?? null,
-      }))
-
 
       // TODO: replace with a computed avg_rating + review_count column on facilities
       // once review volume grows, to avoid fetching every row on startup.
@@ -846,6 +896,46 @@ export default function App() {
     }
     load()
   }, [retryCount])
+
+  // ─── Roster health — SESSION-GATED, and that is the whole point ────────────
+  //
+  // Split out of the effect above on 2026-09-01. duty_list's read policy is
+  // `FOR SELECT TO authenticated` — its NAME is "Anyone can read duty_list", its GRANT
+  // is not — so a read that beats sign-in returns zero rows, and an RLS-blinded read is
+  // indistinguishable from an empty table. Measured that day: anon 0, authenticated 1653.
+  //
+  // In the ungated effect this was not a race but a CERTAINTY on a first-ever launch:
+  // no stored session exists, the read resolves 'absent', and because the deps were
+  // [retryCount] it never re-ran when the guest session arrived — so the Home banner
+  // claimed the roster was missing for the entire app session, against a full table.
+  //
+  // Deliberately NOT merged back into the effect above: that one loads favourites and
+  // facilities, which work fine without a session and must not wait for sign-in.
+  //
+  // Keyed on session?.user?.id rather than session, so it re-runs when the guest session
+  // lands and when a guest later signs in, but not on every token refresh — a refresh
+  // yields a new session object carrying the same user id.
+  useEffect(() => {
+    if (!session) return
+    let cancelled = false
+    async function loadRosterHealth() {
+      const today = localDateKey()
+      // `region`, not head:true+count. The coverage check needs the DISTRICTS, and a
+      // head request returns no rows to count them from. It is ~13 rows a day.
+      const [{ data: dutyToday }, { data: dutyNewest }] = await Promise.all([
+        supabase.from('duty_list').select('region').eq('duty_date', today),
+        supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
+      ])
+      if (cancelled) return
+      setDutyRosterStatus(dutyStatus({
+        todayCount: dutyToday?.length ?? 0,
+        todayDistricts: new Set((dutyToday ?? []).map(r => r.region)).size,
+        maxDate: dutyNewest?.[0]?.duty_date ?? null,
+      }))
+    }
+    loadRosterHealth()
+    return () => { cancelled = true }
+  }, [retryCount, session?.user?.id])
 
   // City welcome — foreground trigger.
   //
@@ -927,6 +1017,20 @@ export default function App() {
   // kept for parity and any path that does reach these screens as admin.
   const isAdmin = profile?.role === 'admin'
 
+  // ─── PROFILE COMPLETION GATE ────────────────────────────────────────────────
+  // CUSTOMER-ONLY. "authenticated and not anonymous" would trap every admin, provider,
+  // estate_agent, organizer, home_service_provider and insurance_provider behind a
+  // wizard asking which university they attend — none of them has a display_name, so the
+  // incomplete test is permanently true for them and the flip would lock you out of
+  // AdminScreen. profiles.role is NOT NULL DEFAULT 'customer', so there is no null case.
+  const gateActive =
+    PROFILE_GATE_LIVE &&
+    !!session && !isGuest(session) && !!profile &&
+    profile.role === 'customer' &&
+    !profile.age_ineligible &&
+    (profile.profile_completed_at == null ||
+     (profile.profile_schema_version ?? 0) < CURRENT_PROFILE_SCHEMA_VERSION)
+
   if (session === undefined || !fontsLoaded || onboarded === null) {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   } else if (onboarded === false) {
@@ -973,6 +1077,70 @@ export default function App() {
         </View>
       </SafeAreaView>
     )
+  } else if (gateActive) {
+    // ONE READABLE ALLOW-LIST of what a gated user may reach. This block renders the
+    // exempt screens ITSELF rather than falling through to the ~25-branch chain below:
+    // if it fell through, "what is reachable while gated" would be an emergent property
+    // of 25 conditions spread over 350 lines, and adding a module later could widen the
+    // gate by accident. Nothing not named here is reachable — see GATE_EXEMPT_MODULES
+    // (${GATE_EXEMPT_MODULES.join(', ')}), whose real contract is GATE_EXEMPT_SCREENS.
+    //
+    // showDutyList is FIRST so a push-notification deep link (`data.screen === 'duty'`,
+    // the listener above) lands on the roster and not on the wizard — by construction
+    // rather than by a special case. Back from any of these returns to the wizard.
+    //
+    // All READ-ONLY: requireProfileCompletion replaces the guest sheet on the one prop
+    // FacilityProfileScreen routes every write through, and onBook is deliberately NOT
+    // passed. Booking is hidden for health types anyway ("directory only"), so the two
+    // together leave no write path open.
+    if (showDutyList) {
+      content = <DutyListScreen onBack={() => { setShowDutyList(false); setDutyRegion(null) }} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+    } else if (showTowing) {
+      content = <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} />
+    } else if (selectedFacility) {
+      content = <FacilityProfileScreen
+        facility={selectedFacility}
+        lang={lang}
+        session={session}
+        isFavorite={favorites.has(selectedFacility.id)}
+        onToggleFavorite={() => toggleFavorite(selectedFacility.id)}
+        onBack={() => setSelectedFacility(null)}
+        onRequireAccount={requireProfileCompletion}
+      />
+    } else if (gateHealthList) {
+      content = <HomeScreen
+        lang={lang}
+        facilities={facilities}
+        dutyFacilityId={dutyFacilityId}
+        dutyRosterStatus={dutyRosterStatus}
+        userLocation={userLocation}
+        facilityRatings={facilityRatings}
+        favorites={favorites}
+        notifications={notifications}
+        facilityLoadError={facilityLoadError}
+        locationDenied={locationDenied}
+        weatherData={weatherData}
+        forceFacilityList
+        hideHeaderActions
+        onExitFacilityList={() => setGateHealthList(false)}
+        onSelectFacility={setSelectedFacility}
+        onUnclaimedFacility={setUnclaimedFacility}
+        onToggleFavorite={toggleFavorite}
+        onShowDutyList={() => setShowDutyList(true)}
+        onRetry={() => { setLoading(true); setRetryCount(c => c + 1) }}
+      />
+    } else {
+      content = <ProfileSetupScreen
+        session={session}
+        lang={lang}
+        profile={profile}
+        prefillRegion={gatePrefillRegion}
+        onDone={() => { setGateHealthList(false); reloadProfile() }}
+        onEmergencyNumbers={() => setShowEmergencyModal(true)}
+        onDutyList={() => setShowDutyList(true)}
+        onHealthDirectory={() => setGateHealthList(true)}
+      />
+    }
   } else if (profile.role === 'admin' && !adminPreview) {
     content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} />
   } else if (profile.role === 'provider') {
@@ -1859,6 +2027,20 @@ export default function App() {
         lang={lang}
         onClose={() => setShowCitySettings(false)}
       />
+      {/* Same component, different refusal: a signed-in user with an incomplete profile
+          browsing the read-only emergency directory. Telling them to "sign up" when they
+          already have an account is how copy makes an app look broken. */}
+      <AccountRequiredSheet
+        visible={!!profileGateKey}
+        messageKey={profileGateKey}
+        titleKey="pgReadOnlyTitle"
+        ctaKey="pgFinishProfile"
+        icon="person-circle-outline"
+        lang={lang}
+        onSignUp={() => { setProfileGateKey(null); setSelectedFacility(null); setGateHealthList(false) }}
+        onClose={() => setProfileGateKey(null)}
+      />
+
       <AccountRequiredSheet
         visible={!!gateKey}
         messageKey={gateKey}

@@ -13,17 +13,16 @@ ADA ("we", "our", "the app") is a directory and services app for residents of an
 1. DATA WE COLLECT
 • Account data: email address, password (hashed by Supabase Auth — we never see it), and your account role.
 • Profile data. Each field is listed with what it is for. Where a field is marked "not used yet", that is literal: we collect it for the stated purpose and nothing in the app reads it today.
-  · First and last name — your real name. A provider you book an appointment with is shown your name, so they know who is coming.
+  · First and last name — your real name. Held on your account; see section 2 for who can see it.
   · Display name — a name you choose, 3 to 20 characters. It does not have to be your real name. This is the name shown next to reviews and questions you post, and it is the only name other users see. Not used yet — no part of the app displays it today.
   · Date of birth — to confirm you are 13 or over. This is checked when you enter it and the account cannot be completed without it. We also intend to use it to keep age-restricted features and content away from accounts that should not see them; that second use is not built yet.
   · Nationality — so that we can tell which residency, permit and paperwork information applies to you, and which languages to offer first. Not used yet — nothing in the app reads it.
-  · Phone number — held on your account so that we can contact you about your account or a booking. It is not shown to other users and is not given to providers. Not used yet — nothing in the app reads it, and we have not contacted anyone using it.
+  · Phone number — held on your account so that we can contact you about your account. It is not shown to other users and is not given to providers. Not used yet — nothing in the app reads it, and we have not contacted anyone using it.
   · Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Not used yet — nothing in the app reads it.
   · Resident status — student, working here, newly arrived, resident, or visiting — and, if you are a student, your study level and, for university and postgraduate study, your institution. This is intended to decide which parts of ADA are put in front of you, because someone who has just arrived needs different things from someone who has lived here ten years. Not used yet — nothing in the app reads it.
   · Preferred language — to show the app, and the notifications we send you, in your language.
 • Profile picture: optional. Either a preset avatar you choose, or an image you upload, which is stored in our file storage.
-• Push notification token: stored to send you duty pharmacy alerts and updates about your bookings. You can disable this in your device settings at any time.
-• Appointment records: facility, requested time, and status.
+• Push notification token: stored to send you duty pharmacy alerts and replies to questions you have asked. You can disable this in your device settings at any time.
 • Reviews and questions you submit.
 • Moderation data: content you report, and users you block. Your block list is private and is never shown to the user you blocked.
 • Rejected submissions: if text you submit is rejected by our content filter, we keep a record of it, linked to your account, for 30 days. Section 5 describes it in full.
@@ -38,14 +37,12 @@ Other users can see:
 
 Other users cannot see: your first and last name, your date of birth, your nationality, your phone number, your region, your resident status, your study level or institution, or your email address.
 
-A provider you book with is shown your full name and the content of your request, so that they can identify your booking. They are not shown your date of birth, phone number, region, resident status, or any of your other bookings.
-
-One exception, and it is one you type yourself. Some booking forms — vehicle servicing, for example — ask for a contact number for that specific booking. A number you enter there is sent to that business along with the booking. It is separate from the phone number on your profile, which is never shared.
+Providers are not shown any of your personal data. When you ask a question on a facility's page, the provider sees the question and your display name — not your real name, your date of birth, your phone number, your region or your resident status.
 
 Our administrators can see the data on your account. This is necessary to operate the service, investigate reports, and respond to your requests.
 
 3. HOW WE USE YOUR DATA
-• To operate the app: show you relevant facilities, manage appointments, send notifications.
+• To operate the app: show you relevant facilities and send notifications.
 • To personalise your experience: display content in your preferred language.
 • To screen text you post against our list of prohibited terms, so that abusive content does not reach other users.
 • To review submissions the filter rejected, so that we can find rejections that were wrong and correct them.
@@ -105,10 +102,7 @@ If we become aware that an account has been created by someone under 13, we will
 5. PROVIDER ACCOUNTS
 Providers are responsible for keeping their facility information accurate and up to date. Listing on ADA does not constitute an endorsement by us. We reserve the right to suspend or remove any listing that contains inaccurate, misleading, or inappropriate content.
 
-6. APPOINTMENTS
-ADA facilitates appointment requests between customers and providers. We are not party to the appointment and bear no responsibility for missed, cancelled, delayed, or unsatisfactory appointments. Any disputes regarding appointments are between the customer and the provider.
-
-7. PROHIBITED USE
+6. PROHIBITED USE
 You may not use ADA to:
 • Submit false, misleading, or fraudulent information.
 • Harass, abuse, or harm other users or providers.
@@ -116,10 +110,10 @@ You may not use ADA to:
 • Scrape, copy, or redistribute app content without permission.
 • Use the app for any unlawful purpose under TRNC or applicable law.
 
-8. USER CONTENT AND COMMUNITY STANDARDS
+7. USER CONTENT AND COMMUNITY STANDARDS
 ADA lets you post content — including reviews, questions, answers, and in some parts of the app listings and other submissions. You are solely responsible for the content you post, and you must have the right to post it.
 
-8.1 ZERO TOLERANCE FOR OBJECTIONABLE CONTENT
+7.1 ZERO TOLERANCE FOR OBJECTIONABLE CONTENT
 There is ZERO TOLERANCE for objectionable content and abusive users. You may not post content that:
 • Is unlawful, defamatory, fraudulent, or misleading.
 • Harasses, threatens, bullies, or intimidates any person.
@@ -132,14 +126,14 @@ There is ZERO TOLERANCE for objectionable content and abusive users. You may not
 
 This list is illustrative, not exhaustive. Content that is not listed here may still be removed if it breaches the spirit of these standards.
 
-8.2 CONTENT FILTERING
+7.2 CONTENT FILTERING
 Text you submit in reviews, questions, answers, facility and place listings, and listing change requests is automatically screened at the moment you submit it against a list of prohibited terms, currently maintained in English and Turkish.
 
 Automated screening is a first line of defence only. It does not cover every type of content or every language, and no automated filter catches everything. The reporting and blocking tools described below apply to all user content, whether or not it was automatically screened.
 
 If a submission is rejected by this screening, we keep the rejected text, the term that triggered the rejection, and the time it happened, so that we can find and correct rejections that were wrong and improve the filter. These records are linked to your account, are visible only to our administrators, are deleted automatically after 30 days, and are not used for any other purpose.
 
-8.3 REPORTING OBJECTIONABLE CONTENT
+7.3 REPORTING OBJECTIONABLE CONTENT
 Every review, question, and answer in ADA carries a Report action. Open the menu on the item you want to report, choose a reason, and submit it — you do not need to contact us separately, and the author is not told who reported them.
 
 We review reported content and remove content that breaches these standards within 24 hours of the report.
@@ -148,33 +142,33 @@ Content reported by several independent users may be hidden automatically, pendi
 
 Content we remove is retained internally so that we can identify repeat breaches by the same account. It is no longer visible to other users.
 
-8.4 BLOCKING ANOTHER USER
+7.4 BLOCKING ANOTHER USER
 You can block another user from any review they have posted. Blocking hides that user's reviews and comments from you wherever community content appears. Blocking is private: the blocked user is not notified and cannot tell that you have blocked them. You can see and reverse your blocks at any time in your profile settings.
 
-8.5 CONSEQUENCES OF BREACHING THESE STANDARDS
+7.5 CONSEQUENCES OF BREACHING THESE STANDARDS
 If you breach these standards we may, at our discretion and depending on severity: remove the content; temporarily suspend your ability to post reviews, questions, and answers; or permanently terminate your account and your access to ADA. Where a breach is serious, we may act without prior notice.
 
-8.6 CONTACTING US ABOUT CONTENT
+7.6 CONTACTING US ABOUT CONTENT
 To report objectionable content, an abusive user, or a decision we have taken, contact us at getadaapp@gmail.com. We aim to respond within 24 hours.
 
-9. INTELLECTUAL PROPERTY
+8. INTELLECTUAL PROPERTY
 All content, design, and code in ADA is owned by or licensed to us. You may not reproduce, distribute, or create derivative works without our written permission.
 
-10. LIMITATION OF LIABILITY
+9. LIMITATION OF LIABILITY
 To the maximum extent permitted by applicable law, ADA is provided "as is" without warranty of any kind, express or implied. We are not liable for any indirect, incidental, special, or consequential damages arising from your use of or inability to use the app, including but not limited to damages resulting from reliance on facility information.
 
-11. TERMINATION
+10. TERMINATION
 We reserve the right to suspend or terminate your account at any time if you breach these terms or if we determine, in our sole discretion, that your use of the app is harmful to other users or to ADA.
 
-12. CHANGES TO THESE TERMS
+11. CHANGES TO THESE TERMS
 We may update these terms from time to time. Continued use of the app after changes constitutes acceptance of the updated terms. The "Last updated" date above always reflects the current version.
 
-13. GOVERNING LAW AND LANGUAGE
+12. GOVERNING LAW AND LANGUAGE
 These terms are governed by the laws of the Turkish Republic of Northern Cyprus (TRNC).
 
 These terms are published in English. If we make a translation available for convenience, the English version governs in the event of any inconsistency.
 
-14. CONTACT
+13. CONTACT
 Questions about these terms, or to report objectionable content? Contact us at getadaapp@gmail.com.`
 
 export default function LegalScreen({ onBack, lang, initialTab = 'privacy' }) {

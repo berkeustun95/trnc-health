@@ -11,6 +11,9 @@ import PageBackground from '../components/PageBackground'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+// Constants, not string literals: a typo'd literal silently never matches and the
+// banner would quietly stay green on a broken roster.
+import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS } from '../constants/flags'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
@@ -91,6 +94,18 @@ const RESULT_META = {
 }
 
 export default function HomeScreen({
+  // ─── Profile-gate props (Slice 2). All three DEFAULT to today's behaviour, so the
+  //     normal render path is byte-identical and this screen has one code path, not two.
+  //
+  //     Why reuse this screen at all: the facility directory is already a MODE of it
+  //     (showFacilityList), separate from the tile hub. A gated user must reach the
+  //     directory WITHOUT the hub, because the hub carries a tile for every marketplace
+  //     module — granting "the health module" would grant the whole app. The alternative
+  //     was a second directory screen duplicating this one's search, distance sort,
+  //     ratings and duty badge, which would drift.
+  forceFacilityList = false,   // start in, and stay in, facility-list mode
+  hideHeaderActions = false,   // no menu / notifications while gated
+  onExitFacilityList,          // back leaves the screen instead of revealing the hub
   lang,
   facilities,
   dutyFacilityId,
@@ -134,7 +149,7 @@ export default function HomeScreen({
   onShowGames,
   onShowStudentHub,
 }) {
-  const [showFacilityList, setShowFacilityList] = useState(false)
+  const [showFacilityList, setShowFacilityList] = useState(forceFacilityList)
   const [searchText, setSearchText]             = useState('')
   const [activeType, setActiveType]             = useState(null)
   const [activeSpecialty, setActiveSpecialty]   = useState(null)
@@ -618,7 +633,14 @@ export default function HomeScreen({
             roster it invited the user in and the next screen denied them. It now tells
             the truth up front and still opens the list, where the KTEB fallback lives. */}
         {(() => {
-          const rosterOk = dutyRosterStatus === 'fresh'
+          const rosterOk = dutyRosterStatus === DUTY_FRESH
+          // THIN, NOT STALE. 'Duty list isn't current' is false on a partial day — the
+          // list IS current, it just does not cover the country — and a user who taps
+          // through to a notice saying something different trusts neither. Styling stays
+          // the alert variant (the point is that it must not read as healthy); only the
+          // title changes. The sub, 'Tap for the current list', is a call to action
+          // rather than a claim about staleness, so it still reads correctly.
+          const rosterPartial = dutyRosterStatus === DUTY_PARTIAL
           return (
             <TouchableOpacity
               style={[s.dutyBanner, !rosterOk && s.dutyBannerStale]}
@@ -635,7 +657,9 @@ export default function HomeScreen({
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[s.dutyBannerTitle, !rosterOk && { color: colors.danger }]}>
-                    {t(rosterOk ? 'tonightDuty' : 'dutyBannerStaleTitle', lang)}
+                    {t(rosterOk ? 'tonightDuty'
+                      : rosterPartial ? 'dutyBannerPartialTitle'
+                      : 'dutyBannerStaleTitle', lang)}
                   </Text>
                   <Text style={s.dutyBannerSub}>
                     {t(rosterOk ? 'allRegions' : 'dutyBannerStaleSub', lang)}
@@ -813,21 +837,28 @@ export default function HomeScreen({
         <View style={s.container}>
           <View style={[s.header, showFacilityList && { justifyContent: 'space-between' }]}>
             {showFacilityList ? (
-              <BackButton lang={lang} onImage onPress={() => setShowFacilityList(false)} />
+              <BackButton lang={lang} onImage onPress={() => {
+                // Under the gate there is no hub to go back TO — revealing it would be
+                // the leak this whole arrangement exists to prevent.
+                if (forceFacilityList) onExitFacilityList?.()
+                else setShowFacilityList(false)
+              }} />
             ) : (
               <View style={s.headerLogoWrap} pointerEvents="none">
                 <Image source={require('../assets/logonobg.png')} style={s.headerIcon} resizeMode="contain" />
               </View>
             )}
-            <View style={s.headerRight}>
-              <TouchableOpacity style={s.notifBtn} onPress={onShowNotifs}>
-                <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
-                {notifications.some(n => !n.read) && <View style={s.notifDot} />}
-              </TouchableOpacity>
-              <TouchableOpacity ref={hamburgerRef} style={s.hamburgerBtn} onPress={onOpenMenu}>
-                <Feather name="menu" size={20} color={colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
+            {hideHeaderActions ? <View /> : (
+              <View style={s.headerRight}>
+                <TouchableOpacity style={s.notifBtn} onPress={onShowNotifs}>
+                  <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
+                  {notifications.some(n => !n.read) && <View style={s.notifDot} />}
+                </TouchableOpacity>
+                <TouchableOpacity ref={hamburgerRef} style={s.hamburgerBtn} onPress={onOpenMenu}>
+                  <Feather name="menu" size={20} color={colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {showFacilityList ? renderFacilityList() : renderHub()}

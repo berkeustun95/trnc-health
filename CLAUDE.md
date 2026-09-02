@@ -97,6 +97,16 @@ went missing). Two mandatory rules:
 - **Every ADD COLUMN migration ends with `NOTIFY pgrst, 'reload schema';`** (after
   `RESET ROLE;`). Without it, a stale PostgREST cache reports 42703 "column does
   not exist" through the REST API even though the column exists in Postgres.
+- **Changing `normalize_for_moderation()` now also changes the display-name uniqueness
+  key.** `normalize_display_name()` wraps it, and `profiles.display_name_normalized` is
+  a STORED column filled by `check_profile_name_content()` — so a redefinition leaves
+  every existing row carrying the OLD normalized value while new rows carry the new one,
+  and the unique index stops comparing like with like. Recompute in the same migration:
+  `UPDATE profiles SET display_name = display_name WHERE display_name IS NOT NULL;`
+  (the trigger recomputes on write). This coupling is the price of enforcing uniqueness
+  on the normalized form, and it was chosen over an expression index precisely because
+  this failure is VISIBLE — an expression index on an IMMUTABLE-declared function would
+  have gone silently corrupt instead, with no error at any point.
 
 ## Conventions
 - Functional React components with hooks.
@@ -359,6 +369,160 @@ went missing). Two mandatory rules:
   is the kind of limit that is crossed by someone adding words through an admin screen,
   not by anyone thinking about PostgREST. The probe prints the live figure on every run;
   trust the printed number, not this sentence.
+
+- **An assertion that cannot fail on the case it exists to detect is worse than no
+  assertion — and `<>` is how you write one by accident.** `NULL <> 'x'` evaluates to
+  NULL, and `IF NULL THEN` does not fire. So every one of these, written in the
+  `20261001` DO block and green on first draft, would have PASSED on precisely the
+  failure it was there to catch:
+    * `IF normalize_display_name('Merhaba 123') <> 'merhaba 123'` — passes if the
+      function returns NULL, i.e. if it is completely broken.
+    * `IF (SELECT display_name_normalized FROM profiles WHERE id = v_a) <> 'zzprobename'`
+      — passes if the trigger never filled the column at all, which is exactly the state
+      that would let duplicate display names through the unique index.
+  Use `IS DISTINCT FROM` in every assertion, and `IS NOT DISTINCT FROM` for the control
+  (`a = b` is NULL when both are NULL, so a "these must differ" control written with `=`
+  is silent when they are both nothing). This is the same family as the green-check and
+  hardcoded-set rules, but sharper: those checks CAN go red and nobody watched them; this
+  one has no red to go to for the one input that matters. Note it is not general — `<>`
+  is correct where the operand cannot be NULL (`SQLERRM`, a `count(*)`, a `coalesce`d
+  expression), and rewriting those adds noise. The test is whether NULL is reachable.
+
+- **A verification block that mutates real rows must pick rows it cannot damage, and
+  restore what it captured — not what it assumes.** The same DO block first took the two
+  lowest `profiles` ids, wrote probe display names onto them, and then set
+  `display_name = NULL, date_of_birth = NULL` to clean up. Correct on the first apply,
+  when every row is nameless. **Destructive on a RE-APPLY** once the wizard ships: it
+  would overwrite a real user's display name and erase a real date of birth, and the
+  file is written re-runnable (`IF NOT EXISTS` throughout) precisely so it can be
+  re-applied. Fixed by selecting only rows `WHERE display_name IS NULL`, capturing
+  `date_of_birth` into a variable and restoring THAT, and scoping the leftover check to
+  the probe's own two names rather than to "any display name anywhere" — the latter
+  reads as a leak the first time a real user has finished the wizard. Same lesson
+  `20260926` already applied when it restored `last_hit_at` captured rather than NULLed;
+  it generalises to every in-migration probe that writes.
+
+- **A scripted edit to a large SQL file needs a STRUCTURAL check, not an eyeball.** Eight
+  anchored inserts were made into `verify_schema.sql` by script; seven were checked by
+  reading the surrounding lines and one was not. That one left `)    'contact_events'`
+  in the RLS-enabled list — QUERY 1 would have died with a syntax error, and the drift
+  report is the thing you run FIRST on a database you are unsure about, so the failure
+  lands at the worst moment. The check that would have caught it costs nothing: strip
+  comments and string literals, count parens, and scan for a closing paren followed by
+  content or two adjacent tuple lines without a comma. Run it over the whole file after
+  any scripted edit, and expect one false positive per line whose trailing comment ends
+  in `)`.
+
+- **THE CHECK AND THE THING CHECKED MUST BE IN THE SAME FRAME OF REFERENCE. This is now
+  one standing hazard, not a shelf of anecdotes — four instances on 2026-08-30/31 alone,
+  every one of them a check that was WRONG while the thing it checked was RIGHT.**
+    * **A `sed` break that never landed.** Written against one file's indentation, run
+      against another's. The probe then printed no failure and the honest-looking
+      conclusion was "that check is dead". The check was fine; the *break* was.
+    * **A forged-term assertion that compared a value to itself.** Structurally incapable
+      of returning anything but pass.
+    * **`?cb=$(date +%s)` on `getadaapp.com/privacy`.** A query string sends that route
+      past the Worker to Vercel, so the probe reported `404` for BOTH store-registered
+      URLs against a deploy that was completely healthy. The ritual's stated pass
+      condition was "anything other than 200 and we roll back" — so the check would have
+      rolled back a good deploy, and the rollback would have "fixed" it, confirming the
+      wrong diagnosis.
+    * **`position('comment' in pg_trigger.tgargs::text)`.** `tgargs` is BYTEA holding
+      NULL-TERMINATED arguments, so `::text` renders `\x636f6d6d656e7400`. The literal
+      substring `comment` is not in a hex string and never will be. It aborted a
+      migration whose trigger was perfect.
+  **They look like four different bugs and they are one.** In each case the check reads
+  the value in one frame and compares it in another — a different file, a different URL,
+  a different encoding, or (worst) the same value on both sides. The *system* is never
+  what these tests report on; the *instrument* is. And an instrument that is broken does
+  not look broken. It looks like a result.
+  **The defence is one question, asked BEFORE the run, not after a surprising answer:**
+  *what exactly am I reading, and is it the same kind of thing I am comparing it to?*
+  Print the raw value next to the expectation once and the mismatch is obvious. This is
+  the same question as *"what would this print if the system were perfect?"* — that rule
+  catches an instrument that cannot fail; this one catches an instrument that cannot pass.
+  **Two corollaries earned the hard way:**
+  **(1) Put the raw value in the failure message.** The `tgargs` bug was diagnosed in
+  seconds because the assertion printed `args=\x636f6d6d656e7400` — the proof it was
+  wrong was inside its own error. An assertion that fails without showing what it read is
+  a dead end, and you will suspect the system before you suspect the test.
+  **(2) When a check fails, the FIRST hypothesis is the check.** Not the system. Three of
+  the four above cost real time to a wrong first hypothesis, and one of them nearly caused
+  an unnecessary production rollback. Reach for the system only once the instrument has
+  been cleared.
+  **And prefer the reading that needs no decoding at all.** `pg_get_triggerdef()` renders
+  canonical SQL; decoding `tgargs` by hand means `encode(...,'escape')` plus stripping a
+  terminator — more encoding handling in exactly the layer that just failed. When a check
+  breaks on a representation, the fix is usually to stop handling representations, not to
+  handle them more carefully.
+  Related, and the reason this cost nothing: **the migration rolled back cleanly.** A false
+  alarm inside `BEGIN … COMMIT` is free — nothing half-applied, no cleanup, re-runnable
+  after the fix. That is the argument for wrapping every manual-apply migration in an
+  explicit transaction with its assertions INSIDE it, even when the change is one line.
+
+- **Confirm the BREAK landed before you trust the RED — a break that does not break
+  looks exactly like a dead check.** Red-first testing has its own failure mode, met
+  head-on while probing the profile gate: a `sed` written against `constants/flags.js`
+  indentation was run against `check-module-flags.mjs`, which indents differently, so it
+  changed nothing. The probe then printed no failure, and the honest-looking conclusion
+  was "that check is dead". It was not; the test was. Ten minutes went into diagnosing a
+  working check.
+  So a red-first run has TWO assertions, not one: *the file changed*, and *the probe
+  noticed*. Print evidence of the mutation (`assert old in s` before replacing, or diff
+  the file) rather than assuming `sed` matched. This is the same shape as the rule above
+  it — an instrument that reports nothing is not the same as a system with nothing to
+  report — and it argues for `python3` with an explicit `assert anchor in text` over
+  `sed`, which fails silently by design.
+  The check that survived this then gained the control it was missing: a slice between
+  two markers now asserts it contains a key it must, because a slice whose end marker
+  precedes its start returns `''` and passes on everything.
+
+- **When a migration changes a count another migration's token asserts, RETIRE that token
+  in the same commit — do not leave it to go red later, and do not bump it.** `20260927`
+  registered "reviews/questions/answers carry 6 policies each". `20260928` then added the
+  owner soft-delete policy, taking two of them to 7, and registered its own
+  "policy counts are 7 / 7 / 6". Both tokens now counted the same set; the older one went
+  STALE/MISSING against a database that was exactly right, and sat red in the drift report
+  until somebody read it carefully.
+  Bumping 6 to 7 would have been the wrong fix — **two tokens counting the same thing is
+  what created the staleness**, and the duplicate would drift again at the next policy
+  change. One count, one owner. Keep the half of the old token that is genuinely its own
+  (here: that the UPDATE policy is PERMISSIVE, which no count can see) and delete the rest.
+  This matters more than a tidy report: a drift checker carrying a known-stale row teaches
+  the reader to skim, and the next real MISSING is skimmed with it. The file already warns
+  about that twice — for `claim_requests.kteb_confirmed` and for the 0925 matcher token —
+  and it happened anyway, because those warnings were about rows somebody might ADD, not
+  about a row that goes stale on its own when a LATER migration moves the number.
+
+## Compliance (Google Play — declared mixed-audience app)
+
+Target age groups were set to **13-15 / 16-17 / 18 and over** on 2026-08-29, which makes
+ADA a declared mixed-audience app. Three standing consequences:
+
+- **Users whose `date_of_birth` indicates UNDER 18 must receive NON-PERSONALIZED ADS.**
+  No ad SDK is integrated today. When one is, the age branch is a launch requirement, not
+  a follow-up — shipping personalized ads to a 15-year-old is a policy violation on day
+  one, and the DOB to make the distinction is already in `profiles`.
+- **Do not add any SDK that is disqualified under Google Play Families policy without
+  flagging it first.** Self-certification is per-SDK and ONE non-compliant SDK makes the
+  whole app ineligible. This includes anything added "just for analytics".
+- **Account-holder age and content visibility are SEPARATE CONCERNS.** The future
+  MEKB-approved kids module is served in guest mode or under a parent account, never via
+  a child-held account, and module access is not coupled to account age beyond
+  `GATE_EXEMPT_MODULES`. Keep them separate; coupling them is easy to do by accident and
+  expensive to unpick.
+
+`MIN_SIGNUP_AGE` lives in `constants/profileGate.js` and is mirrored as
+`interval '13 years'` in `20261001`'s trigger. It CANNOT be a CHECK constraint —
+`CURRENT_DATE` is STABLE and a CHECK requires IMMUTABLE — so the trigger is the only
+place it exists, and `npm run profile:check` fails if the two halves disagree. Never
+inline the number anywhere else.
+
+The DOB screen is a **neutral age screen**: no text stating a minimum, no pre-set date,
+free entry of day/month/year. The year range stops at `currentYear - MIN_SIGNUP_AGE`,
+and that tension has been considered and settled — Google's rule is about the SCREEN,
+not the picker bounds; a pre-set date or "you must be 13+" tells the user what to type,
+a bounded year list does not, and neither bound is singled out. **Do not re-litigate it.**
 
 ## Module go-live SOP (ordered — the order is the point)
 
