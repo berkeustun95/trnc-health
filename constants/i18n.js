@@ -43,7 +43,6 @@ const translations = {
     
     
     
-    
     questionsAnswers: 'Questions & Answers',
     askPlaceholder: 'Ask a question about this facility…',
     noQuestions: 'No questions yet.',
@@ -164,7 +163,6 @@ const translations = {
     
     
     
-    
     rateVisit: 'Rate',
     commentOptional: 'Add a comment (optional)…',
     login: 'Log in', signup: 'Sign up', createAccount: 'Create account',
@@ -174,10 +172,8 @@ const translations = {
     selectFacilityType: 'Facility type',
     
     
-    apptReminderBody: 'Your appointment at {name} starts in 1 hour.',
     notifNewQuestionTitle: 'New Question',
     notifNewQuestionBody: '{name} received a new question from a user.',
-    notifNewApptTitle: 'New Appointment Request',
     notifNewApptBody: '{name} has a new appointment request.',
     notifJobLiveTitle: 'Your job listing is live',
     notifJobLiveBody: '"{title}" is now visible on the jobs board.',
@@ -209,21 +205,19 @@ const translations = {
     notifDutySwapTitle: '💊 Duty pharmacy updated',
     notifDutySwapBody: '{name} is now the duty pharmacy for {date}.',
     tapViewDuty: 'Tap to view duty pharmacies →',
-    tabQA: 'Q&A', tabReviews: 'Reviews', tabArchive: 'Archive', tabStats: 'Stats', tabProfile: 'Profile', tabHome: 'Home', tabSaved: 'Saved', coverPhoto: 'Cover Photo', logoLabel: 'Logo', tapToAddCover: 'Tap to add cover photo', tapToAddLogo: 'Tap to add logo', tapToView: 'TAP TO VIEW', uploadFailed: 'Upload failed. Try again.', providerDocsUploadFailed: 'Some documents did not upload. Check your connection and tap Submit to try again.',
+    tabQA: 'Q&A', tabReviews: 'Reviews', tabArchive: 'Archive', tabStats: 'Stats', tabProfile: 'Profile', tabHome: 'Home', tabSaved: 'Saved', coverPhoto: 'Cover Photo', logoLabel: 'Logo', tapToAddCover: 'Tap to add cover photo', tapToAddLogo: 'Tap to add logo', uploadFailed: 'Upload failed. Try again.', providerDocsUploadFailed: 'Some documents did not upload. Check your connection and tap Submit to try again.',
     labelAddress: 'Address', labelHours: 'Opening Hours', hoursHint: 'e.g. Mon-Sat 08:00-18:00 or 24/7',
-    decline: 'Decline', send: 'Send',
+    send: 'Send',
     writeYourAnswer: 'Write your answer…', yourAnswer: 'Your answer',
     noFacilityLinked: 'No facility linked',
     noFacilityLinkedSub: 'Contact the admin to link your account to a facility.',
-    noPendingRequests: 'No pending appointment requests.',
     questionsFromCustomers: 'Questions from customers will appear here.',
     noPendingReviews: 'No pending reviews',
     noApprovedReviews: 'No approved reviews yet',
     statTotal: 'Total', statAnswered: 'Answered',
     statUnanswered: 'Unanswered', statApproved: 'Approved', statRejected: 'Rejected',
     searchPlaceholder: 'Search by name or address…',
-    noShowBtn: 'No-show', bookingBlocked: 'Booking Suspended', bookingBlockedMsg: 'Your booking access is suspended until {date} due to repeated no-shows or late cancellations.',
-    statusCompleted: 'Completed', reviewPromptTitle: 'How was your visit?', reviewPromptBody: 'Share your experience at {name}.',
+    
     noReviews: 'No reviews yet.',
     languagesSpoken: 'Languages Spoken', aboutFacility: 'About',
     notifications: 'Notifications', noNotifications: 'No notifications yet.', noNewNotifications: 'No new notifications', markAllRead: 'Mark all read', clearAll: 'Clear all',
@@ -320,12 +314,9 @@ const translations = {
     
     
     
-    
     garageBkSelectService: 'Which service?',
-    
     garageManagePhotos: 'Manage photos',
     garageAvailSoon: 'Availability editor coming soon',
-    
     
     
     
@@ -408,7 +399,6 @@ const translations = {
     groomEditMaterialNote: 'Changes to name, category or address need admin re-approval.',
     groomEditSaved: 'Changes saved.',
     groomEditPendingNote: 'Your listing is under review again after the changes.',
-    
     
     
     
@@ -626,7 +616,6 @@ const translations = {
     cancel: 'Cancel',
     openNow: 'Open now',
     reportProblem: 'Suggest a correction',
-    
     
     callToBook: 'Call to book',
     pharmacies: 'Pharmacies', clinics: 'Clinics', hospitals: 'Hospitals', dentists: 'Dentists',
@@ -1321,7 +1310,6 @@ const translations = {
     
     
     
-    
     questionsAnswers: 'Sorular & Cevaplar',
     askPlaceholder: 'Bu tesis hakkında bir soru sorun…',
     noQuestions: 'Henüz soru yok.',
@@ -1439,7 +1427,6 @@ const translations = {
     
     
     
-    
     rateVisit: 'Puan ver',
     commentOptional: 'Yorum ekle (isteğe bağlı)…',
     login: 'Giriş yap', signup: 'Kayıt ol', createAccount: 'Hesap oluştur',
@@ -1449,10 +1436,8 @@ const translations = {
     selectFacilityType: 'Tesis türü',
     
     
-    apptReminderBody: '{name} randevunuz 1 saat sonra başlıyor.',
     notifNewQuestionTitle: 'Yeni Soru',
     notifNewQuestionBody: '{name} bir kullanıcıdan yeni soru aldı.',
-    notifNewApptTitle: 'Yeni Randevu Talebi',
     notifNewApptBody: '{name} için yeni bir randevu talebi var.',
     notifJobLiveTitle: 'İlanın yayında',
     notifJobLiveBody: '"{title}" artık iş ilanları listesinde görünüyor.',
@@ -1484,21 +1469,19 @@ const translations = {
     notifDutySwapTitle: '💊 Nöbetçi eczane güncellendi',
     notifDutySwapBody: '{date} tarihinde nöbetçi eczane {name} oldu.',
     tapViewDuty: 'Nöbetçi eczaneleri görüntülemek için dokun →',
-    tabQA: 'Q&A', tabReviews: 'İncelemeler', tabArchive: 'Arşiv', tabStats: 'İstatistik', tabProfile: 'Profil', tabHome: 'Anasayfa', tabSaved: 'Kaydedilenler', coverPhoto: 'Kapak Fotoğrafı', logoLabel: 'Logo', tapToAddCover: 'Kapak fotoğrafı eklemek için dokun', tapToAddLogo: 'Logo eklemek için dokun', tapToView: 'GÖRÜNTÜLEMEK İÇİN DOKUN', uploadFailed: 'Yükleme başarısız. Tekrar dene.', providerDocsUploadFailed: 'Bazı belgeler yüklenemedi. Bağlantını kontrol edip tekrar Gönder düğmesine dokun.',
+    tabQA: 'Q&A', tabReviews: 'İncelemeler', tabArchive: 'Arşiv', tabStats: 'İstatistik', tabProfile: 'Profil', tabHome: 'Anasayfa', tabSaved: 'Kaydedilenler', coverPhoto: 'Kapak Fotoğrafı', logoLabel: 'Logo', tapToAddCover: 'Kapak fotoğrafı eklemek için dokun', tapToAddLogo: 'Logo eklemek için dokun', uploadFailed: 'Yükleme başarısız. Tekrar dene.', providerDocsUploadFailed: 'Bazı belgeler yüklenemedi. Bağlantını kontrol edip tekrar Gönder düğmesine dokun.',
     labelAddress: 'Adres', labelHours: 'Çalışma Saatleri', hoursHint: 'ör. Mon-Sat 08:00-18:00 veya 24/7',
-    decline: 'Reddet', send: 'Gönder',
+    send: 'Gönder',
     writeYourAnswer: 'Cevabınızı yazın…', yourAnswer: 'Cevabınız',
     noFacilityLinked: 'Bağlı tesis yok',
     noFacilityLinkedSub: 'Hesabınızı bir tesise bağlamak için yöneticiyle iletişime geçin.',
-    noPendingRequests: 'Bekleyen randevu talebi yok.',
     questionsFromCustomers: 'Müşterilerden gelen sorular burada görünecek.',
     noPendingReviews: 'Bekleyen inceleme yok',
     noApprovedReviews: 'Henüz onaylanmış inceleme yok',
     statTotal: 'Toplam', statAnswered: 'Yanıtlandı',
     statUnanswered: 'Yanıtsız', statApproved: 'Onaylandı', statRejected: 'Reddedildi',
     searchPlaceholder: 'İsim veya adrese göre ara…',
-    noShowBtn: 'Gelmedi', bookingBlocked: 'Randevu Askıya Alındı', bookingBlockedMsg: 'Tekrarlanan devamsızlıklar nedeniyle randevu erişiminiz {date} tarihine kadar askıya alınmıştır.',
-    statusCompleted: 'Tamamlandı', reviewPromptTitle: 'Ziyaretiniz nasıldı?', reviewPromptBody: '{name} deneyiminizi paylaşın.',
+    
     noReviews: 'Henüz değerlendirme yok.',
     languagesSpoken: 'Konuşulan Diller', aboutFacility: 'Hakkında',
     notifications: 'Bildirimler', noNotifications: 'Henüz bildirim yok.', noNewNotifications: 'Yeni bildirim yok', markAllRead: 'Tümünü okundu say', clearAll: 'Tümünü temizle',
@@ -1595,12 +1578,9 @@ const translations = {
     
     
     
-    
     garageBkSelectService: 'Hangi hizmet?',
-    
     garageManagePhotos: 'Fotoğrafları yönet',
     garageAvailSoon: 'Müsaitlik düzenleyici yakında',
-    
     
     
     
@@ -1683,7 +1663,6 @@ const translations = {
     groomEditMaterialNote: 'Ad, kategori veya adres değişiklikleri yönetici onayı gerektirir',
     groomEditSaved: 'Değişiklikler kaydedildi.',
     groomEditPendingNote: 'Değişiklikler sonrası ilanınız tekrar incelemede',
-    
     
     
     
@@ -1833,7 +1812,6 @@ const translations = {
     cancel: 'İptal',
     openNow: 'Şu an açık',
     reportProblem: 'Düzeltme öner',
-    
     
     callToBook: 'Aramak için ara',
     pharmacies: 'Eczaneler', clinics: 'Klinikler', hospitals: 'Hastaneler', dentists: 'Diş Hekimleri',
@@ -2601,7 +2579,6 @@ const translations = {
     
     
     
-    
     questionsAnswers: 'أسئلة وأجوبة',
     askPlaceholder: 'اطرح سؤالاً حول هذه المنشأة…',
     noQuestions: 'لا أسئلة حتى الآن.',
@@ -2754,7 +2731,6 @@ const translations = {
     
     
     
-    
     rateVisit: 'قيّم',
     commentOptional: 'أضف تعليقاً (اختياري)…',
     login: 'تسجيل الدخول', signup: 'إنشاء حساب', createAccount: 'إنشاء حساب',
@@ -2764,10 +2740,8 @@ const translations = {
     selectFacilityType: 'نوع المنشأة',
     
     
-    apptReminderBody: 'موعدك في {name} يبدأ بعد ساعة.',
     notifNewQuestionTitle: 'سؤال جديد',
     notifNewQuestionBody: 'تلقّت {name} سؤالاً جديداً من مستخدم.',
-    notifNewApptTitle: 'طلب موعد جديد',
     notifNewApptBody: '{name} لديها طلب موعد جديد.',
     notifJobLiveTitle: 'إعلان وظيفتك منشور',
     notifJobLiveBody: '"{title}" أصبح ظاهراً الآن في لوحة الوظائف.',
@@ -2799,21 +2773,19 @@ const translations = {
     notifDutySwapTitle: '💊 تم تحديث صيدلية المناوبة',
     notifDutySwapBody: '{name} هي صيدلية المناوبة بتاريخ {date}.',
     tapViewDuty: 'اضغط لعرض صيدليات المناوبة →',
-    tabQA: 'Q&A', tabReviews: 'المراجعات', tabArchive: 'الأرشيف', tabStats: 'الإحصائيات', tabProfile: 'الملف', tabHome: 'الرئيسية', tabSaved: 'المحفوظة', coverPhoto: 'صورة الغلاف', logoLabel: 'الشعار', tapToAddCover: 'اضغط لإضافة صورة غلاف', tapToAddLogo: 'اضغط لإضافة الشعار', tapToView: 'اضغط للعرض', uploadFailed: 'فشل الرفع. حاول مرة أخرى.', providerDocsUploadFailed: 'لم يتم رفع بعض المستندات. تحقق من اتصالك واضغط على إرسال للمحاولة مرة أخرى.',
+    tabQA: 'Q&A', tabReviews: 'المراجعات', tabArchive: 'الأرشيف', tabStats: 'الإحصائيات', tabProfile: 'الملف', tabHome: 'الرئيسية', tabSaved: 'المحفوظة', coverPhoto: 'صورة الغلاف', logoLabel: 'الشعار', tapToAddCover: 'اضغط لإضافة صورة غلاف', tapToAddLogo: 'اضغط لإضافة الشعار', uploadFailed: 'فشل الرفع. حاول مرة أخرى.', providerDocsUploadFailed: 'لم يتم رفع بعض المستندات. تحقق من اتصالك واضغط على إرسال للمحاولة مرة أخرى.',
     labelAddress: 'العنوان', labelHours: 'ساعات العمل', hoursHint: 'مثال: Mon-Sat 08:00-18:00 أو 24/7',
-    decline: 'رفض', send: 'إرسال',
+    send: 'إرسال',
     writeYourAnswer: 'اكتب إجابتك…', yourAnswer: 'إجابتك',
     noFacilityLinked: 'لا يوجد مرفق مرتبط',
     noFacilityLinkedSub: 'تواصل مع المسؤول لربط حسابك بمنشأة.',
-    noPendingRequests: 'لا توجد طلبات مواعيد معلقة.',
     questionsFromCustomers: 'ستظهر هنا أسئلة العملاء.',
     noPendingReviews: 'لا توجد مراجعات معلقة',
     noApprovedReviews: 'لا توجد مراجعات معتمدة بعد',
     statTotal: 'الإجمالي', statAnswered: 'تمت الإجابة',
     statUnanswered: 'بدون إجابة', statApproved: 'معتمد', statRejected: 'مرفوض',
     searchPlaceholder: 'ابحث بالاسم أو العنوان…',
-    noShowBtn: 'لم يحضر', bookingBlocked: 'تعليق الحجز', bookingBlockedMsg: 'تم تعليق وصولك إلى الحجز حتى {date} بسبب تكرار الغيابات.',
-    statusCompleted: 'مكتمل', reviewPromptTitle: 'كيف كانت زيارتك؟', reviewPromptBody: 'شارك تجربتك في {name}.',
+    
     noReviews: 'لا توجد تقييمات حتى الآن.',
     languagesSpoken: 'اللغات المتحدثة', aboutFacility: 'حول',
     notifications: 'الإشعارات', noNotifications: 'لا إشعارات حتى الآن.', markAllRead: 'تحديد الكل كمقروء', clearAll: 'مسح الكل',
@@ -2884,7 +2856,6 @@ const translations = {
     groomRegisterActiveSub: 'نشاطك التجاري مُدرَج في الدليل.',
     groomRegisterDeclined: 'لم تتم الموافقة',
     groomRegisterDeclinedSub: 'لم تتم الموافقة على إدراجك. تواصل معنا إذا كنت تعتقد أن هذا خطأ.',
-    
     
     
     
@@ -3035,7 +3006,6 @@ const translations = {
     cancel: 'إلغاء',
     openNow: 'مفتوح الآن',
     reportProblem: 'اقتراح تصحيح',
-    
     
     pharmacies: 'الصيدليات',
     chipDutyPharmacies: 'صيدليات المناوبة',
@@ -3566,7 +3536,6 @@ const translations = {
     
     
     
-    
     questionsAnswers: 'Вопросы и ответы',
     askPlaceholder: 'Задайте вопрос об этом учреждении…',
     noQuestions: 'Вопросов пока нет.',
@@ -3719,7 +3688,6 @@ const translations = {
     
     
     
-    
     rateVisit: 'Оценить',
     commentOptional: 'Добавить комментарий (необязательно)…',
     login: 'Войти', signup: 'Регистрация', createAccount: 'Создать аккаунт',
@@ -3729,10 +3697,8 @@ const translations = {
     selectFacilityType: 'Тип учреждения',
     
     
-    apptReminderBody: 'Ваша запись в {name} начнётся через 1 час.',
     notifNewQuestionTitle: 'Новый вопрос',
     notifNewQuestionBody: '{name} получила новый вопрос от пользователя.',
-    notifNewApptTitle: 'Новый запрос на запись',
     notifNewApptBody: '{name} получила новый запрос на запись.',
     notifJobLiveTitle: 'Ваша вакансия опубликована',
     notifJobLiveBody: '«{title}» теперь видна в списке вакансий.',
@@ -3764,21 +3730,19 @@ const translations = {
     notifDutySwapTitle: '💊 Дежурная аптека обновлена',
     notifDutySwapBody: '{name} теперь дежурная аптека на {date}.',
     tapViewDuty: 'Нажмите, чтобы увидеть дежурные аптеки →',
-    tabQA: 'Q&A', tabReviews: 'Проверки', tabArchive: 'Архив', tabStats: 'Статистика', tabProfile: 'Профиль', tabHome: 'Главная', tabSaved: 'Сохранённые', coverPhoto: 'Обложка', logoLabel: 'Логотип', tapToAddCover: 'Нажмите, чтобы добавить обложку', tapToAddLogo: 'Нажмите, чтобы добавить логотип', tapToView: 'НАЖМИТЕ ДЛЯ ПРОСМОТРА', uploadFailed: 'Ошибка загрузки. Попробуйте снова.', providerDocsUploadFailed: 'Некоторые документы не загрузились. Проверьте соединение и снова нажмите «Отправить».',
+    tabQA: 'Q&A', tabReviews: 'Проверки', tabArchive: 'Архив', tabStats: 'Статистика', tabProfile: 'Профиль', tabHome: 'Главная', tabSaved: 'Сохранённые', coverPhoto: 'Обложка', logoLabel: 'Логотип', tapToAddCover: 'Нажмите, чтобы добавить обложку', tapToAddLogo: 'Нажмите, чтобы добавить логотип', uploadFailed: 'Ошибка загрузки. Попробуйте снова.', providerDocsUploadFailed: 'Некоторые документы не загрузились. Проверьте соединение и снова нажмите «Отправить».',
     labelAddress: 'Адрес', labelHours: 'Часы работы', hoursHint: 'напр. Mon-Sat 08:00-18:00 или 24/7',
-    decline: 'Отклонить', send: 'Отправить',
+    send: 'Отправить',
     writeYourAnswer: 'Напишите ваш ответ…', yourAnswer: 'Ваш ответ',
     noFacilityLinked: 'Учреждение не привязано',
     noFacilityLinkedSub: 'Обратитесь к администратору, чтобы привязать аккаунт к учреждению.',
-    noPendingRequests: 'Нет ожидающих запросов на приём.',
     questionsFromCustomers: 'Здесь появятся вопросы клиентов.',
     noPendingReviews: 'Нет ожидающих проверок',
     noApprovedReviews: 'Утверждённых проверок пока нет',
     statTotal: 'Всего', statAnswered: 'Отвечено',
     statUnanswered: 'Без ответа', statApproved: 'Одобрено', statRejected: 'Отклонено',
     searchPlaceholder: 'Поиск по названию или адресу…',
-    noShowBtn: 'Не явился', bookingBlocked: 'Запись заблокирована', bookingBlockedMsg: 'Ваш доступ к записи заблокирован до {date} из-за повторных пропусков.',
-    statusCompleted: 'Завершено', reviewPromptTitle: 'Как прошёл визит?', reviewPromptBody: 'Поделитесь впечатлением о {name}.',
+    
     noReviews: 'Отзывов пока нет.',
     languagesSpoken: 'Языки обслуживания', aboutFacility: 'О нас',
     notifications: 'Уведомления', noNotifications: 'Уведомлений пока нет.', markAllRead: 'Отметить все прочитанными', clearAll: 'Очистить всё',
@@ -3849,7 +3813,6 @@ const translations = {
     groomRegisterActiveSub: 'Ваш бизнес добавлен в каталог.',
     groomRegisterDeclined: 'Не одобрено',
     groomRegisterDeclinedSub: 'Ваша заявка не одобрена. Свяжитесь с нами, если считаете это ошибкой.',
-    
     
     
     
@@ -4000,7 +3963,6 @@ const translations = {
     cancel: 'Отмена',
     openNow: 'Открыто',
     reportProblem: 'Предложить исправление',
-    
     
     pharmacies: 'Аптеки',
     chipDutyPharmacies: 'Дежурные аптеки',
@@ -4530,7 +4492,6 @@ const translations = {
     
     
     
-    
     questionsAnswers: 'Ερωτήσεις & Απαντήσεις',
     askPlaceholder: 'Κάντε μια ερώτηση για αυτήν την εγκατάσταση…',
     noQuestions: 'Δεν υπάρχουν ερωτήσεις ακόμα.',
@@ -4683,7 +4644,6 @@ const translations = {
     
     
     
-    
     rateVisit: 'Αξιολόγηση',
     commentOptional: 'Προσθέστε σχόλιο (προαιρετικό)…',
     login: 'Σύνδεση', signup: 'Εγγραφή', createAccount: 'Δημιουργία λογαριασμού',
@@ -4693,10 +4653,8 @@ const translations = {
     selectFacilityType: 'Τύπος εγκατάστασης',
     
     
-    apptReminderBody: 'Το ραντεβού σας στο {name} ξεκινά σε 1 ώρα.',
     notifNewQuestionTitle: 'Νέα Ερώτηση',
     notifNewQuestionBody: 'Η {name} έλαβε νέα ερώτηση από χρήστη.',
-    notifNewApptTitle: 'Νέο Αίτημα Ραντεβού',
     notifNewApptBody: 'Η {name} έχει νέο αίτημα ραντεβού.',
     notifJobLiveTitle: 'Η αγγελία σας δημοσιεύτηκε',
     notifJobLiveBody: 'Η αγγελία "{title}" εμφανίζεται τώρα στον πίνακα αγγελιών.',
@@ -4728,21 +4686,19 @@ const translations = {
     notifDutySwapTitle: '💊 Εφημερεύον φαρμακείο ενημερώθηκε',
     notifDutySwapBody: 'Το {name} είναι το εφημερεύον φαρμακείο για {date}.',
     tapViewDuty: 'Πατήστε για εφημερεύοντα φαρμακεία →',
-    tabQA: 'Q&A', tabReviews: 'Κριτικές', tabArchive: 'Αρχείο', tabStats: 'Στατιστικά', tabProfile: 'Προφίλ', tabHome: 'Αρχική', tabSaved: 'Αποθηκευμένα', coverPhoto: 'Φωτογραφία εξωφύλλου', logoLabel: 'Λογότυπο', tapToAddCover: 'Πατήστε για προσθήκη εξωφύλλου', tapToAddLogo: 'Πατήστε για προσθήκη λογοτύπου', tapToView: 'ΠΑΤΗΣΤΕ ΓΙΑ ΠΡΟΒΟΛΗ', uploadFailed: 'Αποτυχία μεταφόρτωσης. Δοκιμάστε ξανά.', providerDocsUploadFailed: 'Ορισμένα έγγραφα δεν ανέβηκαν. Ελέγξτε τη σύνδεσή σας και πατήστε ξανά Υποβολή.',
+    tabQA: 'Q&A', tabReviews: 'Κριτικές', tabArchive: 'Αρχείο', tabStats: 'Στατιστικά', tabProfile: 'Προφίλ', tabHome: 'Αρχική', tabSaved: 'Αποθηκευμένα', coverPhoto: 'Φωτογραφία εξωφύλλου', logoLabel: 'Λογότυπο', tapToAddCover: 'Πατήστε για προσθήκη εξωφύλλου', tapToAddLogo: 'Πατήστε για προσθήκη λογοτύπου', uploadFailed: 'Αποτυχία μεταφόρτωσης. Δοκιμάστε ξανά.', providerDocsUploadFailed: 'Ορισμένα έγγραφα δεν ανέβηκαν. Ελέγξτε τη σύνδεσή σας και πατήστε ξανά Υποβολή.',
     labelAddress: 'Διεύθυνση', labelHours: 'Ώρες Λειτουργίας', hoursHint: 'π.χ. Mon-Sat 08:00-18:00 ή 24/7',
-    decline: 'Άρνηση', send: 'Αποστολή',
+    send: 'Αποστολή',
     writeYourAnswer: 'Γράψτε την απάντησή σας…', yourAnswer: 'Η απάντησή σας',
     noFacilityLinked: 'Δεν έχει συνδεθεί εγκατάσταση',
     noFacilityLinkedSub: 'Επικοινωνήστε με τον διαχειριστή για να συνδέσετε τον λογαριασμό σας.',
-    noPendingRequests: 'Δεν υπάρχουν εκκρεμή αιτήματα ραντεβού.',
     questionsFromCustomers: 'Εδώ θα εμφανίζονται ερωτήσεις από πελάτες.',
     noPendingReviews: 'Δεν υπάρχουν εκκρεμείς αξιολογήσεις',
     noApprovedReviews: 'Δεν υπάρχουν εγκεκριμένες αξιολογήσεις ακόμα',
     statTotal: 'Σύνολο', statAnswered: 'Απαντήθηκαν',
     statUnanswered: 'Αναπάντητες', statApproved: 'Εγκρίθηκε', statRejected: 'Απορρίφθηκε',
     searchPlaceholder: 'Αναζήτηση με όνομα ή διεύθυνση…',
-    noShowBtn: 'Δεν εμφανίστηκε', bookingBlocked: 'Κράτηση Αναστάλθηκε', bookingBlockedMsg: 'Η πρόσβασή σας σε κρατήσεις είναι αναστάλθηκε έως {date} λόγω επαναλαμβανόμενων απουσιών.',
-    statusCompleted: 'Ολοκληρώθηκε', reviewPromptTitle: 'Πώς ήταν η επίσκεψή σας;', reviewPromptBody: 'Μοιραστείτε την εμπειρία σας στο {name}.',
+    
     noReviews: 'Δεν υπάρχουν αξιολογήσεις ακόμα.',
     languagesSpoken: 'Γλώσσες', aboutFacility: 'Σχετικά',
     notifications: 'Ειδοποιήσεις', noNotifications: 'Δεν υπάρχουν ειδοποιήσεις ακόμα.', markAllRead: 'Σήμανση όλων ως αναγνωσμένα', clearAll: 'Εκκαθάριση όλων',
@@ -4813,7 +4769,6 @@ const translations = {
     groomRegisterActiveSub: 'Η επιχείρησή σας είναι καταχωρισμένη στον κατάλογο.',
     groomRegisterDeclined: 'Δεν εγκρίθηκε',
     groomRegisterDeclinedSub: 'Η καταχώρισή σας δεν εγκρίθηκε. Επικοινωνήστε μαζί μας αν πιστεύετε ότι πρόκειται για λάθος.',
-    
     
     
     
@@ -4964,7 +4919,6 @@ const translations = {
     cancel: 'Ακύρωση',
     openNow: 'Ανοιχτά',
     reportProblem: 'Προτείνετε διόρθωση',
-    
     
     pharmacies: 'Φαρμακεία',
     chipDutyPharmacies: 'Εφημερεύοντα φαρμακεία',
@@ -5494,7 +5448,6 @@ const translations = {
     
     
     
-    
     questionsAnswers: 'Questions & Réponses',
     askPlaceholder: 'Posez une question sur cet établissement…',
     noQuestions: 'Pas encore de questions.',
@@ -5649,7 +5602,6 @@ const translations = {
     
     
     
-    
     rateVisit: 'Évaluer',
     commentOptional: 'Ajouter un commentaire (facultatif)…',
     login: 'Connexion', signup: 'S\'inscrire', createAccount: 'Créer un compte',
@@ -5659,10 +5611,8 @@ const translations = {
     selectFacilityType: 'Type d\'établissement',
     
     
-    apptReminderBody: 'Votre rendez-vous chez {name} commence dans 1 heure.',
     notifNewQuestionTitle: 'Nouvelle question',
     notifNewQuestionBody: "{name} a reçu une nouvelle question d'un utilisateur.",
-    notifNewApptTitle: 'Nouvelle demande de rendez-vous',
     notifNewApptBody: '{name} a une nouvelle demande de rendez-vous.',
     notifJobLiveTitle: 'Votre annonce est en ligne',
     notifJobLiveBody: '« {title} » est maintenant visible sur le tableau des offres.',
@@ -5694,21 +5644,19 @@ const translations = {
     notifDutySwapTitle: '💊 Pharmacie de garde mise à jour',
     notifDutySwapBody: '{name} est la pharmacie de garde pour le {date}.',
     tapViewDuty: 'Appuyer pour voir les pharmacies de garde →',
-    tabQA: 'Q&A', tabReviews: 'Revues', tabArchive: 'Archives', tabStats: 'Stats', tabProfile: 'Profil', tabHome: 'Accueil', tabSaved: 'Enregistrés', coverPhoto: 'Photo de couverture', logoLabel: 'Logo', tapToAddCover: 'Appuyer pour ajouter une photo de couverture', tapToAddLogo: 'Appuyer pour ajouter un logo', tapToView: 'APPUYER POUR VOIR', uploadFailed: 'Échec du téléchargement. Réessayer.', providerDocsUploadFailed: 'Certains documents ne se sont pas téléchargés. Vérifiez votre connexion et appuyez de nouveau sur Envoyer.',
+    tabQA: 'Q&A', tabReviews: 'Revues', tabArchive: 'Archives', tabStats: 'Stats', tabProfile: 'Profil', tabHome: 'Accueil', tabSaved: 'Enregistrés', coverPhoto: 'Photo de couverture', logoLabel: 'Logo', tapToAddCover: 'Appuyer pour ajouter une photo de couverture', tapToAddLogo: 'Appuyer pour ajouter un logo', uploadFailed: 'Échec du téléchargement. Réessayer.', providerDocsUploadFailed: 'Certains documents ne se sont pas téléchargés. Vérifiez votre connexion et appuyez de nouveau sur Envoyer.',
     labelAddress: 'Adresse', labelHours: "Heures d'ouverture", hoursHint: 'ex. Mon-Sat 08:00-18:00 ou 24/7',
-    decline: 'Refuser', send: 'Envoyer',
+    send: 'Envoyer',
     writeYourAnswer: 'Écrivez votre réponse…', yourAnswer: 'Votre réponse',
     noFacilityLinked: 'Aucun établissement associé',
     noFacilityLinkedSub: "Contactez l'administrateur pour associer votre compte à un établissement.",
-    noPendingRequests: 'Aucune demande de rendez-vous en attente.',
     questionsFromCustomers: 'Les questions des clients apparaîtront ici.',
     noPendingReviews: 'Aucune révision en attente',
     noApprovedReviews: "Aucune révision approuvée pour l'instant",
     statTotal: 'Total', statAnswered: 'Répondues',
     statUnanswered: 'Sans réponse', statApproved: 'Approuvé', statRejected: 'Rejeté',
     searchPlaceholder: 'Rechercher par nom ou adresse…',
-    noShowBtn: 'Absent', bookingBlocked: 'Réservation Suspendue', bookingBlockedMsg: 'Votre accès aux réservations est suspendu jusqu\'au {date} en raison d\'absences répétées.',
-    statusCompleted: 'Terminé', reviewPromptTitle: 'Comment s\'est passée votre visite ?', reviewPromptBody: 'Partagez votre expérience chez {name}.',
+    
     noReviews: 'Aucun avis pour l\'instant.',
     languagesSpoken: 'Langues parlées', aboutFacility: 'À propos',
     notifications: 'Notifications', noNotifications: 'Aucune notification pour l\'instant.', markAllRead: 'Tout marquer comme lu', clearAll: 'Tout effacer',
@@ -5779,7 +5727,6 @@ const translations = {
     groomRegisterActiveSub: 'Votre établissement figure dans l\'annuaire.',
     groomRegisterDeclined: 'Non approuvé',
     groomRegisterDeclinedSub: 'Votre référencement n\'a pas été approuvé. Contactez-nous si vous pensez qu\'il s\'agit d\'une erreur.',
-    
     
     
     
@@ -5930,7 +5877,6 @@ const translations = {
     cancel: 'Annuler',
     openNow: 'Ouvert',
     reportProblem: 'Suggérer une correction',
-    
     
     pharmacies: 'Pharmacies',
     chipDutyPharmacies: 'Pharmacies de garde',
@@ -6461,7 +6407,6 @@ const translations = {
     
     
     
-    
     questionsAnswers: 'Preguntas y Respuestas',
     askPlaceholder: 'Haz una pregunta sobre este centro…',
     noQuestions: 'Sin preguntas aún.',
@@ -6614,7 +6559,6 @@ const translations = {
     
     
     
-    
     rateVisit: 'Valorar',
     commentOptional: 'Añadir un comentario (opcional)…',
     login: 'Iniciar sesión', signup: 'Registrarse', createAccount: 'Crear cuenta',
@@ -6624,10 +6568,8 @@ const translations = {
     selectFacilityType: 'Tipo de centro',
     
     
-    apptReminderBody: 'Tu cita en {name} comienza en 1 hora.',
     notifNewQuestionTitle: 'Nueva pregunta',
     notifNewQuestionBody: '{name} recibió una nueva pregunta de un usuario.',
-    notifNewApptTitle: 'Nueva solicitud de cita',
     notifNewApptBody: '{name} tiene una nueva solicitud de cita.',
     notifJobLiveTitle: 'Tu anuncio está publicado',
     notifJobLiveBody: '"{title}" ya aparece en el tablón de ofertas.',
@@ -6659,21 +6601,19 @@ const translations = {
     notifDutySwapTitle: '💊 Farmacia de guardia actualizada',
     notifDutySwapBody: '{name} es ahora la farmacia de guardia para el {date}.',
     tapViewDuty: 'Toca para ver farmacias de guardia →',
-    tabQA: 'Q&A', tabReviews: 'Revisiones', tabArchive: 'Archivo', tabStats: 'Stats', tabProfile: 'Perfil', tabHome: 'Inicio', tabSaved: 'Guardados', coverPhoto: 'Foto de portada', logoLabel: 'Logo', tapToAddCover: 'Toca para agregar foto de portada', tapToAddLogo: 'Toca para agregar logo', tapToView: 'TOCA PARA VER', uploadFailed: 'Error al subir. Intenta de nuevo.', providerDocsUploadFailed: 'Algunos documentos no se subieron. Verifica tu conexión y toca Enviar para intentarlo de nuevo.',
+    tabQA: 'Q&A', tabReviews: 'Revisiones', tabArchive: 'Archivo', tabStats: 'Stats', tabProfile: 'Perfil', tabHome: 'Inicio', tabSaved: 'Guardados', coverPhoto: 'Foto de portada', logoLabel: 'Logo', tapToAddCover: 'Toca para agregar foto de portada', tapToAddLogo: 'Toca para agregar logo', uploadFailed: 'Error al subir. Intenta de nuevo.', providerDocsUploadFailed: 'Algunos documentos no se subieron. Verifica tu conexión y toca Enviar para intentarlo de nuevo.',
     labelAddress: 'Dirección', labelHours: 'Horario', hoursHint: 'ej. Mon-Sat 08:00-18:00 o 24/7',
-    decline: 'Rechazar', send: 'Enviar',
+    send: 'Enviar',
     writeYourAnswer: 'Escribe tu respuesta…', yourAnswer: 'Tu respuesta',
     noFacilityLinked: 'No hay centro vinculado',
     noFacilityLinkedSub: 'Contacta al administrador para vincular tu cuenta a un centro.',
-    noPendingRequests: 'No hay solicitudes de cita pendientes.',
     questionsFromCustomers: 'Las preguntas de los clientes aparecerán aquí.',
     noPendingReviews: 'No hay revisiones pendientes',
     noApprovedReviews: 'Aún no hay revisiones aprobadas',
     statTotal: 'Total', statAnswered: 'Respondidas',
     statUnanswered: 'Sin responder', statApproved: 'Aprobado', statRejected: 'Rechazado',
     searchPlaceholder: 'Buscar por nombre o dirección…',
-    noShowBtn: 'No asistió', bookingBlocked: 'Reserva Suspendida', bookingBlockedMsg: 'Su acceso a reservas está suspendido hasta el {date} por ausencias repetidas.',
-    statusCompleted: 'Completado', reviewPromptTitle: '¿Cómo fue su visita?', reviewPromptBody: 'Comparte tu experiencia en {name}.',
+    
     noReviews: 'Aún no hay valoraciones.',
     languagesSpoken: 'Idiomas hablados', aboutFacility: 'Acerca de',
     notifications: 'Notificaciones', noNotifications: 'Aún no hay notificaciones.', markAllRead: 'Marcar todo como leído', clearAll: 'Borrar todo',
@@ -6744,7 +6684,6 @@ const translations = {
     groomRegisterActiveSub: 'Tu negocio está listado en el directorio.',
     groomRegisterDeclined: 'No aprobado',
     groomRegisterDeclinedSub: 'Tu anuncio no fue aprobado. Contáctanos si crees que es un error.',
-    
     
     
     
@@ -6895,7 +6834,6 @@ const translations = {
     cancel: 'Cancelar',
     openNow: 'Abierto',
     reportProblem: 'Sugerir una corrección',
-    
     
     pharmacies: 'Farmacias',
     chipDutyPharmacies: 'Farmacias de guardia',
@@ -7425,7 +7363,6 @@ const translations = {
     
     
     
-    
     questionsAnswers: 'Fragen & Antworten',
     askPlaceholder: 'Stellen Sie eine Frage zu dieser Einrichtung…',
     noQuestions: 'Noch keine Fragen.',
@@ -7578,7 +7515,6 @@ const translations = {
     
     
     
-    
     rateVisit: 'Bewerten',
     commentOptional: 'Kommentar hinzufügen (optional)…',
     login: 'Anmelden', signup: 'Registrieren', createAccount: 'Konto erstellen',
@@ -7588,10 +7524,8 @@ const translations = {
     selectFacilityType: 'Einrichtungstyp',
     
     
-    apptReminderBody: 'Ihr Termin bei {name} beginnt in 1 Stunde.',
     notifNewQuestionTitle: 'Neue Frage',
     notifNewQuestionBody: '{name} hat eine neue Frage von einem Nutzer erhalten.',
-    notifNewApptTitle: 'Neue Terminanfrage',
     notifNewApptBody: '{name} hat eine neue Terminanfrage.',
     notifJobLiveTitle: 'Ihre Anzeige ist online',
     notifJobLiveBody: '„{title}" ist jetzt auf der Stellenbörse sichtbar.',
@@ -7623,21 +7557,19 @@ const translations = {
     notifDutySwapTitle: '💊 Notdienstapotheke aktualisiert',
     notifDutySwapBody: '{name} ist jetzt die Notdienstapotheke für den {date}.',
     tapViewDuty: 'Tippen für Notdienstapotheken →',
-    tabQA: 'Q&A', tabReviews: 'Überprüfungen', tabArchive: 'Archiv', tabStats: 'Statistik', tabProfile: 'Profil', tabHome: 'Startseite', tabSaved: 'Gespeichert', coverPhoto: 'Titelbild', logoLabel: 'Logo', tapToAddCover: 'Tippen um Titelbild hinzuzufügen', tapToAddLogo: 'Tippen um Logo hinzuzufügen', tapToView: 'TIPPEN ZUM ANZEIGEN', uploadFailed: 'Upload fehlgeschlagen. Erneut versuchen.', providerDocsUploadFailed: 'Einige Dokumente wurden nicht hochgeladen. Prüfe deine Verbindung und tippe erneut auf Senden.',
+    tabQA: 'Q&A', tabReviews: 'Überprüfungen', tabArchive: 'Archiv', tabStats: 'Statistik', tabProfile: 'Profil', tabHome: 'Startseite', tabSaved: 'Gespeichert', coverPhoto: 'Titelbild', logoLabel: 'Logo', tapToAddCover: 'Tippen um Titelbild hinzuzufügen', tapToAddLogo: 'Tippen um Logo hinzuzufügen', uploadFailed: 'Upload fehlgeschlagen. Erneut versuchen.', providerDocsUploadFailed: 'Einige Dokumente wurden nicht hochgeladen. Prüfe deine Verbindung und tippe erneut auf Senden.',
     labelAddress: 'Adresse', labelHours: 'Öffnungszeiten', hoursHint: 'z.B. Mon-Sat 08:00-18:00 oder 24/7',
-    decline: 'Ablehnen', send: 'Senden',
+    send: 'Senden',
     writeYourAnswer: 'Schreiben Sie Ihre Antwort…', yourAnswer: 'Ihre Antwort',
     noFacilityLinked: 'Kein Standort verknüpft',
     noFacilityLinkedSub: 'Kontaktieren Sie den Administrator, um Ihr Konto mit einem Standort zu verknüpfen.',
-    noPendingRequests: 'Keine ausstehenden Terminanfragen.',
     questionsFromCustomers: 'Fragen von Kunden erscheinen hier.',
     noPendingReviews: 'Keine ausstehenden Überprüfungen',
     noApprovedReviews: 'Noch keine genehmigten Überprüfungen',
     statTotal: 'Gesamt', statAnswered: 'Beantwortet',
     statUnanswered: 'Unbeantwortet', statApproved: 'Genehmigt', statRejected: 'Abgelehnt',
     searchPlaceholder: 'Nach Name oder Adresse suchen…',
-    noShowBtn: 'Nicht erschienen', bookingBlocked: 'Buchung gesperrt', bookingBlockedMsg: 'Ihr Buchungszugang ist bis {date} gesperrt aufgrund wiederholter Nichterscheinens.',
-    statusCompleted: 'Abgeschlossen', reviewPromptTitle: 'Wie war Ihr Besuch?', reviewPromptBody: 'Teilen Sie Ihre Erfahrung bei {name}.',
+    
     noReviews: 'Noch keine Bewertungen.',
     languagesSpoken: 'Gesprochene Sprachen', aboutFacility: 'Über uns',
     notifications: 'Benachrichtigungen', noNotifications: 'Noch keine Benachrichtigungen.', markAllRead: 'Alle als gelesen markieren', clearAll: 'Alle löschen',
@@ -7708,7 +7640,6 @@ const translations = {
     groomRegisterActiveSub: 'Dein Unternehmen ist im Verzeichnis gelistet.',
     groomRegisterDeclined: 'Nicht genehmigt',
     groomRegisterDeclinedSub: 'Dein Eintrag wurde nicht genehmigt. Kontaktiere uns, wenn du glaubst, dass dies ein Fehler ist.',
-    
     
     
     
@@ -7859,7 +7790,6 @@ const translations = {
     cancel: 'Abbrechen',
     openNow: 'Geöffnet',
     reportProblem: 'Korrektur vorschlagen',
-    
     
     pharmacies: 'Apotheken',
     chipDutyPharmacies: 'Bereitschaftsapotheken',
@@ -8390,7 +8320,6 @@ const translations = {
     
     
     
-    
     questionsAnswers: 'سوالات و پاسخ‌ها',
     askPlaceholder: 'سوالی درباره این مرکز بپرسید…',
     noQuestions: 'هنوز سوالی نیست.',
@@ -8543,7 +8472,6 @@ const translations = {
     
     
     
-    
     rateVisit: 'امتیاز دهید',
     commentOptional: 'نظر اضافه کنید (اختیاری)…',
     login: 'ورود', signup: 'ثبت نام', createAccount: 'ایجاد حساب',
@@ -8553,10 +8481,8 @@ const translations = {
     selectFacilityType: 'نوع مرکز',
     
     
-    apptReminderBody: 'نوبت شما در {name} یک ساعت دیگر شروع می‌شود.',
     notifNewQuestionTitle: 'سوال جدید',
     notifNewQuestionBody: '{name} یک سوال جدید از کاربر دریافت کرد.',
-    notifNewApptTitle: 'درخواست نوبت جدید',
     notifNewApptBody: '{name} یک درخواست نوبت جدید دارد.',
     notifJobLiveTitle: 'آگهی شما منتشر شد',
     notifJobLiveBody: '«{title}» اکنون در تابلوی آگهی‌های شغلی دیده می‌شود.',
@@ -8588,21 +8514,19 @@ const translations = {
     notifDutySwapTitle: '💊 داروخانه نوبتی به‌روز شد',
     notifDutySwapBody: '{name} اکنون داروخانه نوبتی برای {date} است.',
     tapViewDuty: 'برای مشاهده داروخانه‌های نوبتی بزنید →',
-    tabQA: 'Q&A', tabReviews: 'بررسی‌ها', tabArchive: 'بایگانی', tabStats: 'آمار', tabProfile: 'پروفایل', tabHome: 'خانه', tabSaved: 'ذخیره‌ها', coverPhoto: 'تصویر جلد', logoLabel: 'آرم', tapToAddCover: 'برای افزودن تصویر جلد ضربه بزنید', tapToAddLogo: 'برای افزودن آرم ضربه بزنید', tapToView: 'برای مشاهده ضربه بزنید', uploadFailed: 'آپلود ناموفق. دوباره تلاش کنید.', providerDocsUploadFailed: 'برخی مدارک بارگذاری نشد. اتصال خود را بررسی کنید و برای تلاش دوباره روی ارسال بزنید.',
+    tabQA: 'Q&A', tabReviews: 'بررسی‌ها', tabArchive: 'بایگانی', tabStats: 'آمار', tabProfile: 'پروفایل', tabHome: 'خانه', tabSaved: 'ذخیره‌ها', coverPhoto: 'تصویر جلد', logoLabel: 'آرم', tapToAddCover: 'برای افزودن تصویر جلد ضربه بزنید', tapToAddLogo: 'برای افزودن آرم ضربه بزنید', uploadFailed: 'آپلود ناموفق. دوباره تلاش کنید.', providerDocsUploadFailed: 'برخی مدارک بارگذاری نشد. اتصال خود را بررسی کنید و برای تلاش دوباره روی ارسال بزنید.',
     labelAddress: 'آدرس', labelHours: 'ساعات کار', hoursHint: 'مثلاً Mon-Sat 08:00-18:00 یا 24/7',
-    decline: 'رد کردن', send: 'ارسال',
+    send: 'ارسال',
     writeYourAnswer: 'پاسخ خود را بنویسید…', yourAnswer: 'پاسخ شما',
     noFacilityLinked: 'هیچ مرکزی متصل نشده',
     noFacilityLinkedSub: 'با مدیر تماس بگیرید تا حسابتان به یک مرکز متصل شود.',
-    noPendingRequests: 'درخواست نوبت معلقی وجود ندارد.',
     questionsFromCustomers: 'سوالات مشتریان اینجا نمایش داده می‌شوند.',
     noPendingReviews: 'بررسی معلقی وجود ندارد',
     noApprovedReviews: 'هنوز بررسی تأییدشده‌ای وجود ندارد',
     statTotal: 'کل', statAnswered: 'پاسخ داده شده',
     statUnanswered: 'بی‌پاسخ', statApproved: 'تأیید شده', statRejected: 'رد شده',
     searchPlaceholder: 'جستجو بر اساس نام یا آدرس…',
-    noShowBtn: 'غایب', bookingBlocked: 'نوبت تعلیق شد', bookingBlockedMsg: 'دسترسی شما به نوبت‌گیری تا {date} به دلیل غیبت‌های مکرر تعلیق شده است.',
-    statusCompleted: 'تکمیل شد', reviewPromptTitle: 'بازدیدتان چطور بود؟', reviewPromptBody: 'تجربه خود را در {name} به اشتراک بگذارید.',
+    
     noReviews: 'هنوز نظری ثبت نشده.',
     languagesSpoken: 'زبان‌های گفتگو', aboutFacility: 'درباره',
     notifications: 'اعلان‌ها', noNotifications: 'هنوز اعلانی وجود ندارد.', markAllRead: 'علامت‌گذاری همه به عنوان خوانده شده', clearAll: 'پاک کردن همه',
@@ -8673,7 +8597,6 @@ const translations = {
     groomRegisterActiveSub: 'کسب‌وکار شما در فهرست ثبت شده است.',
     groomRegisterDeclined: 'تأیید نشد',
     groomRegisterDeclinedSub: 'ثبت شما تأیید نشد. اگر فکر می‌کنید اشتباهی رخ داده با ما تماس بگیرید.',
-    
     
     
     
@@ -8824,7 +8747,6 @@ const translations = {
     cancel: 'لغو',
     openNow: 'باز است',
     reportProblem: 'پیشنهاد اصلاح',
-    
     
     pharmacies: 'داروخانه‌ها',
     chipDutyPharmacies: 'داروخانه‌های نوبت‌دار',
