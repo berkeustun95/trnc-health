@@ -11,8 +11,6 @@ import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { moderationErrorKey } from '../utils/profanity'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
-import GarageBookingsScreen from './GarageBookingsScreen'
-import GroomingAvailabilityEditor from './GroomingAvailabilityEditor'
 import FacilityPhotoManager from '../components/FacilityPhotoManager'
 import MapPinPicker from '../components/MapPinPicker'
 import Dropdown from '../components/Dropdown'
@@ -50,7 +48,7 @@ function DeclinedState({ lang, onClose }) {
   )
 }
 
-function ActiveState({ lang, facility, hiddenAt, hiddenReason, onClose, onManageBookings, onManageAvailability, onManagePhotos, onEdit, onFeaturedChanged }) {
+function ActiveState({ lang, facility, hiddenAt, hiddenReason, onClose, onManagePhotos, onEdit, onFeaturedChanged }) {
   return (
     <View style={s.stateWrap}>
       <ListingHiddenBanner hiddenAt={hiddenAt} hiddenReason={hiddenReason} lang={lang} style={{ marginBottom: 20, alignSelf: 'stretch' }} />
@@ -58,17 +56,9 @@ function ActiveState({ lang, facility, hiddenAt, hiddenReason, onClose, onManage
       <Text style={s.stateEmoji}>✅</Text>
       <Text style={s.stateTitle}>{t('garageRegisterActive', lang)}</Text>
       <Text style={s.stateSub}>{t('garageRegisterActiveSub', lang)}</Text>
-      <TouchableOpacity style={s.primaryBtn} onPress={onManageBookings} activeOpacity={0.85}>
-        <Ionicons name="list-outline" size={18} color="#fff" />
-        <Text style={s.primaryBtnText}>{t('garageManageBookings', lang)}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={s.secondaryBtn} onPress={onManageAvailability} activeOpacity={0.85}>
-        <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-        <Text style={s.secondaryBtnText}>{t('garageManageAvail', lang)}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={s.secondaryBtn} onPress={onManagePhotos} activeOpacity={0.85}>
-        <Ionicons name="image-outline" size={18} color={colors.primary} />
-        <Text style={s.secondaryBtnText}>{t('garageManagePhotos', lang)}</Text>
+      <TouchableOpacity style={s.primaryBtn} onPress={onManagePhotos} activeOpacity={0.85}>
+        <Ionicons name="image-outline" size={18} color="#fff" />
+        <Text style={s.primaryBtnText}>{t('garageManagePhotos', lang)}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={s.secondaryBtn} onPress={onEdit} activeOpacity={0.85}>
         <Ionicons name="create-outline" size={18} color={colors.primary} />
@@ -97,8 +87,6 @@ function Field({ label, children }) {
 export default function GarageOnboardingScreen({ session, lang, onClose, onSubmitted }) {
   const [existing, setExisting] = useState(undefined)
   const [checking, setChecking] = useState(true)
-  const [managingBookings, setManagingBookings] = useState(false)
-  const [editingAvail, setEditingAvail] = useState(false)
   const [managingPhotos, setManagingPhotos] = useState(false)
   const [editing, setEditing] = useState(false)
 
@@ -303,21 +291,6 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
   }
 
   if (existing?.status === 'active' && !editing) {
-    if (managingBookings) {
-      return <GarageBookingsScreen facility={existing} lang={lang} onBack={() => setManagingBookings(false)} />
-    }
-    if (editingAvail) {
-      // Reuses the service-neutral availability editor (writes facilities.availability
-      // jsonb, the same shape BookingScreen.generateSlots reads for garages).
-      return (
-        <GroomingAvailabilityEditor
-          facility={existing}
-          lang={lang}
-          onBack={() => setEditingAvail(false)}
-          onSaved={a => setExisting(prev => ({ ...prev, availability: a }))}
-        />
-      )
-    }
     if (managingPhotos) {
       return (
         <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -347,8 +320,6 @@ export default function GarageOnboardingScreen({ session, lang, onClose, onSubmi
           hiddenAt={existing.hidden_at}
           hiddenReason={existing.hidden_reason}
           onClose={onClose}
-          onManageBookings={() => setManagingBookings(true)}
-          onManageAvailability={() => setEditingAvail(true)}
           onManagePhotos={() => setManagingPhotos(true)}
           onEdit={startEdit}
           onFeaturedChanged={loadExisting}

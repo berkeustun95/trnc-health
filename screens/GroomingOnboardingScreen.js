@@ -10,8 +10,6 @@ import { supabase } from '../lib/supabase'
 import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { moderationErrorKey } from '../utils/profanity'
-import GroomingAvailabilityEditor from './GroomingAvailabilityEditor'
-import GroomingBookingsScreen from './GroomingBookingsScreen'
 import FacilityPhotoManager from '../components/FacilityPhotoManager'
 import MapPinPicker from '../components/MapPinPicker'
 import Dropdown from '../components/Dropdown'
@@ -55,24 +53,16 @@ function DeclinedState({ lang, onClose }) {
   )
 }
 
-function ActiveState({ lang, hiddenAt, hiddenReason, onClose, onEditAvailability, onManageBookings, onManagePhotos, onEdit }) {
+function ActiveState({ lang, hiddenAt, hiddenReason, onClose, onManagePhotos, onEdit }) {
   return (
     <View style={s.stateWrap}>
       <ListingHiddenBanner hiddenAt={hiddenAt} hiddenReason={hiddenReason} lang={lang} style={{ marginBottom: 20, alignSelf: 'stretch' }} />
       <Text style={s.stateEmoji}>✅</Text>
       <Text style={s.stateTitle}>{t('groomRegisterActive', lang)}</Text>
       <Text style={s.stateSub}>{t('groomRegisterActiveSub', lang)}</Text>
-      <TouchableOpacity style={s.primaryBtn} onPress={onManageBookings} activeOpacity={0.85}>
-        <Ionicons name="list-outline" size={18} color="#fff" />
-        <Text style={s.primaryBtnText}>{t('groomManageBookings', lang)}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={s.secondaryBtn} onPress={onEditAvailability} activeOpacity={0.85}>
-        <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-        <Text style={s.secondaryBtnText}>{t('groomManageAvail', lang)}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={s.secondaryBtn} onPress={onManagePhotos} activeOpacity={0.85}>
-        <Ionicons name="image-outline" size={18} color={colors.primary} />
-        <Text style={s.secondaryBtnText}>{t('groomManagePhotos', lang)}</Text>
+      <TouchableOpacity style={s.primaryBtn} onPress={onManagePhotos} activeOpacity={0.85}>
+        <Ionicons name="image-outline" size={18} color="#fff" />
+        <Text style={s.primaryBtnText}>{t('groomManagePhotos', lang)}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={s.secondaryBtn} onPress={onEdit} activeOpacity={0.85}>
         <Ionicons name="create-outline" size={18} color={colors.primary} />
@@ -101,8 +91,6 @@ function Field({ label, children }) {
 export default function GroomingOnboardingScreen({ session, lang, onClose, onSubmitted }) {
   const [existing, setExisting] = useState(undefined)
   const [checking, setChecking] = useState(true)
-  const [editingAvail, setEditingAvail] = useState(false)
-  const [managingBookings, setManagingBookings] = useState(false)
   const [managingPhotos, setManagingPhotos] = useState(false)
   const [editing, setEditing] = useState(false)
 
@@ -255,25 +243,6 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
     // Owner-only surfaces: `existing` came from a provider_id = session.user.id query,
     // so it is inherently this user's own facility (RLS enforces reads/writes too).
     const isOwner = existing.provider_id === session.user.id
-    if (editingAvail && isOwner) {
-      return (
-        <GroomingAvailabilityEditor
-          facility={existing}
-          lang={lang}
-          onBack={() => setEditingAvail(false)}
-          onSaved={a => setExisting(prev => ({ ...prev, availability: a }))}
-        />
-      )
-    }
-    if (managingBookings && isOwner) {
-      return (
-        <GroomingBookingsScreen
-          facility={existing}
-          lang={lang}
-          onBack={() => setManagingBookings(false)}
-        />
-      )
-    }
     if (managingPhotos && isOwner) {
       return (
         <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -302,8 +271,6 @@ export default function GroomingOnboardingScreen({ session, lang, onClose, onSub
           hiddenAt={existing.hidden_at}
           hiddenReason={existing.hidden_reason}
           onClose={onClose}
-          onEditAvailability={() => setEditingAvail(true)}
-          onManageBookings={() => setManagingBookings(true)}
           onManagePhotos={() => setManagingPhotos(true)}
           onEdit={startEdit}
         />

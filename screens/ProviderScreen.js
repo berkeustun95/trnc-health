@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking, Switch, Modal, Alert } from 'react-native'
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Linking, Modal, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
-import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
@@ -15,7 +14,6 @@ import ContentReportMenu from '../components/ContentReportMenu'
 import ListingHiddenBanner from '../components/ListingHiddenBanner'
 import { containsBlockedTerm, moderationErrorKey } from '../utils/profanity'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
-import { HEALTH_TYPES } from '../constants/facilityTypes'
 
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -41,22 +39,6 @@ function decode(base64) {
   return buf
 }
 
-async function sendPushNotification(token, title, body, data = {}) {
-  try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ to: token, title, body, sound: 'default', data }),
-    })
-  } catch { /* non-critical */ }
-}
-
-async function recordNotification(userId, title, body) {
-  try {
-    await supabase.rpc('insert_notification', { p_user_id: userId, p_title: title, p_body: body })
-  } catch { /* non-critical */ }
-}
-
 const STATUS_COLORS = {
   pending:   { bg: '#FFF0EB', text: '#FF8552' },
   confirmed: { bg: '#E6F4F4', text: '#0E7C7B' },
@@ -64,37 +46,13 @@ const STATUS_COLORS = {
   cancelled: { bg: '#FAEAEC', text: '#D1495B' },
 }
 
-const AVAIL_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
-const AVAIL_DAY_LABELS = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }
-const SLOT_DURATIONS = [15, 30, 45, 60]
-const DEFAULT_AVAIL = {
-  slot_duration: 30,
-  schedule: {
-    mon: { open: '09:00', close: '17:00' },
-    tue: { open: '09:00', close: '17:00' },
-    wed: { open: '09:00', close: '17:00' },
-    thu: { open: '09:00', close: '17:00' },
-    fri: { open: '09:00', close: '17:00' },
-    sat: { closed: true },
-    sun: { closed: true },
-  },
-}
-
 export default function ProviderScreen({ session, lang = 'English', facility, trialDaysLeft, onFacilityUpdated }) {
-  const isHealthType = HEALTH_TYPES.includes(facility.type)
-
-  const [tab, setTab] = useState(isHealthType ? 'qa' : 'requests')
-  const [appointments, setAppointments] = useState([])
-  const [upcomingConfirmed, setUpcomingConfirmed] = useState([])
-  const [pastConfirmed, setPastConfirmed] = useState([])
-  const [noShowLoading, setNoShowLoading] = useState(null)
-  const [completeLoading, setCompleteLoading] = useState(null)
+  const [tab, setTab] = useState('qa')
   const [loading, setLoading] = useState(true)
   const [questions, setQuestions] = useState([])
   const [loadingQ, setLoadingQ] = useState(false)
   const [replyTexts, setReplyTexts] = useState({})
   const [submittingReply, setSubmittingReply] = useState(null)
-  const [stats, setStats] = useState(null)
   const [editPhone, setEditPhone] = useState(facility.phone ?? '')
   const [editAddress, setEditAddress] = useState(facility.address ?? '')
   const [editHours, setEditHours] = useState(facility.opening_hours ?? '')
@@ -111,9 +69,6 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
   const [specialty, setSpecialty] = useState(
     Array.isArray(facility.specialty) ? facility.specialty : (facility.specialty ? [facility.specialty] : [])
   )
-  const [avail, setAvail]             = useState(facility.availability ?? null)
-  const [savingAvail, setSavingAvail] = useState(false)
-  const [availSuccess, setAvailSuccess] = useState(false)
   const [facilityLat, setFacilityLat]   = useState(facility.latitude ?? null)
   const [facilityLng, setFacilityLng]   = useState(facility.longitude ?? null)
   const [showMapPicker, setShowMapPicker] = useState(false)
@@ -132,79 +87,13 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
 
   useEffect(() => {
     async function load() {
-      if (!isHealthType) {
-        const { data, error } = await supabase
-          .from('appointments')
-          .select('id, requested_time, customer_id')
-          .eq('facility_id', facility.id)
-          .eq('status', 'pending')
-          .order('requested_time')
-        if (!error && data) {
-          const customerIds = [...new Set(data.map(a => a.customer_id).filter(Boolean))]
-          let nameMap = {}
-          if (customerIds.length) {
-            const { data: profiles } = await supabase
-              .rpc('get_customer_contacts', { p_ids: customerIds })
-            if (profiles) profiles.forEach(p => { nameMap[p.id] = p.full_name })
-          }
-          setAppointments(data.map(a => ({ ...a, customer_name: nameMap[a.customer_id] ?? null })))
-        }
-
-        const { data: past } = await supabase
-          .from('appointments')
-          .select('id, requested_time, customer_id')
-          .eq('facility_id', facility.id)
-          .eq('status', 'confirmed')
-          .lt('requested_time', new Date().toISOString())
-          .order('requested_time', { ascending: false })
-          .limit(20)
-        if (past) {
-          const pastIds = [...new Set(past.map(a => a.customer_id).filter(Boolean))]
-          let pastNameMap = {}
-          if (pastIds.length) {
-            const { data: pastProfiles } = await supabase.rpc('get_customer_contacts', { p_ids: pastIds })
-            if (pastProfiles) pastProfiles.forEach(p => { pastNameMap[p.id] = p.full_name })
-          }
-          setPastConfirmed(past.map(a => ({ ...a, customer_name: pastNameMap[a.customer_id] ?? null })))
-        }
-
-        const { data: upcoming } = await supabase
-          .from('appointments')
-          .select('id, requested_time, customer_id')
-          .eq('facility_id', facility.id)
-          .eq('status', 'confirmed')
-          .gte('requested_time', new Date().toISOString())
-          .order('requested_time', { ascending: true })
-          .limit(20)
-        if (upcoming) {
-          const upIds = [...new Set(upcoming.map(a => a.customer_id).filter(Boolean))]
-          let upNameMap = {}
-          if (upIds.length) {
-            const { data: upProfiles } = await supabase.rpc('get_customer_contacts', { p_ids: upIds })
-            if (upProfiles) upProfiles.forEach(p => { upNameMap[p.id] = p.full_name })
-          }
-          setUpcomingConfirmed(upcoming.map(a => ({ ...a, customer_name: upNameMap[a.customer_id] ?? null })))
-        }
-      }
       setLoading(false)
     }
     load()
     loadQuestions()
-    loadStats()
     loadCredentials()
     loadSubmissionHistory()
   }, [])
-
-  async function loadStats() {
-    const { data: apptData } = await supabase.from('appointments').select('status').eq('facility_id', facility.id)
-    setStats({
-      appt: {
-        pending:   apptData?.filter(a => a.status === 'pending').length   ?? 0,
-        confirmed: apptData?.filter(a => a.status === 'confirmed').length ?? 0,
-        cancelled: apptData?.filter(a => a.status === 'cancelled').length ?? 0,
-      },
-    })
-  }
 
   async function loadQuestions() {
     setLoadingQ(true)
@@ -243,91 +132,11 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
     setSubmittingReply(null)
   }
 
-  async function updateStatus(id, status, customerId) {
-    const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
-    if (!error) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-      const { data: contacts } = await supabase
-        .rpc('get_customer_contacts', { p_ids: [customerId] })
-      const profile = contacts?.[0]
-      if (profile) {
-        const confirmed = status === 'confirmed'
-        const cLang = profile.preferred_language || 'English'
-        const title = confirmed ? t('notifApptConfirmedTitle', cLang) : t('notifApptDeclinedTitle', cLang)
-        const body = confirmed
-          ? t('notifApptConfirmedBody', cLang).replace('{name}', facility.name)
-          : t('notifApptDeclinedBody', cLang).replace('{name}', facility.name)
-        if (profile.push_token) await sendPushNotification(profile.push_token, title, body, { screen: 'profile' })
-        await recordNotification(customerId, title, body)
-      }
-      const confirmed = status === 'confirmed'
-      const movedAppt = appointments.find(a => a.id === id)
-      setAppointments(prev => prev.filter(a => a.id !== id))
-      if (confirmed && movedAppt) {
-        const dt = new Date(movedAppt.requested_time)
-        if (dt >= new Date()) setUpcomingConfirmed(prev => [...prev, { ...movedAppt }].sort((a, b) => new Date(a.requested_time) - new Date(b.requested_time)))
-        else setPastConfirmed(prev => [{ ...movedAppt }, ...prev])
-      }
-      loadStats()
-    }
-  }
-
-  async function markComplete(appointmentId) {
-    setCompleteLoading(appointmentId)
-    const { error } = await supabase
-      .from('appointments')
-      .update({ status: 'completed' })
-      .eq('id', appointmentId)
-    if (!error) {
-      setPastConfirmed(prev => prev.filter(a => a.id !== appointmentId))
-    }
-    setCompleteLoading(null)
-  }
-
-  async function markNoShow(appointmentId, customerId) {
-    setNoShowLoading(appointmentId)
-    const { error } = await supabase.rpc('record_no_show', { p_appointment_id: appointmentId })
-    if (!error) {
-      setPastConfirmed(prev => prev.filter(a => a.id !== appointmentId))
-    }
-    setNoShowLoading(null)
-  }
-
   async function saveSpecialty(val) {
     const next = specialty.includes(val) ? specialty.filter(s => s !== val) : [...specialty, val]
     setSpecialty(next)
     await supabase.from('facilities').update({ specialty: next.length ? next : null }).eq('id', facility.id)
     if (onFacilityUpdated) onFacilityUpdated()
-  }
-
-  async function saveAvailability() {
-    setSavingAvail(true)
-    await supabase.from('facilities').update({ availability: avail }).eq('id', facility.id)
-    setSavingAvail(false)
-    setAvailSuccess(true)
-    setTimeout(() => setAvailSuccess(false), 3000)
-    if (onFacilityUpdated) onFacilityUpdated()
-  }
-
-  function setDayField(day, field, value) {
-    setAvail(prev => ({
-      ...prev,
-      schedule: {
-        ...prev.schedule,
-        [day]: { ...prev.schedule[day], [field]: value },
-      },
-    }))
-  }
-
-  function toggleDay(day) {
-    setAvail(prev => {
-      const cur = prev.schedule[day]
-      if (cur.closed) {
-        return { ...prev, schedule: { ...prev.schedule, [day]: { open: '09:00', close: '17:00' } } }
-      } else {
-        return { ...prev, schedule: { ...prev.schedule, [day]: { closed: true } } }
-      }
-    })
   }
 
   async function confirmFacilityLocation(lat, lng) {
@@ -506,21 +315,6 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
         )}
 
         <View style={styles.tabs}>
-          {!isHealthType && (
-            <TouchableOpacity
-              style={[styles.tabBtn, tab === 'requests' && styles.tabBtnActive]}
-              onPress={() => setTab('requests')}
-            >
-              <View style={styles.tabWithBadge}>
-                <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>{t('tabRequests', lang)}</Text>
-                {appointments.length > 0 && (
-                  <View style={styles.tabBadge}>
-                    <Text style={styles.tabBadgeText}>{appointments.length}</Text>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          )}
           <TouchableOpacity
             style={[styles.tabBtn, tab === 'qa' && styles.tabBtnActive]}
             onPress={() => setTab('qa')}
@@ -665,110 +459,6 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 onCancel={() => setShowMapPicker(false)}
               />
             </View>
-
-            {/* Availability / slot booking */}
-            {!isHealthType && (
-              <View style={[styles.card, { marginTop: 16 }]}>
-                <View style={styles.availHeader}>
-                  <View>
-                    <Text style={styles.fieldLabel}>Slot booking</Text>
-                    <Text style={styles.availSubLabel}>Customers pick from fixed time slots</Text>
-                  </View>
-                  <Switch
-                    value={!!avail}
-                    onValueChange={v => setAvail(v ? DEFAULT_AVAIL : null)}
-                    trackColor={{ true: colors.primary }}
-                    thumbColor="#fff"
-                  />
-                </View>
-
-                {avail && (
-                  <>
-                    <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Slot duration</Text>
-                    <View style={[styles.specialtyGrid, { marginBottom: 16 }]}>
-                      {SLOT_DURATIONS.map(d => (
-                        <TouchableOpacity
-                          key={d}
-                          style={[styles.specialtyChip, avail.slot_duration === d && styles.specialtyChipActive]}
-                          onPress={() => setAvail(prev => ({ ...prev, slot_duration: d }))}
-                        >
-                          <Text style={[styles.specialtyChipText, avail.slot_duration === d && styles.specialtyChipTextActive]}>
-                            {d} min
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    <Text style={styles.fieldLabel}>Schedule</Text>
-                    {AVAIL_DAYS.map(day => {
-                      const dayData = avail.schedule[day] ?? { closed: true }
-                      const isOpen = !dayData.closed
-                      return (
-                        <View key={day} style={styles.availDayRow}>
-                          <Text style={styles.availDayLabel}>{AVAIL_DAY_LABELS[day].slice(0, 3)}</Text>
-                          {isOpen ? (
-                            <View style={styles.availTimeRow}>
-                              <TextInput
-                                style={styles.availTimeInput}
-                                value={dayData.open ?? '09:00'}
-                                onChangeText={v => setDayField(day, 'open', v)}
-                                placeholder="09:00"
-                                placeholderTextColor={colors.textSecondary}
-                                keyboardType="numbers-and-punctuation"
-                                maxLength={5}
-                              />
-                              <Text style={styles.availTimeSep}>–</Text>
-                              <TextInput
-                                style={styles.availTimeInput}
-                                value={dayData.close ?? '17:00'}
-                                onChangeText={v => setDayField(day, 'close', v)}
-                                placeholder="17:00"
-                                placeholderTextColor={colors.textSecondary}
-                                keyboardType="numbers-and-punctuation"
-                                maxLength={5}
-                              />
-                            </View>
-                          ) : (
-                            <Text style={styles.availClosedLabel}>Closed</Text>
-                          )}
-                          <Switch
-                            value={isOpen}
-                            onValueChange={() => toggleDay(day)}
-                            trackColor={{ true: colors.primary }}
-                            thumbColor="#fff"
-                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                          />
-                        </View>
-                      )
-                    })}
-
-                    <TouchableOpacity
-                      style={[styles.saveBtn, { marginTop: 16 }, (savingAvail || availSuccess) && { opacity: 0.7 }]}
-                      onPress={saveAvailability}
-                      disabled={savingAvail || availSuccess}
-                    >
-                      {savingAvail
-                        ? <ActivityIndicator color="#fff" size="small" />
-                        : <Text style={styles.saveBtnText}>{availSuccess ? 'Saved!' : 'Save schedule'}</Text>
-                      }
-                    </TouchableOpacity>
-                  </>
-                )}
-
-                {!avail && (
-                  <TouchableOpacity
-                    style={[styles.saveBtn, { marginTop: 12, backgroundColor: colors.danger }, savingAvail && { opacity: 0.7 }]}
-                    onPress={saveAvailability}
-                    disabled={savingAvail}
-                  >
-                    {savingAvail
-                      ? <ActivityIndicator color="#fff" size="small" />
-                      : <Text style={styles.saveBtnText}>{availSuccess ? 'Cleared!' : 'Disable slot booking'}</Text>
-                    }
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
 
             {/* ── Credentials ──────────────────────────────────── */}
             <View style={[styles.card, { marginTop: 16 }]}>
@@ -952,32 +642,11 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
           </>
 
         ) : tab === 'stats' ? (
-          !stats ? (
+          loadingQ ? (
             <View style={styles.empty}><ActivityIndicator color={colors.primary} /></View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
-              {!isHealthType && (
-                <>
-                  <Text style={styles.sectionTitle}>{t('statAppointments', lang)}</Text>
-                  <View style={styles.statRow}>
-                    <TouchableOpacity style={[styles.statTile, { backgroundColor: colors.accentLight }]} onPress={() => setTab('requests')} activeOpacity={0.7}>
-                      <Text style={[styles.statNum, { color: colors.accent }]}>{stats.appt.pending}</Text>
-                      <Text style={styles.statLabel}>{t('statusPending', lang)}</Text>
-                      {stats.appt.pending > 0 && <Text style={{ fontSize: 9, fontFamily: 'Inter_700Bold', color: colors.accent, marginTop: 2 }}>{t('tapToView', lang)}</Text>}
-                    </TouchableOpacity>
-                    <View style={[styles.statTile, { backgroundColor: colors.successLight }]}>
-                      <Text style={[styles.statNum, { color: colors.success }]}>{stats.appt.confirmed}</Text>
-                      <Text style={styles.statLabel}>{t('statusConfirmed', lang)}</Text>
-                    </View>
-                    <View style={[styles.statTile, { backgroundColor: colors.dangerLight }]}>
-                      <Text style={[styles.statNum, { color: colors.danger }]}>{stats.appt.cancelled}</Text>
-                      <Text style={styles.statLabel}>{t('statusCancelled', lang)}</Text>
-                    </View>
-                  </View>
-                </>
-              )}
-
-              <Text style={[styles.sectionTitle, !isHealthType && { marginTop: 24 }]}>{t('tabQA', lang)}</Text>
+              <Text style={styles.sectionTitle}>{t('tabQA', lang)}</Text>
               <View style={styles.statRow}>
                 <View style={[styles.statTile, { backgroundColor: colors.cardBg }]}>
                   <Text style={[styles.statNum, { color: colors.textPrimary }]}>{questions.length}</Text>
@@ -993,139 +662,6 @@ export default function ProviderScreen({ session, lang = 'English', facility, tr
                 </View>
               </View>
 
-            </ScrollView>
-          )
-        ) : tab === 'requests' ? (
-          appointments.length === 0 && upcomingConfirmed.length === 0 && pastConfirmed.length === 0 ? (
-            <View style={styles.empty}>
-              <View style={styles.emptyIconWrap}><Feather name="check-circle" size={28} color={colors.success} /></View>
-              <Text style={styles.emptyTitle}>{t('allClear', lang)}</Text>
-              <Text style={styles.emptySub}>{t('noPendingRequests', lang)}</Text>
-              <View style={styles.emptyTipBox}>
-                <Ionicons name="information-circle-outline" size={16} color={colors.primary} style={{ marginTop: 1 }} />
-                <Text style={styles.emptyTipText}>{t('completeProfileTip', lang)}</Text>
-                <TouchableOpacity onPress={() => setTab('profile')} style={styles.emptyTipBtn}>
-                  <Text style={styles.emptyTipBtnText}>{t('goToProfile', lang)}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
-              {appointments.length > 0 && <Text style={styles.noShowSectionLabel}>PENDING REQUESTS</Text>}
-              {appointments.map(item => {
-                const sc = STATUS_COLORS.pending
-                const dt = new Date(item.requested_time)
-                return (
-                  <View key={item.id} style={styles.card}>
-                    <View style={styles.apptCardHead}>
-                      <View>
-                        <Text style={styles.apptDate}>{dt.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</Text>
-                        <Text style={styles.apptTime}>{dt.toLocaleTimeString([], { timeStyle: 'short' })}</Text>
-                      </View>
-                      <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
-                        <View style={[styles.statusDot, { backgroundColor: sc.text }]} />
-                        <Text style={[styles.statusPillText, { color: sc.text }]}>{t('statusPending', lang)}</Text>
-                      </View>
-                    </View>
-                    {item.customer_name && (
-                      <View style={styles.apptPatientRow}>
-                        <Feather name="user" size={12} color={colors.textSecondary} />
-                        <Text style={styles.apptPatientName}>{item.customer_name}</Text>
-                      </View>
-                    )}
-                    <View style={styles.actions}>
-                      <TouchableOpacity style={styles.confirmBtn} onPress={() => updateStatus(item.id, 'confirmed', item.customer_id)}>
-                        <Feather name="check" size={14} color={colors.success} />
-                        <Text style={styles.confirmText}>{t('confirm', lang)}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.declineBtn} onPress={() => updateStatus(item.id, 'cancelled', item.customer_id)}>
-                        <Feather name="x" size={14} color={colors.danger} />
-                        <Text style={styles.declineText}>{t('decline', lang)}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )
-              })}
-              {upcomingConfirmed.length > 0 && (
-                <>
-                  <Text style={styles.noShowSectionLabel}>UPCOMING CONFIRMED</Text>
-                  {upcomingConfirmed.map(item => {
-                    const sc = STATUS_COLORS.confirmed
-                    const dt = new Date(item.requested_time)
-                    return (
-                      <View key={item.id} style={styles.card}>
-                        <View style={styles.apptCardHead}>
-                          <View>
-                            <Text style={styles.apptDate}>{dt.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</Text>
-                            <Text style={styles.apptTime}>{dt.toLocaleTimeString([], { timeStyle: 'short' })}</Text>
-                          </View>
-                          <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
-                            <View style={[styles.statusDot, { backgroundColor: sc.text }]} />
-                            <Text style={[styles.statusPillText, { color: sc.text }]}>{t('statusConfirmed', lang)}</Text>
-                          </View>
-                        </View>
-                        {item.customer_name && (
-                          <View style={styles.apptPatientRow}>
-                            <Feather name="user" size={12} color={colors.textSecondary} />
-                            <Text style={styles.apptPatientName}>{item.customer_name}</Text>
-                          </View>
-                        )}
-                      </View>
-                    )
-                  })}
-                </>
-              )}
-              {pastConfirmed.length > 0 && (
-                <>
-                  <Text style={styles.noShowSectionLabel}>PAST APPOINTMENTS</Text>
-                  {pastConfirmed.map(item => {
-                    const sc = STATUS_COLORS.confirmed
-                    const dt = new Date(item.requested_time)
-                    return (
-                      <View key={item.id} style={styles.card}>
-                        <View style={styles.apptCardHead}>
-                          <View>
-                            <Text style={styles.apptDate}>{dt.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</Text>
-                            <Text style={styles.apptTime}>{dt.toLocaleTimeString([], { timeStyle: 'short' })}</Text>
-                          </View>
-                          <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
-                            <View style={[styles.statusDot, { backgroundColor: sc.text }]} />
-                            <Text style={[styles.statusPillText, { color: sc.text }]}>{t('statusConfirmed', lang)}</Text>
-                          </View>
-                        </View>
-                        {item.customer_name && (
-                          <View style={styles.apptPatientRow}>
-                            <Feather name="user" size={12} color={colors.textSecondary} />
-                            <Text style={styles.apptPatientName}>{item.customer_name}</Text>
-                          </View>
-                        )}
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
-                          <TouchableOpacity
-                            style={[styles.completeBtn, completeLoading === item.id && { opacity: 0.6 }]}
-                            onPress={() => markComplete(item.id)}
-                            disabled={completeLoading === item.id || noShowLoading === item.id}
-                          >
-                            {completeLoading === item.id
-                              ? <ActivityIndicator size="small" color={colors.success} />
-                              : <Text style={styles.completeText}>{t('markComplete', lang)}</Text>
-                            }
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.noShowBtn, noShowLoading === item.id && { opacity: 0.6 }]}
-                            onPress={() => markNoShow(item.id, item.customer_id)}
-                            disabled={noShowLoading === item.id || completeLoading === item.id}
-                          >
-                            {noShowLoading === item.id
-                              ? <ActivityIndicator size="small" color={colors.danger} />
-                              : <Text style={styles.noShowText}>{t('noShowBtn', lang)}</Text>
-                            }
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    )
-                  })}
-                </>
-              )}
             </ScrollView>
           )
         ) : (
@@ -1201,7 +737,6 @@ const styles = StyleSheet.create({
   header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
   headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 10 },
   headerIcon:     { width: 36, height: 36, borderRadius: 8, flexShrink: 0 },
-  facilityTagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
   facilityTag:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   proBadge:       { backgroundColor: colors.primary, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' },
   proBadgeText:   { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.5 },
@@ -1214,34 +749,11 @@ const styles = StyleSheet.create({
   sectionTitle:   { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
   listContent:    { paddingBottom: 32 },
   card:            { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 10, ...shadow },
-  apptCardHead:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  apptDate:        { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 },
-  apptTime:        { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
-  apptPatientRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  apptPatientName: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  statusPill:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  statusDot:       { width: 6, height: 6, borderRadius: 3 },
-  statusPillText:  { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  timeLabel:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  timeValue:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 14 },
-  actions:         { flexDirection: 'row', gap: 10 },
-  confirmBtn:      { flex: 1, backgroundColor: colors.successLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
-  confirmText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.success },
-  declineBtn:      { flex: 1, backgroundColor: colors.dangerLight, borderRadius: 10, paddingVertical: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
-  declineText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.danger },
-  noShowSectionLabel:  { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5, marginTop: 24, marginBottom: 8 },
-  completeBtn:         { flex: 1, backgroundColor: colors.successLight ?? '#E8F5E9', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
-  completeText:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.success },
-  noShowBtn:           { flex: 1, backgroundColor: colors.dangerLight, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
-  noShowText:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
   tabs:           { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 8, padding: 2, marginBottom: 16 },
   tabBtn:         { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: 'center' },
   tabBtnActive:   { backgroundColor: colors.surface, ...shadow },
   tabText:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   tabTextActive:  { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  tabWithBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  tabBadge:       { backgroundColor: colors.danger, borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
-  tabBadgeText:   { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#fff' },
   qTop:           { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   qBody:          { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginBottom: 12, lineHeight: 20 },
   answerBlock:    { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10 },
@@ -1264,29 +776,17 @@ const styles = StyleSheet.create({
   locationNotSet: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 12, marginTop: 4 },
   locationBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 13, marginTop: 4 },
   locationBtnText:{ fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
-  locationHint:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 8, textAlign: 'center' },
   specialtyGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   specialtyChip:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
   specialtyChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   specialtyChipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   specialtyChipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
-  availHeader:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  availSubLabel:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
-  availDayRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 10 },
-  availDayLabel:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, width: 34 },
-  availTimeRow:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  availTimeInput:   { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, backgroundColor: colors.surface, width: 72, textAlign: 'center' },
-  availTimeSep:     { fontSize: 14, color: colors.textSecondary, fontFamily: 'Inter_400Regular' },
-  availClosedLabel: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic' },
   empty:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   noNewQBanner:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.cardBg, borderRadius: 12, padding: 12, marginBottom: 12 },
   noNewQText:     { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   emptyIconWrap:  { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...shadow },
   emptyTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
   emptySub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 12 },
-  emptyTipBox:    { backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14, flexDirection: 'column', alignItems: 'flex-start', gap: 8, width: '100%' },
-  emptyTipText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },
-  emptyTipBtn:    { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16, alignSelf: 'flex-start' },
   emptyTipBtnText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
 
   // credentials

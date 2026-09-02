@@ -23,9 +23,6 @@ const GARAGE_LABEL_KEY = Object.fromEntries(GARAGE_CATEGORIES.map(c => [c.key, c
 const GARAGE_KEY_ORDER = GARAGE_CATEGORIES.map(c => c.key)
 
 const SW = Dimensions.get('window').width
-const SCHED_KEYS   = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
-const SCHED_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const TODAY_KEY    = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
@@ -464,35 +461,6 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
               ) : null}
             </View>
 
-            {/* Schedule */}
-            {facility.availability?.schedule && (
-              <View style={s.section}>
-                <Text style={s.sectionLabel}>{t('scheduleLabel', lang)}</Text>
-                <View style={s.scheduleCard}>
-                  {SCHED_KEYS.map((key, i) => {
-                    const day = facility.availability.schedule[key]
-                    const isToday = key === TODAY_KEY[new Date().getDay()]
-                    return (
-                      <View key={key} style={[s.scheduleRow, isToday && s.scheduleRowToday, i === SCHED_KEYS.length - 1 && { borderBottomWidth: 0 }]}>
-                        <Text style={[s.scheduleDay, isToday && s.scheduleDayToday]}>{SCHED_LABELS[i]}</Text>
-                        {day?.closed
-                          ? <Text style={s.scheduleClosed}>{t('closed', lang)}</Text>
-                          : <Text style={[s.scheduleHours, isToday && s.scheduleHoursToday]}>{day?.open ?? '09:00'} – {day?.close ?? '17:00'}</Text>
-                        }
-                        {isToday && <Text style={s.todayLabel}>{t('todayLabel', lang)}</Text>}
-                      </View>
-                    )
-                  })}
-                  {facility.availability.slot_duration && (
-                    <View style={s.slotDurationRow}>
-                      <Feather name="clock" size={12} color={colors.textSecondary} />
-                      <Text style={s.slotDurationText}>{t('minSlotLabel', lang).replace('{n}', facility.availability.slot_duration)}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-
             {/* Reviews */}
             <View style={s.section}>
               <Text style={s.sectionLabel}>{t('tabReviews', lang)}</Text>
@@ -737,17 +705,7 @@ const s = StyleSheet.create({
   answerLabel:       { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   answerBody:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
   noAnswer:          { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontStyle: 'italic' },
-  scheduleCard:      { backgroundColor: colors.cardBg, borderRadius: 14, overflow: 'hidden', ...shadow },
-  scheduleRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
-  scheduleRowToday:  { backgroundColor: colors.primaryLight },
-  scheduleDay:       { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, width: 36 },
-  scheduleDayToday:  { color: colors.primary },
-  scheduleClosed:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flex: 1 },
-  scheduleHours:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, flex: 1 },
   scheduleHoursToday:{ fontFamily: 'Inter_700Bold', color: colors.primary },
-  todayLabel:        { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary, backgroundColor: colors.primaryLight, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden' },
-  slotDurationRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10 },
-  slotDurationText:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   photoSection:      { marginBottom: 20 },
   photoThumb:        { width: 140, height: 105, borderRadius: 12, backgroundColor: colors.border },
   lightboxBg:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' },
@@ -766,6 +724,4 @@ const s = StyleSheet.create({
   noReviewsWrap:     { alignItems: 'center', paddingVertical: 20 },
   noReviewsTitle:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6, textAlign: 'center' },
   noReviewsSub:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },
-  ctaSecondary:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 16, paddingVertical: 14 },
-  ctaSecondaryText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
 })
