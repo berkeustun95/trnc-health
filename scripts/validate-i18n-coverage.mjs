@@ -21,7 +21,11 @@
 // new that matches English fails until a human either translates it or consciously
 // adds a line here.
 //
-// ─── SCOPE: 115 OF 1135 KEYS, DELIBERATELY ──────────────────────────────────
+// ─── SCOPE: A SUBSET OF THE TABLE, DELIBERATELY ─────────────────────────────
+//
+// Both figures are MEASURED AND PRINTED on every run rather than written here. They
+// were '115 of 1135' until 2026-09-02, when 20261004's client deletions removed 85
+// keys per locale and made the second number wrong in a comment nobody would reread.
 //
 // This guards only the keys reachable from the surfaces listed in SURFACES. That is
 // not laziness, it is the only scope at which the design works: app-wide there are 329
@@ -218,6 +222,11 @@ if (stale.length) {
   for (const s of stale) console.log(`  · ${s}`)
 }
 
+// Measured, never remembered: the total is read out of the table itself on every run,
+// so this line cannot go stale the way the header's old "1135" did.
+const i18nSrc = readFileSync(resolve(ROOT, 'constants/i18n.js'), 'utf8')
+const enBlock = i18nSrc.slice(i18nSrc.indexOf('\n  en: {'), i18nSrc.indexOf('\n  tr: {'))
+const enTotal = (enBlock.match(/\b[A-Za-z0-9_]+:\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g) ?? []).length
 console.log(`i18n coverage: OK — ${KEYS.length} key(s) × ${LANGS.length} locale(s), `
   + `${allowanceCount} declared same-as-English (scope: Explore map, check-in, `
-  + `duty roster and Home — not the whole 1135-key table, see the header)`)
+  + `duty roster and Home — ${KEYS.length} of the ${enTotal} keys in the table)`)

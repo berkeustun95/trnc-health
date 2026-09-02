@@ -390,7 +390,9 @@ setShowPostForm(true)                        // real user -> unchanged
 
 `requireAccount` returns `true` **only** for guests, so signed-in behaviour is untouched at every site. `messageKey` is an i18n key so each site explains what signing up unlocks, rather than one generic string.
 
-Wired at **9 sites**: post a job · home-service / transport / estate-agent onboarding · suggest a place · book an appointment · report/block content · profile tab · notifications. Screens receive it as an `onRequireAccount` prop.
+Wired at **15 distinct message keys** (counted from the call sites, not remembered): post a job · home-service / transport / estate-agent / grooming / garage / insurance onboarding · suggest a place · claim a place · ask a question · **write a review** · report/block content · eSIM · profile tab · notifications. Screens receive it as an `onRequireAccount` prop.
+
+`gateBooking` was removed on 2026-09-02 with the appointments module. `gateReview` replaced it as the customer's write gate on a facility — see **Appointments — removed** below.
 
 **Gate the button that opens the form, not the submit at the end of it** — a guest should never fill a form and then be told no.
 
@@ -432,6 +434,41 @@ The **entry screen carries a language pill** (native names — `Türkçe`, `ال
 - **Device-locale default — needs a native build.** The app **never reads device locale**; `expo-localization` is not a dependency. Default is a hardcoded `'English'` (`App.js` `pendingLang`, `OnboardingScreen` `lang`). `expo-localization` is a native module and **cannot ride an OTA**. The entry-screen language pill is the OTA-safe mitigation, not the fix.
 - **`view_count` → `SECURITY DEFINER` RPC.** `PropertyDetailScreen` increments `properties.view_count` **from the client** — a write on a browse path. The veto now 403s it for guests, so guest views silently stop counting. The RPC fix also closes the fact that this counter is currently client-incrementable and therefore **spoofable by any authenticated user**. Schema change → not an OTA.
 - **Abandoned-guest cleanup** is not built. Anonymous users accumulate in `auth.users`; treat as a monthly-maintenance job.
+
+## Appointments — REMOVED (2026-09-02)
+
+In-app booking is gone. `public.appointments` was dropped by `20261003` + `20261004`
+(two files: the reviews decoupling first, then the table), and the client came out in
+four commits on 2026-09-02.
+
+**Deleted screens:** `BookingScreen`, `GarageBookingsScreen`, `GroomingBookingsScreen`,
+`GroomingAvailabilityEditor`.
+
+**Where the review-write path went, and why it is the important part.** ProfileScreen's
+appointment detail was the app's *only* place a customer could write a review —
+FacilityProfileScreen has always read reviews and never written one. Deleting the
+booking UI without moving it would have left `reviews` readable and unwritable, silently.
+The composer now lives in FacilityProfileScreen's Reviews section, keyed on
+`facility_id`; `reviews_customer_facility_live_uniq` (partial, `deleted_at IS NULL`)
+enforces one live review per customer per facility, and a soft-deleted review is
+invisible to its own author under RLS, so deleting one returns the composer.
+
+**Consequences worth knowing:**
+- `insert_notification` is **admin-only** now. Its two other branches were
+  appointment-keyed. Any provider→customer notification needs a new `p_kind`-style
+  function — do NOT re-add a branch that accepts a client-written title and body.
+- `notify_facility_owner` accepts exactly one kind: `'question'`.
+- `is_customer_blocked()` survives (the questions INSERT policy references it) but has
+  no writer since `record_no_show` was dropped, so it is permanently false.
+  `profiles.blocked_until` can never change again and has left `PROFILE_COLUMNS`.
+- `facilities.availability` still has one reader: HomeScreen's "available today" badge
+  via `utils/facilityUtils.isAvailableToday`. Nothing writes it any more.
+- `notify_owner_text` keeps its nine-locale appointment templates. They are unreachable
+  and deliberately left alone — see the `20261004` header.
+
+**Do not re-add booking without reading `20261004`'s header.** There is no revert path:
+the table, its 15 policies, 2 triggers, 3 indexes, 6 functions and 2 cron jobs would be
+a rewrite, not a rollback.
 
 ## AsyncStorage keys — device-local state
 
