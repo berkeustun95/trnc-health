@@ -55,7 +55,7 @@ export const EXPLORE_MAP_LIVE = true
 //   account on next open, and it collects four new categories of personal data — so
 //   docs/terms.html and screens/LegalScreen.js need their clause FIRST, and neither
 //   copy may carry it alone. See the Slice 2 journal entry.
-export const PROFILE_GATE_LIVE = false
+export const PROFILE_GATE_LIVE = true   // live 2026-09-02
 
 // Marketplace module gating. Each key is a module that is empty in prod today, so
 // it renders a "Coming soon" screen (with one-tap Notify me) instead of an empty
