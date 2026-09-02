@@ -56,7 +56,7 @@ async function updateOrAlert(table, patch, id, label) {
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Bookings', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Moderation']
+const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Moderation']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -337,7 +337,6 @@ function DashboardTab({ onNavigate }) {
       const [
         { count: facilities },
         { count: users },
-        { count: pendingAppts },
         { count: pendingClaims },
         { count: pendingChanges },
         { count: pendingProviders },
@@ -360,7 +359,6 @@ function DashboardTab({ onNavigate }) {
       ] = await Promise.all([
         supabase.from('facilities').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('claim_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('facility_change_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('facilities').select('*', { count: 'exact', head: true }).eq('status', 'pending').neq('type', 'grooming'),
@@ -385,7 +383,7 @@ function DashboardTab({ onNavigate }) {
           .eq('source', 'novest').order('last_seen_at', { ascending: false }).limit(1),
       ])
       const pendingPlaces = pendingPlacesCount ?? 0
-      setStats({ novestLastSeen: novestSeen?.[0]?.last_seen_at ?? null, facilities, users, pendingAppts, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingReports, esimTotal, esimTourist, esimStudent })
+      setStats({ novestLastSeen: novestSeen?.[0]?.last_seen_at ?? null, facilities, users, pendingClaims, pendingChanges, pendingProviders, pendingCredentials, pendingDocs, pendingEvents, pendingProperties, pendingAgents, pendingHomeServices, pendingTransport, pendingInsurance, pendingGrooming, pendingPlaces, pendingJobPostings, pendingReports, esimTotal, esimTourist, esimStudent })
     }
     load()
   }, [])
@@ -399,7 +397,6 @@ function DashboardTab({ onNavigate }) {
     stats.pendingProviders   > 0 && { label: 'Providers awaiting approval',  count: stats.pendingProviders,   tab: 'Providers',   color: colors.danger },
     stats.pendingCredentials > 0 && { label: 'Credentials awaiting review',  count: stats.pendingCredentials, tab: 'Credentials', color: '#7C3AED' },
     (stats.pendingDocs ?? 0) > 0 && { label: 'ID documents to verify',       count: stats.pendingDocs,        tab: 'Claims',      color: colors.accent },
-    stats.pendingAppts           > 0 && { label: 'Pending appointments',          count: stats.pendingAppts,           tab: 'Bookings',    color: colors.primary },
     (stats.pendingEvents ?? 0)   > 0 && { label: 'Events awaiting approval',      count: stats.pendingEvents,          tab: 'Events',      color: colors.primary },
     (stats.pendingProperties ?? 0) > 0 && { label: 'Property listings to review', count: stats.pendingProperties,      tab: 'Properties',  color: colors.primary },
     (stats.pendingAgents ?? 0)      > 0 && { label: 'Agent applications pending',       count: stats.pendingAgents,         tab: 'Agents',       color: '#7C3AED' },
@@ -417,7 +414,6 @@ function DashboardTab({ onNavigate }) {
       <View style={s.statsGrid}>
         <StatCard label="Facilities" value={stats.facilities} />
         <StatCard label="Users" value={stats.users} />
-        <StatCard label="Appt. pending" value={stats.pendingAppts} color={stats.pendingAppts > 0 ? colors.accent : undefined} />
       </View>
 
       <Text style={[s.sectionTitle, { marginTop: 24 }]}>eSIM waitlist</Text>
@@ -632,7 +628,7 @@ function ReportsTab({ session }) {
     if (!authorId) { Alert.alert('Cannot ban', 'This content no longer exists, so its author cannot be identified.'); return }
     Alert.alert(
       'Remove content & ban author',
-      'Removes this content and blocks the author from posting reviews and questions. Their bookings are not affected.',
+      'Removes this content and blocks the author from posting reviews and questions.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: '7 days',  onPress: () => applyBan(g, authorId, 7) },
@@ -738,16 +734,10 @@ function FacilityActivityModal({ facility, visible, onClose }) {
     setLoadingActivity(true)
     async function load() {
       const [
-        { count: pending },
-        { count: total },
         { data: reviewRows },
-        { data: recent },
         providerRes,
       ] = await Promise.all([
-        supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('facility_id', facility.id).eq('status', 'pending'),
-        supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('facility_id', facility.id),
         supabase.from('reviews').select('rating').eq('facility_id', facility.id),
-        supabase.from('appointments').select('id, status, requested_time').eq('facility_id', facility.id).order('requested_time', { ascending: false }).limit(4),
         facility.provider_id
           ? supabase.from('profiles').select('full_name').eq('id', facility.provider_id).single()
           : Promise.resolve({ data: null }),
@@ -756,7 +746,7 @@ function FacilityActivityModal({ facility, visible, onClose }) {
       const avgRating = reviewRows?.length
         ? (reviewRows.reduce((sum, r) => sum + r.rating, 0) / reviewRows.length).toFixed(1)
         : null
-      setData({ pending: pending ?? 0, total: total ?? 0, avgRating, reviewCount: reviewRows?.length ?? 0, recent: recent ?? [], providerName: providerRes.data?.full_name ?? null })
+      setData({ avgRating, reviewCount: reviewRows?.length ?? 0, providerName: providerRes.data?.full_name ?? null })
       setLoadingActivity(false)
     }
     load()
@@ -764,13 +754,6 @@ function FacilityActivityModal({ facility, visible, onClose }) {
   }, [visible, facility])
 
   if (!facility) return null
-
-  function statusColor(status) {
-    if (status === 'confirmed') return colors.success
-    if (status === 'pending') return colors.accent
-    if (status === 'completed') return colors.primary
-    return colors.textSecondary
-  }
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -804,8 +787,6 @@ function FacilityActivityModal({ facility, visible, onClose }) {
               <>
                 <Text style={[s.sectionTitle, { marginBottom: 10 }]}>Activity</Text>
                 <View style={[s.statsGrid, { marginBottom: 20 }]}>
-                  <StatCard label="Pending" value={data.pending} color={data.pending > 0 ? colors.accent : undefined} />
-                  <StatCard label="Total bookings" value={data.total} />
                   <StatCard label="Avg rating" value={data.avgRating ? `⭐ ${data.avgRating}` : '—'} />
                   <StatCard label="Reviews" value={data.reviewCount} />
                 </View>
@@ -820,25 +801,6 @@ function FacilityActivityModal({ facility, visible, onClose }) {
                   </>
                 )}
 
-                {data.recent.length > 0 && (
-                  <>
-                    <Text style={[s.sectionTitle, { marginBottom: 8 }]}>Recent bookings</Text>
-                    {data.recent.map(appt => (
-                      <View key={appt.id} style={[s.card, { marginBottom: 8 }]}>
-                        <View style={[s.cardRow, { justifyContent: 'space-between' }]}>
-                          <Text style={s.cardSub}>
-                            {new Date(appt.requested_time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </Text>
-                          <Text style={{ fontSize: 12, fontFamily: 'Inter_700Bold', color: statusColor(appt.status), textTransform: 'capitalize' }}>
-                            {appt.status}
-                          </Text>
-                        </View>
-                      </View>
-                    ))}
-                  </>
-                )}
-
-                {data.total === 0 && <Text style={s.empty}>No bookings yet.</Text>}
               </>
             )
           }
@@ -1777,82 +1739,6 @@ function UsersTab() {
       )}
     />
   )
-}
-
-// ─── Bookings Tab ───────────────────────────────────────────────────────────
-
-function BookingsTab() {
-  const [appointments, setAppointments] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('pending')
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    const { data } = await supabase
-      .from('appointments')
-      .select('id, requested_time, status, customer_id, facility_id, facilities(name)')
-      .eq('status', filter)
-      .order('requested_time', { ascending: false })
-      .limit(50)
-    setAppointments(data ?? [])
-    setLoading(false)
-  }, [filter])
-
-  useEffect(() => { load() }, [load])
-
-  async function updateStatus(id, status) {
-    await supabase.from('appointments').update({ status }).eq('id', id)
-    load()
-  }
-
-  return (
-    <View style={{ flex: 1 }}>
-      <View style={s.chipRow}>
-        {['pending', 'confirmed', 'cancelled'].map(f => (
-          <TouchableOpacity key={f} style={[s.chip, filter === f && s.chipActive]} onPress={() => setFilter(f)}>
-            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {loading
-        ? <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
-        : (
-          <FlatList
-            data={appointments}
-            keyExtractor={a => a.id}
-            contentContainerStyle={s.listContent}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={<SectionEmpty text={`No ${filter} bookings.`} />}
-            renderItem={({ item }) => (
-              <View style={s.card}>
-                <Text style={s.cardTitle}>{item.facilities?.name ?? 'Unknown facility'}</Text>
-                <Text style={s.cardSub}>{new Date(item.requested_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
-                <Text style={[s.cardSub, { marginTop: 2 }]} numberOfLines={1}>Customer: {item.customer_id.slice(0, 8)}…</Text>
-                {filter === 'pending' && (
-                  <View style={[s.cardRow, { marginTop: 10, gap: 8 }]}>
-                    <TouchableOpacity style={[s.ghostBtn, { backgroundColor: colors.successLight }]} onPress={() => updateStatus(item.id, 'confirmed')}>
-                      <Text style={[s.ghostBtnText, { color: colors.success }]}>Confirm</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[s.ghostBtn, { backgroundColor: colors.dangerLight }]} onPress={() => updateStatus(item.id, 'cancelled')}>
-                      <Text style={[s.ghostBtnText, { color: colors.danger }]}>Cancel</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            )}
-          />
-        )
-      }
-    </View>
-  )
-}
-
-// ─── Changes Tab ────────────────────────────────────────────────────────────
-
-const CHANGE_FIELD_LABELS = {
-  phone: 'Phone', address: 'Address', opening_hours: 'Opening Hours',
-  description: 'About', languages: 'Languages',
 }
 
 function formatVal(val) {
@@ -4436,7 +4322,6 @@ export default function AdminScreen({ session, lang, onShowExplore }) {
           {tab === 'Facilities'  && <FacilitiesTab />}
           {tab === 'Duty'        && <DutyTab />}
           {tab === 'Users'       && <UsersTab />}
-          {tab === 'Bookings'    && <BookingsTab />}
           {tab === 'Broadcast'   && <BroadcastTab />}
           {tab === 'Events'      && <EventsTab />}
           {tab === 'Properties'    && <PropertiesTab />}
@@ -4465,7 +4350,6 @@ const s = StyleSheet.create({
   container:          { flex: 1, paddingHorizontal: 16 },
   center:             { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 12 },
-  wordmark:           { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, letterSpacing: -0.5 },
   headerLeft:         { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerIcon:         { width: 36, height: 36, borderRadius: 8 },
   headerLabel:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -4588,7 +4472,6 @@ const s = StyleSheet.create({
   diffProposed:       { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.success, flex: 1 },
 
   // status pills
-  statusPill:         { alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   pillText:           { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#fff', textTransform: 'capitalize' },
   pillGreen:          { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.success },
   pillOrange:         { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.accent },
