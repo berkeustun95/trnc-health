@@ -4,8 +4,12 @@
 //   npm run profile:check
 //
 // Two halves that must agree — constants/profileGate.js + utils/reservedNames.js on the
-// client, 20261001_profile_completion_schema.sql in the database — plus four live
-// assertions against the deployed schema.
+// client, and the migrations in supabase/migrations/ on the database side — plus four
+// live assertions against the deployed schema.
+//
+// "the migrations", plural and unpinned: a CHECK constraint is redefined under the same
+// name by a later file, so the field-vocabulary section resolves each one to the NEWEST
+// migration that defines it rather than reading 20261001 forever. See section 6.
 //
 // WATCHED RED FIRST. Every check below was broken deliberately and observed failing
 // before it was trusted; the red output is in the journal entry for this slice. A check
@@ -222,15 +226,84 @@ function codepoints(source, re) {
 }
 
 // ─── 6. Field vocabularies match their CHECK constraints ─────────────────────
+//
+// ⚠ THE NEWEST DEFINITION WINS, AND IT IS DERIVED — NOT POINTED AT. A constraint is
+//   redefined by DROP-then-ADD under the SAME NAME, so reading only 20261001 answers
+//   "what did the FIRST migration say", which stops being the question the moment a
+//   later file narrows one (20261006 dropped 'newcomer'). Reading a fixed file would
+//   then report drift against a client that is exactly right — an instrument failing
+//   while the system is healthy, the standing hazard in CLAUDE.md.
+//
+//   check-module-flags.mjs solves the same problem for two functions with a hand-
+//   maintained NOTIFY_SQL pointer, and its own comment says that pointer MUST be
+//   repointed by hand or the guard blocks every push. Deriving the answer from the
+//   directory has no such step: a new migration is picked up because it exists.
+//
+//   Comments are stripped BEFORE the scan. This file's own headers name constraints in
+//   prose, and a prose mention must never win over a real ADD — the frame-of-reference
+//   rule: know exactly what you are reading before comparing it to anything.
+//
+//   Honest limit, same as everywhere else in the repo half: this reads FILES. It says
+//   the client and the newest migration were WRITTEN to agree. Whether that migration
+//   was ever applied is what supabase/verify_schema.sql answers, and only if somebody
+//   runs it.
+const MIGRATION_FILES = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
+const stripSqlComments = text => text.split('\n').map(l => l.replace(/--.*$/, '')).join('\n')
+
+// Balanced-paren slice from the CHECK's opening paren. The old form was lazy up to the
+// first `);`, which happens to be right for `IN ('a','b'));` and quietly wrong for any
+// predicate whose parens nest the other way round.
+function checkBody(code, from) {
+  const open = code.indexOf('(', from)
+  if (open < 0) return null
+  let depth = 0
+  for (let i = open; i < code.length; i++) {
+    if (code[i] === '(') depth++
+    else if (code[i] === ')' && --depth === 0) return code.slice(open + 1, i)
+  }
+  return null
+}
+
+// The last ADD across sorted files wins; a DROP that is never followed by an ADD leaves
+// the constraint GONE, and that must fail loudly rather than fall back to an older file.
+function resolveConstraint(constraint) {
+  let winner = null
+  for (const file of MIGRATION_FILES) {
+    const code = stripSqlComments(readFileSync(resolve(MIGRATIONS, file), 'utf8'))
+    const events = []
+    for (const m of code.matchAll(new RegExp(`ADD\\s+CONSTRAINT\\s+${constraint}\\s+CHECK`, 'g'))) {
+      events.push({ at: m.index, kind: 'add' })
+    }
+    for (const m of code.matchAll(new RegExp(`DROP\\s+CONSTRAINT\\s+(?:IF\\s+EXISTS\\s+)?${constraint}\\b`, 'g'))) {
+      events.push({ at: m.index, kind: 'drop' })
+    }
+    if (!events.length) continue
+    events.sort((x, y) => x.at - y.at)
+    const last = events[events.length - 1]
+    winner = last.kind === 'add'
+      ? { file, body: checkBody(code, last.at) }
+      : { file, body: null, dropped: true }
+  }
+  return winner
+}
+
 function checkVocab(label, constraint, expected) {
-  const re = new RegExp(`CONSTRAINT ${constraint}[\\s\\S]*?CHECK \\(([\\s\\S]*?)\\);`)
-  const m = sql.match(re)
-  if (!m) return fail(`could not find ${constraint} in ${SCHEMA_FILE}`)
-  const got = [...m[1].matchAll(/'([a-z_]+)'/g)].map(x => x[1])
+  const found = resolveConstraint(constraint)
+  if (!found) return fail(`no migration in supabase/migrations/ defines ${constraint}`)
+  if (found.dropped) {
+    return fail(`${found.file} DROPs ${constraint} and never re-adds it — the ${label} ` +
+                `vocabulary is enforced by nothing on the database side`)
+  }
+  if (found.body === null) {
+    return fail(`${constraint} was found in ${found.file} but its CHECK body did not ` +
+                `parse — this check proves nothing about ${label}`)
+  }
+  const got = [...found.body.matchAll(/'([a-z_]+)'/g)].map(x => x[1])
   const a = [...expected].sort().join(',')
   const b = [...new Set(got)].sort().join(',')
-  if (a !== b) fail(`${label} drift — constants: [${a}] · ${constraint}: [${b}]`)
-  else ok(`${label} matches ${constraint} (${expected.length} values)`)
+  if (a !== b) fail(`${label} drift — constants: [${a}] · ${constraint} as defined in ` +
+                    `${found.file}: [${b}]`)
+  else ok(`${label} matches ${constraint} (${expected.length} values, newest definition: ${found.file})`)
 }
 checkVocab('RESIDENT_STATUSES', 'profiles_resident_status_check', RESIDENT_STATUSES)
 checkVocab('STUDENT_LEVELS', 'profiles_student_level_check', STUDENT_LEVELS)
@@ -316,6 +389,18 @@ const I18N_GUARD = readFileSync(resolve(ROOT, 'scripts/validate-i18n-coverage.mj
 const WIZARD_PATH = 'screens/ProfileSetupScreen.js'
 let WIZARD = null
 try { WIZARD = readFileSync(resolve(ROOT, WIZARD_PATH), 'utf8') } catch { /* not built yet */ }
+const EDITOR_PATH = 'screens/ProfileScreen.js'
+let EDITOR = null
+try { EDITOR = readFileSync(resolve(ROOT, EDITOR_PATH), 'utf8') } catch { /* not built yet */ }
+
+// Comments stripped before any of the scans below. Both files DISCUSS the columns they
+// must not inline or write — the full_name note in ProfileScreen names the column six
+// times in prose — and a scan that reads prose as code is the standing hazard in
+// CLAUDE.md: it would forbid a correct file from explaining itself, and the tempting fix
+// would be to delete the explanation.
+const stripJsComments = text => text
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .split('\n').map(l => l.replace(/(^|[^:])\/\/.*$/, '$1')).join('\n')
 
 const notBuilt = what => fail(`NOT BUILT YET — ${what}. This is the expected red before ` +
                              `Slice 2 is implemented, not a regression.`)
@@ -533,16 +618,78 @@ const notBuilt = what => fail(`NOT BUILT YET — ${what}. This is the expected r
            `there means the next bump silently fails to re-gate anyone`)
     } else ok('the wizard writes CURRENT_PROFILE_SCHEMA_VERSION, not a literal')
 
-    const inlined = []
-    for (const v of [...RESIDENT_STATUSES, ...STUDENT_LEVELS, ...DISPLAY_PREFERENCES]) {
-      const arr = new RegExp(`\\[[^\\]]*'${v}'[^\\]]*\\]`)
-      if (arr.test(WIZARD)) inlined.push(v)
+    // BOTH screens that write these columns, not just the wizard. Slice 3a gave
+    // ProfileScreen the same ten fields; a vocabulary inlined THERE drifts from the CHECK
+    // constraints exactly as silently, and the screen was outside every guard until now.
+    for (const [label, src] of [['the wizard', WIZARD], [`${EDITOR_PATH}`, EDITOR]]) {
+      if (!src) { notBuilt(`${label} does not exist`); continue }
+      const code = stripJsComments(src)
+      const inlined = []
+      for (const v of [...RESIDENT_STATUSES, ...STUDENT_LEVELS, ...DISPLAY_PREFERENCES]) {
+        const arr = new RegExp(`\\[[^\\]]*'${v}'[^\\]]*\\]`)
+        if (arr.test(code)) inlined.push(v)
+      }
+      // CONTROL: the scan must be able to SEE this file's vocabulary use at all. Both
+      // screens reach these lists through the imported constants, so the marker below is
+      // present in a correct file and absent in one this scan failed to read — without
+      // it, an unreadable or emptied file reports "no inlining" and passes.
+      if (!/RESIDENT_STATUSES|RESIDENT_STATUS_LABEL_KEY/.test(code)) {
+        fail(`${label} does not reference the resident-status vocabulary at all, so the ` +
+             `inlining scan below proves nothing about it`)
+      } else if (inlined.length) {
+        fail(`${label} inlines a field vocabulary (${[...new Set(inlined)].join(', ')}) ` +
+             `instead of importing it from constants/profileGate.js — the CHECK constraints ` +
+             `and the UI would then drift silently`)
+      } else {
+        ok(`${label} takes its field vocabularies from constants/profileGate.js`)
+      }
     }
-    if (inlined.length) {
-      fail(`the wizard inlines a field vocabulary (${[...new Set(inlined)].join(', ')}) ` +
-           `instead of importing it from constants/profileGate.js — the CHECK constraints ` +
-           `and the UI would then drift silently`)
-    } else ok('the wizard takes its field vocabularies from constants/profileGate.js')
+
+    // ─── full_name has exactly ONE writer, and it is the trigger ─────────────
+    // check_profile_name_content() DERIVES full_name from first_name + last_name.
+    // 20261001 left ProfileScreen writing the column directly and named Slice 3 as the
+    // moment that stops; two writers with disagreeing semantics is what that deferral
+    // was about. A direct write does not error — it is silently overwritten on the next
+    // first/last edit, or silently overwrites the derivation on this one.
+    //
+    // ⚠ SCANS THE .update() PAYLOADS, NOT THE FILE. The first version of this asserted
+    //   `first_name:` appeared anywhere as a control, and it could not fail: the screen
+    //   carries that property in its useState default and in the loaded initialForm, so
+    //   deleting the actual write left the control green. Watched red, found green, fixed
+    //   the instrument — the control and the claim were in different frames. Only the
+    //   payload can answer "what does this screen SEND".
+    if (EDITOR) {
+      const code = stripJsComments(EDITOR)
+      const payloads = []
+      for (const m of code.matchAll(/\.update\(\s*\{/g)) {
+        let depth = 0
+        const open = code.indexOf('{', m.index)
+        for (let k = open; k < code.length; k++) {
+          if (code[k] === '{') depth++
+          else if (code[k] === '}' && --depth === 0) { payloads.push(code.slice(open + 1, k)); break }
+        }
+      }
+      const sent = payloads.join('\n')
+      // SLICE CONTROL. A parse that found nothing returns '' and passes every absence
+      // test below — the towing-seed-validator failure, which cheerfully reported on zero
+      // rows. Assert the slice contains what the screen's whole job is before believing
+      // anything it says about what is missing.
+      if (payloads.length === 0) {
+        fail(`${EDITOR_PATH}: no .update() payload parsed, so the full_name check proves ` +
+             `nothing. Fix what this measures, not what it reports`)
+      } else if (!/\bfirst_name:/.test(sent) || !/\bdisplay_name:/.test(sent)) {
+        fail(`${EDITOR_PATH} sends no first_name/display_name in any of its ` +
+             `${payloads.length} .update() payload(s) — the screen is not writing the ` +
+             `columns it exists to edit, and the full_name absence below is vacuous`)
+      } else if (/\bfull_name:/.test(sent)) {
+        fail(`${EDITOR_PATH} SENDS full_name. That column is DERIVED by ` +
+             `check_profile_name_content() from first_name + last_name — a second writer ` +
+             `disagrees with the trigger silently, in whichever direction was written last`)
+      } else {
+        ok(`${EDITOR_PATH} sends first_name + display_name and never full_name ` +
+           `(${payloads.length} update payload(s) scanned; trigger derives it)`)
+      }
+    }
 
     if (/MIN_SIGNUP_AGE/.test(WIZARD) === false) {
       fail('the wizard does not reference MIN_SIGNUP_AGE — the year range or the age ' +

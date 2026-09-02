@@ -1495,8 +1495,9 @@ WITH report AS (
               AND policyname='read answers'
               AND qual ILIKE '%hidden_at%' AND qual ILIKE '%deleted_at%')
     -- ══ Profile completion gate (Slice 1) ═══════════════════════════════════
-    -- SEVEN tokens. Almost nothing that makes this slice SAFE is a named object:
-    -- a trigger body, an index's target column, two absences and two derived counts.
+    -- EIGHT tokens (the eighth arrived with 20261006 and is at the end of this block).
+    -- Almost nothing that makes this slice SAFE is a named object: a trigger body, an
+    -- index's target column, three absences, two derived counts and one value set.
     -- Sections A-I see the names and cannot see any of it.
     --
     -- (1) The profiles filter routes through the SHARED matcher, so it inherits
@@ -1572,6 +1573,37 @@ WITH report AS (
         LEFT JOIN pg_roles r ON r.oid = a.grantee
         WHERE n.nspname='public' AND p.proname='display_name_available'
           AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+    -- ══ resident_status narrowed to four (20261006) ═════════════════════════
+    -- THE CONSTRAINT NAME DID NOT CHANGE, which is exactly why this token has to
+    -- exist. Section E asserts profiles_resident_status_check is PRESENT, and it stays
+    -- green word for word over a constraint that still permits 'newcomer' — an
+    -- existence check cannot see a value set. This is the only row in the whole report
+    -- that can tell a database with 20261006 applied from one without it.
+    --
+    -- Both directions, because either alone certifies a blind spot: the ABSENCE of
+    -- 'newcomer' (the point of the migration) AND the presence of all four survivors
+    -- (without which a constraint permitting nothing would pass the absence half). The
+    -- value stays 'visiting' while the wizard labels it "Tourist" — do not "fix" the
+    -- string here to match the label; constants/profileGate.js holds the same four and
+    -- npm run profile:check compares them character-for-character.
+    --
+    -- pg_get_constraintdef, never the migration file. A constraint definition carries
+    -- no comments, so unlike the pg_get_functiondef traps recorded in CLAUDE.md a LIKE
+    -- over it matches code and only code.
+    UNION ALL SELECT '1006_resident_status','resident_status permits exactly student/working/resident/visiting, NOT newcomer',
+      EXISTS(SELECT 1 FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace ns ON ns.oid = t.relnamespace
+        WHERE ns.nspname='public' AND t.relname='profiles'
+          AND c.conname='profiles_resident_status_check'
+          AND pg_get_constraintdef(c.oid) NOT LIKE '%newcomer%'
+          AND pg_get_constraintdef(c.oid) LIKE '%''student''%'
+          AND pg_get_constraintdef(c.oid) LIKE '%''working''%'
+          AND pg_get_constraintdef(c.oid) LIKE '%''resident''%'
+          AND pg_get_constraintdef(c.oid) LIKE '%''visiting''%'
+          -- The NULL arm. resident_status is NULL for every row whose owner has not
+          -- finished the wizard, so losing it rejects every new signup.
+          AND pg_get_constraintdef(c.oid) LIKE '%IS NULL%')
   ) z
 
   UNION ALL

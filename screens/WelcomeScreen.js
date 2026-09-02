@@ -4,21 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors } from '../constants/theme'
-import { t, LANG_CODES } from '../constants/i18n'
+import { t, LANG_CODES, LANGUAGES } from '../constants/i18n'
 
 // Native names, not English ones — someone stuck in a language they can't read
 // recognises "Türkçe", not "Turkish".
-const LANGUAGES = [
-  { key: 'English', label: 'English' },
-  { key: 'Turkish', label: 'Türkçe' },
-  { key: 'Arabic',  label: 'العربية' },
-  { key: 'Russian', label: 'Русский' },
-  { key: 'Greek',   label: 'Ελληνικά' },
-  { key: 'French',  label: 'Français' },
-  { key: 'Spanish', label: 'Español' },
-  { key: 'German',  label: 'Deutsch' },
-  { key: 'Persian', label: 'فارسی' },
-]
 
 export default function WelcomeScreen({ lang, onLogin, onSignUp, onLangChange }) {
   const [guestLoading, setGuestLoading] = useState(false)

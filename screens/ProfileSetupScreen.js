@@ -10,27 +10,42 @@
 //    screen; closing the app is honest and leaves the gate in place next launch.
 //
 // 2. THE EMERGENCY BUTTON IS ON EVERY STEP, INCLUDING THE INTRO. It is a HEADER button,
-//    not a footer bar: on Android the keyboard is up for most of Steps 1 and 2, and a
-//    bottom bar is covered at exactly the moment somebody would need it. It is AMBER,
-//    never red — red reads as an error or a destructive action to anyone scanning the
-//    screen, and this is neither.
+//    not a footer bar: on Android the keyboard is up for most of Step 1, and a bottom
+//    bar is covered at exactly the moment somebody would need it. It is AMBER, never
+//    red — red reads as an error or a destructive action to anyone scanning the screen,
+//    and this is neither.
+//
+//    It is NOT part of what SHOW_WIZARD_HEADINGS hides. That flag removes heading TEXT;
+//    the row it sits in, and the progress dots beside it, stay at either value.
+//
+//    THE LANGUAGE PILL SITS BESIDE IT, FOR THE SAME REASON AND ON EVERY STEP INCLUDING
+//    THE INTRO. This gate cannot be skipped, so a user whose app opened in a language
+//    they cannot read had no way out at all — not back, not past, not to a menu, because
+//    App.js's global language modal lives inside the tab-shell return and a gated user
+//    never reaches it. That is the worst place in the app to have no language control
+//    and it was the only screen without one. NEUTRAL styling, not amber: amber is the
+//    emergency pill's, and two amber pills in one row make neither of them mean urgent.
 //
 // 3. EVERY STEP PERSISTS ON ADVANCE. A force-quit resumes where it left off. Only the
 //    final advance writes profile_completed_at + profile_schema_version, and
 //    profiles_completion_requires_fields_check (20261001) makes that write FAIL LOUDLY
 //    if any required field is somehow absent, rather than marking an empty profile done.
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  ActivityIndicator, Modal, FlatList, Linking, Platform,
+  ActivityIndicator, Modal, Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
+import SearchModal from '../components/SearchModal'
+import { pad, ageOn, daysInMonth } from '../utils/profileFields'
+import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../components/DisplayNameCheck'
 import { supabase } from '../lib/supabase'
 import { colors, shadow, radius } from '../constants/theme'
-import { t } from '../constants/i18n'
+import { SHOW_WIZARD_HEADINGS } from '../constants/flags'
+import { t, LANGUAGES, LANG_CODES } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { NATIONALITIES, NATIONALITY_CODES, getNatLabel } from '../constants/nationalityTranslations'
 import { COUNTRY_CODES } from '../constants/countryCodes'
@@ -39,22 +54,29 @@ import {
   MIN_SIGNUP_AGE, MAX_SIGNUP_AGE, CURRENT_PROFILE_SCHEMA_VERSION,
   RESIDENT_STATUSES, STUDENT_LEVELS, INSTITUTION_REQUIRED_LEVELS,
   RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
-  DISPLAY_NAME_MIN, DISPLAY_NAME_MAX, DEBOUNCE_MS, SUPPORT_EMAIL,
-  STEP_TITLE_KEY, HELP_ROW_LABEL_KEY,
+  DISPLAY_NAME_MAX, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY,
 } from '../constants/profileGate'
-import { isReservedDisplayName } from '../utils/reservedNames'
-import { containsBlockedTerm } from '../utils/profanity'
 
-const TOTAL_STEPS = 3
+// TWO steps. What used to be Steps 1 and 2 — the six required identity fields — is now
+// one screen; the old Step 3 (region, status, the student conditional) became Step 2.
+// Persistence is unchanged in shape but not in size: Step 1 now writes SIX columns in
+// ONE atomic patch, so a name race aborts the date of birth with it and the retry is
+// clean. There is no half-saved state between the two former steps any more, which is
+// why resumeStep() no longer has a landing place between them.
+const TOTAL_STEPS = 2
 
 // ─── Presentational pieces, defined OUTSIDE the screen ──────────────────────
 // A component declared inside its parent is a new type on every render, so React
 // unmounts and remounts it — which blurs a TextInput mid-typing. House rule.
 
+// Derived from TOTAL_STEPS, never a literal — a hardcoded dot count is a decoration
+// that disagrees with the wizard the day the step count moves, and it moved today.
+const STEP_NUMBERS = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1)
+
 function Dots({ step }) {
   return (
     <View style={s.dots}>
-      {[1, 2, 3].map(i => (
+      {STEP_NUMBERS.map(i => (
         <View key={i} style={[s.dot, i === step && s.dotOn, i < step && s.dotDone]} />
       ))}
     </View>
@@ -117,86 +139,27 @@ function SelectField({ value, placeholder, onPress, flex }) {
   )
 }
 
-// One searchable modal serves nationality, institutions, country codes and the date
-// parts. options = [{ value, label }].
-function SearchModal({ visible, title, searchPlaceholder, options, value, searchable, onSelect, onClose }) {
-  const [q, setQ] = useState('')
-  const list = useMemo(() => {
-    if (!searchable || !q.trim()) return options
-    const needle = q.trim().toLocaleLowerCase()
-    return options.filter(o => o.label.toLocaleLowerCase().includes(needle))
-  }, [options, q, searchable])
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={s.modalBackdrop}>
-        <View style={s.modalCard}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Feather name="x" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
-          {searchable && (
-            <TextInput
-              style={s.search}
-              value={q}
-              onChangeText={setQ}
-              placeholder={searchPlaceholder}
-              placeholderTextColor={colors.textSecondary}
-              autoCorrect={false}
-            />
-          )}
-          <FlatList
-            data={list}
-            keyExtractor={o => String(o.value)}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[s.modalItem, value === item.value && s.modalItemOn]}
-                onPress={() => { setQ(''); onSelect(item.value) }}
-              >
-                <Text style={[s.modalItemText, value === item.value && s.modalItemTextOn]}>{item.label}</Text>
-                {value === item.value && <Feather name="check" size={15} color={colors.primary} />}
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      </View>
-    </Modal>
-  )
-}
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const pad = n => String(n).padStart(2, '0')
-
-// Age at a given date, in whole years. Mirrors the trigger's
-// `date_of_birth > current_date - interval '13 years'`.
-function ageOn(y, m, d, now = new Date()) {
-  let age = now.getFullYear() - y
-  const beforeBirthday =
-    now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)
-  if (beforeBirthday) age -= 1
-  return age
-}
-
-function daysInMonth(y, m) {
-  if (!y || !m) return 31
-  return new Date(y, m, 0).getDate()
-}
 
 // Where to resume. display_name is the marker that Step 1 completed, so a force-quit
 // mid-wizard comes back to the right place instead of starting over.
+//
+// The middle branch is now UNREACHABLE THROUGH THIS WIZARD — Step 1 writes the name and
+// the date of birth in one patch, so display_name can no longer exist without them. It
+// stays because a row written by the THREE-step version still can be in that state, and
+// this screen has been on a test device. Sending such a row back to Step 1 refills every
+// field from the profile and costs one extra Continue; the alternative is advancing past
+// fields the completion CHECK requires, which fails at the very end with nothing to say
+// why. Delete it only once no row can predate the merge.
 function resumeStep(p) {
   if (!p || !p.display_name) return 0                       // intro, then Step 1
-  if (!p.date_of_birth || !p.nationality_code || !p.phone) return 2
-  return 3
+  if (!p.date_of_birth || !p.nationality_code || !p.phone) return 1
+  return 2
 }
 
 export default function ProfileSetupScreen({
   session, lang, profile, prefillRegion, onDone,
-  onEmergencyNumbers, onDutyList, onHealthDirectory,
+  onEmergencyNumbers, onDutyList, onHealthDirectory, onLangChange,
 }) {
   const [step, setStep] = useState(() => resumeStep(profile))
   const [saving, setSaving] = useState(false)
@@ -204,13 +167,13 @@ export default function ProfileSetupScreen({
   const [helpOpen, setHelpOpen] = useState(false)
   const [ageBlocked, setAgeBlocked] = useState(false)
 
-  // Step 1
+  // Step 1 — name half
   const [firstName, setFirstName] = useState(profile?.first_name ?? '')
   const [lastName, setLastName] = useState(profile?.last_name ?? '')
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
-  const [nameState, setNameState] = useState(null)   // {status, suggestions?}
+  const [nameState, setNameState] = useDisplayNameCheck(displayName)
 
-  // Step 2
+  // Step 1 — date / nationality / phone half
   const dob = profile?.date_of_birth ? profile.date_of_birth.split('-') : null
   const [dobY, setDobY] = useState(dob ? Number(dob[0]) : null)
   const [dobM, setDobM] = useState(dob ? Number(dob[1]) : null)
@@ -219,7 +182,7 @@ export default function ProfileSetupScreen({
   const [cc, setCc] = useState(null)
   const [phone, setPhone] = useState('')
 
-  // Step 3
+  // Step 2
   const [region, setRegion] = useState(profile?.region ?? prefillRegion ?? null)
   const [status, setStatus] = useState(profile?.resident_status ?? null)
   const [level, setLevel] = useState(profile?.student_level ?? null)
@@ -248,43 +211,11 @@ export default function ProfileSetupScreen({
       .then(({ data }) => setInstitutions(data ?? []))
   }, [])
 
-  // ─── Display-name availability ────────────────────────────────────────────
-  // The two client mirrors run FIRST because they are free and instant: a reserved or
-  // profane name never costs a round trip. The RPC is the authority on "taken", which
-  // no client can answer — profiles has three SELECT policies and none of them lets a
-  // customer see another row, so a client-side lookup would report "available" for every
-  // name in the database. See 20261002's header.
-  const nameReqId = useRef(0)
-  useEffect(() => {
-    const name = displayName.trim()
-    const id = ++nameReqId.current
-    if (!name) { setNameState(null); return }
-    if (name.length < DISPLAY_NAME_MIN) { setNameState({ status: 'short' }); return }
-    if (name.length > DISPLAY_NAME_MAX) { setNameState({ status: 'long' }); return }
-    if (isReservedDisplayName(name)) { setNameState({ status: 'reserved' }); return }
-
-    setNameState({ status: 'checking' })
-    const handle = setTimeout(async () => {
-      if (await containsBlockedTerm(name)) {
-        if (nameReqId.current === id) setNameState({ status: 'blocked' })
-        return
-      }
-      const { data, error } = await supabase.rpc('display_name_available', { p_name: name })
-      if (nameReqId.current !== id) return
-      // Fail OPEN on a network error: the unique index is the real boundary, so the worst
-      // case is a 23505 on advance, which is handled. Blocking Continue on a flaky
-      // connection would strand the user inside a gate they cannot skip.
-      if (error || !data) { setNameState(null); return }
-      setNameState({ status: data.status, suggestions: data.suggestions ?? [] })
-    }, DEBOUNCE_MS)
-    return () => clearTimeout(handle)
-  }, [displayName])
-
   // ─── Validity per step ────────────────────────────────────────────────────
   const nameOk = nameState?.status === 'available'
-  const step1Ok = firstName.trim() && lastName.trim() && nameOk
-  const step2Ok = dobY && dobM && dobD && nationality && cc && /^\d{4,15}$/.test(phone.trim())
-  const step3Ok = region && status &&
+  const step1Ok = firstName.trim() && lastName.trim() && nameOk &&
+    dobY && dobM && dobD && nationality && cc && /^\d{4,15}$/.test(phone.trim())
+  const step2Ok = region && status &&
     (status !== 'student' || level) &&
     (!INSTITUTION_REQUIRED_LEVELS.includes(level) || institution)
 
@@ -301,43 +232,38 @@ export default function ProfileSetupScreen({
     if (step === 0) { setStep(1); return }
 
     if (step === 1) {
-      const error = await save({
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        display_name: displayName.trim(),
-      })
-      if (!error) { setStep(2); return }
-      // The race this whole inline check exists to avoid, arriving anyway: somebody took
-      // the name between the check and the write. Re-ask and show fresh suggestions
-      // rather than surfacing a raw Postgres error inside a mandatory gate.
-      if (error.code === '23505') {
-        const { data } = await supabase.rpc('display_name_available', { p_name: displayName.trim() })
-        setNameState({ status: 'race', suggestions: data?.suggestions ?? [] })
-        return
-      }
-      if (error.message?.includes('DISPLAY_NAME_RESERVED')) { setNameState({ status: 'reserved' }); return }
-      if (error.message?.includes('BLOCKED_TERM')) { setNameState({ status: 'blocked' }); return }
-      setSaveError(true)
-      return
-    }
-
-    if (step === 2) {
-      // AGE. Checked before anything is written, and a disqualifying date is NEVER
-      // stored — only the flag is. The trigger backstops a client that sends it anyway,
-      // and profiles_age_ineligible_no_dob_check backstops both.
+      // AGE FIRST, and before anything at all is written. A disqualifying date is NEVER
+      // stored — only the flag is, and the flag write carries nothing else, so a name
+      // and a date of birth do not reach the row on the way past. The trigger backstops
+      // a client that sends it anyway, and profiles_age_ineligible_no_dob_check
+      // backstops both.
       if (ageOn(dobY, dobM, dobD) < MIN_SIGNUP_AGE) {
         await save({ age_ineligible: true })
         setAgeBlocked(true)
         return
       }
+      // ONE patch for all six fields. The merge makes this atomic rather than two
+      // sequential writes, which is strictly better: the failure that actually happens
+      // here is the display-name race below, and under two writes it would land AFTER
+      // the date of birth was already committed — leaving a row that is half of Step 1
+      // and a retry that re-writes fields it did not need to touch.
       const error = await save({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        display_name: displayName.trim(),
         date_of_birth: `${dobY}-${pad(dobM)}-${pad(dobD)}`,
         nationality,                                   // legacy English label
         nationality_code: NATIONALITY_CODES[nationality] ?? null,
         phone: cc + phone.trim(),
       })
-      if (error) { setSaveError(true); return }
-      setStep(3)
+      if (!error) { setStep(2); return }
+      // The race this whole inline check exists to avoid, arriving anyway: somebody took
+      // the name between the check and the write. displayNameSaveError re-asks and
+      // returns fresh suggestions rather than surfacing a raw Postgres error inside a
+      // mandatory gate; a null back from it means the failure was not about the name.
+      const nameErr = await displayNameSaveError(error, displayName.trim())
+      if (nameErr) { setNameState(nameErr); return }
+      setSaveError(true)
       return
     }
 
@@ -383,13 +309,16 @@ export default function ProfileSetupScreen({
     .sort((a, b) => a.label.localeCompare(b.label))
   const instOptions = institutions.map(i => ({ value: i.id, label: i.short_name ? `${i.name} (${i.short_name})` : i.name }))
   const ccOptions = COUNTRY_CODES.map(c => ({ value: c.code, label: `${c.code}  ${c.label}` }))
+  // NATIVE names, never translated ones: somebody who cannot read the current language
+  // has to be able to find their own in this list.
+  const langOptions = LANGUAGES.map(l => ({ value: l.key, label: l.label }))
   const dayOptions = Array.from({ length: daysInMonth(dobY, dobM) }, (_, i) => ({ value: i + 1, label: String(i + 1) }))
   const monthOptions = months.map((m, i) => ({ value: i + 1, label: m }))
   // currentYear-100 … currentYear-MIN_SIGNUP_AGE, newest first.
   const yearOptions = Array.from({ length: MAX_SIGNUP_AGE - MIN_SIGNUP_AGE + 1 },
     (_, i) => thisYear - MIN_SIGNUP_AGE - i).map(y => ({ value: y, label: String(y) }))
 
-  const canAdvance = step === 0 || (step === 1 && step1Ok) || (step === 2 && step2Ok) || (step === 3 && step3Ok)
+  const canAdvance = step === 0 || (step === 1 && step1Ok) || (step === 2 && step2Ok)
   const title = step === 0 ? '' : t(STEP_TITLE_KEY[step], lang)
 
   return (
@@ -401,10 +330,16 @@ export default function ProfileSetupScreen({
             reaches before English does. House rule. */}
         <View style={s.header}>
           {step > 0 ? <Dots step={step} /> : <View style={s.dots} />}
-          <TouchableOpacity style={s.helpBtn} onPress={() => setHelpOpen(true)} activeOpacity={0.8}>
-            <Ionicons name="alert-circle-outline" size={15} color={colors.tintLifestyleFg} />
-            <Text style={s.helpBtnText}>{t('pgHelpButton', lang)}</Text>
-          </TouchableOpacity>
+          <View style={s.headerActions}>
+            <TouchableOpacity style={s.langBtn} onPress={() => setPicker('lang')} activeOpacity={0.8}>
+              <Ionicons name="globe-outline" size={14} color={colors.textSecondary} />
+              <Text style={s.langBtnText}>{(LANG_CODES[lang] ?? 'en').toUpperCase()}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.helpBtn} onPress={() => setHelpOpen(true)} activeOpacity={0.8}>
+              <Ionicons name="alert-circle-outline" size={15} color={colors.tintLifestyleFg} />
+              <Text style={s.helpBtnText}>{t('pgHelpButton', lang)}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
@@ -413,12 +348,20 @@ export default function ProfileSetupScreen({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {step > 0 && <Text style={s.stepLabel}>{t('pgStep', lang).replace('{n}', step).replace('{total}', TOTAL_STEPS)}</Text>}
-          {step > 0 && <Text style={s.title}>{title}</Text>}
+          {/* SHOW_WIZARD_HEADINGS gates HEADING TEXT ONLY, in three places: the
+              "Step n of N" label, the step title, and the intro title below. Field
+              labels, hints, the progress dots, the emergency button and every modal
+              title are unaffected. Kept as a flag rather than deleted because which of
+              the two screens reads better is a device judgement, and the flag makes it
+              a one-line revert instead of an unpick. */}
+          {step > 0 && SHOW_WIZARD_HEADINGS && (
+            <Text style={s.stepLabel}>{t('pgStep', lang).replace('{n}', step).replace('{total}', TOTAL_STEPS)}</Text>
+          )}
+          {step > 0 && SHOW_WIZARD_HEADINGS && <Text style={s.title}>{title}</Text>}
 
           {step === 0 && (
             <View style={s.intro}>
-              <Text style={s.introTitle}>{t('pgIntroTitle', lang)}</Text>
+              {SHOW_WIZARD_HEADINGS && <Text style={s.introTitle}>{t('pgIntroTitle', lang)}</Text>}
               <Text style={s.introBody}>{t('pgIntroBody', lang)}</Text>
               {/* The data line matters more than the reason: for a returning user the
                   question is not "why do you want this" but "what will you do with it". */}
@@ -445,13 +388,12 @@ export default function ProfileSetupScreen({
                   autoCapitalize="none" autoCorrect={false} maxLength={DISPLAY_NAME_MAX} />
                 <NameFeedback state={nameState} lang={lang} onPick={n => setDisplayName(n)} />
               </Field>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
               {/* NEUTRAL AGE SCREEN. No minimum stated, no default date, free entry.
-                  Nothing on this step may hint at the threshold. */}
+                  Nothing on this step may hint at the threshold — and merging the date
+                  of birth in beside the name fields changes nothing about that rule.
+                  NO SECTION HEADER between the name fields and these: the request was to
+                  remove headings, so a "About you" divider must not reappear here under
+                  another name. */}
               <Field label={t('pgDob', lang)}>
                 <View style={s.dobRow}>
                   <SelectField flex value={dobD ? String(dobD) : ''} placeholder={t('pgDay', lang)} onPress={() => setPicker('day')} />
@@ -475,7 +417,7 @@ export default function ProfileSetupScreen({
             </>
           )}
 
-          {step === 3 && (
+          {step === 2 && (
             <>
               <Field label={t('pgRegion', lang)}>
                 <ChipGroup options={regionOptions} value={region} onSelect={setRegion} />
@@ -541,6 +483,13 @@ export default function ProfileSetupScreen({
       <SearchModal visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
         searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
         value={institution} onSelect={v => { setInstitution(v); setPicker(null) }} onClose={() => setPicker(null)} />
+      {/* Nothing here is re-read from `profile` on a language change, so every value the
+          user has typed survives it: the fields are component state, the screen is not
+          remounted (same type, same slot in App.js's content chain), and the one effect
+          that repopulates from the row keys on profile?.phone — a value a language write
+          does not touch. */}
+      <SearchModal visible={picker === 'lang'} title={t('menuLanguage', lang)} options={langOptions}
+        value={lang} onSelect={v => { setPicker(null); onLangChange?.(v) }} onClose={() => setPicker(null)} />
 
       <Modal visible={helpOpen} animationType="slide" transparent onRequestClose={() => setHelpOpen(false)}>
         <View style={s.modalBackdrop}>
@@ -571,63 +520,6 @@ export default function ProfileSetupScreen({
   )
 }
 
-// Five states, five distinct messages. A RESERVED name is not an obscenity and must not
-// be told it is one — "Ada" is a common Turkish woman's name, so that false positive is
-// predictable rather than hypothetical, and the message offers a way out.
-function NameFeedback({ state, lang, onPick }) {
-  if (!state) return null
-  const { status, suggestions = [] } = state
-
-  if (status === 'checking') return <Text style={s.muted}>{t('pgChecking', lang)}</Text>
-  if (status === 'short') return <Text style={s.err}>{t('pgTooShort', lang)}</Text>
-  if (status === 'long' || status === 'invalid') return <Text style={s.err}>{t('pgTooLong', lang)}</Text>
-  if (status === 'blocked') return <Text style={s.err}>{t('contentBlockedTerm', lang)}</Text>
-  if (status === 'available') {
-    return (
-      <View style={s.okRow}>
-        <Feather name="check-circle" size={14} color={colors.success} />
-        <Text style={s.ok}>{t('pgAvailable', lang)}</Text>
-      </View>
-    )
-  }
-  if (status === 'reserved') {
-    return (
-      <View>
-        <Text style={s.err}>{t('pgReserved', lang)}</Text>
-        <TouchableOpacity
-          onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('ADA – display name')}`)}
-          activeOpacity={0.7}
-        >
-          <Text style={s.link}>{t('pgReservedEmail', lang)}</Text>
-        </TouchableOpacity>
-      </View>
-    )
-  }
-  // taken | race
-  return (
-    <View>
-      {/* Two separate lookups rather than one ternary INSIDE the call. The i18n guard
-          finds keys by scanning for a literal single-quoted argument, so passing it a
-          conditional hides BOTH keys from coverage.
-          NB: do not write the example out in this comment — the scanner reads comments
-          too, and the first version of it registered a phantom key called "key". */}
-      <Text style={s.err}>{status === 'race' ? t('pgNameRace', lang) : t('pgTaken', lang)}</Text>
-      {suggestions.length > 0 && (
-        <>
-          {status !== 'race' && <Text style={s.muted}>{t('pgTakenSuggest', lang)}</Text>}
-          <View style={s.chips}>
-            {suggestions.map(n => (
-              <TouchableOpacity key={n} style={s.suggest} onPress={() => onPick(n)} activeOpacity={0.8}>
-                <Text style={s.suggestText}>{n}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      )}
-    </View>
-  )
-}
-
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: {
@@ -646,6 +538,13 @@ const s = StyleSheet.create({
     paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999,
   },
   helpBtnText: { color: colors.tintLifestyleFg, fontSize: 12.5, fontWeight: '700' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  langBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
+  },
+  langBtnText: { color: colors.textSecondary, fontSize: 12.5, fontWeight: '700', letterSpacing: 0.4 },
 
   scroll: { paddingHorizontal: 20, paddingBottom: 24 },
   stepLabel: { color: colors.textSecondary, fontSize: 12.5, fontWeight: '600', marginBottom: 4 },
@@ -687,11 +586,6 @@ const s = StyleSheet.create({
   chipOn: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   chipText: { fontSize: 13.5, color: colors.textSecondary, fontWeight: '600' },
   chipTextOn: { color: colors.primaryDark },
-  suggest: {
-    paddingHorizontal: 13, paddingVertical: 8, borderRadius: 999,
-    backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primary,
-  },
-  suggestText: { fontSize: 13.5, color: colors.primaryDark, fontWeight: '700' },
 
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -702,11 +596,7 @@ const s = StyleSheet.create({
   rowText: { fontSize: 14.5, color: colors.textPrimary, flexShrink: 1, paddingRight: 8 },
   rowTextOn: { color: colors.primaryDark, fontWeight: '600' },
 
-  okRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 7 },
-  ok: { color: colors.success, fontSize: 13, fontWeight: '600' },
   err: { color: colors.danger, fontSize: 13, marginTop: 7, lineHeight: 19 },
-  muted: { color: colors.textSecondary, fontSize: 13, marginTop: 7 },
-  link: { color: colors.primary, fontSize: 13, fontWeight: '700', marginTop: 6 },
 
   footer: {
     flexShrink: 0, flexDirection: 'row', gap: 10,
@@ -726,25 +616,12 @@ const s = StyleSheet.create({
   },
   backBtnText: { color: colors.textSecondary, fontSize: 15, fontWeight: '600' },
 
+  // Backs the emergency-help sheet below. The searchable-list styles that used to sit
+  // beside it moved to components/SearchModal.js; this one stayed because this screen
+  // still renders a sheet of its own.
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(26,43,51,0.45)', justifyContent: 'flex-end' },
-  modalCard: {
-    backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg,
-    paddingTop: 16, paddingHorizontal: 18, paddingBottom: 24, maxHeight: '75%',
-  },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   modalTitle: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary, flexShrink: 1, paddingRight: 10 },
-  search: {
-    backgroundColor: colors.bg, borderRadius: radius.md, paddingHorizontal: 13,
-    paddingVertical: Platform.OS === 'ios' ? 11 : 8, fontSize: 15, marginBottom: 10,
-    color: colors.textPrimary,
-  },
-  modalItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: colors.border,
-  },
-  modalItemOn: {},
-  modalItemText: { fontSize: 15, color: colors.textPrimary, flexShrink: 1, paddingRight: 10 },
-  modalItemTextOn: { color: colors.primary, fontWeight: '700' },
 
   helpCard: {
     backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg,

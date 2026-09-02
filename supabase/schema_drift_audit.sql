@@ -665,7 +665,7 @@ expected_constraint (cname, litsig) AS (VALUES
     ('profiles_nationality_code_check', '2|^[A-Z]{2}$'),
     ('profiles_pkey', ''),
     ('profiles_region_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia'),
-    ('profiles_resident_status_check', 'newcomer|resident|student|visiting|working'),
+    ('profiles_resident_status_check', 'resident|student|visiting|working'),
     ('profiles_role_check', 'admin|customer|estate_agent|home_service_provider|organizer|provider'),
     ('profiles_schema_version_check', '0'),
     ('profiles_student_level_check', 'high_school|language_course|postgraduate|university|vocational'),

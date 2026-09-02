@@ -101,6 +101,11 @@ const EXPECTED_SCALARS = {
   EXPLORE_FEATURED_LIVE: false,
   PRICE_COMPARE_LIVE:    false,
   PROFILE_GATE_LIVE:     true,   // live 2026-09-02
+  // Heading text in the profile wizard. Neither value is a launch — false ships the
+  // headingless form, true ships the headed one — but it is compared on device by
+  // flipping it, and a working-tree flip is exactly what `eas update` bundles. Baselined
+  // so the comparison cannot ride out on an unrelated OTA.
+  SHOW_WIZARD_HEADINGS:  false,
   // Swaps the bottom-nav map tab from the health MapScreen to the Explore map. Unlike the
   // others this does not gate NEW content — it replaces a surface users already have, so
   // an accidental flip is a downgrade for every user, not merely an early reveal.

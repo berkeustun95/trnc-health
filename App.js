@@ -14,7 +14,7 @@ import Constants from 'expo-constants'
 import { supabase, isGuest } from './lib/supabase'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
-import { t } from './constants/i18n'
+import { t, LANGUAGES } from './constants/i18n'
 import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE } from './constants/flags'
@@ -112,17 +112,6 @@ function TypeSVGIcon({ type, size, color }) {
 // and firing forever.
 const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, institution_id, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible'
 
-const LANGUAGES = [
-  { key: 'English', label: 'English' },
-  { key: 'Turkish', label: 'Türkçe' },
-  { key: 'Arabic',  label: 'العربية' },
-  { key: 'Russian', label: 'Русский' },
-  { key: 'Greek',   label: 'Ελληνικά' },
-  { key: 'French',  label: 'Français' },
-  { key: 'Spanish', label: 'Español' },
-  { key: 'German',  label: 'Deutsch' },
-  { key: 'Persian', label: 'فارسی' },
-]
 
 // The `map` tab's identity follows EXPLORE_MAP_LIVE, label AND icon together. A tab
 // reading "Keşfet" under a folded-map icon is half-swapped, and half-swapped reads as a
@@ -1092,6 +1081,13 @@ export default function App() {
         onEmergencyNumbers={() => setShowEmergencyModal(true)}
         onDutyList={() => setShowDutyList(true)}
         onHealthDirectory={() => setGateHealthList(true)}
+        /* selectLang, not a bespoke handler: it writes profiles.preferred_language,
+           updates the device copy AND the in-memory profile, so the wizard re-renders in
+           the new language without being remounted — the field values the user has
+           already typed are component state and survive. The global language modal at the
+           bottom of this file is NOT reachable while gated (it lives inside the tab-shell
+           return), which is why the wizard carries its own picker. */
+        onLangChange={selectLang}
       />
     }
   } else if (profile.role === 'admin' && !adminPreview) {

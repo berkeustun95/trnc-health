@@ -66,7 +66,7 @@ export const GATE_FORBIDDEN_PROP = 'onBook'
 // ─── FIELD VOCABULARIES ──────────────────────────────────────────────────────
 // Each list is mirrored by a CHECK constraint in 20261001. Order is the ORDER THE
 // WIZARD RENDERS THEM IN and is a product decision, not alphabetical.
-export const RESIDENT_STATUSES = ['student', 'working', 'newcomer', 'resident', 'visiting']
+export const RESIDENT_STATUSES = ['student', 'working', 'resident', 'visiting']
 
 export const STUDENT_LEVELS = ['university', 'postgraduate', 'high_school', 'language_course', 'vocational']
 
@@ -86,8 +86,11 @@ export const DISPLAY_PREFERENCES = ['display_name', 'full_name']
 export const RESIDENT_STATUS_LABEL_KEY = {
   student:  'pgStatusStudent',
   working:  'pgStatusWorking',
-  newcomer: 'pgStatusNewcomer',
   resident: 'pgStatusResident',
+  // The value stays 'visiting' while the label reads "Tourist" / "Ziyaretçiyim". Renaming
+  // it to 'tourist' would mean a second CHECK-constraint migration for a string no user
+  // ever sees, and the two halves must agree character-for-character — a rename is a
+  // drift opportunity bought for nothing.
   visiting: 'pgStatusVisiting',
 }
 
@@ -95,7 +98,12 @@ export const RESIDENT_STATUS_LABEL_KEY = {
 // TEMPLATE LITERAL, t(`pgTitle${step}`) — is invisible to the guard's literal scan. That
 // is not hypothetical; the first draft of ProfileSetupScreen hid eleven keys this way and
 // the i18n check went green over them.
-export const STEP_TITLE_KEY = { 1: 'pgTitle1', 2: 'pgTitle2', 3: 'pgTitle3' }
+// TWO steps, and step 2 keys pgTitle3 rather than pgTitle2. The old step 2 ("About you")
+// was merged INTO step 1, so its title has no screen left to head and its i18n key is
+// gone from all nine locales; the surviving titles are the ones that still describe a
+// screen. Renumbering the keys would rewrite nine locales to say the same words under a
+// different name.
+export const STEP_TITLE_KEY = { 1: 'pgTitle1', 2: 'pgTitle3' }
 
 export const HELP_ROW_LABEL_KEY = {
   numbers:   'pgHelpNumbers',

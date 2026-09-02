@@ -57,6 +57,23 @@ export const EXPLORE_MAP_LIVE = true
 //   copy may carry it alone. See the Slice 2 journal entry.
 export const PROFILE_GATE_LIVE = true   // live 2026-09-02
 
+// Wizard headings. false = the profile wizard renders NO heading text in its content
+// area: no step title, no "Step n of N" label, and no intro title. Field labels, hints,
+// the progress dots, the emergency button and every modal title are untouched — this
+// flag is about heading text only.
+//
+// A FLAG RATHER THAN A DELETION, on purpose. Removing six required fields' worth of
+// scaffolding is a judgement call that has to be made ON DEVICE, and the two candidate
+// screens are one boolean apart. Deleting the markup would make going back an unpick;
+// this way it is one line. Flip to true to see the headed version again.
+//
+// NOT a dark-launch flag — nothing is hidden from users that they would otherwise get,
+// and either value is shippable. It lives here anyway because this file is the one the
+// OTA guard reads: `eas update` bundles the WORKING TREE, so a value left flipped after
+// a device comparison would ship, and check-module-flags.mjs carrying it in
+// EXPECTED_SCALARS is what stops that.
+export const SHOW_WIZARD_HEADINGS = false
+
 // Marketplace module gating. Each key is a module that is empty in prod today, so
 // it renders a "Coming soon" screen (with one-tap Notify me) instead of an empty
 // list that reads as broken. false = gated (Coming Soon); flip to true via OTA to

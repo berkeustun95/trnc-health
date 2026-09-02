@@ -77,6 +77,33 @@ const SURFACES = [
   // it — so an untranslated key here renders English on an RTL screen to someone who
   // cannot skip. It is guarded BEFORE PROFILE_GATE_LIVE flips, not after.
   'screens/ProfileSetupScreen.js',
+  // Widened 2026-09-02 with Slice 3a, which gave this screen the wizard's ten fields.
+  // It should have been here already: the gate's own strings nearly shipped unchecked
+  // because the screen that edits the SAME columns was outside the scan, and "the wizard
+  // is covered" is not the same claim as "these fields are covered" once two screens
+  // render them. It also carries the account-deletion and legal copy, which is the last
+  // place an English fallback should appear.
+  //
+  // HONEST LIMIT, and this file cannot close it: the scan finds keys passed to t(). It
+  // cannot see a hardcoded English string, and ProfileScreen still has a few in paths
+  // this slice did not touch (an avatar-upload failure, a phone placeholder). Adding a
+  // file here does not translate it; it only guarantees the keys it DOES use are real in
+  // all nine locales.
+  'screens/ProfileScreen.js',
+  // ⚠ A COMPONENT, NOT A SCREEN, AND IT HAD TO BE ADDED IN THE SAME COMMIT THAT CREATED
+  //   IT. Slice 3a moved the display-name feedback out of ProfileSetupScreen into this
+  //   file so both screens could share one implementation — and the ten keys it renders
+  //   (pgChecking, pgTooShort, pgTooLong, pgAvailable, pgTaken, pgTakenSuggest,
+  //   pgReserved, pgReservedEmail, pgNameRace, contentBlockedTerm) left the guard's scope
+  //   with it. Measured: after the move and before this line, not one of them was
+  //   reachable from any file in this list.
+  //
+  //   NOTHING WENT RED. The translations all exist, so the scan simply stopped looking,
+  //   and the key total ROSE from 206 to 222 in the same commit because ProfileScreen was
+  //   added — a coverage LOSS hidden inside a coverage gain. That is this repo's named
+  //   failure shape and it is worth the paragraph: when code moves out of a guarded file,
+  //   the guard does not follow it, and the total is not the alarm you think it is.
+  'components/DisplayNameCheck.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —

@@ -11,8 +11,18 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { getNatLabel, NATIONALITIES } from '../constants/nationalityTranslations'
+import { getNatLabel, NATIONALITIES, NATIONALITY_CODES } from '../constants/nationalityTranslations'
 import { COUNTRY_CODES } from '../constants/countryCodes'
+import { monthNames } from '../constants/months'
+import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
+import SearchModal from '../components/SearchModal'
+import { pad, ageOn, daysInMonth } from '../utils/profileFields'
+import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../components/DisplayNameCheck'
+import {
+  MIN_SIGNUP_AGE, MAX_SIGNUP_AGE, RESIDENT_STATUSES, STUDENT_LEVELS,
+  INSTITUTION_REQUIRED_LEVELS, RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
+  DISPLAY_NAME_MAX,
+} from '../constants/profileGate'
 import LegalScreen from './LegalScreen'
 import { PRESET_AVATARS, getPreset } from '../constants/avatars'
 import BackButton from '../components/BackButton'
@@ -63,10 +73,39 @@ function AvatarDisplay({ avatarUrl, initials, size = 72, textSize = 26 }) {
 }
 
 
+// ─── Slice 3a: the wizard's ten fields become reviewable and editable ───────
+//
+// Before this, the completion gate collected first name, last name, display name, date
+// of birth, nationality, phone, region, resident status, student level and institution —
+// and this screen showed NONE of it. A mandatory form you cannot afterwards read back is
+// not a profile, it is an interrogation.
+//
+// ⚠ full_name IS NO LONGER WRITTEN HERE, AND MUST NOT BE. Since 20261001 the
+//   check_profile_name_content() trigger DERIVES it from first_name + last_name on any
+//   update that moves either. That migration's own comment names this screen as the one
+//   remaining direct writer and this slice as the moment it stops — two writers on one
+//   column with disagreeing semantics was the drift Slice 1 deferred to here. Grepped at
+//   build time: this was the only client write to profiles.full_name in the app (every
+//   AdminScreen hit is a read; EstateAgentOnboardingScreen writes estate_agents.full_name,
+//   a different table), so the column now has exactly one writer — the trigger.
+//
+// Every field below is bounded by a CHECK constraint in 20261001, and
+// `npm run profile:check` fails if the vocabularies here and in the database disagree.
+// The requiredness rule mirrors profiles_completion_requires_fields_check exactly: it
+// bites only on a row whose profile_completed_at is set, which is why it is derived from
+// that column rather than from the role or from this screen's own opinion.
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange }) {
   const [profile, setProfile]               = useState(null)
-  const [form, setForm]                     = useState({ full_name: '', phone: '', nationality: '', preferred_language: 'English' })
+  const [form, setForm]                     = useState({
+    first_name: '', last_name: '', display_name: '',
+    dobY: null, dobM: null, dobD: null,
+    phone: '', nationality: '', region: null, resident_status: null,
+    student_level: null, institution_id: null, preferred_language: 'English',
+  })
+  const [institutions, setInstitutions]     = useState([])
+  const [picker, setPicker]                 = useState(null)  // 'day'|'month'|'year'|'nat'|'cc'|'inst'|'region'|'status'|'level'
+  const [nameState, setNameState]           = useDisplayNameCheck(form.display_name)
   const [savedForm, setSavedForm]           = useState(null)
   const [savedCC, setSavedCC]               = useState('+90')
   const [loading, setLoading]               = useState(true)
@@ -84,8 +123,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [deleting, setDeleting]                 = useState(false)
   const [deleteError, setDeleteError]           = useState(null)
   const [selectedCC, setSelectedCC]             = useState('+90')
-  const [showCCPicker, setShowCCPicker]         = useState(false)
-  const [showNatPicker, setShowNatPicker]       = useState(false)
   const [personalOpen, setPersonalOpen]         = useState(false)
 
   function toggleSection(setter) {
@@ -97,8 +134,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   useEffect(() => {
     async function loadProfile() {
       try {
+        // full_name is READ (for the legacy-row fallback below) but never written back.
         const { data, error } = await supabase.from('profiles')
-          .select('full_name, phone, nationality, preferred_language, role, avatar_url')
+          .select('first_name, last_name, display_name, date_of_birth, region, resident_status, ' +
+                  'student_level, institution_id, full_name, phone, nationality, nationality_code, ' +
+                  'preferred_language, role, avatar_url, profile_completed_at')
           .eq('id', session.user.id)
           .single()
         if (error) { setLoadError(true); return }
@@ -110,10 +150,26 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           if (matched) setSelectedCC(matched.code)
           const initialCC = matched?.code ?? '+90'
           setSavedCC(initialCC)
+          const dob = data.date_of_birth ? data.date_of_birth.split('-') : null
+          // A row that predates the gate has full_name but no first/last. 20261001's
+          // backfill split those, so this only catches a row written between the backfill
+          // and now — but showing an empty name field to somebody who HAS a name reads as
+          // data loss, and the first save then derives full_name from what is shown.
+          const legacy = (data.full_name ?? '').trim()
+          const spaceAt = legacy.lastIndexOf(' ')
           const initialForm = {
-            full_name: data.full_name ?? '',
+            first_name: data.first_name ?? (spaceAt > 0 ? legacy.slice(0, spaceAt) : legacy),
+            last_name: data.last_name ?? (spaceAt > 0 ? legacy.slice(spaceAt + 1) : ''),
+            display_name: data.display_name ?? '',
+            dobY: dob ? Number(dob[0]) : null,
+            dobM: dob ? Number(dob[1]) : null,
+            dobD: dob ? Number(dob[2]) : null,
             phone: matched ? stored.slice(matched.code.length).trim() : stored,
             nationality: data.nationality ?? '',
+            region: data.region ?? null,
+            resident_status: data.resident_status ?? null,
+            student_level: data.student_level ?? null,
+            institution_id: data.institution_id ?? null,
             preferred_language: data.preferred_language ?? 'English',
           }
           setForm(initialForm)
@@ -126,6 +182,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
     loadProfile()
     loadBlocks()
+    supabase.from('institutions')
+      .select('id, name, short_name')
+      .eq('is_active', true)
+      .order('sort_order')
+      .then(({ data }) => setInstitutions(data ?? []))
   }, [])
 
   // Deliberately NO names here. Reviews are anonymous, so showing "you blocked
@@ -186,23 +247,72 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   }
 
   async function save() {
+    setError(null)
     if (form.phone.trim() && !/^\d{4,15}$/.test(form.phone.trim())) {
-      setError('Enter a valid phone number (digits only, 4–15 characters)')
+      setError(t('pgPhoneInvalid', lang))
       return
     }
+    // A partially-entered date is never a valid date, complete profile or not.
+    const dobParts = [form.dobY, form.dobM, form.dobD].filter(Boolean).length
+    if (dobParts > 0 && dobParts < 3) { setError(t('pgDobInvalid', lang)); return }
+    // The age rule is the TRIGGER's, and it raises UNDERAGE on any date it rejects. This
+    // client check exists so the user gets a field-level message instead of a server
+    // error — it NEVER writes age_ineligible. That flag belongs to the wizard's one-way
+    // age screen; setting it from here would sign a legitimate user out of their own
+    // account over a typo they were still editing.
+    if (dobParts === 3 && ageOn(form.dobY, form.dobM, form.dobD) < MIN_SIGNUP_AGE) {
+      setError(t('pgDobInvalid', lang)); return
+    }
+    // Mirrors profiles_completion_requires_fields_check. Blanking any of these on a
+    // COMPLETED row is rejected by the database, and a raw constraint error names the
+    // constraint and nothing a user can act on — so it is caught here, by name.
+    if (isComplete && missingRequired) { setError(t('pgRequired', lang)); return }
+    // ⚠ ONLY WHEN THE NAME ACTUALLY CHANGED, and that condition is the whole point.
+    // useDisplayNameCheck runs on mount against the STORED name, and containsBlockedTerm
+    // reads blocked_terms live — a table admins edit at runtime. Gate this unconditionally
+    // and an admin adding a term that matches an existing user's stored display name locks
+    // that user out of editing ANYTHING on this screen, including their language, with the
+    // only explanation inside a collapsed accordion. It would present as a dead Save
+    // button and point nowhere near here.
+    //
+    // The database would have accepted that write: check_profile_name_content() checks
+    // display_name only when NEW IS DISTINCT FROM OLD, and 20261001's header explains at
+    // length why that guard exists. This mirrors it rather than re-inventing the trap it
+    // was written to close.
+    const nameChanged = form.display_name.trim() !== (savedForm?.display_name ?? '').trim()
+    if (nameChanged && form.display_name.trim() && nameState &&
+        !['available', 'checking'].includes(nameState.status)) return
+
     setSaving(true)
-    setError(null)
+    const level = form.resident_status === 'student' ? form.student_level : null
     const { error: err } = await supabase
       .from('profiles')
       .update({
-        full_name: form.full_name.trim() || null,
+        first_name: form.first_name.trim() || null,
+        last_name: form.last_name.trim() || null,
+        display_name: form.display_name.trim() || null,
+        date_of_birth: dobParts === 3 ? `${form.dobY}-${pad(form.dobM)}-${pad(form.dobD)}` : null,
         phone: form.phone.trim() ? (selectedCC + form.phone.trim()) : null,
         nationality: form.nationality.trim() || null,
+        nationality_code: NATIONALITY_CODES[form.nationality] ?? null,
+        region: form.region,
+        resident_status: form.resident_status,
+        // The coupling CHECKs reject a student_level without a student status and an
+        // institution without a university-level one, so the clears must ride in the SAME
+        // patch as the change that causes them. Two sequential writes fail on the first.
+        student_level: level,
+        institution_id: INSTITUTION_REQUIRED_LEVELS.includes(level) ? form.institution_id : null,
         preferred_language: form.preferred_language,
+        // full_name is DERIVED by check_profile_name_content() from the two fields above.
+        // resident_status_updated_at is stamped by the same trigger. Neither is sent.
       })
       .eq('id', session.user.id)
-    if (err) setError(err.message)
-    else {
+    if (err) {
+      const nameErr = await displayNameSaveError(err, form.display_name.trim())
+      if (nameErr) setNameState(nameErr)
+      else if (err.message?.includes('UNDERAGE')) setError(t('pgDobInvalid', lang))
+      else setError(err.message)
+    } else {
       setSaved(true)
       setSavedForm({ ...form })
       setSavedCC(selectedCC)
@@ -225,19 +335,43 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
   const set = key => val => setForm(f => ({ ...f, [key]: val }))
 
+  // Derived from the form's own keys rather than a hand-written list — a field added
+  // above and forgotten here would silently never enable Save, which reads as the button
+  // being broken rather than as a missing comparison.
   const hasChanges = savedForm != null && (
-    form.full_name !== savedForm.full_name ||
-    form.phone !== savedForm.phone ||
-    form.nationality !== savedForm.nationality ||
-    form.preferred_language !== savedForm.preferred_language ||
-    selectedCC !== savedCC
+    Object.keys(form).some(k => form[k] !== savedForm[k]) || selectedCC !== savedCC
   )
 
-  const initials = form.full_name.trim()
-    ? form.full_name.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+  const isComplete = profile?.profile_completed_at != null
+  const studentLevel = form.resident_status === 'student' ? form.student_level : null
+  const missingRequired =
+    !form.first_name.trim() || !form.last_name.trim() || !form.display_name.trim() ||
+    !form.dobY || !form.dobM || !form.dobD || !form.region || !form.resident_status ||
+    !form.nationality.trim() || !form.phone.trim() ||
+    (form.resident_status === 'student' && !form.student_level) ||
+    (INSTITUTION_REQUIRED_LEVELS.includes(studentLevel) && !form.institution_id)
+
+  const initials = (form.first_name.trim() || form.last_name.trim())
+    ? [form.first_name.trim()[0], form.last_name.trim()[0]].filter(Boolean).join('').toUpperCase()
     : (session.user.email?.[0] ?? t('guestLabel', lang)[0]).toUpperCase()
 
   const memberId = session.user.id.replace(/-/g, '').slice(0, 12).toUpperCase()
+
+  // Every list below is derived from the constants that mirror a CHECK constraint, never
+  // written out here — profile:check fails if this screen inlines one of them.
+  const months = monthNames(lang)
+  const natOptions = NATIONALITIES.map(v => ({ value: v, label: getNatLabel(v, lang) }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+  const ccOptions = COUNTRY_CODES.map(c => ({ value: c.code, label: `${c.code}  ${c.label}` }))
+  const regionOptions = REGIONS.map(v => ({ value: v, label: t(REGION_LABEL_KEY[v], lang) }))
+  const statusOptions = RESIDENT_STATUSES.map(v => ({ value: v, label: t(RESIDENT_STATUS_LABEL_KEY[v], lang) }))
+  const levelOptions = STUDENT_LEVELS.map(v => ({ value: v, label: t(STUDENT_LEVEL_LABEL_KEY[v], lang) }))
+  const instOptions = institutions.map(i => ({ value: i.id, label: i.short_name ? `${i.name} (${i.short_name})` : i.name }))
+  const dayOptions = Array.from({ length: daysInMonth(form.dobY, form.dobM) }, (_, i) => ({ value: i + 1, label: String(i + 1) }))
+  const monthOptions = months.map((m, i) => ({ value: i + 1, label: m }))
+  const thisYear = new Date().getFullYear()
+  const yearOptions = Array.from({ length: MAX_SIGNUP_AGE - MIN_SIGNUP_AGE + 1 },
+    (_, i) => thisYear - MIN_SIGNUP_AGE - i).map(y => ({ value: y, label: String(y) }))
 
   if (loading) {
     return (
@@ -357,21 +491,90 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           </TouchableOpacity>
           {personalOpen && (
             <View>
+              <Text style={s.sectionHint}>{t('profileDetailsHint', lang)}</Text>
+
               <View style={s.fieldGroup}>
-                <Text style={s.fieldLabel}>{t('fullName', lang)}</Text>
+                <Text style={s.fieldLabel}>{t('pgFirstName', lang)}</Text>
                 <TextInput
                   style={s.input}
-                  value={form.full_name}
-                  onChangeText={set('full_name')}
-                  placeholder="Your full name"
+                  value={form.first_name}
+                  onChangeText={set('first_name')}
+                  autoCapitalize="words"
+                  autoCorrect={false}
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
               <View style={s.fieldGroup}>
-                <Text style={s.fieldLabel}>{t('phone', lang)}</Text>
+                <Text style={s.fieldLabel}>{t('pgLastName', lang)}</Text>
+                <TextInput
+                  style={s.input}
+                  value={form.last_name}
+                  onChangeText={set('last_name')}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+
+              {/* Same availability UX as the wizard, from the same module — debounced
+                  check, three suggestions, the reserved message with its support link.
+                  A bare rejection is worse here than in the wizard: this is not a
+                  first-run screen, so the user already HAS a name and is being told it
+                  cannot be what they just typed. */}
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>{t('pgDisplayName', lang)}</Text>
+                <TextInput
+                  style={s.input}
+                  value={form.display_name}
+                  onChangeText={set('display_name')}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={DISPLAY_NAME_MAX}
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <NameFeedback state={nameState} lang={lang} onPick={n => set('display_name')(n)} />
+                <Text style={s.fieldHint}>{t('pgDisplayNameHint', lang)}</Text>
+              </View>
+
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>{t('pgDob', lang)}</Text>
+                <View style={s.dobRow}>
+                  <TouchableOpacity style={[s.pickerBtn, { flex: 1 }]} onPress={() => setPicker('day')} activeOpacity={0.7}>
+                    <Text style={[s.pickerBtnText, !form.dobD && s.pickerBtnPlaceholder]} numberOfLines={1}>
+                      {form.dobD ? String(form.dobD) : t('pgDay', lang)}
+                    </Text>
+                    <Feather name="chevron-down" size={14} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.pickerBtn, { flex: 1 }]} onPress={() => setPicker('month')} activeOpacity={0.7}>
+                    <Text style={[s.pickerBtnText, !form.dobM && s.pickerBtnPlaceholder]} numberOfLines={1}>
+                      {form.dobM ? months[form.dobM - 1] : t('pgMonth', lang)}
+                    </Text>
+                    <Feather name="chevron-down" size={14} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.pickerBtn, { flex: 1 }]} onPress={() => setPicker('year')} activeOpacity={0.7}>
+                    <Text style={[s.pickerBtnText, !form.dobY && s.pickerBtnPlaceholder]} numberOfLines={1}>
+                      {form.dobY ? String(form.dobY) : t('pgYear', lang)}
+                    </Text>
+                    <Feather name="chevron-down" size={14} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>{t('pgNationality', lang)}</Text>
+                <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('nat')} activeOpacity={0.7}>
+                  <Text style={[s.pickerBtnText, !form.nationality && s.pickerBtnPlaceholder]}>
+                    {form.nationality ? getNatLabel(form.nationality, lang) : t('selectNationality', lang)}
+                  </Text>
+                  <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>{t('pgPhone', lang)}</Text>
                 <View style={s.phoneRow}>
-                  <TouchableOpacity style={s.ccBtn} onPress={() => setShowCCPicker(true)}>
+                  <TouchableOpacity style={s.ccBtn} onPress={() => setPicker('cc')}>
                     <Text style={s.ccBtnText}>{selectedCC}</Text>
                     <Feather name="chevron-down" size={13} color={colors.textSecondary} />
                   </TouchableOpacity>
@@ -382,19 +585,54 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                     placeholder="555 000 00 00"
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="phone-pad"
+                    maxLength={15}
                   />
                 </View>
               </View>
 
               <View style={s.fieldGroup}>
-                <Text style={s.fieldLabel}>{t('nationality', lang)}</Text>
-                <TouchableOpacity style={s.pickerBtn} onPress={() => setShowNatPicker(true)} activeOpacity={0.7}>
-                  <Text style={[s.pickerBtnText, !form.nationality && s.pickerBtnPlaceholder]}>
-                    {form.nationality ? getNatLabel(form.nationality, lang) : t('selectNationality', lang)}
+                <Text style={s.fieldLabel}>{t('pgRegion', lang)}</Text>
+                <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('region')} activeOpacity={0.7}>
+                  <Text style={[s.pickerBtnText, !form.region && s.pickerBtnPlaceholder]}>
+                    {form.region ? t(REGION_LABEL_KEY[form.region], lang) : '—'}
                   </Text>
                   <Feather name="chevron-down" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
+
+              <View style={s.fieldGroup}>
+                <Text style={s.fieldLabel}>{t('pgResidentStatus', lang)}</Text>
+                <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('status')} activeOpacity={0.7}>
+                  <Text style={[s.pickerBtnText, !form.resident_status && s.pickerBtnPlaceholder]}>
+                    {form.resident_status ? t(RESIDENT_STATUS_LABEL_KEY[form.resident_status], lang) : '—'}
+                  </Text>
+                  <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {form.resident_status === 'student' && (
+                <View style={s.fieldGroup}>
+                  <Text style={s.fieldLabel}>{t('pgStudentLevel', lang)}</Text>
+                  <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('level')} activeOpacity={0.7}>
+                    <Text style={[s.pickerBtnText, !form.student_level && s.pickerBtnPlaceholder]}>
+                      {form.student_level ? t(STUDENT_LEVEL_LABEL_KEY[form.student_level], lang) : '—'}
+                    </Text>
+                    <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {form.resident_status === 'student' && INSTITUTION_REQUIRED_LEVELS.includes(form.student_level) && (
+                <View style={s.fieldGroup}>
+                  <Text style={s.fieldLabel}>{t('pgInstitution', lang)}</Text>
+                  <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('inst')} activeOpacity={0.7}>
+                    <Text style={[s.pickerBtnText, !form.institution_id && s.pickerBtnPlaceholder]}>
+                      {instOptions.find(o => o.value === form.institution_id)?.label || t('pgInstitutionSearch', lang)}
+                    </Text>
+                    <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {error && <Text style={s.errorText}>{error}</Text>}
             </View>
@@ -457,60 +695,52 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             </View>
           </Modal>
 
-          <Modal visible={showCCPicker} animationType="slide" transparent onRequestClose={() => setShowCCPicker(false)}>
-            <View style={s.ccModalBackdrop}>
-              <View style={s.ccModalCard}>
-                <View style={s.ccModalHeader}>
-                  <Text style={s.ccModalTitle}>Country Code</Text>
-                  <TouchableOpacity onPress={() => setShowCCPicker(false)}>
-                    <Feather name="x" size={20} color={colors.textPrimary} />
-                  </TouchableOpacity>
-                </View>
-                <FlatList
-                  data={COUNTRY_CODES}
-                  keyExtractor={item => item.code}
-                  showsVerticalScrollIndicator={false}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={[s.ccItem, selectedCC === item.code && s.ccItemActive]}
-                      onPress={() => { setSelectedCC(item.code); setShowCCPicker(false) }}
-                    >
-                      <Text style={[s.ccItemCode, selectedCC === item.code && s.ccItemCodeActive]}>{item.code}</Text>
-                      <Text style={[s.ccItemLabel, selectedCC === item.code && s.ccItemLabelActive]}>{item.label}</Text>
-                      {selectedCC === item.code && <Feather name="check" size={15} color={colors.primary} />}
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            </View>
-          </Modal>
-
-          <Modal visible={showNatPicker} animationType="slide" transparent onRequestClose={() => setShowNatPicker(false)}>
-            <View style={s.ccModalBackdrop}>
-              <View style={s.ccModalCard}>
-                <View style={s.ccModalHeader}>
-                  <Text style={s.ccModalTitle}>{t('nationality', lang)}</Text>
-                  <TouchableOpacity onPress={() => setShowNatPicker(false)}>
-                    <Feather name="x" size={20} color={colors.textPrimary} />
-                  </TouchableOpacity>
-                </View>
-                <FlatList
-                  data={NATIONALITIES}
-                  keyExtractor={item => item}
-                  showsVerticalScrollIndicator={false}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={[s.ccItem, form.nationality === item && s.ccItemActive]}
-                      onPress={() => { set('nationality')(item); setShowNatPicker(false) }}
-                    >
-                      <Text style={[s.ccItemLabel, form.nationality === item && s.ccItemLabelActive]}>{getNatLabel(item, lang)}</Text>
-                      {form.nationality === item && <Feather name="check" size={15} color={colors.primary} />}
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            </View>
-          </Modal>
+          {/* One shared SearchModal per field, replacing the two bespoke Modal+FlatList
+              pickers this screen used to carry. The wizard already renders seven of these
+              over the same vocabularies; a second implementation on the screen that edits
+              the same columns is the drift class this repo keeps paying for. Selecting a
+              resident status other than 'student' clears the level and institution in the
+              SAME setForm call — the coupling CHECKs reject them as a later write. */}
+          <SearchModal visible={picker === 'day'} title={t('pgDay', lang)} options={dayOptions}
+            value={form.dobD} onSelect={v => { set('dobD')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'month'} title={t('pgMonth', lang)} options={monthOptions}
+            value={form.dobM} onSelect={v => { set('dobM')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'year'} title={t('pgYear', lang)} options={yearOptions}
+            value={form.dobY} onSelect={v => { set('dobY')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'nat'} searchable title={t('pgNationality', lang)}
+            searchPlaceholder={t('pgNationalitySearch', lang)} options={natOptions}
+            value={form.nationality} onSelect={v => { set('nationality')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'cc'} searchable title={t('pgPhoneCountry', lang)}
+            searchPlaceholder={t('pgNationalitySearch', lang)} options={ccOptions}
+            value={selectedCC} onSelect={v => { setSelectedCC(v); setPicker(null) }} onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'region'} title={t('pgRegion', lang)} options={regionOptions}
+            value={form.region} onSelect={v => { set('region')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'status'} title={t('pgResidentStatus', lang)} options={statusOptions}
+            value={form.resident_status}
+            onSelect={v => {
+              setForm(f => ({
+                ...f,
+                resident_status: v,
+                student_level: v === 'student' ? f.student_level : null,
+                institution_id: v === 'student' ? f.institution_id : null,
+              }))
+              setPicker(null)
+            }}
+            onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'level'} title={t('pgStudentLevel', lang)} options={levelOptions}
+            value={form.student_level}
+            onSelect={v => {
+              setForm(f => ({
+                ...f,
+                student_level: v,
+                institution_id: INSTITUTION_REQUIRED_LEVELS.includes(v) ? f.institution_id : null,
+              }))
+              setPicker(null)
+            }}
+            onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
+            searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
+            value={form.institution_id} onSelect={v => { set('institution_id')(v); setPicker(null) }} onClose={() => setPicker(null)} />
         </ScrollView>
       </KeyboardAwareForm>
     </SafeAreaView>
@@ -521,6 +751,9 @@ const s = StyleSheet.create({
   safe:             { flex: 1, backgroundColor: colors.bg },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container:        { paddingHorizontal: 20, paddingBottom: 48 },
+  sectionHint:      { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18, marginBottom: 14 },
+  fieldHint:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, marginTop: 6 },
+  dobRow:           { flexDirection: 'row', gap: 8 },
 
   header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 20 },
   title:            { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
@@ -580,16 +813,6 @@ const s = StyleSheet.create({
   ccBtn:            { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 14, borderRightWidth: 1.5, borderRightColor: colors.border },
   ccBtnText:        { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   phoneInput:       { flex: 1, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  ccModalBackdrop:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  ccModalCard:      { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: '70%' },
-  ccModalHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  ccModalTitle:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  ccItem:           { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  ccItemActive:     { backgroundColor: colors.primaryLight, marginHorizontal: -4, paddingHorizontal: 4, borderRadius: 8 },
-  ccItemCode:       { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, width: 52 },
-  ccItemCodeActive: { color: colors.primary },
-  ccItemLabel:      { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  ccItemLabelActive:{ color: colors.textPrimary },
 
   // Avatar picker modal
   modalBackdrop:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
