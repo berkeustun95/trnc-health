@@ -377,7 +377,7 @@ for (const { f, sql } of parsed) {
         const cols = ensure(t), from = colName(am[1]), to = colName(am[2])
         if (cols[from]) { cols[to] = cols[from]; delete cols[from] }
       } else if ((am = a.match(/^ADD\s+CONSTRAINT\s+([\w"]+)\s+([\s\S]+)$/i))) {
-        conEvents.push({ name: colName(am[1]), op: 'add', body: am[2], from: f })
+        conEvents.push({ name: colName(am[1]), op: 'add', body: am[2], from: f, tbl: t })
       } else if ((am = a.match(/^ADD\s+(CHECK|UNIQUE|PRIMARY\s+KEY|FOREIGN\s+KEY)\b([\s\S]*)$/i))) {
         // Unnamed ALTER … ADD CHECK: Postgres auto-names it the same way.
         const kindWord = am[1].toUpperCase()
@@ -396,7 +396,7 @@ for (const { f, sql } of parsed) {
           const cs = splitTopLevel(parenSlice(a, a.toUpperCase().indexOf('FOREIGN'))?.body ?? '').map(colName)
           name = autoName(t, cs, 'fkey', taken)
         }
-        conEvents.push({ name, op: 'add', body: `${kindWord}${am[2]}`, from: f })
+        conEvents.push({ name, op: 'add', body: `${kindWord}${am[2]}`, from: f, tbl: t })
       } else if ((am = a.match(/^DROP\s+CONSTRAINT\s+(?:IF\s+EXISTS\s+)?([\w"]+)/i))) {
         conEvents.push({ name: colName(am[1]), op: 'drop', from: f })
       }
@@ -407,13 +407,42 @@ for (const { f, sql } of parsed) {
   // creates before all drops inverts that inside a single file — which is what kept
   // appointments_active_slot_unique out of the expected set.
   const fileIdx = []
-  for (const mm of sql.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?([\w"]+)/gi))
-    fileIdx.push({ at: mm.index, name: colName(mm[1]), op: 'add', from: f })
+  for (const mm of sql.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?([\w"]+)(?:\s+ON\s+([\w".]+))?/gi))
+    fileIdx.push({ at: mm.index, name: colName(mm[1]), op: 'add', from: f, tbl: mm[2] ? tblName(mm[2]) : null })
   for (const mm of sql.matchAll(/DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?(?:public\.)?([\w"]+)/gi))
     fileIdx.push({ at: mm.index, name: colName(mm[1]), op: 'drop', from: f })
   fileIdx.sort((a, b) => a.at - b.at)
   idxEvents.push(...fileIdx)
 }
+
+// ─── DROP TABLE ─────────────────────────────────────────────────────────────
+//
+// Added 2026-09-02, because 20261004 dropped public.appointments and the generator had
+// no idea: it kept emitting 8 appointment columns and appointments_active_slot_unique as
+// EXPECTED, so the audit would have reported 9 missing objects against a database that
+// is exactly right — and this report is the thing you run FIRST when you are unsure
+// about a database. Measured before the fix, not assumed: `grep appointments` on the
+// generated SQL returned 15 hits.
+//
+// A dropped table takes its indexes and constraints with it, and no migration writes a
+// separate DROP INDEX for them, so they must be subtracted here or not at all. That is
+// why the add events above now carry `tbl`.
+//
+// LAST OPERATION WINS, the same rule the settle() below uses — a table dropped and later
+// recreated is live, and this compares (file order, offset) rather than assuming a drop
+// is final.
+const tableOps = new Map()
+parsed.forEach(({ sql }, fi) => {
+  const note = (name, op, at) => {
+    const t = tblName(name)
+    const prev = tableOps.get(t)
+    if (!prev || fi > prev.fi || (fi === prev.fi && at > prev.at)) tableOps.set(t, { op, fi, at })
+  }
+  for (const mm of sql.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w".]+)/gi)) note(mm[1], 'create', mm.index)
+  for (const mm of sql.matchAll(/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([\w".]+)/gi))      note(mm[1], 'drop',   mm.index)
+})
+const droppedTables = new Set([...tableOps].filter(([, v]) => v.op === 'drop').map(([t]) => t))
+for (const t of droppedTables) delete repo[t]
 
 // LAST operation wins. This is the whole fix for drop-then-create idempotency: the old
 // code subtracted a set of drops from a set of adds and lost every recreated object.
@@ -422,8 +451,9 @@ function settle(events) {
   for (const e of events) state.set(e.name, e)
   return [...state.values()].filter(e => e.op === 'add')
 }
-const constraints = settle(conEvents).sort((a, b) => a.name.localeCompare(b.name))
-const indexes = settle(idxEvents).map(e => e.name).sort()
+const onDroppedTable = e => e.tbl && droppedTables.has(e.tbl)
+const constraints = settle(conEvents).filter(e => !onDroppedTable(e)).sort((a, b) => a.name.localeCompare(b.name))
+const indexes = settle(idxEvents).filter(e => !onDroppedTable(e)).map(e => e.name).sort()
 
 // ─── Emitted-SQL validation ──────────────────────────────────────────────────
 

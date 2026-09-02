@@ -258,9 +258,12 @@ DO $$
 DECLARE
   missing text := '';
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.columns
-             WHERE table_schema='public' AND table_name='appointments' AND column_name='service_type')
-    THEN missing := missing || ' appointments.service_type still present;'; END IF;
+  -- appointments.service_type: RETIRED 2026-09-02. 20261004 dropped the whole table, so
+  -- this clause can no longer distinguish anything — information_schema returns zero rows
+  -- for a table that does not exist, which reads exactly like a correctly-dropped column.
+  -- A check that cannot fail is worse than no check, so it is deleted rather than left
+  -- to look like coverage. The table's absence is asserted by verify_schema.sql's
+  -- '1004_appointments_removal / public.appointments is GONE' token, which owns that fact.
   IF EXISTS (SELECT 1 FROM information_schema.columns
              WHERE table_schema='public' AND table_name='claim_requests' AND column_name='kteb_confirmed')
     THEN missing := missing || ' claim_requests.kteb_confirmed still present;'; END IF;

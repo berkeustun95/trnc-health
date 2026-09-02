@@ -49,9 +49,12 @@
 --
 -- It has three branches and TWO are entirely appointment-keyed (owner→customer, and
 -- customer→owner). Removing appointments leaves only the admin branch. That is not a
--- degradation: after this slice, every surviving caller is AdminScreen (4 call sites);
--- the other three (ProviderScreen, GarageBookingsScreen, GroomingBookingsScreen) go
--- with the booking UI. So the function that accepts CLIENT-WRITTEN p_title/p_body —
+-- degradation: after this slice, every surviving caller is AdminScreen — THREE call
+-- sites, not the four this header claimed until 2026-09-02. The number was remembered
+-- rather than counted, which is the same class of error as a remembered policy count;
+-- the client deletions counted them: AdminScreen.js :90, :3870, :4087 (a fourth mention
+-- at :2142 is a comment). The other three callers (ProviderScreen, GarageBookingsScreen,
+-- GroomingBookingsScreen) went with the booking UI, as predicted. So the function that accepts CLIENT-WRITTEN p_title/p_body —
 -- the injection channel 20260923 closed for provider alerts — becomes admin-only.
 -- ═══════════════════════════════════════════════════════════════════════════
 

@@ -2,13 +2,11 @@
 // this module and render the real strings. Metro resolves both forms. No cycle:
 // regions.js imports nothing.
 import { REGION_LABEL_KEY } from './regions.js'
-
 export const LANG_CODES = {
   'English': 'en', 'Turkish': 'tr', 'Arabic': 'ar',
   'Russian': 'ru', 'Greek': 'el', 'French': 'fr',
   'Spanish': 'es', 'German': 'de', 'Persian': 'fa',
 }
-
 const translations = {
   en: {
     // Ask Oli guide
@@ -40,14 +38,12 @@ const translations = {
     onDuty: 'On duty today',
     enableLocation: 'Enable location to see nearest services.',
     pharmacy: 'Pharmacy', clinic: 'Clinic', hospital: 'Hospital', dentist: 'Dentist', grooming: 'Grooming',
-    requestedTime: 'Requested time',
-    selectDate: 'Select date',
-    selectTime: 'Available times',
-    requestAppointment: 'Request appointment',
-    requestSent: 'Request sent',
-    requestSentSub: "We'll notify you when {name} confirms your appointment.",
-    slotTaken: 'Sorry — that slot was just taken. Please pick another time.',
-    backToList: 'Back to list',
+    
+    
+    
+    
+    
+    
     questionsAnswers: 'Questions & Answers',
     askPlaceholder: 'Ask a question about this facility…',
     noQuestions: 'No questions yet.',
@@ -165,25 +161,20 @@ const translations = {
     slide2Title: 'Duty Pharmacy',
     slide3Title: 'Health & Clinics',
     slide4Title: 'Services & Life',
-    myBookings: 'My Bookings',
-    noBookings: 'No bookings yet.',
-    bookingRef: 'Ref',
-    statusPending: 'Pending',
-    statusConfirmed: 'Confirmed',
-    statusCancelled: 'Cancelled',
+    
+    
+    
+    
     rateVisit: 'Rate',
-    reviewDone: 'Reviewed',
     commentOptional: 'Add a comment (optional)…',
     login: 'Log in', signup: 'Sign up', createAccount: 'Create account',
     email: 'Email', password: 'Password',
     iAmA: 'I am a', roleCustomer: 'User', roleProvider: 'Health Professional', roleOrganizer: 'Event Manager',
     facilityPharmacy: 'Pharmacy', facilityClinic: 'Clinic', facilityHospital: 'Hospital', facilityDentist: 'Dentist',
     selectFacilityType: 'Facility type',
-    notifApptConfirmedTitle: 'Appointment confirmed',
-    notifApptConfirmedBody: '{name} confirmed your appointment.',
-    notifApptDeclinedTitle: 'Appointment declined',
-    notifApptDeclinedBody: '{name} declined your appointment request.',
-    apptReminderTitle: 'Appointment in 1 hour', apptReminderBody: 'Your appointment at {name} starts in 1 hour.',
+    
+    
+    apptReminderBody: 'Your appointment at {name} starts in 1 hour.',
     notifNewQuestionTitle: 'New Question',
     notifNewQuestionBody: '{name} received a new question from a user.',
     notifNewApptTitle: 'New Appointment Request',
@@ -218,22 +209,21 @@ const translations = {
     notifDutySwapTitle: '💊 Duty pharmacy updated',
     notifDutySwapBody: '{name} is now the duty pharmacy for {date}.',
     tapViewDuty: 'Tap to view duty pharmacies →',
-    tabRequests: 'Requests', tabQA: 'Q&A', tabReviews: 'Reviews', tabArchive: 'Archive', tabStats: 'Stats', tabProfile: 'Profile', tabHome: 'Home', tabSaved: 'Saved', coverPhoto: 'Cover Photo', logoLabel: 'Logo', tapToAddCover: 'Tap to add cover photo', tapToAddLogo: 'Tap to add logo', tapToView: 'TAP TO VIEW', uploadFailed: 'Upload failed. Try again.', providerDocsUploadFailed: 'Some documents did not upload. Check your connection and tap Submit to try again.',
+    tabQA: 'Q&A', tabReviews: 'Reviews', tabArchive: 'Archive', tabStats: 'Stats', tabProfile: 'Profile', tabHome: 'Home', tabSaved: 'Saved', coverPhoto: 'Cover Photo', logoLabel: 'Logo', tapToAddCover: 'Tap to add cover photo', tapToAddLogo: 'Tap to add logo', tapToView: 'TAP TO VIEW', uploadFailed: 'Upload failed. Try again.', providerDocsUploadFailed: 'Some documents did not upload. Check your connection and tap Submit to try again.',
     labelAddress: 'Address', labelHours: 'Opening Hours', hoursHint: 'e.g. Mon-Sat 08:00-18:00 or 24/7',
-    confirm: 'Confirm', decline: 'Decline', send: 'Send',
+    decline: 'Decline', send: 'Send',
     writeYourAnswer: 'Write your answer…', yourAnswer: 'Your answer',
     noFacilityLinked: 'No facility linked',
     noFacilityLinkedSub: 'Contact the admin to link your account to a facility.',
-    allClear: 'All clear', noPendingRequests: 'No pending appointment requests.',
+    noPendingRequests: 'No pending appointment requests.',
     questionsFromCustomers: 'Questions from customers will appear here.',
     noPendingReviews: 'No pending reviews',
     noApprovedReviews: 'No approved reviews yet',
-    statAppointments: 'Appointments', statTotal: 'Total', statAnswered: 'Answered',
+    statTotal: 'Total', statAnswered: 'Answered',
     statUnanswered: 'Unanswered', statApproved: 'Approved', statRejected: 'Rejected',
     searchPlaceholder: 'Search by name or address…',
-    cancelAppt: 'Cancel',
-    cancelLate: 'To cancel within 24 hours, please call the clinic directly.', noShowBtn: 'No-show', bookingBlocked: 'Booking Suspended', bookingBlockedMsg: 'Your booking access is suspended until {date} due to repeated no-shows or late cancellations.',
-    markComplete: 'Mark Complete', statusCompleted: 'Completed', reviewPromptTitle: 'How was your visit?', reviewPromptBody: 'Share your experience at {name}.',
+    noShowBtn: 'No-show', bookingBlocked: 'Booking Suspended', bookingBlockedMsg: 'Your booking access is suspended until {date} due to repeated no-shows or late cancellations.',
+    statusCompleted: 'Completed', reviewPromptTitle: 'How was your visit?', reviewPromptBody: 'Share your experience at {name}.',
     noReviews: 'No reviews yet.',
     languagesSpoken: 'Languages Spoken', aboutFacility: 'About',
     notifications: 'Notifications', noNotifications: 'No notifications yet.', noNewNotifications: 'No new notifications', markAllRead: 'Mark all read', clearAll: 'Clear all',
@@ -315,43 +305,40 @@ const translations = {
     garageRegisterDeclined: 'Listing not approved',
     garageRegisterDeclinedSub: 'Your garage listing was declined. Contact support for details.',
     garageViewDetails: 'View details',
-    garageBkTitle: 'Bookings',
-    garageBkPendingSection: 'Pending',
-    garageBkUpcomingSection: 'Upcoming',
-    garageBkPastSection: 'Past',
-    garageBkEmpty: 'No bookings yet',
-    garageBkCustomer: 'Customer',
-    garageBkConfirm: 'Confirm',
-    garageBkDecline: 'Decline',
-    garageBkComplete: 'Complete',
-    garageBkNoShow: 'No-show',
-    garageBkCancel: 'Cancel',
-    garageBkDeclineQ: 'Decline this booking?',
-    garageBkDeclineQBody: 'The customer will be notified.',
-    garageBkCancelQ: 'Cancel this booking?',
-    garageBkCancelQBody: 'The customer will be notified.',
-    garageBkNoShowQ: 'Mark as no-show?',
-    garageBkNoShowQBody: 'This records a warning for the customer.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     garageBkSelectService: 'Which service?',
-    garageManageBookings: 'Manage bookings',
-    garageManageAvail: 'Manage availability',
+    
     garageManagePhotos: 'Manage photos',
     garageAvailSoon: 'Availability editor coming soon',
-    garageNotifConfirmedTitle: 'Booking confirmed',
-    garageNotifConfirmedBody: 'Your booking at {name} is confirmed.',
-    garageNotifDeclinedTitle: 'Booking declined',
-    garageNotifDeclinedBody: 'Your booking request at {name} was declined.',
-    garageNotifCancelledTitle: 'Booking cancelled',
-    garageNotifCancelledBody: 'Your booking at {name} was cancelled.',
-    garageBkSelectServices: 'Which services?',
-    garageBkCarSection: 'Vehicle (optional)',
-    garageBkCarMake: 'Make',
-    garageBkCarModel: 'Model',
-    garageBkCarYear: 'Year',
-    garageBkCarPlate: 'Plate',
-    garageBkPhone: 'Your phone',
-    garageBkNotes: 'Notes (optional)',
-    garageBkNotesPlaceholder: 'Describe the issue or request',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     garageBkErrorService: 'Select at least one service.',
     garageBkErrorPhone: 'Phone number is required.',
     garageEditListing: 'Edit listing',
@@ -414,7 +401,6 @@ const translations = {
     groomRegisterActiveSub: 'Your business is listed in the directory.',
     groomRegisterDeclined: 'Not approved',
     groomRegisterDeclinedSub: 'Your listing wasn\'t approved. Contact us if you think this is a mistake.',
-    groomManageAvail: 'Edit availability',
     groomManagePhotos: 'Manage photos',
     groomEditListing: 'Edit listing',
     groomEditTitle: 'Edit listing',
@@ -422,53 +408,51 @@ const translations = {
     groomEditMaterialNote: 'Changes to name, category or address need admin re-approval.',
     groomEditSaved: 'Changes saved.',
     groomEditPendingNote: 'Your listing is under review again after the changes.',
-    groomAvailTitle: 'Availability',
-    groomAvailIntro: 'Choose the days and hours customers can book. Time slots are created automatically.',
-    groomAvailSlotBooking: 'Slot booking',
-    groomAvailSlotBookingSub: 'Let customers book fixed time slots',
-    groomAvailSlotDuration: 'Slot duration',
-    groomAvailMinutes: '{n} min',
-    groomAvailSchedule: 'Weekly schedule',
-    groomAvailClosed: 'Closed',
-    groomAvailSave: 'Save schedule',
-    groomAvailSaveOff: 'Save changes',
-    groomAvailSaved: 'Saved!',
-    groomAvailOffHint: 'Slot booking is off. Turn it on to offer bookable time slots.',
-    groomDayMon: 'Mon',
-    groomDayTue: 'Tue',
-    groomDayWed: 'Wed',
-    groomDayThu: 'Thu',
-    groomDayFri: 'Fri',
-    groomDaySat: 'Sat',
-    groomDaySun: 'Sun',
-    groomAvailUnsavedTitle: 'Discard changes?',
-    groomAvailUnsavedBody: 'Your unsaved schedule changes will be lost.',
-    groomAvailDiscard: 'Discard',
-    groomManageBookings: 'My bookings',
-    groomStatusRequested: 'Requested — awaiting confirmation',
-    groomBkTitle: 'My bookings',
-    groomBkCustomer: 'Customer',
-    groomBkPendingSection: 'Awaiting your confirmation',
-    groomBkUpcomingSection: 'Upcoming',
-    groomBkPastSection: 'Past',
-    groomBkEmpty: 'No bookings yet',
-    groomBkConfirm: 'Confirm',
-    groomBkDecline: 'Decline',
-    groomBkCancel: 'Cancel',
-    groomBkNoShow: 'No-show',
-    groomBkComplete: 'Mark done',
-    groomBkDeclineQ: 'Decline this booking?',
-    groomBkDeclineQBody: 'The customer will be notified and the slot freed.',
-    groomBkCancelQ: 'Cancel this booking?',
-    groomBkCancelQBody: 'The customer will be notified and the slot freed.',
-    groomBkNoShowQ: 'Mark as no-show?',
-    groomBkNoShowQBody: 'This records a strike against the customer.',
-    groomNotifConfirmedTitle: 'Booking confirmed',
-    groomNotifConfirmedBody: 'Your booking at {name} is confirmed.',
-    groomNotifDeclinedTitle: 'Booking declined',
-    groomNotifDeclinedBody: 'Your booking at {name} was declined.',
-    groomNotifCancelledTitle: 'Booking cancelled',
-    groomNotifCancelledBody: 'Your booking at {name} was cancelled.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     gateInsurance: 'Create a free account to list your insurance company.',
     insTitle: 'Insurance',
     insBackToTypes: 'All insurance types',
@@ -557,7 +541,7 @@ const translations = {
     accomAdminPendingProps: 'Pending listings', accomAdminPendingAgents: 'Pending agents',
     accomClear: 'Clear', accomApply: 'Apply', accomMin: 'Min', accomMax: 'Max',
     favourites: 'Favourites', showAll: 'Show all', adaOnly: 'ADA only', allFacilities: 'All facilities', noFavourites: 'No favourites yet. Tap the ♥ on any facility to save it here.', hiddenFacilitiesHint: 'ADA registered',
-    bookingDetail: 'Appointment Details', yourReview: 'Your Review', getDirections: 'Get Directions', call: 'Call', visitWebsite: 'Website', viewProfile: 'View Profile',
+    yourReview: 'Your Review', getDirections: 'Get Directions', call: 'Call', visitWebsite: 'Website', viewProfile: 'View Profile',
     noFacilitiesTitle: 'No facilities yet', noFacilitiesBody: 'Verified pharmacies, clinics, and hospitals will appear here as they join ADA.',
     noResultsTitle: 'No results found', noResultsBody: 'Try removing a filter or adjusting your search',
     facilityLoadError: 'Could not load facilities. Please check your connection.',
@@ -572,7 +556,6 @@ const translations = {
     gateTransport: 'Create a free account to register as a transport provider.',
     gateEstateAgent: 'Create a free account to list properties as an estate agent.',
     gatePlaceSubmit: 'Create a free account to suggest a place for others to discover.',
-    gateBooking: 'Create a free account to book an appointment.',
     gateQuestion: 'Create a free account to ask this provider a question.',
     gateReview: 'Create a free account to leave a review.',
     gateReport: 'Create a free account to report content.',
@@ -642,13 +625,9 @@ const translations = {
     deleteAccountConfirmBtn: 'Yes, delete my account',
     cancel: 'Cancel',
     openNow: 'Open now',
-    upcoming: 'Upcoming',
-    pastAppt: 'Past',
     reportProblem: 'Suggest a correction',
-    noUpcomingAppt: 'No upcoming appointments.',
-    noPastAppt: 'No past appointments.',
-    completeProfileTip: 'Complete your profile and set your availability to start receiving appointment requests.',
-    goToProfile: 'Go to Profile',
+    
+    
     callToBook: 'Call to book',
     pharmacies: 'Pharmacies', clinics: 'Clinics', hospitals: 'Hospitals', dentists: 'Dentists',
     chipDutyPharmacies: 'Duty pharmacies',
@@ -676,13 +655,10 @@ const translations = {
     coachAccommodationTitle: 'Property & Accommodation', coachAccommodationBody: 'Homes, land and commercial property across TRNC — for sale and to rent.',
     coachTransportTitle: 'Transportation', coachTransportBody: 'Find taxis, car rentals, airport transfers, and intercity bus routes across TRNC.',
     qualificationsLabel: 'Qualifications',
-    scheduleLabel: 'Schedule',
     todayLabel: 'Today', feelsLike: 'Feels',
-    minSlotLabel: '{n}-min appointment slots',
     firstReviewPrompt: 'Be the first to review after your visit',
     reviewCountLabel: '{n} reviews',
     seeAllReviews: 'See all {n} reviews',
-    closedDay: 'Closed this day',
     menuMunicipalities: 'Municipalities',
     menuEvents: 'Events',
     eventsTitle: 'Events',
@@ -1340,14 +1316,12 @@ const translations = {
     onDuty: 'Bugün nöbetçi',
     enableLocation: 'En yakın hizmetleri görmek için konumunuzu etkinleştirin.',
     pharmacy: 'Eczane', clinic: 'Klinik', hospital: 'Hastane', dentist: 'Diş Hekimi', grooming: 'Bakım',
-    requestedTime: 'İstenen zaman',
-    selectDate: 'Tarih seçin',
-    selectTime: 'Müsait saatler',
-    requestAppointment: 'Randevu talep et',
-    requestSent: 'Talep gönderildi',
-    requestSentSub: '{name} randevunuzu onayladığında sizi bilgilendireceğiz.',
-    slotTaken: 'Üzgünüz — bu saat az önce doldu. Lütfen başka bir saat seçin.',
-    backToList: 'Listeye dön',
+    
+    
+    
+    
+    
+    
     questionsAnswers: 'Sorular & Cevaplar',
     askPlaceholder: 'Bu tesis hakkında bir soru sorun…',
     noQuestions: 'Henüz soru yok.',
@@ -1462,25 +1436,20 @@ const translations = {
     slide2Title: 'Nöbetçi Eczane',
     slide3Title: 'Sağlık ve Klinikler',
     slide4Title: 'Hizmetler ve Yaşam',
-    myBookings: 'Randevularım',
-    noBookings: 'Henüz randevu yok.',
-    bookingRef: 'Ref',
-    statusPending: 'Beklemede',
-    statusConfirmed: 'Onaylandı',
-    statusCancelled: 'İptal edildi',
+    
+    
+    
+    
     rateVisit: 'Puan ver',
-    reviewDone: 'Değerlendirildi',
     commentOptional: 'Yorum ekle (isteğe bağlı)…',
     login: 'Giriş yap', signup: 'Kayıt ol', createAccount: 'Hesap oluştur',
     email: 'E-posta', password: 'Şifre',
     iAmA: 'Hesap türü', roleCustomer: 'Kullanıcı', roleProvider: 'Sağlık Profesyoneli', roleOrganizer: 'Etkinlik Yöneticisi',
     facilityPharmacy: 'Eczane', facilityClinic: 'Klinik', facilityHospital: 'Hastane', facilityDentist: 'Diş Kliniği',
     selectFacilityType: 'Tesis türü',
-    notifApptConfirmedTitle: 'Randevu onaylandı',
-    notifApptConfirmedBody: '{name} randevunuzu onayladı.',
-    notifApptDeclinedTitle: 'Randevu reddedildi',
-    notifApptDeclinedBody: '{name} randevu talebinizi reddetti.',
-    apptReminderTitle: '1 saat sonra randevu', apptReminderBody: '{name} randevunuz 1 saat sonra başlıyor.',
+    
+    
+    apptReminderBody: '{name} randevunuz 1 saat sonra başlıyor.',
     notifNewQuestionTitle: 'Yeni Soru',
     notifNewQuestionBody: '{name} bir kullanıcıdan yeni soru aldı.',
     notifNewApptTitle: 'Yeni Randevu Talebi',
@@ -1515,22 +1484,21 @@ const translations = {
     notifDutySwapTitle: '💊 Nöbetçi eczane güncellendi',
     notifDutySwapBody: '{date} tarihinde nöbetçi eczane {name} oldu.',
     tapViewDuty: 'Nöbetçi eczaneleri görüntülemek için dokun →',
-    tabRequests: 'İstekler', tabQA: 'Q&A', tabReviews: 'İncelemeler', tabArchive: 'Arşiv', tabStats: 'İstatistik', tabProfile: 'Profil', tabHome: 'Anasayfa', tabSaved: 'Kaydedilenler', coverPhoto: 'Kapak Fotoğrafı', logoLabel: 'Logo', tapToAddCover: 'Kapak fotoğrafı eklemek için dokun', tapToAddLogo: 'Logo eklemek için dokun', tapToView: 'GÖRÜNTÜLEMEK İÇİN DOKUN', uploadFailed: 'Yükleme başarısız. Tekrar dene.', providerDocsUploadFailed: 'Bazı belgeler yüklenemedi. Bağlantını kontrol edip tekrar Gönder düğmesine dokun.',
+    tabQA: 'Q&A', tabReviews: 'İncelemeler', tabArchive: 'Arşiv', tabStats: 'İstatistik', tabProfile: 'Profil', tabHome: 'Anasayfa', tabSaved: 'Kaydedilenler', coverPhoto: 'Kapak Fotoğrafı', logoLabel: 'Logo', tapToAddCover: 'Kapak fotoğrafı eklemek için dokun', tapToAddLogo: 'Logo eklemek için dokun', tapToView: 'GÖRÜNTÜLEMEK İÇİN DOKUN', uploadFailed: 'Yükleme başarısız. Tekrar dene.', providerDocsUploadFailed: 'Bazı belgeler yüklenemedi. Bağlantını kontrol edip tekrar Gönder düğmesine dokun.',
     labelAddress: 'Adres', labelHours: 'Çalışma Saatleri', hoursHint: 'ör. Mon-Sat 08:00-18:00 veya 24/7',
-    confirm: 'Onayla', decline: 'Reddet', send: 'Gönder',
+    decline: 'Reddet', send: 'Gönder',
     writeYourAnswer: 'Cevabınızı yazın…', yourAnswer: 'Cevabınız',
     noFacilityLinked: 'Bağlı tesis yok',
     noFacilityLinkedSub: 'Hesabınızı bir tesise bağlamak için yöneticiyle iletişime geçin.',
-    allClear: 'Hepsi tamam', noPendingRequests: 'Bekleyen randevu talebi yok.',
+    noPendingRequests: 'Bekleyen randevu talebi yok.',
     questionsFromCustomers: 'Müşterilerden gelen sorular burada görünecek.',
     noPendingReviews: 'Bekleyen inceleme yok',
     noApprovedReviews: 'Henüz onaylanmış inceleme yok',
-    statAppointments: 'Randevular', statTotal: 'Toplam', statAnswered: 'Yanıtlandı',
+    statTotal: 'Toplam', statAnswered: 'Yanıtlandı',
     statUnanswered: 'Yanıtsız', statApproved: 'Onaylandı', statRejected: 'Reddedildi',
     searchPlaceholder: 'İsim veya adrese göre ara…',
-    cancelAppt: 'İptal et',
-    cancelLate: 'Son 24 saat içinde iptal için lütfen kliniği arayın.', noShowBtn: 'Gelmedi', bookingBlocked: 'Randevu Askıya Alındı', bookingBlockedMsg: 'Tekrarlanan devamsızlıklar nedeniyle randevu erişiminiz {date} tarihine kadar askıya alınmıştır.',
-    markComplete: 'Tamamlandı Olarak İşaretle', statusCompleted: 'Tamamlandı', reviewPromptTitle: 'Ziyaretiniz nasıldı?', reviewPromptBody: '{name} deneyiminizi paylaşın.',
+    noShowBtn: 'Gelmedi', bookingBlocked: 'Randevu Askıya Alındı', bookingBlockedMsg: 'Tekrarlanan devamsızlıklar nedeniyle randevu erişiminiz {date} tarihine kadar askıya alınmıştır.',
+    statusCompleted: 'Tamamlandı', reviewPromptTitle: 'Ziyaretiniz nasıldı?', reviewPromptBody: '{name} deneyiminizi paylaşın.',
     noReviews: 'Henüz değerlendirme yok.',
     languagesSpoken: 'Konuşulan Diller', aboutFacility: 'Hakkında',
     notifications: 'Bildirimler', noNotifications: 'Henüz bildirim yok.', noNewNotifications: 'Yeni bildirim yok', markAllRead: 'Tümünü okundu say', clearAll: 'Tümünü temizle',
@@ -1612,43 +1580,40 @@ const translations = {
     garageRegisterDeclined: 'İlan onaylanmadı',
     garageRegisterDeclinedSub: 'Oto servis ilanınız reddedildi. Ayrıntılar için destek ile iletişime geçin.',
     garageViewDetails: 'Detaylar',
-    garageBkTitle: 'Randevular',
-    garageBkPendingSection: 'Bekleyen',
-    garageBkUpcomingSection: 'Yaklaşan',
-    garageBkPastSection: 'Geçmiş',
-    garageBkEmpty: 'Henüz randevu yok',
-    garageBkCustomer: 'Müşteri',
-    garageBkConfirm: 'Onayla',
-    garageBkDecline: 'Reddet',
-    garageBkComplete: 'Tamamla',
-    garageBkNoShow: 'Gelmedi',
-    garageBkCancel: 'İptal',
-    garageBkDeclineQ: 'Bu randevu reddedilsin mi?',
-    garageBkDeclineQBody: 'Müşteri bilgilendirilecek.',
-    garageBkCancelQ: 'Bu randevu iptal edilsin mi?',
-    garageBkCancelQBody: 'Müşteri bilgilendirilecek.',
-    garageBkNoShowQ: 'Gelmedi olarak işaretlensin mi?',
-    garageBkNoShowQBody: 'Bu, müşteriye bir uyarı kaydeder.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     garageBkSelectService: 'Hangi hizmet?',
-    garageManageBookings: 'Randevuları yönet',
-    garageManageAvail: 'Müsaitliği yönet',
+    
     garageManagePhotos: 'Fotoğrafları yönet',
     garageAvailSoon: 'Müsaitlik düzenleyici yakında',
-    garageNotifConfirmedTitle: 'Randevu onaylandı',
-    garageNotifConfirmedBody: '{name} randevunuz onaylandı.',
-    garageNotifDeclinedTitle: 'Randevu reddedildi',
-    garageNotifDeclinedBody: '{name} randevu talebiniz reddedildi.',
-    garageNotifCancelledTitle: 'Randevu iptal edildi',
-    garageNotifCancelledBody: '{name} randevunuz iptal edildi.',
-    garageBkSelectServices: 'Hangi hizmetler?',
-    garageBkCarSection: 'Araç (isteğe bağlı)',
-    garageBkCarMake: 'Marka',
-    garageBkCarModel: 'Model',
-    garageBkCarYear: 'Yıl',
-    garageBkCarPlate: 'Plaka',
-    garageBkPhone: 'Telefonunuz',
-    garageBkNotes: 'Notlar (isteğe bağlı)',
-    garageBkNotesPlaceholder: 'Sorunu veya talebi açıklayın',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     garageBkErrorService: 'En az bir hizmet seçin.',
     garageBkErrorPhone: 'Telefon numarası gereklidir.',
     garageEditListing: 'İlanı düzenle',
@@ -1711,7 +1676,6 @@ const translations = {
     groomRegisterActiveSub: 'İşletmeniz rehberde listeleniyor.',
     groomRegisterDeclined: 'Onaylanmadı',
     groomRegisterDeclinedSub: 'Kaydınız onaylanmadı. Bunun bir hata olduğunu düşünüyorsanız bizimle iletişime geçin.',
-    groomManageAvail: 'Müsaitliği düzenle',
     groomManagePhotos: 'Fotoğrafları yönet',
     groomEditListing: 'İlanı düzenle',
     groomEditTitle: 'İlanı düzenle',
@@ -1719,53 +1683,51 @@ const translations = {
     groomEditMaterialNote: 'Ad, kategori veya adres değişiklikleri yönetici onayı gerektirir',
     groomEditSaved: 'Değişiklikler kaydedildi.',
     groomEditPendingNote: 'Değişiklikler sonrası ilanınız tekrar incelemede',
-    groomAvailTitle: 'Müsaitlik',
-    groomAvailIntro: 'Müşterilerin randevu alabileceği gün ve saatleri seçin. Zaman aralıkları otomatik oluşturulur.',
-    groomAvailSlotBooking: 'Randevu aralıkları',
-    groomAvailSlotBookingSub: 'Müşteriler sabit zaman aralıklarından seçsin',
-    groomAvailSlotDuration: 'Aralık süresi',
-    groomAvailMinutes: '{n} dk',
-    groomAvailSchedule: 'Haftalık program',
-    groomAvailClosed: 'Kapalı',
-    groomAvailSave: 'Programı kaydet',
-    groomAvailSaveOff: 'Değişiklikleri kaydet',
-    groomAvailSaved: 'Kaydedildi!',
-    groomAvailOffHint: 'Randevu aralıkları kapalı. Açarak müşterilere zaman aralığı sunun.',
-    groomDayMon: 'Pzt',
-    groomDayTue: 'Sal',
-    groomDayWed: 'Çar',
-    groomDayThu: 'Per',
-    groomDayFri: 'Cum',
-    groomDaySat: 'Cmt',
-    groomDaySun: 'Paz',
-    groomAvailUnsavedTitle: 'Değişiklikler iptal edilsin mi?',
-    groomAvailUnsavedBody: 'Kaydedilmemiş program değişiklikleriniz kaybolacak.',
-    groomAvailDiscard: 'Vazgeç',
-    groomManageBookings: 'Randevularım',
-    groomStatusRequested: 'Talep edildi — onay bekliyor',
-    groomBkTitle: 'Randevularım',
-    groomBkCustomer: 'Müşteri',
-    groomBkPendingSection: 'Onayınızı bekliyor',
-    groomBkUpcomingSection: 'Yaklaşan',
-    groomBkPastSection: 'Geçmiş',
-    groomBkEmpty: 'Henüz randevu yok',
-    groomBkConfirm: 'Onayla',
-    groomBkDecline: 'Reddet',
-    groomBkCancel: 'İptal et',
-    groomBkNoShow: 'Gelmedi',
-    groomBkComplete: 'Tamamlandı',
-    groomBkDeclineQ: 'Bu randevu reddedilsin mi?',
-    groomBkDeclineQBody: 'Müşteri bilgilendirilecek ve saat serbest bırakılacak.',
-    groomBkCancelQ: 'Bu randevu iptal edilsin mi?',
-    groomBkCancelQBody: 'Müşteri bilgilendirilecek ve saat serbest bırakılacak.',
-    groomBkNoShowQ: 'Gelmedi olarak işaretlensin mi?',
-    groomBkNoShowQBody: 'Bu, müşteriye bir ihlal puanı ekler.',
-    groomNotifConfirmedTitle: 'Randevu onaylandı',
-    groomNotifConfirmedBody: '{name} randevunuz onaylandı.',
-    groomNotifDeclinedTitle: 'Randevu reddedildi',
-    groomNotifDeclinedBody: '{name} randevunuz reddedildi.',
-    groomNotifCancelledTitle: 'Randevu iptal edildi',
-    groomNotifCancelledBody: '{name} randevunuz iptal edildi.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     gateInsurance: 'Sigorta şirketinizi eklemek için ücretsiz hesap oluşturun.',
     insTitle: 'Sigorta',
     insBackToTypes: 'Tüm sigorta türleri',
@@ -1794,7 +1756,7 @@ const translations = {
     insErrorGeneric: 'Bir şeyler ters gitti. Lütfen tekrar deneyin.',
     insTypesOffered: 'Sunulan sigortalar', insAbout: 'Hakkında', insContact: 'İletişim',
     favourites: 'Favoriler', showAll: 'Tümünü göster', adaOnly: 'Yalnızca ADA', allFacilities: 'Tüm tesisler', noFavourites: 'Henüz favori yok. Kaydetmek için herhangi bir tesisin ♥ simgesine dokun.', hiddenFacilitiesHint: 'Ada\'ya katılanlar',
-    bookingDetail: 'Randevu Detayı', yourReview: 'Değerlendirmeniz', getDirections: 'Yol Tarifi', call: 'Ara', visitWebsite: 'Web Sitesi', viewProfile: 'Profili Görüntüle',
+    yourReview: 'Değerlendirmeniz', getDirections: 'Yol Tarifi', call: 'Ara', visitWebsite: 'Web Sitesi', viewProfile: 'Profili Görüntüle',
     noFacilitiesTitle: 'Henüz tesis yok', noFacilitiesBody: 'Onaylı eczane, klinik ve hastaneler ADA\'ya katıldıkça burada görünecek.',
     noResultsTitle: 'Sonuç bulunamadı', noResultsBody: 'Bir filtreyi kaldırmayı veya aramanızı değiştirmeyi deneyin',
     facilityLoadError: 'Tesisler yüklenemedi. Bağlantınızı kontrol edin.',
@@ -1809,7 +1771,6 @@ const translations = {
     gateTransport: 'Ulaşım sağlayıcısı olarak kayıt olmak için ücretsiz hesap oluşturun.',
     gateEstateAgent: 'Emlak danışmanı olarak ilan vermek için ücretsiz hesap oluşturun.',
     gatePlaceSubmit: 'Başkalarının keşfetmesi için yer önermek üzere ücretsiz hesap oluşturun.',
-    gateBooking: 'Randevu almak için ücretsiz hesap oluşturun.',
     gateQuestion: 'Bu sağlayıcıya soru sormak için ücretsiz hesap oluşturun.',
     gateReview: 'Değerlendirme bırakmak için ücretsiz hesap oluşturun.',
     gateReport: 'İçerik bildirmek için ücretsiz hesap oluşturun.',
@@ -1871,13 +1832,9 @@ const translations = {
     deleteAccountConfirmBtn: 'Evet, hesabımı sil',
     cancel: 'İptal',
     openNow: 'Şu an açık',
-    upcoming: 'Yaklaşan',
-    pastAppt: 'Geçmiş',
     reportProblem: 'Düzeltme öner',
-    noUpcomingAppt: 'Yaklaşan randevu yok.',
-    noPastAppt: 'Geçmiş randevu yok.',
-    completeProfileTip: 'Randevu almaya başlamak için profilinizi tamamlayın ve müsaitlik ayarlarınızı yapın.',
-    goToProfile: 'Profile Git',
+    
+    
     callToBook: 'Aramak için ara',
     pharmacies: 'Eczaneler', clinics: 'Klinikler', hospitals: 'Hastaneler', dentists: 'Diş Hekimleri',
     chipDutyPharmacies: 'Nöbetçi eczaneler',
@@ -1905,13 +1862,10 @@ const translations = {
     coachAccommodationTitle: 'Emlak ve Konaklama', coachAccommodationBody: 'KKTC genelinde satılık ve kiralık konut, arsa ve işyeri.',
     coachTransportTitle: 'Ulaşım', coachTransportBody: 'KKTC genelinde taksi, araç kiralama, havalimanı transferi ve şehirlerarası otobüs hatlarını bul.',
     qualificationsLabel: 'Nitelikler',
-    scheduleLabel: 'Program',
     todayLabel: 'Bugün', feelsLike: 'Hissedilen',
-    minSlotLabel: '{n} dakikalık randevu slotları',
     firstReviewPrompt: 'Ziyaretinizden sonra ilk değerlendirmeyi siz yapın',
     reviewCountLabel: '{n} değerlendirme',
     seeAllReviews: 'Tüm {n} değerlendirmeyi gör',
-    closedDay: 'Bu gün kapalı',
     menuMunicipalities: 'Belediyeler',
     menuEvents: 'Etkinlikler',
     eventsTitle: 'Etkinlikler',
@@ -2543,7 +2497,6 @@ const translations = {
     contentPaymentBlocked: 'Lütfen ilanınızdan ödeme veya banka bilgilerini (IBAN, hesap, havale) kaldırın. Müşteriler sizinle doğrudan iletişime geçer ve öder — ADA üzerinden değil.',
     contentBannedUser: 'Önceki bir içerik ihlali nedeniyle paylaşım yetkiniz askıya alındı.',
     termsAgreeContent: 'Paylaşarak Koşullarımızı kabul etmiş olursunuz. Sakıncalı içeriğe ve istismarcı kullanıcılara müsamaha gösterilmez; bildirilen içerik 24 saat içinde kaldırılır.',
-
     towingSecondNumber: '2. numara',
     // ─── Çekici & Yol Yardım (towing / roadside assistance) ───────────────
     towingSecondNumberBtn: '2. numara · {number}',
@@ -2643,14 +2596,12 @@ const translations = {
     onDuty: 'نوبة اليوم',
     enableLocation: 'فعّل الموقع لرؤية أقرب الخدمات.',
     pharmacy: 'صيدلية', clinic: 'عيادة', hospital: 'مستشفى', dentist: 'طبيب أسنان', grooming: 'العناية',
-    requestedTime: 'الوقت المطلوب',
-    selectDate: 'اختر تاريخاً',
-    selectTime: 'الأوقات المتاحة',
-    requestAppointment: 'طلب موعد',
-    requestSent: 'تم إرسال الطلب',
-    requestSentSub: 'سنُعلمك عندما تؤكد {name} موعدك.',
-    slotTaken: 'عذراً — تم حجز هذا الموعد للتو. يرجى اختيار وقت آخر.',
-    backToList: 'العودة للقائمة',
+    
+    
+    
+    
+    
+    
     questionsAnswers: 'أسئلة وأجوبة',
     askPlaceholder: 'اطرح سؤالاً حول هذه المنشأة…',
     noQuestions: 'لا أسئلة حتى الآن.',
@@ -2800,25 +2751,20 @@ const translations = {
     slide2Title: 'صيدلية النوبة',
     slide3Title: 'الصحة والعيادات',
     slide4Title: 'الخدمات والحياة',
-    myBookings: 'حجوزاتي',
-    noBookings: 'لا حجوزات حتى الآن.',
-    bookingRef: 'مرجع',
-    statusPending: 'قيد الانتظار',
-    statusConfirmed: 'مؤكد',
-    statusCancelled: 'ملغى',
+    
+    
+    
+    
     rateVisit: 'قيّم',
-    reviewDone: 'تمت المراجعة',
     commentOptional: 'أضف تعليقاً (اختياري)…',
     login: 'تسجيل الدخول', signup: 'إنشاء حساب', createAccount: 'إنشاء حساب',
     email: 'البريد الإلكتروني', password: 'كلمة المرور',
     iAmA: 'أنا', roleCustomer: 'مستخدم', roleProvider: 'متخصص صحي', roleOrganizer: 'مدير الفعاليات',
     facilityPharmacy: 'صيدلية', facilityClinic: 'عيادة', facilityHospital: 'مستشفى', facilityDentist: 'طبيب أسنان',
     selectFacilityType: 'نوع المنشأة',
-    notifApptConfirmedTitle: 'تم تأكيد الموعد',
-    notifApptConfirmedBody: 'أكدت {name} موعدك.',
-    notifApptDeclinedTitle: 'تم رفض الموعد',
-    notifApptDeclinedBody: 'رفضت {name} طلب موعدك.',
-    apptReminderTitle: 'موعد بعد ساعة', apptReminderBody: 'موعدك في {name} يبدأ بعد ساعة.',
+    
+    
+    apptReminderBody: 'موعدك في {name} يبدأ بعد ساعة.',
     notifNewQuestionTitle: 'سؤال جديد',
     notifNewQuestionBody: 'تلقّت {name} سؤالاً جديداً من مستخدم.',
     notifNewApptTitle: 'طلب موعد جديد',
@@ -2853,22 +2799,21 @@ const translations = {
     notifDutySwapTitle: '💊 تم تحديث صيدلية المناوبة',
     notifDutySwapBody: '{name} هي صيدلية المناوبة بتاريخ {date}.',
     tapViewDuty: 'اضغط لعرض صيدليات المناوبة →',
-    tabRequests: 'الطلبات', tabQA: 'Q&A', tabReviews: 'المراجعات', tabArchive: 'الأرشيف', tabStats: 'الإحصائيات', tabProfile: 'الملف', tabHome: 'الرئيسية', tabSaved: 'المحفوظة', coverPhoto: 'صورة الغلاف', logoLabel: 'الشعار', tapToAddCover: 'اضغط لإضافة صورة غلاف', tapToAddLogo: 'اضغط لإضافة الشعار', tapToView: 'اضغط للعرض', uploadFailed: 'فشل الرفع. حاول مرة أخرى.', providerDocsUploadFailed: 'لم يتم رفع بعض المستندات. تحقق من اتصالك واضغط على إرسال للمحاولة مرة أخرى.',
+    tabQA: 'Q&A', tabReviews: 'المراجعات', tabArchive: 'الأرشيف', tabStats: 'الإحصائيات', tabProfile: 'الملف', tabHome: 'الرئيسية', tabSaved: 'المحفوظة', coverPhoto: 'صورة الغلاف', logoLabel: 'الشعار', tapToAddCover: 'اضغط لإضافة صورة غلاف', tapToAddLogo: 'اضغط لإضافة الشعار', tapToView: 'اضغط للعرض', uploadFailed: 'فشل الرفع. حاول مرة أخرى.', providerDocsUploadFailed: 'لم يتم رفع بعض المستندات. تحقق من اتصالك واضغط على إرسال للمحاولة مرة أخرى.',
     labelAddress: 'العنوان', labelHours: 'ساعات العمل', hoursHint: 'مثال: Mon-Sat 08:00-18:00 أو 24/7',
-    confirm: 'تأكيد', decline: 'رفض', send: 'إرسال',
+    decline: 'رفض', send: 'إرسال',
     writeYourAnswer: 'اكتب إجابتك…', yourAnswer: 'إجابتك',
     noFacilityLinked: 'لا يوجد مرفق مرتبط',
     noFacilityLinkedSub: 'تواصل مع المسؤول لربط حسابك بمنشأة.',
-    allClear: 'لا يوجد شيء', noPendingRequests: 'لا توجد طلبات مواعيد معلقة.',
+    noPendingRequests: 'لا توجد طلبات مواعيد معلقة.',
     questionsFromCustomers: 'ستظهر هنا أسئلة العملاء.',
     noPendingReviews: 'لا توجد مراجعات معلقة',
     noApprovedReviews: 'لا توجد مراجعات معتمدة بعد',
-    statAppointments: 'المواعيد', statTotal: 'الإجمالي', statAnswered: 'تمت الإجابة',
+    statTotal: 'الإجمالي', statAnswered: 'تمت الإجابة',
     statUnanswered: 'بدون إجابة', statApproved: 'معتمد', statRejected: 'مرفوض',
     searchPlaceholder: 'ابحث بالاسم أو العنوان…',
-    cancelAppt: 'إلغاء',
-    cancelLate: 'للإلغاء خلال 24 ساعة، يرجى الاتصال بالعيادة مباشرةً.', noShowBtn: 'لم يحضر', bookingBlocked: 'تعليق الحجز', bookingBlockedMsg: 'تم تعليق وصولك إلى الحجز حتى {date} بسبب تكرار الغيابات.',
-    markComplete: 'تحديد كمكتمل', statusCompleted: 'مكتمل', reviewPromptTitle: 'كيف كانت زيارتك؟', reviewPromptBody: 'شارك تجربتك في {name}.',
+    noShowBtn: 'لم يحضر', bookingBlocked: 'تعليق الحجز', bookingBlockedMsg: 'تم تعليق وصولك إلى الحجز حتى {date} بسبب تكرار الغيابات.',
+    statusCompleted: 'مكتمل', reviewPromptTitle: 'كيف كانت زيارتك؟', reviewPromptBody: 'شارك تجربتك في {name}.',
     noReviews: 'لا توجد تقييمات حتى الآن.',
     languagesSpoken: 'اللغات المتحدثة', aboutFacility: 'حول',
     notifications: 'الإشعارات', noNotifications: 'لا إشعارات حتى الآن.', markAllRead: 'تحديد الكل كمقروء', clearAll: 'مسح الكل',
@@ -2939,54 +2884,52 @@ const translations = {
     groomRegisterActiveSub: 'نشاطك التجاري مُدرَج في الدليل.',
     groomRegisterDeclined: 'لم تتم الموافقة',
     groomRegisterDeclinedSub: 'لم تتم الموافقة على إدراجك. تواصل معنا إذا كنت تعتقد أن هذا خطأ.',
-    groomManageAvail: 'تعديل التوفر',
-    groomAvailTitle: 'التوفر',
-    groomAvailIntro: 'اختر الأيام والساعات التي يمكن للعملاء الحجز فيها. تُنشأ الفترات الزمنية تلقائيًا.',
-    groomAvailSlotBooking: 'الحجز بالمواعيد',
-    groomAvailSlotBookingSub: 'دع العملاء يحجزون فترات زمنية ثابتة',
-    groomAvailSlotDuration: 'مدة الفترة',
-    groomAvailMinutes: '{n} د',
-    groomAvailSchedule: 'الجدول الأسبوعي',
-    groomAvailClosed: 'مغلق',
-    groomAvailSave: 'حفظ الجدول',
-    groomAvailSaveOff: 'حفظ التغييرات',
-    groomAvailSaved: 'تم الحفظ!',
-    groomAvailOffHint: 'الحجز بالمواعيد متوقف. فعّله لتقديم فترات زمنية قابلة للحجز.',
-    groomDayMon: 'إثن',
-    groomDayTue: 'ثلا',
-    groomDayWed: 'أرب',
-    groomDayThu: 'خمي',
-    groomDayFri: 'جمع',
-    groomDaySat: 'سبت',
-    groomDaySun: 'أحد',
-    groomAvailUnsavedTitle: 'تجاهل التغييرات؟',
-    groomAvailUnsavedBody: 'ستفقد تغييرات الجدول غير المحفوظة.',
-    groomAvailDiscard: 'تجاهل',
-    groomManageBookings: 'حجوزاتي',
-    groomStatusRequested: 'تم الطلب — بانتظار التأكيد',
-    groomBkTitle: 'حجوزاتي',
-    groomBkCustomer: 'العميل',
-    groomBkPendingSection: 'بانتظار تأكيدك',
-    groomBkUpcomingSection: 'القادمة',
-    groomBkPastSection: 'السابقة',
-    groomBkEmpty: 'لا توجد حجوزات بعد',
-    groomBkConfirm: 'تأكيد',
-    groomBkDecline: 'رفض',
-    groomBkCancel: 'إلغاء',
-    groomBkNoShow: 'لم يحضر',
-    groomBkComplete: 'تم',
-    groomBkDeclineQ: 'رفض هذا الحجز؟',
-    groomBkDeclineQBody: 'سيتم إخطار العميل وتحرير الموعد.',
-    groomBkCancelQ: 'إلغاء هذا الحجز؟',
-    groomBkCancelQBody: 'سيتم إخطار العميل وتحرير الموعد.',
-    groomBkNoShowQ: 'وضع علامة لم يحضر؟',
-    groomBkNoShowQBody: 'يسجل هذا مخالفة على العميل.',
-    groomNotifConfirmedTitle: 'تم تأكيد الحجز',
-    groomNotifConfirmedBody: 'تم تأكيد حجزك في {name}.',
-    groomNotifDeclinedTitle: 'تم رفض الحجز',
-    groomNotifDeclinedBody: 'تم رفض حجزك في {name}.',
-    groomNotifCancelledTitle: 'تم إلغاء الحجز',
-    groomNotifCancelledBody: 'تم إلغاء حجزك في {name}.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     gateInsurance: 'أنشئ حسابًا مجانيًا لإدراج شركة التأمين الخاصة بك.',
     insTitle: 'التأمين',
     insBackToTypes: 'جميع أنواع التأمين',
@@ -3015,7 +2958,7 @@ const translations = {
     insErrorGeneric: 'حدث خطأ ما. يرجى المحاولة مرة أخرى.',
     insTypesOffered: 'التأمينات المقدمة', insAbout: 'نبذة', insContact: 'التواصل',
     favourites: 'المفضلة', showAll: 'عرض الكل', adaOnly: 'ADA فقط', allFacilities: 'جميع المرافق', noFavourites: 'لا مفضلات بعد. اضغط على ♥ لأي مرفق لحفظه هنا.', hiddenFacilitiesHint: 'مسجّل في ADA',
-    bookingDetail: 'تفاصيل الموعد', yourReview: 'تقييمك', getDirections: 'الاتجاهات', call: 'اتصل', visitWebsite: 'الموقع', viewProfile: 'عرض الملف الشخصي',
+    yourReview: 'تقييمك', getDirections: 'الاتجاهات', call: 'اتصل', visitWebsite: 'الموقع', viewProfile: 'عرض الملف الشخصي',
     noFacilitiesTitle: 'لا توجد مرافق بعد', noFacilitiesBody: 'ستظهر هنا الصيدليات والعيادات والمستشفيات المعتمدة عند انضمامها إلى ADA.',
     noResultsTitle: 'لا توجد نتائج', noResultsBody: 'حاول إزالة أحد الفلاتر أو تعديل بحثك',
     facilityLoadError: 'تعذّر تحميل المرافق. يُرجى التحقق من اتصالك.',
@@ -3030,7 +2973,6 @@ const translations = {
     gateTransport: 'أنشئ حسابًا مجانيًا للتسجيل كمزوّد خدمات نقل.',
     gateEstateAgent: 'أنشئ حسابًا مجانيًا لعرض العقارات كوكيل عقاري.',
     gatePlaceSubmit: 'أنشئ حسابًا مجانيًا لاقتراح مكان ليكتشفه الآخرون.',
-    gateBooking: 'أنشئ حسابًا مجانيًا لحجز موعد.',
     gateQuestion: 'أنشئ حسابًا مجانيًا لطرح سؤال على هذا المزوّد.',
     gateReview: 'أنشئ حسابًا مجانيًا لكتابة تقييم.',
     gateReport: 'أنشئ حسابًا مجانيًا للإبلاغ عن المحتوى.',
@@ -3092,13 +3034,9 @@ const translations = {
     deleteAccountConfirmBtn: 'نعم، احذف حسابي',
     cancel: 'إلغاء',
     openNow: 'مفتوح الآن',
-    upcoming: 'القادمة',
-    pastAppt: 'السابقة',
     reportProblem: 'اقتراح تصحيح',
-    noUpcomingAppt: 'لا توجد مواعيد قادمة.',
-    noPastAppt: 'لا توجد مواعيد سابقة.',
-    completeProfileTip: 'أكمل ملفك الشخصي وحدّد أوقات توفّرك لبدء تلقّي طلبات المواعيد.',
-    goToProfile: 'الذهاب إلى الملف الشخصي',
+    
+    
     pharmacies: 'الصيدليات',
     chipDutyPharmacies: 'صيدليات المناوبة',
     clinics: 'العيادات',
@@ -3112,13 +3050,10 @@ const translations = {
     uvVeryHigh: 'مرتفع جدًا',
     uvExtreme: 'شديد',
     qualificationsLabel: 'المؤهلات',
-    scheduleLabel: 'الجدول الزمني',
     todayLabel: 'اليوم', feelsLike: 'يبدو',
-    minSlotLabel: 'مواعيد {n} دقيقة',
     firstReviewPrompt: 'كن أول من يكتب تقييماً بعد زيارتك',
     reviewCountLabel: '{n} تقييم',
     seeAllReviews: 'عرض جميع {n} تقييمات',
-    closedDay: 'مغلق هذا اليوم',
     menuMunicipalities: 'البلديات',
     menuEvents: 'الفعاليات',
     menuPets: 'الحيوانات الأليفة',
@@ -3626,14 +3561,12 @@ const translations = {
     onDuty: 'Дежурная сегодня',
     enableLocation: 'Включите геолокацию, чтобы увидеть ближайшие услуги.',
     pharmacy: 'Аптека', clinic: 'Клиника', hospital: 'Больница', dentist: 'Стоматолог', grooming: 'Красота',
-    requestedTime: 'Запрошенное время',
-    selectDate: 'Выберите дату',
-    selectTime: 'Доступное время',
-    requestAppointment: 'Записаться на приём',
-    requestSent: 'Запрос отправлен',
-    requestSentSub: 'Мы уведомим вас, когда {name} подтвердит ваш приём.',
-    slotTaken: 'К сожалению, это время только что заняли. Пожалуйста, выберите другое.',
-    backToList: 'Назад к списку',
+    
+    
+    
+    
+    
+    
     questionsAnswers: 'Вопросы и ответы',
     askPlaceholder: 'Задайте вопрос об этом учреждении…',
     noQuestions: 'Вопросов пока нет.',
@@ -3783,25 +3716,20 @@ const translations = {
     slide2Title: 'Дежурная аптека',
     slide3Title: 'Здоровье и клиники',
     slide4Title: 'Услуги и жизнь',
-    myBookings: 'Мои записи',
-    noBookings: 'Записей пока нет.',
-    bookingRef: 'Номер',
-    statusPending: 'Ожидание',
-    statusConfirmed: 'Подтверждено',
-    statusCancelled: 'Отменено',
+    
+    
+    
+    
     rateVisit: 'Оценить',
-    reviewDone: 'Оценено',
     commentOptional: 'Добавить комментарий (необязательно)…',
     login: 'Войти', signup: 'Регистрация', createAccount: 'Создать аккаунт',
     email: 'Эл. почта', password: 'Пароль',
     iAmA: 'Я', roleCustomer: 'Пользователь', roleProvider: 'Медицинский специалист', roleOrganizer: 'Менеджер мероприятий',
     facilityPharmacy: 'Аптека', facilityClinic: 'Клиника', facilityHospital: 'Больница', facilityDentist: 'Стоматология',
     selectFacilityType: 'Тип учреждения',
-    notifApptConfirmedTitle: 'Запись подтверждена',
-    notifApptConfirmedBody: '{name} подтвердил вашу запись.',
-    notifApptDeclinedTitle: 'Запись отклонена',
-    notifApptDeclinedBody: '{name} отклонил вашу заявку.',
-    apptReminderTitle: 'Запись через 1 час', apptReminderBody: 'Ваша запись в {name} начнётся через 1 час.',
+    
+    
+    apptReminderBody: 'Ваша запись в {name} начнётся через 1 час.',
     notifNewQuestionTitle: 'Новый вопрос',
     notifNewQuestionBody: '{name} получила новый вопрос от пользователя.',
     notifNewApptTitle: 'Новый запрос на запись',
@@ -3836,22 +3764,21 @@ const translations = {
     notifDutySwapTitle: '💊 Дежурная аптека обновлена',
     notifDutySwapBody: '{name} теперь дежурная аптека на {date}.',
     tapViewDuty: 'Нажмите, чтобы увидеть дежурные аптеки →',
-    tabRequests: 'Запросы', tabQA: 'Q&A', tabReviews: 'Проверки', tabArchive: 'Архив', tabStats: 'Статистика', tabProfile: 'Профиль', tabHome: 'Главная', tabSaved: 'Сохранённые', coverPhoto: 'Обложка', logoLabel: 'Логотип', tapToAddCover: 'Нажмите, чтобы добавить обложку', tapToAddLogo: 'Нажмите, чтобы добавить логотип', tapToView: 'НАЖМИТЕ ДЛЯ ПРОСМОТРА', uploadFailed: 'Ошибка загрузки. Попробуйте снова.', providerDocsUploadFailed: 'Некоторые документы не загрузились. Проверьте соединение и снова нажмите «Отправить».',
+    tabQA: 'Q&A', tabReviews: 'Проверки', tabArchive: 'Архив', tabStats: 'Статистика', tabProfile: 'Профиль', tabHome: 'Главная', tabSaved: 'Сохранённые', coverPhoto: 'Обложка', logoLabel: 'Логотип', tapToAddCover: 'Нажмите, чтобы добавить обложку', tapToAddLogo: 'Нажмите, чтобы добавить логотип', tapToView: 'НАЖМИТЕ ДЛЯ ПРОСМОТРА', uploadFailed: 'Ошибка загрузки. Попробуйте снова.', providerDocsUploadFailed: 'Некоторые документы не загрузились. Проверьте соединение и снова нажмите «Отправить».',
     labelAddress: 'Адрес', labelHours: 'Часы работы', hoursHint: 'напр. Mon-Sat 08:00-18:00 или 24/7',
-    confirm: 'Подтвердить', decline: 'Отклонить', send: 'Отправить',
+    decline: 'Отклонить', send: 'Отправить',
     writeYourAnswer: 'Напишите ваш ответ…', yourAnswer: 'Ваш ответ',
     noFacilityLinked: 'Учреждение не привязано',
     noFacilityLinkedSub: 'Обратитесь к администратору, чтобы привязать аккаунт к учреждению.',
-    allClear: 'Всё в порядке', noPendingRequests: 'Нет ожидающих запросов на приём.',
+    noPendingRequests: 'Нет ожидающих запросов на приём.',
     questionsFromCustomers: 'Здесь появятся вопросы клиентов.',
     noPendingReviews: 'Нет ожидающих проверок',
     noApprovedReviews: 'Утверждённых проверок пока нет',
-    statAppointments: 'Записи', statTotal: 'Всего', statAnswered: 'Отвечено',
+    statTotal: 'Всего', statAnswered: 'Отвечено',
     statUnanswered: 'Без ответа', statApproved: 'Одобрено', statRejected: 'Отклонено',
     searchPlaceholder: 'Поиск по названию или адресу…',
-    cancelAppt: 'Отменить',
-    cancelLate: 'Для отмены в течение 24 часов позвоните в клинику.', noShowBtn: 'Не явился', bookingBlocked: 'Запись заблокирована', bookingBlockedMsg: 'Ваш доступ к записи заблокирован до {date} из-за повторных пропусков.',
-    markComplete: 'Отметить завершённым', statusCompleted: 'Завершено', reviewPromptTitle: 'Как прошёл визит?', reviewPromptBody: 'Поделитесь впечатлением о {name}.',
+    noShowBtn: 'Не явился', bookingBlocked: 'Запись заблокирована', bookingBlockedMsg: 'Ваш доступ к записи заблокирован до {date} из-за повторных пропусков.',
+    statusCompleted: 'Завершено', reviewPromptTitle: 'Как прошёл визит?', reviewPromptBody: 'Поделитесь впечатлением о {name}.',
     noReviews: 'Отзывов пока нет.',
     languagesSpoken: 'Языки обслуживания', aboutFacility: 'О нас',
     notifications: 'Уведомления', noNotifications: 'Уведомлений пока нет.', markAllRead: 'Отметить все прочитанными', clearAll: 'Очистить всё',
@@ -3922,54 +3849,52 @@ const translations = {
     groomRegisterActiveSub: 'Ваш бизнес добавлен в каталог.',
     groomRegisterDeclined: 'Не одобрено',
     groomRegisterDeclinedSub: 'Ваша заявка не одобрена. Свяжитесь с нами, если считаете это ошибкой.',
-    groomManageAvail: 'Изменить доступность',
-    groomAvailTitle: 'Доступность',
-    groomAvailIntro: 'Выберите дни и часы, когда клиенты могут записаться. Слоты создаются автоматически.',
-    groomAvailSlotBooking: 'Запись по слотам',
-    groomAvailSlotBookingSub: 'Клиенты выбирают из фиксированных слотов',
-    groomAvailSlotDuration: 'Длительность слота',
-    groomAvailMinutes: '{n} мин',
-    groomAvailSchedule: 'Недельное расписание',
-    groomAvailClosed: 'Закрыто',
-    groomAvailSave: 'Сохранить расписание',
-    groomAvailSaveOff: 'Сохранить изменения',
-    groomAvailSaved: 'Сохранено!',
-    groomAvailOffHint: 'Запись по слотам выключена. Включите её, чтобы предлагать слоты для записи.',
-    groomDayMon: 'Пн',
-    groomDayTue: 'Вт',
-    groomDayWed: 'Ср',
-    groomDayThu: 'Чт',
-    groomDayFri: 'Пт',
-    groomDaySat: 'Сб',
-    groomDaySun: 'Вс',
-    groomAvailUnsavedTitle: 'Отменить изменения?',
-    groomAvailUnsavedBody: 'Несохранённые изменения расписания будут потеряны.',
-    groomAvailDiscard: 'Не сохранять',
-    groomManageBookings: 'Мои записи',
-    groomStatusRequested: 'Запрошено — ожидает подтверждения',
-    groomBkTitle: 'Мои записи',
-    groomBkCustomer: 'Клиент',
-    groomBkPendingSection: 'Ожидают подтверждения',
-    groomBkUpcomingSection: 'Предстоящие',
-    groomBkPastSection: 'Прошедшие',
-    groomBkEmpty: 'Пока нет записей',
-    groomBkConfirm: 'Подтвердить',
-    groomBkDecline: 'Отклонить',
-    groomBkCancel: 'Отменить',
-    groomBkNoShow: 'Не пришёл',
-    groomBkComplete: 'Готово',
-    groomBkDeclineQ: 'Отклонить эту запись?',
-    groomBkDeclineQBody: 'Клиент будет уведомлён, слот освободится.',
-    groomBkCancelQ: 'Отменить эту запись?',
-    groomBkCancelQBody: 'Клиент будет уведомлён, слот освободится.',
-    groomBkNoShowQ: 'Отметить как неявку?',
-    groomBkNoShowQBody: 'Это добавит клиенту штрафной балл.',
-    groomNotifConfirmedTitle: 'Запись подтверждена',
-    groomNotifConfirmedBody: 'Ваша запись в {name} подтверждена.',
-    groomNotifDeclinedTitle: 'Запись отклонена',
-    groomNotifDeclinedBody: 'Ваша запись в {name} отклонена.',
-    groomNotifCancelledTitle: 'Запись отменена',
-    groomNotifCancelledBody: 'Ваша запись в {name} отменена.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     gateInsurance: 'Создайте бесплатный аккаунт, чтобы разместить свою страховую компанию.',
     insTitle: 'Страхование',
     insBackToTypes: 'Все виды страхования',
@@ -3998,7 +3923,7 @@ const translations = {
     insErrorGeneric: 'Что-то пошло не так. Попробуйте ещё раз.',
     insTypesOffered: 'Предлагаемое страхование', insAbout: 'О компании', insContact: 'Контакты',
     favourites: 'Избранное', showAll: 'Показать всё', adaOnly: 'Только ADA', allFacilities: 'Все учреждения', noFavourites: 'Избранных ещё нет. Нажмите ♥ на любом объекте, чтобы сохранить.', hiddenFacilitiesHint: 'Участники ADA',
-    bookingDetail: 'Детали записи', yourReview: 'Ваш отзыв', getDirections: 'Маршрут', call: 'Позвонить', visitWebsite: 'Сайт', viewProfile: 'Открыть профиль',
+    yourReview: 'Ваш отзыв', getDirections: 'Маршрут', call: 'Позвонить', visitWebsite: 'Сайт', viewProfile: 'Открыть профиль',
     noFacilitiesTitle: 'Пока нет учреждений', noFacilitiesBody: 'Проверенные аптеки, клиники и больницы появятся здесь по мере присоединения к ADA.',
     noResultsTitle: 'Ничего не найдено', noResultsBody: 'Попробуйте убрать фильтр или изменить запрос',
     facilityLoadError: 'Не удалось загрузить учреждения. Проверьте подключение.',
@@ -4013,7 +3938,6 @@ const translations = {
     gateTransport: 'Создайте бесплатный аккаунт, чтобы зарегистрироваться как перевозчик.',
     gateEstateAgent: 'Создайте бесплатный аккаунт, чтобы размещать объекты как агент по недвижимости.',
     gatePlaceSubmit: 'Создайте бесплатный аккаунт, чтобы предложить место для других.',
-    gateBooking: 'Создайте бесплатный аккаунт, чтобы записаться на приём.',
     gateQuestion: 'Создайте бесплатный аккаунт, чтобы задать вопрос.',
     gateReview: 'Создайте бесплатный аккаунт, чтобы оставить отзыв.',
     gateReport: 'Создайте бесплатный аккаунт, чтобы пожаловаться на контент.',
@@ -4075,13 +3999,9 @@ const translations = {
     deleteAccountConfirmBtn: 'Да, удалить мой аккаунт',
     cancel: 'Отмена',
     openNow: 'Открыто',
-    upcoming: 'Предстоящие',
-    pastAppt: 'Прошедшие',
     reportProblem: 'Предложить исправление',
-    noUpcomingAppt: 'Нет предстоящих записей.',
-    noPastAppt: 'Нет прошедших записей.',
-    completeProfileTip: 'Заполните профиль и укажите доступность, чтобы начать получать запросы на запись.',
-    goToProfile: 'Перейти в профиль',
+    
+    
     pharmacies: 'Аптеки',
     chipDutyPharmacies: 'Дежурные аптеки',
     clinics: 'Клиники',
@@ -4095,13 +4015,10 @@ const translations = {
     uvVeryHigh: 'Очень высокий',
     uvExtreme: 'Экстремальный',
     qualificationsLabel: 'Квалификация',
-    scheduleLabel: 'Расписание',
     todayLabel: 'Сегодня', feelsLike: 'Ощущается',
-    minSlotLabel: 'Слоты по {n} мин',
     firstReviewPrompt: 'Оставьте первый отзыв после визита',
     reviewCountLabel: '{n} отзывов',
     seeAllReviews: 'Все {n} отзывов',
-    closedDay: 'Закрыто в этот день',
     menuMunicipalities: 'Муниципалитеты',
     menuEvents: 'События',
     menuPets: 'Питомцы',
@@ -4608,14 +4525,12 @@ const translations = {
     onDuty: 'Εφημερία σήμερα',
     enableLocation: 'Ενεργοποιήστε την τοποθεσία για να δείτε τις πλησιέστερες υπηρεσίες.',
     pharmacy: 'Φαρμακείο', clinic: 'Κλινική', hospital: 'Νοσοκομείο', dentist: 'Οδοντίατρος', grooming: 'Περιποίηση',
-    requestedTime: 'Ζητούμενη ώρα',
-    selectDate: 'Επιλέξτε ημερομηνία',
-    selectTime: 'Διαθέσιμες ώρες',
-    requestAppointment: 'Αίτηση ραντεβού',
-    requestSent: 'Το αίτημα εστάλη',
-    requestSentSub: 'Θα σας ειδοποιήσουμε όταν η {name} επιβεβαιώσει το ραντεβού σας.',
-    slotTaken: 'Λυπούμαστε — αυτή η ώρα μόλις κλείστηκε. Παρακαλώ επιλέξτε άλλη ώρα.',
-    backToList: 'Επιστροφή στη λίστα',
+    
+    
+    
+    
+    
+    
     questionsAnswers: 'Ερωτήσεις & Απαντήσεις',
     askPlaceholder: 'Κάντε μια ερώτηση για αυτήν την εγκατάσταση…',
     noQuestions: 'Δεν υπάρχουν ερωτήσεις ακόμα.',
@@ -4765,25 +4680,20 @@ const translations = {
     slide2Title: 'Εφημερεύον',
     slide3Title: 'Υγεία & Κλινικές',
     slide4Title: 'Υπηρεσίες & Ζωή',
-    myBookings: 'Οι κρατήσεις μου',
-    noBookings: 'Δεν υπάρχουν κρατήσεις ακόμα.',
-    bookingRef: 'Αριθμ.',
-    statusPending: 'Εκκρεμεί',
-    statusConfirmed: 'Επιβεβαιώθηκε',
-    statusCancelled: 'Ακυρώθηκε',
+    
+    
+    
+    
     rateVisit: 'Αξιολόγηση',
-    reviewDone: 'Αξιολογήθηκε',
     commentOptional: 'Προσθέστε σχόλιο (προαιρετικό)…',
     login: 'Σύνδεση', signup: 'Εγγραφή', createAccount: 'Δημιουργία λογαριασμού',
     email: 'Email', password: 'Κωδικός',
     iAmA: 'Είμαι', roleCustomer: 'Χρήστης', roleProvider: 'Επαγγελματίας υγείας', roleOrganizer: 'Διοργανωτής εκδηλώσεων',
     facilityPharmacy: 'Φαρμακείο', facilityClinic: 'Κλινική', facilityHospital: 'Νοσοκομείο', facilityDentist: 'Οδοντίατρος',
     selectFacilityType: 'Τύπος εγκατάστασης',
-    notifApptConfirmedTitle: 'Επιβεβαίωση ραντεβού',
-    notifApptConfirmedBody: 'Η {name} επιβεβαίωσε το ραντεβού σας.',
-    notifApptDeclinedTitle: 'Άρνηση ραντεβού',
-    notifApptDeclinedBody: 'Η {name} απέρριψε το αίτημά σας.',
-    apptReminderTitle: 'Ραντεβού σε 1 ώρα', apptReminderBody: 'Το ραντεβού σας στο {name} ξεκινά σε 1 ώρα.',
+    
+    
+    apptReminderBody: 'Το ραντεβού σας στο {name} ξεκινά σε 1 ώρα.',
     notifNewQuestionTitle: 'Νέα Ερώτηση',
     notifNewQuestionBody: 'Η {name} έλαβε νέα ερώτηση από χρήστη.',
     notifNewApptTitle: 'Νέο Αίτημα Ραντεβού',
@@ -4818,22 +4728,21 @@ const translations = {
     notifDutySwapTitle: '💊 Εφημερεύον φαρμακείο ενημερώθηκε',
     notifDutySwapBody: 'Το {name} είναι το εφημερεύον φαρμακείο για {date}.',
     tapViewDuty: 'Πατήστε για εφημερεύοντα φαρμακεία →',
-    tabRequests: 'Αιτήματα', tabQA: 'Q&A', tabReviews: 'Κριτικές', tabArchive: 'Αρχείο', tabStats: 'Στατιστικά', tabProfile: 'Προφίλ', tabHome: 'Αρχική', tabSaved: 'Αποθηκευμένα', coverPhoto: 'Φωτογραφία εξωφύλλου', logoLabel: 'Λογότυπο', tapToAddCover: 'Πατήστε για προσθήκη εξωφύλλου', tapToAddLogo: 'Πατήστε για προσθήκη λογοτύπου', tapToView: 'ΠΑΤΗΣΤΕ ΓΙΑ ΠΡΟΒΟΛΗ', uploadFailed: 'Αποτυχία μεταφόρτωσης. Δοκιμάστε ξανά.', providerDocsUploadFailed: 'Ορισμένα έγγραφα δεν ανέβηκαν. Ελέγξτε τη σύνδεσή σας και πατήστε ξανά Υποβολή.',
+    tabQA: 'Q&A', tabReviews: 'Κριτικές', tabArchive: 'Αρχείο', tabStats: 'Στατιστικά', tabProfile: 'Προφίλ', tabHome: 'Αρχική', tabSaved: 'Αποθηκευμένα', coverPhoto: 'Φωτογραφία εξωφύλλου', logoLabel: 'Λογότυπο', tapToAddCover: 'Πατήστε για προσθήκη εξωφύλλου', tapToAddLogo: 'Πατήστε για προσθήκη λογοτύπου', tapToView: 'ΠΑΤΗΣΤΕ ΓΙΑ ΠΡΟΒΟΛΗ', uploadFailed: 'Αποτυχία μεταφόρτωσης. Δοκιμάστε ξανά.', providerDocsUploadFailed: 'Ορισμένα έγγραφα δεν ανέβηκαν. Ελέγξτε τη σύνδεσή σας και πατήστε ξανά Υποβολή.',
     labelAddress: 'Διεύθυνση', labelHours: 'Ώρες Λειτουργίας', hoursHint: 'π.χ. Mon-Sat 08:00-18:00 ή 24/7',
-    confirm: 'Επιβεβαίωση', decline: 'Άρνηση', send: 'Αποστολή',
+    decline: 'Άρνηση', send: 'Αποστολή',
     writeYourAnswer: 'Γράψτε την απάντησή σας…', yourAnswer: 'Η απάντησή σας',
     noFacilityLinked: 'Δεν έχει συνδεθεί εγκατάσταση',
     noFacilityLinkedSub: 'Επικοινωνήστε με τον διαχειριστή για να συνδέσετε τον λογαριασμό σας.',
-    allClear: 'Όλα καλά', noPendingRequests: 'Δεν υπάρχουν εκκρεμή αιτήματα ραντεβού.',
+    noPendingRequests: 'Δεν υπάρχουν εκκρεμή αιτήματα ραντεβού.',
     questionsFromCustomers: 'Εδώ θα εμφανίζονται ερωτήσεις από πελάτες.',
     noPendingReviews: 'Δεν υπάρχουν εκκρεμείς αξιολογήσεις',
     noApprovedReviews: 'Δεν υπάρχουν εγκεκριμένες αξιολογήσεις ακόμα',
-    statAppointments: 'Ραντεβού', statTotal: 'Σύνολο', statAnswered: 'Απαντήθηκαν',
+    statTotal: 'Σύνολο', statAnswered: 'Απαντήθηκαν',
     statUnanswered: 'Αναπάντητες', statApproved: 'Εγκρίθηκε', statRejected: 'Απορρίφθηκε',
     searchPlaceholder: 'Αναζήτηση με όνομα ή διεύθυνση…',
-    cancelAppt: 'Ακύρωση',
-    cancelLate: 'Για ακύρωση εντός 24 ωρών, παρακαλώ καλέστε την κλινική.', noShowBtn: 'Δεν εμφανίστηκε', bookingBlocked: 'Κράτηση Αναστάλθηκε', bookingBlockedMsg: 'Η πρόσβασή σας σε κρατήσεις είναι αναστάλθηκε έως {date} λόγω επαναλαμβανόμενων απουσιών.',
-    markComplete: 'Επισήμανση ως Ολοκληρωμένο', statusCompleted: 'Ολοκληρώθηκε', reviewPromptTitle: 'Πώς ήταν η επίσκεψή σας;', reviewPromptBody: 'Μοιραστείτε την εμπειρία σας στο {name}.',
+    noShowBtn: 'Δεν εμφανίστηκε', bookingBlocked: 'Κράτηση Αναστάλθηκε', bookingBlockedMsg: 'Η πρόσβασή σας σε κρατήσεις είναι αναστάλθηκε έως {date} λόγω επαναλαμβανόμενων απουσιών.',
+    statusCompleted: 'Ολοκληρώθηκε', reviewPromptTitle: 'Πώς ήταν η επίσκεψή σας;', reviewPromptBody: 'Μοιραστείτε την εμπειρία σας στο {name}.',
     noReviews: 'Δεν υπάρχουν αξιολογήσεις ακόμα.',
     languagesSpoken: 'Γλώσσες', aboutFacility: 'Σχετικά',
     notifications: 'Ειδοποιήσεις', noNotifications: 'Δεν υπάρχουν ειδοποιήσεις ακόμα.', markAllRead: 'Σήμανση όλων ως αναγνωσμένα', clearAll: 'Εκκαθάριση όλων',
@@ -4904,54 +4813,52 @@ const translations = {
     groomRegisterActiveSub: 'Η επιχείρησή σας είναι καταχωρισμένη στον κατάλογο.',
     groomRegisterDeclined: 'Δεν εγκρίθηκε',
     groomRegisterDeclinedSub: 'Η καταχώρισή σας δεν εγκρίθηκε. Επικοινωνήστε μαζί μας αν πιστεύετε ότι πρόκειται για λάθος.',
-    groomManageAvail: 'Επεξεργασία διαθεσιμότητας',
-    groomAvailTitle: 'Διαθεσιμότητα',
-    groomAvailIntro: 'Επιλέξτε τις ημέρες και ώρες που μπορούν να κλείσουν οι πελάτες. Τα διαθέσιμα slots δημιουργούνται αυτόματα.',
-    groomAvailSlotBooking: 'Κράτηση με slots',
-    groomAvailSlotBookingSub: 'Οι πελάτες επιλέγουν από σταθερά χρονικά slots',
-    groomAvailSlotDuration: 'Διάρκεια slot',
-    groomAvailMinutes: '{n} λεπ.',
-    groomAvailSchedule: 'Εβδομαδιαίο πρόγραμμα',
-    groomAvailClosed: 'Κλειστά',
-    groomAvailSave: 'Αποθήκευση προγράμματος',
-    groomAvailSaveOff: 'Αποθήκευση αλλαγών',
-    groomAvailSaved: 'Αποθηκεύτηκε!',
-    groomAvailOffHint: 'Η κράτηση με slots είναι ανενεργή. Ενεργοποιήστε την για να προσφέρετε διαθέσιμα slots.',
-    groomDayMon: 'Δευ',
-    groomDayTue: 'Τρι',
-    groomDayWed: 'Τετ',
-    groomDayThu: 'Πεμ',
-    groomDayFri: 'Παρ',
-    groomDaySat: 'Σαβ',
-    groomDaySun: 'Κυρ',
-    groomAvailUnsavedTitle: 'Απόρριψη αλλαγών;',
-    groomAvailUnsavedBody: 'Οι μη αποθηκευμένες αλλαγές θα χαθούν.',
-    groomAvailDiscard: 'Απόρριψη',
-    groomManageBookings: 'Οι κρατήσεις μου',
-    groomStatusRequested: 'Ζητήθηκε — σε αναμονή επιβεβαίωσης',
-    groomBkTitle: 'Οι κρατήσεις μου',
-    groomBkCustomer: 'Πελάτης',
-    groomBkPendingSection: 'Σε αναμονή επιβεβαίωσης',
-    groomBkUpcomingSection: 'Επερχόμενες',
-    groomBkPastSection: 'Προηγούμενες',
-    groomBkEmpty: 'Καμία κράτηση ακόμη',
-    groomBkConfirm: 'Επιβεβαίωση',
-    groomBkDecline: 'Απόρριψη',
-    groomBkCancel: 'Ακύρωση',
-    groomBkNoShow: 'Δεν εμφανίστηκε',
-    groomBkComplete: 'Ολοκληρώθηκε',
-    groomBkDeclineQ: 'Απόρριψη αυτής της κράτησης;',
-    groomBkDeclineQBody: 'Ο πελάτης θα ειδοποιηθεί και η ώρα θα ελευθερωθεί.',
-    groomBkCancelQ: 'Ακύρωση αυτής της κράτησης;',
-    groomBkCancelQBody: 'Ο πελάτης θα ειδοποιηθεί και η ώρα θα ελευθερωθεί.',
-    groomBkNoShowQ: 'Σήμανση ως μη εμφάνιση;',
-    groomBkNoShowQBody: 'Αυτό καταγράφει μια παράβαση στον πελάτη.',
-    groomNotifConfirmedTitle: 'Η κράτηση επιβεβαιώθηκε',
-    groomNotifConfirmedBody: 'Η κράτησή σας στο {name} επιβεβαιώθηκε.',
-    groomNotifDeclinedTitle: 'Η κράτηση απορρίφθηκε',
-    groomNotifDeclinedBody: 'Η κράτησή σας στο {name} απορρίφθηκε.',
-    groomNotifCancelledTitle: 'Η κράτηση ακυρώθηκε',
-    groomNotifCancelledBody: 'Η κράτησή σας στο {name} ακυρώθηκε.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     gateInsurance: 'Δημιουργήστε δωρεάν λογαριασμό για να καταχωρίσετε την ασφαλιστική σας εταιρεία.',
     insTitle: 'Ασφάλιση',
     insBackToTypes: 'Όλοι οι τύποι ασφάλισης',
@@ -4980,7 +4887,7 @@ const translations = {
     insErrorGeneric: 'Κάτι πήγε στραβά. Δοκιμάστε ξανά.',
     insTypesOffered: 'Προσφερόμενη ασφάλιση', insAbout: 'Σχετικά', insContact: 'Επικοινωνία',
     favourites: 'Αγαπημένα', showAll: 'Εμφάνιση όλων', adaOnly: 'Μόνο ADA', allFacilities: 'Όλες οι εγκαταστάσεις', noFavourites: 'Δεν υπάρχουν αγαπημένα ακόμα. Πατήστε ♥ σε κάποια εγκατάσταση για αποθήκευση.', hiddenFacilitiesHint: 'Εγγεγραμμένο στο ADA',
-    bookingDetail: 'Λεπτομέρειες ραντεβού', yourReview: 'Η αξιολόγησή σας', getDirections: 'Οδηγίες', call: 'Κλήση', visitWebsite: 'Ιστότοπος', viewProfile: 'Προβολή προφίλ',
+    yourReview: 'Η αξιολόγησή σας', getDirections: 'Οδηγίες', call: 'Κλήση', visitWebsite: 'Ιστότοπος', viewProfile: 'Προβολή προφίλ',
     noFacilitiesTitle: 'Δεν υπάρχουν εγκαταστάσεις ακόμα', noFacilitiesBody: 'Εγκεκριμένα φαρμακεία, κλινικές και νοσοκομεία θα εμφανίζονται εδώ καθώς εντάσσονται στο ADA.',
     noResultsTitle: 'Δεν βρέθηκαν αποτελέσματα', noResultsBody: 'Δοκιμάστε να αφαιρέσετε ένα φίλτρο ή να προσαρμόσετε την αναζήτησή σας',
     facilityLoadError: 'Αδυναμία φόρτωσης εγκαταστάσεων. Ελέγξτε τη σύνδεσή σας.',
@@ -4995,7 +4902,6 @@ const translations = {
     gateTransport: 'Δημιουργήστε δωρεάν λογαριασμό για να εγγραφείτε ως πάροχος μεταφορών.',
     gateEstateAgent: 'Δημιουργήστε δωρεάν λογαριασμό για να καταχωρίσετε ακίνητα ως κτηματομεσίτης.',
     gatePlaceSubmit: 'Δημιουργήστε δωρεάν λογαριασμό για να προτείνετε ένα μέρος.',
-    gateBooking: 'Δημιουργήστε δωρεάν λογαριασμό για να κλείσετε ραντεβού.',
     gateQuestion: 'Δημιουργήστε δωρεάν λογαριασμό για να κάνετε μια ερώτηση.',
     gateReview: 'Δημιουργήστε δωρεάν λογαριασμό για να αφήσετε μια κριτική.',
     gateReport: 'Δημιουργήστε δωρεάν λογαριασμό για να αναφέρετε περιεχόμενο.',
@@ -5057,13 +4963,9 @@ const translations = {
     deleteAccountConfirmBtn: 'Ναι, διαγραφή λογαριασμού',
     cancel: 'Ακύρωση',
     openNow: 'Ανοιχτά',
-    upcoming: 'Επερχόμενα',
-    pastAppt: 'Προηγούμενα',
     reportProblem: 'Προτείνετε διόρθωση',
-    noUpcomingAppt: 'Δεν υπάρχουν επερχόμενα ραντεβού.',
-    noPastAppt: 'Δεν υπάρχουν προηγούμενα ραντεβού.',
-    completeProfileTip: 'Συμπληρώστε το προφίλ σας και ορίστε τη διαθεσιμότητά σας για να αρχίσετε να λαμβάνετε αιτήματα για ραντεβού.',
-    goToProfile: 'Μετάβαση στο προφίλ',
+    
+    
     pharmacies: 'Φαρμακεία',
     chipDutyPharmacies: 'Εφημερεύοντα φαρμακεία',
     clinics: 'Κλινικές',
@@ -5077,13 +4979,10 @@ const translations = {
     uvVeryHigh: 'Πολύ υψηλός',
     uvExtreme: 'Ακραίος',
     qualificationsLabel: 'Προσόντα',
-    scheduleLabel: 'Πρόγραμμα',
     todayLabel: 'Σήμερα', feelsLike: 'Αίσθηση',
-    minSlotLabel: 'Ραντεβού {n} λεπτών',
     firstReviewPrompt: 'Γίνετε ο πρώτος που αξιολογεί μετά την επίσκεψη',
     reviewCountLabel: '{n} αξιολογήσεις',
     seeAllReviews: 'Όλες οι {n} αξιολογήσεις',
-    closedDay: 'Κλειστό αυτή τη μέρα',
     menuMunicipalities: 'Δήμοι',
     menuEvents: 'Εκδηλώσεις',
     menuPets: 'Κατοικίδια',
@@ -5590,14 +5489,12 @@ const translations = {
     onDuty: "De garde aujourd'hui",
     enableLocation: 'Activez la localisation pour voir les services les plus proches.',
     pharmacy: 'Pharmacie', clinic: 'Clinique', hospital: 'Hôpital', dentist: 'Dentiste', grooming: 'Beauté',
-    requestedTime: 'Heure demandée',
-    selectDate: 'Choisir une date',
-    selectTime: 'Créneaux disponibles',
-    requestAppointment: 'Demander un rendez-vous',
-    requestSent: 'Demande envoyée',
-    requestSentSub: 'Nous vous notifierons quand {name} confirmera votre rendez-vous.',
-    slotTaken: 'Désolé — ce créneau vient d’être pris. Veuillez choisir un autre horaire.',
-    backToList: 'Retour à la liste',
+    
+    
+    
+    
+    
+    
     questionsAnswers: 'Questions & Réponses',
     askPlaceholder: 'Posez une question sur cet établissement…',
     noQuestions: 'Pas encore de questions.',
@@ -5749,25 +5646,20 @@ const translations = {
     slide2Title: 'Pharmacie de Garde',
     slide3Title: 'Santé & Cliniques',
     slide4Title: 'Services & Vie',
-    myBookings: 'Mes rendez-vous',
-    noBookings: 'Aucun rendez-vous pour l\'instant.',
-    bookingRef: 'Réf',
-    statusPending: 'En attente',
-    statusConfirmed: 'Confirmé',
-    statusCancelled: 'Annulé',
+    
+    
+    
+    
     rateVisit: 'Évaluer',
-    reviewDone: 'Évalué',
     commentOptional: 'Ajouter un commentaire (facultatif)…',
     login: 'Connexion', signup: 'S\'inscrire', createAccount: 'Créer un compte',
     email: 'E-mail', password: 'Mot de passe',
     iAmA: 'Je suis', roleCustomer: 'Utilisateur', roleProvider: 'Professionnel de santé', roleOrganizer: 'Gestionnaire d\'événements',
     facilityPharmacy: 'Pharmacie', facilityClinic: 'Clinique', facilityHospital: 'Hôpital', facilityDentist: 'Dentiste',
     selectFacilityType: 'Type d\'établissement',
-    notifApptConfirmedTitle: 'Rendez-vous confirmé',
-    notifApptConfirmedBody: '{name} a confirmé votre rendez-vous.',
-    notifApptDeclinedTitle: 'Rendez-vous refusé',
-    notifApptDeclinedBody: '{name} a refusé votre demande de rendez-vous.',
-    apptReminderTitle: 'Rendez-vous dans 1 heure', apptReminderBody: 'Votre rendez-vous chez {name} commence dans 1 heure.',
+    
+    
+    apptReminderBody: 'Votre rendez-vous chez {name} commence dans 1 heure.',
     notifNewQuestionTitle: 'Nouvelle question',
     notifNewQuestionBody: "{name} a reçu une nouvelle question d'un utilisateur.",
     notifNewApptTitle: 'Nouvelle demande de rendez-vous',
@@ -5802,22 +5694,21 @@ const translations = {
     notifDutySwapTitle: '💊 Pharmacie de garde mise à jour',
     notifDutySwapBody: '{name} est la pharmacie de garde pour le {date}.',
     tapViewDuty: 'Appuyer pour voir les pharmacies de garde →',
-    tabRequests: 'Demandes', tabQA: 'Q&A', tabReviews: 'Revues', tabArchive: 'Archives', tabStats: 'Stats', tabProfile: 'Profil', tabHome: 'Accueil', tabSaved: 'Enregistrés', coverPhoto: 'Photo de couverture', logoLabel: 'Logo', tapToAddCover: 'Appuyer pour ajouter une photo de couverture', tapToAddLogo: 'Appuyer pour ajouter un logo', tapToView: 'APPUYER POUR VOIR', uploadFailed: 'Échec du téléchargement. Réessayer.', providerDocsUploadFailed: 'Certains documents ne se sont pas téléchargés. Vérifiez votre connexion et appuyez de nouveau sur Envoyer.',
+    tabQA: 'Q&A', tabReviews: 'Revues', tabArchive: 'Archives', tabStats: 'Stats', tabProfile: 'Profil', tabHome: 'Accueil', tabSaved: 'Enregistrés', coverPhoto: 'Photo de couverture', logoLabel: 'Logo', tapToAddCover: 'Appuyer pour ajouter une photo de couverture', tapToAddLogo: 'Appuyer pour ajouter un logo', tapToView: 'APPUYER POUR VOIR', uploadFailed: 'Échec du téléchargement. Réessayer.', providerDocsUploadFailed: 'Certains documents ne se sont pas téléchargés. Vérifiez votre connexion et appuyez de nouveau sur Envoyer.',
     labelAddress: 'Adresse', labelHours: "Heures d'ouverture", hoursHint: 'ex. Mon-Sat 08:00-18:00 ou 24/7',
-    confirm: 'Confirmer', decline: 'Refuser', send: 'Envoyer',
+    decline: 'Refuser', send: 'Envoyer',
     writeYourAnswer: 'Écrivez votre réponse…', yourAnswer: 'Votre réponse',
     noFacilityLinked: 'Aucun établissement associé',
     noFacilityLinkedSub: "Contactez l'administrateur pour associer votre compte à un établissement.",
-    allClear: 'Tout est en ordre', noPendingRequests: 'Aucune demande de rendez-vous en attente.',
+    noPendingRequests: 'Aucune demande de rendez-vous en attente.',
     questionsFromCustomers: 'Les questions des clients apparaîtront ici.',
     noPendingReviews: 'Aucune révision en attente',
     noApprovedReviews: "Aucune révision approuvée pour l'instant",
-    statAppointments: 'Rendez-vous', statTotal: 'Total', statAnswered: 'Répondues',
+    statTotal: 'Total', statAnswered: 'Répondues',
     statUnanswered: 'Sans réponse', statApproved: 'Approuvé', statRejected: 'Rejeté',
     searchPlaceholder: 'Rechercher par nom ou adresse…',
-    cancelAppt: 'Annuler',
-    cancelLate: 'Pour annuler dans les 24 heures, veuillez appeler la clinique.', noShowBtn: 'Absent', bookingBlocked: 'Réservation Suspendue', bookingBlockedMsg: 'Votre accès aux réservations est suspendu jusqu\'au {date} en raison d\'absences répétées.',
-    markComplete: 'Marquer comme terminé', statusCompleted: 'Terminé', reviewPromptTitle: 'Comment s\'est passée votre visite ?', reviewPromptBody: 'Partagez votre expérience chez {name}.',
+    noShowBtn: 'Absent', bookingBlocked: 'Réservation Suspendue', bookingBlockedMsg: 'Votre accès aux réservations est suspendu jusqu\'au {date} en raison d\'absences répétées.',
+    statusCompleted: 'Terminé', reviewPromptTitle: 'Comment s\'est passée votre visite ?', reviewPromptBody: 'Partagez votre expérience chez {name}.',
     noReviews: 'Aucun avis pour l\'instant.',
     languagesSpoken: 'Langues parlées', aboutFacility: 'À propos',
     notifications: 'Notifications', noNotifications: 'Aucune notification pour l\'instant.', markAllRead: 'Tout marquer comme lu', clearAll: 'Tout effacer',
@@ -5888,54 +5779,52 @@ const translations = {
     groomRegisterActiveSub: 'Votre établissement figure dans l\'annuaire.',
     groomRegisterDeclined: 'Non approuvé',
     groomRegisterDeclinedSub: 'Votre référencement n\'a pas été approuvé. Contactez-nous si vous pensez qu\'il s\'agit d\'une erreur.',
-    groomManageAvail: 'Modifier les disponibilités',
-    groomAvailTitle: 'Disponibilités',
-    groomAvailIntro: 'Choisissez les jours et heures où les clients peuvent réserver. Les créneaux sont générés automatiquement.',
-    groomAvailSlotBooking: 'Réservation par créneaux',
-    groomAvailSlotBookingSub: 'Les clients choisissent parmi des créneaux fixes',
-    groomAvailSlotDuration: 'Durée du créneau',
-    groomAvailMinutes: '{n} min',
-    groomAvailSchedule: 'Horaires hebdomadaires',
-    groomAvailClosed: 'Fermé',
-    groomAvailSave: 'Enregistrer les horaires',
-    groomAvailSaveOff: 'Enregistrer les modifications',
-    groomAvailSaved: 'Enregistré !',
-    groomAvailOffHint: 'La réservation par créneaux est désactivée. Activez-la pour proposer des créneaux réservables.',
-    groomDayMon: 'Lun',
-    groomDayTue: 'Mar',
-    groomDayWed: 'Mer',
-    groomDayThu: 'Jeu',
-    groomDayFri: 'Ven',
-    groomDaySat: 'Sam',
-    groomDaySun: 'Dim',
-    groomAvailUnsavedTitle: 'Ignorer les modifications ?',
-    groomAvailUnsavedBody: 'Vos modifications non enregistrées seront perdues.',
-    groomAvailDiscard: 'Ignorer',
-    groomManageBookings: 'Mes réservations',
-    groomStatusRequested: 'Demandé — en attente de confirmation',
-    groomBkTitle: 'Mes réservations',
-    groomBkCustomer: 'Client',
-    groomBkPendingSection: 'En attente de votre confirmation',
-    groomBkUpcomingSection: 'À venir',
-    groomBkPastSection: 'Passées',
-    groomBkEmpty: 'Aucune réservation pour le moment',
-    groomBkConfirm: 'Confirmer',
-    groomBkDecline: 'Refuser',
-    groomBkCancel: 'Annuler',
-    groomBkNoShow: 'Absence',
-    groomBkComplete: 'Terminé',
-    groomBkDeclineQ: 'Refuser cette réservation ?',
-    groomBkDeclineQBody: 'Le client sera prévenu et le créneau libéré.',
-    groomBkCancelQ: 'Annuler cette réservation ?',
-    groomBkCancelQBody: 'Le client sera prévenu et le créneau libéré.',
-    groomBkNoShowQ: 'Marquer comme absence ?',
-    groomBkNoShowQBody: 'Cela enregistre un avertissement contre le client.',
-    groomNotifConfirmedTitle: 'Réservation confirmée',
-    groomNotifConfirmedBody: 'Votre réservation chez {name} est confirmée.',
-    groomNotifDeclinedTitle: 'Réservation refusée',
-    groomNotifDeclinedBody: 'Votre réservation chez {name} a été refusée.',
-    groomNotifCancelledTitle: 'Réservation annulée',
-    groomNotifCancelledBody: 'Votre réservation chez {name} a été annulée.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     gateInsurance: 'Créez un compte gratuit pour référencer votre compagnie d\'assurance.',
     insTitle: 'Assurance',
     insBackToTypes: 'Tous les types d\'assurance',
@@ -5964,7 +5853,7 @@ const translations = {
     insErrorGeneric: 'Une erreur s\'est produite. Veuillez réessayer.',
     insTypesOffered: 'Assurances proposées', insAbout: 'À propos', insContact: 'Contact',
     favourites: 'Favoris', showAll: 'Tout afficher', adaOnly: 'ADA uniquement', allFacilities: 'Tous les établissements', noFavourites: 'Aucun favori pour l\'instant. Appuyez sur ♥ pour sauvegarder un établissement.', hiddenFacilitiesHint: 'Inscrit sur ADA',
-    bookingDetail: 'Détails du rendez-vous', yourReview: 'Votre avis', getDirections: 'Itinéraire', call: 'Appeler', visitWebsite: 'Site web', viewProfile: 'Voir le profil',
+    yourReview: 'Votre avis', getDirections: 'Itinéraire', call: 'Appeler', visitWebsite: 'Site web', viewProfile: 'Voir le profil',
     noFacilitiesTitle: 'Aucun établissement pour l\'instant', noFacilitiesBody: 'Les pharmacies, cliniques et hôpitaux vérifiés apparaîtront ici au fur et à mesure qu\'ils rejoindront ADA.',
     noResultsTitle: 'Aucun résultat', noResultsBody: 'Essayez de supprimer un filtre ou d\'ajuster votre recherche',
     facilityLoadError: 'Impossible de charger les établissements. Vérifiez votre connexion.',
@@ -5979,7 +5868,6 @@ const translations = {
     gateTransport: 'Créez un compte gratuit pour vous inscrire comme prestataire de transport.',
     gateEstateAgent: 'Créez un compte gratuit pour publier des biens en tant qu\'agent immobilier.',
     gatePlaceSubmit: 'Créez un compte gratuit pour suggérer un lieu à découvrir.',
-    gateBooking: 'Créez un compte gratuit pour prendre rendez-vous.',
     gateQuestion: 'Créez un compte gratuit pour poser une question.',
     gateReview: 'Créez un compte gratuit pour laisser un avis.',
     gateReport: 'Créez un compte gratuit pour signaler un contenu.',
@@ -6041,13 +5929,9 @@ const translations = {
     deleteAccountConfirmBtn: 'Oui, supprimer mon compte',
     cancel: 'Annuler',
     openNow: 'Ouvert',
-    upcoming: 'À venir',
-    pastAppt: 'Passés',
     reportProblem: 'Suggérer une correction',
-    noUpcomingAppt: 'Aucun rendez-vous à venir.',
-    noPastAppt: 'Aucun rendez-vous passé.',
-    completeProfileTip: 'Complétez votre profil et indiquez vos disponibilités pour commencer à recevoir des demandes de rendez-vous.',
-    goToProfile: 'Aller au profil',
+    
+    
     pharmacies: 'Pharmacies',
     chipDutyPharmacies: 'Pharmacies de garde',
     clinics: 'Cliniques',
@@ -6061,13 +5945,10 @@ const translations = {
     uvVeryHigh: 'Très élevé',
     uvExtreme: 'Extrême',
     qualificationsLabel: 'Qualifications',
-    scheduleLabel: 'Horaires',
     todayLabel: "Aujourd'hui", feelsLike: 'Ressenti',
-    minSlotLabel: 'Créneaux de {n} min',
     firstReviewPrompt: 'Soyez le premier à laisser un avis après votre visite',
     reviewCountLabel: '{n} avis',
     seeAllReviews: 'Voir les {n} avis',
-    closedDay: 'Fermé ce jour',
     menuMunicipalities: 'Municipalités',
     menuEvents: 'Événements',
     menuPets: 'Animaux',
@@ -6575,14 +6456,12 @@ const translations = {
     onDuty: 'De guardia hoy',
     enableLocation: 'Activa la ubicación para ver los servicios más cercanos.',
     pharmacy: 'Farmacia', clinic: 'Clínica', hospital: 'Hospital', dentist: 'Dentista', grooming: 'Estética',
-    requestedTime: 'Hora solicitada',
-    selectDate: 'Seleccionar fecha',
-    selectTime: 'Horas disponibles',
-    requestAppointment: 'Solicitar cita',
-    requestSent: 'Solicitud enviada',
-    requestSentSub: 'Te notificaremos cuando {name} confirme tu cita.',
-    slotTaken: 'Lo sentimos — ese horario acaba de ocuparse. Por favor elige otro.',
-    backToList: 'Volver a la lista',
+    
+    
+    
+    
+    
+    
     questionsAnswers: 'Preguntas y Respuestas',
     askPlaceholder: 'Haz una pregunta sobre este centro…',
     noQuestions: 'Sin preguntas aún.',
@@ -6732,25 +6611,20 @@ const translations = {
     slide2Title: 'Farmacia de Guardia',
     slide3Title: 'Salud & Clínicas',
     slide4Title: 'Servicios & Vida',
-    myBookings: 'Mis citas',
-    noBookings: 'Sin citas aún.',
-    bookingRef: 'Ref',
-    statusPending: 'Pendiente',
-    statusConfirmed: 'Confirmado',
-    statusCancelled: 'Cancelado',
+    
+    
+    
+    
     rateVisit: 'Valorar',
-    reviewDone: 'Valorado',
     commentOptional: 'Añadir un comentario (opcional)…',
     login: 'Iniciar sesión', signup: 'Registrarse', createAccount: 'Crear cuenta',
     email: 'Correo electrónico', password: 'Contraseña',
     iAmA: 'Soy', roleCustomer: 'Usuario', roleProvider: 'Profesional de salud', roleOrganizer: 'Organizador de eventos',
     facilityPharmacy: 'Farmacia', facilityClinic: 'Clínica', facilityHospital: 'Hospital', facilityDentist: 'Dentista',
     selectFacilityType: 'Tipo de centro',
-    notifApptConfirmedTitle: 'Cita confirmada',
-    notifApptConfirmedBody: '{name} confirmó tu cita.',
-    notifApptDeclinedTitle: 'Cita rechazada',
-    notifApptDeclinedBody: '{name} rechazó tu solicitud de cita.',
-    apptReminderTitle: 'Cita en 1 hora', apptReminderBody: 'Tu cita en {name} comienza en 1 hora.',
+    
+    
+    apptReminderBody: 'Tu cita en {name} comienza en 1 hora.',
     notifNewQuestionTitle: 'Nueva pregunta',
     notifNewQuestionBody: '{name} recibió una nueva pregunta de un usuario.',
     notifNewApptTitle: 'Nueva solicitud de cita',
@@ -6785,22 +6659,21 @@ const translations = {
     notifDutySwapTitle: '💊 Farmacia de guardia actualizada',
     notifDutySwapBody: '{name} es ahora la farmacia de guardia para el {date}.',
     tapViewDuty: 'Toca para ver farmacias de guardia →',
-    tabRequests: 'Solicitudes', tabQA: 'Q&A', tabReviews: 'Revisiones', tabArchive: 'Archivo', tabStats: 'Stats', tabProfile: 'Perfil', tabHome: 'Inicio', tabSaved: 'Guardados', coverPhoto: 'Foto de portada', logoLabel: 'Logo', tapToAddCover: 'Toca para agregar foto de portada', tapToAddLogo: 'Toca para agregar logo', tapToView: 'TOCA PARA VER', uploadFailed: 'Error al subir. Intenta de nuevo.', providerDocsUploadFailed: 'Algunos documentos no se subieron. Verifica tu conexión y toca Enviar para intentarlo de nuevo.',
+    tabQA: 'Q&A', tabReviews: 'Revisiones', tabArchive: 'Archivo', tabStats: 'Stats', tabProfile: 'Perfil', tabHome: 'Inicio', tabSaved: 'Guardados', coverPhoto: 'Foto de portada', logoLabel: 'Logo', tapToAddCover: 'Toca para agregar foto de portada', tapToAddLogo: 'Toca para agregar logo', tapToView: 'TOCA PARA VER', uploadFailed: 'Error al subir. Intenta de nuevo.', providerDocsUploadFailed: 'Algunos documentos no se subieron. Verifica tu conexión y toca Enviar para intentarlo de nuevo.',
     labelAddress: 'Dirección', labelHours: 'Horario', hoursHint: 'ej. Mon-Sat 08:00-18:00 o 24/7',
-    confirm: 'Confirmar', decline: 'Rechazar', send: 'Enviar',
+    decline: 'Rechazar', send: 'Enviar',
     writeYourAnswer: 'Escribe tu respuesta…', yourAnswer: 'Tu respuesta',
     noFacilityLinked: 'No hay centro vinculado',
     noFacilityLinkedSub: 'Contacta al administrador para vincular tu cuenta a un centro.',
-    allClear: 'Todo en orden', noPendingRequests: 'No hay solicitudes de cita pendientes.',
+    noPendingRequests: 'No hay solicitudes de cita pendientes.',
     questionsFromCustomers: 'Las preguntas de los clientes aparecerán aquí.',
     noPendingReviews: 'No hay revisiones pendientes',
     noApprovedReviews: 'Aún no hay revisiones aprobadas',
-    statAppointments: 'Citas', statTotal: 'Total', statAnswered: 'Respondidas',
+    statTotal: 'Total', statAnswered: 'Respondidas',
     statUnanswered: 'Sin responder', statApproved: 'Aprobado', statRejected: 'Rechazado',
     searchPlaceholder: 'Buscar por nombre o dirección…',
-    cancelAppt: 'Cancelar',
-    cancelLate: 'Para cancelar en las últimas 24 horas, llame a la clínica directamente.', noShowBtn: 'No asistió', bookingBlocked: 'Reserva Suspendida', bookingBlockedMsg: 'Su acceso a reservas está suspendido hasta el {date} por ausencias repetidas.',
-    markComplete: 'Marcar como completado', statusCompleted: 'Completado', reviewPromptTitle: '¿Cómo fue su visita?', reviewPromptBody: 'Comparte tu experiencia en {name}.',
+    noShowBtn: 'No asistió', bookingBlocked: 'Reserva Suspendida', bookingBlockedMsg: 'Su acceso a reservas está suspendido hasta el {date} por ausencias repetidas.',
+    statusCompleted: 'Completado', reviewPromptTitle: '¿Cómo fue su visita?', reviewPromptBody: 'Comparte tu experiencia en {name}.',
     noReviews: 'Aún no hay valoraciones.',
     languagesSpoken: 'Idiomas hablados', aboutFacility: 'Acerca de',
     notifications: 'Notificaciones', noNotifications: 'Aún no hay notificaciones.', markAllRead: 'Marcar todo como leído', clearAll: 'Borrar todo',
@@ -6871,54 +6744,52 @@ const translations = {
     groomRegisterActiveSub: 'Tu negocio está listado en el directorio.',
     groomRegisterDeclined: 'No aprobado',
     groomRegisterDeclinedSub: 'Tu anuncio no fue aprobado. Contáctanos si crees que es un error.',
-    groomManageAvail: 'Editar disponibilidad',
-    groomAvailTitle: 'Disponibilidad',
-    groomAvailIntro: 'Elige los días y horas en que los clientes pueden reservar. Los turnos se generan automáticamente.',
-    groomAvailSlotBooking: 'Reserva por turnos',
-    groomAvailSlotBookingSub: 'Los clientes eligen entre turnos fijos',
-    groomAvailSlotDuration: 'Duración del turno',
-    groomAvailMinutes: '{n} min',
-    groomAvailSchedule: 'Horario semanal',
-    groomAvailClosed: 'Cerrado',
-    groomAvailSave: 'Guardar horario',
-    groomAvailSaveOff: 'Guardar cambios',
-    groomAvailSaved: '¡Guardado!',
-    groomAvailOffHint: 'La reserva por turnos está desactivada. Actívala para ofrecer turnos reservables.',
-    groomDayMon: 'Lun',
-    groomDayTue: 'Mar',
-    groomDayWed: 'Mié',
-    groomDayThu: 'Jue',
-    groomDayFri: 'Vie',
-    groomDaySat: 'Sáb',
-    groomDaySun: 'Dom',
-    groomAvailUnsavedTitle: '¿Descartar cambios?',
-    groomAvailUnsavedBody: 'Se perderán los cambios no guardados del horario.',
-    groomAvailDiscard: 'Descartar',
-    groomManageBookings: 'Mis reservas',
-    groomStatusRequested: 'Solicitado — esperando confirmación',
-    groomBkTitle: 'Mis reservas',
-    groomBkCustomer: 'Cliente',
-    groomBkPendingSection: 'Esperando tu confirmación',
-    groomBkUpcomingSection: 'Próximas',
-    groomBkPastSection: 'Pasadas',
-    groomBkEmpty: 'Aún no hay reservas',
-    groomBkConfirm: 'Confirmar',
-    groomBkDecline: 'Rechazar',
-    groomBkCancel: 'Cancelar',
-    groomBkNoShow: 'No asistió',
-    groomBkComplete: 'Hecho',
-    groomBkDeclineQ: '¿Rechazar esta reserva?',
-    groomBkDeclineQBody: 'Se notificará al cliente y el turno quedará libre.',
-    groomBkCancelQ: '¿Cancelar esta reserva?',
-    groomBkCancelQBody: 'Se notificará al cliente y el turno quedará libre.',
-    groomBkNoShowQ: '¿Marcar como no asistió?',
-    groomBkNoShowQBody: 'Esto registra una falta contra el cliente.',
-    groomNotifConfirmedTitle: 'Reserva confirmada',
-    groomNotifConfirmedBody: 'Tu reserva en {name} está confirmada.',
-    groomNotifDeclinedTitle: 'Reserva rechazada',
-    groomNotifDeclinedBody: 'Tu reserva en {name} fue rechazada.',
-    groomNotifCancelledTitle: 'Reserva cancelada',
-    groomNotifCancelledBody: 'Tu reserva en {name} fue cancelada.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     gateInsurance: 'Crea una cuenta gratuita para incluir tu compañía de seguros.',
     insTitle: 'Seguros',
     insBackToTypes: 'Todos los tipos de seguro',
@@ -6947,7 +6818,7 @@ const translations = {
     insErrorGeneric: 'Algo salió mal. Inténtalo de nuevo.',
     insTypesOffered: 'Seguros ofrecidos', insAbout: 'Acerca de', insContact: 'Contacto',
     favourites: 'Favoritos', showAll: 'Ver todo', adaOnly: 'Solo ADA', allFacilities: 'Todos los centros', noFavourites: 'Sin favoritos aún. Toca ♥ en cualquier centro para guardarlo aquí.', hiddenFacilitiesHint: 'Registrado en ADA',
-    bookingDetail: 'Detalles de la cita', yourReview: 'Tu valoración', getDirections: 'Cómo llegar', call: 'Llamar', visitWebsite: 'Sitio web', viewProfile: 'Ver perfil',
+    yourReview: 'Tu valoración', getDirections: 'Cómo llegar', call: 'Llamar', visitWebsite: 'Sitio web', viewProfile: 'Ver perfil',
     noFacilitiesTitle: 'Aún no hay centros', noFacilitiesBody: 'Las farmacias, clínicas y hospitales verificados aparecerán aquí cuando se unan a ADA.',
     noResultsTitle: 'Sin resultados', noResultsBody: 'Intenta eliminar un filtro o ajustar tu búsqueda',
     facilityLoadError: 'No se pudieron cargar los centros. Comprueba tu conexión.',
@@ -6962,7 +6833,6 @@ const translations = {
     gateTransport: 'Crea una cuenta gratuita para registrarte como proveedor de transporte.',
     gateEstateAgent: 'Crea una cuenta gratuita para publicar propiedades como agente inmobiliario.',
     gatePlaceSubmit: 'Crea una cuenta gratuita para sugerir un lugar.',
-    gateBooking: 'Crea una cuenta gratuita para reservar una cita.',
     gateQuestion: 'Crea una cuenta gratuita para hacer una pregunta.',
     gateReview: 'Crea una cuenta gratuita para dejar una reseña.',
     gateReport: 'Crea una cuenta gratuita para denunciar contenido.',
@@ -7024,13 +6894,9 @@ const translations = {
     deleteAccountConfirmBtn: 'Sí, eliminar mi cuenta',
     cancel: 'Cancelar',
     openNow: 'Abierto',
-    upcoming: 'Próximas',
-    pastAppt: 'Pasadas',
     reportProblem: 'Sugerir una corrección',
-    noUpcomingAppt: 'No hay citas próximas.',
-    noPastAppt: 'No hay citas pasadas.',
-    completeProfileTip: 'Completa tu perfil y configura tu disponibilidad para empezar a recibir solicitudes de cita.',
-    goToProfile: 'Ir al perfil',
+    
+    
     pharmacies: 'Farmacias',
     chipDutyPharmacies: 'Farmacias de guardia',
     clinics: 'Clínicas',
@@ -7044,13 +6910,10 @@ const translations = {
     uvVeryHigh: 'Muy alto',
     uvExtreme: 'Extremo',
     qualificationsLabel: 'Cualificaciones',
-    scheduleLabel: 'Horario',
     todayLabel: 'Hoy', feelsLike: 'Sensación',
-    minSlotLabel: 'Turnos de {n} min',
     firstReviewPrompt: 'Sé el primero en dejar una reseña tras tu visita',
     reviewCountLabel: '{n} reseñas',
     seeAllReviews: 'Ver las {n} reseñas',
-    closedDay: 'Cerrado este día',
     menuMunicipalities: 'Municipios',
     menuEvents: 'Eventos',
     menuPets: 'Mascotas',
@@ -7557,14 +7420,12 @@ const translations = {
     onDuty: 'Heute im Dienst',
     enableLocation: 'Aktivieren Sie den Standort, um die nächsten Dienste zu sehen.',
     pharmacy: 'Apotheke', clinic: 'Klinik', hospital: 'Krankenhaus', dentist: 'Zahnarzt', grooming: 'Pflege',
-    requestedTime: 'Gewünschte Zeit',
-    selectDate: 'Datum auswählen',
-    selectTime: 'Verfügbare Zeiten',
-    requestAppointment: 'Termin anfragen',
-    requestSent: 'Anfrage gesendet',
-    requestSentSub: 'Wir benachrichtigen Sie, wenn {name} Ihren Termin bestätigt.',
-    slotTaken: 'Leider wurde dieser Termin gerade vergeben. Bitte wählen Sie eine andere Zeit.',
-    backToList: 'Zurück zur Liste',
+    
+    
+    
+    
+    
+    
     questionsAnswers: 'Fragen & Antworten',
     askPlaceholder: 'Stellen Sie eine Frage zu dieser Einrichtung…',
     noQuestions: 'Noch keine Fragen.',
@@ -7714,25 +7575,20 @@ const translations = {
     slide2Title: 'Notdienstapotheke',
     slide3Title: 'Gesundheit & Kliniken',
     slide4Title: 'Dienste & Leben',
-    myBookings: 'Meine Termine',
-    noBookings: 'Noch keine Termine.',
-    bookingRef: 'Nr.',
-    statusPending: 'Ausstehend',
-    statusConfirmed: 'Bestätigt',
-    statusCancelled: 'Storniert',
+    
+    
+    
+    
     rateVisit: 'Bewerten',
-    reviewDone: 'Bewertet',
     commentOptional: 'Kommentar hinzufügen (optional)…',
     login: 'Anmelden', signup: 'Registrieren', createAccount: 'Konto erstellen',
     email: 'E-Mail', password: 'Passwort',
     iAmA: 'Ich bin', roleCustomer: 'Benutzer', roleProvider: 'Medizinischer Fachmann', roleOrganizer: 'Veranstaltungsmanager',
     facilityPharmacy: 'Apotheke', facilityClinic: 'Klinik', facilityHospital: 'Krankenhaus', facilityDentist: 'Zahnarzt',
     selectFacilityType: 'Einrichtungstyp',
-    notifApptConfirmedTitle: 'Termin bestätigt',
-    notifApptConfirmedBody: '{name} hat Ihren Termin bestätigt.',
-    notifApptDeclinedTitle: 'Termin abgelehnt',
-    notifApptDeclinedBody: '{name} hat Ihre Anfrage abgelehnt.',
-    apptReminderTitle: 'Termin in 1 Stunde', apptReminderBody: 'Ihr Termin bei {name} beginnt in 1 Stunde.',
+    
+    
+    apptReminderBody: 'Ihr Termin bei {name} beginnt in 1 Stunde.',
     notifNewQuestionTitle: 'Neue Frage',
     notifNewQuestionBody: '{name} hat eine neue Frage von einem Nutzer erhalten.',
     notifNewApptTitle: 'Neue Terminanfrage',
@@ -7767,22 +7623,21 @@ const translations = {
     notifDutySwapTitle: '💊 Notdienstapotheke aktualisiert',
     notifDutySwapBody: '{name} ist jetzt die Notdienstapotheke für den {date}.',
     tapViewDuty: 'Tippen für Notdienstapotheken →',
-    tabRequests: 'Anfragen', tabQA: 'Q&A', tabReviews: 'Überprüfungen', tabArchive: 'Archiv', tabStats: 'Statistik', tabProfile: 'Profil', tabHome: 'Startseite', tabSaved: 'Gespeichert', coverPhoto: 'Titelbild', logoLabel: 'Logo', tapToAddCover: 'Tippen um Titelbild hinzuzufügen', tapToAddLogo: 'Tippen um Logo hinzuzufügen', tapToView: 'TIPPEN ZUM ANZEIGEN', uploadFailed: 'Upload fehlgeschlagen. Erneut versuchen.', providerDocsUploadFailed: 'Einige Dokumente wurden nicht hochgeladen. Prüfe deine Verbindung und tippe erneut auf Senden.',
+    tabQA: 'Q&A', tabReviews: 'Überprüfungen', tabArchive: 'Archiv', tabStats: 'Statistik', tabProfile: 'Profil', tabHome: 'Startseite', tabSaved: 'Gespeichert', coverPhoto: 'Titelbild', logoLabel: 'Logo', tapToAddCover: 'Tippen um Titelbild hinzuzufügen', tapToAddLogo: 'Tippen um Logo hinzuzufügen', tapToView: 'TIPPEN ZUM ANZEIGEN', uploadFailed: 'Upload fehlgeschlagen. Erneut versuchen.', providerDocsUploadFailed: 'Einige Dokumente wurden nicht hochgeladen. Prüfe deine Verbindung und tippe erneut auf Senden.',
     labelAddress: 'Adresse', labelHours: 'Öffnungszeiten', hoursHint: 'z.B. Mon-Sat 08:00-18:00 oder 24/7',
-    confirm: 'Bestätigen', decline: 'Ablehnen', send: 'Senden',
+    decline: 'Ablehnen', send: 'Senden',
     writeYourAnswer: 'Schreiben Sie Ihre Antwort…', yourAnswer: 'Ihre Antwort',
     noFacilityLinked: 'Kein Standort verknüpft',
     noFacilityLinkedSub: 'Kontaktieren Sie den Administrator, um Ihr Konto mit einem Standort zu verknüpfen.',
-    allClear: 'Alles klar', noPendingRequests: 'Keine ausstehenden Terminanfragen.',
+    noPendingRequests: 'Keine ausstehenden Terminanfragen.',
     questionsFromCustomers: 'Fragen von Kunden erscheinen hier.',
     noPendingReviews: 'Keine ausstehenden Überprüfungen',
     noApprovedReviews: 'Noch keine genehmigten Überprüfungen',
-    statAppointments: 'Termine', statTotal: 'Gesamt', statAnswered: 'Beantwortet',
+    statTotal: 'Gesamt', statAnswered: 'Beantwortet',
     statUnanswered: 'Unbeantwortet', statApproved: 'Genehmigt', statRejected: 'Abgelehnt',
     searchPlaceholder: 'Nach Name oder Adresse suchen…',
-    cancelAppt: 'Stornieren',
-    cancelLate: 'Für Stornierungen innerhalb von 24 Stunden rufen Sie bitte die Klinik an.', noShowBtn: 'Nicht erschienen', bookingBlocked: 'Buchung gesperrt', bookingBlockedMsg: 'Ihr Buchungszugang ist bis {date} gesperrt aufgrund wiederholter Nichterscheinens.',
-    markComplete: 'Als abgeschlossen markieren', statusCompleted: 'Abgeschlossen', reviewPromptTitle: 'Wie war Ihr Besuch?', reviewPromptBody: 'Teilen Sie Ihre Erfahrung bei {name}.',
+    noShowBtn: 'Nicht erschienen', bookingBlocked: 'Buchung gesperrt', bookingBlockedMsg: 'Ihr Buchungszugang ist bis {date} gesperrt aufgrund wiederholter Nichterscheinens.',
+    statusCompleted: 'Abgeschlossen', reviewPromptTitle: 'Wie war Ihr Besuch?', reviewPromptBody: 'Teilen Sie Ihre Erfahrung bei {name}.',
     noReviews: 'Noch keine Bewertungen.',
     languagesSpoken: 'Gesprochene Sprachen', aboutFacility: 'Über uns',
     notifications: 'Benachrichtigungen', noNotifications: 'Noch keine Benachrichtigungen.', markAllRead: 'Alle als gelesen markieren', clearAll: 'Alle löschen',
@@ -7853,54 +7708,52 @@ const translations = {
     groomRegisterActiveSub: 'Dein Unternehmen ist im Verzeichnis gelistet.',
     groomRegisterDeclined: 'Nicht genehmigt',
     groomRegisterDeclinedSub: 'Dein Eintrag wurde nicht genehmigt. Kontaktiere uns, wenn du glaubst, dass dies ein Fehler ist.',
-    groomManageAvail: 'Verfügbarkeit bearbeiten',
-    groomAvailTitle: 'Verfügbarkeit',
-    groomAvailIntro: 'Wähle die Tage und Zeiten, zu denen Kunden buchen können. Zeitfenster werden automatisch erstellt.',
-    groomAvailSlotBooking: 'Terminbuchung',
-    groomAvailSlotBookingSub: 'Kunden wählen aus festen Zeitfenstern',
-    groomAvailSlotDuration: 'Dauer des Zeitfensters',
-    groomAvailMinutes: '{n} Min.',
-    groomAvailSchedule: 'Wochenplan',
-    groomAvailClosed: 'Geschlossen',
-    groomAvailSave: 'Plan speichern',
-    groomAvailSaveOff: 'Änderungen speichern',
-    groomAvailSaved: 'Gespeichert!',
-    groomAvailOffHint: 'Terminbuchung ist aus. Schalte sie ein, um buchbare Zeitfenster anzubieten.',
-    groomDayMon: 'Mo',
-    groomDayTue: 'Di',
-    groomDayWed: 'Mi',
-    groomDayThu: 'Do',
-    groomDayFri: 'Fr',
-    groomDaySat: 'Sa',
-    groomDaySun: 'So',
-    groomAvailUnsavedTitle: 'Änderungen verwerfen?',
-    groomAvailUnsavedBody: 'Deine nicht gespeicherten Änderungen gehen verloren.',
-    groomAvailDiscard: 'Verwerfen',
-    groomManageBookings: 'Meine Buchungen',
-    groomStatusRequested: 'Angefragt — wartet auf Bestätigung',
-    groomBkTitle: 'Meine Buchungen',
-    groomBkCustomer: 'Kunde',
-    groomBkPendingSection: 'Wartet auf deine Bestätigung',
-    groomBkUpcomingSection: 'Anstehend',
-    groomBkPastSection: 'Vergangen',
-    groomBkEmpty: 'Noch keine Buchungen',
-    groomBkConfirm: 'Bestätigen',
-    groomBkDecline: 'Ablehnen',
-    groomBkCancel: 'Stornieren',
-    groomBkNoShow: 'Nicht erschienen',
-    groomBkComplete: 'Erledigt',
-    groomBkDeclineQ: 'Diese Buchung ablehnen?',
-    groomBkDeclineQBody: 'Der Kunde wird benachrichtigt und der Termin freigegeben.',
-    groomBkCancelQ: 'Diese Buchung stornieren?',
-    groomBkCancelQBody: 'Der Kunde wird benachrichtigt und der Termin freigegeben.',
-    groomBkNoShowQ: 'Als nicht erschienen markieren?',
-    groomBkNoShowQBody: 'Dies verzeichnet einen Verstoß gegen den Kunden.',
-    groomNotifConfirmedTitle: 'Buchung bestätigt',
-    groomNotifConfirmedBody: 'Deine Buchung bei {name} ist bestätigt.',
-    groomNotifDeclinedTitle: 'Buchung abgelehnt',
-    groomNotifDeclinedBody: 'Deine Buchung bei {name} wurde abgelehnt.',
-    groomNotifCancelledTitle: 'Buchung storniert',
-    groomNotifCancelledBody: 'Deine Buchung bei {name} wurde storniert.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     gateInsurance: 'Erstelle ein kostenloses Konto, um deine Versicherungsgesellschaft einzutragen.',
     insTitle: 'Versicherung',
     insBackToTypes: 'Alle Versicherungsarten',
@@ -7929,7 +7782,7 @@ const translations = {
     insErrorGeneric: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
     insTypesOffered: 'Angebotene Versicherungen', insAbout: 'Über', insContact: 'Kontakt',
     favourites: 'Favoriten', showAll: 'Alle anzeigen', adaOnly: 'Nur ADA', allFacilities: 'Alle Einrichtungen', noFavourites: 'Noch keine Favoriten. Tippe auf ♥ bei einer Einrichtung, um sie zu speichern.', hiddenFacilitiesHint: 'In ADA eingetragen',
-    bookingDetail: 'Termindetails', yourReview: 'Ihre Bewertung', getDirections: 'Route', call: 'Anrufen', visitWebsite: 'Webseite', viewProfile: 'Profil anzeigen',
+    yourReview: 'Ihre Bewertung', getDirections: 'Route', call: 'Anrufen', visitWebsite: 'Webseite', viewProfile: 'Profil anzeigen',
     noFacilitiesTitle: 'Noch keine Einrichtungen', noFacilitiesBody: 'Verifizierte Apotheken, Kliniken und Krankenhäuser erscheinen hier, sobald sie ADA beitreten.',
     noResultsTitle: 'Keine Ergebnisse', noResultsBody: 'Versuche einen Filter zu entfernen oder die Suche anzupassen',
     facilityLoadError: 'Einrichtungen konnten nicht geladen werden. Überprüfe deine Verbindung.',
@@ -7944,7 +7797,6 @@ const translations = {
     gateTransport: 'Erstelle ein kostenloses Konto, um dich als Transportanbieter zu registrieren.',
     gateEstateAgent: 'Erstelle ein kostenloses Konto, um Immobilien als Makler einzustellen.',
     gatePlaceSubmit: 'Erstelle ein kostenloses Konto, um einen Ort vorzuschlagen.',
-    gateBooking: 'Erstelle ein kostenloses Konto, um einen Termin zu buchen.',
     gateQuestion: 'Erstelle ein kostenloses Konto, um eine Frage zu stellen.',
     gateReview: 'Erstelle ein kostenloses Konto, um eine Bewertung abzugeben.',
     gateReport: 'Erstelle ein kostenloses Konto, um Inhalte zu melden.',
@@ -8006,13 +7858,9 @@ const translations = {
     deleteAccountConfirmBtn: 'Ja, mein Konto löschen',
     cancel: 'Abbrechen',
     openNow: 'Geöffnet',
-    upcoming: 'Anstehend',
-    pastAppt: 'Vergangene',
     reportProblem: 'Korrektur vorschlagen',
-    noUpcomingAppt: 'Keine anstehenden Termine.',
-    noPastAppt: 'Keine vergangenen Termine.',
-    completeProfileTip: 'Vervollständige dein Profil und lege deine Verfügbarkeit fest, um Terminanfragen zu erhalten.',
-    goToProfile: 'Zum Profil',
+    
+    
     pharmacies: 'Apotheken',
     chipDutyPharmacies: 'Bereitschaftsapotheken',
     clinics: 'Kliniken',
@@ -8026,13 +7874,10 @@ const translations = {
     uvVeryHigh: 'Sehr hoch',
     uvExtreme: 'Extrem',
     qualificationsLabel: 'Qualifikationen',
-    scheduleLabel: 'Zeitplan',
     todayLabel: 'Heute', feelsLike: 'Gefühlt',
-    minSlotLabel: '{n}-min-Termine',
     firstReviewPrompt: 'Schreiben Sie die erste Bewertung nach Ihrem Besuch',
     reviewCountLabel: '{n} Bewertungen',
     seeAllReviews: 'Alle {n} Bewertungen ansehen',
-    closedDay: 'An diesem Tag geschlossen',
     menuMunicipalities: 'Gemeinden',
     menuEvents: 'Veranstaltungen',
     menuPets: 'Haustiere',
@@ -8540,14 +8385,12 @@ const translations = {
     onDuty: 'نوبت امروز',
     enableLocation: 'موقعیت مکانی را فعال کنید تا نزدیک‌ترین خدمات را ببینید.',
     pharmacy: 'داروخانه', clinic: 'کلینیک', hospital: 'بیمارستان', dentist: 'دندانپزشک', grooming: 'آرایش',
-    requestedTime: 'زمان درخواستی',
-    selectDate: 'تاریخ را انتخاب کنید',
-    selectTime: 'زمان‌های موجود',
-    requestAppointment: 'درخواست نوبت',
-    requestSent: 'درخواست ارسال شد',
-    requestSentSub: 'وقتی {name} نوبت شما را تأیید کرد، اطلاع می‌دهیم.',
-    slotTaken: 'متأسفیم — این زمان همین حالا رزرو شد. لطفاً زمان دیگری انتخاب کنید.',
-    backToList: 'بازگشت به لیست',
+    
+    
+    
+    
+    
+    
     questionsAnswers: 'سوالات و پاسخ‌ها',
     askPlaceholder: 'سوالی درباره این مرکز بپرسید…',
     noQuestions: 'هنوز سوالی نیست.',
@@ -8697,25 +8540,20 @@ const translations = {
     slide2Title: 'داروخانه کشیک',
     slide3Title: 'سلامت و کلینیک',
     slide4Title: 'خدمات و زندگی',
-    myBookings: 'نوبت‌های من',
-    noBookings: 'هنوز نوبتی ندارید.',
-    bookingRef: 'شماره',
-    statusPending: 'در انتظار',
-    statusConfirmed: 'تأیید شد',
-    statusCancelled: 'لغو شد',
+    
+    
+    
+    
     rateVisit: 'امتیاز دهید',
-    reviewDone: 'امتیاز داده شد',
     commentOptional: 'نظر اضافه کنید (اختیاری)…',
     login: 'ورود', signup: 'ثبت نام', createAccount: 'ایجاد حساب',
     email: 'ایمیل', password: 'رمز عبور',
     iAmA: 'من یک', roleCustomer: 'کاربر', roleProvider: 'متخصص بهداشت', roleOrganizer: 'مدیر رویداد',
     facilityPharmacy: 'داروخانه', facilityClinic: 'کلینیک', facilityHospital: 'بیمارستان', facilityDentist: 'دندانپزشک',
     selectFacilityType: 'نوع مرکز',
-    notifApptConfirmedTitle: 'نوبت تأیید شد',
-    notifApptConfirmedBody: '{name} نوبت شما را تأیید کرد.',
-    notifApptDeclinedTitle: 'نوبت رد شد',
-    notifApptDeclinedBody: '{name} درخواست نوبت شما را رد کرد.',
-    apptReminderTitle: 'نوبت ۱ ساعت دیگر', apptReminderBody: 'نوبت شما در {name} یک ساعت دیگر شروع می‌شود.',
+    
+    
+    apptReminderBody: 'نوبت شما در {name} یک ساعت دیگر شروع می‌شود.',
     notifNewQuestionTitle: 'سوال جدید',
     notifNewQuestionBody: '{name} یک سوال جدید از کاربر دریافت کرد.',
     notifNewApptTitle: 'درخواست نوبت جدید',
@@ -8750,22 +8588,21 @@ const translations = {
     notifDutySwapTitle: '💊 داروخانه نوبتی به‌روز شد',
     notifDutySwapBody: '{name} اکنون داروخانه نوبتی برای {date} است.',
     tapViewDuty: 'برای مشاهده داروخانه‌های نوبتی بزنید →',
-    tabRequests: 'درخواست‌ها', tabQA: 'Q&A', tabReviews: 'بررسی‌ها', tabArchive: 'بایگانی', tabStats: 'آمار', tabProfile: 'پروفایل', tabHome: 'خانه', tabSaved: 'ذخیره‌ها', coverPhoto: 'تصویر جلد', logoLabel: 'آرم', tapToAddCover: 'برای افزودن تصویر جلد ضربه بزنید', tapToAddLogo: 'برای افزودن آرم ضربه بزنید', tapToView: 'برای مشاهده ضربه بزنید', uploadFailed: 'آپلود ناموفق. دوباره تلاش کنید.', providerDocsUploadFailed: 'برخی مدارک بارگذاری نشد. اتصال خود را بررسی کنید و برای تلاش دوباره روی ارسال بزنید.',
+    tabQA: 'Q&A', tabReviews: 'بررسی‌ها', tabArchive: 'بایگانی', tabStats: 'آمار', tabProfile: 'پروفایل', tabHome: 'خانه', tabSaved: 'ذخیره‌ها', coverPhoto: 'تصویر جلد', logoLabel: 'آرم', tapToAddCover: 'برای افزودن تصویر جلد ضربه بزنید', tapToAddLogo: 'برای افزودن آرم ضربه بزنید', tapToView: 'برای مشاهده ضربه بزنید', uploadFailed: 'آپلود ناموفق. دوباره تلاش کنید.', providerDocsUploadFailed: 'برخی مدارک بارگذاری نشد. اتصال خود را بررسی کنید و برای تلاش دوباره روی ارسال بزنید.',
     labelAddress: 'آدرس', labelHours: 'ساعات کار', hoursHint: 'مثلاً Mon-Sat 08:00-18:00 یا 24/7',
-    confirm: 'تأیید', decline: 'رد کردن', send: 'ارسال',
+    decline: 'رد کردن', send: 'ارسال',
     writeYourAnswer: 'پاسخ خود را بنویسید…', yourAnswer: 'پاسخ شما',
     noFacilityLinked: 'هیچ مرکزی متصل نشده',
     noFacilityLinkedSub: 'با مدیر تماس بگیرید تا حسابتان به یک مرکز متصل شود.',
-    allClear: 'همه چیز روبراه', noPendingRequests: 'درخواست نوبت معلقی وجود ندارد.',
+    noPendingRequests: 'درخواست نوبت معلقی وجود ندارد.',
     questionsFromCustomers: 'سوالات مشتریان اینجا نمایش داده می‌شوند.',
     noPendingReviews: 'بررسی معلقی وجود ندارد',
     noApprovedReviews: 'هنوز بررسی تأییدشده‌ای وجود ندارد',
-    statAppointments: 'نوبت‌ها', statTotal: 'کل', statAnswered: 'پاسخ داده شده',
+    statTotal: 'کل', statAnswered: 'پاسخ داده شده',
     statUnanswered: 'بی‌پاسخ', statApproved: 'تأیید شده', statRejected: 'رد شده',
     searchPlaceholder: 'جستجو بر اساس نام یا آدرس…',
-    cancelAppt: 'لغو',
-    cancelLate: 'برای لغو در ۲۴ ساعت آینده، لطفاً مستقیماً با کلینیک تماس بگیرید.', noShowBtn: 'غایب', bookingBlocked: 'نوبت تعلیق شد', bookingBlockedMsg: 'دسترسی شما به نوبت‌گیری تا {date} به دلیل غیبت‌های مکرر تعلیق شده است.',
-    markComplete: 'علامت‌گذاری به عنوان تکمیل‌شده', statusCompleted: 'تکمیل شد', reviewPromptTitle: 'بازدیدتان چطور بود؟', reviewPromptBody: 'تجربه خود را در {name} به اشتراک بگذارید.',
+    noShowBtn: 'غایب', bookingBlocked: 'نوبت تعلیق شد', bookingBlockedMsg: 'دسترسی شما به نوبت‌گیری تا {date} به دلیل غیبت‌های مکرر تعلیق شده است.',
+    statusCompleted: 'تکمیل شد', reviewPromptTitle: 'بازدیدتان چطور بود؟', reviewPromptBody: 'تجربه خود را در {name} به اشتراک بگذارید.',
     noReviews: 'هنوز نظری ثبت نشده.',
     languagesSpoken: 'زبان‌های گفتگو', aboutFacility: 'درباره',
     notifications: 'اعلان‌ها', noNotifications: 'هنوز اعلانی وجود ندارد.', markAllRead: 'علامت‌گذاری همه به عنوان خوانده شده', clearAll: 'پاک کردن همه',
@@ -8836,54 +8673,52 @@ const translations = {
     groomRegisterActiveSub: 'کسب‌وکار شما در فهرست ثبت شده است.',
     groomRegisterDeclined: 'تأیید نشد',
     groomRegisterDeclinedSub: 'ثبت شما تأیید نشد. اگر فکر می‌کنید اشتباهی رخ داده با ما تماس بگیرید.',
-    groomManageAvail: 'ویرایش زمان‌های در دسترس',
-    groomAvailTitle: 'زمان‌های در دسترس',
-    groomAvailIntro: 'روزها و ساعت‌هایی را که مشتریان می‌توانند نوبت بگیرند انتخاب کنید. بازه‌های زمانی به‌طور خودکار ساخته می‌شوند.',
-    groomAvailSlotBooking: 'رزرو بازه‌ای',
-    groomAvailSlotBookingSub: 'مشتریان از بازه‌های زمانی ثابت انتخاب می‌کنند',
-    groomAvailSlotDuration: 'مدت هر بازه',
-    groomAvailMinutes: '{n} دقیقه',
-    groomAvailSchedule: 'برنامه هفتگی',
-    groomAvailClosed: 'تعطیل',
-    groomAvailSave: 'ذخیره برنامه',
-    groomAvailSaveOff: 'ذخیره تغییرات',
-    groomAvailSaved: 'ذخیره شد!',
-    groomAvailOffHint: 'رزرو بازه‌ای خاموش است. آن را روشن کنید تا بازه‌های قابل رزرو ارائه دهید.',
-    groomDayMon: 'دوش',
-    groomDayTue: 'سه‌ش',
-    groomDayWed: 'چها',
-    groomDayThu: 'پنج',
-    groomDayFri: 'جمعه',
-    groomDaySat: 'شنبه',
-    groomDaySun: 'یک‌ش',
-    groomAvailUnsavedTitle: 'تغییرات نادیده گرفته شود؟',
-    groomAvailUnsavedBody: 'تغییرات ذخیره‌نشده برنامه از بین می‌رود.',
-    groomAvailDiscard: 'نادیده گرفتن',
-    groomManageBookings: 'رزروهای من',
-    groomStatusRequested: 'درخواست شد — در انتظار تأیید',
-    groomBkTitle: 'رزروهای من',
-    groomBkCustomer: 'مشتری',
-    groomBkPendingSection: 'در انتظار تأیید شما',
-    groomBkUpcomingSection: 'آینده',
-    groomBkPastSection: 'گذشته',
-    groomBkEmpty: 'هنوز رزروی نیست',
-    groomBkConfirm: 'تأیید',
-    groomBkDecline: 'رد',
-    groomBkCancel: 'لغو',
-    groomBkNoShow: 'غیبت',
-    groomBkComplete: 'انجام شد',
-    groomBkDeclineQ: 'این رزرو رد شود؟',
-    groomBkDeclineQBody: 'به مشتری اطلاع داده می‌شود و زمان آزاد می‌شود.',
-    groomBkCancelQ: 'این رزرو لغو شود؟',
-    groomBkCancelQBody: 'به مشتری اطلاع داده می‌شود و زمان آزاد می‌شود.',
-    groomBkNoShowQ: 'به‌عنوان غیبت علامت‌گذاری شود؟',
-    groomBkNoShowQBody: 'این یک تخلف برای مشتری ثبت می‌کند.',
-    groomNotifConfirmedTitle: 'رزرو تأیید شد',
-    groomNotifConfirmedBody: 'رزرو شما در {name} تأیید شد.',
-    groomNotifDeclinedTitle: 'رزرو رد شد',
-    groomNotifDeclinedBody: 'رزرو شما در {name} رد شد.',
-    groomNotifCancelledTitle: 'رزرو لغو شد',
-    groomNotifCancelledBody: 'رزرو شما در {name} لغو شد.',
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     gateInsurance: 'برای ثبت شرکت بیمه خود یک حساب رایگان بسازید.',
     insTitle: 'بیمه',
     insBackToTypes: 'همه انواع بیمه',
@@ -8912,7 +8747,7 @@ const translations = {
     insErrorGeneric: 'مشکلی پیش آمد. لطفاً دوباره تلاش کنید.',
     insTypesOffered: 'بیمه‌های ارائه‌شده', insAbout: 'درباره', insContact: 'تماس',
     favourites: 'علاقه‌مندی‌ها', showAll: 'نمایش همه', adaOnly: 'فقط ADA', allFacilities: 'همه مراکز', noFavourites: 'هنوز موردی ذخیره نشده. روی ♥ هر مرکز بزنید تا اینجا ذخیره شود.', hiddenFacilitiesHint: 'ثبت‌شده در ADA',
-    bookingDetail: 'جزئیات نوبت', yourReview: 'نظر شما', getDirections: 'مسیریابی', call: 'تماس', visitWebsite: 'وب‌سایت', viewProfile: 'مشاهده پروفایل',
+    yourReview: 'نظر شما', getDirections: 'مسیریابی', call: 'تماس', visitWebsite: 'وب‌سایت', viewProfile: 'مشاهده پروفایل',
     noFacilitiesTitle: 'هنوز مرکزی وجود ندارد', noFacilitiesBody: 'داروخانه‌ها، کلینیک‌ها و بیمارستان‌های تأییدشده با پیوستن به ADA اینجا نمایش داده می‌شوند.',
     noResultsTitle: 'نتیجه‌ای یافت نشد', noResultsBody: 'یک فیلتر را حذف کنید یا جستجوی خود را تغییر دهید',
     facilityLoadError: 'بارگذاری مراکز ممکن نشد. اتصال خود را بررسی کنید.',
@@ -8927,7 +8762,6 @@ const translations = {
     gateTransport: 'برای ثبت‌نام به عنوان ارائه‌دهنده حمل‌ونقل، حساب رایگان بسازید.',
     gateEstateAgent: 'برای ثبت املاک به عنوان مشاور املاک، حساب رایگان بسازید.',
     gatePlaceSubmit: 'برای پیشنهاد یک مکان، حساب رایگان بسازید.',
-    gateBooking: 'برای رزرو نوبت، حساب رایگان بسازید.',
     gateQuestion: 'برای پرسیدن سؤال، حساب رایگان بسازید.',
     gateReview: 'برای ثبت نظر یک حساب رایگان بسازید.',
     gateReport: 'برای گزارش محتوا، حساب رایگان بسازید.',
@@ -8989,13 +8823,9 @@ const translations = {
     deleteAccountConfirmBtn: 'بله، حساب مرا حذف کن',
     cancel: 'لغو',
     openNow: 'باز است',
-    upcoming: 'پیش‌رو',
-    pastAppt: 'گذشته',
     reportProblem: 'پیشنهاد اصلاح',
-    noUpcomingAppt: 'قرار ملاقات پیش‌رویی نیست.',
-    noPastAppt: 'قرار ملاقات گذشته‌ای نیست.',
-    completeProfileTip: 'برای دریافت درخواست‌های نوبت، نمایه خود را کامل کنید و زمان‌های در دسترس بودنتان را تعیین کنید.',
-    goToProfile: 'رفتن به نمایه',
+    
+    
     pharmacies: 'داروخانه‌ها',
     chipDutyPharmacies: 'داروخانه‌های نوبت‌دار',
     clinics: 'کلینیک‌ها',
@@ -9009,13 +8839,10 @@ const translations = {
     uvVeryHigh: 'خیلی زیاد',
     uvExtreme: 'بسیار شدید',
     qualificationsLabel: 'مدارک تحصیلی',
-    scheduleLabel: 'برنامه زمانی',
     todayLabel: 'امروز', feelsLike: 'احساس',
-    minSlotLabel: 'نوبت‌های {n} دقیقه‌ای',
     firstReviewPrompt: 'اولین نظر را بعد از بازدید بگذارید',
     reviewCountLabel: '{n} نظر',
     seeAllReviews: 'مشاهده همه {n} نظر',
-    closedDay: 'در این روز تعطیل است',
     menuMunicipalities: 'شهرداری‌ها',
     menuEvents: 'رویدادها',
     menuPets: 'حیوانات خانگی',
@@ -9493,7 +9320,6 @@ const translations = {
     photoSourceA11y: "باز کردن صفحهٔ منبع عکس",
   },
 }
-
 export function t(key, lang) {
   const code = LANG_CODES[lang] || 'en'
   return translations[code]?.[key] ?? translations.en[key] ?? key
@@ -9521,7 +9347,6 @@ export function tCity(key, region, lang) {
   const template = translations[code]?.[key] ?? translations.en[key] ?? key
   const label = REGION_LABEL_KEY[region] ? t(REGION_LABEL_KEY[region], lang) : ''
   const forms = translations[code]?.cityForms?.[region]
-
   return template
     .replace('{cityLocCop}', forms?.locCop ?? label)
     .replace('{cityLoc}', forms?.loc ?? label)

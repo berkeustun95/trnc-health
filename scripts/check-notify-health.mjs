@@ -239,9 +239,12 @@ async function run() {
 
   const rows = []
 
-  // ── owner flows: appointment + question ──
+  // ── owner flows: question ──
+  // The appointment probe was removed with 20261004: it read public.appointments, which
+  // no longer exists, so it would have failed outright rather than reported anything.
+  // ONE row now, and the loop is kept rather than inlined precisely because this table
+  // is the thing that makes a second kind cheap to add.
   for (const [label, table, titleKey] of [
-    ['appointment → provider', 'appointments', 'notifNewApptTitle'],
     ['question → provider',    'questions',    'notifNewQuestionTitle'],
   ]) {
     const all = await fetchAll(table, sb.from(table)
