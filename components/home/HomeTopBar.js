@@ -4,21 +4,25 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { colors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 
-const LOGO = require('../../assets/logonobg.png')
-
-// Eight offsets at radius R, forming a continuous ring. Four would leave the diagonals
-// thin at the corners of every stroke, which is where a mark like this is busiest.
-const R = 2
-const HALO = [
-  [-R, -R], [0, -R], [R, -R],
-  [-R,  0],          [R,  0],
-  [-R,  R], [0,  R], [R,  R],
-]
+// The wordmark with its keyline BAKED IN — one asset, one Image, identical on both
+// platforms. Generated from assets/logonobg.png by a true disc dilation of its alpha at
+// source resolution (radius 6px on a 552px-tall artwork = 1pt at the 88pt render size),
+// thresholded hard so the edge has no falloff.
+//
+// ─── WHY BAKED AND NOT A RING OF COPIES ─────────────────────────────────────
+// A runtime ring cannot produce a UNIFORM edge. Eight copies at radius r sit at r on the
+// axes and r x sqrt(2) on the diagonals — 41% thicker on the diagonals — and each copy
+// being semi-transparent made the overlaps denser at corners than along straight runs.
+// That unevenness plus the falloff is what read as a soft halo rather than an edge. The
+// baked disc uses 113 offsets and is uniform by construction.
+//
+// It also drops nine Image mounts to one.
+const LOGO = require('../../assets/hero/ada-wordmark-keyline.png')
 
 // The app bar. Two forms, one component.
 //
-//   onHero (default)  — rendered INSIDE the hero photograph: ADA wordmark centred and
-//                       haloed, three white circular buttons top-right.
+//   onHero (default)  — rendered INSIDE the hero photograph: ADA wordmark centred with
+//                       a keyline, three white circular buttons top-right.
 //   searchOpen        — the expanded search field, rendered on the page canvas with the
 //                       hero unmounted, because at that point the results ARE the screen.
 //
@@ -30,30 +34,36 @@ const HALO = [
 // byte-identical to V1's; only the entry point moved.
 //
 // ─── EVERY TOP ELEMENT CARRIES ITS OWN CONTRAST ─────────────────────────────
-// White circles with dark glyphs, and a haloed wordmark — not bare marks on a scrim.
+// White circles with dark glyphs, and a keylined wordmark — not bare marks on a scrim.
 // That is a measurement, not a preference: two of the five hero photographs (Salamis,
 // Kantara) have blown-out sky across the whole top edge, brightest-5% luminance 0.996
 // and 1.000, and no tolerable scrim makes a white mark legible on that. See HomeHero.js.
 //
-// ⚠ THE WORDMARK IS A DARK ASSET AND BARE IT FAILS ON EVERY PHOTO. Measured per-pixel,
-//   compositing the real logo at render size onto each background and scoring each of
-//   its ink pixels against what sits behind it: the share of the mark falling under the
-//   3:1 UI floor is 86.2% on Büyük Han, 83.0% on St. Hilarion, 62.6% on Salamis, 60.8%
-//   on Golden Beach, 49.9% on Kantara and 31.6% on the generic fallback. The intuition
-//   that a dark mark would do well against bright sky is right about the sky and wrong
-//   about the photograph — the logo's footprint also covers a dome, a castle wall and a
-//   headland, and it vanishes into those.
+// ⚠ THE WORDMARK IS A DARK ASSET AND BARE IT FAILS. Measured at the SHIPPED size
+//   (72x88pt) by compositing it onto each background and asking, for every pixel on the
+//   mark's outer boundary, whether that boundary separates from the photo at 3:1. Bare:
+//   89.9% of the boundary fails on Büyük Han, 60.9% on St. Hilarion, 39.0% on Salamis,
+//   34.5% on Golden Beach, 19.8% on the generic fallback, 10.6% on Kantara.
+//
+//   ⚠ MEASURE THE BOUNDARY, NOT THE FILL. An earlier metric scored every ink pixel
+//     against the background behind it, which is meaningless for the interior of an
+//     OPAQUE mark — you cannot see what an opaque pixel covers. It made a thick glow
+//     look better than a thin keyline purely because the glow covered more area.
 //
 //   No light logo variant exists to use instead. assets/adalogo.png is the same mark on
 //   an OPAQUE white background (worse over a photo) and android-icon-monochrome.png is a
-//   solid black silhouette mask for Android themed icons.
+//   minimal abstract chevron — no map, no compass, no wordmark — for Android themed icons.
 //
-//   So it gets the halo — the same idea as components/BackButton.js's HALO_LIGHT, which
-//   is a zero-offset inverse-coloured glow. textShadow only applies to Text, so for an
-//   Image the equivalent is a ring of white-tinted copies of the same asset behind the
-//   real one. tintColor replaces every non-transparent pixel while preserving alpha, so
-//   each copy is a white silhouette of the mark; eight of them at a small radius make a
-//   continuous outline. No background plate, no chip.
+//   So it gets a KEYLINE — a hard, evenly weighted 1pt white edge, baked into the asset
+//   rather than assembled at runtime. It reads as a deliberate outline, the way a badge
+//   or a sticker does, instead of as a glow. No background plate, no chip.
+//
+//   AND IT IS BACKGROUND-INDEPENDENT BY CONSTRUCTION, which is why keylines are the
+//   standard answer here. The mark presents two boundaries: white-against-photo on the
+//   outside and white-against-dark-ink on the inside. The inner step is ~8:1 on every
+//   photograph because both of its colours belong to the mark. So on a light ground the
+//   keyline disappears and the dark ink does the separating; on a dark ground the keyline
+//   does it. Measured at the shipped size: 0.0% boundary failure on all six backgrounds.
 //
 // ─── THE searchRef GOES ON THE ICON, AND THAT IS LOAD-BEARING ───────────────
 // App.js measures searchRef at tutorial time (measureRef → coachSteps) and a ref that
@@ -115,14 +125,6 @@ export default function HomeTopBar({
   return (
     <View style={[s.heroBar, { paddingTop: insets.top + 6 }]} pointerEvents="box-none">
       <View style={[s.logoWrap, { top: insets.top + 6 }]} pointerEvents="none">
-        {HALO.map(([dx, dy]) => (
-          <Image
-            key={`${dx},${dy}`}
-            source={LOGO}
-            style={[s.logo, s.logoHalo, { transform: [{ translateX: dx }, { translateY: dy }] }]}
-            resizeMode="contain"
-          />
-        ))}
         <Image source={LOGO} style={s.logo} resizeMode="contain" />
       </View>
 
@@ -186,9 +188,21 @@ const s = StyleSheet.create({
   // safe-area inset — absoluteFillObject would ignore the bar's own paddingTop and put
   // the logo under the status bar.
   logoWrap:    { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  // Substantially larger than the 96x34 chip version — a focal element, per the draft.
-  logo:        { width: 168, height: 60 },
-  logoHalo:    { position: 'absolute', top: 0, tintColor: 'rgba(255,255,255,0.92)' },
+  // ─── 72x88, AND THE OLD 168x60 WAS A BUG ──────────────────────────────────
+  // The box must match the ASSET's aspect or `contain` letterboxes it. logonobg.png is a
+  // 1024 SQUARE with the artwork inset inside it, so `width: 168, height: 60` was
+  // height-constrained to a 60x60 box and the mark actually drew at 26x32pt — a sixth of
+  // the width the style appeared to ask for.
+  //
+  // That is the mechanical cause of "the halo looks unprofessional": a 2pt ring around a
+  // 26pt-wide mark is 8% of its width. It was never a 2pt keyline on screen; it was a
+  // thick fuzzy border on a small logo.
+  //
+  // The baked asset is cropped to its own bounds (aspect 0.817), so these numbers are its
+  // real proportions and nothing is letterboxed. 88pt tall is sized for the SMALLEST hero
+  // (HERO_MIN 280): status bar and inset take ~50, the district block and the Oli
+  // clearance take ~140, leaving ~90.
+  logo:        { width: 72, height: 88 },
   actions:     { flexDirection: 'row', gap: 8 },
   // White circles with dark glyphs — legible on any photograph without help from a scrim.
   heroAction:  { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.94)',
