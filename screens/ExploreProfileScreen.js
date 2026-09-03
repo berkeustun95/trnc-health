@@ -13,6 +13,7 @@ import { categoryToGroup, GROUP_META, CATEGORY_LABEL_KEY, isClaimableCategory } 
 import { EXPLORE_FEATURED_LIVE } from '../constants/flags'
 import { isFeatured } from '../utils/featured'
 import { resolveAttribution } from '../utils/photoAttribution'
+import PhotoCredit from '../components/PhotoCredit'
 import ContentReportMenu from '../components/ContentReportMenu'
 import BackButton from '../components/BackButton'
 import ComingSoonScreen from '../components/ComingSoonScreen'
@@ -51,70 +52,20 @@ function categoryLabel(category, lang) {
 // Platform names are proper nouns — not translated. 'own' is the one source whose label
 // is a real phrase, so it comes from i18n. An unknown source renders no source line at
 // all rather than the raw slug: "partner" under a photo means nothing to a reader.
-const SOURCE_LABEL = {
-  commons:  'Wikimedia Commons',
-  unsplash: 'Unsplash',
-  pexels:   'Pexels',
-}
-
-// Attribution for the photo currently in view. Defined at module level, NOT inside
-// ExploreProfileScreen — a component re-created on each render remounts its subtree and
-// the link presses land on a stale closure (house rule).
+// PhotoAttribution now delegates its BODY to components/PhotoCredit.js so the Home hero
+// renders the identical credit. What stays here is this screen's own wiring: resolving
+// the attribution for the photo currently in view, and the container that positions it
+// under the gallery.
 //
-// ─── WHY EVERY ROW IS A ROW, AND WHY flexShrink IS LOAD-BEARING ──────────────
-// The credit sits in a flexDirection:'row' container so the licence and source can
-// follow it. In a row, a Text that cannot shrink pushes its siblings off-screen instead
-// of wrapping — which is how PropertyDetailScreen's contact bar clipped at
-// "Hüseyin Kamb…", roughly the SHORTEST plausible Turkish name. Turkish photographer
-// names are long ("Hüseyin Kambüroğlu"), so flexShrink:1 + no numberOfLines is what
-// makes them wrap onto a second line rather than truncate. Do not add numberOfLines
-// here: a truncated credit is a broken attribution, not a cosmetic problem.
+// Defined at module level, NOT inside ExploreProfileScreen — a component re-created on
+// each render remounts its subtree and the link presses land on a stale closure
+// (house rule).
+//
+// The layout notes that used to live here moved with the markup, into PhotoCredit.js.
 function PhotoAttribution({ place, url, index, lang }) {
   const a = resolveAttribution(place, url, index)
   if (!a) return null   // legacy row with nothing to say — render nothing, never a blank line
-
-  const sourceLabel = a.source === 'own' ? t('photoSourceOwn', lang) : SOURCE_LABEL[a.source]
-  const hasMeta     = !!a.license || !!sourceLabel
-
-  return (
-    <View style={s.creditWrap}>
-      {!!a.credit && (
-        <View style={s.creditRow}>
-          <Text style={s.photoCredit}>
-            {t('photoCreditPrefix', lang)}: {a.credit}
-          </Text>
-        </View>
-      )}
-
-      {hasMeta && (
-        <View style={s.creditMetaRow}>
-          {!!a.license && (a.licenseUrl ? (
-            <Text
-              style={[s.photoCreditMeta, s.creditLink]}
-              accessibilityRole="link"
-              accessibilityLabel={t('photoLicenseA11y', lang)}
-              onPress={() => Linking.openURL(a.licenseUrl)}
-            >{a.license}</Text>
-          ) : (
-            <Text style={s.photoCreditMeta}>{a.license}</Text>
-          ))}
-
-          {!!a.license && !!sourceLabel && <Text style={s.creditDot}>·</Text>}
-
-          {!!sourceLabel && (a.sourceUrl ? (
-            <Text
-              style={[s.photoCreditMeta, s.creditLink]}
-              accessibilityRole="link"
-              accessibilityLabel={t('photoSourceA11y', lang)}
-              onPress={() => Linking.openURL(a.sourceUrl)}
-            >{sourceLabel}</Text>
-          ) : (
-            <Text style={s.photoCreditMeta}>{sourceLabel}</Text>
-          ))}
-        </View>
-      )}
-    </View>
-  )
+  return <PhotoCredit a={a} lang={lang} style={s.creditWrap} />
 }
 
 export default function ExploreProfileScreen({ place, lang, session, onBack, onRequireAccount, isFavorite, onToggleFavorite }) {
@@ -411,19 +362,10 @@ const s = StyleSheet.create({
   // Gallery
   galleryImg:         { width: W, height: GALLERY_H },
 
-  // Attribution block. creditRow/creditMetaRow are ROWS so the licence and source can
-  // sit beside each other; flexShrink:1 on the text is what makes a long Turkish
-  // photographer name WRAP instead of shoving the rest off-screen. See the note on
-  // PhotoAttribution — no numberOfLines anywhere in here, deliberately.
+  // The credit's POSITION on this page. Everything about how a credit is composed —
+  // the rows, the flexShrink that wraps long photographer names, the no-numberOfLines
+  // rule — moved to components/PhotoCredit.js with the markup.
   creditWrap:         { paddingHorizontal: 16, paddingTop: 8, gap: 2 },
-  creditRow:          { flexDirection: 'row' },
-  creditMetaRow:      { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  photoCredit:        { flexShrink: 1, fontSize: 11, fontFamily: 'Inter_400Regular',
-                        color: colors.textSecondary },
-  photoCreditMeta:    { flexShrink: 1, fontSize: 11, fontFamily: 'Inter_400Regular',
-                        color: colors.textSecondary },
-  creditLink:         { color: colors.primary, textDecorationLine: 'underline' },
-  creditDot:          { fontSize: 11, color: colors.textSecondary },
   galleryPlaceholder: { width: W, height: GALLERY_H, alignItems: 'center', justifyContent: 'center' },
   galleryEmoji:       { fontSize: 80 },
   dotRow:             { flexDirection: 'row', justifyContent: 'center', gap: 6,

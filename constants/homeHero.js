@@ -1,86 +1,191 @@
-// Home hero — the district photo, and the Explore place it opens.
+// Home hero — the district photo, the Explore place it opens, and the photo's provenance.
 //
-// ─── WHY BUNDLED ASSETS AND NOT places.cover_image_url ──────────────────────
+// ─── WIKIMEDIA COMMONS, WITH AN ATTRIBUTION UI ──────────────────────────────
 //
-// The obvious source is the place's own cover photo, and it is the wrong one. Those
-// images are Wikimedia-seeded and carry attribution obligations that ExploreProfileScreen
-// honours with a visible credit line and a source link (utils/photoAttribution.js). The
-// hero has no attribution UI and cannot grow one without becoming a different design —
-// a photo credit over a district name is not a hero, it is a caption. So the hero shows
-// only images ADA owns or has licensed outright, bundled with the app.
+// The first version of this file used bundled ADA-owned images precisely BECAUSE the
+// hero had no way to render a credit. That constraint is gone: the hero now carries an
+// ℹ︎ chip opening a sheet, built on the same components/PhotoCredit.js that
+// ExploreProfileScreen renders, so a licensed third-party photo can be shown correctly.
 //
-// The side benefit is that it works offline and paints on the first frame: no request,
-// no skeleton, no layout shift. That is a consequence of the licensing decision, not the
-// reason for it.
+// Sourcing rules these five images were selected under:
+//   • Public domain, CC0 or CC BY only. NO share-alike — a CC BY-SA hero would put a
+//     copyleft obligation on the surrounding work, which is not a trade to make for
+//     decoration. Also no NC and no ND.
+//   • Verified to depict the TRNC, not the Republic of Cyprus. Ambiguous means REJECTED,
+//     not guessed. This is not hypothetical: a licence-clean search for "Lefke" returns
+//     a Greek FERRY named Lefka Ori and a mountain range in Crete, both of which would
+//     have sailed through an automated filter.
+//   • Verified to depict the PLACE THE HERO OPENS, not merely the district. A photo
+//     taken FROM Saint Hilarion looking at the Kyrenia coast is a fine picture and the
+//     wrong one: the tap opens a castle the user cannot see in the image.
 //
-// ─── THE TWO CONDITIONS ARE SEPARATE, AND BOTH ARE HERE ─────────────────────
+// ─── THE PROVENANCE IS DATA, AND IT IS PART OF THE PHOTO ────────────────────
 //
-//   asset   — null means we have no licensed photo for this district yet, so the hero
-//             falls back to the generic ADA image.
-//   placeId — the Explore place the hero deep-links to.
+// Each entry carries the credit as fields, not as a pre-formatted string, so the sheet
+// renders it through the same code path as every other attributed photo in the app.
 //
-// The product rule is that a GENERIC hero is never tappable: an ADA-branded gradient
-// that silently opens a monument the user cannot see in it is a mis-tap generator, not
-// a shortcut. resolveHero() below derives tappability from the pair rather than letting
-// a caller decide, so the rule cannot be half-applied at one call site.
+// ⚠ INCOMPLETE PROVENANCE IS TREATED AS NO PHOTO. A district whose entry has an asset
+//   but is missing an author, a licence name, a licence URL or a source page falls back
+//   to the generic hero and becomes non-tappable — see resolveHero(). That is the whole
+//   point of the rule: the failure mode it prevents is publishing somebody's photograph
+//   with the attribution silently missing, which is a licence breach that looks exactly
+//   like a working screen. Making it fail CLOSED costs one district's hero; making it
+//   fail open costs a licence.
 //
-// ⚠ ADDING A DISTRICT PHOTO IS ONE LINE. Drop the file in assets/hero/ and replace the
-//   null with a require(). Nothing else changes — the hero becomes a real photo and
-//   becomes tappable in the same edit, because those are the same condition.
+// ─── PROVENANCE READ FROM THE COMMONS API, NOT FROM A PAGE ──────────────────
 //
-// ─── THE placeIds ARE REAL AND WERE READ FROM THE DATABASE ──────────────────
+// Every field below came from `action=query&prop=imageinfo&iiprop=extmetadata` on
+// commons.wikimedia.org on 2026-09-03 — the structured record, not a scrape. Coordinates
+// on the file were checked against a TRNC bounding box where present, and the file's
+// categories were read where they were not.
 //
-// Queried 2026-09-03 against public.places as anon (status='active', which is exactly
-// what the client can see), one row per region, chosen as the district's most
-// recognisable destination. All seven regions have at least one active place, so no
-// region is structurally photo-less — a NULL asset here is a missing photo, never a
-// missing place. A placeId that stops resolving is a graceful no-op, not a crash:
-// HomeScreen's lookup is .eq('status','active').maybeSingle(), which returns
-// {data: null, error: null} on zero rows.
+// ─── TWO DISTRICTS HAVE NO PHOTO, DELIBERATELY ──────────────────────────────
+//
+//   morphou — no licence-clean photograph of St. Mamas Church could be found.
+//   lefke   — the only licence-clean images of its places (Soli, Vouni) are 1920s
+//             Swedish Cyprus Expedition excavation photographs. Genuine, correctly
+//             licensed, and wrong for a hero next to today's temperature.
+//
+// They render the generic and are not tappable. That is the designed behaviour, not a
+// gap: the alternative was a share-alike image or a guess about what a photo depicts.
 
 import { REGIONS } from './regions'
 
+// Licences accepted here. A licence not on this list fails the completeness check even
+// if every other field is present — an unrecognised licence string is exactly the
+// ambiguity the sourcing rules say to reject rather than resolve by guessing.
+const ALLOWED_LICENCES = new Set([
+  'CC0', 'Public domain', 'CC BY 2.0', 'CC BY 3.0', 'CC BY 4.0',
+])
+
 export const HOME_HERO = {
-  nicosia:   { placeId: '1100ad4c-a412-4528-b96d-c2543fd23b25', asset: null },  // Büyük Han
-  kyrenia:   { placeId: '7ecf2c84-2192-45c9-b075-a2ce115f842c', asset: null },  // Kyrenia Castle
-  famagusta: { placeId: '9abee5c9-0d44-4a34-abef-04e3260151d1', asset: null },  // Othello Castle
-  morphou:   { placeId: '9f14da0c-e9a2-4489-81e2-20973b662942', asset: null },  // St. Mamas Church
-  iskele:    { placeId: '88def13a-3ee3-4c3b-bb7b-56bf15f27f33', asset: null },  // Kantara Castle
-  lefke:     { placeId: '328fad9c-9da7-4273-a638-1682de89da39', asset: null },  // Soli Ruins
-  karpaz:    { placeId: '2392247c-9cd3-446a-8eeb-588fdd9ea50a', asset: null },  // Apostolos Andreas
+  nicosia: {
+    placeId: '1100ad4c-a412-4528-b96d-c2543fd23b25',   // Büyük Han (Great Inn)
+    asset:   require('../assets/hero/hero-nicosia.jpg'),
+    credit: {
+      author:     'ToprakM',
+      license:    'CC BY 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/4.0',
+      sourceUrl:  'https://commons.wikimedia.org/wiki/File:B%C3%BCy%C3%BCk_Han_(Great_Inn)_at_North_Nicosia.jpg',
+      source:     'commons',
+    },
+  },
+  kyrenia: {
+    placeId: 'd773e658-95ac-48ba-ae53-5936374a976f',   // St. Hilarion Castle
+    asset:   require('../assets/hero/hero-kyrenia.jpg'),
+    credit: {
+      // CC0 waives the attribution REQUIREMENT. Credited anyway: the sheet exists, the
+      // author is known, and dropping a name because the licence does not compel it is
+      // a choice nobody would defend out loud.
+      author:     'Chris06',
+      license:    'CC0',
+      licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+      sourceUrl:  'https://commons.wikimedia.org/wiki/File:Saint_Hilarion_Castle_(01).JPG',
+      source:     'commons',
+    },
+  },
+  famagusta: {
+    placeId: '28f69a7c-48f1-4a51-b84e-37beda5e29b8',   // Salamis Ancient City
+    asset:   require('../assets/hero/hero-famagusta.jpg'),
+    credit: {
+      author:     'George Groutas',
+      license:    'CC BY 2.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/2.0/',
+      sourceUrl:  'https://commons.wikimedia.org/wiki/File:Salamis_Ruins,_Cyprus.jpg',
+      source:     'commons',
+    },
+  },
+  iskele: {
+    placeId: '88def13a-3ee3-4c3b-bb7b-56bf15f27f33',   // Kantara Castle
+    asset:   require('../assets/hero/hero-iskele.jpg'),
+    credit: {
+      author:     'George Groutas',
+      license:    'CC BY 2.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/2.0/',
+      sourceUrl:  'https://commons.wikimedia.org/wiki/File:Castle_of_Kantara.jpg',
+      source:     'commons',
+    },
+  },
+  karpaz: {
+    placeId: '95b6d924-e3c0-40e4-a2bd-b55ca1a105ef',   // Golden Beach (Altın Kumsal)
+    asset:   require('../assets/hero/hero-karpaz.jpg'),
+    credit: {
+      // "Golden Beach" is a name a hundred beaches share. This file's own coordinates
+      // (35.640, 34.537) sit on the Karpaz peninsula and its category is
+      // "Golden Beach, Northern Cyprus" — that pair is what resolved the ambiguity.
+      author:     'Александр Чудновский',
+      license:    'CC BY 3.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/3.0/',
+      sourceUrl:  'https://commons.wikimedia.org/wiki/File:Golden_Beach_-_panoramio_(7).jpg',
+      source:     'commons',
+    },
+  },
+
+  // No licence-clean, unambiguous photograph found. See the note above — these are
+  // decided absences, not missing rows.
+  morphou: { placeId: '9f14da0c-e9a2-4489-81e2-20973b662942', asset: null, credit: null },
+  lefke:   { placeId: '328fad9c-9da7-4273-a638-1682de89da39', asset: null, credit: null },
 }
 
 // The fallback image. auth-bg.png is already the Home background and already ships in
 // every bundle, so a district with no photo costs zero additional bytes.
 export const HERO_GENERIC = require('../assets/auth-bg.png')
 
-// Resolve a region slug to everything the hero needs. An unknown or null slug — a guest
-// with location denied and no profile.region — lands on the generic, which is the same
-// state as a known district with no photo yet. One code path, not two.
+const filled = v => typeof v === 'string' && v.trim().length > 0
+
+// Is this credit complete enough to publish the photo it belongs to?
+// Exported so a guard script can ask the same question this module asks.
+export function creditIsComplete(c) {
+  return !!c
+    && filled(c.author)
+    && filled(c.license)
+    && filled(c.licenseUrl)
+    && filled(c.sourceUrl)
+    && ALLOWED_LICENCES.has(c.license.trim())
+}
+
+// Resolve a region slug to everything the hero needs.
+//
+// An unknown or null slug — a guest with location denied and no profile.region — lands
+// on the generic, which is the same state as a district with no photo. One code path.
 export function resolveHero(region) {
   const entry = region && HOME_HERO[region]
-  const hasPhoto = !!entry?.asset
+  // ALL THREE, together: an asset, a place to open, and provenance good enough to
+  // display. Any one missing and the district is generic and inert.
+  const usable = !!entry?.asset && !!entry?.placeId && creditIsComplete(entry.credit)
+
   return {
-    source:   hasPhoto ? entry.asset : HERO_GENERIC,
-    isGeneric: !hasPhoto,
-    // Tappable ONLY when a real district photo is on screen AND it maps to a place.
-    // Both halves, deliberately: see the note above.
-    placeId:  hasPhoto ? entry.placeId : null,
+    source:    usable ? entry.asset : HERO_GENERIC,
+    isGeneric: !usable,
+    placeId:   usable ? entry.placeId : null,
+    // Shaped for components/PhotoCredit.js, which expects the same field names
+    // resolveAttribution() produces for a place row. One renderer, one shape.
+    credit: usable ? {
+      credit:     entry.credit.author,
+      license:    entry.credit.license,
+      licenseUrl: entry.credit.licenseUrl,
+      sourceUrl:  entry.credit.sourceUrl,
+      source:     entry.credit.source ?? 'commons',
+    } : null,
   }
 }
 
 // Every canonical region should have an entry, or a district silently loses its hero the
 // day somebody adds an eighth slug to regions.js.
 //
-// ⚠ A WARNING AND NOT A THROW, DELIBERATELY. The first draft threw at import time, which
-//   would have turned one developer's editing mistake into an app that will not START
-//   for anybody — and for nothing, because resolveHero() above ALREADY degrades a missing
-//   or unknown region to the generic hero correctly. The throw guarded a case the code
-//   handles, at the price of a launch crash. __DEV__ puts the message where the mistake
-//   is made and nowhere near a user.
+// ⚠ A WARNING AND NOT A THROW, DELIBERATELY. An earlier draft threw at import time, which
+//   would have turned one developer's editing mistake into an app that will not START —
+//   and for nothing, because resolveHero() above already degrades a missing or unknown
+//   region to the generic hero correctly. __DEV__ puts the message where the mistake is
+//   made and nowhere near a user.
 if (__DEV__) {
   const missing = REGIONS.filter(r => !HOME_HERO[r])
   if (missing.length) {
     console.warn(`homeHero.js: no entry for region(s) ${missing.join(', ')} — those districts fall back to the generic hero`)
+  }
+  for (const [r, e] of Object.entries(HOME_HERO)) {
+    if (e.asset && !creditIsComplete(e.credit)) {
+      console.warn(`homeHero.js: '${r}' has a photo but incomplete/unaccepted provenance — it will render the GENERIC hero rather than publish an unattributed image`)
+    }
   }
 }

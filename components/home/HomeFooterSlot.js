@@ -24,9 +24,15 @@ export default function HomeFooterSlot() {
 }
 
 const s = StyleSheet.create({
-  // Transparent, not a tinted box. A visible empty grey rectangle at the bottom of Home
-  // reads as a failed image load, and shipping one behind a flag that is already on for
-  // everyone (this component is not gated — only the V2 hub that renders it is) would be
-  // a visible defect in exchange for nothing. It reserves the space and shows nothing.
-  slot: { height: 60 },
+  // ZERO HEIGHT. The first version reserved 60pt so that "the page does not suddenly grow
+  // when something fills it" — which was the wrong trade twice over. There is no ad SDK
+  // and no date for one, so that reasoning bought a layout shift we may never take in
+  // exchange for months of dead space at the bottom of Home, every session, for every
+  // user. And it would not even have worked: a real ad unit sizes itself, so it shifts
+  // the layout whenever it arrives regardless of what was reserved for it.
+  //
+  // What this component is FOR, then, is the position and the note above it — the slot's
+  // place in the layout, findable by name, with the compliance constraint written where
+  // whoever fills it will read it.
+  slot: { height: 0 },
 })

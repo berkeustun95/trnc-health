@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../constants/regions'
 import { resolveHero } from '../../constants/homeHero'
+import HeroCreditSheet from './HeroCreditSheet'
 import { weatherIcon } from '../../utils/facilityUtils'
 
 // Half-height district hero. Photo + district name + current temperature.
@@ -27,7 +29,8 @@ export const HERO_HEIGHT = 176
 const SCRIM_BANDS = [0.04, 0.13, 0.22, 0.34, 0.50, 0.68]
 
 export default function HomeHero({ region, weatherData, lang, onOpenPlace, onOpenWeather }) {
-  const { source, isGeneric, placeId } = resolveHero(region)
+  const { source, placeId, credit } = resolveHero(region)
+  const [creditOpen, setCreditOpen] = useState(false)
 
   // The district name falls back to a country-level label rather than to an empty
   // string: a hero with a blank title reads as a failed load. A guest with location
@@ -93,21 +96,51 @@ export default function HomeHero({ region, weatherData, lang, onOpenPlace, onOpe
           </View>
         )}
       </View>
+
+      {/* ℹ︎ — rendered from `credit`, the SAME value that decides whether a licensed
+          photo is on screen at all. Not from a separate condition: two conditions is
+          how a photo ends up displayed with its route to the attribution missing, and
+          that is a licence breach that looks like a working screen. */}
+      {!!credit && (
+        <TouchableOpacity
+          style={s.infoChip}
+          onPress={() => setCreditOpen(true)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('heroCreditTitle', lang)}
+        >
+          <Ionicons name="information" size={13} color="#fff" />
+        </TouchableOpacity>
+      )}
     </View>
   )
 
-  if (!tappable) return <View style={s.card}>{body}</View>
+  // The sheet is a SIBLING of the card, never a child of the tappable wrapper: nested
+  // inside it, a press anywhere on the sheet would also fire the hero's deep-link.
+  const sheet = (
+    <HeroCreditSheet
+      visible={creditOpen}
+      credit={credit}
+      lang={lang}
+      onClose={() => setCreditOpen(false)}
+    />
+  )
+
+  if (!tappable) return <>{<View style={s.card}>{body}</View>}{sheet}</>
 
   return (
-    <TouchableOpacity
-      style={s.card}
-      onPress={() => onOpenPlace?.(placeId)}
-      activeOpacity={0.9}
-      accessibilityRole="button"
-      accessibilityLabel={title}
-    >
-      {body}
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity
+        style={s.card}
+        onPress={() => onOpenPlace?.(placeId)}
+        activeOpacity={0.9}
+        accessibilityRole="button"
+        accessibilityLabel={title}
+      >
+        {body}
+      </TouchableOpacity>
+      {sheet}
+    </>
   )
 }
 
@@ -123,4 +156,7 @@ const s = StyleSheet.create({
   tempEmoji: { fontSize: 14 },
   tempText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   openChip:  { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
+  // Top-right. The bottom of the hero belongs to the district name, the temperature and
+  // the open chip; the top-right is the only corner with nothing in it.
+  infoChip:  { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'center', alignItems: 'center' },
 })

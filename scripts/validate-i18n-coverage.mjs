@@ -127,6 +127,11 @@ const SURFACES = [
   'components/home/OliRow.js',
   'components/home/DutyRow.js',
   'components/home/ModuleGrid.js',
+  // Added with the hero attribution UI. PhotoCredit.js is shared with
+  // ExploreProfileScreen (already in this list) — adding it here guards the credit
+  // strings from BOTH surfaces at once, which is the point of there being one renderer.
+  'components/home/HeroCreditSheet.js',
+  'components/PhotoCredit.js',
   'constants/homeModules.js',
 ]
 
