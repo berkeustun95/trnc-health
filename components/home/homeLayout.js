@@ -16,9 +16,23 @@
 // How far the Oli CARD is pulled up over the hero's bottom edge.
 export const HERO_OVERLAP = 22
 
-// How far the mascot rises ABOVE the card's top edge. He is a cut-out sitting ON the
+// How far the mascot rises ABOVE the card's top edge. He is a cut-out standing ON the
 // banner, so he breaks its top line; this is that overhang.
-export const OLI_OVERHANG = 26
+//
+// ⚠ DERIVED FROM HIS SIZE, NOT CHOSEN. His artwork's BOTTOM has always been pinned to
+//   the card's bottom edge, so the overhang is simply (artwork height - card height).
+//   Round 6 raised MASCOT_BOX 132 -> 158, which is what moved this 26 -> 48. If the box
+//   changes again this number must be recomputed from OliRow's arithmetic, not nudged.
+export const OLI_OVERHANG = 48
+
+// Height of the keylined wordmark on the hero.
+//
+// ⚠ TWO HALVES OF ONE NUMBER. The keyline is BAKED into the asset at a radius chosen for
+//   this exact render height (see assets/hero/ada-wordmark-keyline.json). Change this
+//   without re-baking and the keyline is no longer 1pt on screen — thicker if the render
+//   shrinks, thinner if it grows. `npm run logo:check` fails when the two disagree; that
+//   guard exists because this is the class of bug that cost rounds 3 to 5.
+export const HERO_LOGO_H = 72
 
 // Breathing room between the hero's lowest content and the highest thing Oli occupies.
 //

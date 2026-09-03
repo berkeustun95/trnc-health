@@ -3,10 +3,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { colors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
+import { HERO_LOGO_H } from './homeLayout'
 
 // The wordmark with its keyline BAKED IN — one asset, one Image, identical on both
 // platforms. Generated from assets/logonobg.png by a true disc dilation of its alpha at
-// source resolution (radius 6px on a 552px-tall artwork = 1pt at the 88pt render size),
+// source resolution (radius 8px on a 566px-tall artwork = 1pt at the 72pt render size),
 // thresholded hard so the edge has no falloff.
 //
 // ─── WHY BAKED AND NOT A RING OF COPIES ─────────────────────────────────────
@@ -14,7 +15,7 @@ import { t } from '../../constants/i18n'
 // axes and r x sqrt(2) on the diagonals — 41% thicker on the diagonals — and each copy
 // being semi-transparent made the overlaps denser at corners than along straight runs.
 // That unevenness plus the falloff is what read as a soft halo rather than an edge. The
-// baked disc uses 113 offsets and is uniform by construction.
+// baked disc uses 197 offsets and is uniform by construction.
 //
 // It also drops nine Image mounts to one.
 const LOGO = require('../../assets/hero/ada-wordmark-keyline.png')
@@ -40,7 +41,7 @@ const LOGO = require('../../assets/hero/ada-wordmark-keyline.png')
 // and 1.000, and no tolerable scrim makes a white mark legible on that. See HomeHero.js.
 //
 // ⚠ THE WORDMARK IS A DARK ASSET AND BARE IT FAILS. Measured at the SHIPPED size
-//   (72x88pt) by compositing it onto each background and asking, for every pixel on the
+//   (59x72pt) by compositing it onto each background and asking, for every pixel on the
 //   mark's outer boundary, whether that boundary separates from the photo at 3:1. Bare:
 //   89.9% of the boundary fails on Büyük Han, 60.9% on St. Hilarion, 39.0% on Salamis,
 //   34.5% on Golden Beach, 19.8% on the generic fallback, 10.6% on Kantara.
@@ -188,21 +189,20 @@ const s = StyleSheet.create({
   // safe-area inset — absoluteFillObject would ignore the bar's own paddingTop and put
   // the logo under the status bar.
   logoWrap:    { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  // ─── 72x88, AND THE OLD 168x60 WAS A BUG ──────────────────────────────────
-  // The box must match the ASSET's aspect or `contain` letterboxes it. logonobg.png is a
-  // 1024 SQUARE with the artwork inset inside it, so `width: 168, height: 60` was
-  // height-constrained to a 60x60 box and the mark actually drew at 26x32pt — a sixth of
-  // the width the style appeared to ask for.
+  // ─── 59x72, AND THE OLD 168x60 WAS A BUG ──────────────────────────────────
+  // The box must match the ASSET's aspect or `contain` letterboxes it — and it does not
+  // stretch the mark, it SHRINKS it inside the box, silently. logonobg.png is a 1024
+  // SQUARE with the artwork inset, so `width: 168, height: 60` was height-constrained to
+  // a 60x60 box and the mark drew at 26x32pt. A 2pt ring around that is 8% of its width,
+  // which is the whole of "the halo looks improvised".
   //
-  // That is the mechanical cause of "the halo looks unprofessional": a 2pt ring around a
-  // 26pt-wide mark is 8% of its width. It was never a 2pt keyline on screen; it was a
-  // thick fuzzy border on a small logo.
+  // The baked asset is cropped to its own bounds (aspect 0.818), so these are its real
+  // proportions and nothing is letterboxed. `npm run logo:check` asserts the width still
+  // matches that aspect at HERO_LOGO_H, and that the asset was baked FOR this height.
   //
-  // The baked asset is cropped to its own bounds (aspect 0.817), so these numbers are its
-  // real proportions and nothing is letterboxed. 88pt tall is sized for the SMALLEST hero
-  // (HERO_MIN 280): status bar and inset take ~50, the district block and the Oli
-  // clearance take ~140, leaving ~90.
-  logo:        { width: 72, height: 88 },
+  // height comes from the shared constant, never a literal — a literal satisfies every
+  // other check in that guard and then drifts.
+  logo:        { width: 59, height: HERO_LOGO_H },
   actions:     { flexDirection: 'row', gap: 8 },
   // White circles with dark glyphs — legible on any photograph without help from a scrim.
   heroAction:  { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.94)',

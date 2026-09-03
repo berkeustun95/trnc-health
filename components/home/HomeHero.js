@@ -55,10 +55,61 @@ const HERO_MAX = 400
 // Golden Beach at 5.29:1, clear of AA. Measured across all five images, not the one that
 // happened to be on screen.
 //
-// If either ramp is retuned, re-measure against all five. The numbers above are the
-// output of a script, not a recollection.
-const TOP_BANDS    = [0.28, 0.21, 0.14, 0.08, 0.03]
-const BOTTOM_BANDS = [0.05, 0.14, 0.24, 0.36, 0.50, 0.66]
+// If either ramp is retuned, re-measure against all five AND re-solve the deltas. The
+// numbers above are the output of a script, not a recollection.
+// ─── The ramps are GENERATED, not typed ─────────────────────────────────────
+//
+// A ramp is RAMP_STEPS layers, all anchored at their own edge, layer k spanning
+// (k+1)/RAMP_STEPS of the ramp height. They stack, so their alphas multiply and the
+// visible result is the cumulative curve below.
+//
+// ⚠ STACKED, NOT TILED — that is a bug fix. The first version laid each band in its own
+//   slot with `height: bandH + 1`. The +1 made consecutive bands OVERLAP by a point, and
+//   two semi-transparent blacks over the same point composite darker than either, so
+//   every boundary drew a dark hairline — five of them across the hero. Dropping the +1
+//   would only trade a dark seam for a bright one at sub-pixel positions. Anchoring every
+//   layer at the edge removes the question: the only edge in the stack is the TOP of each
+//   layer, which is exactly where the ramp is meant to step.
+//
+// ⚠ AND THE BOTTOM RAMP USED TO BE UPSIDE DOWN. Both arrays were indexed by distance from
+//   their own edge; the top one was written darkest-first and was right, the bottom one
+//   lightest-first, which put alpha 0.05 on the bottom edge and 0.66 about 150pt above it.
+//   The bottom ramp got LIGHTER toward the bottom — the opposite of a scrim. Round 3's
+//   check did not catch it because it assumed the strongest band covered the bottom strip
+//   and computed against 0.66 there: the code and the check disagreed and only the check
+//   was read.
+//
+// RAMP_STEPS is 14 because at 6 the steps were visible as banding across flat sky, which
+// is exactly where a hero photograph is smoothest and least able to hide them.
+//
+// The exponent 1.5 is not decorative: it reproduces the hand-tuned profile those six
+// values described (0.66 0.50 0.36 0.24 0.14 0.05 at sixths) to within 0.005, so the
+// curve is the same shape sampled finer rather than a new one.
+const RAMP_STEPS  = 14
+const TOP_MAX     = 0.28
+const BOTTOM_MAX  = 0.66
+const RAMP_EXP    = 1.5
+
+// Cumulative alpha this ramp should show at normalised distance u from its edge.
+export function rampAlphaAt(max, u) {
+  return u >= 1 ? 0 : max * Math.pow(1 - u, RAMP_EXP)
+}
+
+// Per-layer alphas whose PRODUCT reproduces that curve. Solved outward-in: each layer
+// only has to supply what the layers beyond it have not.
+function rampLayers(max) {
+  const d = new Array(RAMP_STEPS)
+  for (let i = RAMP_STEPS - 1; i >= 0; i--) {
+    let below = 1
+    for (let k = i + 1; k < RAMP_STEPS; k++) below *= (1 - d[k])
+    d[i] = 1 - (1 - rampAlphaAt(max, i / RAMP_STEPS)) / below
+  }
+  return d
+}
+
+const TOP_LAYERS    = rampLayers(TOP_MAX)
+const BOTTOM_LAYERS = rampLayers(BOTTOM_MAX)
+
 
 export default function HomeHero({
   region, weatherData, lang, onOpenPlace, onOpenWeather, topControls,
@@ -91,19 +142,19 @@ export default function HomeHero({
     <View style={s.fill}>
       <Image source={source} style={s.photo} resizeMode="cover" fadeDuration={0} />
 
-      {TOP_BANDS.map((a, i) => (
-        <View key={`t${a}`} pointerEvents="none" style={[s.band, {
+      {TOP_LAYERS.map((a, i) => (
+        <View key={`t${i}`} pointerEvents="none" style={[s.band, {
           backgroundColor: `rgba(0,0,0,${a})`,
-          top: (topRampH / TOP_BANDS.length) * i,
-          height: topRampH / TOP_BANDS.length + 1,
+          top: 0,
+          height: (topRampH / RAMP_STEPS) * (i + 1),
         }]} />
       ))}
 
-      {BOTTOM_BANDS.map((a, i) => (
-        <View key={`b${a}`} pointerEvents="none" style={[s.band, {
+      {BOTTOM_LAYERS.map((a, i) => (
+        <View key={`b${i}`} pointerEvents="none" style={[s.band, {
           backgroundColor: `rgba(0,0,0,${a})`,
-          bottom: (bottomRampH / BOTTOM_BANDS.length) * i,
-          height: bottomRampH / BOTTOM_BANDS.length + 1,
+          bottom: 0,
+          height: (bottomRampH / RAMP_STEPS) * (i + 1),
         }]} />
       ))}
 
@@ -113,27 +164,35 @@ export default function HomeHero({
       {topControls}
 
       <View style={[s.content, { paddingBottom: HERO_CONTENT_BOTTOM }]} pointerEvents="box-none">
-        <View style={s.textCol} pointerEvents="box-none">
+        {/* ─── ONE LINE: pin · district · dot · sun · temperature ───────────
+            Was a 28pt district title stacked over a separate temperature pill — about
+            71pt of stacked chrome. This is a single 32pt row.
+
+            Only the TEMPERATURE half is tappable; the district name is not, so a tap
+            there falls through to the hero's own deep-link. Two touch targets inside one
+            pill, not one target doing two jobs. */}
+        <View style={s.chipCol} pointerEvents="box-none">
+        <View style={s.chip} pointerEvents="box-none">
+          <Ionicons name="location" size={13} color="#fff" />
           <Text style={s.district} numberOfLines={1}>{title}</Text>
 
           {temp != null && (
-            // A separate target INSIDE the hero. The weather detail is the old weather
-            // card's expanded state — UV, sunscreen warning, four-day forecast — which
-            // the V2 anatomy has no row for. Attaching it to the temperature keeps every
-            // one of those values reachable rather than quietly dropping them.
-            <TouchableOpacity
-              style={s.tempPill}
-              onPress={onOpenWeather}
-              activeOpacity={0.75}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel={t('homeWeatherTitle', lang)}
-            >
-              <Text style={s.tempEmoji}>{weatherIcon(code)}</Text>
-              <Text style={s.tempText}>{Math.round(temp)}°C</Text>
-              <Ionicons name="chevron-forward" size={12} color="#fff" />
-            </TouchableOpacity>
+            <>
+              <Text style={s.chipDot}>·</Text>
+              <TouchableOpacity
+                style={s.tempHit}
+                onPress={onOpenWeather}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('homeWeatherTitle', lang)}
+              >
+                <Text style={s.tempEmoji}>{weatherIcon(code)}</Text>
+                <Text style={s.tempText}>{Math.round(temp)}°C</Text>
+              </TouchableOpacity>
+            </>
           )}
+        </View>
         </View>
 
         {/* Bottom-right COLUMN, not two absolutely-placed chips. Stacking them means
@@ -202,11 +261,35 @@ const s = StyleSheet.create({
   photo:     { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   band:      { position: 'absolute', left: 0, right: 0 },
   content:   { flex: 1, justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', padding: 20, gap: 12 },
-  textCol:   { flex: 1 },
-  district:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: '#fff' },
-  tempPill:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.20)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 6 },
-  tempEmoji: { fontSize: 14 },
-  tempText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+  // A single pill, deliberately shallow: paddingVertical 6 against the old stack's ~71pt.
+  // alignSelf flex-start so it hugs its content instead of stretching across the hero.
+  // flex:1 so the bottom-right column stays pinned right; the chip itself hugs its
+  // content via alignSelf.
+  chipCol:   { flex: 1 },
+  // ⚠ THE BACKDROP IS 0.68 BECAUSE IT HAS TO CARRY THE CONTRAST ITSELF, and that is
+  //   measured. Shrinking this row also moved it UP — it now sits ~106pt above the hero's
+  //   bottom, where the bottom ramp is only 0.24, not the 0.66 it reaches at the edge. At
+  //   the original 0.28 the district name was 2.45:1 on the generic fallback.
+  //
+  //   Solved against the ramp curve at the chip's OWN height — 0.114 at its top edge,
+  //   the weakest point the text sits on — not against a band index. 0.74 gives
+  //   auth-bg 5.03:1, Golden Beach 5.44:1, Salamis 7.15:1, the rest 9.5:1 and up.
+  //   0.68 was the answer against the coarse 6-band version and would be 4.27:1 here;
+  //   finer sampling made the scrim weaker exactly where this sits.
+  //
+  //   Same principle as the white action buttons and the wordmark's keyline: on a hero
+  //   that shows six different photographs, every element carries its own contrast rather
+  //   than borrowing it from a scrim.
+  chip:      { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+               backgroundColor: 'rgba(0,0,0,0.74)', borderRadius: 18,
+               paddingHorizontal: 12, paddingVertical: 6 },
+  // 17pt bold, down from 28pt. Still the loudest thing in the row, and still white on
+  // the bottom ramp — the measured figures are in the round-6 log.
+  district:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: '#fff', flexShrink: 1 },
+  chipDot:   { fontSize: 13, color: 'rgba(255,255,255,0.65)' },
+  tempHit:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  tempEmoji: { fontSize: 13 },
+  tempText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
   rightCol:  { alignItems: 'center', gap: 10 },
   openChip:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
   infoChip:  { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'center', alignItems: 'center' },

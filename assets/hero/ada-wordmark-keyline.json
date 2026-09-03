@@ -1,0 +1,16 @@
+{
+  "source": "assets/logonobg.png",
+  "artworkPx": [
+    449,
+    552
+  ],
+  "bakedPx": [
+    463,
+    566
+  ],
+  "renderHeightPt": 72,
+  "keylinePt": 1.0,
+  "dilationRadiusPx": 8,
+  "discOffsets": 197,
+  "note": "renderHeightPt MUST equal HERO_LOGO_H in components/home/homeLayout.js. Verified by scripts/check-hero-logo.mjs."
+}
