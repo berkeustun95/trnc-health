@@ -171,6 +171,21 @@ const SAME_AS_ENGLISH = {
                             German: 'Famagusta is the German form' },
   'blDistrictNicosia':    { Spanish: 'Nicosia is the Spanish form' },
 
+  // ─── German Home-grid labels, 2026-09-03 (Slice 1 polish r3) ──────────────
+  // The 4-across grid gives a label ~14 characters per line and German compounds do not
+  // wrap: 'Veranstaltungen' (15) and 'Stellenangebote' (15) both ellipsed mid-word. The
+  // replacements are the English loanwords, which is not laziness — 'Events' and 'Jobs'
+  // are what German listing sites and job boards actually use, and they are the forms a
+  // German speaker in Cyprus would scan for. 'Termine' and 'Stellen' are the native
+  // alternatives and were considered; both read narrower than the sections they label
+  // ('Termine' suggests appointments, 'Stellen' suggests vacancies only).
+  //
+  // Declared rather than worked around: this guard firing here was CORRECT, and the
+  // right response to a correct alarm is to record the decision where the next person
+  // will read it.
+  'menuEvents':      { German: "'Events' is standard German usage for a what's-on listing; 'Veranstaltungen' (15 chars) truncates in the 4-across grid" },
+  'menuJobPostings': { German: "'Jobs' is standard German usage on job boards; 'Stellenangebote' (15 chars) truncates in the 4-across grid" },
+
   // Loanwords and shared Latin roots. Identical because the word IS the word.
   'exploreCatCafe':       { French: 'Café is French', German: 'Café is used in German' },
   'exploreCatRestaurant': { French: 'Restaurant is French', German: 'Restaurant is German' },

@@ -4,10 +4,21 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { colors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 
+const LOGO = require('../../assets/logonobg.png')
+
+// Eight offsets at radius R, forming a continuous ring. Four would leave the diagonals
+// thin at the corners of every stroke, which is where a mark like this is busiest.
+const R = 2
+const HALO = [
+  [-R, -R], [0, -R], [R, -R],
+  [-R,  0],          [R,  0],
+  [-R,  R], [0,  R], [R,  R],
+]
+
 // The app bar. Two forms, one component.
 //
-//   onHero (default)  — rendered INSIDE the hero photograph: ADA wordmark centred on a
-//                       white chip, three white circular buttons top-right.
+//   onHero (default)  — rendered INSIDE the hero photograph: ADA wordmark centred and
+//                       haloed, three white circular buttons top-right.
 //   searchOpen        — the expanded search field, rendered on the page canvas with the
 //                       hero unmounted, because at that point the results ARE the screen.
 //
@@ -19,18 +30,30 @@ import { t } from '../../constants/i18n'
 // byte-identical to V1's; only the entry point moved.
 //
 // ─── EVERY TOP ELEMENT CARRIES ITS OWN CONTRAST ─────────────────────────────
-// White circles with dark glyphs, and the wordmark on a white chip — not white marks on
-// a scrim. That is a measurement, not a preference: two of the five hero photographs
-// (Salamis, Kantara) have blown-out sky across the whole top edge, brightest-5%
-// luminance 0.996 and 1.000. Making a white mark legible on that needs a black scrim at
-// alpha 0.82, which blacks the photograph out. A white pill on any of the five is
-// self-sufficient. See the scrim note in HomeHero.js.
+// White circles with dark glyphs, and a haloed wordmark — not bare marks on a scrim.
+// That is a measurement, not a preference: two of the five hero photographs (Salamis,
+// Kantara) have blown-out sky across the whole top edge, brightest-5% luminance 0.996
+// and 1.000, and no tolerable scrim makes a white mark legible on that. See HomeHero.js.
 //
-// ⚠ THE LOGO IS A DARK ASSET. logonobg.png is 81% dark pixels (median luminance 0.081)
-//   and contrasts at 1.19:1 against a dark scrim — it is INVISIBLE tinted onto a
-//   darkened photo, and tinting it white loses nothing (its internal detail is knockout,
-//   so the alpha channel carries the mark) but still fails over bright sky. The white
-//   chip is what makes it work on all five, and it keeps the brand colours.
+// ⚠ THE WORDMARK IS A DARK ASSET AND BARE IT FAILS ON EVERY PHOTO. Measured per-pixel,
+//   compositing the real logo at render size onto each background and scoring each of
+//   its ink pixels against what sits behind it: the share of the mark falling under the
+//   3:1 UI floor is 86.2% on Büyük Han, 83.0% on St. Hilarion, 62.6% on Salamis, 60.8%
+//   on Golden Beach, 49.9% on Kantara and 31.6% on the generic fallback. The intuition
+//   that a dark mark would do well against bright sky is right about the sky and wrong
+//   about the photograph — the logo's footprint also covers a dome, a castle wall and a
+//   headland, and it vanishes into those.
+//
+//   No light logo variant exists to use instead. assets/adalogo.png is the same mark on
+//   an OPAQUE white background (worse over a photo) and android-icon-monochrome.png is a
+//   solid black silhouette mask for Android themed icons.
+//
+//   So it gets the halo — the same idea as components/BackButton.js's HALO_LIGHT, which
+//   is a zero-offset inverse-coloured glow. textShadow only applies to Text, so for an
+//   Image the equivalent is a ring of white-tinted copies of the same asset behind the
+//   real one. tintColor replaces every non-transparent pixel while preserving alpha, so
+//   each copy is a white silhouette of the mark; eight of them at a small radius make a
+//   continuous outline. No background plate, no chip.
 //
 // ─── THE searchRef GOES ON THE ICON, AND THAT IS LOAD-BEARING ───────────────
 // App.js measures searchRef at tutorial time (measureRef → coachSteps) and a ref that
@@ -84,10 +107,23 @@ export default function HomeTopBar({
 
   // On the hero. Absolutely positioned so it floats over the photograph without taking
   // part in the hero's own bottom-aligned content layout.
+  //
+  // The wordmark is CENTRED on the hero, not laid out beside the buttons: it is a focal
+  // element in the draft, and a flex row would push it off-centre by exactly the width
+  // of the action cluster. Its own absolute layer, with pointerEvents none so it never
+  // eats a tap meant for the hero's deep-link.
   return (
     <View style={[s.heroBar, { paddingTop: insets.top + 6 }]} pointerEvents="box-none">
-      <View style={s.logoChip} pointerEvents="none">
-        <Image source={require('../../assets/logonobg.png')} style={s.logo} resizeMode="contain" />
+      <View style={[s.logoWrap, { top: insets.top + 6 }]} pointerEvents="none">
+        {HALO.map(([dx, dy]) => (
+          <Image
+            key={`${dx},${dy}`}
+            source={LOGO}
+            style={[s.logo, s.logoHalo, { transform: [{ translateX: dx }, { translateY: dy }] }]}
+            resizeMode="contain"
+          />
+        ))}
+        <Image source={LOGO} style={s.logo} resizeMode="contain" />
       </View>
 
       {!hideActions && (
@@ -124,9 +160,14 @@ const s = StyleSheet.create({
   // tappable deep-link.
   heroBar:     { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16,
                  flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  logoChip:    { backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 14,
-                 paddingHorizontal: 12, paddingVertical: 6 },
-  logo:        { width: 96, height: 34 },
+  // Absolute and full-width so the wordmark's centre is the SCREEN's centre, not the
+  // centre of whatever space the action cluster leaves. `top` is set inline from the
+  // safe-area inset — absoluteFillObject would ignore the bar's own paddingTop and put
+  // the logo under the status bar.
+  logoWrap:    { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  // Substantially larger than the 96x34 chip version — a focal element, per the draft.
+  logo:        { width: 168, height: 60 },
+  logoHalo:    { position: 'absolute', top: 0, tintColor: 'rgba(255,255,255,0.92)' },
   actions:     { flexDirection: 'row', gap: 8 },
   // White circles with dark glyphs — legible on any photograph without help from a scrim.
   heroAction:  { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.94)',

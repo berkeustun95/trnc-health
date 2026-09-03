@@ -7,6 +7,7 @@ import { REGION_LABEL_KEY } from '../../constants/regions'
 import { resolveHero } from '../../constants/homeHero'
 import { weatherIcon } from '../../utils/facilityUtils'
 import HeroCreditSheet from './HeroCreditSheet'
+import { HERO_CONTENT_BOTTOM } from './homeLayout'
 
 // The district hero. Photo, the app's top bar, district name, temperature, attribution.
 //
@@ -17,31 +18,20 @@ import HeroCreditSheet from './HeroCreditSheet'
 // which is what buys the band its new proportion at no cost to the content below.
 //
 // ─── HEIGHT IS PROPORTIONAL, WITH BOUNDS ────────────────────────────────────
-// 34% of the window is roughly the top third the design asks for, but a fixed pixel
-// height that looks right on a 6.1" phone is half the screen on a 4.7" one and a stripe
-// on a tablet. The clamp is what keeps it a HERO on both ends rather than a number that
-// happened to suit the device it was designed on.
-const HERO_FRACTION = 0.34
-const HERO_MIN = 250
-const HERO_MAX = 330
-
-// How far the Oli card is pulled up over the hero's bottom edge.
+// 40% of the window is the draft's "top third and then some", with the Oli card
+// overlapping its bottom edge. A fixed pixel height that suits a 6.1" phone is half the
+// screen on a 4.7" one and a stripe on a tablet, so the clamp is what keeps it a HERO at
+// both ends rather than a number that fitted the device it was drawn on.
 //
-// ─── ONE NUMBER, TWO COMPONENTS, AND THAT IS THE POINT ──────────────────────
-// The card overlaps the hero by design. What was NOT designed was three controls landing
-// in the same corner: the card's top edge crossed both the temperature chip and the
-// hero's round arrow, so two tappable things sat underneath an opaque card. Whichever
-// won the touch, one of them was a lie.
-//
-// The hero reserves this much space at the bottom of its own content (plus clearance),
-// and OliRow pulls up by exactly the same figure — so the overlap zone provably contains
-// nothing tappable. Two components reading one constant cannot drift; two components
-// each carrying their own -22 can, and silently, because the symptom is a mis-tap rather
-// than a visual break.
-export const HERO_OVERLAP = 22
-
-// Clearance between the hero's lowest content and the top of the Oli card.
-const OVERLAP_CLEARANCE = 14
+// ⚠ THE UPPER BOUND IS THE DUTY ROW, NOT TASTE. Nöbetçi eczaneler has to stay above the
+//   fold — it is what somebody opens this app for at 2am. At HERO_MAX the duty row's
+//   bottom edge lands at hero + 150pt, which clears the fold on every viewport in the
+//   round-3 log's fold table, the narrowest being a 640x1424 device read as 320x712dp.
+//   Raising HERO_MAX without redoing that table is how the one row that must never be
+//   scrolled to ends up below the fold on the cheapest phone somebody owns.
+const HERO_FRACTION = 0.40
+const HERO_MIN = 280
+const HERO_MAX = 400
 
 // ─── THE SCRIM IS TWO RAMPS, AND ONLY ONE OF THEM CARRIES LEGIBILITY ───────
 //
@@ -122,7 +112,7 @@ export default function HomeHero({
           what they do, and still owns the refs App.js measures for the coach marks. */}
       {topControls}
 
-      <View style={[s.content, { paddingBottom: HERO_OVERLAP + OVERLAP_CLEARANCE }]} pointerEvents="box-none">
+      <View style={[s.content, { paddingBottom: HERO_CONTENT_BOTTOM }]} pointerEvents="box-none">
         <View style={s.textCol} pointerEvents="box-none">
           <Text style={s.district} numberOfLines={1}>{title}</Text>
 

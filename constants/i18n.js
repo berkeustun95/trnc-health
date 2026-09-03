@@ -7610,7 +7610,7 @@ const translations = {
     dutyBannerPartialTitle: 'Die heutige Liste scheint unvollständig',
     dutyBannerStaleTitle: 'Notdienstliste nicht aktuell',
     dutyBannerStaleSub: 'Für die aktuelle Liste tippen',
-    menuGarages: 'Autowerkstätten',
+    menuGarages: 'Werkstätten',
     tonightDuty: 'Bereitschaftsapotheken heute',
     allRegions: 'Alle Bereitschaftsapotheken nach Region',
     getStarted: 'Loslegen',
@@ -7922,9 +7922,9 @@ const translations = {
     reviewCountLabel: '{n} Bewertungen',
     seeAllReviews: 'Alle {n} Bewertungen ansehen',
     menuMunicipalities: 'Gemeinden',
-    menuEvents: 'Veranstaltungen',
+    menuEvents: 'Events',
     menuPets: 'Haustiere',
-    menuHomeServices: 'Haushaltsservices',
+    menuHomeServices: 'Hausservice',
     comingSoonBadge: 'Demnächst',
     comingSoonBody: 'Wir bereiten diesen Bereich vor. Er ist bald verfügbar — danke für deine Geduld.',
     notifyMeCta: 'Benachrichtige mich',
@@ -8009,7 +8009,7 @@ const translations = {
     // points to two different screens — and, worse, to two different maps of the same
     // 42 places. The tile is the browsable DIRECTORY; the tab is the map. Naming them
     // apart is what makes that a choice the user can make rather than a coin flip.
-    menuPlaces: 'Sehenswürdigkeiten',
+    menuPlaces: 'Ausflugsziele',
     exploreSavedTitle: 'Gespeicherte Orte',
     // "I am here". NOT "Einchecken" — the transactional framing rejected
     // in Turkish.
@@ -8131,7 +8131,7 @@ const translations = {
     trBusTerminal: 'Terminal / Haltestelle', trBusFrequency: 'Taktfolge',
     trBusFare: 'Fahrpreis', trBusNote: 'Hinweise', trBusNoRoutes: 'Keine Linien gefunden.',
     trBusAllOrigins: 'Alle Startpunkte', trBusAllDestinations: 'Alle Ziele',
-    menuJobPostings: 'Stellenangebote',
+    menuJobPostings: 'Jobs',
     jobTitle: 'Stellenangebote', jobSubtitle: 'Stellenangebote in Nordzypern entdecken.',
     jobCatHospitality: 'Gastgewerbe', jobCatConstruction: 'Bauwesen', jobCatRetail: 'Einzelhandel',
     jobCatHealthcare: 'Gesundheitswesen', jobCatAdminOffice: 'Verwaltung & Büro', jobCatEducation: 'Bildung',
@@ -8186,7 +8186,7 @@ const translations = {
     coachEventsTitle: 'Veranstaltungen', coachEventsBody: 'Entdecke lokale Veranstaltungen, Festivals und Aktivitäten im TRNC.',
     coachAccommodationTitle: 'Immobilien & Unterkünfte', coachAccommodationBody: 'Wohnungen, Grundstücke und Gewerbeimmobilien in ganz Nordzypern — zum Kauf und zur Miete.',
     coachTransportTitle: 'Transport', coachTransportBody: 'Taxis, Mietwagen, Flughafentransfers und Überlandbuslinien im TRNC.',
-    menuExchangeRates: 'Wechselkurse', menuNewcomerEssentials: 'Willkommensführer',
+    menuExchangeRates: 'Wechselkurse', menuNewcomerEssentials: 'Erste Schritte',
     menuGames: 'Spiele',
     gamesHubTitle: 'Spiele',
     gamesComingSoon: 'Demnächst',
@@ -8335,7 +8335,7 @@ const translations = {
     towingHoursUnknownBadge: 'Zeiten unbekannt',
     towingFromGaragesSub: 'Panne und nicht mehr fahrbereit? Finden Sie einen Abschleppdienst für Ihr Gebiet.',
     towingFromEmergencySub: 'Abschlepp- und Pannenhilfedienste',
-    menuTowing: 'Abschleppdienst & Pannenhilfe',
+    menuTowing: 'Abschleppen & Pannenhilfe',
     towingClassCar: 'Pkw',
     towingClassHeavy: 'Schwerfahrzeug',
     towingSubCar: 'Pkw',

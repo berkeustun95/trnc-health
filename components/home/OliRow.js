@@ -2,9 +2,10 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import { HERO_OVERLAP } from './HomeHero'
+import { HERO_OVERLAP, OLI_OVERHANG } from './homeLayout'
 
-// The Oli entry point: a solid brand-teal banner overlapping the hero's bottom edge.
+// The Oli entry point: a solid brand-teal banner overlapping the hero's bottom edge,
+// with the mascot sitting ON it rather than inside it.
 //
 // ─── IT REPLACES THE FAB, IT DOES NOT JOIN IT ───────────────────────────────
 // OliGuide's visibility condition in App.js is already `activeTab === 'home' && …` —
@@ -14,77 +15,96 @@ import { HERO_OVERLAP } from './HomeHero'
 //
 // The SHEET is untouched: this calls straight into OliGuide's openSheet through a ref, so
 // the chip set, resolveOliQuery matching, keyboard handling, hardware-back handler and
-// accessibility modality all stay where they are. Nothing about Ask Oli was
-// reimplemented for the redesign — only the thing you press.
+// accessibility modality all stay where they are. The drag / edge-snap / @trnc_oli_pos
+// code stays there too, dormant, because HOME_V2_LIVE can be false and V1 still shows
+// the FAB. It becomes deletable the day old Home is deleted, and not before.
 //
-// The drag / edge-snap / @trnc_oli_pos code stays in OliGuide.js and is dormant while
-// this row is in use. It is not dead: HOME_V2_LIVE can be false, and V1 still shows the
-// FAB. It becomes deletable the day old Home is deleted, and not before.
+// ─── THE MASCOT IS AN ABSOLUTE SIBLING OF THE CARD, AND THAT IS THREE FIXES ─
 //
-// ─── THE MASCOT IS A CUT-OUT, NOT AN AVATAR ────────────────────────────────
-// oli-button.png is a genuine transparent cut-out — measured, not assumed: 74.7% of its
-// pixels are fully transparent and all four corners AND all four edge midpoints have
-// alpha 0. (`sips -g hasAlpha` says "yes" for an opaque PNG that merely carries an
-// unused alpha channel, so that flag proves nothing on its own.)
+// He must rise above the banner's top edge, the banner must NOT grow to fit him, and his
+// flat shoulder crop must not show. Those three pull against each other and the naive
+// arrangements each break one:
 //
-// So it sits DIRECTLY on the teal at 76pt with no circular background. Inside a circle
-// it read flat and small — a 42pt avatar of a character drawn to be seen.
+//   • A taller Image inside the flex row GROWS the row. Explicitly forbidden.
+//   • `overflow: 'hidden'` hides the flat crop but also clips the ears — it cannot both
+//     let him break the top edge and clip the bottom.
+//   • A child overflowing a view that carries `elevation` gets CLIPPED on Android, so he
+//     cannot live inside the shadowed teal card at all.
 //
-// The artwork's content stops at 91.4% of its height (a flat crop across the shoulders).
-// Rendered at its natural aspect that flat edge is visible and reads as a sticker, so the
-// row clips it: `overflow: 'hidden'` on the card plus a negative bottom margin drops the
-// crop line below the card's rounded edge, and Oli reads as leaning out of the banner.
+// So: a transparent `wrap` holds the shadowed `card` (fixed height) and the mascot as an
+// absolutely-positioned sibling. He is outside the elevated view, takes part in no
+// layout, and cannot change the card's height. The flat crop needs no clipping because
+// it is placed to coincide exactly with the card's bottom edge.
 //
-// ─── SOLID TEAL, NOT A WHITE CARD ───────────────────────────────────────────
-// As a small white card with a small avatar this had no presence at all — it read as a
-// list row that happened to be above the grid, on a page whose every other surface is
-// also a white card. Ask Oli is the one thing on Home that answers a question instead of
-// navigating somewhere, and the brand colour is what says so.
+// ─── THE OFFSETS ARE DERIVED FROM THE ARTWORK, NOT EYEBALLED ────────────────
+// oli-button.png is 1024x1024 with its content bounding box at x 26.6%..72.2%,
+// y 5.4%..91.4% — measured from the alpha channel. Under resizeMode 'contain' in a
+// square box those fractions hold, so:
 //
-// CONTRAST, MEASURED. White title on solid primary is 5.01:1. The subtitle wanted
-// `primaryLight` for hierarchy and that lands at 4.44:1 — under the 4.5 AA floor for
-// 13pt regular text, by a margin small enough to have been waved through on the grounds
-// that it "looks fine on teal". It is #F2FAFA instead, a shade lighter, at 4.74:1.
-// Hierarchy still comes from size and weight (17 bold against 13 regular), which is
-// where it should come from anyway. (An earlier draft of this comment asserted 7.4:1 for
-// the title, a figure nobody had computed; if these colours change, recompute.)
+//   bottom offset  -MASCOT_BOX * 0.086   puts the 91.4% crop line on the card's bottom
+//   visible top     MASCOT_BOX * 0.054   below the box top
+//
+// which lands the visible mascot exactly OLI_OVERHANG above the card. If the artwork is
+// ever re-exported with different margins, re-measure the bbox — these are its numbers,
+// not arbitrary nudges.
+const CARD_H       = 88
+// Transparent slack above the card so the mascot's BOX (not its ink) never sits flush
+// with the wrap's top edge, where Android would be entitled to clip it.
+const HEADROOM     = 10
+const MASCOT_BOX   = 132
+const ASSET_TOP    = 0.054    // fraction of the asset above the artwork
+const ASSET_BOTTOM = 0.086    // fraction below it
+const WRAP_H       = CARD_H + OLI_OVERHANG + HEADROOM
+// Where the text starts: clear of the mascot's widest point.
+const TEXT_INSET   = 14 + Math.round(MASCOT_BOX * 0.722) + 12
+
 export default function OliRow({ lang, onPress }) {
   return (
-    <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.88} accessibilityRole="button">
-      <Image source={require('../../assets/oli-button.png')} style={s.mascot} resizeMode="contain" />
-      <View style={s.text}>
-        <Text style={s.title} numberOfLines={1}>{t('homeOliTitle', lang)}</Text>
-        <Text style={s.sub} numberOfLines={2}>{t('homeOliSub', lang)}</Text>
+    <TouchableOpacity style={s.wrap} onPress={onPress} activeOpacity={0.88} accessibilityRole="button">
+      <View style={s.card}>
+        <View style={s.text}>
+          <Text style={s.title} numberOfLines={1}>{t('homeOliTitle', lang)}</Text>
+          <Text style={s.sub} numberOfLines={2}>{t('homeOliSub', lang)}</Text>
+        </View>
+        {/* A filled circle rather than a bare chevron: on a saturated background a lone
+            glyph reads as decoration, and this is the row's only affordance. */}
+        <View style={s.chevron}>
+          <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+        </View>
       </View>
-      {/* A filled circle rather than a bare chevron: on a saturated background a lone
-          glyph reads as decoration, and this is the row's only affordance. */}
-      <View style={s.chevron}>
-        <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-      </View>
+
+      <Image
+        source={require('../../assets/oli-button.png')}
+        style={s.mascot}
+        resizeMode="contain"
+        pointerEvents="none"
+      />
     </TouchableOpacity>
   )
 }
 
 const s = StyleSheet.create({
-  // marginTop is the NEGATIVE of the hero's reserved overlap — imported, never retyped.
-  // HomeHero pads its content by this same figure plus clearance, so the band this card
-  // covers provably holds nothing tappable.
-  // overflow:'hidden' is what clips the mascot's flat bottom crop against the card's
-  // rounded edge. It also means nothing inside this row can ever escape it, which is
-  // fine — nothing needs to.
-  row:     { flexDirection: 'row', alignItems: 'center', gap: 12,
-             backgroundColor: colors.primary, borderRadius: 18, overflow: 'hidden',
-             paddingVertical: 12, paddingHorizontal: 16, paddingLeft: 12,
-             marginTop: -HERO_OVERLAP, marginHorizontal: 10, ...shadow },
-  // No borderRadius and no backgroundColor: the whole point is that there is no disc.
-  // alignSelf flex-end + a negative bottom margin pushes the flat crop past the card's
-  // bottom edge, where overflow:'hidden' removes it.
-  mascot:  { width: 76, height: 76, alignSelf: 'flex-end', marginBottom: -18 },
+  // marginTop lifts the CARD's top edge to HERO_OVERLAP above the hero's bottom — the
+  // wrap's own transparent headroom has to be added back, or the card would sit that
+  // much lower than the hero reserved for it.
+  wrap:    { height: WRAP_H, marginTop: -(HERO_OVERLAP + OLI_OVERHANG + HEADROOM),
+             marginHorizontal: 10 },
+  card:    { position: 'absolute', left: 0, right: 0, bottom: 0, height: CARD_H,
+             flexDirection: 'row', alignItems: 'center', gap: 12,
+             backgroundColor: colors.primary, borderRadius: 18,
+             paddingLeft: TEXT_INSET, paddingRight: 16, ...shadow },
+  // No disc, no borderRadius, no background — the whole point is that he is a cut-out.
+  mascot:  { position: 'absolute', left: 14, bottom: -Math.round(MASCOT_BOX * ASSET_BOTTOM),
+             width: MASCOT_BOX, height: MASCOT_BOX },
   text:    { flex: 1 },
   title:   { fontSize: 17, fontFamily: 'Inter_700Bold', color: '#fff' },
-  // #F2FAFA, not colors.primaryLight: see the contrast note above. A literal because
-  // it exists to clear a threshold on ONE background, not as a palette entry.
+  // #F2FAFA, not colors.primaryLight: primaryLight is 4.44:1 on primary, under the 4.5
+  // floor for 13pt regular. This is 4.74:1. Title white on primary is 5.01:1.
   sub:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#F2FAFA', marginTop: 2 },
   chevron: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff',
              justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
 })
+
+// Exported for the fold arithmetic in the log and for anything that needs to know how
+// much vertical space this row actually consumes after its negative margin.
+export const OLI_ROW_FLOW_HEIGHT = WRAP_H - (HERO_OVERLAP + OLI_OVERHANG + HEADROOM)
