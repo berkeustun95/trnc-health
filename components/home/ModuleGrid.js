@@ -77,18 +77,26 @@ const s = StyleSheet.create({
   tile:     { width: `${100 / GRID_COLUMNS}%`, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 2 },
   icon:     { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
   labelBox: { height: GRID_LABEL_HEIGHT, justifyContent: 'flex-start', alignSelf: 'stretch' },
-  // ─── Inter_400Regular, AND THAT IS A BUG FIX, NOT A STYLE CHOICE ──────────
-  // This said Inter_600SemiBold, which App.js DOES NOT LOAD — useFonts registers only
-  // Inter_400Regular and Inter_700Bold. React Native cannot find an unregistered family
-  // and silently falls back to the platform default (Roboto on Android), so these labels
-  // were never rendering in Inter at all. That is exactly the "heavier and more cramped
-  // than the draft" symptom: a different typeface at a different apparent weight, with
-  // no error anywhere to say so.
+  // ─── Inter_500Medium — THE SEPARATE DECISION THIS COMMENT USED TO DEFER ───
+  // This block previously said Inter_600SemiBold, which App.js did not load; React Native
+  // cannot find an unregistered family and silently substitutes the platform default
+  // (Roboto on Android), so the labels were rendering in the wrong TYPEFACE with no error
+  // anywhere to say so. The stopgap was Inter_400Regular, chosen because it was a face
+  // that actually existed, with a note that registering more weights was "a separate
+  // decision, noted in the log".
   //
-  // Regular is also what the draft wants, so the fix and the intent agree. Registering
-  // the SemiBold face instead would pull a font file into the bundle and restyle the six
-  // other files that reference it — a separate decision, noted in the log.
+  // That decision has now been taken: App.js registers 400 / 500 / 600 / 700, and the V2
+  // scale puts grid labels at 500. Medium rather than SemiBold because these are 11pt
+  // labels under a 52pt tinted icon — the icon is the tile's signal and the label names
+  // it. At 600 nineteen labels start competing with the icons for weight, which is the
+  // "wall" the bare-icon grid exists to undo.
+  //
+  // ⚠ THE FACE MUST STAY REGISTERED IN App.js. That is the whole failure this block
+  //   records, and it is invisible on screen unless you know Inter from Roboto.
+  //
+  // lineHeight stays GRID_LABEL_LINE_HEIGHT — the fixed two-line box is what keeps the
+  // grid the same shape in all nine locales, and weight does not change it.
   //
   // Colour is #3F4E57, softer than textPrimary's near-black at 8.24:1 on the canvas.
-  label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: 'Inter_400Regular', color: '#3F4E57', textAlign: 'center' },
+  label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: 'Inter_500Medium', color: '#3F4E57', textAlign: 'center' },
 })

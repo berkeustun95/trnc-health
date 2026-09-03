@@ -91,7 +91,7 @@ const s = StyleSheet.create({
   // Near-black rather than coral. The title is the loudest thing in the row and coral on
   // pale pink was both noisy and, at 2.17:1 MEASURED, nowhere near AA for 15pt — it was
   // failing legibility, not just taste. This is 13.16:1.
-  title:         { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  title:         { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   titleAlert:    { color: colors.danger },
   subRow:        { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   // Muted coral, but a REAL one rather than accent + 'AA' alpha: an alpha suffix composites

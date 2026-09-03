@@ -6,7 +6,9 @@ import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
-import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter'
+import {
+  useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
+} from '@expo-google-fonts/inter'
 import { PlayfairDisplay_400Regular, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display'
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
@@ -228,7 +230,51 @@ class BLErrorBoundary extends Component {
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_700Bold, PlayfairDisplay_400Regular, PlayfairDisplay_700Bold })
+  // ─── FOUR INTER WEIGHTS, AND TWO OF THEM ARE A BUG FIX ────────────────────
+  //
+  // 500Medium and 600SemiBold were added for the Home V2 type scale (grid labels 500;
+  // chip / Oli / duty titles 600). Registering them ALSO repairs sixteen references that
+  // were already in the codebase and had never once rendered:
+  // screens/games/* and HomeScreen's `searchResultTitle` all name Inter_600SemiBold, and
+  // React Native cannot find an unregistered family — it silently substitutes the
+  // platform default (Roboto on Android) with no error anywhere. So those surfaces have
+  // been drawing in the wrong TYPEFACE, not merely the wrong weight, since they were
+  // written. They now draw in real Inter SemiBold.
+  //
+  // ⚠ A FAMILY NAME THAT IS NOT LOADED FAILS SILENTLY. It is the same class of defect as
+  //   the missing `s.mascot` style and the wordmark's `contain` box — a value that is not
+  //   what anyone thinks it is, with nothing to say so. If a new weight is used anywhere,
+  //   it must be added HERE in the same commit. `npm run home:check` asserts that for the
+  //   components/home files.
+  //
+  // ─── COST: 40 BYTES. MEASURED, AND NOT WHAT IT LOOKS LIKE ─────────────────
+  //
+  // The obvious estimate is 342,892 + 343,632 = ~0.67 MB of TTF added to every user's
+  // next OTA download. It is wrong, and only an export says so: two `npx expo export
+  // --platform android` runs across this exact change gave 40,846,810 B before and
+  // 40,846,850 B after — a 40-byte difference, all of it in the JS bundle, with the
+  // 90-file asset set BYTE-IDENTICAL between the two.
+  //
+  // Because `@expo-google-fonts/inter`'s index.js is a barrel of eighteen top-level
+  // `require('./400Regular/Inter_400Regular.ttf')` statements. Importing ANY name from it
+  // pulls in ALL of them at bundle time, whatever useFonts is handed. So every Inter and
+  // Playfair weight has been shipping since the first build; registering two more only
+  // added them to a JS object that already had the files behind it.
+  //
+  // ⚠ WHICH MEANS THE REAL NUMBER IS THE ONE NOBODY WAS LOOKING FOR: 30 font faces are
+  //   bundled, 8.45 MB in total, and 24 of them — 6.69 MB — are never registered and can
+  //   never render. That is dead weight in every install and every OTA. The fix is deep
+  //   imports ('@expo-google-fonts/inter/400Regular/Inter_400Regular') instead of the
+  //   barrel, which is a separate change with its own risk (six import sites, and the
+  //   Playfair barrel has the same shape) and is NOT made here.
+  //
+  // Do not restate these figures from memory — re-export and diff. The reason this
+  // comment is right is that somebody ran the two exports, not that the arithmetic looked
+  // convincing; the arithmetic looked convincing and was off by four orders of magnitude.
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
+    PlayfairDisplay_400Regular, PlayfairDisplay_700Bold,
+  })
   const [session, setSession] = useState(undefined)
   const [facilities, setFacilities] = useState([])
   const [loading, setLoading] = useState(true)

@@ -316,13 +316,17 @@ const s = StyleSheet.create({
   chip:      { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
                backgroundColor: 'rgba(0,0,0,0.74)', borderRadius: 18,
                paddingHorizontal: 12, paddingVertical: 6 },
-  // 17pt bold, down from 28pt. Still the loudest thing in the row, and still white on
-  // the bottom ramp — the measured figures are in the round-6 log.
-  district:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: '#fff', flexShrink: 1 },
+  // 17pt, down from 28pt. Still the loudest thing in the row, and still white on the
+  // bottom ramp — the measured figures are in the round-6 log and are UNCHANGED by the
+  // move from Bold to SemiBold: contrast is a property of the two colours, and none of
+  // this hero's figures leaned on WCAG's large-text exemption (which would have needed
+  // >=14pt BOLD to apply). Both texts clear the 4.5:1 normal-text floor on their own —
+  // district 5.03:1 at worst, on auth-bg — so the weight change costs nothing.
+  district:  { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: '#fff', flexShrink: 1 },
   chipDot:   { fontSize: 13, color: 'rgba(255,255,255,0.65)' },
   tempHit:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   tempEmoji: { fontSize: 13 },
-  tempText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+  tempText:  { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   rightCol:  { alignItems: 'center', gap: 10 },
   openChip:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
   infoChip:  { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'center', alignItems: 'center' },

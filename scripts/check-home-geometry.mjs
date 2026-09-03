@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DIR  = 'components/home'
 const problems = []
+let fontReport = 'fonts: not checked'
 const read = p => readFileSync(resolve(ROOT, p), 'utf8')
 const num  = (src, name) => {
   const m = src.match(new RegExp(`(?:export )?const ${name}\\s*=\\s*(-?[\\d.]+)`))
@@ -102,6 +103,56 @@ if ([MASCOT_BOX, CARD_H, HEADROOM, ASSET_TOP, ASSET_BOTTOM, OLI_OVERHANG, HERO_O
   }
 }
 
+// ─── C. Every font family used here must be REGISTERED in App.js ────────────
+// Third instance of "a value that is not what anyone thinks it is", and the cheapest to
+// get wrong. React Native has no error for an unregistered fontFamily — it silently
+// substitutes the platform default (Roboto on Android), so the text renders in the wrong
+// TYPEFACE, not merely the wrong weight, and nothing anywhere says so.
+//
+// It has already happened twice in this repo: ModuleGrid's labels named Inter_600SemiBold
+// while useFonts registered only 400 and 700, and sixteen further references across
+// screens/games/* and HomeScreen had never once drawn in Inter.
+//
+// ⚠ WHAT A HEALTHY RUN PRINTS: the families found, so the list can be read rather than
+//   trusted. A guard that says only "OK" cannot be told apart from one that matched
+//   nothing — and a regex that silently stops matching is the failure mode here, since
+//   both sides of this comparison are scraped from source.
+const appSrc = read('App.js')
+const useFontsBlock = appSrc.match(/useFonts\(\{[\s\S]*?\}\)/)
+if (!useFontsBlock) {
+  problems.push('App.js: could not find the useFonts({...}) call — this guard cannot run, '
+    + 'and a guard that cannot run must fail rather than pass silently')
+} else {
+  const registered = new Set([...useFontsBlock[0].matchAll(/\b([A-Za-z]+_\d{3}[A-Za-z]+)\b/g)].map(m => m[1]))
+  if (registered.size === 0) {
+    problems.push('App.js: the useFonts block matched zero font names — the regex or the '
+      + 'call shape changed, so this check was about to pass on everything')
+  }
+  const usedFamilies = new Map()
+  for (const f of readdirSync(resolve(ROOT, DIR)).filter(n => n.endsWith('.js'))) {
+    const src = read(join(DIR, f))
+    // Only real style values: `fontFamily: 'X'`. A family named in a COMMENT is prose —
+    // this file's own notes discuss Inter_400Regular and Inter_600SemiBold by name, and
+    // matching those would forbid the comments that explain the bug.
+    for (const m of src.matchAll(/fontFamily:\s*'([^']+)'/g)) {
+      if (!usedFamilies.has(m[1])) usedFamilies.set(m[1], `${DIR}/${f}`)
+    }
+  }
+  if (usedFamilies.size === 0) {
+    problems.push(`no fontFamily declarations found under ${DIR} — the scraper broke, `
+      + 'not the code')
+  }
+  for (const [fam, where] of usedFamilies) {
+    if (!registered.has(fam)) {
+      problems.push(`${where}: fontFamily '${fam}' is NOT registered in App.js's useFonts. `
+        + `React Native will silently fall back to the platform default. `
+        + `Registered: ${[...registered].join(', ')}`)
+    }
+  }
+  fontReport = `fonts: ${usedFamilies.size} famil${usedFamilies.size === 1 ? 'y' : 'ies'} used `
+    + `(${[...usedFamilies.keys()].sort().join(', ')}), all registered among ${registered.size} in App.js`
+}
+
 if (problems.length) {
   console.error('\n  ┌─ HOME GEOMETRY CHECK FAILED ───────────────────────────────────┐')
   for (const p of problems) console.error('  │ ' + p)
@@ -109,5 +160,6 @@ if (problems.length) {
   process.exit(1)
 }
 const artH = (1 - ASSET_TOP - ASSET_BOTTOM) * MASCOT_BOX
+console.log(fontReport)
 console.log(`home geometry: OK (mascot box ${MASCOT_BOX}, ink ${(MASCOT_BOX*0.456).toFixed(0)}x${artH.toFixed(0)}pt, `
   + `${(artH-CARD_H).toFixed(0)}pt above a ${CARD_H}pt card, 0pt below)`)

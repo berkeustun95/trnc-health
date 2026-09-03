@@ -152,7 +152,7 @@ const s = StyleSheet.create({
   mascot:  { position: 'absolute', left: 14, bottom: -Math.round(MASCOT_BOX * ASSET_BOTTOM),
              width: MASCOT_BOX, height: MASCOT_BOX },
   text:    { flex: 1 },
-  title:   { fontSize: 17, fontFamily: 'Inter_700Bold', color: '#fff' },
+  title:   { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   // #F2FAFA, not colors.primaryLight: primaryLight is 4.44:1 on primary, under the 4.5
   // floor for 13pt regular. This is 4.74:1. Title white on primary is 5.01:1.
   sub:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#F2FAFA', marginTop: 2 },
