@@ -110,6 +110,14 @@ const EXPECTED_SCALARS = {
   // others this does not gate NEW content — it replaces a surface users already have, so
   // an accidental flip is a downgrade for every user, not merely an early reveal.
   EXPLORE_MAP_LIVE:      true,
+  // The Home redesign. Like EXPLORE_MAP_LIVE this replaces a surface every user already
+  // has rather than revealing new content, so a working-tree flip left over from a device
+  // comparison is a whole-app visual change shipped to everyone, not an early reveal.
+  //
+  // It is a scalar and not a MODULE_FLAGS key on purpose — see the note in flags.js.
+  // Putting it in that map would fail this script's own waitlist and notify-path checks
+  // against a perfectly correct app.
+  HOME_V2_LIVE:          false,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

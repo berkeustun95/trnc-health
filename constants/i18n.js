@@ -1296,6 +1296,16 @@ const translations = {
     photoSourceOwn: "ADA original photo",
     photoLicenseA11y: "Open the license terms",
     photoSourceA11y: "Open the photo source page",
+
+    // ─── Home V2 (HOME_V2_LIVE) ───────────────────────────────────────────
+    homeSearchA11y: "Search",
+    homeHeroFallbackTitle: "North Cyprus",
+    homeWeatherTitle: "Weather",
+    homeOliTitle: "Ask Oli",
+    homeOliSub: "Your guide to North Cyprus",
+    homeAllModules: "All modules",
+    homeDutySub: "Find the nearest pharmacy",
+    coachSearchBodyV2: "Tap the search icon to find anything in ADA — pharmacies, places, events and more.",
   },
   tr: {
     // Ask Oli guide
@@ -2566,6 +2576,16 @@ const translations = {
     photoSourceOwn: "ADA özgün fotoğrafı",
     photoLicenseA11y: "Lisans koşullarını aç",
     photoSourceA11y: "Fotoğrafın kaynak sayfasını aç",
+
+    // ─── Home V2 (HOME_V2_LIVE) ───────────────────────────────────────────
+    homeSearchA11y: "Ara",
+    homeHeroFallbackTitle: "Kuzey Kıbrıs",
+    homeWeatherTitle: "Hava durumu",
+    homeOliTitle: "Oli'ye sor",
+    homeOliSub: "Kuzey Kıbrıs rehberin",
+    homeAllModules: "Tüm modüller",
+    homeDutySub: "En yakın eczaneyi bul",
+    coachSearchBodyV2: "ADA'daki her şeyi bulmak için arama simgesine dokun — eczaneler, mekânlar, etkinlikler ve dahası.",
   },
   ar: {
     // Ask Oli guide
@@ -3524,6 +3544,16 @@ const translations = {
     photoSourceOwn: "صورة أصلية من ADA",
     photoLicenseA11y: "فتح شروط الترخيص",
     photoSourceA11y: "فتح صفحة مصدر الصورة",
+
+    // ─── Home V2 (HOME_V2_LIVE) ───────────────────────────────────────────
+    homeSearchA11y: "بحث",
+    homeHeroFallbackTitle: "شمال قبرص",
+    homeWeatherTitle: "الطقس",
+    homeOliTitle: "اسأل أولي",
+    homeOliSub: "دليلك في شمال قبرص",
+    homeAllModules: "كل الأقسام",
+    homeDutySub: "اعثر على أقرب صيدلية",
+    coachSearchBodyV2: "اضغط على أيقونة البحث للعثور على أي شيء في ADA — الصيدليات والأماكن والفعاليات وغيرها.",
   },
   ru: {
     // Ask Oli guide
@@ -4481,6 +4511,16 @@ const translations = {
     photoSourceOwn: "Собственное фото ADA",
     photoLicenseA11y: "Открыть условия лицензии",
     photoSourceA11y: "Открыть страницу источника фото",
+
+    // ─── Home V2 (HOME_V2_LIVE) ───────────────────────────────────────────
+    homeSearchA11y: "Поиск",
+    homeHeroFallbackTitle: "Северный Кипр",
+    homeWeatherTitle: "Погода",
+    homeOliTitle: "Спросите Оли",
+    homeOliSub: "Ваш гид по Северному Кипру",
+    homeAllModules: "Все разделы",
+    homeDutySub: "Найти ближайшую аптеку",
+    coachSearchBodyV2: "Нажмите значок поиска, чтобы найти всё в ADA — аптеки, места, события и другое.",
   },
   el: {
     // Ask Oli guide
@@ -5438,6 +5478,16 @@ const translations = {
     photoSourceOwn: "Πρωτότυπη φωτογραφία ADA",
     photoLicenseA11y: "Άνοιγμα των όρων της άδειας",
     photoSourceA11y: "Άνοιγμα της σελίδας προέλευσης",
+
+    // ─── Home V2 (HOME_V2_LIVE) ───────────────────────────────────────────
+    homeSearchA11y: "Αναζήτηση",
+    homeHeroFallbackTitle: "Βόρεια Κύπρος",
+    homeWeatherTitle: "Καιρός",
+    homeOliTitle: "Ρώτα τον Oli",
+    homeOliSub: "Ο οδηγός σου για τη Βόρεια Κύπρο",
+    homeAllModules: "Όλες οι ενότητες",
+    homeDutySub: "Βρες το πλησιέστερο φαρμακείο",
+    coachSearchBodyV2: "Πάτησε το εικονίδιο αναζήτησης για να βρεις τα πάντα στο ADA — φαρμακεία, μέρη, εκδηλώσεις και άλλα.",
   },
   fr: {
     // Ask Oli guide
@@ -6398,6 +6448,16 @@ const translations = {
     photoSourceOwn: "Photo originale ADA",
     photoLicenseA11y: "Ouvrir les conditions de la licence",
     photoSourceA11y: "Ouvrir la page source de la photo",
+
+    // ─── Home V2 (HOME_V2_LIVE) ───────────────────────────────────────────
+    homeSearchA11y: "Rechercher",
+    homeHeroFallbackTitle: "Chypre du Nord",
+    homeWeatherTitle: "Météo",
+    homeOliTitle: "Demander à Oli",
+    homeOliSub: "Votre guide de Chypre du Nord",
+    homeAllModules: "Tous les modules",
+    homeDutySub: "Trouver la pharmacie la plus proche",
+    coachSearchBodyV2: "Appuyez sur l'icône de recherche pour tout trouver dans ADA — pharmacies, lieux, événements et plus.",
   },
   es: {
     // Ask Oli guide
@@ -7355,6 +7415,16 @@ const translations = {
     photoSourceOwn: "Foto original de ADA",
     photoLicenseA11y: "Abrir los términos de la licencia",
     photoSourceA11y: "Abrir la página de origen de la foto",
+
+    // ─── Home V2 (HOME_V2_LIVE) ───────────────────────────────────────────
+    homeSearchA11y: "Buscar",
+    homeHeroFallbackTitle: "Chipre del Norte",
+    homeWeatherTitle: "El tiempo",
+    homeOliTitle: "Pregunta a Oli",
+    homeOliSub: "Tu guía del norte de Chipre",
+    homeAllModules: "Todos los módulos",
+    homeDutySub: "Encuentra la farmacia más cercana",
+    coachSearchBodyV2: "Toca el icono de búsqueda para encontrar todo en ADA: farmacias, lugares, eventos y más.",
   },
   de: {
     // Ask Oli guide
@@ -8313,6 +8383,16 @@ const translations = {
     photoSourceOwn: "ADA-Originalfoto",
     photoLicenseA11y: "Lizenzbedingungen öffnen",
     photoSourceA11y: "Quellseite des Fotos öffnen",
+
+    // ─── Home V2 (HOME_V2_LIVE) ───────────────────────────────────────────
+    homeSearchA11y: "Suchen",
+    homeHeroFallbackTitle: "Nordzypern",
+    homeWeatherTitle: "Wetter",
+    homeOliTitle: "Frag Oli",
+    homeOliSub: "Dein Wegweiser durch Nordzypern",
+    homeAllModules: "Alle Bereiche",
+    homeDutySub: "Die nächste Apotheke finden",
+    coachSearchBodyV2: "Tippe auf das Suchsymbol, um alles in ADA zu finden — Apotheken, Orte, Veranstaltungen und mehr.",
   },
   fa: {
     // Ask Oli guide
@@ -9270,6 +9350,16 @@ const translations = {
     photoSourceOwn: "عکس اختصاصی ADA",
     photoLicenseA11y: "باز کردن شرایط مجوز",
     photoSourceA11y: "باز کردن صفحهٔ منبع عکس",
+
+    // ─── Home V2 (HOME_V2_LIVE) ───────────────────────────────────────────
+    homeSearchA11y: "جست‌وجو",
+    homeHeroFallbackTitle: "قبرس شمالی",
+    homeWeatherTitle: "آب و هوا",
+    homeOliTitle: "از اولی بپرس",
+    homeOliSub: "راهنمای شما در قبرس شمالی",
+    homeAllModules: "همهٔ بخش‌ها",
+    homeDutySub: "نزدیک‌ترین داروخانه را پیدا کنید",
+    coachSearchBodyV2: "برای یافتن هر چیزی در ADA روی نماد جست‌وجو بزنید — داروخانه‌ها، مکان‌ها، رویدادها و بیشتر.",
   },
 }
 export function t(key, lang) {

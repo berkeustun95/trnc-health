@@ -32,7 +32,16 @@ const CHIPS = [
   { id: 'newcomer',     labelKey: 'oliChipNewcomer' },
 ]
 
-export default function OliGuide({ lang, onNavigate, onOpenChange, closeRef }) {
+// openRef / hideFab were added for HOME_V2, whose Home carries an Oli ROW instead of a
+// floating button. The SHEET is what matters and it is untouched — same chips, same
+// resolveOliQuery matching, same keyboard handling, same hardware-back handler, same
+// a11y modality. Only the trigger is external.
+//
+// hideFab suppresses the floating button and nothing else. The drag / edge-snap /
+// @trnc_oli_pos code below still runs and is simply not rendered: HOME_V2_LIVE can be
+// false, and old Home still shows the FAB, so this is dormant code rather than dead
+// code. It becomes deletable when old Home does.
+export default function OliGuide({ lang, onNavigate, onOpenChange, closeRef, openRef, hideFab = false }) {
   const insets = useSafeAreaInsets()
   const { width, height } = useWindowDimensions()
   const [open, setOpen] = useState(false)
@@ -102,6 +111,9 @@ export default function OliGuide({ lang, onNavigate, onOpenChange, closeRef }) {
 
   // Re-assigned every render so the root's back handler always calls the live closure.
   if (closeRef) closeRef.current = () => closeSheet()
+  // Same idiom, opposite direction: Home's Oli row calls this to raise the sheet.
+  // Re-assigned every render for the same reason — a captured closure would go stale.
+  if (openRef) openRef.current = () => openSheet()
 
   // --- Draggable floating button -------------------------------------------
   const minX = EDGE_MARGIN
@@ -264,6 +276,7 @@ export default function OliGuide({ lang, onNavigate, onOpenChange, closeRef }) {
 
   return (
     <>
+      {!hideFab && (
       <Animated.View
         {...drag.panHandlers}
         pointerEvents={hydrated && !open ? 'auto' : 'none'}
@@ -276,6 +289,7 @@ export default function OliGuide({ lang, onNavigate, onOpenChange, closeRef }) {
       >
         <Image source={require('../assets/oli-button.png')} style={s.fabImg} resizeMode="cover" fadeDuration={0} />
       </Animated.View>
+      )}
 
       {open && (
       <View style={s.overlay} accessibilityViewIsModal>

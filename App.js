@@ -17,7 +17,7 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE } from './constants/flags'
 import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
 } from './constants/profileGate'
@@ -273,7 +273,7 @@ export default function App() {
   // gated user taps a write action on one of the exempt screens.
   const [gateHealthList, setGateHealthList] = useState(false)
   const [profileGateKey, setProfileGateKey] = useState(null)
-  const [gatePrefillRegion, setGatePrefillRegion] = useState(null)
+  const [deviceRegion, setDeviceRegion] = useState(null)
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
@@ -314,6 +314,11 @@ export default function App() {
   // up (to hide the app content from the a11y tree) and how to close it (hardware back).
   const [oliSheetOpen, setOliSheetOpen] = useState(false)
   const oliCloseRef = useRef(null)
+  // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
+  // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
+  // way — the sheet, its chips, its matching and its keyboard handling are untouched;
+  // only the thing that presses the button moved.
+  const oliOpenRef = useRef(null)
   const [showCoachMarks, setShowCoachMarks] = useState(false)
   const [coachSteps, setCoachSteps]         = useState([])
   const hamburgerRef       = useRef(null)
@@ -359,7 +364,12 @@ export default function App() {
 
     const steps = []
     if (menuBtn) steps.push({ ...menuBtn, title: t('coachMenuTitle', lang), body: t('coachMenuBody', lang) })
-    if (search)  steps.push({ ...search,  title: t('coachSearchTitle', lang),  body: t('coachSearchBody', lang) })
+    // Copy follows HOME_V2_LIVE, same reason the map step follows EXPLORE_MAP_LIVE below:
+    // under V2 this ref is on a search ICON in the top bar, and V1's body describes a
+    // search BAR that finds facilities by name or address. Pointing at an icon while
+    // describing a bar is half-swapped, and half-swapped reads as a bug.
+    if (search)  steps.push({ ...search,  title: t('coachSearchTitle', lang),
+                                          body:  t(HOME_V2_LIVE ? 'coachSearchBodyV2' : 'coachSearchBody', lang) })
     if (duty)    steps.push({ ...duty,    title: t('coachDutyTitle', lang),    body: t('coachDutyBody', lang) })
     // Copy follows EXPLORE_MAP_LIVE with the tab label and icon. The coach mark points
     // AT that tab; describing health facilities while it reads Keşfet is half-swapped.
@@ -703,18 +713,32 @@ export default function App() {
     }
   }, [session])
 
+  // Which district is this device in, as far as the DEVICE knows.
+  //
   // Slice 1's backfill deliberately left profiles.region NULL for everyone: the City
-  // Welcome home city is DEVICE-LOCAL AsyncStorage and SQL cannot read it. This is the
-  // other half — the prefill runs where the data actually lives.
+  // Welcome home city is DEVICE-LOCAL AsyncStorage and SQL cannot read it. This runs
+  // where that data actually lives, and falls back to classifying the GPS fix.
+  //
+  // ⚠ RENAMED FROM gatePrefillRegion, AND THE GUARD WIDENED, IN THE HOME_V2 SLICE.
+  //   It had exactly one consumer — the profile wizard's region prefill — so it was
+  //   named for that consumer and skipped entirely when PROFILE_GATE_LIVE was false.
+  //   The V2 hero is a second consumer, and under the old guard the hero would have
+  //   silently shown its country-level fallback forever the day the gate flag went
+  //   false: no error, no empty state, just a permanently generic hero and nothing
+  //   pointing at the flag that caused it. A value two features read is not "the gate's
+  //   prefill", so it stopped being called that.
+  //
+  //   'visiting' is a legitimate City Welcome answer and is NOT a region — the
+  //   REGIONS.includes() test is what keeps it out, and it must stay.
   useEffect(() => {
-    if (!PROFILE_GATE_LIVE) return
+    if (!PROFILE_GATE_LIVE && !HOME_V2_LIVE) return
     let cancelled = false
     loadCityWelcomeState().then(st => {
       if (cancelled) return
-      if (st?.home && REGIONS.includes(st.home)) { setGatePrefillRegion(st.home); return }
+      if (st?.home && REGIONS.includes(st.home)) { setDeviceRegion(st.home); return }
       if (userLocation) {
         const r = resolveRegion(userLocation.latitude, userLocation.longitude)
-        if (r) setGatePrefillRegion(r)
+        if (r) setDeviceRegion(r)
       }
     }).catch(() => {})
     return () => { cancelled = true }
@@ -1076,7 +1100,7 @@ export default function App() {
         session={session}
         lang={lang}
         profile={profile}
-        prefillRegion={gatePrefillRegion}
+        prefillRegion={deviceRegion}
         onDone={() => { setGateHealthList(false); reloadProfile() }}
         onEmergencyNumbers={() => setShowEmergencyModal(true)}
         onDutyList={() => setShowDutyList(true)}
@@ -1533,6 +1557,14 @@ export default function App() {
             onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
             onShowExchangeRates={() => setShowExchangeRates(true)}
             onShowGames={() => setShowGames(true)}
+            // ─── HOME_V2 ────────────────────────────────────────────────────
+            // The hero's district: the profile's own answer first, then whatever the
+            // device knows (City Welcome home city, else a GPS classification — see
+            // deviceRegion above). null is a NORMAL outcome, not a failure — a guest
+            // with location denied and no profile — and the hero renders its
+            // country-level fallback rather than an error state.
+            region={profile?.region || deviceRegion || null}
+            onOpenOli={() => oliOpenRef.current?.()}
           />
         )}
 
@@ -1804,6 +1836,14 @@ export default function App() {
   // Drag, edge-snap and @trnc_oli_pos persistence are untouched: bounds in
   // OliGuide.js come from useWindowDimensions + safe-area insets, never from a
   // screen's own layout, so a position saved elsewhere still clamps correctly here.
+  //
+  // ⚠ UNDER HOME_V2 THE FAB IS SUPPRESSED, NOT THE COMPONENT. OliGuide still mounts —
+  //   it owns the sheet — but renders no floating button, because Home's Oli ROW is the
+  //   entry point and two buttons for one sheet on the only screen either appears on is
+  //   not a choice, it is a duplicate. `hideFab` is what draws that line; the drag,
+  //   edge-snap and @trnc_oli_pos code stays in OliGuide.js, dormant, because
+  //   HOME_V2_LIVE can be false and V1 still shows the FAB. It is deletable the day old
+  //   Home is deleted, and not one day before.
   const oliVisible =
     inTabShell && activeTab === 'home' &&
     inCustomerHub && !cityWelcomeVisible && !homeCityAskVisible
@@ -1826,7 +1866,7 @@ export default function App() {
         {content}
       </View>
       {oliVisible && (
-        <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} />
+        <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} hideFab={HOME_V2_LIVE} />
       )}
 
       {showEmergencyModal && (

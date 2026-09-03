@@ -109,3 +109,27 @@ export const MODULE_FLAGS = {
   //   waiting for. This flag gates the eventual FEATURE, not the signup.
   checkins:     false,
 }
+
+// Home V2 (HOME_V2 redesign). false = HomeScreen renders today's hub — weather card,
+// inline search bar, duty tile, three quick buttons, seventeen two-across white cards.
+// true = the new anatomy: top bar, half-height district hero, Oli row, Nöbetçi row,
+// bare-icon 4-across grid, footer ad slot.
+//
+// NOT a MODULE_FLAGS key, and that is a mechanical constraint rather than a preference.
+// A true entry in that map trips two guards in scripts/check-module-flags.mjs — the
+// WAITLIST_BLAST_DONE check ("LIVE but not listed in WAITLIST_BLAST_DONE") and the
+// notify-path agreement, which requires the key to appear inside notify_module_waitlist
+// and module_notif_text. HOME_V2 has no waitlist and cannot be notified about: it is a
+// redesign of a surface every user already has, not content that becomes ready. Same
+// reasoning that kept PROFILE_GATE_LIVE out of the map, and the same resolution — a
+// scalar carried in EXPECTED_SCALARS, which gives identical `eas update` protection
+// without the false failures.
+//
+// ⚠ IT SWAPS renderHub() AND NOTHING ELSE. HomeScreen's facility-list mode is
+//   load-bearing for the profile gate — GATE_EXEMPT_SCREENS.health names this screen,
+//   and the gate renders it with forceFacilityList / hideHeaderActions /
+//   onExitFacilityList to grant a read-only directory WITHOUT the hub. If the V2 branch
+//   ever reached that path, an incomplete profile would be handed the whole app. Both
+//   flag states must leave that path byte-identical, and `npm run profile:check` is what
+//   says so.
+export const HOME_V2_LIVE = false

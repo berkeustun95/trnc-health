@@ -14,7 +14,15 @@ import { t } from '../constants/i18n'
 // Constants, not string literals: a typo'd literal silently never matches and the
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
-import { MODULE_FLAGS } from '../constants/flags'
+import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
+import HomeTopBar from '../components/home/HomeTopBar'
+import HomeHero from '../components/home/HomeHero'
+import WeatherSheet from '../components/home/WeatherSheet'
+import OliRow from '../components/home/OliRow'
+import DutyRow from '../components/home/DutyRow'
+import ModuleGrid from '../components/home/ModuleGrid'
+import HomeFooterSlot from '../components/home/HomeFooterSlot'
+import { HOME_MODULES } from '../constants/homeModules'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
   haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherDesc, isAvailableToday, coarseCoord,
@@ -56,6 +64,18 @@ const TINTS = {
 // (vet has its own directory; grooming has its own module) are gated out so they
 // never leak into the health "All" view.
 const HEALTH_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
+
+// Explore place columns for a lookup-by-id. Module scope, not component scope: it is a
+// constant and does not want re-allocating on every render.
+//
+// Mirrors ExploreScreen's BROWSE_COLS rather than importing it — reaching for a string
+// is not worth pulling that screen's module graph into Home, and this list was already
+// inline in this file before HOME_V2 gave it a second caller.
+//
+// photo_attribution is INCLUDED and must stay: ExploreProfileScreen renders the credit
+// line and source link from it, and both callers here are production routes to that
+// screen.
+const PLACE_COLS = 'id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until'
 
 const MODULES = [
   { id: 'exchangeRates',      icon: 'trending-up-outline', tint: 'service',   labelKey: 'menuExchangeRates'      },
@@ -148,6 +168,11 @@ export default function HomeScreen({
   onShowExchangeRates,
   onShowGames,
   onShowStudentHub,
+  // ─── HOME_V2 props ────────────────────────────────────────────────────────
+  // Both optional, and both unused while HOME_V2_LIVE is false — the V1 render path
+  // never reads them, so old Home behaves identically whether App.js passes them or not.
+  region,      // resolved home district slug (profile.region → City Welcome → GPS), or null
+  onOpenOli,   // opens the Ask Oli sheet — OliGuide's own openSheet, reached through a ref
 }) {
   const [showFacilityList, setShowFacilityList] = useState(forceFacilityList)
   const [searchText, setSearchText]             = useState('')
@@ -157,6 +182,11 @@ export default function HomeScreen({
   const [langFilter, setLangFilter]             = useState(false)
   const [showFilters, setShowFilters]           = useState(false)
   const [weatherExpanded, setWeatherExpanded]   = useState(false)
+
+  // HOME_V2 only. Declared unconditionally — hooks cannot sit behind a flag — and inert
+  // while HOME_V2_LIVE is false: nothing in the V1 path reads either one.
+  const [searchOpen, setSearchOpen]             = useState(false)
+  const [weatherOpen, setWeatherOpen]           = useState(false)
 
   // Global hub search
   const [globalQuery, setGlobalQuery]       = useState('')
@@ -181,6 +211,22 @@ export default function HomeScreen({
     return () => clearTimeout(timer)
   }, [globalQuery, runSearch])
 
+  // ─── ONE PLACE-LOOKUP, TWO CALLERS ──────────────────────────────────────────
+  // Global search resolves a beach/landmark hit by id, and the V2 hero resolves its
+  // district's place by id. Same table, same status filter, same columns (PLACE_COLS at
+  // module scope) — one function rather than two selects that would drift the day
+  // somebody adds a column to only one of them.
+  //
+  // A miss is a graceful no-op, never a crash: .maybeSingle() returns
+  // {data: null, error: null} on zero rows — it does NOT throw — so a hero pointing at a
+  // place that has since been un-published simply does nothing when tapped.
+  async function openPlaceById(id) {
+    if (!id) return
+    const { data } = await supabase.from('places')
+      .select(PLACE_COLS).eq('id', id).eq('status', 'active').maybeSingle()
+    if (data) onSelectExplorePlace(data)
+  }
+
   async function handleResultPress(result) {
     setGlobalQuery('')
     setGlobalResults([])
@@ -203,14 +249,7 @@ export default function HomeScreen({
         // search_content still returns 'beach'/'landmark' (its arms are deferred to the DROP
         // migration), but both resolve against `places` by their preserved UUID → ExploreProfileScreen.
         // A miss (id not an active/visible place) is a graceful no-op, never a crash.
-        const { data } = await supabase.from('places')
-          // Mirrors ExploreScreen's BROWSE_COLS — photo_attribution INCLUDED. This is the
-          // production path to a landmark's detail screen (search_content's landmark arm
-          // reads the legacy table and resolves the hit here), so an omission would drop
-          // the attribution source link on the one route real users take today.
-          .select('id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until')
-          .eq('id', result.id).eq('status', 'active').maybeSingle()
-        if (data) onSelectExplorePlace(data)
+        await openPlaceById(result.id)
         break
       }
     }
@@ -234,6 +273,26 @@ export default function HomeScreen({
     esim:               onShowEsim,
     municipal:          onShowMunicipal,
     studentHub:         onShowStudentHub,
+    // ─── Added for the V2 grid ────────────────────────────────────────────────
+    // V1 reached these three from the quick-button row rather than the tile grid, so
+    // they were never in this map. V2 has one grid and no quick row, so they join it.
+    // `beaches` stays above and stays wired even though the V2 grid dropped its tile:
+    // Ask Oli still routes to it, and the entry is one line.
+    events:             onShowEvents,
+    emergency:          onShowEmergency,
+    health:             () => setShowFacilityList(true),
+  }
+
+  // Every configured tile must resolve to a handler. A missing wire would otherwise be a
+  // tile that silently does nothing when tapped — the failure looks like a frozen app,
+  // not like a bug in a config file, and it would ship. __DEV__ only: this is a
+  // developer's mistake to catch at edit time, not a crash to hand a user.
+  if (__DEV__ && HOME_V2_LIVE) {
+    for (const m of HOME_MODULES) {
+      if (typeof moduleHandlers[m.id] !== 'function') {
+        console.warn(`HomeScreen: HOME_MODULES tile '${m.id}' has no handler in moduleHandlers`)
+      }
+    }
   }
 
   const listed = facilities
@@ -366,6 +425,105 @@ export default function HomeScreen({
           </>
         )}
       </TouchableOpacity>
+    )
+  }
+
+  // ─── HOME_V2 hub ────────────────────────────────────────────────────────────
+  //
+  // The V2 anatomy, top to bottom: top bar · half-height district hero · Oli row ·
+  // Nöbetçi eczaneler · Tüm modüller · home_footer slot.
+  //
+  // ⚠ THIS FUNCTION IS THE ENTIRE SCOPE OF HOME_V2_LIVE. It replaces renderHub() and
+  //   nothing else. HomeScreen's facility-list mode is load-bearing for the profile
+  //   gate — constants/profileGate.js names this screen in GATE_EXEMPT_SCREENS.health,
+  //   and App.js renders it with forceFacilityList / hideHeaderActions /
+  //   onExitFacilityList to hand an incomplete profile a READ-ONLY directory WITHOUT the
+  //   hub. The hub carries a tile for every module, so if the V2 branch ever reached the
+  //   gated path it would grant the whole app to a profile that has not been completed.
+  //   The flag must never appear anywhere near renderFacilityList().
+  //
+  // ─── WHAT SLICE 1 DELIBERATELY DOES NOT RENDER ─────────────────────────────
+  // The "Bugün ADA'da" live strip is Slice 2 and the "Sık kullandıkların" favourites row
+  // is Slice 3. Neither is stubbed here: an empty section header with nothing under it
+  // reads as a broken screen, and a placeholder card is fake content that outlives the
+  // session it was written for. The Nöbetçi row sits directly under the Oli row until
+  // the strip lands between them.
+  function renderHubV2() {
+    const searching = !!globalQuery.trim()
+    return (
+      <>
+        {/* hideHeaderActions is honoured here as well as in the V1 header, and that is
+            defence rather than decoration. It is UNREACHABLE today — the gate sets
+            forceFacilityList, showFacilityList starts true, and the back handler calls
+            onExitFacilityList instead of clearing it, so a gated user never reaches this
+            hub. But "unreachable" is a property of three separate conditions in two
+            files, and the thing on the other side of it is a bell and a drawer for a
+            profile the gate has not let through. One prop is a cheaper insurance than
+            re-deriving that argument the next time this screen is edited. */}
+        <HomeTopBar
+          lang={lang}
+          hideActions={hideHeaderActions}
+          hasUnread={notifications.some(n => !n.read)}
+          searchOpen={searchOpen}
+          query={globalQuery}
+          onQueryChange={setGlobalQuery}
+          onOpenSearch={() => setSearchOpen(true)}
+          onCloseSearch={() => { setSearchOpen(false); setGlobalQuery(''); setGlobalResults([]) }}
+          onShowNotifs={onShowNotifs}
+          onOpenMenu={onOpenMenu}
+          searchRef={searchRef}
+          hamburgerRef={hamburgerRef}
+        />
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.v2Content}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Search takes over the page while it has a query — the results ARE the
+              screen at that point, and leaving the hero and grid underneath them makes
+              the user scroll past their own search to see it. Identical behaviour to V1;
+              only the entry point moved into the top bar. */}
+          {searching ? renderSearchResults() : (
+            <>
+              <HomeHero
+                region={region}
+                weatherData={weatherData}
+                lang={lang}
+                onOpenPlace={openPlaceById}
+                onOpenWeather={() => setWeatherOpen(true)}
+              />
+
+              <OliRow lang={lang} onPress={onOpenOli} />
+
+              {/* dutyBannerRef, not a new ref: App.js measures this exact ref to place
+                  the duty coach mark, and a ref that measures null drops that tutorial
+                  step silently. Both hub variants must attach it. */}
+              <View style={s.v2DutyWrap}>
+                <DutyRow
+                  lang={lang}
+                  status={dutyRosterStatus}
+                  onPress={onShowDutyList}
+                  innerRef={dutyBannerRef}
+                />
+              </View>
+
+              <Text style={s.v2SectionTitle}>{t('homeAllModules', lang)}</Text>
+              <ModuleGrid lang={lang} onPress={mod => moduleHandlers[mod.id]?.()} />
+
+              <HomeFooterSlot />
+            </>
+          )}
+        </ScrollView>
+
+        <WeatherSheet
+          visible={weatherOpen}
+          weatherData={weatherData}
+          lang={lang}
+          locale={locale}
+          onClose={() => setWeatherOpen(false)}
+        />
+      </>
     )
   }
 
@@ -835,6 +993,15 @@ export default function HomeScreen({
       {showFacilityList && <PageBackground topic="medical_facilities" />}
       <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
         <View style={s.container}>
+          {/* ─── THE HEADER IS V1's, AND V2 BRINGS ITS OWN ────────────────────
+              The condition is `showFacilityList || !HOME_V2_LIVE`, not `!HOME_V2_LIVE`,
+              and the difference is the whole safety property of this slice: in
+              facility-list mode this header renders EXACTLY as it does today whatever
+              the flag says. That mode is what the profile gate renders (it supplies the
+              BackButton and honours hideHeaderActions), so it must not have two
+              behaviours. V2 only ever removes this header from the HUB, where it is
+              replaced by HomeTopBar inside renderHubV2. */}
+          {(showFacilityList || !HOME_V2_LIVE) && (
           <View style={[s.header, showFacilityList && { justifyContent: 'space-between' }]}>
             {showFacilityList ? (
               <BackButton lang={lang} onImage onPress={() => {
@@ -860,8 +1027,11 @@ export default function HomeScreen({
               </View>
             )}
           </View>
+          )}
 
-          {showFacilityList ? renderFacilityList() : renderHub()}
+          {showFacilityList
+            ? renderFacilityList()
+            : (HOME_V2_LIVE ? renderHubV2() : renderHub())}
         </View>
       </SafeAreaView>
     </ImageBackground>
@@ -878,6 +1048,16 @@ const s = StyleSheet.create({
   notifBtn:       { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
   notifDot:       { position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
   hamburgerBtn:   { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
+
+  // Hub V2 (HOME_V2_LIVE)
+  // No `gap` here: the Oli row overlaps the hero with a negative margin of its own, and
+  // a container gap would fight it. Spacing is owned by the rows.
+  v2Content:        { paddingBottom: 32 },
+  v2SectionTitle:   { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 24, marginBottom: 4 },
+  // The gap between the Oli row and the Nöbetçi row lives HERE, on a wrapper, not inside
+  // DutyRow — Slice 2 drops the live strip in between them, and a component that carries
+  // its own top margin would have to be edited to move.
+  v2DutyWrap:       { marginTop: 16 },
 
   // Hub
   hubContent:       { paddingBottom: 32, gap: 12 },

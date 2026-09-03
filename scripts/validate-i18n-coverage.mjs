@@ -104,6 +104,30 @@ const SURFACES = [
   //   failure shape and it is worth the paragraph: when code moves out of a guarded file,
   //   the guard does not follow it, and the total is not the alarm you think it is.
   'components/DisplayNameCheck.js',
+  // ─── Widened 2026-09-03, HOME_V2 Slice 1 — IN THE COMMIT THAT CREATED THEM ──
+  //
+  // The same lesson the DisplayNameCheck paragraph above records, applied in advance
+  // rather than after the fact: Home's copy moved out of screens/HomeScreen.js (which
+  // IS in this list) into seven new component files, and every key that moved would
+  // have left the guard's scope with it. Nothing would have gone red — the translations
+  // exist — the scan would simply have stopped looking, while the printed key total went
+  // UP because these files add keys of their own. A coverage loss hidden inside a
+  // coverage gain.
+  //
+  // Guarded BEFORE HOME_V2_LIVE flips, not after, for the same reason ProfileSetupScreen
+  // was: this is the first screen every user sees, in whatever language they picked.
+  //
+  // constants/homeModules.js is here because the grid's labels are looked up through a
+  // VARIABLE — t(mod.labelKey, lang) — and a scan that only matched literal t('key')
+  // would silently cover none of them. That is this repo's named blind spot; the scan
+  // reads key maps for exactly this reason, and the map has to be in scope to be read.
+  'components/home/HomeTopBar.js',
+  'components/home/HomeHero.js',
+  'components/home/WeatherSheet.js',
+  'components/home/OliRow.js',
+  'components/home/DutyRow.js',
+  'components/home/ModuleGrid.js',
+  'constants/homeModules.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
