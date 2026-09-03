@@ -137,6 +137,20 @@ const s = StyleSheet.create({
   // edge lands at 341 + 10 - 64 = 287, beyond the text's 279.
   decorDot:  { position: 'absolute', right: -10, top: -24, width: 64, height: 64,
                borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.05)' },
+  // ─── RESTORED IN ROUND 7 AFTER A SCRIPTED EDIT DELETED IT ─────────────────
+  // Round 6's decoration edit replaced a slice running from a comment down to
+  // `text:` — and this style sat inside that range, so it was removed silently. With
+  // `s.mascot` undefined, `<Image style={undefined}>` falls back to the asset's
+  // INTRINSIC size: 1024x1024dp, unpositioned. He covered the grid and the tab bar.
+  //
+  // Nothing complained. JS has no error for a missing style key, and the failure is not
+  // "a bit off" but three orders of magnitude — which is why scripts/check-home-geometry.mjs
+  // now asserts that every `s.X` used in these components is actually defined. Same
+  // family as the logo's `contain` bug: a size that is not what anyone thinks it is.
+  //
+  // No disc, no borderRadius, no background — the whole point is that he is a cut-out.
+  mascot:  { position: 'absolute', left: 14, bottom: -Math.round(MASCOT_BOX * ASSET_BOTTOM),
+             width: MASCOT_BOX, height: MASCOT_BOX },
   text:    { flex: 1 },
   title:   { fontSize: 17, fontFamily: 'Inter_700Bold', color: '#fff' },
   // #F2FAFA, not colors.primaryLight: primaryLight is 4.44:1 on primary, under the 4.5

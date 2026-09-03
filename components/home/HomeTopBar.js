@@ -23,7 +23,7 @@ const LOGO = require('../../assets/hero/ada-wordmark-keyline.png')
 // The app bar. Two forms, one component.
 //
 //   onHero (default)  — rendered INSIDE the hero photograph: ADA wordmark centred with
-//                       a keyline, three white circular buttons top-right.
+//                       a keyline, two white circular buttons top-right.
 //   searchOpen        — the expanded search field, rendered on the page canvas with the
 //                       hero unmounted, because at that point the results ARE the screen.
 //
@@ -66,11 +66,13 @@ const LOGO = require('../../assets/hero/ada-wordmark-keyline.png')
 //   keyline disappears and the dark ink does the separating; on a dark ground the keyline
 //   does it. Measured at the shipped size: 0.0% boundary failure on all six backgrounds.
 //
-// ─── THE searchRef GOES ON THE ICON, AND THAT IS LOAD-BEARING ───────────────
-// App.js measures searchRef at tutorial time (measureRef → coachSteps) and a ref that
+// ─── searchRef LIVES ON THE HERO'S SEARCH PILL, NOT HERE ────────────────────
+// App.js measures searchRef at tutorial time (measureRef -> coachSteps) and a ref that
 // measures null SILENTLY DROPS that step — no error, one fewer coach mark, nobody
-// notices for a release. It sits on the icon's WRAPPER, which survives the
-// collapsed→expanded swap, rather than on the icon itself.
+// notices for a release. Round 7 moved search out of this bar and into HomeHero's pill,
+// so the ref moved with it. If a search control ever returns here, the ref comes back
+// too, and it goes on a WRAPPER that survives any collapsed/expanded swap rather than on
+// the control itself.
 export default function HomeTopBar({
   lang,
   hideActions = false,   // profile gate: no bell, no drawer, no search — see HomeScreen
@@ -78,11 +80,9 @@ export default function HomeTopBar({
   searchOpen,
   query,
   onQueryChange,
-  onOpenSearch,
   onCloseSearch,
   onShowNotifs,
   onOpenMenu,
-  searchRef,
   hamburgerRef,
 }) {
   const insets = useSafeAreaInsets()
@@ -131,17 +131,13 @@ export default function HomeTopBar({
 
       {!hideActions && (
         <View style={s.actions}>
-          <View ref={searchRef} collapsable={false}>
-            <TouchableOpacity
-              style={s.heroAction}
-              onPress={onOpenSearch}
-              accessibilityRole="button"
-              accessibilityLabel={t('homeSearchA11y', lang)}
-            >
-              <Feather name="search" size={18} color={colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
-
+          {/* ─── NO SEARCH ICON HERE ANY MORE ────────────────────────────────
+              Round 7 moved search into a pill inside the hero. Three white circles on a
+              photograph read as heavy, and a full-width bar is also the more honest
+              affordance — search is the widest-reaching thing on this screen and an icon
+              understated it. The BEHAVIOUR is unchanged: the pill opens the same
+              expand-in-place search, and searchRef moved with it so the coach mark still
+              points at the real target. */}
           <TouchableOpacity style={s.heroAction} onPress={onShowNotifs} accessibilityRole="button">
             <Ionicons name="notifications-outline" size={18} color={colors.textPrimary} />
             {hasUnread && <View style={s.dot} />}

@@ -467,7 +467,6 @@ export default function HomeScreen({
         onCloseSearch={() => { setSearchOpen(false); setGlobalQuery(''); setGlobalResults([]) }}
         onShowNotifs={onShowNotifs}
         onOpenMenu={onOpenMenu}
-        searchRef={searchRef}
         hamburgerRef={hamburgerRef}
       />
     )
@@ -517,6 +516,12 @@ export default function HomeScreen({
             onOpenPlace={openPlaceById}
             onOpenWeather={() => setWeatherOpen(true)}
             topControls={topBar}
+            // Search moved out of the top bar and into the hero in round 7. searchRef
+            // moved with it — App.js measures that exact ref for the coach mark, and a
+            // ref that measures null silently drops the step.
+            onOpenSearch={() => setSearchOpen(true)}
+            searchRef={searchRef}
+            showSearch={!hideHeaderActions}
           />
 
           <View style={s.v2Below}>

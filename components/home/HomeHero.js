@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import { colors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../constants/regions'
@@ -30,7 +30,11 @@ import { HERO_CONTENT_BOTTOM } from './homeLayout'
 //   Raising HERO_MAX without redoing that table is how the one row that must never be
 //   scrolled to ends up below the fold on the cheapest phone somebody owns.
 const HERO_FRACTION = 0.40
-const HERO_MIN = 280
+// 280 -> 305 in round 7. The search pill added 58pt of content inside the hero, and at
+// 280 the logo's bottom edge landed 2pt from the pill's top on a 712dp device — touching,
+// not merely tight. 305 restores a 23pt gap there and costs nothing at the fold: the duty
+// row still clears it by 185pt on the same device (round-7 log has the table).
+const HERO_MIN = 305
 const HERO_MAX = 400
 
 // ─── THE SCRIM IS TWO RAMPS, AND ONLY ONE OF THEM CARRIES LEGIBILITY ───────
@@ -113,6 +117,7 @@ const BOTTOM_LAYERS = rampLayers(BOTTOM_MAX)
 
 export default function HomeHero({
   region, weatherData, lang, onOpenPlace, onOpenWeather, topControls,
+  onOpenSearch, searchRef, showSearch = true,
 }) {
   const { height: winH } = useWindowDimensions()
   const heroH = Math.max(HERO_MIN, Math.min(HERO_MAX, Math.round(winH * HERO_FRACTION)))
@@ -171,6 +176,28 @@ export default function HomeHero({
             Only the TEMPERATURE half is tappable; the district name is not, so a tap
             there falls through to the hero's own deep-link. Two touch targets inside one
             pill, not one target doing two jobs. */}
+        {/* ─── SEARCH, AS A BAR ON THE PHOTOGRAPH ────────────────────────────
+            A white pill rather than a third circular button in the top-right. It opens
+            the SAME expand-in-place search — only the entry point's appearance changed —
+            and it carries searchRef so App.js's coach mark still measures the real
+            target. Solid white, so like every other element on this hero it carries its
+            own contrast instead of borrowing it from the scrim. */}
+        {showSearch && (
+          <View ref={searchRef} collapsable={false}>
+            <TouchableOpacity
+              style={s.searchPill}
+              onPress={onOpenSearch}
+              activeOpacity={0.85}
+              accessibilityRole="search"
+              accessibilityLabel={t('homeSearchA11y', lang)}
+            >
+              <Feather name="search" size={17} color={colors.textSecondary} />
+              <Text style={s.searchText} numberOfLines={1}>{t('hubSearchPlaceholder', lang)}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={s.bottomRow} pointerEvents="box-none">
         <View style={s.chipCol} pointerEvents="box-none">
         <View style={s.chip} pointerEvents="box-none">
           <Ionicons name="location" size={13} color="#fff" />
@@ -220,6 +247,7 @@ export default function HomeHero({
             )}
           </View>
         )}
+        </View>
       </View>
     </View>
   )
@@ -260,7 +288,12 @@ const s = StyleSheet.create({
   fill:      { flex: 1 },
   photo:     { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   band:      { position: 'absolute', left: 0, right: 0 },
-  content:   { flex: 1, justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', padding: 20, gap: 12 },
+  // A COLUMN now: the search pill sits full-width above the district row.
+  content:   { flex: 1, justifyContent: 'flex-end', padding: 20, gap: 12 },
+  bottomRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
+  searchPill:{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 46,
+               borderRadius: 23, backgroundColor: '#fff', paddingHorizontal: 16 },
+  searchText:{ flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   // A single pill, deliberately shallow: paddingVertical 6 against the old stack's ~71pt.
   // alignSelf flex-start so it hugs its content instead of stretching across the hero.
   // flex:1 so the bottom-right column stays pinned right; the chip itself hugs its
