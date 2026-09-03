@@ -158,8 +158,29 @@ const s = StyleSheet.create({
   // pointerEvents box-none on the container: the empty space between the chip and the
   // buttons must fall THROUGH to the hero, or the top half of the photo stops being a
   // tappable deep-link.
+  // ─── flex-end, NOT space-between ──────────────────────────────────────────
+  // This said `space-between`, which was correct while the logo was a FLEX CHILD sitting
+  // at the start of the row. Round 3 made the logo absolutely positioned so it could be
+  // centred on the screen rather than on the space the buttons leave — and that took it
+  // out of the flex flow, leaving this row with exactly ONE in-flow child.
+  //
+  // `space-between` distributes free space BETWEEN items. With one item there is no
+  // between, so it resolves to flex-start and the button cluster jumped to the left.
+  //
+  // ⚠ IT WAS NOT AN RTL BUG, AND IT RENDERED LEFT IN ENGLISH TOO. It surfaced in a
+  //   Turkish device pass, which makes "the Arabic mirror leaked" the obvious first
+  //   hypothesis and the wrong one — this app contains no RTL handling at all
+  //   (`I18nManager` is referenced nowhere), so nothing locale-dependent could have
+  //   moved it. When a layout looks mirrored, check the flex arithmetic before the
+  //   locale: a container whose children changed from two to one is the cheaper
+  //   explanation and was the true one.
+  //
+  // flex-end is also the direction-correct choice for the day RTL is added: under
+  // `direction: rtl` Yoga reverses the row's main axis, so flex-end resolves to the
+  // visual LEFT on its own. A hardcoded `justifyContent: 'flex-start'` plus a manual
+  // flip would not.
   heroBar:     { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16,
-                 flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+                 flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end' },
   // Absolute and full-width so the wordmark's centre is the SCREEN's centre, not the
   // centre of whatever space the action cluster leaves. `top` is set inline from the
   // safe-area inset — absoluteFillObject would ignore the bar's own paddingTop and put
