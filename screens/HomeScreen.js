@@ -987,8 +987,26 @@ export default function HomeScreen({
     )
   }
 
-  return (
-    <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
+  // ─── THE V2 HUB HAS A SOLID CANVAS; EVERYTHING ELSE KEEPS THE PHOTO ────────
+  //
+  // V1 and facility-list mode render inside a full-bleed <ImageBackground>. That was
+  // fine when the page was white cards on a photo, and it is NOT fine for a bare-icon
+  // grid: the lower rows' labels landed over the sea in auth-bg.png and became
+  // unreadable — eSIM, Öğrenci Merkezi and Belediyeler worst of all. Photo-behind-text
+  // fails hardest in bright outdoor light, which is exactly when somebody is standing in
+  // the street looking for the duty pharmacy tile.
+  //
+  // So under V2 the photograph is confined to the hero band, which owns its own scrim,
+  // and the page below it is a solid warm cream (colors.bgWarm). Grid labels are
+  // textPrimary on that: 13.56:1, measured.
+  //
+  // ⚠ THE BRANCH IS ON THE HUB ONLY. `showFacilityList` keeps the ImageBackground in
+  //   BOTH flag states, so the profile gate's read-only directory — which is what that
+  //   mode renders — is byte-identical to today whatever HOME_V2_LIVE says.
+  const v2Hub = HOME_V2_LIVE && !showFacilityList
+
+  const shell = (
+    <>
       {/* Facility-list mode swaps the hub's sky for the medical-facilities art (full-bleed). */}
       {showFacilityList && <PageBackground topic="medical_facilities" />}
       <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
@@ -1034,8 +1052,19 @@ export default function HomeScreen({
             : (HOME_V2_LIVE ? renderHubV2() : renderHub())}
         </View>
       </SafeAreaView>
-    </ImageBackground>
+    </>
   )
+
+  // Same children either way — only what they sit ON changes. Keeping one `shell` rather
+  // than two copies of the tree is what makes "V1 is byte-identical" checkable by
+  // reading: there is exactly one place the two paths differ, and it is this ternary.
+  return v2Hub
+    ? <View style={s.v2Canvas}>{shell}</View>
+    : (
+      <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
+        {shell}
+      </ImageBackground>
+    )
 }
 
 const s = StyleSheet.create({
@@ -1048,6 +1077,10 @@ const s = StyleSheet.create({
   notifBtn:       { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
   notifDot:       { position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.bg },
   hamburgerBtn:   { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
+
+  // The V2 page canvas. ONE background surface — cards on top of it are cardBg, as
+  // everywhere else in the app. Do not add a second.
+  v2Canvas:         { flex: 1, backgroundColor: colors.bgWarm },
 
   // Hub V2 (HOME_V2_LIVE)
   // No `gap` here: the Oli row overlaps the hero with a negative margin of its own, and

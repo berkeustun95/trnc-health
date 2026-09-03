@@ -104,9 +104,11 @@ export default function HomeTopBar({
 const s = StyleSheet.create({
   // Height is fixed so the collapsed and expanded states are the same size — an
   // expanding search that also changes the bar's height shoves the hero down as the
-  // keyboard comes up.
-  bar:    { flexDirection: 'row', alignItems: 'center', height: 46, gap: 6, marginBottom: 12 },
-  logo:   { width: 92, height: 40 },
+  // keyboard comes up. Raised from 46 with the logo, so the wordmark is not boxed in.
+  bar:    { flexDirection: 'row', alignItems: 'center', height: 54, gap: 6, marginBottom: 10 },
+  // Was 92x40 and read as a favicon rather than a wordmark — the first thing on the
+  // first screen, and the smallest. 124x46 fills the bar's height properly.
+  logo:   { width: 124, height: 46 },
   action: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' },
   dot:    { position: 'absolute', top: 7, right: 7, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.cardBg },
   field:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, height: 38, borderRadius: 12, backgroundColor: colors.cardBg, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border },

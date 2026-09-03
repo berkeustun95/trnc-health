@@ -18,6 +18,24 @@ import { weatherIcon } from '../../utils/facilityUtils'
 // down under the user's thumb mid-tap.
 export const HERO_HEIGHT = 176
 
+// How far the Oli card is pulled up over the hero's bottom edge.
+//
+// ─── ONE NUMBER, TWO COMPONENTS, AND THAT IS THE POINT ──────────────────────
+// The card overlaps the hero by design. What was NOT designed was three controls landing
+// in the same corner: the card's top edge crossed both the temperature chip and the
+// hero's round arrow, so two tappable things sat underneath an opaque card. Whichever
+// won the touch, one of them was a lie.
+//
+// The fix is that the hero reserves this much space at the bottom of its own content
+// (plus clearance), and OliRow pulls up by exactly the same figure — so the overlap
+// zone provably contains nothing tappable. Two components reading one constant cannot
+// drift; two components each carrying their own -22 can, and silently, because the
+// symptom is a mis-tap rather than a visual break.
+export const HERO_OVERLAP = 22
+
+// Clearance between the hero's lowest content and the top of the Oli card.
+const OVERLAP_CLEARANCE = 14
+
 // ─── THE GRADIENT IS SIX FLAT BANDS, NOT A GRADIENT ─────────────────────────
 // expo-linear-gradient is not installed, and this repo does not add packages to get a
 // visual effect (CLAUDE.md pins the SDK deliberately). Six stacked bands of increasing
@@ -149,7 +167,10 @@ const s = StyleSheet.create({
   fill:      { flex: 1 },
   photo:     { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   band:      { position: 'absolute', left: 0, right: 0 },
-  content:   { flex: 1, justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', padding: 16, gap: 12 },
+  // paddingBottom is DERIVED from the overlap, never a literal: everything in here sits
+  // above the Oli card's top edge because the number that positions the card is the same
+  // number that reserves the room.
+  content:   { flex: 1, justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', padding: 16, paddingBottom: HERO_OVERLAP + OVERLAP_CLEARANCE, gap: 12 },
   textCol:   { flex: 1 },
   district:  { fontSize: 24, fontFamily: 'Inter_700Bold', color: '#fff' },
   tempPill:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },

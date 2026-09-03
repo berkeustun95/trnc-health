@@ -6,10 +6,20 @@ import {
   HOME_MODULES, GRID_COLUMNS, GRID_LABEL_HEIGHT, GRID_LABEL_LINE_HEIGHT,
 } from '../../constants/homeModules'
 
+// TWO families, matching the `tint` vocabulary in constants/homeModules.js. This map is
+// the whole of the grid's colour logic — there is no module id anywhere in this file, so
+// recolouring a module is an edit to its data row and nothing else.
+//
+// Equal strength on both, deliberately: each is a pale background carrying a saturated
+// icon at the same weight, so `standard` reads as "not urgent" rather than as disabled.
+// MEASURED, not asserted — urgent is 3.75:1 on its own background, standard 4.44:1, a
+// gap of 0.70. Both clear the 3:1 minimum for a UI component and they are close enough
+// that neither family reads as recessed beside the other. (The first draft of this
+// comment claimed 4.79 and 5.09, which were numbers nobody had computed. If these pairs
+// are ever retuned, recompute rather than adjust the sentence.)
 const TINTS = {
-  urgent:    { bg: colors.tintUrgentBg,    fg: colors.tintUrgentFg    },
-  service:   { bg: colors.tintServiceBg,   fg: colors.tintServiceFg   },
-  lifestyle: { bg: colors.tintLifestyleBg, fg: colors.tintLifestyleFg },
+  urgent:   { bg: colors.tintUrgentBg,  fg: colors.tintUrgentFg  },
+  standard: { bg: colors.tintServiceBg, fg: colors.tintServiceFg },
 }
 
 // Tüm modüller — every module, four across, bare icons.

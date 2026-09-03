@@ -10,9 +10,35 @@
 //
 //   id         stable identifier, also the key the handler map in HomeScreen uses
 //   icon       Ionicons outline name (no icon-library change: @expo/vector-icons)
-//   tint       urgent | service | lifestyle — the pairs live in constants/theme.js
+//   tint       urgent | standard — see the urgency encoding below
 //   labelKey   i18n key, resolved in all 9 locales
 //   opensModal true for the two entries that are modals rather than screens
+//
+// ─── THE TINT ENCODES URGENCY, AND ONLY URGENCY ─────────────────────────────
+//
+// TWO values, not three. The previous set (urgent / service / lifestyle) was a
+// CATEGORY split, and as a visual system it said nothing: Games and Pets were coral
+// while Insurance and Transport were teal, which no user could have derived a rule from
+// and which spent the palette's only strong signal on a distinction nobody needs at a
+// glance.
+//
+//   urgent    coral — the things somebody opens the app FOR in an emergency:
+//             health facilities, emergency numbers, towing/roadside. (Duty pharmacy is
+//             the fourth, and it is the permanent Nöbetçi row above this grid rather
+//             than a tile — it already carries the same coral.)
+//   standard  teal — everything else.
+//
+// The two families carry EQUAL tint strength (a pale background, a saturated icon) so
+// that neither reads as disabled or secondary. Teal is not "off"; it is "not urgent".
+//
+// ⚠ COLOUR IS NOT THE SOLE CARRIER OF MEANING, and that is a property to preserve, not
+//   a claim to repeat. All 19 icons are distinct and every tile is labelled, so the
+//   grid is fully usable in greyscale and to a red-green colourblind reader. Do not add
+//   an affordance whose only signal is its colour.
+//
+// ⚠ RECOLOURING A MODULE IS A DATA CHANGE — edit its `tint` here. There is deliberately
+//   no id list anywhere in the rendering code; ModuleGrid maps `tint` to a pair and
+//   knows nothing about which module is which.
 //
 // ─── EVERY MODULE, FOR EVERY USER — AND WHAT THAT CHANGED ───────────────────
 //
@@ -41,34 +67,34 @@
 export const HOME_MODULES = [
   // Urgent first. These are what somebody opens the app FOR at 2am, and the profile
   // gate's exemption list (constants/profileGate.js) names the same three concerns.
-  { id: 'health',             icon: 'medkit-outline',           tint: 'urgent',    labelKey: 'hubMedicalTitle' },
-  { id: 'emergency',          icon: 'call-outline',             tint: 'urgent',    labelKey: 'menuEmergency', opensModal: true },
-  { id: 'towing',             icon: 'car-outline',              tint: 'urgent',    labelKey: 'menuTowing' },
+  { id: 'health',             icon: 'medkit-outline',           tint: 'urgent',   labelKey: 'hubMedicalTitle' },
+  { id: 'emergency',          icon: 'call-outline',             tint: 'urgent',   labelKey: 'menuEmergency', opensModal: true },
+  { id: 'towing',             icon: 'car-outline',              tint: 'urgent',   labelKey: 'menuTowing' },
 
   // Everyday life.
-  { id: 'events',             icon: 'calendar-outline',         tint: 'lifestyle', labelKey: 'menuEvents' },
+  { id: 'events',             icon: 'calendar-outline',         tint: 'standard', labelKey: 'menuEvents' },
   // menuPlaces, NOT menuExplore: the bottom-nav tab owns 'Keşfet'. This tile opens the
   // browsable DIRECTORY, the one thing the map tab does not offer. Icon must not be
   // compass-outline either — that is the tab's icon.
-  { id: 'explore',            icon: 'albums-outline',           tint: 'lifestyle', labelKey: 'menuPlaces' },
-  { id: 'accommodation',      icon: 'home-outline',             tint: 'lifestyle', labelKey: 'menuAccommodations' },
-  { id: 'pets',               icon: 'paw-outline',              tint: 'lifestyle', labelKey: 'menuPets' },
-  { id: 'games',              icon: 'game-controller-outline',  tint: 'lifestyle', labelKey: 'menuGames' },
+  { id: 'explore',            icon: 'albums-outline',           tint: 'standard', labelKey: 'menuPlaces' },
+  { id: 'accommodation',      icon: 'home-outline',             tint: 'standard', labelKey: 'menuAccommodations' },
+  { id: 'pets',               icon: 'paw-outline',              tint: 'standard', labelKey: 'menuPets' },
+  { id: 'games',              icon: 'game-controller-outline',  tint: 'standard', labelKey: 'menuGames' },
 
   // Getting things done.
-  { id: 'jobPostings',        icon: 'briefcase-outline',        tint: 'service',   labelKey: 'menuJobPostings' },
-  { id: 'homeServices',       icon: 'hammer-outline',           tint: 'service',   labelKey: 'menuHomeServices' },
-  { id: 'transport',          icon: 'bus-outline',              tint: 'service',   labelKey: 'menuTransportation' },
-  { id: 'garages',            icon: 'car-sport-outline',        tint: 'service',   labelKey: 'menuGarages' },
-  { id: 'insurance',          icon: 'shield-checkmark-outline', tint: 'service',   labelKey: 'menuInsurance' },
-  { id: 'grooming',           icon: 'cut-outline',              tint: 'lifestyle', labelKey: 'menuGrooming' },
+  { id: 'jobPostings',        icon: 'briefcase-outline',        tint: 'standard', labelKey: 'menuJobPostings' },
+  { id: 'homeServices',       icon: 'hammer-outline',           tint: 'standard', labelKey: 'menuHomeServices' },
+  { id: 'transport',          icon: 'bus-outline',              tint: 'standard', labelKey: 'menuTransportation' },
+  { id: 'garages',            icon: 'car-sport-outline',        tint: 'standard', labelKey: 'menuGarages' },
+  { id: 'insurance',          icon: 'shield-checkmark-outline', tint: 'standard', labelKey: 'menuInsurance' },
+  { id: 'grooming',           icon: 'cut-outline',              tint: 'standard', labelKey: 'menuGrooming' },
 
   // Settling in.
-  { id: 'newcomerEssentials', icon: 'compass-outline',          tint: 'service',   labelKey: 'menuNewcomerEssentials' },
-  { id: 'exchangeRates',      icon: 'trending-up-outline',      tint: 'service',   labelKey: 'menuExchangeRates' },
-  { id: 'esim',               icon: 'cellular-outline',         tint: 'service',   labelKey: 'menuEsim' },
-  { id: 'studentHub',         icon: 'school-outline',           tint: 'service',   labelKey: 'menuStudentHub' },
-  { id: 'municipal',          icon: 'business-outline',         tint: 'service',   labelKey: 'menuMunicipalities', opensModal: true },
+  { id: 'newcomerEssentials', icon: 'compass-outline',          tint: 'standard', labelKey: 'menuNewcomerEssentials' },
+  { id: 'exchangeRates',      icon: 'trending-up-outline',      tint: 'standard', labelKey: 'menuExchangeRates' },
+  { id: 'esim',               icon: 'cellular-outline',         tint: 'standard', labelKey: 'menuEsim' },
+  { id: 'studentHub',         icon: 'school-outline',           tint: 'standard', labelKey: 'menuStudentHub' },
+  { id: 'municipal',          icon: 'business-outline',         tint: 'standard', labelKey: 'menuMunicipalities', opensModal: true },
 ]
 
 // ─── THE FIXED LABEL HEIGHT, AND WHY IT IS A NUMBER RATHER THAN A MIN ───────

@@ -8,6 +8,20 @@ export const colors = {
   accent:        '#FF8552',
   accentLight:   '#FFF0EB',
   bg:            '#F7F8FA',
+  // Home V2's page canvas, below the hero band. A WARM cream against the app's otherwise
+  // cool greys, so the photo band reads as a distinct object sitting ON a page rather
+  // than as the page itself.
+  //
+  // WHY A NEW TOKEN AND NOT `sand`. sand (#EFEBE2) is the obvious candidate and is the
+  // wrong one: it is documented below as the towing coverage map's "uncovered region"
+  // fill and is MIRRORED in scripts/generate-towing-map.mjs, so a third consumer with
+  // different needs would mean a change made for Home silently shifts a generated map
+  // legend. Same hue family, deliberately — this is sand's much lighter sibling — but its
+  // own token with its own reason to change.
+  //
+  // ONE canvas colour, not two: cards on top of it are `cardBg` (#FFFFFF) as everywhere
+  // else in the app. Do not add a second background surface.
+  bgWarm:        '#FAF6EF',
   cardBg:        '#FFFFFF',
   surface:       '#FFFFFF',
   border:        '#E8EDF2',
