@@ -24,6 +24,15 @@
 // Each entry carries the credit as fields, not as a pre-formatted string, so the sheet
 // renders it through the same code path as every other attributed photo in the app.
 //
+// ⚠ ALL FIVE IMAGES ARE CROPPED AND RESIZED FROM THE ORIGINAL, AND THE SHEET SAYS SO.
+//   CC BY 2.0/3.0/4.0 each require indicating that changes were made (4.0 is explicit
+//   about it in §3(a)(1)(B)); a credit that names the author and licence but silently
+//   presents a crop as the original is an incomplete attribution, not a complete one.
+//   The notice lives in the `heroCreditNote` string rendered by HeroCreditSheet, so it
+//   is stated once, in all nine locales, and cannot drift per district. If a future hero
+//   is ever used UNCROPPED, that string is the thing to revisit — it currently asserts a
+//   modification for every photo it describes.
+//
 // ⚠ INCOMPLETE PROVENANCE IS TREATED AS NO PHOTO. A district whose entry has an asset
 //   but is missing an author, a licence name, a licence URL or a source page falls back
 //   to the generic hero and becomes non-tappable — see resolveHero(). That is the whole

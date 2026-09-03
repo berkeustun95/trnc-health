@@ -36,6 +36,10 @@ export default function HeroCreditSheet({ visible, credit, lang, onClose }) {
               and what is tappable are not, and those stay in the shared component. */}
           <PhotoCredit a={credit} lang={lang} style={s.body} textStyle={s.bodyText} />
 
+          {/* Carries the MODIFICATION NOTICE as well as the source. Every hero image
+              is cropped and resized from its original, and CC BY asks for changes to be
+              indicated — naming the author and licence while presenting a crop as the
+              original is an incomplete attribution. See constants/homeHero.js. */}
           <Text style={s.note}>{t('heroCreditNote', lang)}</Text>
         </View>
       </TouchableOpacity>

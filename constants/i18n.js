@@ -1307,7 +1307,7 @@ const translations = {
     homeDutySub: "Find the nearest pharmacy",
     coachSearchBodyV2: "Tap the search icon to find anything in ADA — pharmacies, places, events and more.",
     heroCreditTitle: "About this photo",
-    heroCreditNote: "This photo comes from Wikimedia Commons and is used under the licence shown above.",
+    heroCreditNote: "This photo comes from Wikimedia Commons and is used under the licence shown above. It has been cropped and resized to fit this screen.",
   },
   tr: {
     // Ask Oli guide
@@ -2589,7 +2589,7 @@ const translations = {
     homeDutySub: "En yakın eczaneyi bul",
     coachSearchBodyV2: "ADA'daki her şeyi bulmak için arama simgesine dokun — eczaneler, mekânlar, etkinlikler ve dahası.",
     heroCreditTitle: "Bu fotoğraf hakkında",
-    heroCreditNote: "Bu fotoğraf Wikimedia Commons'tan alınmıştır ve yukarıda belirtilen lisansla kullanılmaktadır.",
+    heroCreditNote: "Bu fotoğraf Wikimedia Commons'tan alınmıştır ve yukarıda belirtilen lisansla kullanılmaktadır. Bu ekrana sığması için kırpılmış ve yeniden boyutlandırılmıştır.",
   },
   ar: {
     // Ask Oli guide
@@ -3559,7 +3559,7 @@ const translations = {
     homeDutySub: "اعثر على أقرب صيدلية",
     coachSearchBodyV2: "اضغط على أيقونة البحث للعثور على أي شيء في ADA — الصيدليات والأماكن والفعاليات وغيرها.",
     heroCreditTitle: "عن هذه الصورة",
-    heroCreditNote: "هذه الصورة مأخوذة من ويكيميديا كومنز وتُستخدم بموجب الترخيص الموضح أعلاه.",
+    heroCreditNote: "هذه الصورة مأخوذة من ويكيميديا كومنز وتُستخدم بموجب الترخيص الموضح أعلاه. وقد تم اقتصاصها وتغيير حجمها لتناسب هذه الشاشة.",
   },
   ru: {
     // Ask Oli guide
@@ -4528,7 +4528,7 @@ const translations = {
     homeDutySub: "Найти ближайшую аптеку",
     coachSearchBodyV2: "Нажмите значок поиска, чтобы найти всё в ADA — аптеки, места, события и другое.",
     heroCreditTitle: "Об этой фотографии",
-    heroCreditNote: "Эта фотография взята из Викисклада и используется по указанной выше лицензии.",
+    heroCreditNote: "Эта фотография взята из Викисклада и используется по указанной выше лицензии. Она была обрезана и уменьшена под этот экран.",
   },
   el: {
     // Ask Oli guide
@@ -5497,7 +5497,7 @@ const translations = {
     homeDutySub: "Βρες το πλησιέστερο φαρμακείο",
     coachSearchBodyV2: "Πάτησε το εικονίδιο αναζήτησης για να βρεις τα πάντα στο ADA — φαρμακεία, μέρη, εκδηλώσεις και άλλα.",
     heroCreditTitle: "Σχετικά με τη φωτογραφία",
-    heroCreditNote: "Η φωτογραφία προέρχεται από το Wikimedia Commons και χρησιμοποιείται με την παραπάνω άδεια.",
+    heroCreditNote: "Η φωτογραφία προέρχεται από το Wikimedia Commons και χρησιμοποιείται με την παραπάνω άδεια. Έχει περικοπεί και αλλάξει μέγεθος για να ταιριάζει σε αυτήν την οθόνη.",
   },
   fr: {
     // Ask Oli guide
@@ -6469,7 +6469,7 @@ const translations = {
     homeDutySub: "Trouver la pharmacie la plus proche",
     coachSearchBodyV2: "Appuyez sur l'icône de recherche pour tout trouver dans ADA — pharmacies, lieux, événements et plus.",
     heroCreditTitle: "À propos de cette photo",
-    heroCreditNote: "Cette photo provient de Wikimedia Commons et est utilisée sous la licence indiquée ci-dessus.",
+    heroCreditNote: "Cette photo provient de Wikimedia Commons et est utilisée sous la licence indiquée ci-dessus. Elle a été recadrée et redimensionnée pour cet écran.",
   },
   es: {
     // Ask Oli guide
@@ -7438,7 +7438,7 @@ const translations = {
     homeDutySub: "Encuentra la farmacia más cercana",
     coachSearchBodyV2: "Toca el icono de búsqueda para encontrar todo en ADA: farmacias, lugares, eventos y más.",
     heroCreditTitle: "Sobre esta foto",
-    heroCreditNote: "Esta foto procede de Wikimedia Commons y se usa bajo la licencia indicada arriba.",
+    heroCreditNote: "Esta foto procede de Wikimedia Commons y se usa bajo la licencia indicada arriba. Ha sido recortada y redimensionada para esta pantalla.",
   },
   de: {
     // Ask Oli guide
@@ -8408,7 +8408,7 @@ const translations = {
     homeDutySub: "Die nächste Apotheke finden",
     coachSearchBodyV2: "Tippe auf das Suchsymbol, um alles in ADA zu finden — Apotheken, Orte, Veranstaltungen und mehr.",
     heroCreditTitle: "Über dieses Foto",
-    heroCreditNote: "Dieses Foto stammt von Wikimedia Commons und wird unter der oben genannten Lizenz verwendet.",
+    heroCreditNote: "Dieses Foto stammt von Wikimedia Commons und wird unter der oben genannten Lizenz verwendet. Es wurde für diesen Bildschirm zugeschnitten und skaliert.",
   },
   fa: {
     // Ask Oli guide
@@ -9377,7 +9377,7 @@ const translations = {
     homeDutySub: "نزدیک‌ترین داروخانه را پیدا کنید",
     coachSearchBodyV2: "برای یافتن هر چیزی در ADA روی نماد جست‌وجو بزنید — داروخانه‌ها، مکان‌ها، رویدادها و بیشتر.",
     heroCreditTitle: "دربارهٔ این عکس",
-    heroCreditNote: "این عکس از ویکی‌انبار گرفته شده و بر پایهٔ پروانهٔ بالا استفاده می‌شود.",
+    heroCreditNote: "این عکس از ویکی‌انبار گرفته شده و بر پایهٔ پروانهٔ بالا استفاده می‌شود. برای تناسب با این صفحه بریده و کوچک شده است.",
   },
 }
 export function t(key, lang) {
