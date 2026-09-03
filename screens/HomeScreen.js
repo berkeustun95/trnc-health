@@ -21,8 +21,10 @@ import WeatherSheet from '../components/home/WeatherSheet'
 import OliRow from '../components/home/OliRow'
 import DutyRow from '../components/home/DutyRow'
 import ModuleGrid from '../components/home/ModuleGrid'
+import LiveStrip from '../components/home/LiveStrip'
 import HomeFooterSlot from '../components/home/HomeFooterSlot'
 import { HOME_MODULES } from '../constants/homeModules'
+import { resolveStripItem } from '../utils/homeStripResolver'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
   haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherDesc, isAvailableToday, coarseCoord,
@@ -173,6 +175,13 @@ export default function HomeScreen({
   // never reads them, so old Home behaves identically whether App.js passes them or not.
   region,      // resolved home district slug (profile.region → City Welcome → GPS), or null
   onOpenOli,   // opens the Ask Oli sheet — OliGuide's own openSheet, reached through a ref
+  // ─── Bugün ADA'da (Slice 2) ───────────────────────────────────────────────
+  // Whether this user may be shown paid placement. COMPUTED IN App.js, from
+  // promosAllowed() in constants/homeStrip.js — that function is the single statement of
+  // the rule (guest / null DOB / under 18), and passing the ANSWER rather than the
+  // profile keeps this screen from acquiring a second opinion about it. Defaults to
+  // false, so every caller that has not thought about it gets the safe branch.
+  promosEligible = false,
 }) {
   const [showFacilityList, setShowFacilityList] = useState(forceFacilityList)
   const [searchText, setSearchText]             = useState('')
@@ -187,6 +196,11 @@ export default function HomeScreen({
   // while HOME_V2_LIVE is false: nothing in the V1 path reads either one.
   const [searchOpen, setSearchOpen]             = useState(false)
   const [weatherOpen, setWeatherOpen]           = useState(false)
+
+  // The live strip. `stripLoading` starts TRUE so the first paint is the fixed-height
+  // skeleton rather than a collapsed row that grows when the resolver returns.
+  const [stripItem, setStripItem]       = useState(null)
+  const [stripLoading, setStripLoading] = useState(true)
 
   // Global hub search
   const [globalQuery, setGlobalQuery]       = useState('')
@@ -225,6 +239,51 @@ export default function HomeScreen({
     const { data } = await supabase.from('places')
       .select(PLACE_COLS).eq('id', id).eq('status', 'active').maybeSingle()
     if (data) onSelectExplorePlace(data)
+  }
+
+  // ─── Bugün ADA'da — resolve once per mount ────────────────────────────────
+  //
+  // ⚠ GATED ON HOME_V2_LIVE, WHICH IS NOT DECORATION. The V1 hub never renders the strip,
+  //   so running the ladder there would be network traffic and battery spent on a card
+  //   nobody can see — and it would make the V1 path observably different from today,
+  //   which is the one thing this flag promises it is not.
+  //
+  // Also skipped in facility-list mode: that is what the profile gate renders, and a
+  // gated user must not have Home's content resolved on their behalf.
+  //
+  // No cleanup flag is needed — resolveStripItem never rejects (every rank catches, and
+  // rank 6 is a local constant) — but an unmounted setState is still a warning, so the
+  // effect tracks liveness the ordinary way.
+  useEffect(() => {
+    if (!HOME_V2_LIVE || showFacilityList) return
+    let alive = true
+    setStripLoading(true)
+    resolveStripItem({ lang, promosEligible })
+      .then(item => { if (alive) { setStripItem(item); setStripLoading(false) } })
+    return () => { alive = false }
+  }, [lang, promosEligible, showFacilityList])
+
+  // The strip's `action` is a plain descriptor, never a closure — the resolver has no
+  // navigation in it, and this is the one place that turns a kind into a destination.
+  function handleStripPress(item) {
+    const a = item?.action
+    if (!a) return
+    switch (a.type) {
+      // Events has no initialEventId prop today, so a tapped event opens the LIST rather
+      // than that event. Deliberate and recorded: adding a deep-link means threading an id
+      // through EventsScreen's own selection state, which is its own change. The list is
+      // date-ordered and the strip only ever surfaces something starting today, so the
+      // event is at the top of it.
+      case 'events':    onShowEvents?.(); break
+      case 'place':     openPlaceById(a.id); break
+      case 'oli':       onOpenOli?.(); break
+      case 'duty':      onShowDutyList?.(); break
+      case 'explore':   onShowExplore?.(); break
+      case 'emergency': onShowEmergency?.(); break
+      // Promos are the only outbound link on this screen. openURL can reject on a
+      // malformed href, and an unhandled rejection here would be a red box over Home.
+      case 'link':      if (a.url) Linking.openURL(a.url).catch(() => {}); break
+    }
   }
 
   async function handleResultPress(result) {
@@ -526,6 +585,26 @@ export default function HomeScreen({
 
           <View style={s.v2Below}>
             <OliRow lang={lang} onPress={onOpenOli} />
+
+            {/* ─── Bugün ADA'da ────────────────────────────────────────────
+                The heading lives HERE rather than inside LiveStrip so it uses the same
+                v2SectionTitle token as "Tüm modüller" below and cannot drift from it.
+                That is only safe because LiveStrip has no empty branch — it renders the
+                skeleton while loading and a card otherwise, and the resolver's rank 6 is
+                a local constant — so this heading can never be left standing over
+                nothing.
+
+                ⚠ AND THE STRIP SITS ABOVE THE DUTY ROW WITHOUT COMPETING WITH IT. Duty
+                  is a permanent row and is deliberately not one of the strip's kinds; if
+                  it were, the single most important row on this screen would disappear
+                  on any day an event outranked it. */}
+            <Text style={s.v2SectionTitle}>{t('stripSectionTitle', lang)}</Text>
+            <LiveStrip
+              item={stripItem}
+              loading={stripLoading}
+              lang={lang}
+              onPress={handleStripPress}
+            />
 
             {/* dutyBannerRef, not a new ref: App.js measures this exact ref to place
                 the duty coach mark, and a ref that measures null drops that tutorial

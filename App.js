@@ -20,6 +20,7 @@ import { t, LANGUAGES } from './constants/i18n'
 import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE } from './constants/flags'
+import { promosAllowed } from './constants/homeStrip'
 import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
 } from './constants/profileGate'
@@ -1611,6 +1612,17 @@ export default function App() {
             // country-level fallback rather than an error state.
             region={profile?.region || deviceRegion || null}
             onOpenOli={() => oliOpenRef.current?.()}
+            /* ─── Bugün ADA'da: may this user be shown paid placement? ──────
+               The ANSWER is computed here and the rule lives in one function
+               (constants/homeStrip.js). Passing `profile` instead would let HomeScreen
+               form its own opinion about a rule that is partly a Play policy obligation:
+               ADA is a declared mixed-audience app, so a user whose date_of_birth
+               indicates under 18 is in scope for the non-personalized-ads requirement,
+               and promosAllowed() is where that reading is written down and argued. */
+            promosEligible={promosAllowed({
+              isGuest: isGuest(session),
+              dateOfBirth: profile?.date_of_birth,
+            })}
           />
         )}
 

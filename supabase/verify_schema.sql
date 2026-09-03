@@ -61,6 +61,7 @@ WITH report AS (
     ('1001_profile_completion','institutions'),
     ('1001_profile_completion','reserved_names'),
     ('0926_moderation_rejection_log','moderation_rejections'),
+    ('1007_home_strip_pin','home_strip_pin'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -415,6 +416,17 @@ WITH report AS (
     ('0910_contact_events','contact_events_module_check'),
     ('0910_contact_events','contact_events_action_check'),
     ('0910_contact_events','contact_events_region_check'),
+    -- home_strip_pin (1007). home_strip_pin_kind_check is the one that matters most:
+    -- it is the structural reason a DUTY PHARMACY can never enter the strip's ladder.
+    -- Duty has a permanent row of its own precisely because anything in a ladder can
+    -- be outranked, and the row somebody opens this app for at 2am must never be the
+    -- one that lost. shape_check keeps a sponsored link from wearing an editorial
+    -- card's clothes; sponsor_check is the disclosure half.
+    ('1007_home_strip_pin','home_strip_pin_kind_check'),
+    ('1007_home_strip_pin','home_strip_pin_shape_check'),
+    ('1007_home_strip_pin','home_strip_pin_sponsor_check'),
+    ('1007_home_strip_pin','home_strip_pin_window_check'),
+    ('1007_home_strip_pin','home_strip_pin_link_scheme_check'),
     -- ── Profile gate. profiles_completion_requires_fields_check is the one that makes
     --    profile_completed_at MEAN something: without it the flag can be set on an empty
     --    row and the gate is decoration a modified client walks straight past.
@@ -494,7 +506,13 @@ WITH report AS (
     -- an impersonation vector. See the H-token below for the half that matters more:
     -- that it is built on the NORMALIZED column and not the raw string.
     ('1001_profile_completion','profiles_display_name_norm_uniq'),
-    ('1001_profile_completion','idx_profiles_institution_id')
+    ('1001_profile_completion','idx_profiles_institution_id'),
+    -- home_strip_pin (1007). The PARTIAL UNIQUE is the load-bearing one: rank 1 of
+    -- the Home strip asks for "the pin for today", singular, and without this two
+    -- active rows on one date make that answer depend on row order — a bug that
+    -- surfaces only on the day somebody double-books.
+    ('1007_home_strip_pin','home_strip_pin_one_per_day'),
+    ('1007_home_strip_pin','idx_home_strip_pin_active_pool')
 
   ) e(m,o)
 
@@ -1126,6 +1144,15 @@ WITH report AS (
       EXISTS(SELECT 1 FROM information_schema.columns
         WHERE table_schema='public' AND table_name='towing_companies'
           AND column_name='is_active' AND column_default = 'false')
+    -- home_strip_pin.is_active DEFAULTs to FALSE, the same deliberate inversion for the
+    -- same reason. A revert here is worse than towing's: this table can carry a PAID
+    -- promo, so a row that publishes itself on omission is a sponsored card appearing on
+    -- every user's home screen before anyone decided it should. No named object changes
+    -- when the default does, so nothing but the value itself can detect it.
+    UNION ALL SELECT '1007_home_strip_pin','home_strip_pin.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='home_strip_pin'
+          AND column_name='is_active' AND column_default = 'false')
     -- search_content gained a towing_companies arm. CREATE OR REPLACE adds no new named
     -- object, so only a body token can tell the new definition from the old one.
     -- Unclaimed pharmacies leave the search index (0924). CREATE OR REPLACE adds no named
@@ -1624,6 +1651,11 @@ WITH report AS (
     -- admin-seeded directory: no user data, but public-read + admin-write only
     -- works solely because RLS is ON. OFF here = world-writable firm listings.
     'towing_companies',
+    -- home_strip_pin is the same shape: admin-seeded, public-read, no user data. RLS OFF
+    -- here means world-writable cards on the first screen of the app — an unauthenticated
+    -- writer could put an arbitrary title and an arbitrary outbound link in front of every
+    -- user, which is worse than a defaced directory row.
+    'home_strip_pin',
     -- push_log records who we tried to push to. RLS is the only thing keeping that
     -- delivery history off every signed-in customer. OFF here = a readable log of
     -- which providers got which alerts and when.

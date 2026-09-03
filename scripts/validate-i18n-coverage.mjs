@@ -52,6 +52,7 @@ import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories.js'
 import { REGION_LABEL_KEY } from '../constants/regions.js'
 import { RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY } from '../constants/profileGate.js'
+import { STRIP_TIPS } from '../constants/homeStrip.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -133,14 +134,31 @@ const SURFACES = [
   'components/home/HeroCreditSheet.js',
   'components/PhotoCredit.js',
   'constants/homeModules.js',
+  // ─── Widened with HOME_V2 Slice 2, in the commit that creates them ────────
+  // The live strip's own copy. constants/homeStrip.js is here for the same reason
+  // homeModules.js is: STRIP_TIPS's keys are reached through a VARIABLE —
+  // t(tip.titleKey, lang) — and a scan matching only the literal call form covers none
+  // of them. The keys are derived from the imported array below, not from this file's
+  // text, so a tip added to that array is guarded the moment it is added.
+  'components/home/LiveStrip.js',
+  'constants/homeStrip.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
 // so a literal scan cannot see them. Reading them out of the file is what turned up
 // menuGarages sitting untranslated in seven locales.
-const HOME_TILE_LABEL_KEYS = [...new Set(
-  [...readFileSync(resolve(ROOT, 'screens/HomeScreen.js'), 'utf8')
-     .matchAll(/labelKey:\s*'([a-zA-Z][a-zA-Z0-9_]*)'/g)].map(m => m[1]))]
+//
+// ⚠ TWO FILES, BECAUSE THE V2 GRID'S DATA MOVED AND THIS DID NOT FOLLOW IT. Slice 1 lifted
+//   the tile list into constants/homeModules.js, and this derivation still read only
+//   screens/HomeScreen.js — so hubMedicalTitle, menuEmergency and menuEvents, which exist
+//   ONLY in the new file, had quietly left the scan. Nothing went red; the translations
+//   are fine, the scan just stopped looking at three of them. That is the exact shape the
+//   DisplayNameCheck paragraph above records, hit a second time in the file that records
+//   it — which is the argument for deriving the SOURCE LIST rather than naming one file.
+const TILE_LABEL_SOURCES = ['screens/HomeScreen.js', 'constants/homeModules.js']
+const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
+  [...readFileSync(resolve(ROOT, f), 'utf8')
+     .matchAll(/labelKey:\s*'([a-zA-Z][a-zA-Z0-9_]*)'/g)].map(m => m[1])))]
 
 // ─── ALLOWLIST — one line per key×locale, with the reason ────────────────────
 //
@@ -233,6 +251,8 @@ for (const f of SURFACES) {
 // index into, so a new category or group is covered the moment it is added.
 const viaVariable = [
   ...HOME_TILE_LABEL_KEYS,
+  // The live strip's offline floor. Reached as t(tip.titleKey, lang).
+  ...STRIP_TIPS.flatMap(tip => [tip.titleKey, tip.subtitleKey]),
   ...HEALTH_TYPES,
   ...Object.values(GROUP_META).map(m => m.labelKey),
   // The wizard's two single-select groups. Reached as t(MAP[value]), invisible to the
