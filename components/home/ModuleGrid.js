@@ -33,7 +33,7 @@ const TINTS = {
 // ─── BARE ICONS, AND THE LABEL BOX IS A FIXED HEIGHT ────────────────────────
 // No cards and no shadows: nineteen white cards with nineteen drop shadows is what made
 // the V1 grid feel like a wall. The tint square stays because it is the only thing
-// separating urgent from lifestyle at a glance.
+// separating urgent from everything else at a glance.
 //
 // The label box is GRID_LABEL_HEIGHT tall in every state — one-word English and two-line
 // Turkish occupy identical space — so the grid is the same shape in all nine locales and
@@ -43,7 +43,10 @@ export default function ModuleGrid({ lang, onPress }) {
   return (
     <View style={s.grid}>
       {HOME_MODULES.map(mod => {
-        const tint = TINTS[mod.tint] || TINTS.service
+        // Falls back to `standard`, which is the one that still exists — the old
+        // fallback named `service`, a key the two-family rewrite removed, so an unknown
+        // tint would have crashed on `tint.bg` instead of degrading to teal.
+        const tint = TINTS[mod.tint] || TINTS.standard
         return (
           <TouchableOpacity
             key={mod.id}
@@ -74,5 +77,18 @@ const s = StyleSheet.create({
   tile:     { width: `${100 / GRID_COLUMNS}%`, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 2 },
   icon:     { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
   labelBox: { height: GRID_LABEL_HEIGHT, justifyContent: 'flex-start', alignSelf: 'stretch' },
-  label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, textAlign: 'center' },
+  // ─── Inter_400Regular, AND THAT IS A BUG FIX, NOT A STYLE CHOICE ──────────
+  // This said Inter_600SemiBold, which App.js DOES NOT LOAD — useFonts registers only
+  // Inter_400Regular and Inter_700Bold. React Native cannot find an unregistered family
+  // and silently falls back to the platform default (Roboto on Android), so these labels
+  // were never rendering in Inter at all. That is exactly the "heavier and more cramped
+  // than the draft" symptom: a different typeface at a different apparent weight, with
+  // no error anywhere to say so.
+  //
+  // Regular is also what the draft wants, so the fix and the intent agree. Registering
+  // the SemiBold face instead would pull a font file into the bundle and restyle the six
+  // other files that reference it — a separate decision, noted in the log.
+  //
+  // Colour is #3F4E57, softer than textPrimary's near-black at 8.24:1 on the canvas.
+  label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: 'Inter_400Regular', color: '#3F4E57', textAlign: 'center' },
 })

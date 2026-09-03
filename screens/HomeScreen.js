@@ -449,71 +449,96 @@ export default function HomeScreen({
   // session it was written for. The Nöbetçi row sits directly under the Oli row until
   // the strip lands between them.
   function renderHubV2() {
-    const searching = !!globalQuery.trim()
+    // hideHeaderActions is honoured here as well as in the V1 header, and that is defence
+    // rather than decoration. It is UNREACHABLE today — the gate sets forceFacilityList,
+    // showFacilityList starts true, and the back handler calls onExitFacilityList instead
+    // of clearing it, so a gated user never reaches this hub. But "unreachable" is a
+    // property of three separate conditions in two files, and the thing on the other side
+    // of it is a bell and a drawer for a profile the gate has not let through.
+    const topBar = (
+      <HomeTopBar
+        lang={lang}
+        hideActions={hideHeaderActions}
+        hasUnread={notifications.some(n => !n.read)}
+        searchOpen={searchOpen}
+        query={globalQuery}
+        onQueryChange={setGlobalQuery}
+        onOpenSearch={() => setSearchOpen(true)}
+        onCloseSearch={() => { setSearchOpen(false); setGlobalQuery(''); setGlobalResults([]) }}
+        onShowNotifs={onShowNotifs}
+        onOpenMenu={onOpenMenu}
+        searchRef={searchRef}
+        hamburgerRef={hamburgerRef}
+      />
+    )
+
+    // ─── SEARCH REPLACES THE HERO, IT DOES NOT SIT UNDER IT ───────────────────
+    // With search open the results ARE the screen: the bar moves onto the canvas and the
+    // hero unmounts. Leaving a 300pt photograph above a result list would mean scrolling
+    // past the picture to read your own search. Same behaviour V1 had — results replaced
+    // the hub — with the bar in its new home.
+    if (searchOpen) {
+      return (
+        <>
+          {topBar}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={s.v2SearchContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {renderSearchResults()}
+          </ScrollView>
+          <WeatherSheet
+            visible={weatherOpen}
+            weatherData={weatherData}
+            lang={lang}
+            locale={locale}
+            onClose={() => setWeatherOpen(false)}
+          />
+        </>
+      )
+    }
+
     return (
       <>
-        {/* hideHeaderActions is honoured here as well as in the V1 header, and that is
-            defence rather than decoration. It is UNREACHABLE today — the gate sets
-            forceFacilityList, showFacilityList starts true, and the back handler calls
-            onExitFacilityList instead of clearing it, so a gated user never reaches this
-            hub. But "unreachable" is a property of three separate conditions in two
-            files, and the thing on the other side of it is a bell and a drawer for a
-            profile the gate has not let through. One prop is a cheaper insurance than
-            re-deriving that argument the next time this screen is edited. */}
-        <HomeTopBar
-          lang={lang}
-          hideActions={hideHeaderActions}
-          hasUnread={notifications.some(n => !n.read)}
-          searchOpen={searchOpen}
-          query={globalQuery}
-          onQueryChange={setGlobalQuery}
-          onOpenSearch={() => setSearchOpen(true)}
-          onCloseSearch={() => { setSearchOpen(false); setGlobalQuery(''); setGlobalResults([]) }}
-          onShowNotifs={onShowNotifs}
-          onOpenMenu={onOpenMenu}
-          searchRef={searchRef}
-          hamburgerRef={hamburgerRef}
-        />
-
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.v2Content}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Search takes over the page while it has a query — the results ARE the
-              screen at that point, and leaving the hero and grid underneath them makes
-              the user scroll past their own search to see it. Identical behaviour to V1;
-              only the entry point moved into the top bar. */}
-          {searching ? renderSearchResults() : (
-            <>
-              <HomeHero
-                region={region}
-                weatherData={weatherData}
+          {/* Full-bleed: the hero is the ONLY thing outside v2Below's horizontal inset,
+              and it runs to the top of the screen under the status bar. HomeTopBar pads
+              itself by the safe-area inset from inside the photo, which is why this
+              screen's V2 path does not wrap anything in a top-edge SafeAreaView. */}
+          <HomeHero
+            region={region}
+            weatherData={weatherData}
+            lang={lang}
+            onOpenPlace={openPlaceById}
+            onOpenWeather={() => setWeatherOpen(true)}
+            topControls={topBar}
+          />
+
+          <View style={s.v2Below}>
+            <OliRow lang={lang} onPress={onOpenOli} />
+
+            {/* dutyBannerRef, not a new ref: App.js measures this exact ref to place
+                the duty coach mark, and a ref that measures null drops that tutorial
+                step silently. Both hub variants must attach it. */}
+            <View style={s.v2DutyWrap}>
+              <DutyRow
                 lang={lang}
-                onOpenPlace={openPlaceById}
-                onOpenWeather={() => setWeatherOpen(true)}
+                status={dutyRosterStatus}
+                onPress={onShowDutyList}
+                innerRef={dutyBannerRef}
               />
+            </View>
 
-              <OliRow lang={lang} onPress={onOpenOli} />
+            <Text style={s.v2SectionTitle}>{t('homeAllModules', lang)}</Text>
+            <ModuleGrid lang={lang} onPress={mod => moduleHandlers[mod.id]?.()} />
 
-              {/* dutyBannerRef, not a new ref: App.js measures this exact ref to place
-                  the duty coach mark, and a ref that measures null drops that tutorial
-                  step silently. Both hub variants must attach it. */}
-              <View style={s.v2DutyWrap}>
-                <DutyRow
-                  lang={lang}
-                  status={dutyRosterStatus}
-                  onPress={onShowDutyList}
-                  innerRef={dutyBannerRef}
-                />
-              </View>
-
-              <Text style={s.v2SectionTitle}>{t('homeAllModules', lang)}</Text>
-              <ModuleGrid lang={lang} onPress={mod => moduleHandlers[mod.id]?.()} />
-
-              <HomeFooterSlot />
-            </>
-          )}
+            <HomeFooterSlot />
+          </View>
         </ScrollView>
 
         <WeatherSheet
@@ -1005,21 +1030,38 @@ export default function HomeScreen({
   //   mode renders — is byte-identical to today whatever HOME_V2_LIVE says.
   const v2Hub = HOME_V2_LIVE && !showFacilityList
 
+  // ─── V2's HUB IS ITS OWN TREE, AND IT HAS TO BE ────────────────────────────
+  // The other paths wrap their content in a top-edge SafeAreaView and a horizontally
+  // padded container. V2's hero must escape BOTH: it runs under the status bar and to
+  // the screen edges, and HomeTopBar applies the safe-area inset itself from inside the
+  // photograph. A top-edge SafeAreaView here would leave a strip of canvas above the
+  // photo — exactly the separate top bar this pass removed.
+  //
+  // ⚠ THIS IS THE ONLY PLACE THE TWO TREES DIVERGE. Everything else — V1 hub, facility
+  //   list, the profile gate's read-only directory — goes through `shell` below and is
+  //   untouched whatever the flag says.
+  if (v2Hub) {
+    return (
+      <View style={s.v2Canvas}>
+        {renderHubV2()}
+      </View>
+    )
+  }
+
   const shell = (
     <>
       {/* Facility-list mode swaps the hub's sky for the medical-facilities art (full-bleed). */}
       {showFacilityList && <PageBackground topic="medical_facilities" />}
       <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
         <View style={s.container}>
-          {/* ─── THE HEADER IS V1's, AND V2 BRINGS ITS OWN ────────────────────
-              The condition is `showFacilityList || !HOME_V2_LIVE`, not `!HOME_V2_LIVE`,
-              and the difference is the whole safety property of this slice: in
-              facility-list mode this header renders EXACTLY as it does today whatever
-              the flag says. That mode is what the profile gate renders (it supplies the
-              BackButton and honours hideHeaderActions), so it must not have two
-              behaviours. V2 only ever removes this header from the HUB, where it is
-              replaced by HomeTopBar inside renderHubV2. */}
-          {(showFacilityList || !HOME_V2_LIVE) && (
+          {/* ─── THE HEADER IS V1's, UNCONDITIONALLY ──────────────────────────
+              It used to be guarded by `showFacilityList || !HOME_V2_LIVE`. The V2 hub now
+              returns before this tree is built, so that condition is true on every path
+              that reaches here and the guard only made the invariant harder to see. The
+              invariant itself is unchanged and is the safety property of this slice: in
+              facility-list mode — which is what the profile gate renders, with the
+              BackButton and hideHeaderActions — this header is EXACTLY today's whatever
+              the flag says. */}
           <View style={[s.header, showFacilityList && { justifyContent: 'space-between' }]}>
             {showFacilityList ? (
               <BackButton lang={lang} onImage onPress={() => {
@@ -1045,26 +1087,19 @@ export default function HomeScreen({
               </View>
             )}
           </View>
-          )}
 
-          {showFacilityList
-            ? renderFacilityList()
-            : (HOME_V2_LIVE ? renderHubV2() : renderHub())}
+          {/* v2Hub returned above, so this is V1's hub or the facility list — never V2. */}
+          {showFacilityList ? renderFacilityList() : renderHub()}
         </View>
       </SafeAreaView>
     </>
   )
 
-  // Same children either way — only what they sit ON changes. Keeping one `shell` rather
-  // than two copies of the tree is what makes "V1 is byte-identical" checkable by
-  // reading: there is exactly one place the two paths differ, and it is this ternary.
-  return v2Hub
-    ? <View style={s.v2Canvas}>{shell}</View>
-    : (
-      <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
-        {shell}
-      </ImageBackground>
-    )
+  return (
+    <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
+      {shell}
+    </ImageBackground>
+  )
 }
 
 const s = StyleSheet.create({
@@ -1083,9 +1118,14 @@ const s = StyleSheet.create({
   v2Canvas:         { flex: 1, backgroundColor: colors.bgWarm },
 
   // Hub V2 (HOME_V2_LIVE)
-  // No `gap` here: the Oli row overlaps the hero with a negative margin of its own, and
-  // a container gap would fight it. Spacing is owned by the rows.
+  // No `gap` and no horizontal padding: the hero is full-bleed and the Oli row overlaps
+  // it with a negative margin of its own, so a container gap would fight both. Horizontal
+  // inset belongs to v2Below; spacing between rows is owned by the rows.
   v2Content:        { paddingBottom: 32 },
+  // Everything BELOW the hero. This is where the page's horizontal inset lives, because
+  // the hero is the one section that must escape it.
+  v2Below:          { paddingHorizontal: 16 },
+  v2SearchContent:  { paddingHorizontal: 16, paddingBottom: 32 },
   v2SectionTitle:   { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 24, marginBottom: 4 },
   // The gap between the Oli row and the Nöbetçi row lives HERE, on a wrapper, not inside
   // DutyRow — Slice 2 drops the live strip in between them, and a component that carries

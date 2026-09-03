@@ -21,7 +21,12 @@ export const colors = {
   //
   // ONE canvas colour, not two: cards on top of it are `cardBg` (#FFFFFF) as everywhere
   // else in the app. Do not add a second background surface.
-  bgWarm:        '#FAF6EF',
+  //
+  // RETUNED 2026-09-03 (polish round 2): was #FAF6EF, which measured 11 points of
+  // R-minus-B warmth and read yellow and heavy against white cards rather than as a
+  // near-white ground. This is 2 points warm and a luminance of 0.955 against 0.925 —
+  // lighter and much closer to neutral, while still not the cool blue-grey of `bg`.
+  bgWarm:        '#FAFAF8',
   cardBg:        '#FFFFFF',
   surface:       '#FFFFFF',
   border:        '#E8EDF2',

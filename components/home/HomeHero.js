@@ -1,22 +1,29 @@
 import { useState } from 'react'
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../constants/regions'
 import { resolveHero } from '../../constants/homeHero'
-import HeroCreditSheet from './HeroCreditSheet'
 import { weatherIcon } from '../../utils/facilityUtils'
+import HeroCreditSheet from './HeroCreditSheet'
 
-// Half-height district hero. Photo + district name + current temperature.
+// The district hero. Photo, the app's top bar, district name, temperature, attribution.
 //
-// ─── FIXED HEIGHT, ALWAYS ───────────────────────────────────────────────────
-// Nothing below this reflows: the image is bundled (constants/homeHero.js), so it paints
-// on the first frame with no request and no skeleton, and the only async value on the
-// card is the temperature — which appears or does not, inside a box whose height never
-// depends on it. A hero that grows when the weather lands would shove the Nöbetçi row
-// down under the user's thumb mid-tap.
-export const HERO_HEIGHT = 176
+// ─── IT ABSORBED THE TOP BAR ────────────────────────────────────────────────
+// There is no separate 54pt bar above this any more: the logo sits centred on the photo
+// and the three actions are circular white buttons at the top-right, ON the photo. The
+// bar's height went into the hero rather than being spent on a strip of empty canvas,
+// which is what buys the band its new proportion at no cost to the content below.
+//
+// ─── HEIGHT IS PROPORTIONAL, WITH BOUNDS ────────────────────────────────────
+// 34% of the window is roughly the top third the design asks for, but a fixed pixel
+// height that looks right on a 6.1" phone is half the screen on a 4.7" one and a stripe
+// on a tablet. The clamp is what keeps it a HERO on both ends rather than a number that
+// happened to suit the device it was designed on.
+const HERO_FRACTION = 0.34
+const HERO_MIN = 250
+const HERO_MAX = 330
 
 // How far the Oli card is pulled up over the hero's bottom edge.
 //
@@ -26,27 +33,49 @@ export const HERO_HEIGHT = 176
 // hero's round arrow, so two tappable things sat underneath an opaque card. Whichever
 // won the touch, one of them was a lie.
 //
-// The fix is that the hero reserves this much space at the bottom of its own content
-// (plus clearance), and OliRow pulls up by exactly the same figure — so the overlap
-// zone provably contains nothing tappable. Two components reading one constant cannot
-// drift; two components each carrying their own -22 can, and silently, because the
-// symptom is a mis-tap rather than a visual break.
+// The hero reserves this much space at the bottom of its own content (plus clearance),
+// and OliRow pulls up by exactly the same figure — so the overlap zone provably contains
+// nothing tappable. Two components reading one constant cannot drift; two components
+// each carrying their own -22 can, and silently, because the symptom is a mis-tap rather
+// than a visual break.
 export const HERO_OVERLAP = 22
 
 // Clearance between the hero's lowest content and the top of the Oli card.
 const OVERLAP_CLEARANCE = 14
 
-// ─── THE GRADIENT IS SIX FLAT BANDS, NOT A GRADIENT ─────────────────────────
-// expo-linear-gradient is not installed, and this repo does not add packages to get a
-// visual effect (CLAUDE.md pins the SDK deliberately). Six stacked bands of increasing
-// black alpha across the bottom 60% read as a smooth ramp at hero scale because each
-// step is only ~0.09 apart — well under the ~0.02-per-pixel threshold where banding
-// becomes visible on a photo. The point of it is legibility, not decoration: the title
-// sits on the darkest band, so it stays readable over a bright sky or a pale wall
-// without knowing anything about the photo underneath.
-const SCRIM_BANDS = [0.04, 0.13, 0.22, 0.34, 0.50, 0.68]
+// ─── THE SCRIM IS TWO RAMPS, AND ONLY ONE OF THEM CARRIES LEGIBILITY ───────
+//
+// expo-linear-gradient is not installed and this repo does not add packages for a visual
+// effect (CLAUDE.md pins the SDK deliberately), so each ramp is a stack of flat bands.
+// Steps of ~0.05-0.08 read as smooth at hero scale.
+//
+// ⚠ THE TOP RAMP IS DECORATION. IT CANNOT BE MADE TO CARRY WHITE CONTROLS, AND THE
+//   ATTEMPT WAS MEASURED RATHER THAN ABANDONED ON A HUNCH. Famagusta and İskele have
+//   blown-out sky along their entire top edge — brightest-5% luminance 0.996 and 1.000 —
+//   and white on that needs a scrim of alpha 0.82 to reach 4.5:1, or 0.70 for even the
+//   3:1 UI floor. Either one blacks the photograph out. There is no tolerable flat scrim
+//   that makes a white mark legible over an overexposed sky.
+//
+//   So nothing at the top depends on it: the action buttons are white circles with dark
+//   glyphs and the wordmark sits on a white chip, each carrying its own contrast on any
+//   photograph whatsoever. The top ramp exists purely to give the band some depth.
+//
+// The BOTTOM ramp does carry legibility — the district name and temperature are white
+// text directly on the photo — and it is sized for it. At 0.66 the worst of the five is
+// Golden Beach at 5.29:1, clear of AA. Measured across all five images, not the one that
+// happened to be on screen.
+//
+// If either ramp is retuned, re-measure against all five. The numbers above are the
+// output of a script, not a recollection.
+const TOP_BANDS    = [0.28, 0.21, 0.14, 0.08, 0.03]
+const BOTTOM_BANDS = [0.05, 0.14, 0.24, 0.36, 0.50, 0.66]
 
-export default function HomeHero({ region, weatherData, lang, onOpenPlace, onOpenWeather }) {
+export default function HomeHero({
+  region, weatherData, lang, onOpenPlace, onOpenWeather, topControls,
+}) {
+  const { height: winH } = useWindowDimensions()
+  const heroH = Math.max(HERO_MIN, Math.min(HERO_MAX, Math.round(winH * HERO_FRACTION)))
+
   const { source, placeId, credit } = resolveHero(region)
   const [creditOpen, setCreditOpen] = useState(false)
 
@@ -61,30 +90,39 @@ export default function HomeHero({ region, weatherData, lang, onOpenPlace, onOpe
   const code = weatherData?.current?.weather_code
 
   // Tappability comes from resolveHero, never from a local condition — the rule is that
-  // a GENERIC hero is inert, and deriving it here in each caller is how half of them
-  // end up not applying it.
+  // a GENERIC hero is inert, and deriving it in each caller is how half of them end up
+  // not applying it.
   const tappable = !!placeId
+
+  const topRampH    = Math.round(heroH * 0.42)
+  const bottomRampH = Math.round(heroH * 0.52)
 
   const body = (
     <View style={s.fill}>
       <Image source={source} style={s.photo} resizeMode="cover" fadeDuration={0} />
 
-      {SCRIM_BANDS.map((a, i) => (
-        <View
-          key={a}
-          pointerEvents="none"
-          style={[
-            s.band,
-            {
-              backgroundColor: `rgba(0,0,0,${a})`,
-              bottom: (HERO_HEIGHT * 0.6 / SCRIM_BANDS.length) * i,
-              height: HERO_HEIGHT * 0.6 / SCRIM_BANDS.length + 1,
-            },
-          ]}
-        />
+      {TOP_BANDS.map((a, i) => (
+        <View key={`t${a}`} pointerEvents="none" style={[s.band, {
+          backgroundColor: `rgba(0,0,0,${a})`,
+          top: (topRampH / TOP_BANDS.length) * i,
+          height: topRampH / TOP_BANDS.length + 1,
+        }]} />
       ))}
 
-      <View style={s.content} pointerEvents="box-none">
+      {BOTTOM_BANDS.map((a, i) => (
+        <View key={`b${a}`} pointerEvents="none" style={[s.band, {
+          backgroundColor: `rgba(0,0,0,${a})`,
+          bottom: (bottomRampH / BOTTOM_BANDS.length) * i,
+          height: bottomRampH / BOTTOM_BANDS.length + 1,
+        }]} />
+      ))}
+
+      {/* The app bar, rendered INSIDE the photo. Passed in rather than built here so
+          this component stays about the hero: HomeScreen owns which controls exist and
+          what they do, and still owns the refs App.js measures for the coach marks. */}
+      {topControls}
+
+      <View style={[s.content, { paddingBottom: HERO_OVERLAP + OVERLAP_CLEARANCE }]} pointerEvents="box-none">
         <View style={s.textCol} pointerEvents="box-none">
           <Text style={s.district} numberOfLines={1}>{title}</Text>
 
@@ -108,28 +146,32 @@ export default function HomeHero({ region, weatherData, lang, onOpenPlace, onOpe
           )}
         </View>
 
-        {tappable && (
-          <View style={s.openChip} pointerEvents="none">
-            <Ionicons name="arrow-forward" size={16} color={colors.textPrimary} />
+        {/* Bottom-right COLUMN, not two absolutely-placed chips. Stacking them means
+            neither can land on the temperature pill and neither needs a magic offset:
+            they inherit the content box's padding, which already clears the Oli overlap.
+            An earlier draft put ℹ︎ at absolute bottom-left, directly on top of the
+            temperature pill. */}
+        {(!!credit || tappable) && (
+          <View style={s.rightCol}>
+            {!!credit && (
+              <TouchableOpacity
+                style={s.infoChip}
+                onPress={() => setCreditOpen(true)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('heroCreditTitle', lang)}
+              >
+                <Ionicons name="information" size={13} color="#fff" />
+              </TouchableOpacity>
+            )}
+            {tappable && (
+              <View style={s.openChip} pointerEvents="none">
+                <Ionicons name="arrow-forward" size={16} color={colors.textPrimary} />
+              </View>
+            )}
           </View>
         )}
       </View>
-
-      {/* ℹ︎ — rendered from `credit`, the SAME value that decides whether a licensed
-          photo is on screen at all. Not from a separate condition: two conditions is
-          how a photo ends up displayed with its route to the attribution missing, and
-          that is a licence breach that looks like a working screen. */}
-      {!!credit && (
-        <TouchableOpacity
-          style={s.infoChip}
-          onPress={() => setCreditOpen(true)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel={t('heroCreditTitle', lang)}
-        >
-          <Ionicons name="information" size={13} color="#fff" />
-        </TouchableOpacity>
-      )}
     </View>
   )
 
@@ -144,12 +186,12 @@ export default function HomeHero({ region, weatherData, lang, onOpenPlace, onOpe
     />
   )
 
-  if (!tappable) return <>{<View style={s.card}>{body}</View>}{sheet}</>
+  if (!tappable) return <>{<View style={[s.card, { height: heroH }]}>{body}</View>}{sheet}</>
 
   return (
     <>
       <TouchableOpacity
-        style={s.card}
+        style={[s.card, { height: heroH }]}
         onPress={() => onOpenPlace?.(placeId)}
         activeOpacity={0.9}
         accessibilityRole="button"
@@ -163,21 +205,19 @@ export default function HomeHero({ region, weatherData, lang, onOpenPlace, onOpe
 }
 
 const s = StyleSheet.create({
-  card:      { height: HERO_HEIGHT, borderRadius: 20, overflow: 'hidden', backgroundColor: colors.border },
+  // Square top corners: the hero runs to the very top of the screen now, under the
+  // status bar, so a rounded top edge would show canvas in the notch corners.
+  card:      { borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden', backgroundColor: colors.border },
   fill:      { flex: 1 },
   photo:     { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   band:      { position: 'absolute', left: 0, right: 0 },
-  // paddingBottom is DERIVED from the overlap, never a literal: everything in here sits
-  // above the Oli card's top edge because the number that positions the card is the same
-  // number that reserves the room.
-  content:   { flex: 1, justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', padding: 16, paddingBottom: HERO_OVERLAP + OVERLAP_CLEARANCE, gap: 12 },
+  content:   { flex: 1, justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', padding: 20, gap: 12 },
   textCol:   { flex: 1 },
-  district:  { fontSize: 24, fontFamily: 'Inter_700Bold', color: '#fff' },
-  tempPill:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  district:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: '#fff' },
+  tempPill:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.20)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 6 },
   tempEmoji: { fontSize: 14 },
   tempText:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
-  openChip:  { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
-  // Top-right. The bottom of the hero belongs to the district name, the temperature and
-  // the open chip; the top-right is the only corner with nothing in it.
-  infoChip:  { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'center', alignItems: 'center' },
+  rightCol:  { alignItems: 'center', gap: 10 },
+  openChip:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+  infoChip:  { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'center', alignItems: 'center' },
 })

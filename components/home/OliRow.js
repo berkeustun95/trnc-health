@@ -21,6 +21,20 @@ import { HERO_OVERLAP } from './HomeHero'
 // this row is in use. It is not dead: HOME_V2_LIVE can be false, and V1 still shows the
 // FAB. It becomes deletable the day old Home is deleted, and not before.
 //
+// ─── THE MASCOT IS A CUT-OUT, NOT AN AVATAR ────────────────────────────────
+// oli-button.png is a genuine transparent cut-out — measured, not assumed: 74.7% of its
+// pixels are fully transparent and all four corners AND all four edge midpoints have
+// alpha 0. (`sips -g hasAlpha` says "yes" for an opaque PNG that merely carries an
+// unused alpha channel, so that flag proves nothing on its own.)
+//
+// So it sits DIRECTLY on the teal at 76pt with no circular background. Inside a circle
+// it read flat and small — a 42pt avatar of a character drawn to be seen.
+//
+// The artwork's content stops at 91.4% of its height (a flat crop across the shoulders).
+// Rendered at its natural aspect that flat edge is visible and reads as a sticker, so the
+// row clips it: `overflow: 'hidden'` on the card plus a negative bottom margin drops the
+// crop line below the card's rounded edge, and Oli reads as leaning out of the banner.
+//
 // ─── SOLID TEAL, NOT A WHITE CARD ───────────────────────────────────────────
 // As a small white card with a small avatar this had no presence at all — it read as a
 // list row that happened to be above the grid, on a page whose every other surface is
@@ -37,7 +51,7 @@ import { HERO_OVERLAP } from './HomeHero'
 export default function OliRow({ lang, onPress }) {
   return (
     <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.88} accessibilityRole="button">
-      <Image source={require('../../assets/oli-button.png')} style={s.mascot} resizeMode="cover" />
+      <Image source={require('../../assets/oli-button.png')} style={s.mascot} resizeMode="contain" />
       <View style={s.text}>
         <Text style={s.title} numberOfLines={1}>{t('homeOliTitle', lang)}</Text>
         <Text style={s.sub} numberOfLines={2}>{t('homeOliSub', lang)}</Text>
@@ -55,11 +69,17 @@ const s = StyleSheet.create({
   // marginTop is the NEGATIVE of the hero's reserved overlap — imported, never retyped.
   // HomeHero pads its content by this same figure plus clearance, so the band this card
   // covers provably holds nothing tappable.
-  row:     { flexDirection: 'row', alignItems: 'center', gap: 14,
-             backgroundColor: colors.primary, borderRadius: 18,
-             paddingVertical: 14, paddingHorizontal: 16,
+  // overflow:'hidden' is what clips the mascot's flat bottom crop against the card's
+  // rounded edge. It also means nothing inside this row can ever escape it, which is
+  // fine — nothing needs to.
+  row:     { flexDirection: 'row', alignItems: 'center', gap: 12,
+             backgroundColor: colors.primary, borderRadius: 18, overflow: 'hidden',
+             paddingVertical: 12, paddingHorizontal: 16, paddingLeft: 12,
              marginTop: -HERO_OVERLAP, marginHorizontal: 10, ...shadow },
-  mascot:  { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primaryLight },
+  // No borderRadius and no backgroundColor: the whole point is that there is no disc.
+  // alignSelf flex-end + a negative bottom margin pushes the flat crop past the card's
+  // bottom edge, where overflow:'hidden' removes it.
+  mascot:  { width: 76, height: 76, alignSelf: 'flex-end', marginBottom: -18 },
   text:    { flex: 1 },
   title:   { fontSize: 17, fontFamily: 'Inter_700Bold', color: '#fff' },
   // #F2FAFA, not colors.primaryLight: see the contrast note above. A literal because

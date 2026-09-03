@@ -109,6 +109,11 @@ export const HOME_MODULES = [
 //
 // numberOfLines={2} on the Text is the other half: without it a third line pushes past
 // the box instead of ellipsing.
-export const GRID_LABEL_LINE_HEIGHT = 15
+// RETUNED 2026-09-03 (polish round 2). 15 was tight for 11pt — roughly 1.36x, which is
+// caption spacing, not label spacing, and two lines of it looked cramped. 16 is ~1.45x
+// and lets the second line breathe. The BOX is still exactly two lines tall, which is
+// the requirement that stands: every tile is the same height in every locale, so the
+// grid cannot reshape when the language changes.
+export const GRID_LABEL_LINE_HEIGHT = 16
 export const GRID_LABEL_HEIGHT = GRID_LABEL_LINE_HEIGHT * 2
 export const GRID_COLUMNS = 4
