@@ -30,6 +30,7 @@ const DIR  = 'components/home'
 const problems = []
 let fontReport = 'fonts: not checked'
 let favReport  = 'favourites: not checked'
+let mascotReport = 'mascot: not checked'
 const read = p => readFileSync(resolve(ROOT, p), 'utf8')
 const num  = (src, name) => {
   const m = src.match(new RegExp(`(?:export )?const ${name}\\s*=\\s*(-?[\\d.]+)`))
@@ -53,11 +54,21 @@ for (const f of readdirSync(resolve(ROOT, DIR)).filter(n => n.endsWith('.js'))) 
   }
 }
 
-// ─── B. The mascot cannot exceed the banner plus its declared overhang ──────
+// ─── B. The mascot must sit INSIDE the banner ───────────────────────────────
+//
+// ⚠ REWRITTEN 2026-09-07, BECAUSE THE THING IT ASSERTED STOPPED BEING TRUE. It used to
+//   check that his ink rose exactly OLI_OVERHANG above the card — correct while he was a
+//   cut-out STANDING ON the banner and breaking its top line. He now sits inside it, so
+//   that assertion would have failed on a perfectly correct layout, and "fixing" it by
+//   loosening the tolerance would have left a guard that asserts nothing.
+//
+// What it checks now is the property the design actually has: his ink fits between the
+// card's edges, with the inset he declares below him and real clearance above.
 const oli    = read(`${DIR}/OliRow.js`)
 const layout = read(`${DIR}/homeLayout.js`)
 
 const MASCOT_BOX   = num(oli, 'MASCOT_BOX')
+const MASCOT_INSET = num(oli, 'MASCOT_INSET')
 const CARD_H       = num(oli, 'CARD_H')
 const HEADROOM     = num(oli, 'HEADROOM')
 const ASSET_TOP    = num(oli, 'ASSET_TOP')
@@ -65,8 +76,11 @@ const ASSET_BOTTOM = num(oli, 'ASSET_BOTTOM')
 const OLI_OVERHANG = num(layout, 'OLI_OVERHANG')
 const HERO_OVERLAP = num(layout, 'HERO_OVERLAP')
 
-if ([MASCOT_BOX, CARD_H, HEADROOM, ASSET_TOP, ASSET_BOTTOM, OLI_OVERHANG, HERO_OVERLAP].some(v => v == null)) {
-  problems.push('could not read the Oli geometry constants — a rename needs this guard updated')
+const geom = { MASCOT_BOX, MASCOT_INSET, CARD_H, HEADROOM, ASSET_TOP, ASSET_BOTTOM, OLI_OVERHANG, HERO_OVERLAP }
+const unread = Object.entries(geom).filter(([, v]) => v == null).map(([k]) => k)
+if (unread.length) {
+  problems.push(`could not read the Oli geometry constant(s) ${unread.join(', ')} — a rename `
+    + `needs this guard updated. It measures nothing until then, so it fails rather than passes.`)
 } else {
   // The style must declare an EXPLICIT box. Without width/height an Image is intrinsic.
   const mStyle = oli.match(/mascot:\s*\{[^}]*\}/s)
@@ -77,37 +91,63 @@ if ([MASCOT_BOX, CARD_H, HEADROOM, ASSET_TOP, ASSET_BOTTOM, OLI_OVERHANG, HERO_O
         + `An Image without an explicit box renders at its intrinsic size (1024dp for this asset)`)
     }
     if (!/position:\s*'absolute'/.test(mStyle[0])) {
-      problems.push(`${DIR}/OliRow.js: the mascot must stay position:'absolute' — in flow it grows the card`)
+      problems.push(`${DIR}/OliRow.js: the mascot must stay position:'absolute' — in flow he grows the card`)
+    }
+    // He is positioned from his INK, not his box: the style offsets by the asset's own
+    // transparent bottom margin. Without that the visible mascot lands ASSET_BOTTOM * BOX
+    // away from where the inset says, which at box 88 is 7.6pt — enough to look wrong and
+    // small enough to be argued about instead of measured.
+    if (!/MASCOT_INSET\s*-\s*Math\.round\(MASCOT_BOX \* ASSET_BOTTOM\)/.test(mStyle[0])) {
+      problems.push(`${DIR}/OliRow.js: the mascot's \`bottom\` must be `
+        + `MASCOT_INSET - Math.round(MASCOT_BOX * ASSET_BOTTOM), so his FEET land at the inset `
+        + `rather than his transparent box edge`)
     }
   }
 
   // Where his INK lands, from the asset's measured alpha bounds.
-  const artH      = (1 - ASSET_TOP - ASSET_BOTTOM) * MASCOT_BOX
-  const inkAbove  = artH - CARD_H          // how far his artwork rises above the card top
-  const inkBelow  = 0                      // bottom offset pins the artwork to the card's edge
-  const wrapH     = CARD_H + OLI_OVERHANG + HEADROOM
+  const artH     = (1 - ASSET_TOP - ASSET_BOTTOM) * MASCOT_BOX
+  const inkTop   = MASCOT_INSET + artH             // above the card's BOTTOM edge
+  const inkAbove = Math.max(0, inkTop - CARD_H)    // how far he breaks the card's top line
+  const wrapH    = CARD_H + OLI_OVERHANG + HEADROOM
 
+  // The hero reserves space from OLI_OVERHANG, so the two must agree or the hero either
+  // wastes space or puts its own text under him.
   if (Math.abs(inkAbove - OLI_OVERHANG) > 1) {
-    problems.push(`OLI_OVERHANG is ${OLI_OVERHANG} but MASCOT_BOX ${MASCOT_BOX} puts his ink `
-      + `${inkAbove.toFixed(1)}pt above the card. The hero reserves space from OLI_OVERHANG, so a `
-      + `mismatch means he overlaps the district chip (too big) or floats (too small). `
+    problems.push(`OLI_OVERHANG is ${OLI_OVERHANG} but MASCOT_BOX ${MASCOT_BOX} at inset `
+      + `${MASCOT_INSET} puts his ink ${inkAbove.toFixed(1)}pt above the card. The hero reserves `
+      + `space from OLI_OVERHANG, so a mismatch means he overlaps the district text (too big) `
+      + `or the hero wastes ${(OLI_OVERHANG - inkAbove).toFixed(1)}pt (too small). `
       + `Set OLI_OVERHANG to ${Math.round(inkAbove)}.`)
   }
+
+  // ─── The current design: he is INSIDE the card ────────────────────────────
+  if (OLI_OVERHANG === 0) {
+    if (inkTop > CARD_H) {
+      problems.push(`he is meant to sit INSIDE the banner (OLI_OVERHANG is 0) but his ink `
+        + `reaches ${inkTop.toFixed(1)}pt in an ${CARD_H}pt card — it breaks the top edge`)
+    } else if (CARD_H - inkTop < 3) {
+      problems.push(`his ink stops ${(CARD_H - inkTop).toFixed(1)}pt below the card's top edge. `
+        + `That is close enough to read as clipped rather than placed; shrink MASCOT_BOX.`)
+    }
+    if (MASCOT_INSET < 3) {
+      problems.push(`MASCOT_INSET is ${MASCOT_INSET} — his feet sit on the card's bottom edge `
+        + `from the inside, which reads as clipped. It was 0 when he stood ON the card.`)
+    }
+  }
+
   if (inkAbove > wrapH - CARD_H) {
     problems.push(`his ink rises ${inkAbove.toFixed(1)}pt above the card but the wrap only extends `
       + `${(wrapH - CARD_H).toFixed(1)}pt above it — the top of him would be clipped on Android`)
   }
-  if (inkBelow > 0) {
-    problems.push(`his ink extends ${inkBelow}pt below the card's bottom edge — it would overlap `
-      + `the duty pharmacy row`)
-  }
-  // The declared box, positioned as the style says, must sit inside the wrap.
-  const boxBottomBelowWrap = Math.round(MASCOT_BOX * ASSET_BOTTOM) - 0
-  const boxTopAboveWrap    = MASCOT_BOX - boxBottomBelowWrap - wrapH
+  // The declared BOX, positioned as the style says, must sit inside the wrap.
+  const boxTopAboveWrap = MASCOT_BOX - (Math.round(MASCOT_BOX * ASSET_BOTTOM) - MASCOT_INSET) - wrapH
   if (boxTopAboveWrap > 0) {
     problems.push(`the mascot's BOX overflows the wrap's top by ${boxTopAboveWrap.toFixed(1)}pt; `
       + `Android may clip it. Raise HEADROOM or shrink MASCOT_BOX.`)
   }
+  mascotReport = `mascot: box ${MASCOT_BOX}, ink ${(MASCOT_BOX * 0.456).toFixed(0)}x${artH.toFixed(0)}pt, `
+    + `feet ${MASCOT_INSET}pt above the card's bottom, head ${(CARD_H - inkTop).toFixed(1)}pt below its top `
+    + `(${OLI_OVERHANG === 0 ? 'inside the banner' : `${inkAbove.toFixed(0)}pt above it`}), card ${CARD_H}pt`
 }
 
 // ─── C. Every font family used here must be REGISTERED in App.js ────────────
@@ -326,8 +366,11 @@ if (problems.length) {
   console.error('  └────────────────────────────────────────────────────────────────┘\n')
   process.exit(1)
 }
-const artH = (1 - ASSET_TOP - ASSET_BOTTOM) * MASCOT_BOX
 console.log(fontReport)
 console.log(favReport)
-console.log(`home geometry: OK (mascot box ${MASCOT_BOX}, ink ${(MASCOT_BOX*0.456).toFixed(0)}x${artH.toFixed(0)}pt, `
-  + `${(artH-CARD_H).toFixed(0)}pt above a ${CARD_H}pt card, 0pt below)`)
+// The mascot line is built in section B, where the numbers are, rather than recomputed
+// here from a subset of them. The previous version of this file recomputed it — and after
+// the mascot moved inside the card it printed "-12pt above a 88pt card", a negative
+// distance above something, which is the shape of a report that has outlived its geometry.
+console.log(mascotReport)
+console.log('home geometry: OK')

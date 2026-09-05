@@ -38,11 +38,16 @@ import { HERO_CONTENT_BOTTOM } from './homeLayout'
 //   top. Tab bar = 1 border + 10 padding + 24 icon + 3 gap + 13.2 label + bottom inset.
 //
 //       device                        hero   duty ends   fold (gesture nav)   margin
-//       360x640  small Android         305        478          555             +77
-//       320x712  cheapest in the table 305        478          627            +149
-//       360x800  mid-range             320        493          715            +222
-//       393x852  Pixel 8 class         341        514          767            +253
-//       412x915  large Android         366        539          830            +291
+//       360x640  small Android         305        460          555             +95
+//       320x712  cheapest in the table 305        460          627            +167
+//       360x800  mid-range             320        475          715            +240
+//       393x852  Pixel 8 class         341        496          767            +271
+//       412x915  large Android         366        521          830            +309
+//
+//   RE-MEASURED 2026-09-07 after the hero's overlap deepened and the mascot moved inside
+//   the card. Both improved it: the Oli row's flow height fell from 66pt to 48 (the
+//   overhang and headroom it used to add are gone), so the duty row moved 18pt UP and the
+//   worst case went from +77 to +95.
 //
 //   Button-nav devices have a 59pt bar instead of 85 and clear by a further 26.
 //
@@ -118,8 +123,34 @@ const HERO_MAX = 400
 // curve is the same shape sampled finer rather than a new one.
 const RAMP_STEPS  = 14
 const TOP_MAX     = 0.28
-const BOTTOM_MAX  = 0.66
-const RAMP_EXP    = 1.5
+// ─── 0.66 -> 0.72 AND 1.5 -> 1.15, BOTH SOLVED FOR THE PILL-FREE TEXT ───────
+// The district row lost its dark pill on 2026-09-07, so the scrim is now the ONLY thing
+// carrying that text and it had to be re-solved rather than inherited. Measured against
+// all six real backgrounds — the five district photos and the generic — sampled at the
+// text row's actual position with the 95th-percentile luminance, which is the figure a
+// glyph sits on rather than a single specular pixel.
+//
+// The exponent matters more than the max here. At 1.5 the curve is still shallow where the
+// text sits (~40% up the ramp) and delivered only 0.317; at 1.15 the same row gets 0.410.
+// Raising the max alone could not have worked: even BOTTOM_MAX 0.95 at exponent 1.5 left
+// the generic at 3.05:1.
+//
+// The extra darkness is largely FREE now, and that is a consequence of HERO_OVERLAP going
+// to 40: the bottom 40pt of the ramp — where it is strongest — sits behind the Oli card.
+const BOTTOM_MAX  = 0.72
+const RAMP_EXP    = 1.15
+// ─── THE GENERIC FALLBACK NEEDS MORE, AND IT IS THE ONLY ONE THAT DOES ──────
+// auth-bg.png is not a photograph chosen for a hero; it is the app's auth background
+// standing in for districts with no licence-clean image (morphou, lefke) and for anyone
+// with no region at all. It is also far brighter than any of the five photos: 95th
+// percentile 0.823 at the text row, against 0.526 for the next worst (karpaz).
+//
+// A flat 0.28 over it, composited on top of the ramp, is what takes it from 2.21:1 to
+// 5.12:1. Applied ONLY when isGeneric — darkening the five photographs to solve a problem
+// only the sixth has would be paying a licensed image's fidelity for our own asset choice.
+// It is flat rather than another ramp because the whole image is too bright, not its
+// bottom.
+const GENERIC_SCRIM = 0.28
 
 // Cumulative alpha this ramp should show at normalised distance u from its edge.
 export function rampAlphaAt(max, u) {
@@ -149,7 +180,7 @@ export default function HomeHero({
   const { height: winH } = useWindowDimensions()
   const heroH = Math.max(HERO_MIN, Math.min(HERO_MAX, Math.round(winH * HERO_FRACTION)))
 
-  const { source, placeId, credit } = resolveHero(region)
+  const { source, placeId, credit, isGeneric } = resolveHero(region)
   const [creditOpen, setCreditOpen] = useState(false)
 
   // The district name falls back to a country-level label rather than to an empty
@@ -181,6 +212,13 @@ export default function HomeHero({
           height: (topRampH / RAMP_STEPS) * (i + 1),
         }]} />
       ))}
+
+      {/* The generic's extra flat scrim, under the ramp layers so the ramp still shapes
+          the bottom. See GENERIC_SCRIM. */}
+      {isGeneric && (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFillObject,
+          { backgroundColor: `rgba(0,0,0,${GENERIC_SCRIM})` }]} />
+      )}
 
       {BOTTOM_LAYERS.map((a, i) => (
         <View key={`b${i}`} pointerEvents="none" style={[s.band, {
@@ -227,7 +265,7 @@ export default function HomeHero({
         <View style={s.bottomRow} pointerEvents="box-none">
         <View style={s.chipCol} pointerEvents="box-none">
         <View style={s.chip} pointerEvents="box-none">
-          <Ionicons name="location" size={13} color="#fff" />
+          <Ionicons name="location" size={12} color="#fff" />
           <Text style={s.district} numberOfLines={1}>{title}</Text>
 
           {temp != null && (
@@ -327,7 +365,13 @@ const s = StyleSheet.create({
   //
   // The VERTICAL 20 stays: it is breathing room above the search pill, not an alignment,
   // and the bottom is overridden inline with HERO_CONTENT_BOTTOM anyway.
-  content:   { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 16, paddingTop: 20, gap: 12 },
+  // gap 12 -> 18. Two things move the search pill DOWN, away from the wordmark it was
+  // crowding: HERO_CONTENT_BOTTOM dropping 90 -> 60 takes the whole content box 30pt
+  // lower, and this widens the space between the pill and the district row beneath it.
+  // Measured on the tightest case — a 360x640 device with a 44pt safe-area inset, where
+  // the wordmark's bottom edge lands at 116: the pill's top was 125 (a 9pt gap, which is
+  // what 'crowding each other' looks like) and is now 164, clearing by 48.
+  content:   { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 16, paddingTop: 20, gap: 18 },
   bottomRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
   searchPill:{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 46,
                borderRadius: 23, backgroundColor: '#fff', paddingHorizontal: 16 },
@@ -337,34 +381,42 @@ const s = StyleSheet.create({
   // flex:1 so the bottom-right column stays pinned right; the chip itself hugs its
   // content via alignSelf.
   chipCol:   { flex: 1 },
-  // ⚠ THE BACKDROP IS 0.68 BECAUSE IT HAS TO CARRY THE CONTRAST ITSELF, and that is
-  //   measured. Shrinking this row also moved it UP — it now sits ~106pt above the hero's
-  //   bottom, where the bottom ramp is only 0.24, not the 0.66 it reaches at the edge. At
-  //   the original 0.28 the district name was 2.45:1 on the generic fallback.
+  // ─── NO BACKDROP. PLAIN TEXT ON THE PHOTOGRAPH ────────────────────────────
   //
-  //   Solved against the ramp curve at the chip's OWN height — 0.114 at its top edge,
-  //   the weakest point the text sits on — not against a band index. 0.74 gives
-  //   auth-bg 5.03:1, Golden Beach 5.44:1, Salamis 7.15:1, the rest 9.5:1 and up.
-  //   0.68 was the answer against the coarse 6-band version and would be 4.27:1 here;
-  //   finer sampling made the scrim weaker exactly where this sits.
+  // This was a rgba(0,0,0,0.74) pill. The draft has no plate at all — smaller, lighter
+  // text sitting directly on the image — and the pill is gone.
   //
-  //   Same principle as the white action buttons and the wordmark's keyline: on a hero
-  //   that shows six different photographs, every element carries its own contrast rather
-  //   than borrowing it from a scrim.
-  chip:      { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
-               backgroundColor: 'rgba(0,0,0,0.74)', borderRadius: 18,
-               paddingHorizontal: 12, paddingVertical: 6 },
-  // 17pt, down from 28pt. Still the loudest thing in the row, and still white on the
-  // bottom ramp — the measured figures are in the round-6 log and are UNCHANGED by the
-  // move from Bold to SemiBold: contrast is a property of the two colours, and none of
-  // this hero's figures leaned on WCAG's large-text exemption (which would have needed
-  // >=14pt BOLD to apply). Both texts clear the 4.5:1 normal-text floor on their own —
-  // district 5.03:1 at worst, on auth-bg — so the weight change costs nothing.
-  district:  { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: '#fff', flexShrink: 1 },
-  chipDot:   { fontSize: 13, color: 'rgba(255,255,255,0.65)' },
+  // ⚠ IT WAS NOT SHIPPED BARE ON A HUNCH. Measured against ALL SIX real backgrounds (the
+  //   five district photographs and the generic), at the text row's actual position, using
+  //   the 95th-percentile luminance rather than a single bright pixel:
+  //
+  //     BARE, at the OLD position and the OLD ramp — three of six FAIL
+  //       kyrenia 4.84  famagusta 3.51  iskele 5.62  karpaz 2.51  nicosia 5.98  generic 1.89
+  //
+  //   Moving the row lower (HERO_OVERLAP 40 dropped the content box 30pt) was not enough on
+  //   its own — the generic is bright at every height. What closed it was the ramp re-solve
+  //   plus the generic's own flat scrim; both are documented at BOTTOM_MAX above.
+  //
+  //     SHIPPED — all six clear the 4.5:1 floor for normal text
+  //       kyrenia 6.68  famagusta 6.03  iskele 8.27  karpaz 4.56  nicosia 9.36  generic 5.12
+  //
+  //   Worst case is karpaz at 4.56:1 on a 360x305 hero. Re-measure all six if the ramp,
+  //   HERO_OVERLAP or the type size changes — each of the three moves these numbers.
+  //
+  // The textShadow is a belt-and-braces perceptual aid at glyph EDGES and is deliberately
+  // not counted in any figure above: WCAG has no method for it, so it is not something the
+  // numbers may lean on. The scrim is what carries the contrast.
+  chip:      { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  // 14pt, down from 17. "Smaller and lighter" is the brief; the floor does not move with
+  // size here because 17pt was never large-text either (that needs 18pt, or 14pt bold).
+  district:  { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#fff', flexShrink: 1,
+               textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  chipDot:   { fontSize: 12, color: 'rgba(255,255,255,0.75)',
+               textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   tempHit:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  tempEmoji: { fontSize: 13 },
-  tempText:  { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  tempEmoji: { fontSize: 12 },
+  tempText:  { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#fff',
+               textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   rightCol:  { alignItems: 'center', gap: 10 },
   openChip:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
   infoChip:  { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'center', alignItems: 'center' },

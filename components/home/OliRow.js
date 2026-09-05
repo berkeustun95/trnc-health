@@ -45,22 +45,36 @@ import { HERO_OVERLAP, OLI_OVERHANG } from './homeLayout'
 // ever re-exported with different margins, re-measure the bbox — these are its numbers,
 // not arbitrary nudges.
 const CARD_H       = 88
-// Transparent slack above the card so the mascot's BOX (not its ink) never sits flush
-// with the wrap's top edge, where Android would be entitled to clip it.
-const HEADROOM     = 10
-// 132 -> 158 in round 6.
+// Transparent slack above the card, for when the mascot's BOX overflowed it. It does not
+// any more — he is entirely inside the card — so there is nothing to keep clear of the
+// wrap's top edge and this is zero. Kept as a named constant because WRAP_H and the wrap's
+// negative margin are both derived from it, and because a future taller mascot needs it
+// back rather than needing it reinvented.
+const HEADROOM     = 0
+// 158 -> 88 on 2026-09-07. He no longer stands ON the banner breaking its top line; he
+// sits INSIDE it.
 //
-// ⚠ HIS BOTTOM WAS ALREADY ON THE CARD'S EDGE. The brief read as "he floats", and the
-//   arithmetic said otherwise — ASSET_BOTTOM has pinned the artwork's lowest pixel to
-//   the card's bottom since round 3. What actually made him hover is that the artwork
-//   TAPERS: measured row by row, he is 116px wide at 86% of his height, 32px at 90%, and
-//   0 at 91.3%. So the extreme point being on the edge left his visible MASS about 7pt
-//   above it, resting on a wisp of bandana. The fix is size, not position — at 158 the
-//   body is large enough that the taper is a small fraction of him and he reads as
-//   standing on the row.
-const MASCOT_BOX   = 158
+// ⚠ THE NUMBER IS SOLVED, NOT PICKED. His artwork occupies (1 - ASSET_TOP - ASSET_BOTTOM)
+//   = 0.860 of the box, and it has to fit inside an 88pt card with room to breathe at both
+//   ends. At 88 the artwork is 75.7pt: standing on a 6pt inset it reaches 81.7, clearing
+//   the card's top edge by 6.3pt — near-symmetric padding above and below, which is what
+//   "inside the card" has to mean if it is not to look dropped in.
+//
+//   The next size up that still fits is 92 (2.9pt of headroom), which is inside the
+//   rounding noise of a device's pixel grid. 88 is the largest he can be and still read as
+//   deliberately placed rather than jammed.
+//
+//   He is now 40pt of ink wide by 76 tall, down from 72 x 136.
+const MASCOT_BOX   = 88
+// How far his feet sit above the card's bottom edge. He used to be pinned flush to it,
+// which was right when he was standing ON the card and wrong now that he is in it —
+// resting on the edge from the inside reads as clipped.
+const MASCOT_INSET = 6
 const ASSET_TOP    = 0.054    // fraction of the asset above the artwork
 const ASSET_BOTTOM = 0.086    // fraction below it
+// With no overhang and no headroom this is simply the card. The expression is kept in
+// derived form rather than collapsed to CARD_H so that restoring either constant restores
+// the geometry, instead of quietly doing nothing.
 const WRAP_H       = CARD_H + OLI_OVERHANG + HEADROOM
 // Where the text starts: clear of the mascot's widest point.
 const TEXT_INSET   = 14 + Math.round(MASCOT_BOX * 0.722) + 12
@@ -85,6 +99,7 @@ export default function OliRow({ lang, onPress }) {
             Views with borderRadius rather than SVG: react-native-svg is not installed and
             this repo does not add packages for decoration. */}
         <View style={s.decorWave} pointerEvents="none" />
+        <View style={s.decorWave2} pointerEvents="none" />
         <View style={s.decorDot} pointerEvents="none" />
 
         <View style={s.text}>
@@ -127,30 +142,47 @@ const s = StyleSheet.create({
              backgroundColor: colors.primary, borderRadius: 18,
              paddingLeft: TEXT_INSET, paddingRight: 16, ...shadow },
   // ─── Decoration geometry, and it is checked, not eyeballed ────────────────
-  // RECOMPUTED 2026-09-05 for the new type scale and the removed marginHorizontal — both
-  // of which move these numbers, and a comment carrying a measured figure has to be
-  // regenerated rather than left to age.
+  //
+  // RECOMPUTED 2026-09-07. Two things moved it: the type scale, and the card growing 20pt
+  // wider when its stray horizontal margin went. A comment carrying a measured figure has
+  // to be regenerated rather than left to age.
   //
   // Text block: title 16pt (~19.2 line) + subtitle 12pt x2 (~28.8) + 2pt margin = ~50pt,
-  // centred in an 88pt card, so it occupies y 19..69 (was y 17..71 at the old sizes).
-  // The card is now 361pt wide on a 393pt screen (was 341, before the 10pt inset went),
-  // so the text's right edge is 361 - 16 padding - 34 chevron - 12 gap = 299 (was 279).
+  // centred in an 88pt card, so it occupies y 19..69. The card is 361pt wide on a 393pt
+  // screen, so the text's right edge is 361 - 16 padding - 34 chevron - 12 gap = 299.
   //
-  // Each shape must clear the text EITHER horizontally (start beyond 299) OR vertically
-  // (stay below y=69).
+  // ⚠ THE CONSTRAINT IS UNCHANGED AND IS NOT NEGOTIABLE: every shape must clear the text
+  //   EITHER horizontally (start beyond its right edge) OR vertically (stay below y=69).
+  //   Lightening the card behind the text is what the contrast budget forbids — white on
+  //   primary is 5.01:1 and the subtitle 4.74:1, so even 3% of white takes the subtitle to
+  //   4.23:1, under the floor, while being barely visible. The band behind the text stays
+  //   flat primary and both figures hold exactly.
   //
-  // A wide, shallow arc along the bottom — the "wave". A disc of diameter 520 whose top
-  // sits at y=76 shows only its crown, a soft swell across the middle of the card, now 7pt
-  // below the lowest text (was 5pt — the smaller type gained 2pt). bottom is -508 because
-  // a child's top lands at parentH - bottom - childH = 88 + 508 - 520 = 76.
-  decorWave: { position: 'absolute', left: -90, bottom: -508, width: 520, height: 520,
-               borderRadius: 260, backgroundColor: 'rgba(255,255,255,0.06)' },
-  // A smaller swell in the right-hand strip, clear of the text horizontally: its left
-  // edge lands at 361 + 10 - 64 = 307, beyond the text's 299. The margin grew from 8pt to
-  // 8pt — both edges moved by 20, so the clearance is unchanged, which is the point of
-  // positioning it from the card's own right edge rather than from a screen width.
-  decorDot:  { position: 'absolute', right: -10, top: -24, width: 64, height: 64,
-               borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.05)' },
+  // ─── WHAT CHANGED: MORE PRESENT, SAME CONSTRAINT ──────────────────────────
+  //
+  // The old motif was one 6%-white crown and one 5% disc, which at that strength read as a
+  // printing artefact rather than as decoration. This is two crowns of DIFFERENT curvature
+  // (520 and 620 diameter) crossing at slightly different heights, plus a stronger corner
+  // swell — a layered wave with an actual shape to it, at 11% / 8% / 9%.
+  //
+  // Both crowns sit BELOW the text: a disc of diameter D whose top is at y=T needs
+  // bottom = 88 - D - T, so 74 and 82 give 5pt and 13pt of clearance under the lowest text
+  // line. Two diameters rather than two offsets of one, because parallel arcs of equal
+  // curvature read as a mistake and crossing arcs read as drawn.
+  //
+  // The corner disc is positioned from the card's RIGHT edge, which makes its clearance
+  // device-independent by construction: its left edge lands at cardW - 58 while the text
+  // ends at cardW - 62, so the 4pt gap holds at 393dp and at 320dp without a second
+  // measurement. That property is the reason it is anchored right rather than left.
+  //
+  // Views with borderRadius rather than SVG: react-native-svg is not installed and this
+  // repo does not add packages for decoration.
+  decorWave: { position: 'absolute', left: -90, bottom: -506, width: 520, height: 520,
+               borderRadius: 260, backgroundColor: 'rgba(255,255,255,0.11)' },
+  decorWave2:{ position: 'absolute', left: -180, bottom: -614, width: 620, height: 620,
+               borderRadius: 310, backgroundColor: 'rgba(255,255,255,0.08)' },
+  decorDot:  { position: 'absolute', right: -22, top: -40, width: 80, height: 80,
+               borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.09)' },
   // ─── RESTORED IN ROUND 7 AFTER A SCRIPTED EDIT DELETED IT ─────────────────
   // Round 6's decoration edit replaced a slice running from a comment down to
   // `text:` — and this style sat inside that range, so it was removed silently. With
@@ -163,7 +195,12 @@ const s = StyleSheet.create({
   // family as the logo's `contain` bug: a size that is not what anyone thinks it is.
   //
   // No disc, no borderRadius, no background — the whole point is that he is a cut-out.
-  mascot:  { position: 'absolute', left: 14, bottom: -Math.round(MASCOT_BOX * ASSET_BOTTOM),
+  // ─── POSITIONED FROM HIS INK, NOT HIS BOX ────────────────────────────────
+  // The asset carries transparent margins (ASSET_BOTTOM of the box sits below the lowest
+  // pixel), so pinning the BOX to a position puts the visible mascot somewhere else. This
+  // offsets by that margin, which places his FEET exactly MASCOT_INSET above the card's
+  // bottom edge — the thing the design is actually about.
+  mascot:  { position: 'absolute', left: 14, bottom: MASCOT_INSET - Math.round(MASCOT_BOX * ASSET_BOTTOM),
              width: MASCOT_BOX, height: MASCOT_BOX },
   text:    { flex: 1 },
   // 16/600 — the shared ROW TITLE step. Oli, the live strip and the Nöbetçi row are

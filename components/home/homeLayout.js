@@ -14,16 +14,35 @@
 // mis-tap — a control sitting underneath an opaque card — not a visual break.
 
 // How far the Oli CARD is pulled up over the hero's bottom edge.
-export const HERO_OVERLAP = 22
-
-// How far the mascot rises ABOVE the card's top edge. He is a cut-out standing ON the
-// banner, so he breaks its top line; this is that overhang.
 //
-// ⚠ DERIVED FROM HIS SIZE, NOT CHOSEN. His artwork's BOTTOM has always been pinned to
-//   the card's bottom edge, so the overhang is simply (artwork height - card height).
-//   Round 6 raised MASCOT_BOX 132 -> 158, which is what moved this 26 -> 48. If the box
-//   changes again this number must be recomputed from OliRow's arithmetic, not nudged.
-export const OLI_OVERHANG = 48
+// 22 -> 40 on 2026-09-07. At 22 the banner read as sitting BELOW the photograph with a
+// sliver of overlap; the draft has it sitting INTO the photo. 40 of the card's 88pt height
+// is over the image — a little under half — which is enough to read as inset rather than
+// adjacent, while leaving the card's own text block clear of the hero's bottom edge.
+//
+// It also pays for itself twice over. The hero's content box is padded by
+// HERO_CONTENT_BOTTOM, which is derived from this, so a deeper overlap moves the district
+// text LOWER — into a stronger part of the bottom scrim, where it measures better. And the
+// darkest 40pt of that scrim is now hidden behind the card, so the ramp can be deepened
+// without the murk showing.
+export const HERO_OVERLAP = 40
+
+// How far the mascot rises ABOVE the card's top edge.
+//
+// ⚠ ZERO SINCE 2026-09-07, AND THAT IS THE POINT RATHER THAN AN OMISSION. He used to be a
+//   cut-out standing ON the banner and breaking its top line — MASCOT_BOX 158 put 48pt of
+//   him above the card. The brief is now that he sits INSIDE it. At MASCOT_BOX 88 his
+//   artwork is 75.7pt tall in an 88pt card, so he clears the top edge by 6.3pt and the
+//   overhang is nothing.
+//
+//   It stays a NAMED CONSTANT at zero rather than being deleted, because it is what the
+//   hero reserves space from (HERO_CONTENT_BOTTOM below) and what the geometry guard
+//   compares his ink against. Deleting it would scatter the assumption "he does not stick
+//   out" across three files instead of stating it in one.
+//
+//   Still derived, not chosen: it is max(0, artwork height + inset - card height) from
+//   OliRow's own numbers. `npm run home:check` recomputes it and fails if they disagree.
+export const OLI_OVERHANG = 0
 
 // Height of the keylined wordmark on the hero.
 //
@@ -48,6 +67,13 @@ export const HERO_LOGO_H = 72
 //   layout bug, and is the exact class of defect this file exists to prevent.
 //
 //   20 puts the chip's full slop above the Oli row's first pixel with 2pt to spare.
+//
+//   ⚠ RE-VERIFIED 2026-09-07 after the mascot shrank and the overlap deepened. Both moved
+//     the boundary this number defends. The Oli row's first pixel is still exactly
+//     HERO_OVERLAP + OLI_OVERHANG + HEADROOM above the hero's bottom — 40 + 0 + 0 = 40 —
+//     and the temperature text's bottom sits at HERO_CONTENT_BOTTOM = 60, so its 8pt lower
+//     slop reaches 52 and clears Oli's 40 by 12pt. More margin than before, not less,
+//     because the overhang and headroom that used to eat into it are gone.
 const CLEARANCE = 20
 
 // What the hero must reserve at the bottom of its content box.
