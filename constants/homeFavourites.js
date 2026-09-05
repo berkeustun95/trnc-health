@@ -23,11 +23,40 @@ export const FAVOURITE_SLOTS = 4
 // ⚠ AN ENTRY THAT IS DARK OR MISSPELLED IS SILENTLY SKIPPED. That is deliberate — a
 //   default must never be able to put a dead tile on Home — but it means a typo here
 //   costs you a slot with no error. `npm run home:check` asserts every id in this array
-//   exists in HOME_MODULES, so a typo fails the build instead.
+//   exists in HOME_MODULES, and that at least FAVOURITE_SLOTS of them are ELIGIBLE right
+//   now, so neither a typo nor a dark entry can quietly hand a slot back to grid order.
+//
+// ─── IT IS A PREFERENCE ORDER, NOT EXACTLY FOUR ─────────────────────────────
+//
+// Longer than FAVOURITE_SLOTS on purpose. Ineligible entries are skipped and the ones
+// below them move up, so a module can sit in its intended POSITION while still dark and
+// take that position automatically on the day it launches — no edit, no follow-up ticket,
+// no "why is this not in the row" three months later.
+//
+// `transport` is exactly that case today: MODULE_FLAGS.transport is false, so the row
+// currently renders explore · events · exchangeRates · newcomerEssentials, and becomes
+// explore · events · transport · exchangeRates the moment transport goes live.
+//
+// ─── WHY THESE FOUR (2026-09-05) ────────────────────────────────────────────
+//
+// The previous set opened with `health`, which is ALSO the grid's first tile in the
+// grid's first position — so the shortcuts row read as a partial clone of the grid 40pt
+// below it, which on first launch looks like a rendering bug rather than a feature. These
+// five are drawn from the middle and end of the grid (positions 5, 4, 11, 16, 15), so
+// there is no positional echo.
+//
+// They are also all `standard` tint. The old set put a coral tile directly under the
+// coral duty row and above the grid's three coral tiles — duty + health + emergency +
+// towing stacked, which is a lot of one colour in 200pt of screen. Coral is the urgency
+// signal in this design; it stops being one when it is also the colour of the shortcuts.
 export const DEFAULT_FAVOURITES = [
-  'health',
-  'events',
   'explore',
+  'events',
+  'transport',          // dark today — see the note above; takes slot 3 on launch
+  'exchangeRates',
+  // The backstop, and it is UNGATED on purpose: no flag can switch it off, so the row is
+  // guaranteed to be filled from editorial choices in every flag state rather than
+  // falling through to grid order.
   'newcomerEssentials',
 ]
 

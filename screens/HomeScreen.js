@@ -1324,20 +1324,39 @@ const s = StyleSheet.create({
   // the hero is the one section that must escape it.
   v2Below:          { paddingHorizontal: 16 },
   v2SearchContent:  { paddingHorizontal: 16, paddingBottom: 32 },
-  v2SectionTitle:   { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 24, marginBottom: 4 },
+  // ─── THE SECTION HEADING, AND THE SCALE IT SITS IN ────────────────────────
+  // 17/700, up from 16/700. The row titles below it (Oli, live strip, Nöbetçi) are all
+  // 16/600 now, so at 16/700 a heading and the thing it introduced were the same SIZE and
+  // differed only by weight — a distinction too fine to lead a section. The screen's type
+  // scale is now four clean steps:
+  //
+  //     17/700  section heading        Bugün ADA'da · Sık kullandıkların · Tüm modüller
+  //     17/600  hero district          the one thing above all sections
+  //     16/600  row title              Oli · strip · Nöbetçi
+  //     12/400  row subtitle           all three
+  //     11/500  grid + shortcut label
+  //
+  // marginBottom 8, up from 4. Four points under a 17pt bold heading reads as the heading
+  // touching its content; the gap above is 24, so 4 made the pair look bottom-heavy.
+  v2SectionTitle:   { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 24, marginBottom: 8 },
   // A heading that carries an action. The MARGINS move to the row so the title and the
   // button share a centre line; the type spec stays in v2SectionTitle and is reused
   // rather than restated, so all three headings on this screen are one definition.
   v2SectionRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                      marginTop: 24, marginBottom: 4 },
+                      marginTop: 24, marginBottom: 8 },
   v2SectionTitleInRow: { marginTop: 0, marginBottom: 0 },
   // primaryDark rather than primary: this is 13pt text on the warm canvas and primary
   // measures 4.44:1 there, under the 4.5 floor. primaryDark is 6.71:1.
   v2SectionAction:  { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark },
-  // The gap between the Oli row and the Nöbetçi row lives HERE, on a wrapper, not inside
-  // DutyRow — Slice 2 drops the live strip in between them, and a component that carries
-  // its own top margin would have to be edited to move.
-  v2DutyWrap:       { marginTop: 16 },
+  // The gap above the Nöbetçi row lives HERE, on a wrapper, not inside DutyRow — the live
+  // strip landed between them in Slice 2, and a component carrying its own top margin
+  // would have had to be edited to move.
+  //
+  // 24, up from 16. It is the ONE section boundary on this screen that is not a heading,
+  // and it was 8pt tighter than every other, so the duty row sat closer to the strip above
+  // it than any other pair on the page. Every section gap is now 24: Oli → strip heading,
+  // strip → duty, duty → shortcuts heading, shortcuts → grid heading.
+  v2DutyWrap:       { marginTop: 24 },
 
   // Hub
   hubContent:       { paddingBottom: 32, gap: 12 },

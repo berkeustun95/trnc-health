@@ -112,8 +112,14 @@ const s = StyleSheet.create({
   // marginTop lifts the CARD's top edge to HERO_OVERLAP above the hero's bottom — the
   // wrap's own transparent headroom has to be added back, or the card would sit that
   // much lower than the hero reserved for it.
-  wrap:    { height: WRAP_H, marginTop: -(HERO_OVERLAP + OLI_OVERHANG + HEADROOM),
-             marginHorizontal: 10 },
+  // ─── NO marginHorizontal — IT USED TO BE 10, AND THAT WAS A MISALIGNMENT ──
+  // v2Below already insets this whole column by 16pt. A further 10 here put the Oli
+  // card's edges 26pt from the screen while the live strip, the Nöbetçi row and the
+  // module grid all sit at 16 — so the one card with a shadow and a mascot was also the
+  // one card that did not line up with anything, which is what made the top of the
+  // screen read as slightly loose. Nothing depended on the number: TEXT_INSET is derived
+  // from MASCOT_BOX, and the decoration is positioned from the card's own edges.
+  wrap:    { height: WRAP_H, marginTop: -(HERO_OVERLAP + OLI_OVERHANG + HEADROOM) },
   // overflow:'hidden' clips the decoration to the card's rounded shape. Safe now only
   // because the mascot is a SIBLING, not a child — as a child he would be clipped too.
   card:    { position: 'absolute', left: 0, right: 0, bottom: 0, height: CARD_H,
@@ -121,20 +127,28 @@ const s = StyleSheet.create({
              backgroundColor: colors.primary, borderRadius: 18,
              paddingLeft: TEXT_INSET, paddingRight: 16, ...shadow },
   // ─── Decoration geometry, and it is checked, not eyeballed ────────────────
-  // The text block is title 17pt (~20.4 line) + subtitle 13pt x2 (~31.2) + 2pt margin =
-  // ~54pt, centred in an 88pt card, so it occupies y 17..71. Each shape must therefore
-  // clear the text EITHER horizontally (start beyond its right edge, 279pt on a 393pt
-  // screen) OR vertically (stay below y=71). scripts/check-hero-logo.mjs does not cover
-  // this; the round-6 log records the arithmetic.
+  // RECOMPUTED 2026-09-05 for the new type scale and the removed marginHorizontal — both
+  // of which move these numbers, and a comment carrying a measured figure has to be
+  // regenerated rather than left to age.
+  //
+  // Text block: title 16pt (~19.2 line) + subtitle 12pt x2 (~28.8) + 2pt margin = ~50pt,
+  // centred in an 88pt card, so it occupies y 19..69 (was y 17..71 at the old sizes).
+  // The card is now 361pt wide on a 393pt screen (was 341, before the 10pt inset went),
+  // so the text's right edge is 361 - 16 padding - 34 chevron - 12 gap = 299 (was 279).
+  //
+  // Each shape must clear the text EITHER horizontally (start beyond 299) OR vertically
+  // (stay below y=69).
   //
   // A wide, shallow arc along the bottom — the "wave". A disc of diameter 520 whose top
-  // sits at y=76 shows only its crown, a soft swell across the middle of the card, 5pt
-  // below the lowest text. bottom is -508 because a child's top lands at
-  // parentH - bottom - childH = 88 + 508 - 520 = 76.
+  // sits at y=76 shows only its crown, a soft swell across the middle of the card, now 7pt
+  // below the lowest text (was 5pt — the smaller type gained 2pt). bottom is -508 because
+  // a child's top lands at parentH - bottom - childH = 88 + 508 - 520 = 76.
   decorWave: { position: 'absolute', left: -90, bottom: -508, width: 520, height: 520,
                borderRadius: 260, backgroundColor: 'rgba(255,255,255,0.06)' },
   // A smaller swell in the right-hand strip, clear of the text horizontally: its left
-  // edge lands at 341 + 10 - 64 = 287, beyond the text's 279.
+  // edge lands at 361 + 10 - 64 = 307, beyond the text's 299. The margin grew from 8pt to
+  // 8pt — both edges moved by 20, so the clearance is unchanged, which is the point of
+  // positioning it from the card's own right edge rather than from a screen width.
   decorDot:  { position: 'absolute', right: -10, top: -24, width: 64, height: 64,
                borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.05)' },
   // ─── RESTORED IN ROUND 7 AFTER A SCRIPTED EDIT DELETED IT ─────────────────
@@ -152,10 +166,18 @@ const s = StyleSheet.create({
   mascot:  { position: 'absolute', left: 14, bottom: -Math.round(MASCOT_BOX * ASSET_BOTTOM),
              width: MASCOT_BOX, height: MASCOT_BOX },
   text:    { flex: 1 },
-  title:   { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  // 16/600 — the shared ROW TITLE step. Oli, the live strip and the Nöbetçi row are
+  // peers, and they were 17 / 16 / 15, which read as three sizes for one job. White on
+  // primary is 5.01:1, unchanged by the size (contrast is a property of the two colours,
+  // and nothing here leans on WCAG's large-text exemption).
+  title:   { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  // 12/400 — the shared ROW SUBTITLE step (was 13, while the strip and Nöbetçi rows
+  // were both already 12).
+  //
   // #F2FAFA, not colors.primaryLight: primaryLight is 4.44:1 on primary, under the 4.5
-  // floor for 13pt regular. This is 4.74:1. Title white on primary is 5.01:1.
-  sub:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#F2FAFA', marginTop: 2 },
+  // floor. This is 4.74:1 — RE-MEASURED after the size change, not assumed: 12pt regular
+  // sits under the same 4.5 floor as 13pt did, so the figure still clears it.
+  sub:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#F2FAFA', marginTop: 2 },
   chevron: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff',
              justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
 })

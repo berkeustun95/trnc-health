@@ -55,7 +55,22 @@ export default function DutyRow({ lang, status = DUTY_FRESH, onPress, innerRef }
       </View>
 
       <View style={s.text}>
-        <Text style={[s.title, !ok && s.titleAlert]} numberOfLines={1}>
+        {/* ─── TWO LINES, AND THIS IS A BUG FIX RATHER THAN A POLISH CHOICE ────
+            Measured from the real Inter metrics at the row's actual text width (243pt on
+            a 393dp screen): at ONE line the title ellipsed in Greek, French and Persian
+            even in the HEALTHY state — "Εφημερεύοντα φαρμακεία σήμερα" is 272.7pt — and
+            every locale's ALERT title overflowed, Greek by 96pt.
+
+            ⚠ IT PREDATES THIS PASS. At the old 15pt the same Greek alert title was 307pt
+              against the same 243pt box; going to 16pt made it 328. So this was never a
+              size regression, it was an overflow nobody had measured — and the string
+              being cut off is the one that says WE HAVE LOST THE DUTY ROSTER, on the row
+              somebody opens this app for at 2am. An ellipsis there is not a cosmetic
+              blemish.
+
+            The row has no fixed height, so it grows only when a title actually wraps;
+            the short healthy titles leave it exactly as it was. */}
+        <Text style={[s.title, !ok && s.titleAlert]} numberOfLines={2}>
           {t(ok ? 'tonightDuty' : partial ? 'dutyBannerPartialTitle' : 'dutyBannerStaleTitle', lang)}
         </Text>
         <View style={s.subRow}>
@@ -91,7 +106,9 @@ const s = StyleSheet.create({
   // Near-black rather than coral. The title is the loudest thing in the row and coral on
   // pale pink was both noisy and, at 2.17:1 MEASURED, nowhere near AA for 15pt — it was
   // failing legibility, not just taste. This is 13.16:1.
-  title:         { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
+  // 16/600 — the shared ROW TITLE step (was 15). Contrast is unchanged at 13.16:1,
+  // re-measured rather than assumed, and it never leaned on the large-text exemption.
+  title:         { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   titleAlert:    { color: colors.danger },
   subRow:        { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   // Muted coral, but a REAL one rather than accent + 'AA' alpha: an alpha suffix composites

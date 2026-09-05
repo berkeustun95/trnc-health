@@ -221,6 +221,20 @@ for (const id of DEFAULT_FAVOURITES) {
   }
 }
 
+// DEFAULT_FAVOURITES is a preference ORDER and may legitimately be longer than the row,
+// carrying entries that are dark today. What must NOT happen is the row falling through to
+// grid order because too few of them are eligible — that is invisible at runtime (an
+// ineligible default is correctly skipped) and it is precisely how the row ends up
+// mirroring the grid's opening tiles again.
+const eligibleDefaults = DEFAULT_FAVOURITES.filter(id => moduleEligible(id))
+if (eligibleDefaults.length < FAVOURITE_SLOTS) {
+  problems.push(`only ${eligibleDefaults.length} of ${DEFAULT_FAVOURITES.length} DEFAULT_FAVOURITES `
+    + `are eligible under today's flags (${eligibleDefaults.join(', ') || 'none'}), but the row has `
+    + `${FAVOURITE_SLOTS} slots — so ${FAVOURITE_SLOTS - eligibleDefaults.length} slot(s) would be `
+    + `filled from GRID ORDER instead of from editorial intent. Add another live entry to the `
+    + `list; dark entries may stay, they just cannot be counted on.`)
+}
+
 // ─── The row can never come up empty — computed, not asserted in prose ──────
 // The heading lives in HomeScreen, so an empty row leaves it standing over nothing. Run
 // the real resolver against the WORST case: every flag false, no pins, no usage.
@@ -285,14 +299,25 @@ scenario('a pin outranks a heavily-used module',
   { pins: ['municipal', null, null, null], usage: { esim: 90 }, flags: liveFlags },
   out => out[0] === 'municipal' ? null : 'usage beat an explicit pin')
 
-// 6. A fresh device shows exactly the editorial defaults, in their editorial order. This
-//    is the one that would break silently if the tie-break lost the defaults.
+// 6. A fresh device shows the editorial defaults, in their editorial order. The one that
+//    would break silently if the tie-break lost the defaults.
+//
+//    ⚠ COMPARED AGAINST THE FIRST FAVOURITE_SLOTS *ELIGIBLE* DEFAULTS, not against the
+//      whole array. DEFAULT_FAVOURITES is a preference ORDER and is deliberately longer
+//      than the row, so an earlier draft of this scenario — which compared the row to the
+//      entire array — went red the moment a fifth entry was added, against a resolver that
+//      was behaving perfectly. The check was wrong, not the system; this is what it should
+//      have said all along.
+const expectFresh = DEFAULT_FAVOURITES
+  .filter(id => moduleEligible(id, { flags: liveFlags }))
+  .slice(0, FAVOURITE_SLOTS)
 scenario('fresh install shows the defaults in order', { pins: [], usage: {}, flags: liveFlags },
-  out => out.join(',') === DEFAULT_FAVOURITES.join(',')
-    ? null : `expected the DEFAULT_FAVOURITES order [${DEFAULT_FAVOURITES.join(', ')}]`)
+  out => out.join(',') === expectFresh.join(',')
+    ? null : `expected the first ${FAVOURITE_SLOTS} eligible defaults [${expectFresh.join(', ')}]`)
 
 favReport = `favourites: ${ids.length} tiles (${gated} flag-gated, ${UNGATED_MODULES.size} ungated), `
   + `defaults [${DEFAULT_FAVOURITES.join(', ')}], worst-case row fills ${worstCase.length}/${FAVOURITE_SLOTS}, `
+  + `${eligibleDefaults.length}/${DEFAULT_FAVOURITES.length} defaults eligible now, `
   + `7 degradation scenarios pass`
 
 if (problems.length) {

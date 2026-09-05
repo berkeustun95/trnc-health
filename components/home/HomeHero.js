@@ -23,12 +23,26 @@ import { HERO_CONTENT_BOTTOM } from './homeLayout'
 // screen on a 4.7" one and a stripe on a tablet, so the clamp is what keeps it a HERO at
 // both ends rather than a number that fitted the device it was drawn on.
 //
-// ⚠ THE UPPER BOUND IS THE DUTY ROW, NOT TASTE. Nöbetçi eczaneler has to stay above the
-//   fold — it is what somebody opens this app for at 2am. At HERO_MAX the duty row's
-//   bottom edge lands at hero + 150pt, which clears the fold on every viewport in the
-//   round-3 log's fold table, the narrowest being a 640x1424 device read as 320x712dp.
-//   Raising HERO_MAX without redoing that table is how the one row that must never be
-//   scrolled to ends up below the fold on the cheapest phone somebody owns.
+// ⚠ THE UPPER BOUND WAS THE DUTY ROW — AND THAT GUARANTEE NO LONGER HOLDS ON SMALL
+//   PHONES. It used to: with the Nöbetçi row sitting directly under Oli, its bottom edge
+//   landed at hero + 150pt and cleared the fold on every viewport in the round-3 table.
+//
+//   Slice 2 put the "Bugün ADA'da" strip between them — 150pt of card plus a 52pt heading
+//   plus a 24pt gap — and re-measured on 2026-09-05 the arithmetic is:
+//
+//     320x712dp (the table's cheapest device)  duty row 597-669dp, fold ~624dp  → 45dp BELOW
+//     393x852dp (Pixel 8 class)                duty row 633-705dp, fold ~764dp  → 59dp above
+//
+//   So on the smallest supported phone the duty row now needs a scroll. That is a
+//   CONSEQUENCE OF THE AGREED ANATOMY, not a regression to fix here — the strip's position
+//   was decided deliberately — but the old claim above was still written as a guarantee,
+//   and a comment asserting a measured property that has since become false is worse than
+//   no comment: the next person sizing this hero would trust it.
+//
+//   Lowering HERO_MIN to 280 recovers 25dp of the 45. It is not enough on its own, and
+//   the remaining options (a shorter strip card, a tighter heading, or moving the row)
+//   are anatomy decisions rather than sizing ones. Flagged in the polish-pass log for a
+//   decision; do not "fix" it by quietly shrinking the hero.
 const HERO_FRACTION = 0.40
 // 280 -> 305 in round 7. The search pill added 58pt of content inside the hero, and at
 // 280 the logo's bottom edge landed 2pt from the pill's top on a 712dp device — touching,
@@ -288,8 +302,19 @@ const s = StyleSheet.create({
   fill:      { flex: 1 },
   photo:     { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   band:      { position: 'absolute', left: 0, right: 0 },
-  // A COLUMN now: the search pill sits full-width above the district row.
-  content:   { flex: 1, justifyContent: 'flex-end', padding: 20, gap: 12 },
+  // A COLUMN: the search pill sits full-width above the district row.
+  //
+  // ─── paddingHorizontal 16, NOT 20 — ONE LEFT EDGE FOR THE WHOLE SCREEN ────
+  // It was a uniform 20, which put the search pill and the district chip 4pt further in
+  // than everything else on the page: v2Below insets its column by 16 and HomeTopBar's
+  // own bar is already 16. So the hero had two different left edges inside it (bar at 16,
+  // content at 20) and neither matched the cards below. With the Oli card's stray 10pt
+  // inset also removed in this pass, every element from the top bar to the last grid tile
+  // now starts at the same 16pt.
+  //
+  // The VERTICAL 20 stays: it is breathing room above the search pill, not an alignment,
+  // and the bottom is overridden inline with HERO_CONTENT_BOTTOM anyway.
+  content:   { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 16, paddingTop: 20, gap: 12 },
   bottomRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
   searchPill:{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 46,
                borderRadius: 23, backgroundColor: '#fff', paddingHorizontal: 16 },

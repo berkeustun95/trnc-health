@@ -94,7 +94,8 @@ function StripCard({ item, lang, onPress }) {
           solid band is both simpler and strictly better — its contrast is a constant
           rather than a function of which photograph loaded.
 
-          0.78 black gives white text 11.6:1 at worst, against a white photo. */}
+          0.78 black gives white text 11.73:1 at worst, against a white photo. Measured,
+          not recalled — the previous figure here said 11.6. */}
       <View style={s.band}>
         <View style={s.bandText}>
           <Text style={s.title} numberOfLines={1}>{title}</Text>
@@ -166,13 +167,24 @@ const s = StyleSheet.create({
   // maxWidth so a long Turkish or German label cannot run under the card's right edge —
   // "Sponsorlu" is short but "Yakında başlıyor" is not, and the tag must ellipse rather
   // than escape.
-  tag:           { position: 'absolute', top: 12, right: 10, maxWidth: '62%',
+  // top: 10 to sit on the badge's line — it was 12, so the two things in the card's top
+  // strip were 2pt out of alignment with each other.
+  tag:           { position: 'absolute', top: 10, right: 10, maxWidth: '62%',
                    borderRadius: 11, paddingHorizontal: 9, paddingVertical: 4 },
   tagSponsored:  { backgroundColor: 'rgba(0,0,0,0.62)' },
-  // Deepened accent, not `accent` itself: white on #FF8552 is 2.41:1 and this is a label
-  // meant to be read at a glance. #C2410C is the same token DutyRow and the lifestyle tint
-  // already use for exactly this reason, and gives white 5.94:1.
-  tagSoon:       { backgroundColor: '#C2410C' },
+  // ─── TEAL, NOT CORAL — AND THAT IS THE URGENCY SYSTEM, NOT A PREFERENCE ───
+  // This was #C2410C, a deepened accent in the coral family. It measured fine (white at
+  // 5.18:1) and was still wrong, because in this design CORAL MEANS URGENT: the Nöbetçi
+  // row is coral, and so are exactly three grid tiles — health, emergency, towing, the
+  // things somebody opens this app for at 2am. An event starting in four hours is not one
+  // of those, and a coral badge on it spends the only strong signal in the palette on
+  // something that does not need it. Once "coral" also means "soon", it stops meaning
+  // "urgent" everywhere else on the screen.
+  //
+  // Brand teal, measured: white on #0E7C7B is 5.01:1, clear of the 4.5 floor for this
+  // 11pt label and only 0.17 off what the coral gave. The signal is preserved; the
+  // vocabulary is not diluted.
+  tagSoon:       { backgroundColor: colors.primary },
   tagText:       { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   band:          { position: 'absolute', left: 0, right: 0, bottom: 0, height: STRIP_BAND_H,
                    backgroundColor: 'rgba(0,0,0,0.78)', flexDirection: 'row', alignItems: 'center',
@@ -184,6 +196,10 @@ const s = StyleSheet.create({
   // rgba(255,255,255,0.86) is 8.9:1 on the band. A flat grey token would composite against
   // whatever photograph is behind the band's own alpha and stop being knowable by reading.
   sub:           { fontSize: 12, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.86)', marginTop: 2 },
-  chevron:       { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fff',
+  // 34, matching the Oli row's. Both are a CARD'S PRIMARY AFFORDANCE and were 34 / 32 —
+  // two sizes for one role, 250pt apart on the same screen. The badge above stays 32
+  // deliberately: it is a passive marker, not something to press, and a slightly smaller
+  // circle is how that reads.
+  chevron:       { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff',
                    justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
 })
