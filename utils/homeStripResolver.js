@@ -4,46 +4,49 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase.js'
 import { LANG_CODES } from '../constants/i18n.js'
-import {
-  STRIP_TIPS, STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY,
-} from '../constants/homeStrip.js'
+import { STRIP_SOON_HOURS, STRIP_LAST_KIND_KEY } from '../constants/homeStrip.js'
 
-// ─── THE LADDER ─────────────────────────────────────────────────────────────
+// ─── THE LADDER — THE LEFT CARD ONLY ────────────────────────────────────────
 //
 //   1  a pinned item for today          home_strip_pin, pin_date = today
 //   2  an event starting within 6h      the "leave now" case
 //   3  an event later today             still actionable, less urgent
-//   4  a place added in the last 7 days  see the RANK 4 caveat below
-//   5  a sponsored promo                 labelled, gated, never consecutive
-//   6  an Oli tip                        local constant — the floor
+//   4  a sponsored promo                labelled, gated, never displacing an event
+//   5  the events module's generic card  <- terminal, and it is NOT a rank that can fail
 //
-// ─── EVERY RANK IS INDIVIDUALLY FALLIBLE, ON PURPOSE ────────────────────────
+// ⚠ THIS RESOLVER NO LONGER DECIDES WHETHER THE SECTION IS EMPTY. It decides what the LEFT
+//   card shows. The right card is the duty pharmacy, rendered unconditionally by
+//   LiveStrip, never resolved and never outranked — so "Bugün ADA'da" is non-empty by
+//   construction rather than by a fallback surviving.
 //
-// Each source runs inside its own try/catch and a throw drops THAT RANK ONLY, continuing
-// down the ladder. This is one mechanism doing three jobs, which is why it is not
-// defensive clutter:
+// ⚠ WHERE THE PROMO LANDS, AND WHY IT IS STRICTER THAN IT WAS. It keeps its position
+//   BELOW every real event, and what it now outranks is only the generic filler card —
+//   where it used to outrank an Oli tip that was itself a real destination. So a promo can
+//   never displace content, only the placeholder. The other rules are unchanged: labelled
+//   "Sponsorlu", never twice running, and never shown to a guest, a null-DOB profile or
+//   anyone under PROMO_MIN_AGE.
 //
-//   • home_strip_pin DOES NOT EXIST IN PRODUCTION as this ships. The DDL is written and
-//     deliberately unapplied, so rank 1 (and rank 5, which reads the same table) will
-//     answer 42P01 "relation does not exist" on every call until somebody runs it. That
-//     must be a fall-through, not a crash, and not an empty card.
-//   • Offline, every network rank fails and the ladder lands on the local tip.
-//   • RLS. A guest cannot read `events` at all — "read approved events" is TO
-//     authenticated — so rank 2 and 3 return nothing for a signed-out user. That is a
-//     correct empty, not an error, and it is the reason a guest sees places and tips.
+// ⚠ TWO RANKS WERE REMOVED. The Oli tip (which contained a duty-pharmacy entry typed as a
+//   tip — see constants/homeStrip.js) and the recently-added place. The place rank had
+//   nowhere left to sit once the left card became "today's event" with a stated generic
+//   fallback, and its created_at caveat retires with it.
 //
-// ⚠ AND IT IS WHY "NEVER RENDERS EMPTY" IS A STRUCTURAL CLAIM RATHER THAN A HOPE. Rank 6
-//   reads no table, needs no session and cannot 404: STRIP_TIPS is a module-level
-//   constant compiled into the bundle. There is no path through this function that
-//   returns null, and the return type says so.
+// ─── EVERY RANK IS STILL INDIVIDUALLY FALLIBLE ──────────────────────────────
+//
+// Each source runs inside its own try/catch and a throw drops THAT RANK ONLY:
+//   • home_strip_pin DOES NOT EXIST IN PRODUCTION as this ships — the DDL is written and
+//     deliberately unapplied, so ranks 1 and 4 answer 42P01 on every call.
+//   • Offline, every network rank fails.
+//   • RLS: a guest cannot read `events` at all ("read approved events" is TO
+//     authenticated), so ranks 2 and 3 are structurally empty for them. A correct empty.
+// All of those land on rank 5, which reads nothing and cannot fail.
 //
 // ─── WHAT THIS RETURNS ──────────────────────────────────────────────────────
 //
-//   { kind, id, title, subtitle, icon, imageUrl, sponsored, action }
+//   { kind, id, title, subtitle, icon, imageUrl, image, sponsored, action }
 //
-// Strings are RESOLVED here, so the card renders text and makes no decisions. `action` is
-// a plain descriptor — { type: 'place', id } — never a closure, so the resolver has no
-// opinion about navigation and HomeScreen keeps owning it.
+// `imageUrl` is a remote URI; `image` is a bundled require() for the generic card. Strings
+// are RESOLVED here except the generic card's, which are i18n keys — see LiveStrip.
 
 const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
@@ -183,70 +186,19 @@ async function readEventsToday(now, lang) {
   }
 }
 
-// ─── RANK 4 — a place added in the last 7 days ──────────────────────────────
+// ─── RANK 5 — the generic events card, and it is terminal ───────────────────
 //
-// ⚠ created_at IS A SUBMISSION TIMESTAMP, NOT A PUBLICATION ONE, AND THE TWO CAN BE WEEKS
-//   APART. `places` rows arrive through ExploreSubmitScreen at status 'pending' and become
-//   visible only when an admin approves them; the column records when the row was WRITTEN,
-//   and nothing in the table records when it was approved. So a place submitted on the 1st
-//   and approved on the 20th is invisible to this rank forever — it was never "new" during
-//   any window in which it was also visible — while the whole 42-row Explore seed shares
-//   one created_at from the import and would have surfaced as "new" together on the day it
-//   landed.
-//
-//   This is the denominator mistake CLAUDE.md records for check-notify-health: a column
-//   that is a fact about SUBMISSION being read as a fact about PUBLICATION. It is accepted
-//   here rather than fixed, because the honest fix is an `approved_at` column and that is
-//   a schema change this slice did not scope. The cost of being wrong is small and
-//   symmetric — rank 4 is a nice-to-have between an event and a promo, so a miss costs a
-//   fall-through and a false positive costs a card about a real, visible, active place.
-//   THAT is why it is tolerable, not the fact that it is unlikely.
-//
-//   If a real "recently published" signal is ever wanted, add `published_at` and read it
-//   here. Do not widen the window to compensate; a wider window on the wrong column is
-//   more wrong, not less.
-async function readNewPlace(now, lang) {
-  const since = new Date(now.getTime() - STRIP_NEW_PLACE_DAYS * 24 * 60 * 60 * 1000)
-  const { data, error } = await supabase
-    .from('places')
-    .select('id, name, name_i18n, cover_image_url, photos, created_at')
-    .eq('status', 'active')
-    .gte('created_at', since.toISOString())
-    .order('created_at', { ascending: false })
-    .limit(1)
-  if (error) throw error
-  const p = (data || [])[0]
-  if (!p) return null
+// Not a "fallback" in the sense of something that might also fail: it reads no table, has
+// no session and its image is a bundled require(). It carries KEYS rather than resolved
+// strings because its copy is ours, unlike an event title which is a database row.
+function genericEventsItem() {
   return {
-    kind: 'place', id: p.id,
-    title: i18nText(p.name_i18n, lang) || p.name || '',
-    subtitle: '',
-    icon: 'location-outline',
-    imageUrl: p.cover_image_url || firstImage(p.photos) || null,
-    sponsored: false,
-    action: { type: 'place', id: p.id },
-  }
-}
-
-// ─── RANK 6 — the floor ─────────────────────────────────────────────────────
-// Rotates by day-of-year so a user does not read the same sentence every morning, and
-// deterministically so that two opens on the same day agree. No Math.random(): a tip that
-// changes when you background and reopen the app reads as a glitch.
-export function pickTip(now = new Date()) {
-  const dayIndex = Math.floor(
-    (Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(now.getFullYear(), 0, 0)) / 86400000)
-  return STRIP_TIPS[dayIndex % STRIP_TIPS.length]
-}
-
-function tipItem(now) {
-  const tip = pickTip(now)
-  return {
-    kind: 'tip', id: tip.id,
-    titleKey: tip.titleKey, subtitleKey: tip.subtitleKey,
-    icon: tip.icon,
+    kind: 'event', id: 'generic', generic: true,
+    titleKey: 'stripEventsTitle', subtitleKey: 'stripEventsSub',
+    icon: 'calendar-outline',
     imageUrl: null,
     sponsored: false,
-    action: { type: tip.action },
+    action: { type: 'events' },
   }
 }
 
@@ -274,29 +226,18 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
     const e = await readEventsToday(now, lang)
     if (e) {
       const withinSoon = e.startsAt - now.getTime() <= STRIP_SOON_HOURS * 60 * 60 * 1000
-      // Rank 2 and rank 3 differ only in URGENCY, and the card says so through `soon`
-      // rather than through a different shape — same component, same height.
       const { startsAt, ...item } = e
       return { ...item, soon: withinSoon }
     }
   } catch { /* fall through */ }
 
-  // ── RANK 4 ── a recently added place.
-  try {
-    const p = await readNewPlace(now, lang)
-    if (p) return p
-  } catch { /* fall through */ }
-
-  // ── RANK 5 ── a sponsored promo. Two gates, and both are hard.
+  // ── RANK 4 ── a sponsored promo. Two gates, and both are hard.
   //
   // ⚠ THE ELIGIBILITY CHECK COMES FIRST AND SHORT-CIRCUITS THE READ. An ineligible user's
   //   device never asks for promo rows at all, rather than fetching them and declining to
-  //   draw one. Same reasoning as the towing policy's split SELECT arms: the cheapest way
-  //   to be sure a thing is not shown is for it never to arrive.
+  //   draw one. The cheapest way to be sure a thing is not shown is for it never to arrive.
   if (promosEligible) {
     try {
-      // Never twice running. Read from the device, not from the item — the previous card
-      // was on a previous mount and nothing in this call knows about it.
       let lastKind = null
       try { lastKind = await AsyncStorage.getItem(STRIP_LAST_KIND_KEY) } catch { /* absent is fine */ }
       if (lastKind !== 'promo') {
@@ -310,8 +251,8 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
     } catch { /* fall through */ }
   }
 
-  // ── RANK 6 ── the floor. No await, no failure mode.
-  return tipItem(now)
+  // ── RANK 5 ── the generic events card. No await, no failure mode.
+  return genericEventsItem()
 }
 
 // Called by the card once it has actually rendered something, so "what was shown last" is

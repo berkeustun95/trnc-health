@@ -185,14 +185,20 @@ function num(file, blockKey, prop) {
 const GEOM = {
   pageInset: num('screens/HomeScreen.js',        'v2Below',  'paddingHorizontal'),
   tilePad:   num('components/home/ModuleTile.js', 'tile',    'paddingHorizontal'),
-  dutyPad:   num('components/home/DutyRow.js',    'row',     'padding'),
-  dutyGap:   num('components/home/DutyRow.js',    'row',     'gap'),
-  dutyIcon:  num('components/home/DutyRow.js',    'iconTile','width'),
-}
-// The chevron is a JSX prop rather than a style, so it is read from the element itself.
-{
-  const m = /name="chevron-forward"\s+size=\{(\d+)\}/.exec(read('components/home/DutyRow.js'))
-  GEOM.dutyChevron = m ? { v: parseFloat(m[1]) } : { err: 'DutyRow.js: no chevron-forward size' }
+  // ─── THE DUTY FRAME MOVED, AND SO DID THIS ────────────────────────────────
+  // It used to scrape components/home/DutyRow.js — a full-width row with 243pt of text.
+  // That row was deleted on 2026-09-08 when the duty pharmacy became the right-hand card
+  // of the two-up strip, and its text box is now 77pt at 320dp: a third of what this guard
+  // was measuring against.
+  //
+  // ⚠ AND THE SCRAPER WOULD HAVE HARD-FAILED, NOT DRIFTED — readFileSync on a deleted file
+  //   throws, so `npm run ota` was blocked the moment the component went. That is the
+  //   designed behaviour (a guard that cannot read its subject must not pass), and it is
+  //   why this repointing belongs in the same commit as the deletion.
+  bandPad:   num('components/home/LiveStrip.js',  'band',    'paddingHorizontal'),
+  bandGap:   num('components/home/LiveStrip.js',  'band',    'gap'),
+  chevron:   num('components/home/LiveStrip.js',  'chevron', 'width'),
+  cardGap:   num('components/home/LiveStrip.js',  'row',     'gap'),
 }
 
 const geomErrors = Object.entries(GEOM).filter(([, r]) => r.err).map(([k, r]) => `${k}: ${r.err}`)
@@ -209,8 +215,10 @@ const G = Object.fromEntries(Object.entries(GEOM).map(([k, r]) => [k, r.v]))
 // ModuleTile sits in a column inset by v2Below on both sides, takes 1/GRID_COLUMNS of it,
 // and pads itself horizontally on both sides.
 const labelBox = W => (W - G.pageInset * 2) / GRID_COLUMNS - G.tilePad * 2
-// DutyRow: the row pads all round, then icon tile · text · chevron with a gap between each.
-const dutyBox  = W => (W - G.pageInset * 2) - G.dutyPad * 2 - G.dutyIcon - G.dutyChevron - G.dutyGap * 2
+// The strip's card band: two cards share the page width with one gap between them, then
+// each band pads both sides and reserves the chevron plus a gap. 114pt at 393dp, 97 at 360
+// and 77 at 320 — tighter than the module-grid label box, with type at 14pt rather than 11.
+const cardBox  = W => (W - G.pageInset * 2 - G.cardGap) / 2 - G.bandPad * 2 - G.chevron - G.bandGap
 
 const problems = []
 let checked = 0
@@ -243,11 +251,19 @@ for (const W of WIDTHS) {
     for (const m of HOME_MODULES) {
       assess('tile', t(m.labelKey, L), 11, labelBox(W), `${W}dp ${L} tile:${m.id}`, CURSIVE.has(L))
     }
-    // The Nöbetçi row's three states. Its ALERT titles are the copy that says WE HAVE LOST
-    // THE DUTY ROSTER, and they were being ellipsed in every locale before 2026-09-05 —
-    // found by this tool, not by review.
-    for (const k of ['tonightDuty', 'dutyBannerPartialTitle', 'dutyBannerStaleTitle']) {
-      assess('duty', t(k, L), 16, dutyBox(W), `${W}dp ${L} duty:${k}`, CURSIVE.has(L))
+    // ─── The strip's card copy ──────────────────────────────────────────────
+    // Titles at 14pt over two lines; subtitles at 11pt, which the card renders on ONE, so a
+    // subtitle needing two shows up here as a mid-word break or an over-long wrap.
+    //
+    // The duty ALERT titles are the copy that says WE HAVE LOST THE DUTY ROSTER. They were
+    // being ellipsed in every locale before 2026-09-05 — found by this tool, not by review
+    // — and they now live in a box a third the width, so they are re-measured here rather
+    // than assumed to have survived the move.
+    for (const k of ['stripDutyTitle', 'stripDutyPartialTitle', 'stripDutyStaleTitle', 'stripEventsTitle']) {
+      assess('card', t(k, L), 14, cardBox(W), `${W}dp ${L} card:${k}`, CURSIVE.has(L))
+    }
+    for (const k of ['stripDutySub', 'stripDutyAlertSub', 'stripEventsSub']) {
+      assess('card', t(k, L), 11, cardBox(W), `${W}dp ${L} card:${k}`, CURSIVE.has(L))
     }
   }
 }
@@ -267,8 +283,8 @@ if (problems.length) {
 }
 console.log(`tile labels: OK — ${checked} strings from Inter_${WEIGHT} at ${WIDTHS.join('dp / ')}dp`)
 console.log(`  geometry read from source: page inset ${G.pageInset}, tile pad ${G.tilePad}, `
-  + `duty pad ${G.dutyPad}/gap ${G.dutyGap}/icon ${G.dutyIcon}/chevron ${G.dutyChevron} `
-  + `-> label box ${labelBox(320).toFixed(1)}pt, duty box ${dutyBox(320).toFixed(1)}pt at 320dp`)
+  + `card gap ${G.cardGap}/band pad ${G.bandPad}/gap ${G.bandGap}/chevron ${G.chevron} `
+  + `-> label box ${labelBox(320).toFixed(1)}pt, card band ${cardBox(320).toFixed(1)}pt at 320dp`)
 console.log(`  tightest (shaped scripts excluded): ${JSON.stringify(tightestLatin.str)} `
   + `at ${tightestLatin.where}, ${tightestLatin.spare.toFixed(1)}pt spare of ${tightestLatin.box.toFixed(1)}pt`)
 console.log(`  tightest overall:                   ${JSON.stringify(tightest.str)} `

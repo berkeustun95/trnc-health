@@ -19,7 +19,6 @@ import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
 import WeatherSheet from '../components/home/WeatherSheet'
 import OliRow from '../components/home/OliRow'
-import DutyRow from '../components/home/DutyRow'
 import ModuleGrid from '../components/home/ModuleGrid'
 import LiveStrip from '../components/home/LiveStrip'
 import FavouritesRow from '../components/home/FavouritesRow'
@@ -354,11 +353,13 @@ export default function HomeScreen({
       // date-ordered and the strip only ever surfaces something starting today, so the
       // event is at the top of it.
       case 'events':    onShowEvents?.(); break
+      // A PINNED place is still reachable — home_strip_pin accepts kind 'place', which is
+      // an editorial act rather than a ranked one. The unranked place rank is gone; this
+      // branch is not it.
       case 'place':     openPlaceById(a.id); break
-      case 'oli':       onOpenOli?.(); break
-      case 'duty':      onShowDutyList?.(); break
-      case 'explore':   onShowExplore?.(); break
-      case 'emergency': onShowEmergency?.(); break
+      // 'oli', 'duty', 'explore' and 'emergency' were removed with the tip pool. Nothing
+      // produces them any more, and a switch arm for an action no source emits is a
+      // branch that can only ever be wrong about why it exists.
       // Promos are the only outbound link on this screen. openURL can reject on a
       // malformed href, and an unhandled rejection here would be a red box over Home.
       case 'link':      if (a.url) Linking.openURL(a.url).catch(() => {}); break
@@ -569,7 +570,8 @@ export default function HomeScreen({
   // ─── HOME_V2 hub ────────────────────────────────────────────────────────────
   //
   // The V2 anatomy, top to bottom: top bar · half-height district hero · Oli row ·
-  // Nöbetçi eczaneler · Bugün ADA'da · Sık kullandıkların · Tüm modüller · home_footer.
+  // Bugün ADA'da (event card + duty card) · Sık kullandıkların · Tüm modüller ·
+  // home_footer. Nöbetçi is no longer a row of its own — it is the right-hand card.
   //
   // ⚠ THIS FUNCTION IS THE ENTIRE SCOPE OF HOME_V2_LIVE. It replaces renderHub() and
   //   nothing else. HomeScreen's facility-list mode is load-bearing for the profile
@@ -666,50 +668,33 @@ export default function HomeScreen({
           <View style={s.v2Below}>
             <OliRow lang={lang} onPress={onOpenOli} />
 
-            {/* ─── NÖBETÇİ ECZANELER — SECOND, AND THAT POSITION IS THE POINT ──
-                It sat BELOW the live strip until 2026-09-06, which put it 597-669dp down
-                a 320x712dp screen against a ~624dp fold: 45dp below, needing a scroll on
-                the cheapest phone in the fold table. Duty pharmacy is the most-used
-                feature in the app and the one people reach for under pressure at 2am, so
-                that was the wrong 45dp to spend on anything.
+            {/* ─── Bugün ADA'da — TWO CARDS, AND THE DUTY ROW IS INSIDE ONE ─────
+                The standalone Nöbetçi row is gone. Its job moved into the right-hand
+                card, which renders unconditionally and opens the same DutyListScreen.
 
-                Moving it above the strip gives back the strip's whole block — heading 52
-                + card 150 + gap 24 = 226pt — and it now clears the fold on every device
-                in the table with room to spare. The arithmetic is in HomeHero.js beside
-                HERO_MAX, recomputed rather than recalled.
+                ⚠ THAT IS A STRONGER GUARANTEE THAN THE ROW HAD, NOT A WEAKER ONE. The row
+                  could be outranked by nothing, but it could be scrolled past, and it sat
+                  below a 150pt strip that put it exactly on the fold at 360x640. A fixed
+                  slot in a 134pt two-up cannot be lost and cannot be pushed down.
 
-                dutyBannerRef, not a new ref: App.js measures this exact ref to place the
-                duty coach mark, and a ref that measures null drops that tutorial step
-                silently. Both hub variants must attach it. */}
-            <View style={s.v2DutyWrap}>
-              <DutyRow
-                lang={lang}
-                status={dutyRosterStatus}
-                onPress={onShowDutyList}
-                innerRef={dutyBannerRef}
-              />
-            </View>
-
-            {/* ─── Bugün ADA'da ────────────────────────────────────────────
                 The heading lives HERE rather than inside LiveStrip so it uses the same
-                v2SectionTitle token as "Tüm modüller" below and cannot drift from it.
-                That is only safe because LiveStrip has no empty branch — it renders the
-                skeleton while loading and a card otherwise, and the resolver's rank 6 is
-                a local constant — so this heading can never be left standing over
+                v2SectionTitle token as the two below it. Safe because LiveStrip has no
+                branch that renders fewer than two cards — both fall back to a require()d
+                image compiled into the bundle — so this heading can never stand over
                 nothing.
 
-                ⚠ THE STRIP NOW SITS BELOW THE DUTY ROW, AND DUTY IS STILL NOT ONE OF ITS
-                  KINDS. The two facts are independent and both must hold: a permanent row
-                  cannot lose a ladder it is not in, and putting duty second on the page
-                  is what keeps it above the fold. Neither one substitutes for the other —
-                  if duty were ever added to the strip's kinds it could still be outranked
-                  on any day an event beat it, wherever the strip happened to sit. */}
+                dutyBannerRef is passed THROUGH to the duty card. App.js measures that
+                exact ref for the coach mark, and a ref that measures null drops the step
+                silently. V1's own attachment further down this file is untouched. */}
             <Text style={s.v2SectionTitle}>{t('stripSectionTitle', lang)}</Text>
             <LiveStrip
               item={stripItem}
               loading={stripLoading}
               lang={lang}
-              onPress={handleStripPress}
+              dutyStatus={dutyRosterStatus}
+              onPressEvent={handleStripPress}
+              onPressDuty={onShowDutyList}
+              dutyRef={dutyBannerRef}
             />
 
             {/* ─── Sık kullandıkların ──────────────────────────────────────
@@ -1363,14 +1348,6 @@ const s = StyleSheet.create({
   // primaryDark rather than primary: this is 13pt text on the warm canvas and primary
   // measures 4.44:1 there, under the 4.5 floor. primaryDark is 6.71:1.
   v2SectionAction:  { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark },
-  // The gap above the Nöbetçi row lives HERE, on a wrapper, not inside DutyRow. That is
-  // exactly why the 2026-09-06 reorder was a move of two JSX blocks and nothing else — a
-  // component carrying its own top margin would have had to be edited to change position.
-  //
-  // 24. It is the ONE section boundary on this screen that is not a heading, and it was
-  // 16 while every other was 24. Every section gap is now 24: Oli → duty, duty → strip
-  // heading, strip → shortcuts heading, shortcuts → grid heading.
-  v2DutyWrap:       { marginTop: 24 },
 
   // Hub
   hubContent:       { paddingBottom: 32, gap: 12 },

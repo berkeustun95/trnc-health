@@ -10,28 +10,33 @@
 // resolves through a ladder (utils/homeStripResolver.js) and shows the first thing that
 // matches. It is never empty and never a spinner-shaped hole.
 
-// ─── THE KINDS ARE A CLOSED SET, AND TWO ABSENCES ARE THE POINT ─────────────
+// ─── THE KINDS ARE A CLOSED SET ─────────────────────────────────────────────
 //
-// event | place | promo | tip. A renderer that switches on `kind` must handle all four
-// and nothing else, which is what STRIP_KINDS is for.
+// event | promo. A renderer that switches on `kind` must handle both and nothing else.
 //
-// ⚠ DUTY PHARMACY IS NOT A KIND, AND CANNOT BECOME ONE BY ACCIDENT. Nöbetçi eczaneler has
-//   its own permanent row directly ABOVE this card, and it is the single thing somebody
-//   opens this app for at 2am. Putting it in a rotation means that on any day an event or
-//   a promo outranks it, the most important row on the screen is the one that did not
-//   render. A permanent row cannot lose a ladder it is not in. There is no 'duty' member
-//   here, no duty branch in the resolver, and the strip queries no duty table.
+// ⚠ `tip` IS GONE, AND THE REASON IS WORTH KEEPING. The strip used to end in an Oli tip
+//   whose only job was to stop the card being empty. One of those tips was
+//   { id: 'tipDuty', action: 'duty' } — a duty pharmacy entry, sitting in the strip,
+//   typed as `tip`.
 //
-//   ⚠ AND THE ORDER IS A SEPARATE PROTECTION, NOT THE SAME ONE. Duty moved above the strip
-//     on 2026-09-06 so it clears the fold on a 360x640 device. That is about SCROLLING;
-//     this is about RANKING. Both must hold — a duty entry in the ladder could still lose
-//     to an event wherever the strip happened to sit on the page.
+//   Every structural guard passed. This file forbade a 'duty' KIND in capitals, the
+//   migration's CHECK forbade it in the database, and both were satisfied, because what
+//   was forbidden was the LABEL and what shipped was the DESTINATION. Same family as the
+//   repo's `NOT ILIKE '%appointments%'` note: an assertion about a name is not an
+//   assertion about behaviour. The tip pool is deleted rather than filtered — with nothing
+//   left to point anywhere, there is nothing left to guard.
 //
-// ⚠ `tip` IS DELIBERATELY ABSENT FROM THE DATABASE. home_strip_pin's CHECK allows only
-//   event | place | promo, so this union is a strict SUPERSET of what the table can hold.
-//   That is the structural half of "never renders empty": the fallback is a local
-//   constant that cannot be un-seeded, cannot 404 and cannot be emptied by an admin.
-export const STRIP_KINDS = ['event', 'place', 'promo', 'tip']
+// ⚠ `place` IS ALSO GONE. The left card is "today's event" and its stated fallback is the
+//   events module's generic image, so a place row had nowhere left to rank: it would have
+//   occupied the slot the fallback rule names. Its created_at caveat — a SUBMISSION
+//   timestamp read as a publication one — retires with it. Say so if it is ever restored;
+//   the caveat comes back with the rank.
+//
+// ⚠ AND DUTY IS NOW A CARD, NOT A LADDER ENTRY. It occupies the RIGHT slot unconditionally
+//   and is never resolved, ranked or outranked. That is a stronger guarantee than the old
+//   permanent row had, and it is the one thing about this section that must not be
+//   refactored into the resolver.
+export const STRIP_KINDS = ['event', 'promo']
 
 // ─── CARD HEIGHT — ONE NUMBER, TWO CONSUMERS ────────────────────────────────
 //
@@ -39,7 +44,13 @@ export const STRIP_KINDS = ['event', 'place', 'promo', 'tip']
 // actually fixed if the thing it stands in for is the same height, and two literals drift
 // the first time either is tuned — the symptom being a page that jumps under the user's
 // thumb exactly when the resolver returns, which is the one moment they are looking at it.
-export const STRIP_CARD_H = 150
+// 150 -> 134 on 2026-09-08, and the number is a FOLD constraint rather than a taste one.
+// With the standalone Nöbetçi row folded into the right-hand card, the duty content's
+// bottom edge IS this card's bottom edge — so "duty stays above the fold" now depends on
+// it directly. At 150 the card ended at 555.4 on a 360x640 gesture-nav device against a
+// 555 fold: exactly on the line. 134 clears it by 16pt. It also suits the new shape — a
+// half-width card at 134 is close to 4:3 where 150 was nearly square.
+export const STRIP_CARD_H = 134
 
 // How much of the card's bottom the solid text band occupies. A BAND, not a gradient
 // scrim: this card shows an arbitrary photograph from an arbitrary event submission, and
@@ -47,37 +58,50 @@ export const STRIP_CARD_H = 150
 // white text legible over a blown-out sky without blacking the photo out. A solid band
 // carries its own contrast on any image whatsoever, which is the same resolution the hero
 // reached for its wordmark chip and action buttons.
-export const STRIP_BAND_H = 62
+// 62 -> 60. The band now holds a 2-line 14pt title over a 1-line 11pt subtitle — 48.8pt of
+// content — because a half-width card's text box is 77pt at 320dp and no single line
+// survives that. See STRIP_CARD_TEXT_BOX below.
+export const STRIP_BAND_H = 60
 
-// ─── THE OFFLINE FLOOR ──────────────────────────────────────────────────────
+// ─── THE TWO CARDS ARE ALWAYS PRESENT ───────────────────────────────────────
 //
-// Rank 6, and the reason the strip has no empty state. Every field is either a local
-// string key or an icon name, so this branch needs no network, no table, no session and
-// no permission. A user in a dead spot, a user whose token expired, a user on the day
-// every query fails — all of them get a card.
+// Both fall back to an image compiled into the bundle: no network, no table, no session,
+// no permission. That is what replaces the old Oli tip as the proof that this section can
+// never be empty — and it is a stronger proof, because it is now TWO unconditional cards
+// rather than one card with a fallback ladder under it.
 //
-// ⚠ THESE ARE NOT PLACEHOLDERS AND MUST NOT READ AS FAKE CONTENT. Each one points at a
-//   real destination that exists today. A tip that advertises something unbuilt is the
-//   Coming Soon failure in a nicer wrapper: the user learns ADA cannot help with the
-//   thing it just offered.
+// ⚠ THE IMAGES THEMSELVES LIVE IN components/home/LiveStrip.js, NOT HERE, AND THAT IS A
+//   HARD CONSTRAINT RATHER THAN A PREFERENCE. This file is imported by
+//   scripts/validate-i18n-coverage.mjs running under plain Node, where `require()` of a
+//   PNG throws "require is not defined in ES module scope". Metro resolves it happily, so
+//   the failure appears in the guard and never in the app — which is the worst place for
+//   it. The header of this file says it must stay free of React Native imports; an asset
+//   require is exactly that.
 //
-// ⚠ THE KEYS ARE REACHED THROUGH A VARIABLE — t(tip.titleKey, lang) — which is this
-//   repo's named i18n blind spot: a scan that matches only the literal call form — the
-//   translate function with a quoted key inline — covers none of them.
-//   scripts/validate-i18n-coverage.mjs imports THIS ARRAY and derives the keys from it, so
-//   a tip added here is guarded the moment it is added. Do not inline a tip's strings at
-//   the call site; that is how they leave the guard's scope.
+// ─── THE TEXT BOX, WHICH IS THE REAL CONSTRAINT AT HALF WIDTH ───────────────
+// card = (screenW - 32 page inset - 10 gap) / 2; text = card - 24 band padding - 28
+// chevron - 10 gap. That is 114pt at 393dp, 97 at 360 and 77 at 320 — tighter than the
+// module grid's label box, with type at 14pt instead of 11. Every string in this section
+// is measured against it by `npm run labels:check`.
+export const STRIP_TITLE_LINES = 2
+export const STRIP_SUB_LINES   = 1
+
+// ─── EVERY STRING THE TWO CARDS CAN RENDER ──────────────────────────────────
 //
-//   ⚠ AND DO NOT WRITE THAT CALL SHAPE OUT IN A COMMENT ANYWHERE. The scan is a regex over
-//     the file, not a parse, so a call written inside a comment registers as a REAL key and
-//     the guard fails with "not present in English at all" — for a key that does not exist
-//     and never did. This paragraph is the second time that has happened in this repo; the
-//     first is recorded in the validator's own header.
-export const STRIP_TIPS = [
-  { id: 'tipOli',      icon: 'chatbubbles-outline', titleKey: 'stripTipOliTitle',      subtitleKey: 'stripTipOliSub',      action: 'oli' },
-  { id: 'tipDuty',     icon: 'medkit-outline',      titleKey: 'stripTipDutyTitle',     subtitleKey: 'stripTipDutySub',     action: 'duty' },
-  { id: 'tipExplore',  icon: 'compass-outline',     titleKey: 'stripTipExploreTitle',  subtitleKey: 'stripTipExploreSub',  action: 'explore' },
-  { id: 'tipEmergency',icon: 'call-outline',        titleKey: 'stripTipEmergencyTitle',subtitleKey: 'stripTipEmergencySub',action: 'emergency' },
+// ⚠ THESE ARE ALL REACHED THROUGH A TERNARY OR A VARIABLE, WHICH MAKES THEM INVISIBLE TO
+//   A LITERAL SCAN. LiveStrip picks a duty title with
+//   `t(ok ? A : partial ? B : C, lang)`, and the generic card's copy arrives as
+//   `item.titleKey`. Neither form matches the translate-call shape the i18n scanner
+//   recognises, so without this list all seven would sit outside the guard while the key
+//   total went UP — a coverage loss hidden inside a coverage gain, which is this repo's
+//   named failure shape.
+//
+//   scripts/validate-i18n-coverage.mjs imports this array. Add a key here in the same
+//   commit that renders it.
+export const STRIP_CARD_KEYS = [
+  'stripEventsTitle', 'stripEventsSub',
+  'stripDutyTitle', 'stripDutySub',
+  'stripDutyPartialTitle', 'stripDutyStaleTitle', 'stripDutyAlertSub',
 ]
 
 // ─── LADDER WINDOWS ─────────────────────────────────────────────────────────

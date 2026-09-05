@@ -4,117 +4,109 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { Skeleton } from '../Skeleton'
+import { DUTY_FRESH, DUTY_PARTIAL } from '../../utils/dutyStatus'
 import { STRIP_CARD_H, STRIP_BAND_H } from '../../constants/homeStrip'
 import { rememberStripKind } from '../../utils/homeStripResolver'
 
-// Bugün ADA'da — the live strip.
+// ─── THE TWO BUNDLED IMAGES ─────────────────────────────────────────────────
 //
-// ─── ONE CARD TODAY, TWO-UP AS A PROP ───────────────────────────────────────
+// They live HERE and not in constants/homeStrip.js because that file is imported by a
+// plain-Node guard, where require() of a PNG throws. See the note there.
 //
-// The brief asks for one full-width card built so a two-up variant is a prop rather than a
-// rewrite. That is a statement about where the WIDTH is decided, and the answer is: not in
-// the card. StripCard carries no width, no marginHorizontal and no percentage — it is
-// `flex: 1` inside a row, so one card fills the row and two share it, with `columns`
-// deciding nothing but how many the row contains.
-//
-// The parts that would otherwise need rewriting are already width-agnostic for the same
-// reason: the photo is absolutely filled, the band is anchored left/right/bottom, and the
-// title ellipses rather than wrapping to a height the card does not have. Only the ITEMS
-// array and `columns` change. Nothing here is a placeholder for the second variant; there
-// is no dead two-up code, because there is nothing to write.
-//
-// ─── IT CANNOT RENDER NOTHING ───────────────────────────────────────────────
-//
-// There is no early return in this component and no empty branch. `loading` gives the
-// skeleton; anything else gives cards. The invariant that the strip is never empty is
-// enforced one level up — utils/homeStripResolver.js has no path that returns null, ending
-// at a local constant — and this file simply has no way to express an empty state. That
-// matters because the section HEADING lives in HomeScreen next to the grid's, and a
-// component that could return null would orphan it.
-//
-// ─── THE SKELETON IS THE SAME HEIGHT AS THE CARD, FROM THE SAME CONSTANT ────
-//
-// Both read STRIP_CARD_H. A skeleton that is merely "about right" is worse than none: the
-// page settles under the user's thumb at the exact moment the resolver returns, which is
-// the moment they are looking at it. One number, two consumers, no drift.
+// ⚠ THE LEFT CARD'S FALLBACK IS THE EVENTS MODULE'S GENERIC IMAGE, NEVER A PAST EVENT'S
+//   PHOTO. Reusing the last event's picture on a day it is not happening misrepresents
+//   what is on, which is the one thing this section exists to report. When nothing
+//   qualifies, the card says "Events / What's on" over this image and opens the events
+//   screen — honest, and still a destination.
+const STRIP_EVENTS_IMAGE = require('../../assets/backgrounds/ada-bg-events.png')
 
-function StripCard({ item, lang, onPress }) {
-  const isTip = item.kind === 'tip'
-  // Tips carry KEYS, everything else carries resolved strings — a tip's text comes from a
-  // local constant and must be translated at render, while an event's title is a row in
-  // the database. Resolving both in the resolver would mean passing `lang` in to build a
-  // string that could be built here; carrying keys for both would mean inventing keys for
-  // user-submitted event titles.
-  const title    = isTip ? t(item.titleKey, lang)    : item.title
-  const subtitle = isTip ? t(item.subtitleKey, lang) : item.subtitle
+// ⚠ PLACEHOLDER, PENDING BERKE'S IMAGE. assets/backgrounds/ada-bg-duty-pharmacy.png is an
+//   existing ADA-owned asset, already used by components/PageBackground.js for the duty
+//   screen — so it is on-brand, correctly licensed, and actually depicts a pharmacy.
+//   Swapping it is this one line and nothing else.
+const STRIP_DUTY_IMAGE = require('../../assets/backgrounds/ada-bg-duty-pharmacy.png')
 
+// Bugün ADA'da — two photo cards, side by side.
+//
+//   LEFT   today's event, resolved through the ladder in utils/homeStripResolver.js,
+//          falling back to the events module's generic image.
+//   RIGHT  the duty pharmacy, always, opening DutyListScreen.
+//
+// ─── THE TWO-UP PROP DID NOT SURVIVE, AND HALF OF IT DID ────────────────────
+//
+// The old contract was `items` + `columns`: N interchangeable cards from ONE ladder. This
+// design is two FIXED SLOTS with different sources and different state models, so that
+// contract is gone and the props are explicit.
+//
+// What DID survive is the part that mattered: StripCard needed no change to work at half
+// width. It carries no width, no margin and no percentage — `flex: 1` in a row — and the
+// photo is absolutely filled, the band anchored, the title ellipsing. That was the actual
+// claim, and it held.
+//
+// What could not survive:
+//   • the duty card has FRESHNESS STATES the ladder never produces and cannot rank;
+//   • `rememberStripKind` recorded the LAST item, which would now record the duty card and
+//     silently corrupt the never-two-promos-in-a-row rule. It records the LEFT card only;
+//   • `columns` is meaningless when there are exactly two slots of different kinds.
+//
+// ─── IT CANNOT RENDER NOTHING, AND THE PROOF IS DIFFERENT NOW ───────────────
+//
+// It used to be "the resolver's last rank is a local constant". It is now stronger: both
+// cards are unconditional JSX and both fall back to a `require`d image compiled into the
+// bundle. There is no branch here that renders fewer than two cards, and no data state —
+// offline, RLS-blocked, empty database, unapplied migration — that can produce one.
+
+function StripCard({ image, imageUrl, icon, title, subtitle, tag, tagTone, alert, onPress, innerRef }) {
   return (
     <TouchableOpacity
-      style={s.card}
-      onPress={() => onPress?.(item)}
+      ref={innerRef}
+      collapsable={false}
+      style={[s.card, alert && s.cardAlert]}
+      onPress={onPress}
       activeOpacity={0.88}
       accessibilityRole="button"
-      accessibilityLabel={subtitle ? `${title} — ${subtitle}` : title}
+      accessibilityLabel={subtitle ? title + ' — ' + subtitle : title}
     >
-      {/* No photo is a NORMAL state, not a broken one — every tip is imageless by design
-          and plenty of events are submitted without one. The fallback is a flat brand
-          surface, so the card keeps its shape and its band keeps its contrast. */}
-      {item.imageUrl
-        ? <Image source={{ uri: item.imageUrl }} style={s.photo} resizeMode="cover" />
-        : <View style={[s.photo, s.photoFallback]} />}
+      {/* ─── THE ALERT STATE REPLACES THE PHOTOGRAPH, IT DOES NOT TINT IT ─────
+          At half width a tint is easy to miss and a missing photograph is not. A duty
+          roster running out is the failure this app has already inflicted on users — the
+          list ran out on 2026-06-30 and for two months the app said there was no duty
+          pharmacy tonight, when the truth was that we had lost the list — so an unhealthy
+          card must be unmistakable at a glance, not a shade different.
 
-      {/* ─── ICON BADGE, TOP-LEFT ────────────────────────────────────────────
-          A white circle with a dark glyph, like the hero's action buttons and for the
-          same measured reason: this sits on an arbitrary photograph from an arbitrary
-          submission, and there is no flat scrim alpha that makes a white mark legible
-          over a blown-out sky without blacking the photo out. It carries its own
-          contrast instead of borrowing it. */}
-      <View style={s.badge}>
-        <Ionicons name={item.icon} size={17} color={colors.textPrimary} />
+          FIVE things change at once (surface, badge colour, badge glyph, band colour,
+          card border), so colour is never the sole carrier and the state survives
+          greyscale and colour-blindness. Same principle the standalone Nöbetçi row used. */}
+      {alert
+        ? <View style={[s.photo, s.photoAlert]} />
+        : <Image source={imageUrl ? { uri: imageUrl } : image} style={s.photo} resizeMode="cover" />}
+
+      <View style={[s.badge, alert && s.badgeAlert]}>
+        <Ionicons name={alert ? 'alert-circle' : icon} size={15} color={alert ? '#fff' : colors.textPrimary} />
       </View>
 
-      {/* Two labels can share the top-right corner: "Sponsorlu" and "soon". They never
-          collide because a promo is rank 5 and a soon-event is rank 2 — the ladder
-          returns ONE item, so at most one of these is ever true. */}
-      {item.sponsored && (
-        <View style={[s.tag, s.tagSponsored]}>
-          <Text style={s.tagText} numberOfLines={1}>{t('stripSponsored', lang)}</Text>
-        </View>
-      )}
-      {!item.sponsored && item.soon && (
-        <View style={[s.tag, s.tagSoon]}>
-          <Text style={s.tagText} numberOfLines={1}>{t('stripStartingSoon', lang)}</Text>
+      {!!tag && (
+        <View style={[s.tag, tagTone === 'sponsored' ? s.tagSponsored : s.tagSoon]}>
+          <Text style={s.tagText} numberOfLines={1}>{tag}</Text>
         </View>
       )}
 
-      {/* ─── A SOLID BAND, NOT A GRADIENT ────────────────────────────────────
-          expo-linear-gradient is not installed and this repo does not add a package for a
-          visual effect. The hero fakes a ramp with stacked flat bands because its text
-          sits high on the photo; here the text sits in a fixed strip at the bottom, so a
-          solid band is both simpler and strictly better — its contrast is a constant
-          rather than a function of which photograph loaded.
-
-          0.78 black gives white text 11.73:1 at worst, against a white photo. Measured,
-          not recalled — the previous figure here said 11.6. */}
-      <View style={s.band}>
+      {/* A solid band, not a gradient: expo-linear-gradient is not installed and this repo
+          does not add a package for a visual effect. Solid is also strictly better here —
+          its contrast is a constant rather than a function of which photograph loaded.
+          White on rgba(0,0,0,0.78) over a white photo is 11.73:1; on the alert band's
+          #C0384A it is 5.38:1. Both measured, neither carried forward. */}
+      <View style={[s.band, alert && s.bandAlert]}>
         <View style={s.bandText}>
-          <Text style={s.title} numberOfLines={1}>{title}</Text>
-          {/* TWO lines, and that is the degradation path rather than the design. Every
-              locale's tip copy is written to fit ONE line on a 393dp screen (measured;
-              the numbers are in the Slice 2 log), but Greek, Russian and German run
-              20-25% longer than English and a 320dp device is in the fold table. Wrapping
-              a subtitle costs nothing — the band is 62pt and title + two subtitle lines is
-              ~51pt — while truncating one costs the whole point of the card: "Beaches,
-              sights and mo…" is not a shorter sentence, it is a broken one.
-              The TITLE stays at one line: a wrapped title unbalances the band, and titles
-              are short enough in every locale to fit. */}
-          {!!subtitle && <Text style={s.sub} numberOfLines={2}>{subtitle}</Text>}
+          {/* TWO lines. The text box is 77pt at 320dp — narrower than a module-grid label,
+              with type at 14pt instead of 11 — so one line is not survivable in any
+              locale. Every string in this section is measured against that box by
+              `npm run labels:check`. */}
+          <Text style={s.title} numberOfLines={2}>{title}</Text>
+          {!!subtitle && <Text style={s.sub} numberOfLines={1}>{subtitle}</Text>}
         </View>
-        {/* A filled circle rather than a bare chevron — same reasoning as the Oli row:
-            on a busy background a lone glyph reads as decoration, and this is the card's
-            only affordance. */}
         <View style={s.chevron}>
-          <Ionicons name="chevron-forward" size={17} color={colors.textPrimary} />
+          <Ionicons name="chevron-forward" size={15} color={alert ? '#C0384A' : colors.textPrimary} />
         </View>
       </View>
     </TouchableOpacity>
@@ -124,82 +116,104 @@ function StripCard({ item, lang, onPress }) {
 function StripSkeleton() {
   return (
     <View style={s.row}>
-      <Skeleton width="100%" height={STRIP_CARD_H} borderRadius={18} />
+      <Skeleton width="100%" height={STRIP_CARD_H} borderRadius={18} style={{ flex: 1 }} />
+      <Skeleton width="100%" height={STRIP_CARD_H} borderRadius={18} style={{ flex: 1 }} />
     </View>
   )
 }
 
-export default function LiveStrip({ item, items, loading, lang, columns = 1, onPress }) {
-  // `items` is the two-up path and `item` the one-up shorthand. Both land in one array so
-  // the render below has a single shape.
-  const list = items ?? (item ? [item] : [])
-
-  // ─── RECORDED WHEN SHOWN, NOT WHEN RESOLVED ──────────────────────────────
-  // The "never two promos in a row" rule is about what APPEARED, and a mount abandoned
-  // mid-flight resolves an item nobody saw. Writing from the render effect keeps the
-  // record honest. Fires per kind change rather than per render.
-  const shownKind = list.map(i => i.kind).join(',')
+export default function LiveStrip({
+  item, loading, lang, dutyStatus = DUTY_FRESH, onPressEvent, onPressDuty, dutyRef,
+}) {
+  // Recorded when SHOWN, not when resolved — a mount abandoned mid-flight resolves
+  // something nobody saw, and the promo rule is about what appeared. The LEFT card only:
+  // the duty card is not ranked and must never enter that sequence.
+  const kind = item?.kind
   useEffect(() => {
-    if (!loading && list.length) rememberStripKind(list[list.length - 1].kind)
-  }, [loading, shownKind])
+    if (!loading && kind) rememberStripKind(kind)
+  }, [loading, kind])
 
   if (loading) return <StripSkeleton />
 
+  const ok = dutyStatus === DUTY_FRESH
+  // The generic card carries i18n KEYS; a real event carries its database title. Resolving
+  // both upstream would mean inventing keys for user-submitted event names.
+  const evTitle = item?.generic ? t(item.titleKey, lang)    : item?.title
+  const evSub   = item?.generic ? t(item.subtitleKey, lang) : item?.subtitle
+
   return (
     <View style={s.row}>
-      {list.slice(0, columns).map(it => (
-        <StripCard key={`${it.kind}:${it.id}`} item={it} lang={lang} onPress={onPress} />
-      ))}
+      <StripCard
+        image={STRIP_EVENTS_IMAGE}
+        imageUrl={item?.imageUrl}
+        icon={item?.icon || 'calendar-outline'}
+        title={evTitle}
+        subtitle={evSub}
+        tag={item?.sponsored ? t('stripSponsored', lang) : item?.soon ? t('stripStartingSoon', lang) : null}
+        tagTone={item?.sponsored ? 'sponsored' : 'soon'}
+        onPress={() => onPressEvent?.(item)}
+      />
+      {/* ─── THE DUTY CARD IS UNCONDITIONAL ──────────────────────────────────
+          It is not resolved, not ranked and cannot be outranked — a stronger guarantee
+          than the standalone row it replaces, because a row can be scrolled past and a
+          slot cannot be lost.
+
+          Both unhealthy states keep the card TAPPABLE and still pointing at
+          DutyListScreen, which carries the KTEB fallback. Telling somebody the roster is
+          thin and then refusing to open it would be worse than the banner that started
+          this.
+
+          dutyBannerRef lands HERE. App.js measures that exact ref to place the duty coach
+          mark, and a ref that measures null drops the tutorial step silently. */}
+      <StripCard
+        innerRef={dutyRef}
+        image={STRIP_DUTY_IMAGE}
+        icon="medkit"
+        alert={!ok}
+        title={t(ok ? 'stripDutyTitle'
+                    : dutyStatus === DUTY_PARTIAL ? 'stripDutyPartialTitle'
+                    : 'stripDutyStaleTitle', lang)}
+        subtitle={t(ok ? 'stripDutySub' : 'stripDutyAlertSub', lang)}
+        onPress={onPressDuty}
+      />
     </View>
   )
 }
 
 const s = StyleSheet.create({
-  // The row owns the gap; the card owns nothing about its own width. `gap` is inert at
-  // columns=1 and is what makes the two-up variant a prop.
   row:           { flexDirection: 'row', gap: 10 },
   card:          { flex: 1, height: STRIP_CARD_H, borderRadius: 18, overflow: 'hidden',
                    backgroundColor: colors.border, ...shadow },
+  // A danger border as the fifth signal — the one that still reads when a screenshot is
+  // scaled to a thumbnail and the band's text is illegible.
+  cardAlert:     { borderWidth: 1, borderColor: colors.danger },
   photo:         { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  photoFallback: { backgroundColor: colors.primary },
-  badge:         { position: 'absolute', top: 10, left: 10, width: 32, height: 32, borderRadius: 16,
+  photoAlert:    { backgroundColor: colors.dangerLight },
+  badge:         { position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: 14,
                    backgroundColor: 'rgba(255,255,255,0.94)', justifyContent: 'center', alignItems: 'center' },
-  // maxWidth so a long Turkish or German label cannot run under the card's right edge —
-  // "Sponsorlu" is short but "Yakında başlıyor" is not, and the tag must ellipse rather
-  // than escape.
-  // top: 10 to sit on the badge's line — it was 12, so the two things in the card's top
-  // strip were 2pt out of alignment with each other.
-  tag:           { position: 'absolute', top: 10, right: 10, maxWidth: '62%',
-                   borderRadius: 11, paddingHorizontal: 9, paddingVertical: 4 },
+  // White glyph on colors.danger is 4.36:1 — clear of the 3:1 floor that applies to a UI
+  // component, which is the rule for an icon rather than the 4.5:1 text floor.
+  badgeAlert:    { backgroundColor: colors.danger },
+  tag:           { position: 'absolute', top: 10, right: 10, maxWidth: '84%',
+                   borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 },
   tagSponsored:  { backgroundColor: 'rgba(0,0,0,0.62)' },
-  // ─── TEAL, NOT CORAL — AND THAT IS THE URGENCY SYSTEM, NOT A PREFERENCE ───
-  // This was #C2410C, a deepened accent in the coral family. It measured fine (white at
-  // 5.18:1) and was still wrong, because in this design CORAL MEANS URGENT: the Nöbetçi
-  // row is coral, and so are exactly three grid tiles — health, emergency, towing, the
-  // things somebody opens this app for at 2am. An event starting in four hours is not one
-  // of those, and a coral badge on it spends the only strong signal in the palette on
-  // something that does not need it. Once "coral" also means "soon", it stops meaning
-  // "urgent" everywhere else on the screen.
-  //
-  // Brand teal, measured: white on #0E7C7B is 5.01:1, clear of the 4.5 floor for this
-  // 11pt label and only 0.17 off what the coral gave. The signal is preserved; the
-  // vocabulary is not diluted.
+  // Brand teal, not coral: coral means URGENT on this screen — the duty card and three
+  // grid tiles — and an event starting in four hours is not that. White on #0E7C7B is
+  // 5.01:1.
   tagSoon:       { backgroundColor: colors.primary },
-  tagText:       { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  tagText:       { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   band:          { position: 'absolute', left: 0, right: 0, bottom: 0, height: STRIP_BAND_H,
                    backgroundColor: 'rgba(0,0,0,0.78)', flexDirection: 'row', alignItems: 'center',
-                   paddingHorizontal: 14, gap: 12 },
+                   paddingHorizontal: 12, gap: 10 },
+  // #C0384A, not colors.danger. White on danger (#D1495B) is 4.36:1 — under the 4.5 floor
+  // for this 14pt title. This is the same hue deepened until white clears it at 5.38:1,
+  // the same move DutyRow made for its icon tile and its subtitle.
+  bandAlert:     { backgroundColor: '#C0384A' },
   bandText:      { flex: 1 },
-  // 600, matching the Oli and duty titles — this card is a peer of those two rows, not a
-  // section heading, and the V2 scale puts row titles at SemiBold.
-  title:         { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
-  // rgba(255,255,255,0.86) is 8.9:1 on the band. A flat grey token would composite against
-  // whatever photograph is behind the band's own alpha and stop being knowable by reading.
-  sub:           { fontSize: 12, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.86)', marginTop: 2 },
-  // 34, matching the Oli row's. Both are a CARD'S PRIMARY AFFORDANCE and were 34 / 32 —
-  // two sizes for one role, 250pt apart on the same screen. The badge above stays 32
-  // deliberately: it is a passive marker, not something to press, and a slightly smaller
-  // circle is how that reads.
-  chevron:       { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff',
+  title:         { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  // rgba white rather than a grey token: a flat token would composite against whatever the
+  // band's own alpha sits on and stop being knowable by reading.
+  sub:           { fontSize: 11, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.88)', marginTop: 2 },
+  chevron:       { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff',
                    justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
 })

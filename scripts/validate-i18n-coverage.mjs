@@ -52,7 +52,7 @@ import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories.js'
 import { REGION_LABEL_KEY } from '../constants/regions.js'
 import { RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY } from '../constants/profileGate.js'
-import { STRIP_TIPS } from '../constants/homeStrip.js'
+import { STRIP_CARD_KEYS } from '../constants/homeStrip.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -126,7 +126,6 @@ const SURFACES = [
   'components/home/HomeHero.js',
   'components/home/WeatherSheet.js',
   'components/home/OliRow.js',
-  'components/home/DutyRow.js',
   'components/home/ModuleGrid.js',
   // Added with the hero attribution UI. PhotoCredit.js is shared with
   // ExploreProfileScreen (already in this list) — adding it here guards the credit
@@ -271,8 +270,16 @@ for (const f of SURFACES) {
 // index into, so a new category or group is covered the moment it is added.
 const viaVariable = [
   ...HOME_TILE_LABEL_KEYS,
-  // The live strip's offline floor. Reached as t(tip.titleKey, lang).
-  ...STRIP_TIPS.flatMap(tip => [tip.titleKey, tip.subtitleKey]),
+  // The two strip cards. Every one of these is chosen by a ternary or arrives as
+  // item.titleKey, so the literal scan sees none of them — see the note on the array.
+  ...STRIP_CARD_KEYS,
+  // The V1 duty banner's three states, picked the same way in renderHub(). They have
+  // NEVER been in scope: the scan cannot see `t(ok ? 'a' : b ? 'c' : 'd', lang)`, and when
+  // components/home/DutyRow.js was a listed surface it did not help, because being listed
+  // only matters if the regex matches. Adding them here is the fix that should have been
+  // made when the pattern was introduced, not when the file was deleted.
+  'tonightDuty', 'dutyBannerPartialTitle', 'dutyBannerStaleTitle',
+  'homeDutySub', 'dutyBannerStaleSub',
   ...HEALTH_TYPES,
   ...Object.values(GROUP_META).map(m => m.labelKey),
   // The wizard's two single-select groups. Reached as t(MAP[value]), invisible to the
