@@ -6,7 +6,7 @@
 //
 // ─── WHAT THE STRIP IS ──────────────────────────────────────────────────────
 //
-// ONE card, directly under the Oli row, answering "what is happening in ADA today". It
+// ONE card, below the Nöbetçi row, answering "what is happening in ADA today". It
 // resolves through a ladder (utils/homeStripResolver.js) and shows the first thing that
 // matches. It is never empty and never a spinner-shaped hole.
 
@@ -16,11 +16,16 @@
 // and nothing else, which is what STRIP_KINDS is for.
 //
 // ⚠ DUTY PHARMACY IS NOT A KIND, AND CANNOT BECOME ONE BY ACCIDENT. Nöbetçi eczaneler has
-//   its own permanent row directly below this card, and it is the single thing somebody
+//   its own permanent row directly ABOVE this card, and it is the single thing somebody
 //   opens this app for at 2am. Putting it in a rotation means that on any day an event or
 //   a promo outranks it, the most important row on the screen is the one that did not
 //   render. A permanent row cannot lose a ladder it is not in. There is no 'duty' member
 //   here, no duty branch in the resolver, and the strip queries no duty table.
+//
+//   ⚠ AND THE ORDER IS A SEPARATE PROTECTION, NOT THE SAME ONE. Duty moved above the strip
+//     on 2026-09-06 so it clears the fold on a 360x640 device. That is about SCROLLING;
+//     this is about RANKING. Both must hold — a duty entry in the ladder could still lose
+//     to an event wherever the strip happened to sit on the page.
 //
 // ⚠ `tip` IS DELIBERATELY ABSENT FROM THE DATABASE. home_strip_pin's CHECK allows only
 //   event | place | promo, so this union is a strict SUPERSET of what the table can hold.

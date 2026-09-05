@@ -35,7 +35,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "check:flags": "node scripts/check-module-flags.mjs",
-    "ota": "node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-logo.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-home-geometry.mjs && eas update --channel production",
+    "ota": "node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-logo.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-home-geometry.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs && eas update --channel production",
     "setup:hooks": "git config core.hooksPath .githooks && echo 'hooks enabled (.githooks)'",
     "eas-build-pre-install": "node scripts/check-module-flags.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
@@ -59,7 +59,8 @@
     "web:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-web-assets.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs && npx wrangler deploy",
     "privacy:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs",
     "logo:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-logo.mjs",
-    "home:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-home-geometry.mjs"
+    "home:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-home-geometry.mjs",
+    "labels:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs"
   },
   "private": true,
   "devDependencies": {

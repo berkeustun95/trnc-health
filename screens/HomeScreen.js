@@ -569,7 +569,7 @@ export default function HomeScreen({
   // ─── HOME_V2 hub ────────────────────────────────────────────────────────────
   //
   // The V2 anatomy, top to bottom: top bar · half-height district hero · Oli row ·
-  // Nöbetçi eczaneler · Tüm modüller · home_footer slot.
+  // Nöbetçi eczaneler · Bugün ADA'da · Sık kullandıkların · Tüm modüller · home_footer.
   //
   // ⚠ THIS FUNCTION IS THE ENTIRE SCOPE OF HOME_V2_LIVE. It replaces renderHub() and
   //   nothing else. HomeScreen's facility-list mode is load-bearing for the profile
@@ -584,8 +584,9 @@ export default function HomeScreen({
   // The "Bugün ADA'da" live strip is Slice 2 and the "Sık kullandıkların" favourites row
   // is Slice 3. Neither is stubbed here: an empty section header with nothing under it
   // reads as a broken screen, and a placeholder card is fake content that outlives the
-  // session it was written for. The Nöbetçi row sits directly under the Oli row until
-  // the strip lands between them.
+  // session it was written for. Both landed in Slices 2 and 3, and the Nöbetçi row was
+  // moved back above the strip on 2026-09-06 so it clears the fold on the cheapest
+  // device — see the note at its render site.
   function renderHubV2() {
     // hideHeaderActions is honoured here as well as in the V1 header, and that is defence
     // rather than decoration. It is UNREACHABLE today — the gate sets forceFacilityList,
@@ -665,29 +666,21 @@ export default function HomeScreen({
           <View style={s.v2Below}>
             <OliRow lang={lang} onPress={onOpenOli} />
 
-            {/* ─── Bugün ADA'da ────────────────────────────────────────────
-                The heading lives HERE rather than inside LiveStrip so it uses the same
-                v2SectionTitle token as "Tüm modüller" below and cannot drift from it.
-                That is only safe because LiveStrip has no empty branch — it renders the
-                skeleton while loading and a card otherwise, and the resolver's rank 6 is
-                a local constant — so this heading can never be left standing over
-                nothing.
+            {/* ─── NÖBETÇİ ECZANELER — SECOND, AND THAT POSITION IS THE POINT ──
+                It sat BELOW the live strip until 2026-09-06, which put it 597-669dp down
+                a 320x712dp screen against a ~624dp fold: 45dp below, needing a scroll on
+                the cheapest phone in the fold table. Duty pharmacy is the most-used
+                feature in the app and the one people reach for under pressure at 2am, so
+                that was the wrong 45dp to spend on anything.
 
-                ⚠ AND THE STRIP SITS ABOVE THE DUTY ROW WITHOUT COMPETING WITH IT. Duty
-                  is a permanent row and is deliberately not one of the strip's kinds; if
-                  it were, the single most important row on this screen would disappear
-                  on any day an event outranked it. */}
-            <Text style={s.v2SectionTitle}>{t('stripSectionTitle', lang)}</Text>
-            <LiveStrip
-              item={stripItem}
-              loading={stripLoading}
-              lang={lang}
-              onPress={handleStripPress}
-            />
+                Moving it above the strip gives back the strip's whole block — heading 52
+                + card 150 + gap 24 = 226pt — and it now clears the fold on every device
+                in the table with room to spare. The arithmetic is in HomeHero.js beside
+                HERO_MAX, recomputed rather than recalled.
 
-            {/* dutyBannerRef, not a new ref: App.js measures this exact ref to place
-                the duty coach mark, and a ref that measures null drops that tutorial
-                step silently. Both hub variants must attach it. */}
+                dutyBannerRef, not a new ref: App.js measures this exact ref to place the
+                duty coach mark, and a ref that measures null drops that tutorial step
+                silently. Both hub variants must attach it. */}
             <View style={s.v2DutyWrap}>
               <DutyRow
                 lang={lang}
@@ -696,6 +689,28 @@ export default function HomeScreen({
                 innerRef={dutyBannerRef}
               />
             </View>
+
+            {/* ─── Bugün ADA'da ────────────────────────────────────────────
+                The heading lives HERE rather than inside LiveStrip so it uses the same
+                v2SectionTitle token as "Tüm modüller" below and cannot drift from it.
+                That is only safe because LiveStrip has no empty branch — it renders the
+                skeleton while loading and a card otherwise, and the resolver's rank 6 is
+                a local constant — so this heading can never be left standing over
+                nothing.
+
+                ⚠ THE STRIP NOW SITS BELOW THE DUTY ROW, AND DUTY IS STILL NOT ONE OF ITS
+                  KINDS. The two facts are independent and both must hold: a permanent row
+                  cannot lose a ladder it is not in, and putting duty second on the page
+                  is what keeps it above the fold. Neither one substitutes for the other —
+                  if duty were ever added to the strip's kinds it could still be outranked
+                  on any day an event beat it, wherever the strip happened to sit. */}
+            <Text style={s.v2SectionTitle}>{t('stripSectionTitle', lang)}</Text>
+            <LiveStrip
+              item={stripItem}
+              loading={stripLoading}
+              lang={lang}
+              onPress={handleStripPress}
+            />
 
             {/* ─── Sık kullandıkların ──────────────────────────────────────
                 The heading sits here rather than inside FavouritesRow so all three
@@ -1348,14 +1363,13 @@ const s = StyleSheet.create({
   // primaryDark rather than primary: this is 13pt text on the warm canvas and primary
   // measures 4.44:1 there, under the 4.5 floor. primaryDark is 6.71:1.
   v2SectionAction:  { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark },
-  // The gap above the Nöbetçi row lives HERE, on a wrapper, not inside DutyRow — the live
-  // strip landed between them in Slice 2, and a component carrying its own top margin
-  // would have had to be edited to move.
+  // The gap above the Nöbetçi row lives HERE, on a wrapper, not inside DutyRow. That is
+  // exactly why the 2026-09-06 reorder was a move of two JSX blocks and nothing else — a
+  // component carrying its own top margin would have had to be edited to change position.
   //
-  // 24, up from 16. It is the ONE section boundary on this screen that is not a heading,
-  // and it was 8pt tighter than every other, so the duty row sat closer to the strip above
-  // it than any other pair on the page. Every section gap is now 24: Oli → strip heading,
-  // strip → duty, duty → shortcuts heading, shortcuts → grid heading.
+  // 24. It is the ONE section boundary on this screen that is not a heading, and it was
+  // 16 while every other was 24. Every section gap is now 24: Oli → duty, duty → strip
+  // heading, strip → shortcuts heading, shortcuts → grid heading.
   v2DutyWrap:       { marginTop: 24 },
 
   // Hub

@@ -23,26 +23,39 @@ import { HERO_CONTENT_BOTTOM } from './homeLayout'
 // screen on a 4.7" one and a stripe on a tablet, so the clamp is what keeps it a HERO at
 // both ends rather than a number that fitted the device it was drawn on.
 //
-// ⚠ THE UPPER BOUND WAS THE DUTY ROW — AND THAT GUARANTEE NO LONGER HOLDS ON SMALL
-//   PHONES. It used to: with the Nöbetçi row sitting directly under Oli, its bottom edge
-//   landed at hero + 150pt and cleared the fold on every viewport in the round-3 table.
+// ⚠ THE UPPER BOUND IS THE DUTY ROW, AND THE GUARANTEE IS BACK — BY REORDERING THE PAGE,
+//   NOT BY RESIZING THIS HERO. Nöbetçi eczaneler is the most-used feature in the app and
+//   the one people reach for under pressure at 2am, so it must not need a scroll.
 //
-//   Slice 2 put the "Bugün ADA'da" strip between them — 150pt of card plus a 52pt heading
-//   plus a 24pt gap — and re-measured on 2026-09-05 the arithmetic is:
+//   It briefly did. Slice 2 put the "Bugün ADA'da" strip between Oli and the duty row —
+//   a 52pt heading, a 150pt card and a 24pt gap, 226pt in total — which pushed duty below
+//   the fold on small phones. On 2026-09-06 the duty row moved back above the strip and
+//   the whole 226pt came back.
 //
-//     320x712dp (the table's cheapest device)  duty row 597-669dp, fold ~624dp  → 45dp BELOW
-//     393x852dp (Pixel 8 class)                duty row 633-705dp, fold ~764dp  → 59dp above
+//   RE-MEASURED after the move, worst case throughout (a duty title wrapped to two lines,
+//   which is the tallest that row gets). The fold is screenHeight minus the tab bar; the
+//   hero is full-bleed and scrolls under the status bar, so nothing is subtracted at the
+//   top. Tab bar = 1 border + 10 padding + 24 icon + 3 gap + 13.2 label + bottom inset.
 //
-//   So on the smallest supported phone the duty row now needs a scroll. That is a
-//   CONSEQUENCE OF THE AGREED ANATOMY, not a regression to fix here — the strip's position
-//   was decided deliberately — but the old claim above was still written as a guarantee,
-//   and a comment asserting a measured property that has since become false is worse than
-//   no comment: the next person sizing this hero would trust it.
+//       device                        hero   duty ends   fold (gesture nav)   margin
+//       360x640  small Android         305        478          555             +77
+//       320x712  cheapest in the table 305        478          627            +149
+//       360x800  mid-range             320        493          715            +222
+//       393x852  Pixel 8 class         341        514          767            +253
+//       412x915  large Android         366        539          830            +291
 //
-//   Lowering HERO_MIN to 280 recovers 25dp of the 45. It is not enough on its own, and
-//   the remaining options (a shorter strip card, a tighter heading, or moving the row)
-//   are anatomy decisions rather than sizing ones. Flagged in the polish-pass log for a
-//   decision; do not "fix" it by quietly shrinking the hero.
+//   Button-nav devices have a 59pt bar instead of 85 and clear by a further 26.
+//
+//   HERO_MIN STAYS AT 305: the margin is comfortable at every size, so there is no reason
+//   to shrink the band. If HERO_MAX is ever raised, or anything is inserted between Oli
+//   and the duty row, redo this table — those are the two edits that can spend the margin,
+//   and the 45dp shortfall this note used to record is what happens when one of them is
+//   made without recomputing.
+//
+//   ⚠ AND THE EARLIER FIGURE IN THIS FILE WAS TOO KIND. It said 45dp below on a 320x712
+//     device; that model subtracted a status bar the content actually scrolls under, and
+//     it never tested a 360x640 screen, where the real shortfall was 147dp. Both are moot
+//     now, and both are why this table names its model rather than just its answers.
 const HERO_FRACTION = 0.40
 // 280 -> 305 in round 7. The search pill added 58pt of content inside the hero, and at
 // 280 the logo's bottom edge landed 2pt from the pill's top on a 712dp device — touching,

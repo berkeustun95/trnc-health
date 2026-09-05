@@ -198,6 +198,17 @@ const SAME_AS_ENGLISH = {
                             German: 'Famagusta is the German form' },
   'blDistrictNicosia':    { Spanish: 'Nicosia is the Spanish form' },
 
+  // ─── menuTransportation, 2026-09-06 ──────────────────────────────────────
+  // English was 'Transportation' and broke mid-word in a 4-across tile, so it was
+  // shortened to 'Transport' — which is ALSO the French and German word, exactly as it
+  // already was in both locales before this change. Nothing was copied from English and
+  // nothing is untranslated; the three languages simply agree.
+  //
+  // This collision is the guard doing its job: it appeared the moment the English string
+  // moved, which is the one time somebody should be asked whether a match is real.
+  'menuTransportation': { French: "'Transport' is the French word, and was already the French value",
+                          German: "'Transport' is the German word, and was already the German value" },
+
   // ─── German Home-grid labels, 2026-09-03 (Slice 1 polish r3) ──────────────
   // The 4-across grid gives a label ~14 characters per line and German compounds do not
   // wrap: 'Veranstaltungen' (15) and 'Stellenangebote' (15) both ellipsed mid-word. The

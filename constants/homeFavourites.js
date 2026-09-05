@@ -45,10 +45,11 @@ export const FAVOURITE_SLOTS = 4
 // five are drawn from the middle and end of the grid (positions 5, 4, 11, 16, 15), so
 // there is no positional echo.
 //
-// They are also all `standard` tint. The old set put a coral tile directly under the
-// coral duty row and above the grid's three coral tiles — duty + health + emergency +
-// towing stacked, which is a lot of one colour in 200pt of screen. Coral is the urgency
-// signal in this design; it stops being one when it is also the colour of the shortcuts.
+// They are also all `standard` tint. The old set led with a coral tile sitting above the
+// grid's three coral tiles — health + emergency + towing stacked with the coral Nöbetçi
+// row a little further up, which is a lot of one colour in a short stretch of screen.
+// Coral is the urgency signal in this design; it stops being one when it is also the
+// colour of the shortcuts.
 export const DEFAULT_FAVOURITES = [
   'explore',
   'events',

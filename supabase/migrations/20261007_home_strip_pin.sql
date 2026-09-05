@@ -34,7 +34,7 @@
 --     claim rather than a hope. A tip row would quietly move the floor into a table.
 --
 --   • `duty` IS NOT HERE AND MUST NEVER BE ADDED. Nöbetçi eczaneler has its own
---     permanent row directly below the strip. Anything in this table can be OUTRANKED —
+--     permanent row directly above the strip. Anything in this table can be OUTRANKED —
 --     that is what a ladder is — so a duty pin would mean that on any day an event or a
 --     promo ranked higher, the one row somebody opens this app for at 2am is the row
 --     that did not render. A permanent row cannot lose a ladder it is not in.
