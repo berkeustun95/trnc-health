@@ -34,7 +34,10 @@
 //   read rather than trusted. A guard that prints only "OK" cannot be told apart from one
 //   whose scraper matched nothing.
 import { readFileSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const FONTS = {
   400: 'node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf',
   500: 'node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf',
@@ -154,11 +157,60 @@ import { t, LANG_CODES } from '../constants/i18n.js'
 // Both widths that matter: a typical modern phone, and the narrowest device in the fold
 // table. The narrow one is where every locale except Turkish failed before 2026-09-06.
 const WIDTHS = [393, 320]
-// ModuleTile: width `100/GRID_COLUMNS`% of a column already inset 16pt each side, minus
-// the tile's own paddingHorizontal: 2. Derived, so a change to either number is picked up.
-const labelBox = W => (W - 32) / GRID_COLUMNS - 4
-// DutyRow: padding 14 each side, iconTile 44, chevron 18, two 14pt gaps.
-const dutyBox  = W => (W - 32) - 28 - 44 - 18 - 28
+
+// ─── THE BOXES ARE SCRAPED FROM THE COMPONENTS, NOT TYPED HERE ──────────────
+//
+// An earlier version hardcoded `(W - 32) / GRID_COLUMNS - 4` and `(W-32) -28 -44 -18 -28`
+// while its comment claimed the numbers were derived. Only GRID_COLUMNS actually was. That
+// is the precise shape of this repo's standing hazard — a guard whose FRAME OF REFERENCE
+// drifts from the thing it measures — and it is worse here than usual, because the drift
+// would be silent in both directions: a narrower tile would stop being flagged, and a wider
+// one would flag copy that fits.
+//
+// So every number below is read out of the file that owns it, and a value that cannot be
+// read is a hard failure rather than a default. `num()` returning null is the only way this
+// guard is allowed to not know something.
+const read = f => readFileSync(resolve(ROOT, f), 'utf8')
+function num(file, blockKey, prop) {
+  const src = read(file)
+  // The style block, from `key:` to its closing brace. Non-greedy so a later block's
+  // properties cannot be read as this one's.
+  const block = new RegExp(blockKey + ':\\s*\\{[^}]*\\}').exec(src)
+  if (!block) return { err: `${file}: no style block named \`${blockKey}\`` }
+  const m = new RegExp(prop + ':\\s*(-?[\\d.]+)').exec(block[0])
+  if (!m) return { err: `${file}: \`${blockKey}\` has no numeric \`${prop}\`` }
+  return { v: parseFloat(m[1]) }
+}
+
+const GEOM = {
+  pageInset: num('screens/HomeScreen.js',        'v2Below',  'paddingHorizontal'),
+  tilePad:   num('components/home/ModuleTile.js', 'tile',    'paddingHorizontal'),
+  dutyPad:   num('components/home/DutyRow.js',    'row',     'padding'),
+  dutyGap:   num('components/home/DutyRow.js',    'row',     'gap'),
+  dutyIcon:  num('components/home/DutyRow.js',    'iconTile','width'),
+}
+// The chevron is a JSX prop rather than a style, so it is read from the element itself.
+{
+  const m = /name="chevron-forward"\s+size=\{(\d+)\}/.exec(read('components/home/DutyRow.js'))
+  GEOM.dutyChevron = m ? { v: parseFloat(m[1]) } : { err: 'DutyRow.js: no chevron-forward size' }
+}
+
+const geomErrors = Object.entries(GEOM).filter(([, r]) => r.err).map(([k, r]) => `${k}: ${r.err}`)
+if (geomErrors.length) {
+  console.error('\n  ┌─ TILE LABEL CHECK CANNOT RUN ──────────────────────────────────┐')
+  for (const e of geomErrors) console.error('  │ ' + e)
+  console.error('  │ A renamed style or prop moved out from under this guard. It measures')
+  console.error('  │ nothing until the scraper is updated, so it fails rather than passes.')
+  console.error('  └────────────────────────────────────────────────────────────────┘\n')
+  process.exit(1)
+}
+const G = Object.fromEntries(Object.entries(GEOM).map(([k, r]) => [k, r.v]))
+
+// ModuleTile sits in a column inset by v2Below on both sides, takes 1/GRID_COLUMNS of it,
+// and pads itself horizontally on both sides.
+const labelBox = W => (W - G.pageInset * 2) / GRID_COLUMNS - G.tilePad * 2
+// DutyRow: the row pads all round, then icon tile · text · chevron with a gap between each.
+const dutyBox  = W => (W - G.pageInset * 2) - G.dutyPad * 2 - G.dutyIcon - G.dutyChevron - G.dutyGap * 2
 
 const problems = []
 let checked = 0
@@ -214,8 +266,11 @@ if (problems.length) {
   process.exit(1)
 }
 console.log(`tile labels: OK — ${checked} strings from Inter_${WEIGHT} at ${WIDTHS.join('dp / ')}dp`)
+console.log(`  geometry read from source: page inset ${G.pageInset}, tile pad ${G.tilePad}, `
+  + `duty pad ${G.dutyPad}/gap ${G.dutyGap}/icon ${G.dutyIcon}/chevron ${G.dutyChevron} `
+  + `-> label box ${labelBox(320).toFixed(1)}pt, duty box ${dutyBox(320).toFixed(1)}pt at 320dp`)
 console.log(`  tightest (shaped scripts excluded): ${JSON.stringify(tightestLatin.str)} `
   + `at ${tightestLatin.where}, ${tightestLatin.spare.toFixed(1)}pt spare of ${tightestLatin.box.toFixed(1)}pt`)
 console.log(`  tightest overall:                   ${JSON.stringify(tightest.str)} `
   + `at ${tightest.where}, ${tightest.spare.toFixed(1)}pt spare `
-  + `${CURSIVE.has(tightest.where.split(' ')[1]) ? '(UPPER BOUND — cursive,real width is narrower)' : ''}`)
+  + `${CURSIVE.has(tightest.where.split(' ')[1]) ? '(UPPER BOUND — cursive, real width is narrower)' : ''}`)
