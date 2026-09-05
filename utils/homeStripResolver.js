@@ -4,32 +4,38 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase.js'
 import { LANG_CODES } from '../constants/i18n.js'
-import { STRIP_SOON_HOURS, STRIP_LAST_KIND_KEY } from '../constants/homeStrip.js'
+import { STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY } from '../constants/homeStrip.js'
 
 // ─── THE LADDER — THE LEFT CARD ONLY ────────────────────────────────────────
 //
 //   1  a pinned item for today          home_strip_pin, pin_date = today
 //   2  an event starting within 6h      the "leave now" case
 //   3  an event later today             still actionable, less urgent
-//   4  a sponsored promo                labelled, gated, never displacing an event
-//   5  the events module's generic card  <- terminal, and it is NOT a rank that can fail
+//   4  a place added in the last 7 days  real content — see the caveat on readNewPlace
+//   5  a sponsored promo                labelled, gated, never displacing a real item
+//   6  the events module's generic card  <- terminal, and it is NOT a rank that can fail
 //
 // ⚠ THIS RESOLVER NO LONGER DECIDES WHETHER THE SECTION IS EMPTY. It decides what the LEFT
 //   card shows. The right card is the duty pharmacy, rendered unconditionally by
 //   LiveStrip, never resolved and never outranked — so "Bugün ADA'da" is non-empty by
 //   construction rather than by a fallback surviving.
 //
-// ⚠ WHERE THE PROMO LANDS, AND WHY IT IS STRICTER THAN IT WAS. It keeps its position
-//   BELOW every real event, and what it now outranks is only the generic filler card —
-//   where it used to outrank an Oli tip that was itself a real destination. So a promo can
-//   never displace content, only the placeholder. The other rules are unchanged: labelled
+// ⚠ WHERE THE PROMO LANDS. Below every real item — events AND the recently-added place —
+//   and above only the generic filler card. So a promo can never displace content, only the
+//   placeholder. It used to outrank an Oli tip, which WAS a real destination; it does not
+//   any more. The other rules are unchanged: labelled
 //   "Sponsorlu", never twice running, and never shown to a guest, a null-DOB profile or
 //   anyone under PROMO_MIN_AGE.
 //
-// ⚠ TWO RANKS WERE REMOVED. The Oli tip (which contained a duty-pharmacy entry typed as a
-//   tip — see constants/homeStrip.js) and the recently-added place. The place rank had
-//   nowhere left to sit once the left card became "today's event" with a stated generic
-//   fallback, and its created_at caveat retires with it.
+// ⚠ THE PLACE RANK IS BACK, RESTORED 2026-09-09, AND SO IS ITS CAVEAT. It was dropped when
+//   the left card became "today's event" with a generic fallback — but without it the card
+//   shows a stock photograph on every day with no event, which is most days. A place added
+//   this week is real content and real discovery; the generic card is neither. The
+//   created_at caveat below comes back with the rank, in full, because it is the reason the
+//   rank is approximate rather than a note about its history.
+//
+// ⚠ THE OLI TIP IS STILL GONE, AND STAYS GONE. It contained a duty-pharmacy entry typed as
+//   a tip — see constants/homeStrip.js. That is not a rank that can be restored.
 //
 // ─── EVERY RANK IS STILL INDIVIDUALLY FALLIBLE ──────────────────────────────
 //
@@ -186,6 +192,50 @@ async function readEventsToday(now, lang) {
   }
 }
 
+// ─── RANK 4 — a place added in the last 7 days ──────────────────────────────
+//
+// ⚠ created_at IS A SUBMISSION TIMESTAMP, NOT A PUBLICATION ONE, AND THE TWO CAN BE WEEKS
+//   APART. `places` rows arrive through ExploreSubmitScreen at status 'pending' and become
+//   visible only when an admin approves them; the column records when the row was WRITTEN,
+//   and nothing in the table records when it was approved. So a place submitted on the 1st
+//   and approved on the 20th is invisible to this rank forever — it was never "new" during
+//   any window in which it was also visible — while the whole 42-row Explore seed shares
+//   one created_at from the import and would surface as "new" together on the day it lands.
+//
+//   This is the denominator mistake CLAUDE.md records for check-notify-health: a column
+//   that is a fact about SUBMISSION read as a fact about PUBLICATION. It is accepted rather
+//   than fixed, because the honest fix is an `approved_at` column and that is a schema
+//   change this section has never scoped. The cost of being wrong is small and symmetric —
+//   a miss costs a fall-through to the promo or the generic card, and a false positive
+//   costs a card about a real, visible, active place. THAT is why it is tolerable, not the
+//   fact that it is unlikely.
+//
+//   If a real "recently published" signal is ever wanted, add `published_at` and read it
+//   here. Do not widen the window to compensate; a wider window on the wrong column is more
+//   wrong, not less.
+async function readNewPlace(now, lang) {
+  const since = new Date(now.getTime() - STRIP_NEW_PLACE_DAYS * 24 * 60 * 60 * 1000)
+  const { data, error } = await supabase
+    .from('places')
+    .select('id, name, name_i18n, cover_image_url, photos, created_at')
+    .eq('status', 'active')
+    .gte('created_at', since.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+  if (error) throw error
+  const p = (data || [])[0]
+  if (!p) return null
+  return {
+    kind: 'place', id: p.id,
+    title: i18nText(p.name_i18n, lang) || p.name || '',
+    subtitle: '',
+    icon: 'location-outline',
+    imageUrl: p.cover_image_url || firstImage(p.photos) || null,
+    sponsored: false,
+    action: { type: 'place', id: p.id },
+  }
+}
+
 // ─── RANK 5 — the generic events card, and it is terminal ───────────────────
 //
 // Not a "fallback" in the sense of something that might also fail: it reads no table, has
@@ -231,7 +281,13 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
     }
   } catch { /* fall through */ }
 
-  // ── RANK 4 ── a sponsored promo. Two gates, and both are hard.
+  // ── RANK 4 ── a place added recently. Real content, so it outranks the promo.
+  try {
+    const p = await readNewPlace(now, lang)
+    if (p) return p
+  } catch { /* fall through */ }
+
+  // ── RANK 5 ── a sponsored promo. Two gates, and both are hard.
   //
   // ⚠ THE ELIGIBILITY CHECK COMES FIRST AND SHORT-CIRCUITS THE READ. An ineligible user's
   //   device never asks for promo rows at all, rather than fetching them and declining to
@@ -251,7 +307,7 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
     } catch { /* fall through */ }
   }
 
-  // ── RANK 5 ── the generic events card. No await, no failure mode.
+  // ── RANK 6 ── the generic events card. No await, no failure mode.
   return genericEventsItem()
 }
 

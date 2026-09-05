@@ -23,50 +23,66 @@ import { HERO_CONTENT_BOTTOM } from './homeLayout'
 // screen on a 4.7" one and a stripe on a tablet, so the clamp is what keeps it a HERO at
 // both ends rather than a number that fitted the device it was drawn on.
 //
-// ⚠ THE UPPER BOUND IS THE DUTY ROW, AND THE GUARANTEE IS BACK — BY REORDERING THE PAGE,
-//   NOT BY RESIZING THIS HERO. Nöbetçi eczaneler is the most-used feature in the app and
-//   the one people reach for under pressure at 2am, so it must not need a scroll.
+// ⚠ THE UPPER BOUND IS THE DUTY CARD. Nöbetçi is the most-used feature in the app and the
+//   one people reach for under pressure at 2am, so it must not need a scroll. Since
+//   2026-09-08 it is the RIGHT-HAND CARD of the Bugün ADA'da strip, so the whole section's
+//   bottom edge is what has to clear.
 //
-//   It briefly did. Slice 2 put the "Bugün ADA'da" strip between Oli and the duty row —
-//   a 52pt heading, a 150pt card and a 24pt gap, 226pt in total — which pushed duty below
-//   the fold on small phones. On 2026-09-06 the duty row moved back above the strip and
-//   the whole 226pt came back.
+// ⚠ THE MODEL BEHIND THIS TABLE WAS WRONG TWICE, BOTH TIMES IN THE FLATTERING DIRECTION.
+//   Re-verified against the toolchain on 2026-09-09 rather than reasoned about again:
 //
-//   RE-MEASURED after the move, worst case throughout (a duty title wrapped to two lines,
-//   which is the tallest that row gets). The fold is screenHeight minus the tab bar; the
-//   hero is full-bleed and scrolls under the status bar, so nothing is subtracted at the
-//   top. Tab bar = 1 border + 10 padding + 24 icon + 3 gap + 13.2 label + bottom inset.
+//   @expo/config-types states edgeToEdgeEnabled defaults to TRUE and "can't be disabled
+//   anymore" on Android 16+. Under edge-to-edge the window IS the screen and
+//   insets.bottom is the NAVIGATION BAR — roughly 24dp for gesture nav, 48dp for
+//   3-button. The previous table used the full screen as the window (true only WITH
+//   edge-to-edge) and insets.bottom = 8 (true only WITHOUT it): the flattering half of two
+//   incompatible models. That overstated the fold by ~40dp on 3-button navigation, which
+//   is the commonest configuration on cheap Android hardware. The reported +16 was really
+//   +2.
 //
-//       device                        hero   duty ends   fold (gesture nav)   margin
-//       360x640  small Android         305        460          555             +95
-//       320x712  cheapest in the table 305        460          627            +167
-//       360x800  mid-range             320        475          715            +240
-//       393x852  Pixel 8 class         341        496          767            +271
-//       412x915  large Android         366        521          830            +309
+//   The earlier error was the mirror image — it subtracted a status bar the content
+//   actually scrolls under, and never tested a 360x640 screen. Same lesson twice: state
+//   the model, because the answer alone is not reviewable.
 //
-//   RE-MEASURED 2026-09-07 after the hero's overlap deepened and the mascot moved inside
-//   the card. Both improved it: the Oli row's flow height fell from 66pt to 48 (the
-//   overhang and headroom it used to add are gone), so the duty row moved 18pt UP and the
-//   worst case went from +77 to +95.
+//   Tab bar = 1 border + 10 padding + 24 icon + 3 gap + 13.2 label + inset
+//           = 75.2 (gesture) / 99.2 (3-button). The 3-button case is the worst and is what
+//   this table reports.
 //
-//   Button-nav devices have a 59pt bar instead of 85 and clear by a further 26.
+//       device     hero   section ends   fold (3-button)   margin
+//       360x640     280        500            541            +41
+//       320x712     285        505            613           +108
+//       360x800     320        540            701           +161
+//       393x852     341        561            753           +192
+//       412x915     366        586            816           +230
 //
-//   HERO_MIN STAYS AT 305: the margin is comfortable at every size, so there is no reason
-//   to shrink the band. If HERO_MAX is ever raised, or anything is inserted between Oli
-//   and the duty row, redo this table — those are the two edits that can spend the margin,
-//   and the 45dp shortfall this note used to record is what happens when one of them is
-//   made without recomputing.
+//   HERO_MIN 305 -> 280 IS WHERE MOST OF THAT MARGIN CAME FROM, and it had to be: card
+//   height alone would have needed 96pt to reach 40dp, at which point the text band is 63%
+//   of the card. See the note beside HERO_MIN, including the contrast coupling.
 //
-//   ⚠ AND THE EARLIER FIGURE IN THIS FILE WAS TOO KIND. It said 45dp below on a 320x712
-//     device; that model subtracted a status bar the content actually scrolls under, and
-//     it never tested a 360x640 screen, where the real shortfall was 147dp. Both are moot
-//     now, and both are why this table names its model rather than just its answers.
+//   If HERO_MIN or HERO_MAX changes, the card grows, or anything is inserted above the
+//   strip, REDO THIS TABLE — and re-state the model with it.
 const HERO_FRACTION = 0.40
-// 280 -> 305 in round 7. The search pill added 58pt of content inside the hero, and at
-// 280 the logo's bottom edge landed 2pt from the pill's top on a 712dp device — touching,
-// not merely tight. 305 restores a 23pt gap there and costs nothing at the fold: the duty
-// row still clears it by 185pt on the same device (round-7 log has the table).
-const HERO_MIN = 305
+// 305 -> 280 on 2026-09-09, and the height it gives back goes to the FOLD.
+//
+// Round 7 raised this 280 -> 305 because the search pill's top was landing 2pt below the
+// wordmark. That reason has since evaporated: the content box moved 30pt down when
+// HERO_CONTENT_BOTTOM went 90 -> 60, and the content gap went 12 -> 18, so at the same
+// hero height the pill now sits 39pt LOWER than it did when 305 was chosen. At 280 the
+// pill's top is 139 against a wordmark bottom of 96 on the devices where this clamp
+// actually binds — a 43pt gap, where round 7 was defending 23.
+//
+// ⚠ THE CLAMP ONLY BINDS ON SMALL SCREENS, WHICH IS EXACTLY WHERE IT WAS EXPENSIVE. It
+//   engages when 0.40 x windowHeight < 280, i.e. below 700dp. On a 640dp device it was
+//   forcing 305pt of photograph — 48% of the whole screen — onto the device with the least
+//   room, and the duty card was paying for it at the fold.
+//
+// ⚠ AND IT IS COUPLED TO CONTRAST, WHICH IS NOT OBVIOUS FROM EITHER NUMBER. The bottom
+//   scrim's height is 0.52 x heroH, so a SHORTER hero puts the district text further up
+//   its own ramp, where the alpha is lower. Measured: at heroH 305 karpaz reads 4.56:1 and
+//   at 280 the same ramp gives 4.15:1 — a fail. BOTTOM_MAX and RAMP_EXP were re-solved for
+//   this minimum, not left alone. Anyone changing HERO_MIN again must re-run
+//   `npm run hero:check`, whose device list includes this exact value for that reason.
+const HERO_MIN = 280
 const HERO_MAX = 400
 
 // ─── THE SCRIM IS TWO RAMPS, AND ONLY ONE OF THEM CARRIES LEGIBILITY ───────
@@ -154,8 +170,13 @@ const TOP_MAX     = 0.28
 //
 // The extra darkness is largely FREE now, and that is a consequence of HERO_OVERLAP going
 // to 40: the bottom 40pt of the ramp — where it is strongest — sits behind the Oli card.
-const BOTTOM_MAX  = 0.72
-const RAMP_EXP    = 1.15
+// 0.72 -> 0.78 and 1.15 -> 1.08, re-solved for HERO_MIN 280 rather than inherited.
+// A shorter hero means a shorter ramp, which puts the text row at u=0.469 instead of
+// 0.431 — less alpha exactly where the text is. Measured across all six backgrounds at the
+// SMALLEST hero (360x280), the largest (412x400) and 393x341: worst is karpaz at 4.71:1.
+// The cost is the hero's lower half: mid-ramp alpha goes 0.324 -> 0.369.
+const BOTTOM_MAX  = 0.78
+const RAMP_EXP    = 1.08
 // ─── THE GENERIC FALLBACK NEEDS MORE, AND IT IS THE ONLY ONE THAT DOES ──────
 // auth-bg.png is not a photograph chosen for a hero; it is the app's auth background
 // standing in for districts with no licence-clean image (morphou, lefke) and for anyone

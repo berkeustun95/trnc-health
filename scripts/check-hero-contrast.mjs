@@ -67,8 +67,23 @@ const BACKGROUNDS = [
   ['nicosia',   'assets/hero/hero-nicosia.jpg'],
   ['generic',   'assets/auth-bg.png'],
 ]
-// Both ends of the size range: the hero is clamped to [305, 400].
-const DEVICES = [[393, 341], [360, 305]]
+// ─── BOTH ENDS OF THE SIZE RANGE, AND THE SMALL END IS THE BINDING ONE ──────
+//
+// The hero is clamped to [HERO_MIN, HERO_MAX]. The scrim's height is 0.52 x heroH, so the
+// SHORTER the hero, the further up its own ramp the text sits and the LESS alpha it gets.
+// The smallest hero is therefore the worst case, and this list must contain it.
+//
+// ⚠ HERO_MIN IS READ FROM SOURCE, NOT TYPED HERE. It moved 305 -> 280 on 2026-09-09 to buy
+//   fold margin, and a hardcoded 305 would have left this guard measuring a hero size that
+//   no longer occurs — passing on a screen nobody has while the real one failed. That is
+//   the frame-of-reference drift this file was written to avoid.
+const HERO_MIN = num('components/home/HomeHero.js', 'HERO_MIN')
+const HERO_MAX = num('components/home/HomeHero.js', 'HERO_MAX')
+if (HERO_MIN == null || HERO_MAX == null) {
+  console.error('\n  hero contrast: cannot read HERO_MIN / HERO_MAX — this guard measures nothing.\n')
+  process.exit(1)
+}
+const DEVICES = [[393, 341], [360, HERO_MIN], [412, HERO_MAX]]
 
 const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4) }
 const Y = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)

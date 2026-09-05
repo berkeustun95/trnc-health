@@ -26,17 +26,17 @@
 //   assertion about behaviour. The tip pool is deleted rather than filtered — with nothing
 //   left to point anywhere, there is nothing left to guard.
 //
-// ⚠ `place` IS ALSO GONE. The left card is "today's event" and its stated fallback is the
-//   events module's generic image, so a place row had nowhere left to rank: it would have
-//   occupied the slot the fallback rule names. Its created_at caveat — a SUBMISSION
-//   timestamp read as a publication one — retires with it. Say so if it is ever restored;
-//   the caveat comes back with the rank.
+// ⚠ `place` WAS BRIEFLY REMOVED AND IS BACK (2026-09-09). Dropping it left the left card
+//   showing a stock photograph on every day with no event — which is most days — and a
+//   recently-added place is real content where the generic card is filler. Its created_at
+//   caveat came back with it, in full, in the resolver: a SUBMISSION timestamp read as a
+//   publication one. The caveat is not history, it is why the rank is approximate.
 //
 // ⚠ AND DUTY IS NOW A CARD, NOT A LADDER ENTRY. It occupies the RIGHT slot unconditionally
 //   and is never resolved, ranked or outranked. That is a stronger guarantee than the old
 //   permanent row had, and it is the one thing about this section that must not be
 //   refactored into the resolver.
-export const STRIP_KINDS = ['event', 'promo']
+export const STRIP_KINDS = ['event', 'place', 'promo']
 
 // ─── CARD HEIGHT — ONE NUMBER, TWO CONSUMERS ────────────────────────────────
 //
@@ -50,7 +50,13 @@ export const STRIP_KINDS = ['event', 'promo']
 // it directly. At 150 the card ended at 555.4 on a 360x640 gesture-nav device against a
 // 555 fold: exactly on the line. 134 clears it by 16pt. It also suits the new shape — a
 // half-width card at 134 is close to 4:3 where 150 was nearly square.
-export const STRIP_CARD_H = 134
+// 134 -> 120 on 2026-09-09. The fold model was re-verified and had been WRONG in the
+// flattering direction (see the note in HomeHero.js beside HERO_MIN): the true worst-case
+// margin at 134 was +2dp, not the +16 reported. Card height alone could not buy a
+// comfortable margin — 96pt would have been needed, at which point the band is 63%% of the
+// card — so most of the height came from HERO_MIN instead and this gives the rest.
+// 120 leaves a 60pt photo above a 60pt band at 176pt wide.
+export const STRIP_CARD_H = 120
 
 // How much of the card's bottom the solid text band occupies. A BAND, not a gradient
 // scrim: this card shows an arbitrary photograph from an arbitrary event submission, and
