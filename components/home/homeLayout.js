@@ -78,9 +78,12 @@ const CLEARANCE = 20
 
 // What the hero must reserve at the bottom of its content box.
 //
-// ⚠ DERIVED, NOT TYPED. It is the overlap PLUS the mascot's overhang, because the
-//   mascot rises higher than the card does — so a hero that only cleared HERO_OVERLAP
-//   would put the district name and the temperature chip underneath a donkey's ears.
-//   That is precisely the failure this file exists to prevent, one component further on
-//   from the version that only had to clear the card.
+// ⚠ DERIVED, NOT TYPED. It is the overlap PLUS the mascot's overhang PLUS the clearance.
+//   The overhang term is zero today — he sits inside the card — so what the hero actually
+//   reserves is 40 + 20 = 60. The term stays in the expression because it is what makes
+//   this correct for a mascot that sticks out again: when he did, at OLI_OVERHANG 48, a
+//   hero clearing only HERO_OVERLAP would have put the district name and the temperature
+//   underneath a donkey's ears. That failure is why this file exists, and the arithmetic
+//   that prevents it should not be quietly deleted just because one of its terms is
+//   currently zero.
 export const HERO_CONTENT_BOTTOM = HERO_OVERLAP + OLI_OVERHANG + CLEARANCE

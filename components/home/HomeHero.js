@@ -87,9 +87,16 @@ const HERO_MAX = 400
 //   photograph whatsoever. The top ramp exists purely to give the band some depth.
 //
 // The BOTTOM ramp does carry legibility — the district name and temperature are white
-// text directly on the photo — and it is sized for it. At 0.66 the worst of the five is
-// Golden Beach at 5.29:1, clear of AA. Measured across all five images, not the one that
-// happened to be on screen.
+// text directly on the photo — and since 2026-09-07 it is the ONLY thing carrying them,
+// because the dark pill they used to sit on is gone. It is sized for exactly that: the
+// figures live at BOTTOM_MAX below and are re-derived on every run by
+// `npm run hero:check`, which composites all SIX backgrounds (the five photos and the
+// generic) rather than the one that happened to be on screen.
+//
+// ⚠ THE FIGURE THAT USED TO BE QUOTED HERE — "at 0.66 the worst of the five is 5.29:1" —
+//   HAS BEEN REMOVED RATHER THAN UPDATED. It certified the old chip, whose dark plate did
+//   most of the work, and it counted five backgrounds when six can render. Carrying it
+//   forward would have been a number that was true of a design that no longer exists.
 //
 // If either ramp is retuned, re-measure against all five AND re-solve the deltas. The
 // numbers above are the output of a script, not a recollection.
@@ -118,9 +125,19 @@ const HERO_MAX = 400
 // RAMP_STEPS is 14 because at 6 the steps were visible as banding across flat sky, which
 // is exactly where a hero photograph is smoothest and least able to hide them.
 //
-// The exponent 1.5 is not decorative: it reproduces the hand-tuned profile those six
-// values described (0.66 0.50 0.36 0.24 0.14 0.05 at sixths) to within 0.005, so the
-// curve is the same shape sampled finer rather than a new one.
+// ⚠ THE EXPONENT IS NO LONGER 1.5, AND IT NO LONGER REPRODUCES THE OLD HAND-TUNED PROFILE.
+//   It used to: 1.5 matched the six values 0.66 0.50 0.36 0.24 0.14 0.05 at sixths to
+//   within 0.005, and that sentence stood here as its justification. Removing the pill
+//   made that profile the wrong one — it is shallow exactly where the text now sits — so
+//   1.15 is a DELIBERATE departure from it, solved against the six backgrounds. The old
+//   curve is history, not a target; see BOTTOM_MAX below for what replaced it and why.
+//
+// ⚠ ONE SHARED EXPONENT, TWO RAMPS. RAMP_EXP shapes the TOP ramp as well, so this change
+//   made it slightly fuller too — about +0.03 alpha at its midpoint. That is harmless by
+//   the top ramp's own design (nothing up there depends on it: the action buttons are
+//   white circles and the wordmark carries a baked keyline, each holding its own contrast
+//   on any photograph). If the two ever need to diverge, split it into TOP_EXP and
+//   BOTTOM_EXP — it is one constant, not a refactor.
 const RAMP_STEPS  = 14
 const TOP_MAX     = 0.28
 // ─── 0.66 -> 0.72 AND 1.5 -> 1.15, BOTH SOLVED FOR THE PILL-FREE TEXT ───────

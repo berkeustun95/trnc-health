@@ -21,8 +21,11 @@ import { HERO_OVERLAP, OLI_OVERHANG } from './homeLayout'
 //
 // ─── THE MASCOT IS AN ABSOLUTE SIBLING OF THE CARD, AND THAT IS THREE FIXES ─
 //
-// He must rise above the banner's top edge and the banner must NOT grow to fit him.
-// Those pull against each other and the naive arrangements each break one:
+// He must fit INSIDE the banner and the banner must NOT grow to fit him. (Until
+// 2026-09-07 the first half was the opposite — he rose ABOVE its top edge as a cut-out —
+// which is why the arrangement below is built the way it is. It still holds, and for the
+// same two reasons, but the premise it was written under has been inverted.)
+// These pull against each other and the naive arrangements each break one:
 //
 //   • A taller Image inside the flex row GROWS the row. Explicitly forbidden.
 //   • A child overflowing a view that carries `elevation` gets CLIPPED on Android, so he
@@ -38,12 +41,18 @@ import { HERO_OVERLAP, OLI_OVERHANG } from './homeLayout'
 // y 5.4%..91.4% — measured from the alpha channel. Under resizeMode 'contain' in a
 // square box those fractions hold, so:
 //
-//   bottom offset  -MASCOT_BOX * 0.086   puts the 91.4% crop line on the card's bottom
-//   visible top     MASCOT_BOX * 0.054   below the box top
+//   bottom offset  MASCOT_INSET - MASCOT_BOX * 0.086   puts his FEET (the 91.4% crop
+//                                                        line) MASCOT_INSET above the
+//                                                        card's bottom edge
+//   visible top     MASCOT_BOX * 0.054                   below the box top
 //
-// which lands the visible mascot exactly OLI_OVERHANG above the card. If the artwork is
-// ever re-exported with different margins, re-measure the bbox — these are its numbers,
-// not arbitrary nudges.
+// which lands the visible mascot wholly inside the card. The offset used to be plain
+// -MASCOT_BOX * 0.086, pinning his feet flush to the card's bottom — right when he stood
+// ON the banner, and a clipped look now that he stands IN it.
+//
+// If the artwork is ever re-exported with different margins, re-measure the bbox — these
+// are its numbers, not arbitrary nudges. `npm run home:check` asserts the offset keeps
+// this form.
 const CARD_H       = 88
 // Transparent slack above the card, for when the mascot's BOX overflowed it. It does not
 // any more — he is entirely inside the card — so there is nothing to keep clear of the
