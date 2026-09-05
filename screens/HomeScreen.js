@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, Image, ImageBackground, FlatList, StyleSheet,
   TouchableOpacity, TextInput, ScrollView, Linking, ActivityIndicator,
@@ -22,9 +22,13 @@ import OliRow from '../components/home/OliRow'
 import DutyRow from '../components/home/DutyRow'
 import ModuleGrid from '../components/home/ModuleGrid'
 import LiveStrip from '../components/home/LiveStrip'
+import FavouritesRow from '../components/home/FavouritesRow'
+import FavouritesEditSheet from '../components/home/FavouritesEditSheet'
 import HomeFooterSlot from '../components/home/HomeFooterSlot'
 import { HOME_MODULES } from '../constants/homeModules'
 import { resolveStripItem } from '../utils/homeStripResolver'
+import { resolveFavourites } from '../constants/homeFavourites'
+import { loadUsage, loadPins, savePins, recordModuleOpen } from '../utils/moduleUsage'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
   haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherDesc, isAvailableToday, coarseCoord,
@@ -202,6 +206,15 @@ export default function HomeScreen({
   const [stripItem, setStripItem]       = useState(null)
   const [stripLoading, setStripLoading] = useState(true)
 
+  // ─── Sık kullandıkların ───────────────────────────────────────────────────
+  // `favIds` is the RESOLVED row and is written in exactly two places: once when this
+  // screen mounts, and again when the user presses Bitti in the edit sheet. Nothing else
+  // may set it — see the resolve effect below for why.
+  const [favIds, setFavIds]           = useState([])
+  const [favPins, setFavPins]         = useState([])
+  const [favUsage, setFavUsage]       = useState({})
+  const [favEditOpen, setFavEditOpen] = useState(false)
+
   // Global hub search
   const [globalQuery, setGlobalQuery]       = useState('')
   const [globalResults, setGlobalResults]   = useState([])
@@ -262,6 +275,72 @@ export default function HomeScreen({
       .then(item => { if (alive) { setStripItem(item); setStripLoading(false) } })
     return () => { alive = false }
   }, [lang, promosEligible, showFacilityList])
+
+  // ─── Sık kullandıkların — resolved ONCE per mount ─────────────────────────
+  //
+  // ⚠ THE RE-SORT TRIGGER IS "ON MOUNT", AND THE ALTERNATIVES WERE REJECTED FOR A REASON.
+  //
+  //   • ON TAP — immediately. Rejected outright: the row reorders under the finger that
+  //     is still touching it, so the tile you meant to press has moved by the time you
+  //     press it again. It also makes the row's order a function of the last thing you
+  //     did rather than of what you usually do.
+  //   • ON FOREGROUND (an AppState listener). Rejected, and it is the tempting one: it
+  //     sounds like "between sessions". It is not. Coming back from the background leaves
+  //     you looking at the screen you left, so the re-sort happens WHILE THE ROW IS
+  //     VISIBLE — the same shuffle as on-tap, just delayed and less explicable.
+  //   • ON MOUNT. Chosen. HomeScreen is a conditional render (`activeTab === 'home' &&`),
+  //     so it remounts on every return to the tab: the order is fresh every time you
+  //     arrive at Home and frozen for as long as you are looking at it.
+  //
+  // Which is why `favUsage` is NOT in this dependency array and why the tap handler does
+  // not write it into state. A tap records to disk and is picked up next mount. Adding
+  // favUsage here would silently turn this into the on-tap design.
+  //
+  // Gated on HOME_V2_LIVE for the same reason the strip is: the V1 hub renders no
+  // favourites row, so this would be two disk reads for a row nobody can see, and it
+  // would make the V1 path observably different from today.
+  // The one case a MODULE_FLAGS entry cannot express. HomeScreen already receives
+  // garagesTileVisible (GARAGES_LIVE || admin || ownsGarage), and a garage owner genuinely
+  // uses that module while it is dark for everybody else — so for them it is a legitimate
+  // favourite. Memoised because a fresh object literal in a dependency array re-runs the
+  // effect on every render, which would quietly become the on-tap design.
+  const favOverrides = useMemo(() => ({ garages: !!garagesTileVisible }), [garagesTileVisible])
+
+  useEffect(() => {
+    if (!HOME_V2_LIVE || showFacilityList) return
+    let alive = true
+    Promise.all([loadUsage(), loadPins()]).then(([usage, pins]) => {
+      if (!alive) return
+      setFavUsage(usage)
+      setFavPins(pins)
+      setFavIds(resolveFavourites({ pins, usage, overrides: favOverrides }))
+    })
+    return () => { alive = false }
+  }, [showFacilityList, favOverrides])
+
+  // Every V2 tile tap, from the grid AND from the favourites row. recordModuleOpen is
+  // fire-and-forget by design — awaiting it would put a disk write between the finger and
+  // the screen opening, for a counter that only affects the NEXT mount.
+  //
+  // ⚠ ONLY V2 TILES COUNT. This wrapper is called from renderHubV2 and nowhere else, so
+  //   V1 records nothing and the whole feature is inherently flag-gated. Strip taps
+  //   deliberately do not count either: the question the row answers is "which module
+  //   TILES do you reach for", and a strip tap is a response to a card we chose to show,
+  //   not a choice the user navigated to.
+  function openModule(mod) {
+    recordModuleOpen(mod.id)
+    moduleHandlers[mod.id]?.()
+  }
+
+  function saveFavourites(pins) {
+    setFavEditOpen(false)
+    setFavPins(pins)
+    savePins(pins)
+    // Re-resolve immediately. This is NOT the shuffle the mount-only rule forbids — it is
+    // the direct result of the user pressing Bitti, and a row that ignored an edit until
+    // the next launch would read as the edit having failed.
+    setFavIds(resolveFavourites({ pins, usage: favUsage, overrides: favOverrides }))
+  }
 
   // The strip's `action` is a plain descriptor, never a closure — the resolver has no
   // navigation in it, and this is the one place that turns a kind into a destination.
@@ -618,8 +697,33 @@ export default function HomeScreen({
               />
             </View>
 
+            {/* ─── Sık kullandıkların ──────────────────────────────────────
+                The heading sits here rather than inside FavouritesRow so all three
+                section headings on this screen share ONE type token and cannot drift.
+                Safe for the same reason it was safe for the strip: the row has no empty
+                branch — UNGATED_MODULES holds seven ids no flag can switch off, so the
+                auto-fill pool cannot run dry and this heading can never be left standing
+                over nothing.
+
+                ⚠ THESE FOUR TILES ALSO REMAIN IN THE GRID BELOW, AND THAT DUPLICATION IS
+                  THE DESIGN. The grid is the app's navigation and must be complete and
+                  identical for every user; this row is a per-device shortcut. Removing a
+                  favourite from the grid would make the grid's contents depend on
+                  behaviour, so two people comparing phones would see different apps. */}
+            <View style={s.v2SectionRow}>
+              <Text style={[s.v2SectionTitle, s.v2SectionTitleInRow]}>{t('favSectionTitle', lang)}</Text>
+              <TouchableOpacity
+                onPress={() => setFavEditOpen(true)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+              >
+                <Text style={s.v2SectionAction}>{t('favEdit', lang)}</Text>
+              </TouchableOpacity>
+            </View>
+            <FavouritesRow ids={favIds} lang={lang} onPress={openModule} />
+
             <Text style={s.v2SectionTitle}>{t('homeAllModules', lang)}</Text>
-            <ModuleGrid lang={lang} onPress={mod => moduleHandlers[mod.id]?.()} />
+            <ModuleGrid lang={lang} onPress={openModule} />
 
             <HomeFooterSlot />
           </View>
@@ -631,6 +735,16 @@ export default function HomeScreen({
           lang={lang}
           locale={locale}
           onClose={() => setWeatherOpen(false)}
+        />
+
+        <FavouritesEditSheet
+          visible={favEditOpen}
+          pins={favPins}
+          usage={favUsage}
+          overrides={favOverrides}
+          lang={lang}
+          onSave={saveFavourites}
+          onClose={() => setFavEditOpen(false)}
         />
       </>
     )
@@ -1211,6 +1325,15 @@ const s = StyleSheet.create({
   v2Below:          { paddingHorizontal: 16 },
   v2SearchContent:  { paddingHorizontal: 16, paddingBottom: 32 },
   v2SectionTitle:   { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 24, marginBottom: 4 },
+  // A heading that carries an action. The MARGINS move to the row so the title and the
+  // button share a centre line; the type spec stays in v2SectionTitle and is reused
+  // rather than restated, so all three headings on this screen are one definition.
+  v2SectionRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                      marginTop: 24, marginBottom: 4 },
+  v2SectionTitleInRow: { marginTop: 0, marginBottom: 0 },
+  // primaryDark rather than primary: this is 13pt text on the warm canvas and primary
+  // measures 4.44:1 there, under the 4.5 floor. primaryDark is 6.71:1.
+  v2SectionAction:  { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark },
   // The gap between the Oli row and the Nöbetçi row lives HERE, on a wrapper, not inside
   // DutyRow — Slice 2 drops the live strip in between them, and a component that carries
   // its own top margin would have to be edited to move.

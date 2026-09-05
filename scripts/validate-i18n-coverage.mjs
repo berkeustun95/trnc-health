@@ -142,6 +142,15 @@ const SURFACES = [
   // text, so a tip added to that array is guarded the moment it is added.
   'components/home/LiveStrip.js',
   'constants/homeStrip.js',
+  // ─── Widened with HOME_V2 Slice 3, in the commit that creates them ────────
+  // The favourites row and its edit sheet. ModuleTile.js is here even though it adds no
+  // literal keys of its own — it is where the grid's tile RENDERING moved in this slice,
+  // and a file that draws user-visible text belongs in scope before somebody adds a
+  // string to it, not after. Its labels come through a variable and are already covered
+  // by TILE_LABEL_SOURCES below.
+  'components/home/FavouritesRow.js',
+  'components/home/FavouritesEditSheet.js',
+  'components/home/ModuleTile.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —

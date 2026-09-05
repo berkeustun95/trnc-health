@@ -18,11 +18,18 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { HOME_MODULES } from '../constants/homeModules.js'
+import { MODULE_FLAGS } from '../constants/flags.js'
+import {
+  DEFAULT_FAVOURITES, MODULE_FLAG_KEY, UNGATED_MODULES, FAVOURITE_SLOTS,
+  resolveFavourites, moduleEligible,
+} from '../constants/homeFavourites.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DIR  = 'components/home'
 const problems = []
 let fontReport = 'fonts: not checked'
+let favReport  = 'favourites: not checked'
 const read = p => readFileSync(resolve(ROOT, p), 'utf8')
 const num  = (src, name) => {
   const m = src.match(new RegExp(`(?:export )?const ${name}\\s*=\\s*(-?[\\d.]+)`))
@@ -153,6 +160,141 @@ if (!useFontsBlock) {
     + `(${[...usedFamilies.keys()].sort().join(', ')}), all registered among ${registered.size} in App.js`
 }
 
+// ─── D. The favourites row can only offer modules that actually work ────────
+//
+// The tile id and the flag key are two namespaces that do not always agree — HOME_MODULES
+// says `jobPostings`, MODULE_FLAGS says `jobs` — and neither may be renamed to close the
+// gap (the flag key is the module_waitlist `module` value, its CHECK, and the notify RPC;
+// the tile id is in moduleHandlers and in every stored favourite on every device).
+//
+// So the map is the fix, and this is what keeps the map honest. Without it a NEW tile
+// whose id drifts from its flag key resolves to `undefined`, and the only thing standing
+// between that and a Coming Soon tile pinned to somebody's home screen is a fail-closed
+// branch nobody would notice had started firing.
+//
+// ⚠ WHAT A HEALTHY RUN PRINTS: the counts, so the numbers can be read rather than trusted.
+//   A guard that prints only "OK" cannot be told apart from one whose scraper matched
+//   nothing — and both sides of this comparison come from imported modules that a rename
+//   could empty.
+const ids = HOME_MODULES.map(m => m.id)
+if (ids.length === 0) {
+  problems.push('HOME_MODULES is empty — this whole section just passed on nothing')
+}
+
+let gated = 0
+for (const id of ids) {
+  const ungated = UNGATED_MODULES.has(id)
+  const key     = MODULE_FLAG_KEY[id] ?? id
+  const known   = typeof MODULE_FLAGS[key] === 'boolean'
+  if (ungated && known) {
+    problems.push(`'${id}' is listed in UNGATED_MODULES but MODULE_FLAGS also has a '${key}' `
+      + `entry. One of the two is wrong, and eligibility currently answers "ungated" — so a `
+      + `dark module would be offered as a favourite.`)
+  }
+  if (!ungated && !known) {
+    problems.push(`'${id}' is not in UNGATED_MODULES and resolves to flag key '${key}', which `
+      + `is not a boolean in MODULE_FLAGS. It will be INELIGIBLE for favourites forever. `
+      + `Add it to UNGATED_MODULES if nothing gates it, or to MODULE_FLAG_KEY if its flag `
+      + `is named differently. (This is the jobPostings/jobs shape.)`)
+  }
+  if (!ungated && known) gated++
+}
+
+// A mapping entry that points at a flag which does not exist is the same defect wearing a
+// disguise — it LOOKS handled.
+for (const [id, key] of Object.entries(MODULE_FLAG_KEY)) {
+  if (!ids.includes(id)) {
+    problems.push(`MODULE_FLAG_KEY maps '${id}', which is not a HOME_MODULES id — a stale entry`)
+  }
+  if (typeof MODULE_FLAGS[key] !== 'boolean') {
+    problems.push(`MODULE_FLAG_KEY maps '${id}' -> '${key}', which is not in MODULE_FLAGS`)
+  }
+}
+
+// A typo in the editorial defaults costs a slot with NO error at runtime, because an
+// unknown id is silently skipped. That silence is correct for a stored favourite from an
+// old build and wrong for a constant somebody just typed.
+for (const id of DEFAULT_FAVOURITES) {
+  if (!ids.includes(id)) {
+    problems.push(`DEFAULT_FAVOURITES names '${id}', which is not a HOME_MODULES id. It would `
+      + `be skipped silently and the row would quietly fall back to grid order.`)
+  }
+}
+
+// ─── The row can never come up empty — computed, not asserted in prose ──────
+// The heading lives in HomeScreen, so an empty row leaves it standing over nothing. Run
+// the real resolver against the WORST case: every flag false, no pins, no usage.
+const allFalse = Object.fromEntries(Object.keys(MODULE_FLAGS).map(k => [k, false]))
+const worstCase = resolveFavourites({ pins: [], usage: {}, flags: allFalse, overrides: {} })
+if (worstCase.length !== FAVOURITE_SLOTS) {
+  problems.push(`with every module flag false the favourites row resolves to `
+    + `${worstCase.length} tile(s), not ${FAVOURITE_SLOTS}. The section heading in `
+    + `HomeScreen would be left standing over a short or empty row. Ungated modules: `
+    + `${[...UNGATED_MODULES].join(', ')}`)
+}
+// Control: the same call must NOT be padded with ineligible ids.
+for (const id of worstCase) {
+  if (!moduleEligible(id, { flags: allFalse })) {
+    problems.push(`CONTROL FAILED: resolveFavourites returned '${id}' under all-false flags, `
+      + `but moduleEligible says it is ineligible — the filter and the fill disagree`)
+  }
+}
+if (new Set(worstCase).size !== worstCase.length) {
+  problems.push(`resolveFavourites returned a duplicate: ${worstCase.join(', ')}`)
+}
+
+// ─── The four degradation rules, exercised rather than described ───────────
+// A stored favourite is read off a device we have never seen, written by a build we may
+// no longer have. Each of these is a scenario the row must survive SILENTLY — no dead
+// tile, no crash, no gap.
+const liveFlags = Object.fromEntries(Object.keys(MODULE_FLAGS).map(k => [k, true]))
+const scenario = (name, args, check) => {
+  let out
+  try { out = resolveFavourites(args) } catch (e) {
+    problems.push(`degradation "${name}" THREW: ${e.message}`); return
+  }
+  if (new Set(out).size !== out.length) problems.push(`degradation "${name}" returned duplicates: ${out.join(', ')}`)
+  if (out.length !== FAVOURITE_SLOTS)   problems.push(`degradation "${name}" returned ${out.length} tiles, not ${FAVOURITE_SLOTS}: ${out.join(', ')}`)
+  const msg = check(out)
+  if (msg) problems.push(`degradation "${name}": ${msg} (got ${out.join(', ')})`)
+}
+
+// 1. REMOVED — a pin naming a module that no longer exists.
+scenario('pin points at a deleted module', { pins: ['nopeNotAModule', null, null, null], flags: liveFlags },
+  out => out.includes('nopeNotAModule') ? 'the dead id reached the row' : null)
+
+// 2. DARK — a pin naming a real module whose flag is false.
+scenario('pin points at a dark module',
+  { pins: ['grooming', null, null, null], flags: { ...liveFlags, grooming: false } },
+  out => out.includes('grooming') ? 'a Coming Soon module reached the row' : null)
+
+// 3. The same pin must COME BACK when the module goes live — storage is never rewritten,
+//    so the user's arrangement survives a module being dark for a release.
+scenario('the same pin once the module is live', { pins: ['grooming', null, null, null], flags: liveFlags },
+  out => out[0] === 'grooming' ? null : 'the pin did not return to slot 1 once eligible')
+
+// 4. A pin holds its SLOT, and unpinned slots still auto-fill around it.
+scenario('a pin in slot 3 holds position 3', { pins: [null, null, 'esim', null], flags: liveFlags },
+  out => out[2] === 'esim' ? null : 'the pin did not land in slot 3')
+
+// 5. Usage outranks the editorial defaults once it exists, and a pin outranks usage.
+scenario('usage reorders the auto-filled slots',
+  { pins: [], usage: { esim: 90, games: 80, municipal: 70, exchangeRates: 60 }, flags: liveFlags },
+  out => out[0] === 'esim' && out[1] === 'games' ? null : 'usage did not drive the order')
+scenario('a pin outranks a heavily-used module',
+  { pins: ['municipal', null, null, null], usage: { esim: 90 }, flags: liveFlags },
+  out => out[0] === 'municipal' ? null : 'usage beat an explicit pin')
+
+// 6. A fresh device shows exactly the editorial defaults, in their editorial order. This
+//    is the one that would break silently if the tie-break lost the defaults.
+scenario('fresh install shows the defaults in order', { pins: [], usage: {}, flags: liveFlags },
+  out => out.join(',') === DEFAULT_FAVOURITES.join(',')
+    ? null : `expected the DEFAULT_FAVOURITES order [${DEFAULT_FAVOURITES.join(', ')}]`)
+
+favReport = `favourites: ${ids.length} tiles (${gated} flag-gated, ${UNGATED_MODULES.size} ungated), `
+  + `defaults [${DEFAULT_FAVOURITES.join(', ')}], worst-case row fills ${worstCase.length}/${FAVOURITE_SLOTS}, `
+  + `7 degradation scenarios pass`
+
 if (problems.length) {
   console.error('\n  ┌─ HOME GEOMETRY CHECK FAILED ───────────────────────────────────┐')
   for (const p of problems) console.error('  │ ' + p)
@@ -161,5 +303,6 @@ if (problems.length) {
 }
 const artH = (1 - ASSET_TOP - ASSET_BOTTOM) * MASCOT_BOX
 console.log(fontReport)
+console.log(favReport)
 console.log(`home geometry: OK (mascot box ${MASCOT_BOX}, ink ${(MASCOT_BOX*0.456).toFixed(0)}x${artH.toFixed(0)}pt, `
   + `${(artH-CARD_H).toFixed(0)}pt above a ${CARD_H}pt card, 0pt below)`)
