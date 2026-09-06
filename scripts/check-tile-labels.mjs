@@ -44,8 +44,34 @@ const FONTS = {
   600: 'node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf',
   700: 'node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf',
 }
-const WEIGHT = Number(process.env.INTER_WEIGHT || 500)   // 400 | 500 | 600 | 700
-const buf = readFileSync(FONTS[WEIGHT])
+// ─── THE WEIGHT IS DERIVED FROM WHAT THE TILE ACTUALLY RENDERS ──────────────
+//
+// This defaulted to 500 until 2026-09-12, when the labels went to Inter 700 for weight. A
+// guard measuring 500 while the app draws 700 is measuring a face that is not on screen —
+// and it would have passed, because 500 is narrower. Two labels that overflow at 700 would
+// have shipped broken with a green check beside them.
+//
+// So it reads ModuleTile's LABEL_FAMILY and the flag that chooses between its two arms.
+// An unreadable value is a hard failure; this guard may not guess which font it is
+// measuring.
+const TILE_SRC = readFileSync(new URL('../components/home/ModuleTile.js', import.meta.url), 'utf8')
+const FLAG_SRC = readFileSync(new URL('../constants/flags.js', import.meta.url), 'utf8')
+const famMatch = TILE_SRC.match(/const LABEL_FAMILY = (\w+) \? '([^']+)' : '([^']+)'/)
+if (!famMatch) {
+  console.error('\n  tile labels: could not read LABEL_FAMILY from ModuleTile.js — this guard '
+    + 'cannot know which face the labels use, so it fails rather than guessing.\n')
+  process.exit(1)
+}
+const flagOn = new RegExp(`export const ${famMatch[1]} = true`).test(FLAG_SRC)
+const ACTIVE_FAMILY = flagOn ? famMatch[2] : famMatch[3]
+const WEIGHT = Number((ACTIVE_FAMILY.match(/_(\d{3})/) || [])[1] || 0)
+const MANROPE = new URL('../assets/fonts/Manrope-Medium.ttf', import.meta.url)
+const FONT_FILE = ACTIVE_FAMILY.startsWith('Manrope') ? MANROPE : FONTS[WEIGHT]
+if (!FONT_FILE) {
+  console.error(`\n  tile labels: no font file for the active family '${ACTIVE_FAMILY}'.\n`)
+  process.exit(1)
+}
+const buf = readFileSync(FONT_FILE)
 
 const u16 = o => buf.readUInt16BE(o)
 const i16 = o => buf.readInt16BE(o)
@@ -281,7 +307,7 @@ if (problems.length) {
     + `fixed two lines so the grid keeps one shape in all nine locales.\n`)
   process.exit(1)
 }
-console.log(`tile labels: OK — ${checked} strings from Inter_${WEIGHT} at ${WIDTHS.join('dp / ')}dp`)
+console.log(`tile labels: OK — ${checked} strings from ${ACTIVE_FAMILY} (the face ModuleTile actually renders) at ${WIDTHS.join('dp / ')}dp`)
 console.log(`  geometry read from source: page inset ${G.pageInset}, tile pad ${G.tilePad}, `
   + `card gap ${G.cardGap}/band pad ${G.bandPad}/gap ${G.bandGap}/chevron ${G.chevron} `
   + `-> label box ${labelBox(320).toFixed(1)}pt, card band ${cardBox(320).toFixed(1)}pt at 320dp`)

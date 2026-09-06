@@ -10,7 +10,7 @@ import { TILE_FONT_MANROPE } from '../../constants/flags'
 // chooses which one the label NAMES. Measured before it was offered: Manrope Medium has
 // identical script coverage to Inter (Arabic and Persian fall back to the system font in
 // both) and is 2.1% narrower at the same weight, so no label needs new copy.
-const LABEL_FAMILY = TILE_FONT_MANROPE ? 'Manrope_500Medium' : 'Inter_500Medium'
+const LABEL_FAMILY = TILE_FONT_MANROPE ? 'Manrope_500Medium' : 'Inter_700Bold'
 
 // ONE tile, rendered identically by the module grid and the favourites row.
 //
