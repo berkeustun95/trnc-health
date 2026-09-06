@@ -95,6 +95,18 @@ export const HIDDEN_TILES = new Set([
   // providers reads as an empty app rather than as a promise.
   'grooming',
   'garages',
+  // ─── explore, 2026-09-13 ─────────────────────────────────────────────────
+  // Hidden for a DIFFERENT reason from the two above, and the difference matters if this
+  // is ever revisited: grooming and garages are hidden because they are empty, while the
+  // places directory is hidden because the Keşfet TAB covers the same content better —
+  // with a map, and now with a map/list control that reaches the same browsable screen.
+  //
+  // ⚠ IT WAS NOT HIDDEN UNTIL THAT CONTROL SHIPPED AND WAS CHECKED ON DEVICE. Until
+  //   2026-09-11 this tile was the ONLY non-admin entrance to the directory, so hiding it
+  //   would have stranded the 2-level taxonomy, the ownership guards, the claimed listings
+  //   and the featured tier. If the map/list control is ever removed, this line has to come
+  //   out in the same commit.
+  'explore',
 ])
 
 export const HOME_MODULES = [

@@ -51,9 +51,20 @@ export const FAVOURITE_SLOTS = 4
 // Coral is the urgency signal in this design; it stops being one when it is also the
 // colour of the shortcuts.
 export const DEFAULT_FAVOURITES = [
+  // Hidden since 2026-09-13 (the Keşfet tab covers it), so it is SKIPPED — kept in the list
+  // for the same reason `transport` is: this is a preference ORDER, and an entry that
+  // becomes eligible again takes its position back with no edit.
   'explore',
   'events',
-  'transport',          // dark today — see the note above; takes slot 3 on launch
+  'transport',          // dark today — see the note above; takes its slot on launch
+  // ⚠ ADDED WHEN explore WAS HIDDEN, AND THE GUARD IS WHY. Hiding explore took the
+  //   eligible-default count from 4 to 3, which would have filled one shortcut slot from
+  //   GRID ORDER — health, emergency, towing, the coral block this set was chosen to get
+  //   away from. `npm run home:check` failed on exactly that and named the shortfall.
+  //   Housing is the natural replacement: live, `standard` tint like the rest of this set,
+  //   drawn from the middle of the grid so there is no positional echo, and the most
+  //   practical thing a newcomer opens after events.
+  'accommodation',
   'exchangeRates',
   // The backstop, and it is UNGATED on purpose: no flag can switch it off, so the row is
   // guaranteed to be filled from editorial choices in every flag state rather than
