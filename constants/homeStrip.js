@@ -64,10 +64,11 @@ export const STRIP_CARD_H = 120
 // white text legible over a blown-out sky without blacking the photo out. A solid band
 // carries its own contrast on any image whatsoever, which is the same resolution the hero
 // reached for its wordmark chip and action buttons.
-// 62 -> 60. The band now holds a 2-line 14pt title over a 1-line 11pt subtitle — 48.8pt of
-// content — because a half-width card's text box is 77pt at 320dp and no single line
-// survives that. See STRIP_CARD_TEXT_BOX below.
-export const STRIP_BAND_H = 60
+// 60 -> 46 on 2026-09-10, when the cards lost their subtitles. The band now holds a 2-line
+// 14pt title and nothing else — 33.6pt of content — so 46 leaves 12.4pt of padding and
+// hands the other 14pt back to the PHOTOGRAPH, which is the point of removing them. The
+// card height is unchanged, so the fold table is unaffected.
+export const STRIP_BAND_H = 46
 
 // ─── THE TWO CARDS ARE ALWAYS PRESENT ───────────────────────────────────────
 //
@@ -90,7 +91,6 @@ export const STRIP_BAND_H = 60
 // module grid's label box, with type at 14pt instead of 11. Every string in this section
 // is measured against it by `npm run labels:check`.
 export const STRIP_TITLE_LINES = 2
-export const STRIP_SUB_LINES   = 1
 
 // ─── EVERY STRING THE TWO CARDS CAN RENDER ──────────────────────────────────
 //
@@ -105,9 +105,8 @@ export const STRIP_SUB_LINES   = 1
 //   scripts/validate-i18n-coverage.mjs imports this array. Add a key here in the same
 //   commit that renders it.
 export const STRIP_CARD_KEYS = [
-  'stripEventsTitle', 'stripEventsSub',
-  'stripDutyTitle', 'stripDutySub',
-  'stripDutyPartialTitle', 'stripDutyStaleTitle', 'stripDutyAlertSub',
+  'stripEventsTitle',
+  'stripDutyTitle', 'stripDutyPartialTitle', 'stripDutyStaleTitle',
 ]
 
 // ─── LADDER WINDOWS ─────────────────────────────────────────────────────────

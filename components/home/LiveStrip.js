@@ -56,7 +56,7 @@ const STRIP_DUTY_IMAGE = require('../../assets/backgrounds/ada-bg-duty-pharmacy.
 // bundle. There is no branch here that renders fewer than two cards, and no data state —
 // offline, RLS-blocked, empty database, unapplied migration — that can produce one.
 
-function StripCard({ image, imageUrl, icon, title, subtitle, tag, tagTone, alert, onPress, innerRef }) {
+function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress, innerRef }) {
   return (
     <TouchableOpacity
       ref={innerRef}
@@ -65,7 +65,7 @@ function StripCard({ image, imageUrl, icon, title, subtitle, tag, tagTone, alert
       onPress={onPress}
       activeOpacity={0.88}
       accessibilityRole="button"
-      accessibilityLabel={subtitle ? title + ' — ' + subtitle : title}
+      accessibilityLabel={title}
     >
       {/* ─── THE ALERT STATE REPLACES THE PHOTOGRAPH, IT DOES NOT TINT IT ─────
           At half width a tint is easy to miss and a missing photograph is not. A duty
@@ -98,12 +98,12 @@ function StripCard({ image, imageUrl, icon, title, subtitle, tag, tagTone, alert
           #C0384A it is 5.38:1. Both measured, neither carried forward. */}
       <View style={[s.band, alert && s.bandAlert]}>
         <View style={s.bandText}>
-          {/* TWO lines. The text box is 77pt at 320dp — narrower than a module-grid label,
-              with type at 14pt instead of 11 — so one line is not survivable in any
-              locale. Every string in this section is measured against that box by
-              `npm run labels:check`. */}
+          {/* TITLE ONLY since 2026-09-10 — the subtitles are gone and the band shrank from
+              60 to 46 so the photograph gets the difference.
+              TWO lines: the text box is 83pt at 320dp, narrower than a module-grid label
+              with type at 14pt instead of 11, so one line is not survivable in any locale.
+              Every string here is measured against that box by `npm run labels:check`. */}
           <Text style={s.title} numberOfLines={2}>{title}</Text>
-          {!!subtitle && <Text style={s.sub} numberOfLines={1}>{subtitle}</Text>}
         </View>
         <View style={s.chevron}>
           <Ionicons name="chevron-forward" size={15} color={alert ? '#C0384A' : colors.textPrimary} />
@@ -138,8 +138,13 @@ export default function LiveStrip({
   const ok = dutyStatus === DUTY_FRESH
   // The generic card carries i18n KEYS; a real event carries its database title. Resolving
   // both upstream would mean inventing keys for user-submitted event names.
-  const evTitle = item?.generic ? t(item.titleKey, lang)    : item?.title
-  const evSub   = item?.generic ? t(item.subtitleKey, lang) : item?.subtitle
+  // ─── TITLE ONLY, AND THE EVENT'S TIME IS DELIBERATELY DROPPED ─────────────
+  // The subtitle used to carry "19:30". Appending it to the title instead — "Bandabuliya
+  // Gecesi · 19:30" — would re-import the overflow this change exists to remove: the box
+  // is 83pt at 320dp and an event name already needs both lines of it. The card also
+  // already says TODAY by being on this strip, and the urgency case keeps its signal: the
+  // "starting soon" tag is a chip on the PHOTO, not in the band, so it survives untouched.
+  const evTitle = item?.generic ? t(item.titleKey, lang) : item?.title
 
   return (
     <View style={s.row}>
@@ -148,7 +153,6 @@ export default function LiveStrip({
         imageUrl={item?.imageUrl}
         icon={item?.icon || 'calendar-outline'}
         title={evTitle}
-        subtitle={evSub}
         tag={item?.sponsored ? t('stripSponsored', lang) : item?.soon ? t('stripStartingSoon', lang) : null}
         tagTone={item?.sponsored ? 'sponsored' : 'soon'}
         onPress={() => onPressEvent?.(item)}
@@ -173,7 +177,6 @@ export default function LiveStrip({
         title={t(ok ? 'stripDutyTitle'
                     : dutyStatus === DUTY_PARTIAL ? 'stripDutyPartialTitle'
                     : 'stripDutyStaleTitle', lang)}
-        subtitle={t(ok ? 'stripDutySub' : 'stripDutyAlertSub', lang)}
         onPress={onPressDuty}
       />
     </View>
@@ -204,7 +207,7 @@ const s = StyleSheet.create({
   tagText:       { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   band:          { position: 'absolute', left: 0, right: 0, bottom: 0, height: STRIP_BAND_H,
                    backgroundColor: 'rgba(0,0,0,0.78)', flexDirection: 'row', alignItems: 'center',
-                   paddingHorizontal: 12, gap: 10 },
+                   paddingHorizontal: 12, gap: 8 },
   // #C0384A, not colors.danger. White on danger (#D1495B) is 4.36:1 — under the 4.5 floor
   // for this 14pt title. This is the same hue deepened until white clears it at 5.38:1,
   // the same move DutyRow made for its icon tile and its subtitle.
@@ -213,7 +216,10 @@ const s = StyleSheet.create({
   title:         { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   // rgba white rather than a grey token: a flat token would composite against whatever the
   // band's own alpha sits on and stop being knowable by reading.
-  sub:           { fontSize: 11, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.88)', marginTop: 2 },
-  chevron:       { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff',
+  // 28 -> 24 with the band's shrink. A 28pt disc in a 46pt band leaves 9pt above and
+  // below and reads as jammed; 24 leaves 11. It also widens the title box from 77pt to
+  // 83pt at 320dp, which is what lets the plural duty titles fit — "Pharmacies" measures
+  // 79.6pt and did not fit the old box in English or French.
+  chevron:       { width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
                    justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
 })

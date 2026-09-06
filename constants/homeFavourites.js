@@ -4,7 +4,7 @@
 // AsyncStorage, no React and no side effect in this file: it is the cityWelcomeRules /
 // cityWelcome split applied again, and it exists in that shape so the degradation rules
 // below can be tested by a script rather than by tapping a phone.
-import { HOME_MODULES } from './homeModules.js'
+import { HOME_MODULES, HIDDEN_TILES } from './homeModules.js'
 import { MODULE_FLAGS } from './flags.js'
 
 export const FAVOURITE_SLOTS = 4
@@ -123,6 +123,12 @@ const DEFAULT_INDEX = new Map(DEFAULT_FAVOURITES.map((id, i) => [id, i]))
 // uses that module while it is dark for everyone else.
 export function moduleEligible(id, { flags = MODULE_FLAGS, overrides = {} } = {}) {
   if (!MODULE_INDEX.has(id)) return false
+  // ⚠ HIDDEN BEATS EVERYTHING, INCLUDING AN OVERRIDE. A shortcut to a tile the grid does
+  //   not show is an orphan: the user cannot find it again, cannot see what it belongs to,
+  //   and Düzenle would offer it from a list of modules that are otherwise all present.
+  //   Pins naming a hidden tile SURVIVE in storage — same rule as a dark module — so
+  //   unhiding restores the user's own arrangement rather than having forgotten it.
+  if (HIDDEN_TILES.has(id)) return false
   if (overrides[id]) return true
   if (UNGATED_MODULES.has(id)) return true
 

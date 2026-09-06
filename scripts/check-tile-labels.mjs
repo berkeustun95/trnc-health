@@ -262,9 +262,9 @@ for (const W of WIDTHS) {
     for (const k of ['stripDutyTitle', 'stripDutyPartialTitle', 'stripDutyStaleTitle', 'stripEventsTitle']) {
       assess('card', t(k, L), 14, cardBox(W), `${W}dp ${L} card:${k}`, CURSIVE.has(L))
     }
-    for (const k of ['stripDutySub', 'stripDutyAlertSub', 'stripEventsSub']) {
-      assess('card', t(k, L), 11, cardBox(W), `${W}dp ${L} card:${k}`, CURSIVE.has(L))
-    }
+    // The subtitle loop is gone with the subtitles (2026-09-10). Measuring keys that no
+    // longer render would be the guard reporting on ghosts — it would keep passing while
+    // saying nothing, which is worse than not checking.
   }
 }
 

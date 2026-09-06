@@ -64,6 +64,39 @@
 // • eat_drink. A taxonomy row inside Explore (constants/exploreCategories.js), never a
 //   module of its own.
 
+// ─── HIDDEN_TILES — GRID VISIBILITY, DELIBERATELY NOT A MODULE FLAG ─────────
+//
+// A tile named here is not rendered in the grid, is not offered in the Düzenle sheet and
+// cannot auto-fill a shortcut slot. Everything else about the module is untouched: its
+// screen, its route, its handler and its MODULE_FLAGS entry all still exist, so unhiding
+// is deleting one line.
+//
+// ⚠ WHY NOT MODULE_FLAGS. A MODULE_FLAGS key is a WAITLIST STORY. scripts/check-module-flags.mjs
+//   requires every live key to appear in WAITLIST_BLAST_DONE, and the notify-path check
+//   requires it inside notify_module_waitlist and module_notif_text — three places, one of
+//   them a database function. That machinery exists so a module going LIVE notifies the
+//   people who asked for it. Hiding a tile for a month is not that story, and minting a
+//   flag for it would put a fake waitlist entry in the notify path forever.
+//
+// ⚠ AND THIS IS THE FIRST THING THAT HIDES ANYTHING FROM THE V2 GRID AT ALL. V1 filtered
+//   two tiles (garages behind garagesTileVisible, towing behind its flag); V2 deliberately
+//   filters NONE — see the note below on every module for every user. So a dark module has
+//   been rendering to every user by design since Slice 1, which is the answer to "why can
+//   I see grooming and garages": that is the towing lesson working, not a bug.
+//
+// ⚠ HIDING IS NOT DARK-LAUNCHING. A dark module still renders its tile and routes to
+//   Coming Soon, which is how it collects demand. A HIDDEN module collects nothing —
+//   nobody can reach its waitlist. That is the correct trade only when the tile is being
+//   removed for a REASON OTHER than "not ready yet". Read the per-entry notes below.
+export const HIDDEN_TILES = new Set([
+  // Both are already dark, so this is belt-and-braces rather than a change in what a tap
+  // does — it changes whether the tap is offered at all. Accepted knowingly: neither has a
+  // waitlist worth collecting, and a Coming Soon screen for a service category with no
+  // providers reads as an empty app rather than as a promise.
+  'grooming',
+  'garages',
+])
+
 export const HOME_MODULES = [
   // Urgent first. These are what somebody opens the app FOR at 2am, and the profile
   // gate's exemption list (constants/profileGate.js) names the same three concerns.

@@ -24,6 +24,7 @@ import {
   DEFAULT_FAVOURITES, MODULE_FLAG_KEY, UNGATED_MODULES, FAVOURITE_SLOTS,
   resolveFavourites, moduleEligible,
 } from '../constants/homeFavourites.js'
+import { HIDDEN_TILES } from '../constants/homeModules.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DIR  = 'components/home'
@@ -302,7 +303,9 @@ if (new Set(worstCase).size !== worstCase.length) {
 // no longer have. Each of these is a scenario the row must survive SILENTLY — no dead
 // tile, no crash, no gap.
 const liveFlags = Object.fromEntries(Object.keys(MODULE_FLAGS).map(k => [k, true]))
+let scenarioCount = 0
 const scenario = (name, args, check) => {
+  scenarioCount++
   let out
   try { out = resolveFavourites(args) } catch (e) {
     problems.push(`degradation "${name}" THREW: ${e.message}`); return
@@ -318,14 +321,28 @@ scenario('pin points at a deleted module', { pins: ['nopeNotAModule', null, null
   out => out.includes('nopeNotAModule') ? 'the dead id reached the row' : null)
 
 // 2. DARK — a pin naming a real module whose flag is false.
+//
+//    ⚠ `insurance`, NOT `grooming`. This scenario used grooming until 2026-09-10, when
+//      grooming entered HIDDEN_TILES — at which point it stopped being a test of DARKNESS
+//      and became a test of hiddenness, and scenario 3 below (the same pin coming back
+//      when the flag flips) could never pass again. The subject has to be a module that is
+//      dark and NOT hidden, or the pair asserts something other than what it says.
 scenario('pin points at a dark module',
-  { pins: ['grooming', null, null, null], flags: { ...liveFlags, grooming: false } },
-  out => out.includes('grooming') ? 'a Coming Soon module reached the row' : null)
+  { pins: ['insurance', null, null, null], flags: { ...liveFlags, insurance: false } },
+  out => out.includes('insurance') ? 'a Coming Soon module reached the row' : null)
 
 // 3. The same pin must COME BACK when the module goes live — storage is never rewritten,
 //    so the user's arrangement survives a module being dark for a release.
-scenario('the same pin once the module is live', { pins: ['grooming', null, null, null], flags: liveFlags },
-  out => out[0] === 'grooming' ? null : 'the pin did not return to slot 1 once eligible')
+scenario('the same pin once the module is live', { pins: ['insurance', null, null, null], flags: liveFlags },
+  out => out[0] === 'insurance' ? null : 'the pin did not return to slot 1 once eligible')
+
+// 3b. HIDDEN beats everything, including a live flag and an explicit override. A shortcut
+//     to a tile the grid does not render is an orphan the user cannot find again.
+for (const hid of HIDDEN_TILES) {
+  scenario(`hidden tile '${hid}' never reaches the row, even live and pinned`,
+    { pins: [hid, null, null, null], usage: { [hid]: 999 }, flags: liveFlags, overrides: { [hid]: true } },
+    out => out.includes(hid) ? 'a HIDDEN tile reached the row' : null)
+}
 
 // 4. A pin holds its SLOT, and unpinned slots still auto-fill around it.
 scenario('a pin in slot 3 holds position 3', { pins: [null, null, 'esim', null], flags: liveFlags },
@@ -355,10 +372,11 @@ scenario('fresh install shows the defaults in order', { pins: [], usage: {}, fla
   out => out.join(',') === expectFresh.join(',')
     ? null : `expected the first ${FAVOURITE_SLOTS} eligible defaults [${expectFresh.join(', ')}]`)
 
-favReport = `favourites: ${ids.length} tiles (${gated} flag-gated, ${UNGATED_MODULES.size} ungated), `
+favReport = `favourites: ${ids.length} tiles (${gated} flag-gated, ${UNGATED_MODULES.size} ungated, `
+  + `${HIDDEN_TILES.size} hidden: ${[...HIDDEN_TILES].join('/')}), `
   + `defaults [${DEFAULT_FAVOURITES.join(', ')}], worst-case row fills ${worstCase.length}/${FAVOURITE_SLOTS}, `
   + `${eligibleDefaults.length}/${DEFAULT_FAVOURITES.length} defaults eligible now, `
-  + `7 degradation scenarios pass`
+  + `${scenarioCount} degradation scenarios pass`
 
 if (problems.length) {
   console.error('\n  ┌─ HOME GEOMETRY CHECK FAILED ───────────────────────────────────┐')

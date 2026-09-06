@@ -1,5 +1,5 @@
 import { View, StyleSheet } from 'react-native'
-import { HOME_MODULES, GRID_COLUMNS } from '../../constants/homeModules'
+import { HOME_MODULES, GRID_COLUMNS, HIDDEN_TILES } from '../../constants/homeModules'
 import ModuleTile from './ModuleTile'
 
 // Tüm modüller — every module, four across, bare icons.
@@ -33,7 +33,10 @@ import ModuleTile from './ModuleTile'
 export default function ModuleGrid({ lang, onPress }) {
   return (
     <View style={s.grid}>
-      {HOME_MODULES.map(mod => (
+      {/* HIDDEN_TILES is the ONLY filter in this grid, and it is a visibility decision
+          rather than a readiness one — see its note in constants/homeModules.js. Dark
+          modules still render, deliberately. */}
+      {HOME_MODULES.filter(mod => !HIDDEN_TILES.has(mod.id)).map(mod => (
         <ModuleTile
           key={mod.id}
           mod={mod}
