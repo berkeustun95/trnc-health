@@ -179,10 +179,24 @@ if (!useFontsBlock) {
   const usedFamilies = new Map()
   for (const f of readdirSync(resolve(ROOT, DIR)).filter(n => n.endsWith('.js'))) {
     const src = read(join(DIR, f))
-    // Only real style values: `fontFamily: 'X'`. A family named in a COMMENT is prose —
-    // this file's own notes discuss Inter_400Regular and Inter_600SemiBold by name, and
-    // matching those would forbid the comments that explain the bug.
-    for (const m of src.matchAll(/fontFamily:\s*'([^']+)'/g)) {
+    // ─── SCAN FOR THE FONT-NAME SHAPE, NOT FOR `fontFamily:` ────────────────
+    // This matched `fontFamily: 'X'` inline until 2026-09-11, when ModuleTile started
+    // choosing its family through a const:
+    //
+    //     const LABEL_FAMILY = TILE_FONT_MANROPE ? 'Manrope_500Medium' : 'Inter_500Medium'
+    //     label: { fontFamily: LABEL_FAMILY, ... }
+    //
+    // The guard went on passing and reported 4 families while the file used 5. A typo in
+    // the Manrope name would have shipped labels in the system font with nothing to say
+    // so — which is the exact defect this section exists to catch, reintroduced by the
+    // indirection rather than by the mistake.
+    //
+    // So it now matches the NAME SHAPE (Family_NNNWeight) in any string literal, which no
+    // amount of indirection can hide. Comments are stripped FIRST, because this file's own
+    // notes discuss Inter_600SemiBold by name and matching prose would forbid the comments
+    // that explain the bug.
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+    for (const m of code.matchAll(/'([A-Za-z][A-Za-z0-9]*_\d{3}[A-Za-z]+)'/g)) {
       if (!usedFamilies.has(m[1])) usedFamilies.set(m[1], `${DIR}/${f}`)
     }
   }

@@ -207,6 +207,15 @@ export default function ExploreMapScreen({
   onSelectFacility,
   onSelectUnclaimed,
   onSelectPlace,
+  // ─── THE DIRECTORY'S SECOND ENTRANCE ──────────────────────────────────────
+  // Until 2026-09-11 the browsable places directory had exactly ONE non-admin entrance:
+  // the `explore` tile on Home. This tab showed the same content as a map and offered no
+  // way to reach the list — so hiding that tile would have stranded the 2-level taxonomy,
+  // the ownership guards, the claimed listings and the featured tier for every user.
+  //
+  // This is that second entrance, and it has to ship and be checked on device BEFORE the
+  // tile is hidden. Optional so the screen still renders if a caller does not pass it.
+  onShowList,
 }) {
   const { width, height } = useWindowDimensions()
   const mapRef = useRef(null)
@@ -309,6 +318,36 @@ export default function ExploreMapScreen({
 
   return (
     <View style={s.container}>
+      {/* ─── MAP / LIST, AS A PAIR ────────────────────────────────────────────
+          A segmented control rather than a lone "list" button: a pair states that there
+          are two views of one thing, where a single button reads as an action leaving the
+          screen. The map half is inert — it is the view you are already on — and carries
+          the selected treatment so the control still says where you are.
+
+          It floats over the map on its own surface rather than pushing the map down: the
+          map is the content here, and a header bar would cost it the height for a control
+          most sessions will not touch. */}
+      {!!onShowList && (
+        <View style={s.viewToggle} pointerEvents="box-none">
+          <View style={s.segment}>
+            <View style={[s.segItem, s.segItemActive]}>
+              <Ionicons name="map" size={15} color="#fff" />
+              <Text style={[s.segText, s.segTextActive]}>{t('exploreViewMap', lang)}</Text>
+            </View>
+            <TouchableOpacity
+              style={s.segItem}
+              onPress={onShowList}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={t('exploreViewList', lang)}
+            >
+              <Ionicons name="list" size={15} color={colors.textPrimary} />
+              <Text style={s.segText}>{t('exploreViewList', lang)}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       <MapView
         ref={mapRef}
         style={s.map}
@@ -386,6 +425,22 @@ const cl = StyleSheet.create({
 })
 
 const s = StyleSheet.create({
+  // ─── The map/list segmented control ───────────────────────────────────────
+  // Floats over the map, below the safe-area top. `pointerEvents: box-none` on the wrapper
+  // so the empty space beside the control still pans the map — a full-width invisible bar
+  // that ate gestures would be a worse bug than the one this fixes.
+  viewToggle: { position: 'absolute', top: 54, left: 0, right: 0, alignItems: 'center', zIndex: 5 },
+  segment:    { flexDirection: 'row', backgroundColor: colors.cardBg, borderRadius: 20,
+                padding: 3, gap: 2, ...shadow },
+  segItem:    { flexDirection: 'row', alignItems: 'center', gap: 5,
+                paddingHorizontal: 12, paddingVertical: 7, borderRadius: 17 },
+  // Selected is a filled pill, not a colour swap on the label: the same discipline the
+  // grid's tints follow, so the state survives greyscale. White on primary is 5.01:1;
+  // textPrimary on cardBg is 14.6:1.
+  segItemActive: { backgroundColor: colors.primary },
+  segText:    { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
+  segTextActive: { color: '#fff' },
+
   container:     { flex: 1 },
   map:           { flex: 1 },
   loading:       { position: 'absolute', top: 66, alignSelf: 'center', backgroundColor: colors.cardBg, borderRadius: 20, padding: 10, ...shadow },

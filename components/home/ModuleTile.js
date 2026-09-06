@@ -3,6 +3,14 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { GRID_COLUMNS, GRID_LABEL_HEIGHT, GRID_LABEL_LINE_HEIGHT } from '../../constants/homeModules'
+import { TILE_FONT_MANROPE } from '../../constants/flags'
+
+// ─── THE LABEL'S FAMILY IS A FLAG, AND IT IS RESOLVED ONCE ──────────────────
+// Both faces are registered in App.js — useFonts cannot be called conditionally — so this
+// chooses which one the label NAMES. Measured before it was offered: Manrope Medium has
+// identical script coverage to Inter (Arabic and Persian fall back to the system font in
+// both) and is 2.1% narrower at the same weight, so no label needs new copy.
+const LABEL_FAMILY = TILE_FONT_MANROPE ? 'Manrope_500Medium' : 'Inter_500Medium'
 
 // ONE tile, rendered identically by the module grid and the favourites row.
 //
@@ -88,5 +96,5 @@ const s = StyleSheet.create({
   //   asserts the registration.
   //
   // Colour is #3F4E57, softer than textPrimary's near-black at 8.24:1 on the canvas.
-  label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: 'Inter_500Medium', color: '#3F4E57', textAlign: 'center' },
+  label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: LABEL_FAMILY, color: '#3F4E57', textAlign: 'center' },
 })

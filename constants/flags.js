@@ -110,6 +110,29 @@ export const MODULE_FLAGS = {
   checkins:     false,
 }
 
+// Tile-label typeface. false = Inter_500Medium (what ships today); true = Manrope Medium.
+//
+// A LOOK EXPERIMENT, NOT A LAUNCH. The grid's 11pt labels read cheap in Inter Regular, and
+// Manrope is the candidate that survived measurement: identical script coverage to Inter
+// (Latin, Turkish, Greek, Cyrillic — Arabic and Persian fall back to the system font in
+// BOTH, so nothing is lost), and 2.1% narrower at the same weight, so no copy changes.
+// Plus Jakarta Sans was rejected on measurement — no Greek and no Cyrillic, a regression.
+// Rubik was rejected as a trade rather than a win: it gains Arabic and Persian but drops
+// Greek, a locale we deliberately support.
+//
+// ⚠ THE FILE IS A STATIC INSTANCE, NOT THE VARIABLE FONT. Manrope's variable default is
+//   wght=200 (ExtraLight), so shipping Manrope[wght].ttf would have rendered hairline
+//   labels and produced a false comparison — the first overflow numbers I took were
+//   against that 200 weight and made it look 7% narrower than it is.
+//   assets/fonts/Manrope-Medium.ttf is pinned to 500 with fontTools.varLib.instancer.
+//
+// ⚠ NOT a MODULE_FLAGS key: it gates a TYPEFACE, not content, and has no waitlist. Same
+//   reasoning as HOME_V2_LIVE and SHOW_WIZARD_HEADINGS — carried in EXPECTED_SCALARS so a
+//   working-tree flip cannot ride out on an unrelated `eas update`.
+//
+// Reverting is this one boolean; nothing else depends on it.
+export const TILE_FONT_MANROPE = false
+
 // Home V2 (HOME_V2 redesign). false = HomeScreen renders today's hub — weather card,
 // inline search bar, duty tile, three quick buttons, seventeen two-across white cards.
 // true = the new anatomy: top bar, half-height district hero, Oli row, Nöbetçi row,

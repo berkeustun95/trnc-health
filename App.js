@@ -128,23 +128,83 @@ const TAB_ITEMS = [
     iconOn:   EXPLORE_MAP_LIVE ? 'compass'         : 'map',
     labelKey: EXPLORE_MAP_LIVE ? 'menuExplore'     : 'map',
   },
-  { key: 'favourites', iconOff: 'heart-outline',   iconOn: 'heart',   labelKey: 'tabSaved' },
   { key: 'profile',    iconOff: 'person-outline',  iconOn: 'person',  labelKey: 'tabProfile' },
 ]
+
+// ─── THREE TABS, THE MIDDLE ONE RAISED ──────────────────────────────────────
+//
+// Home (flat) · Keşfet (raised) · Profil (flat).
+//
+// ⚠ THE RAISED BUTTON MUST NOT MAKE THE BAR TALLER. The fold model has been wrong twice in
+//   this project, both times on inset handling, and the whole Home layout is measured
+//   against `tabBarHeight = 51.2 + max(insets.bottom, 8)`. So the disc OVERHANGS UPWARD out
+//   of the bar's box — a negative marginTop on an item whose parent does not clip — and the
+//   bar's own height is byte-identical to the four-tab version. Nothing about the fold
+//   table changes.
+//
+// ⚠ AND IT NEVER REACHES DOWN INTO insets.bottom. The overhang is upward only; the bar
+//   keeps its `paddingBottom: max(insets.bottom, 8)` untouched, so on three-button
+//   navigation (48dp inset) the disc sits exactly as far above the nav bar as the flat
+//   labels do. Reaching downward is how a raised button ends up under the gesture pill.
+//
+// ⚠ IT KEEPS ITS LABEL. An unlabelled compass is less discoverable than the flat tab it
+//   replaces, which would defeat the point of raising it.
+//
+// ⚠ ACTIVE STATE IS NOT CARRIED BY THE DISC ALONE. A raised button usually loses its
+//   selected state because the disc looks "on" all the time. Three things change here, the
+//   same discipline the grid's tints and the duty card's alert state follow: the disc fills
+//   with primary (inactive: cardBg with a primary ring), the glyph inverts to white
+//   (inactive: primary), and the label goes primary + Bold (inactive: textSecondary +
+//   Regular) — identical to how the flat tabs mark themselves.
+//   Measured: white on primary #0E7C7B is 5.01:1; primary on cardBg is 4.85:1; the label's
+//   primary on cardBg is the same 4.85:1. All clear their floors.
+const RAISED_TAB = 'map'
+const RAISE_BY   = 18      // how far the disc's top rises above the bar's own top edge
+const DISC       = 52
 
 function BottomTabBar({ activeTab, onTabPress, mapTabRef, lang }) {
   const insets = useSafeAreaInsets()
   return (
+    // overflow 'visible' is what lets the disc leave the bar's box on Android. A child that
+    // overflows a view carrying `elevation` gets clipped — the OliRow lesson — so the bar
+    // keeps its border and background but no elevation, and the disc is a normal child.
     <View style={[tabBar.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {TAB_ITEMS.map(tab => {
         const active = activeTab === tab.key
+        const raised = tab.key === RAISED_TAB
+        if (raised) {
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              ref={mapTabRef}
+              style={tabBar.raisedBtn}
+              onPress={() => onTabPress(tab.key)}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={t(tab.labelKey, lang)}
+            >
+              <View style={[tabBar.disc, active ? tabBar.discActive : tabBar.discIdle]}>
+                <Ionicons
+                  name={active ? tab.iconOn : tab.iconOff}
+                  size={26}
+                  color={active ? '#fff' : colors.primary}
+                />
+              </View>
+              <Text style={[tabBar.label, tabBar.raisedLabel, active && tabBar.labelActive]}>
+                {t(tab.labelKey, lang)}
+              </Text>
+            </TouchableOpacity>
+          )
+        }
         return (
           <TouchableOpacity
             key={tab.key}
-            ref={tab.key === 'map' ? mapTabRef : undefined}
             style={tabBar.btn}
             onPress={() => onTabPress(tab.key)}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
           >
             <Ionicons
               name={active ? tab.iconOn : tab.iconOff}
@@ -160,8 +220,22 @@ function BottomTabBar({ activeTab, onTabPress, mapTabRef, lang }) {
 }
 
 const tabBar = StyleSheet.create({
-  bar:        { flexDirection: 'row', backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
+  // overflow visible so the raised disc can leave the box. No elevation on the bar: an
+  // elevated view CLIPS an overflowing child on Android, which is the OliRow lesson.
+  bar:        { flexDirection: 'row', backgroundColor: colors.cardBg, borderTopWidth: 1,
+                borderTopColor: colors.border, paddingTop: 10, overflow: 'visible' },
   btn:        { flex: 1, alignItems: 'center', gap: 3 },
+  // The raised item occupies the SAME flex slot as a flat tab, so the bar's layout and
+  // height are unchanged; only its content is lifted. marginTop is negative by exactly
+  // RAISE_BY, and marginBottom gives that height back so the row does not grow.
+  raisedBtn:  { flex: 1, alignItems: 'center', gap: 3, marginTop: -RAISE_BY - 10,
+                marginBottom: -0 },
+  disc:       { width: DISC, height: DISC, borderRadius: DISC / 2,
+                justifyContent: 'center', alignItems: 'center' },
+  // Inactive: a ring, so the button reads as a target rather than as "on". Active: filled.
+  discIdle:   { backgroundColor: colors.cardBg, borderWidth: 2, borderColor: colors.primary },
+  discActive: { backgroundColor: colors.primary },
+  raisedLabel:{ marginTop: 1 },
   label:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   labelActive:{ fontFamily: 'Inter_700Bold', color: colors.primary },
 })
@@ -275,6 +349,16 @@ export default function App() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
     PlayfairDisplay_400Regular, PlayfairDisplay_700Bold,
+    // ─── Manrope, for the tile-label comparison behind TILE_FONT_MANROPE ─────
+    // A DIRECT require of one file in assets/fonts — NOT an @expo-google-fonts barrel.
+    // That is deliberate: the barrel is why registering two Inter weights cost 40 bytes
+    // while 6.69 MB of unrenderable faces were already in the bundle. This adds exactly
+    // one file, and its size is the whole delta.
+    //
+    // It is loaded whatever the flag says, because useFonts cannot be called
+    // conditionally — a hook may not sit behind a boolean. The flag chooses which family
+    // ModuleTile NAMES, not which files exist.
+    Manrope_500Medium: require('./assets/fonts/Manrope-Medium.ttf'),
   })
   const [session, setSession] = useState(undefined)
   const [facilities, setFacilities] = useState([])
@@ -1531,17 +1615,6 @@ export default function App() {
     content = <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
   } else {
     inTabShell = true
-    // Same exclusion as HomeScreen's browse list (2026-08-28): an unclaimed pharmacy is
-    // not directory content anywhere. A previously-favourited one therefore DISAPPEARS
-    // from this tab — a deliberate call, not an oversight.
-    //
-    // ⚠ AND IT IS LOAD-BEARING FOR THE UNCLAIMED SCREEN ABOVE. Collapsing that screen's
-    //   badge/description to the publicFacility* strings is only correct because every
-    //   facility that can still reach it is sector='public'. This filter is what makes
-    //   that true. The two changes ship together or neither does.
-    const favList = facilities
-      .filter(f => !(f.type === 'pharmacy' && !f.provider_id))
-      .filter(f => favorites.has(f.id))
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
     // drawer holds settings & app options. `dividerBefore` opens a visual group.
     const drawerItems = [
@@ -1634,6 +1707,10 @@ export default function App() {
                 chooses between the two; both branches ship in every bundle. */}
             {EXPLORE_MAP_LIVE ? (
               <ExploreMapScreen
+                // The directory's second entrance — see the prop's note in that file. It
+                // opens the SAME ExploreScreen the Home tile opens, so the tile can be
+                // hidden once this has been checked on device.
+                onShowList={() => setShowExplore(true)}
                 facilities={facilities}
                 dutyFacilityId={dutyFacilityId}
                 userLocation={userLocation}
@@ -1660,89 +1737,12 @@ export default function App() {
           </SafeAreaView>
         )}
 
-        {activeTab === 'favourites' && (
-          <SafeAreaView style={styles.safe} edges={['top']}>
-            {/* Was styles.header (flex-end), which right-aligned a lone screen title. */}
-            <View style={styles.favHeader}>
-              <Text style={styles.favScreenTitle}>{t('favourites', lang)}</Text>
-            </View>
-            {favList.length === 0 ? (
-              <View style={styles.emptyWrap}>
-                <Ionicons name="heart" size={48} color={colors.border} style={{ marginBottom: 16 }} />
-                <Text style={styles.emptyTitle}>{t('noFavourites', lang)}</Text>
-                <Text style={styles.emptyBody}>Tap the ❤️ on any facility to save it here for quick access</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={favList}
-                keyExtractor={f => f.id}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
-                renderItem={({ item }) => {
-                  const tc = typeColors[item.type] || typeColors.clinic
-                  const isOpen = parseIsOpen(item.opening_hours)
-                  const dist = userLocation && item.latitude != null && item.longitude != null
-                    ? haversineKm(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude)
-                    : null
-                  const rating = facilityRatings[item.id]
-                  return (
-                    <TouchableOpacity
-                      activeOpacity={0.75}
-                      style={styles.card}
-                      onPress={() => setSelectedFacility(item)}
-                    >
-                      <View style={styles.cardBody}>
-                        <View style={styles.cardMain}>
-                          <View style={[styles.typeIcon, { backgroundColor: tc.bg }]}>
-                            {item.logo_url
-                              ? <Image source={{ uri: item.logo_url }} style={{ width: 36, height: 36, borderRadius: 8 }} resizeMode="contain" />
-                              : <TypeSVGIcon type={item.type} size={22} color={tc.text} />
-                            }
-                          </View>
-                          <View style={styles.cardContent}>
-                            <View style={styles.cardTop}>
-                              <View style={styles.cardNameRow}>
-                                <Text style={styles.facilityName} numberOfLines={1}>{item.name}</Text>
-                              </View>
-                              {dist != null && (
-                                <Text style={styles.distanceText}>{dist.toFixed(1)} km</Text>
-                              )}
-                            </View>
-                            <View style={styles.badgeRow}>
-                              <View style={[styles.typeBadge, { backgroundColor: tc.bg }]}>
-                                <Text style={[styles.typeBadgeText, { color: tc.text }]}>{t(item.type, lang)}</Text>
-                              </View>
-                              {item.verified && (
-                                <View style={styles.verifiedBadge}>
-                                  <Ionicons name="shield-checkmark" size={10} color="#fff" />
-                                  <Text style={styles.verifiedBadgeText}>{t('verified', lang)}</Text>
-                                </View>
-                              )}
-                              {isOpen != null && (
-                                <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
-                                  <Text style={[styles.statusText, isOpen ? styles.openText : styles.closedText]}>
-                                    {isOpen ? t('open', lang) : t('closed', lang)}
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-                            {item.address ? <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text> : null}
-                            {rating && (
-                              <View style={styles.ratingRow}>
-                                <Ionicons name="star" size={11} color="#F5A623" />
-                                <Text style={styles.ratingText}> {rating.avg} ({rating.count})</Text>
-                              </View>
-                            )}
-                          </View>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  )
-                }}
-              />
-            )}
-          </SafeAreaView>
-        )}
+        {/* The Kaydedilenler tab was removed on 2026-09-11 with its branch. `favorites` and
+            toggleFavorite REMAIN — the heart on a facility profile still writes ada_favorites,
+            so the data model is intact and a future entry point needs no migration. What went
+            is the LIST, which was this tab's whole content. Accepted cost, stated by Berke: a
+            small number of the 208 users lose a saved list silently, and no query exists that
+            could have told us whether anyone used it. */}
 
         {activeTab === 'profile' && (
           <ProfileScreen

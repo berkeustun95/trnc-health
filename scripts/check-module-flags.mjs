@@ -118,6 +118,10 @@ const EXPECTED_SCALARS = {
   // Putting it in that map would fail this script's own waitlist and notify-path checks
   // against a perfectly correct app.
   HOME_V2_LIVE:          false,
+  // Tile-label typeface experiment (Inter vs Manrope). Neither value is a launch, but it
+  // is compared ON DEVICE by flipping it, and a working-tree flip is exactly what
+  // `eas update` bundles. Baselined so the comparison cannot ship by accident.
+  TILE_FONT_MANROPE:     false,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

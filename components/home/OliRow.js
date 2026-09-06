@@ -111,9 +111,17 @@ export default function OliRow({ lang, onPress }) {
         <View style={s.decorWave2} pointerEvents="none" />
         <View style={s.decorDot} pointerEvents="none" />
 
+        {/* ─── SMALL LINE ON TOP, BIG LINE BELOW ────────────────────────────
+            Reversed 2026-09-11. The shape is fixed for every locale; only the split
+            varies. Turkish puts the verb last — "Ada'da aradığın her şeyi / Oli'ye sor" —
+            so the reversal lands the emphasis on the ACTION, which is the point. English
+            cannot do that, so "Ask Oli" stays the big line with a lead-in above it rather
+            than a literal translation of the Turkish split.
+            Measured before writing: all 18 strings clear the card's text box (209pt at
+            393dp, 136pt at 320dp) at 12pt over two lines and 18pt over one. */}
         <View style={s.text}>
+          <Text style={s.lead} numberOfLines={2}>{t('homeOliSub', lang)}</Text>
           <Text style={s.title} numberOfLines={1}>{t('homeOliTitle', lang)}</Text>
-          <Text style={s.sub} numberOfLines={2}>{t('homeOliSub', lang)}</Text>
         </View>
         {/* A filled circle rather than a bare chevron: on a saturated background a lone
             glyph reads as decoration, and this is the row's only affordance. */}
@@ -156,9 +164,11 @@ const s = StyleSheet.create({
   // wider when its stray horizontal margin went. A comment carrying a measured figure has
   // to be regenerated rather than left to age.
   //
-  // Text block: title 16pt (~19.2 line) + subtitle 12pt x2 (~28.8) + 2pt margin = ~50pt,
-  // centred in an 88pt card, so it occupies y 19..69. The card is 361pt wide on a 393pt
-  // screen, so the text's right edge is 361 - 16 padding - 34 chevron - 12 gap = 299.
+  // Text block, RECOMPUTED 2026-09-11 for the reversed copy: lead 12pt x2 (~28.8) + 2pt
+  // margin + title 18pt (~21.6) = ~52.4pt, centred in an 88pt card, so it occupies
+  // y 17.8..70.2 (was y 19..69 when the title was 16pt on one line above a 12pt subtitle).
+  // The card is 361pt wide on a 393pt screen, so the text's right edge is
+  // 361 - 16 padding - 34 chevron - 12 gap = 299.
   //
   // ⚠ THE CONSTRAINT IS UNCHANGED AND IS NOT NEGOTIABLE: every shape must clear the text
   //   EITHER horizontally (start beyond its right edge) OR vertically (stay below y=69).
@@ -212,18 +222,21 @@ const s = StyleSheet.create({
   mascot:  { position: 'absolute', left: 14, bottom: MASCOT_INSET - Math.round(MASCOT_BOX * ASSET_BOTTOM),
              width: MASCOT_BOX, height: MASCOT_BOX },
   text:    { flex: 1 },
-  // 16/600 — the shared ROW TITLE step. Oli, the live strip and the Nöbetçi row are
-  // peers, and they were 17 / 16 / 15, which read as three sizes for one job. White on
-  // primary is 5.01:1, unchanged by the size (contrast is a property of the two colours,
-  // and nothing here leans on WCAG's large-text exemption).
-  title:   { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
-  // 12/400 — the shared ROW SUBTITLE step (was 13, while the strip and Nöbetçi rows
-  // were both already 12).
+  // 18/700 — the card's ONE emphasised line, and it steps out of the shared 16/600 row
+  // title because it is no longer a row title: it is the second half of a sentence whose
+  // first half sits above it. White on primary is 5.01:1, unchanged by size or weight —
+  // contrast is a property of the two colours, and nothing here leans on WCAG's large-text
+  // exemption (which would need 18pt BOLD, and this is 18pt Bold, so it would qualify
+  // anyway; the figure clears the stricter 4.5:1 floor regardless).
+  title:   { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#fff' },
+  // The LEAD-IN, above the emphasised line. 12/500 — Medium rather than Regular because a
+  // 12pt line above an 18pt Bold one disappears at Regular; it is the first half of a
+  // sentence, not a caption.
   //
   // #F2FAFA, not colors.primaryLight: primaryLight is 4.44:1 on primary, under the 4.5
-  // floor. This is 4.74:1 — RE-MEASURED after the size change, not assumed: 12pt regular
-  // sits under the same 4.5 floor as 13pt did, so the figure still clears it.
-  sub:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#F2FAFA', marginTop: 2 },
+  // floor. This is 4.74:1, and the figure is unchanged by the weight — contrast is a
+  // property of the two colours.
+  lead:    { fontSize: 12, fontFamily: 'Inter_500Medium', color: '#F2FAFA', marginBottom: 2 },
   chevron: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff',
              justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
 })
