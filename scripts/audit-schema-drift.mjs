@@ -734,6 +734,49 @@ if (problems.length) {
   process.exit(1)
 }
 
+// ─── --check: is the COMMITTED artifact still what this generator produces? ──
+//
+// Non-mutating. It exists because a generated file whose generator nobody runs is a
+// file that quietly stops describing the repo: schema_drift_audit.sql sat three
+// migrations behind (1007 home_strip_pin, 1008 ad_banners, 1009 ad_modules) and
+// nothing anywhere said so. The drift report is the thing you run FIRST on a database
+// you are unsure about, so a stale one is worse than none — it answers a question
+// about a schema that no longer exists.
+//
+// DERIVED, not remembered: it re-parses every migration and compares the WHOLE emitted
+// artifact, so it cannot go green by forgetting one. A token listing "the migrations we
+// know about" would certify exactly the blind spot it was written for.
+if (process.argv.includes('--check')) {
+  let onDisk = null
+  try { onDisk = readFileSync(OUT, 'utf8') } catch { /* absent — reported below */ }
+  const rel = OUT.replace(ROOT + '/', '')
+  if (onDisk === sql) {
+    console.log(`drift audit: OK — ${rel} matches the ${Object.keys(repo).length} tables `
+      + `parsed from supabase/migrations/ (${colVals.length} columns, ${constraints.length} constraints, ${indexes.length} indexes)`)
+    process.exit(0)
+  }
+  console.error('')
+  console.error(onDisk === null
+    ? `drift audit: ${rel} DOES NOT EXIST.`
+    : `drift audit: ${rel} is STALE — it no longer matches supabase/migrations/.`)
+  if (onDisk !== null) {
+    // Print WHAT differs, not just that something does. An assertion that fails without
+    // showing what it read is a dead end, and the reader suspects the system first.
+    const a = onDisk.split('\n'), b = sql.split('\n')
+    let first = 0
+    while (first < a.length && first < b.length && a[first] === b[first]) first++
+    console.error(`  first difference at line ${first + 1}:`)
+    console.error(`    committed: ${JSON.stringify((a[first] ?? '<end of file>').trim().slice(0, 100))}`)
+    console.error(`    generated: ${JSON.stringify((b[first] ?? '<end of file>').trim().slice(0, 100))}`)
+    console.error(`  ${a.length} lines committed vs ${b.length} generated`)
+  }
+  console.error('')
+  console.error('  Fix:  npm run drift:regen     then include the file in the same commit.')
+  console.error('  Nothing was written by this run.')
+  console.error('')
+  process.exit(1)
+}
+
 writeFileSync(OUT, sql)
 console.log('')
 console.log(`written: ${OUT.replace(ROOT + '/', '')}`)

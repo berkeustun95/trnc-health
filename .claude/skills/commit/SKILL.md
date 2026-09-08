@@ -2,7 +2,7 @@
 name: commit
 description: Stage and commit ADA changes with a message in the project's house style. Use when the user types /commit or asks to commit their work.
 disable-model-invocation: true
-allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git push *)
+allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git push *) Bash(npm run drift:check) Bash(npm run drift:regen)
 ---
 
 ## Working tree
@@ -13,11 +13,54 @@ Status:
 Diff vs last commit:
 !`git diff HEAD`
 
+Migrations touched in this change (tracked edits AND new files):
+!`{ git diff HEAD --name-only -- supabase/migrations/; git ls-files --others --exclude-standard -- supabase/migrations/; } | sort -u | sed 's/^/  /' || true`
+
+Drift-audit freshness:
+!`npm run --silent drift:check 2>&1 | tail -12 || true`
+
 ## Your task
 
 You are committing changes to ADA, a React Native + Expo (SDK 54) health-access app
 for North Cyprus. The project commits directly to the current branch (`main`, no
 feature branches).
+
+### Step 0 — The drift audit (a BLOCKING check, not a reminder)
+
+`supabase/schema_drift_audit.sql` is GENERATED from every DDL statement in
+`supabase/migrations/`. It is the report you run FIRST against a database you are
+unsure about — so a stale one is worse than no report at all: it answers confidently
+about a schema that no longer exists. It has already gone stale by three migrations
+(`1007` home_strip_pin, `1008` ad_banners, `1009` ad_modules) with nothing anywhere
+saying so.
+
+**Read the two blocks above — they were executed before you saw this file, so there is
+nothing here to remember to run.**
+
+The migrations list covers `git ls-files --others` as well as `git diff HEAD`, and that
+is not belt-and-braces: `git diff HEAD` does not list UNTRACKED files, so a brand-new
+migration — the commonest migration commit there is — showed up as "nothing touched"
+until this was fixed. The block would then have sent you down the "EMPTY but STALE"
+branch and made you ask a question you already had the answer to.
+
+- **"Migrations touched" is NON-EMPTY and the drift check says STALE** → run
+  `npm run drift:regen`, then `git add supabase/schema_drift_audit.sql` and include it
+  in THIS commit. Not a follow-up commit: the audit and the migration that moved it
+  belong in the same change, or the repo has a window where they disagree. Say in your
+  reply that you regenerated it.
+- **"Migrations touched" is NON-EMPTY and the drift check says OK** → nothing to do.
+  Somebody already regenerated it, which is the intended state.
+- **"Migrations touched" is EMPTY but the drift check says STALE** → do NOT silently
+  regenerate; that would bury an unrelated schema change inside this commit. Tell the
+  user the audit is stale, quote the first differing line the check printed, and ask
+  whether to fix it here or in its own commit.
+- **The drift check errored rather than passing or failing** → treat it as a failure and
+  say so. A guard that could not run has told you nothing, and "no output" and "no
+  problems" are the same thing on screen.
+
+Never edit `schema_drift_audit.sql` by hand to make the check pass. It carries a
+"GENERATED — do not hand-edit" banner for the reason every generated artifact does: the
+next regeneration silently discards the edit.
 
 ### Step 1 — Check for house-rule violations BEFORE committing
 
