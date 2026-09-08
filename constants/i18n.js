@@ -8085,7 +8085,7 @@ const translations = {
     hsCategoryPlumber: 'Klempner', hsCategoryElectrician: 'Elektriker', hsCategoryCarpenter: 'Tischler',
     hsCategoryPainter: 'Maler', hsCategorySewer: 'Rohrservice', hsCategoryAcTech: 'Klimatechnik',
     hsCategoryLocksmith: 'Schlosser', hsCategoryTiler: 'Fliesenleger', hsCategoryHandyman: 'Heimwerker',
-    hsCategoryRenovation: 'Renovierung', hsCategoryBathroom: 'Badsanierung',
+    hsCategoryRenovation: 'Renovierung', hsCategoryBathroom: 'Badumbau',
     hsCategoryKitchen: 'Küchenbau',
     hsDistrictAll: 'Alle', hsAllDistricts: 'Alle Bezirke',
     hsDistrictNicosia: 'Nikosia', hsDistrictKyrenia: 'Kyrenia', hsDistrictFamagusta: 'Famagusta',
