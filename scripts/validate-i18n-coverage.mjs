@@ -53,6 +53,7 @@ import { GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories.j
 import { REGION_LABEL_KEY } from '../constants/regions.js'
 import { RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY } from '../constants/profileGate.js'
 import { STRIP_CARD_KEYS } from '../constants/homeStrip.js'
+import { AD_SPONSORED_KEY } from '../constants/ads.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -273,6 +274,16 @@ const viaVariable = [
   // The two strip cards. Every one of these is chosen by a ternary or arrives as
   // item.titleKey, so the literal scan sees none of them — see the note on the array.
   ...STRIP_CARD_KEYS,
+  // The banner ad disclosure label. components/AdSlot.js renders it as
+  // t(AD_SPONSORED_KEY, lang) — a VARIABLE — so the literal scan cannot see it.
+  //
+  // ⚠ IT IS COVERED TODAY ONLY BY ACCIDENT, WHICH IS WHY THIS LINE EXISTS. LiveStrip
+  //   happens to call t('stripSponsored', lang) literally for the strip's promo rank, so
+  //   the key is in scope through that surface. The day the promo rank is removed — and it
+  //   has already been removed and restored once — the ad banner's ONLY user-visible string
+  //   would drop out of coverage silently, while the key total went UP. That is this repo's
+  //   named failure shape: a coverage loss hidden inside a coverage gain.
+  AD_SPONSORED_KEY,
   // The V1 duty banner's three states, picked the same way in renderHub(). They have
   // NEVER been in scope: the scan cannot see `t(ok ? 'a' : b ? 'c' : 'd', lang)`, and when
   // components/home/DutyRow.js was a listed surface it did not help, because being listed

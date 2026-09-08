@@ -1,3 +1,5 @@
+import ExploreListTopSlot from '../components/ads/ExploreListTopSlot'
+import ExploreListInlineSlot from '../components/ads/ExploreListInlineSlot'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
@@ -270,7 +272,7 @@ export const BROWSE_COLS =
   'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
   'cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until'
 
-export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, placeFavorites, onTogglePlaceFavorite, isAdmin = false, initialCategory = null, initialRegion = null }) {
+export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, placeFavorites, onTogglePlaceFavorite, isAdmin = false, initialCategory = null, initialRegion = null, onAdNavigate }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin previewing.
   // Mirrors the GaragesScreen showFeatured gate. The owner "request featured" CTA lands in Slice 5.
   const showFeatured = EXPLORE_FEATURED_LIVE || isAdmin
@@ -556,6 +558,21 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
             keyExtractor={item => item.id}
             contentContainerStyle={s.listContent}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              // list_top on THE DRILLED-IN CATEGORY LIST ONLY — this FlatList and nothing
+              // else on this screen. Not the group-tile landing, not the saved list, and
+              // NEVER the map: ExploreMapScreen draws health pins and is two taps from
+              // FacilityProfileScreen, so it is a named excluded surface.
+              //
+              // ⚠ THERE IS NO list_bottom HERE, DELIBERATELY. A 52x52 FAB sits at
+              //   bottom:24/right:16 over every branch of this screen and listContent's
+              //   paddingBottom is 40 — less than the FAB's footprint — so a banner at the
+              //   end of the list renders underneath it. Raising the inset to make room
+              //   would degrade the module to sell a placement nobody asked for.
+              filtered.length > 0
+                ? <ExploreListTopSlot lang={lang} onNavigate={onAdNavigate} />
+                : null
+            }
             ListEmptyComponent={
               <View style={s.emptyWrap}>
                 <View style={s.emptyCard}>
@@ -564,15 +581,19 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
                 </View>
               </View>
             }
-            renderItem={({ item }) => (
-              <PlaceCard
-                item={item}
-                lang={lang}
-                showFeatured={showFeatured}
-                isSaved={placeFavorites?.has(item.id)}
-                onToggleSave={() => onTogglePlaceFavorite?.(item.id)}
-                onPress={() => onSelectPlace?.(item)}
-              />
+            renderItem={({ item, index }) => (
+              // list_inline — ONCE, after the 8th card. A point, not a modulus.
+              <>
+                <PlaceCard
+                  item={item}
+                  lang={lang}
+                  showFeatured={showFeatured}
+                  isSaved={placeFavorites?.has(item.id)}
+                  onToggleSave={() => onTogglePlaceFavorite?.(item.id)}
+                  onPress={() => onSelectPlace?.(item)}
+                />
+                {index === 7 && <ExploreListInlineSlot lang={lang} onNavigate={onAdNavigate} />}
+              </>
             )}
           />
         </View>

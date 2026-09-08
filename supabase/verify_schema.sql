@@ -62,6 +62,8 @@ WITH report AS (
     ('1001_profile_completion','reserved_names'),
     ('0926_moderation_rejection_log','moderation_rejections'),
     ('1007_home_strip_pin','home_strip_pin'),
+    ('1008_ad_banners','ad_banners'),
+    ('1009_ad_position_module','ad_modules'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -183,6 +185,12 @@ WITH report AS (
     ('1001_profile_completion','profiles','display_name'),
     ('1001_profile_completion','profiles','display_name_normalized'),
     ('1001_profile_completion','profiles','date_of_birth'),
+    -- ad_banners: position + module REPLACED the flat `slot` id (1009). Section A sees
+    -- the table and cannot see which shape it is in; a half-applied restructure leaves
+    -- the table present with the OLD column and every client read returns nothing,
+    -- which looks exactly like an unsold slot.
+    ('1009_ad_position_module','ad_banners','position'),
+    ('1009_ad_position_module','ad_banners','module'),
     ('1001_profile_completion','profiles','region'),
     ('1001_profile_completion','profiles','resident_status'),
     ('1001_profile_completion','profiles','resident_status_updated_at'),
@@ -283,7 +291,12 @@ WITH report AS (
     ('1001_profile_completion','normalize_display_name'),
     ('1001_profile_completion','is_reserved_display_name'),
     ('1001_profile_completion','check_profile_name_content'),
-    ('1002_display_name_rpc','display_name_available')
+    ('1002_display_name_rpc','display_name_available'),
+    -- The ONLY write path the app has on ad_banners: the client is never granted UPDATE on
+    -- that table, so if this function is missing every view and tap counts ZERO — silently,
+    -- and a silent zero reads as "nobody looks at the ads", which is a conclusion somebody
+    -- would act on.
+    ('1008_ad_banners','bump_ad_counter')
   ) e(m,o)
 
   UNION ALL
@@ -446,7 +459,37 @@ WITH report AS (
     -- UNIQUE: correctness. institutions.name is what the seed's ON CONFLICT and any
     -- future admin add both key on.
     ('1001_profile_completion','institutions_name_unique'),
-    ('1001_profile_completion','institutions_city_check')
+    ('1001_profile_completion','institutions_city_check'),
+    -- ad_banners (1008). destination_check is the load-bearing one: EXACTLY one of
+    -- link_url / route, so a paid banner can carry neither two destinations nor none.
+    -- Zero is as much a defect as two — a banner that renders, is charged for and does
+    -- nothing when tapped reads to the advertiser as the app being broken, and nothing
+    -- in the app would report it. route_check is the second half of the permanent
+    -- exclusion list: it stops a banner being pointed INTO duty, emergency or health,
+    -- which would monetise those surfaces at one remove. The FIRST half cannot live in
+    -- the database at all — a slot id constrains what an admin may TYPE, never where a
+    -- component is MOUNTED — and is scripts/check-ad-placement.mjs.
+    -- ad_banners_slot_check was RETIRED by 1009, which drops the constraint and the
+    -- `slot` column with it. Deleted rather than left to go red: a token for a dropped
+    -- object sits MISSING forever against a database that is exactly right, and this
+    -- file already records twice what one known-stale row does to the reader's
+    -- attention — the next real MISSING gets skimmed with it. Nothing of its own is
+    -- worth keeping: the 1009 H-token 'ad_banners.slot is dropped' owns the transition,
+    -- and it asserts the stronger thing (that the old scheme is GONE, not merely that
+    -- the constraint once existed).
+    ('1008_ad_banners','ad_banners_destination_check'),
+    ('1008_ad_banners','ad_banners_route_check'),
+    ('1008_ad_banners','ad_banners_link_scheme_check'),
+    ('1008_ad_banners','ad_banners_image_scheme_check'),
+    ('1008_ad_banners','ad_banners_window_check'),
+    ('1008_ad_banners','ad_banners_advertiser_check'),
+    ('1008_ad_banners','ad_banners_counts_check'),
+    -- 1009. position_check is the vocabulary; module_fkey is what makes adding a module
+    -- a data change instead of a migration. The FK is ON DELETE RESTRICT on purpose:
+    -- deleting a module out from under a live campaign must fail loudly rather than
+    -- silently delete somebody's paid banner.
+    ('1009_ad_position_module','ad_banners_position_check'),
+    ('1009_ad_position_module','ad_banners_module_fkey')
 
   ) e(m,o)
 
@@ -512,7 +555,16 @@ WITH report AS (
     -- active rows on one date make that answer depend on row order — a bug that
     -- surfaces only on the day somebody double-books.
     ('1007_home_strip_pin','home_strip_pin_one_per_day'),
-    ('1007_home_strip_pin','idx_home_strip_pin_active_pool')
+    ('1007_home_strip_pin','idx_home_strip_pin_active_pool'),
+    -- ad_banners (1008). Perf only, and deliberately NOT unique: several ads may be live
+    -- for one slot at once and the newest wins by ORDER BY, so a takeover can be sold
+    -- over a standing placement without a gap where the slot is empty. The tie-break's
+    -- correctness lives in the client's ORDER BY, not in this index.
+    -- 1009 REPLACED idx_ad_banners_slot_live with the position/module form. The old
+    -- name is deliberately NOT registered here any more: a token for a dropped index
+    -- would sit red forever against a database that is exactly right, and this file
+    -- already records twice what a known-stale row does to the reader's attention.
+    ('1009_ad_position_module','idx_ad_banners_position_module_live')
 
   ) e(m,o)
 
@@ -551,7 +603,13 @@ WITH report AS (
     -- The ONE new RPC. Without the grant it exists and every keystroke in the wizard's
     -- display-name field returns a permission error the user cannot act on — inside a
     -- hard block, on the step people abandon on.
-    ('1002_display_name_rpc','display_name_available')
+    ('1002_display_name_rpc','display_name_available'),
+    -- bump_ad_counter is ALSO granted to anon, which this section does not check — the app
+    -- signs in anonymously on launch, so a render landing before that completes runs as
+    -- true `anon`. The migration's own DO block asserts BOTH grants via
+    -- has_function_privilege(); this row covers the `authenticated` half every other RPC
+    -- here is measured on.
+    ('1008_ad_banners','bump_ad_counter')
   ) e(m,o)
 
   UNION ALL
@@ -1153,6 +1211,79 @@ WITH report AS (
       EXISTS(SELECT 1 FROM information_schema.columns
         WHERE table_schema='public' AND table_name='home_strip_pin'
           AND column_name='is_active' AND column_default = 'false')
+    -- ── 1008 ad_banners. FOUR tokens, because nothing that makes this system safe creates
+    --    a named object sections A-G can see.
+    --
+    -- (1) The same is_active inversion, and a revert here is the sharpest of the three
+    --     tables carrying it: an INSERT omitting the column would publish a PAID BANNER to
+    --     every user's home screen the moment it was typed, before anyone decided the
+    --     campaign should start.
+    UNION ALL SELECT '1008_ad_banners','ad_banners.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='ad_banners'
+          AND column_name='is_active' AND column_default = 'false')
+    -- (2) starts_at and ends_at NOT NULL is what makes SCHEDULING REQUIRED. Drop either and
+    --     an unbounded ad becomes expressible — a placement that never expires by itself,
+    --     which is the one thing the flight window exists to guarantee. Dropping a NOT NULL
+    --     creates and destroys no named object, so nothing else here can see it.
+    --     COUNT-based, not name-based: it asserts BOTH ends, and if a third window column is
+    --     ever added this goes red and that edit is the review moment.
+    UNION ALL SELECT '1008_ad_banners','ad_banners flight window is NOT NULL both ends',
+      (SELECT count(*) = 2 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='ad_banners'
+          AND column_name IN ('starts_at','ends_at') AND is_nullable = 'NO')
+    -- (3) bump_ad_counter is SECURITY DEFINER, and a SECURITY DEFINER function WITHOUT a
+    --     pinned search_path is a privilege-escalation hole: a caller able to create objects
+    --     in an earlier schema can shadow `ad_banners` and have the body run against their
+    --     own table as the owner. A later CREATE OR REPLACE that omits the SET clause leaves
+    --     the function present, working and unsafe — section C sees the NAME and cannot see
+    --     this. Derived from pg_proc, never from the migration file.
+    UNION ALL SELECT '1008_ad_banners','bump_ad_counter is SECURITY DEFINER with pinned search_path',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='bump_ad_counter'
+          AND p.prosecdef
+          AND p.proconfig IS NOT NULL
+          AND EXISTS (SELECT 1 FROM unnest(p.proconfig) c WHERE c LIKE 'search_path=%'))
+    -- (4) The public SELECT policy must carry the FLIGHT WINDOW, not merely is_active.
+    --     QUERY 3 counts policies and cannot see what one SAYS. Without the window an
+    --     expired campaign stays READABLE — and it looks perfect on screen for exactly as
+    --     long as the campaign is current, so the failure surfaces on the day somebody stops
+    --     paying, which is the worst possible day to discover it.
+    --
+    --     POSITIVE anchors only, on the three column names. This reads pg_policies.qual,
+    --     which renders the expression WITHOUT comments — but the 0827/0924 tokens record
+    --     what a negative over a definition costs, and there is nothing here a positive
+    --     cannot express.
+    UNION ALL SELECT '1008_ad_banners','ad_banners public SELECT enforces the flight window',
+      EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='ad_banners'
+          AND policyname='ad_banners_select_public'
+          AND qual LIKE '%is_active%' AND qual LIKE '%starts_at%' AND qual LIKE '%ends_at%')
+    -- ── 1009 position x module. THREE tokens, none of which any other section can see.
+    --
+    -- (1) THE OLD `slot` COLUMN IS GONE. A half-applied restructure — new columns added,
+    --     old column not dropped — leaves TWO schemes live at once, which is the exact
+    --     state this migration existed to end. Section B confirms the new columns EXIST;
+    --     only this can confirm the old one does not.
+    UNION ALL SELECT '1009_ad_position_module','ad_banners.slot is dropped',
+      NOT EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='ad_banners' AND column_name='slot')
+    -- (2) THE ad_modules SEED IS EXACTLY FOUR, AND newcomerEssentials IS NOT ONE OF THEM.
+    --     A COUNT, not a name list — if a fifth module is genuinely added this goes red and
+    --     that edit is the review moment. The second half is the one that matters: the
+    --     Welcome Guide has NO LIST, so a lookup row for it would accept a PAID campaign
+    --     that renders nowhere and passes every other check in this repo. Inert inventory
+    --     that looks sold is worse than absent inventory.
+    UNION ALL SELECT '1009_ad_position_module','ad_modules seeded 4, newcomerEssentials absent',
+      ((SELECT count(*) FROM public.ad_modules) = 4
+       AND NOT EXISTS(SELECT 1 FROM public.ad_modules WHERE module = 'newcomerEssentials'))
+    -- (3) THE FK IS ON DELETE RESTRICT. CASCADE here would mean deleting a module row
+    --     silently deletes every ad sold against it — a paid campaign disappearing with no
+    --     error anywhere. confdeltype 'r' = RESTRICT; 'c' would be CASCADE. Read from
+    --     pg_constraint, not from the migration file that claims to have set it.
+    UNION ALL SELECT '1009_ad_position_module','ad_banners_module_fkey is ON DELETE RESTRICT',
+      EXISTS(SELECT 1 FROM pg_constraint
+        WHERE conname='ad_banners_module_fkey' AND contype='f' AND confdeltype='r')
     -- search_content gained a towing_companies arm. CREATE OR REPLACE adds no new named
     -- object, so only a body token can tell the new definition from the old one.
     -- Unclaimed pharmacies leave the search index (0924). CREATE OR REPLACE adds no named
@@ -1656,6 +1787,18 @@ WITH report AS (
     -- writer could put an arbitrary title and an arbitrary outbound link in front of every
     -- user, which is worse than a defaced directory row.
     'home_strip_pin',
+    -- ad_banners is the same shape again: admin-seeded, public-read, no user data. RLS
+    -- OFF here is worse than for home_strip_pin, because this table's whole purpose is
+    -- to carry an OUTBOUND LINK and an IMAGE URL that render on the first screen of the
+    -- app — an unauthenticated writer could put arbitrary artwork and an arbitrary
+    -- destination in front of every user, and it would look exactly like a campaign we
+    -- sold.
+    'ad_banners',
+    -- ad_modules is the FK target that decides which modules may carry an ad. RLS OFF
+    -- here means any signed-in user can INSERT a module — which on its own renders
+    -- nothing, but it is the row that makes an ad_banners row insertable, so it is the
+    -- first half of a two-step to publish artwork nobody reviewed.
+    'ad_modules',
     -- push_log records who we tried to push to. RLS is the only thing keeping that
     -- delivery history off every signed-in customer. OFF here = a readable log of
     -- which providers got which alerts and when.

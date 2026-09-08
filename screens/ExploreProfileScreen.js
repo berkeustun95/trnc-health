@@ -1,3 +1,4 @@
+import ExploreDetailBottomSlot from '../components/ads/ExploreDetailBottomSlot'
 import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -68,7 +69,7 @@ function PhotoAttribution({ place, url, index, lang }) {
   return <PhotoCredit a={a} lang={lang} style={s.creditWrap} />
 }
 
-export default function ExploreProfileScreen({ place, lang, session, onBack, onRequireAccount, isFavorite, onToggleFavorite }) {
+export default function ExploreProfileScreen({ place, lang, session, onBack, onRequireAccount, isFavorite, onToggleFavorite, onAdNavigate }) {
   const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
 
@@ -94,6 +95,22 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
   const [featBusy,  setFeatBusy]  = useState(false)
   const [featSent,  setFeatSent]  = useState(false)
   const [showCheckin, setShowCheckin] = useState(false)
+
+  // ─── THE SCROLL RESERVE IS MEASURED, NOT TYPED ────────────────────────────
+  //
+  // It was a hardcoded `paddingBottom: 100` against a fixed footer whose real height is
+  // 12 + 28 padding + a ~48pt button + a 1pt border + whatever the type metrics add — i.e.
+  // right at 100 with no margin, and wrong the moment a locale wraps the button label to
+  // two lines. Turkish and German are the ones that do that. Nothing looked broken because
+  // the last element was an amenity block nobody scrolls to the very end of; putting an AD
+  // there makes the last element something an advertiser paid for.
+  //
+  // So it is derived from the footer's own onLayout. A HEIGHT, not a position — CLAUDE.md
+  // forbids caching a measured POSITION for later use because layout shifts; a height that
+  // re-fires onLayout whenever it changes is the thing that does not go stale.
+  //
+  // Seeded at 100 so the first frame is never worse than what shipped before.
+  const [footerH, setFooterH] = useState(100)
 
   // Category gate: a ruin, a monument or a beach has no owner who could produce
   // evidence, so the question is never askable there. Mirrors the sector branch that
@@ -155,7 +172,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
       {/* Back button — overlaid on gallery */}
       <BackButton variant="hero" lang={lang} onPress={onBack} style={[s.backBtn, { top: insets.top + 8 }]} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: footerH + 16 }}>
         {/* Gallery */}
         {photos.length > 0 ? (
           <View>
@@ -295,6 +312,16 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
               <Text style={s.ownerNoticeText}>{t('exploreFeatureDone', lang)}</Text>
             </View>
           )}
+
+          {/* detail_bottom — the last child of the body, above the measured footer reserve.
+              Safe on THIS screen specifically: ExploreProfileScreen cannot render a health
+              facility. The Explore taxonomy has 16 categories and none is health; this
+              screen takes `place` as a prop and never queries; all three feeders read
+              `places` WHERE status='active'; HomeScreen's search routes `medical` hits to
+              FacilityProfileScreen instead; and mapSources drops any row whose category has
+              no group. The Explore-to-health path is ExploreMapScreen — a different file,
+              and a named excluded surface. */}
+          <ExploreDetailBottomSlot lang={lang} onNavigate={onAdNavigate} />
         </View>
       </ScrollView>
 
@@ -302,7 +329,13 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
           footer itself is no longer gated on them and Check-in takes the full width when
           a place has none. (Every place has coordinates today — this is about the button
           not silently disappearing with the one next to it if that ever stops being true.) */}
-      <View style={s.footer}>
+      <View
+        style={s.footer}
+        onLayout={e => {
+          const h = Math.round(e.nativeEvent.layout.height)
+          setFooterH(prev => (prev === h ? prev : h))   // setState only on a real change
+        }}
+      >
         <View style={s.footerRow}>
           {hasCoords && (
             <TouchableOpacity style={[s.directionsBtn, { flex: 1 }]} onPress={openDirections} activeOpacity={0.85}>

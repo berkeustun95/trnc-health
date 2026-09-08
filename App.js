@@ -1120,6 +1120,46 @@ export default function App() {
   // wizard asking which university they attend — none of them has a display_name, so the
   // incomplete test is permanently true for them and the flip would lock you out of
   // AdminScreen. profiles.role is NOT NULL DEFAULT 'customer', so there is no null case.
+  // ─── An ad's in-app destination, for every ad-bearing module screen ────────
+  //
+  // ONE map, here, rather than one per screen. HomeScreen already has moduleHandlers for
+  // its tiles and reuses it for the Home slot; the module screens have no such map, and
+  // giving each of them a partial copy is how they drift.
+  //
+  // The vocabulary is AD_ROUTES (constants/ads.js), enforced at INSERT by
+  // ad_banners_route_check and re-checked client-side by isRenderable — an ad whose route
+  // this bundle cannot resolve is DROPPED rather than drawn, because a paid banner that
+  // does nothing when tapped reads to the advertiser as the app being broken.
+  // scripts/check-ad-placement.mjs asserts every AD_ROUTES id appears below.
+  //
+  // ⚠ health, emergency and duty are deliberately NOT reachable. They are on the permanent
+  //   exclusion list, and routing a paid banner INTO one monetises it at one remove.
+  //
+  // Opening a module from another module STACKS, exactly as a Home tile tap does — the
+  // hardware-back chain pops them in order. That is existing behaviour, not new.
+  function openAdRoute(route) {
+    switch (route) {
+      case 'accommodation':      setShowAccommodation(true); break
+      case 'beaches':            setShowExploreBeach(true); break
+      case 'esim':               setShowEsim(true); break
+      case 'events':             setShowEvents(true); break
+      case 'exchangeRates':      setShowExchangeRates(true); break
+      case 'explore':            setShowExplore(true); break
+      case 'games':              setShowGames(true); break
+      case 'garages':            setShowGarages(true); break
+      case 'grooming':           setShowGrooming(true); break
+      case 'homeServices':       setShowHomeServices(true); break
+      case 'insurance':          setShowInsurance(true); break
+      case 'jobPostings':        setShowJobPostings(true); break
+      case 'municipal':          setShowMunicipalModal(true); break
+      case 'newcomerEssentials': setShowNewcomerEssentials(true); break
+      case 'pets':               setShowPets(true); break
+      case 'studentHub':         setShowStudentHub(true); break
+      case 'towing':             setShowTowing(true); break
+      case 'transport':          setShowTransport(true); break
+    }
+  }
+
   const gateActive =
     PROFILE_GATE_LIVE &&
     !!session && !isGuest(session) && !!profile &&
@@ -1352,7 +1392,7 @@ export default function App() {
     content = <DutyListScreen onBack={() => { setShowDutyList(false); setDutyRegion(null) }} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
   } else if (showEvents) {
     content = (MODULE_FLAGS.events || isAdmin)
-      ? <EventsScreen lang={lang} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} initialDistrict={eventsDistrict} />
+      ? <EventsScreen lang={lang} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} initialDistrict={eventsDistrict} onAdNavigate={openAdRoute} />
       : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} />
   // PARKED, NOT DEAD. `showAgentOnboarding` is never set to true any more: the only
   // caller was the "become an agent" CTA on AccommodationScreen, removed in Slice 3c
@@ -1377,6 +1417,7 @@ export default function App() {
   } else if (showAccommodation) {
     content = (MODULE_FLAGS.accommodation || isAdmin) ? (
       <AccommodationScreen
+        onAdNavigate={openAdRoute}
         lang={lang}
         onClose={() => setShowAccommodation(false)}
         onOpenProperty={prop => setOpenedProperty(prop)}
@@ -1407,11 +1448,11 @@ export default function App() {
   } else if (showLegal) {
     content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
   } else if (selectedExplorePlace) {
-    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} isFavorite={placeFavorites.has(selectedExplorePlace.id)} onToggleFavorite={() => togglePlaceFavorite(selectedExplorePlace.id)} />
+    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} isFavorite={placeFavorites.has(selectedExplorePlace.id)} onToggleFavorite={() => togglePlaceFavorite(selectedExplorePlace.id)} onAdNavigate={openAdRoute} />
   } else if (showExploreBeach) {
     content = (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => { setShowExploreBeach(false); setExploreBeachRegion(null) }} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} />
+        <ExploreScreen lang={lang} onBack={() => { setShowExploreBeach(false); setExploreBeachRegion(null) }} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} onAdNavigate={openAdRoute} />
       </BLErrorBoundary>
     )
   } else if (showExplore) {
@@ -1420,7 +1461,7 @@ export default function App() {
     // Notify-me upserts module='explore' into module_waitlist (shape-guard accepts it now).
     content = (MODULE_FLAGS.explore || isAdmin) ? (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
+        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} onAdNavigate={openAdRoute} />
       </BLErrorBoundary>
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />

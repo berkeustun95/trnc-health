@@ -156,3 +156,29 @@ export const TILE_FONT_MANROPE = false
 //   flag states must leave that path byte-identical, and `npm run profile:check` is what
 //   says so.
 export const HOME_V2_LIVE = false
+
+// Banner advertising (ad_banners). false = no banner slot renders anywhere, whatever is in
+// the table — AdSlot returns null before it even reads. true = a sold, active, in-window ad
+// draws in whichever slots are placed (today: home_footer only, at the foot of the V2 hub).
+//
+// NOT a MODULE_FLAGS key, and for the same mechanical reason HOME_V2_LIVE and
+// PROFILE_GATE_LIVE are not: a true entry in that map trips the WAITLIST_BLAST_DONE check
+// and the notify-path agreement in scripts/check-module-flags.mjs, both of which require
+// the key to exist inside notify_module_waitlist and module_notif_text. Advertising has no
+// waitlist and cannot be notified about — nobody signed up to be shown an advert. It is a
+// scalar carried in EXPECTED_SCALARS, which gives identical `eas update` protection with no
+// false failures.
+//
+// ⚠ FLIPPING THIS IS NOT BY ITSELF A GO-LIVE, AND THAT IS THE DESIGN. Every slot is unsold
+//   until a row is INSERTed by hand, and ad_banners.is_active DEFAULTs to false, so a flip
+//   with an empty table changes nothing a user can see. Going live is: seed the row
+//   inactive, check the artwork and the destination, THEN flip is_active. Two deliberate
+//   acts, neither of which is this boolean.
+//
+// ⚠ AND IT DOES NOT GATE THE DATA. Same lesson MODULE_FLAGS records about search: a flag
+//   hides a SURFACE, never a table. ad_banners rows are publicly readable when active and
+//   in-window regardless of this flag — which is harmless here (an ad row is artwork and a
+//   link, not content a user could stumble into out of context) but is the reason the
+//   is_active DEFAULT, and not this flag, is what keeps a draft campaign invisible.
+export const AD_BANNERS_LIVE = false
+

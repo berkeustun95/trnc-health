@@ -8,6 +8,9 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
+import AccommodationListTopSlot from '../components/ads/AccommodationListTopSlot'
+import AccommodationListInlineSlot from '../components/ads/AccommodationListInlineSlot'
+import AccommodationListBottomSlot from '../components/ads/AccommodationListBottomSlot'
 import PropertyDetailScreen from './PropertyDetailScreen'
 import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow } from '../constants/theme'
@@ -333,7 +336,7 @@ function FilterPill({ label, active, disabled, onPress }) {
 // App.js:490 already reads `if (openedProperty) { setOpenedProperty(null); return true }`
 // BEFORE its showAccommodation line, so the correct two-step back — detail, then module —
 // is preserved by construction rather than by winning a registration race.
-export default function AccommodationScreen({ lang, onClose, onOpenProperty, selectedProperty, onCloseProperty }) {
+export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpenProperty, selectedProperty, onCloseProperty }) {
   const [items, setItems]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -536,6 +539,15 @@ export default function AccommodationScreen({ lang, onClose, onOpenProperty, sel
           data={items}
           keyExtractor={i => i.id}
           contentContainerStyle={cs.listContent}
+          ListHeaderComponent={
+            // list_top — a HEADER, so it scrolls away. Mounting it above the FlatList
+            // would make it sticky, and a permanently visible ad is a different product.
+            // GATED ON A NON-EMPTY LIST: an ad above "no results" is worse than no ad,
+            // and this list's filters intersect to zero routinely.
+            items.length > 0
+              ? <AccommodationListTopSlot lang={lang} onNavigate={onAdNavigate} />
+              : null
+          }
           showsVerticalScrollIndicator={false}
           onEndReached={loadMore}
           onEndReachedThreshold={0.3}
@@ -569,10 +581,25 @@ export default function AccommodationScreen({ lang, onClose, onOpenProperty, sel
           ListFooterComponent={
             loadingMore
               ? <ActivityIndicator style={{ marginVertical: 20 }} color={colors.primary} />
-              : <View style={{ height: 24 }} />
+              : items.length > 0
+                ? <>
+                    {/* list_bottom. LOW-VALUE INVENTORY BY CONSTRUCTION: this list
+                        paginates, so the footer is only reached after every page has
+                        loaded. Shipped, but do not price it like list_top. */}
+                    <AccommodationListBottomSlot lang={lang} onNavigate={onAdNavigate} />
+                    <View style={{ height: 24 }} />
+                  </>
+                : <View style={{ height: 24 }} />
           }
-          renderItem={({ item }) => (
-            <PropertyCard item={item} lang={lang} onPress={() => onOpenProperty(item)} />
+          renderItem={({ item, index }) => (
+            // list_inline — ONCE, after the 8th card, never repeated however far the user
+            // paginates. `index === 7` is a point, not a modulus: an every-Nth rule would
+            // turn a directory into an ad feed. Below 8 results it never renders, which is
+            // correct on a heavily filtered list.
+            <>
+              <PropertyCard item={item} lang={lang} onPress={() => onOpenProperty(item)} />
+              {index === 7 && <AccommodationListInlineSlot lang={lang} onNavigate={onAdNavigate} />}
+            </>
           )}
         />
       )}
@@ -660,7 +687,7 @@ export default function AccommodationScreen({ lang, onClose, onOpenProperty, sel
       {/* Above everything, and the list beneath it is never unmounted. */}
       {selectedProperty && (
         <View style={cs.detailOverlay}>
-          <PropertyDetailScreen property={selectedProperty} lang={lang} onBack={onCloseProperty} />
+          <PropertyDetailScreen property={selectedProperty} lang={lang} onBack={onCloseProperty} onAdNavigate={onAdNavigate} />
         </View>
       )}
 

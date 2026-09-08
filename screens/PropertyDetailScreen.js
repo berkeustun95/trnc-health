@@ -1,3 +1,4 @@
+import AccommodationDetailBottomSlot from '../components/ads/AccommodationDetailBottomSlot'
 import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
@@ -103,7 +104,7 @@ function Fact({ label, value }) {
   )
 }
 
-export default function PropertyDetailScreen({ property: prop, lang, onBack, onOpenMap }) {
+export default function PropertyDetailScreen({ property: prop, lang, onBack, onOpenMap, onAdNavigate }) {
   const [overPhoto, setOverPhoto] = useState(true)
   const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
@@ -312,6 +313,14 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
               </View>
             </>
           )}
+
+          {/* detail_bottom — the LAST child of the scroll body.
+              ⚠ NO CONSTANT WAS TOUCHED, AND THAT IS THE POINT. contentContainerStyle
+                already reserves CONTACT_BAR_BASE + insets BELOW the last child, so the ad
+                lands above that reserve and clears the fixed contact bar on its own. The
+                comment on CONTACT_BAR_BASE records that a fixed constant was got wrong
+                here once; the safest change to it is none. */}
+          <AccommodationDetailBottomSlot lang={lang} onNavigate={onAdNavigate} />
         </View>
       </ScrollView>
 

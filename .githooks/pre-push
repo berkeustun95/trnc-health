@@ -50,6 +50,20 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitme
   exit 1
 }
 
+# Ad placement. Blocks a push that would mount an advert on a surface the permanent
+# exclusion list forbids — duty pharmacy, emergency contacts, health facilities, search
+# results, push notifications, Ask Oli — or point one at an excluded destination.
+#
+# A slot id cannot encode that rule: `detail_footer` on a facility profile is a valid slot
+# id and a forbidden placement, and every CHECK constraint in the migration stays green.
+# Only a file path identifies a surface, so this is a mount-point allowlist. It also fails
+# if the slot/route vocabularies in constants/ads.js and the migration disagree.
+# `npm run ads:selftest` proves every one of its checks can go red.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.mjs || {
+  echo "  push blocked: an advert would land on an excluded surface."
+  exit 1
+}
+
 # Privacy parity — WARN ONLY, deliberately. Three copies of one privacy document publish
 # by three different actions: docs/ on this push, web/ via `npm run web:deploy`, the
 # LegalScreen const via `npm run ota`. A push therefore publishes ONE of the three, and

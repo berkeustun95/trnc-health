@@ -23,7 +23,7 @@ import ModuleGrid from '../components/home/ModuleGrid'
 import LiveStrip from '../components/home/LiveStrip'
 import FavouritesRow from '../components/home/FavouritesRow'
 import FavouritesEditSheet from '../components/home/FavouritesEditSheet'
-import HomeFooterSlot from '../components/home/HomeFooterSlot'
+import HomeListBottomSlot from '../components/ads/HomeListBottomSlot'
 import { HOME_MODULES } from '../constants/homeModules'
 import { resolveStripItem } from '../utils/homeStripResolver'
 import { resolveFavourites } from '../constants/homeFavourites'
@@ -364,6 +364,28 @@ export default function HomeScreen({
       // malformed href, and an unhandled rejection here would be a red box over Home.
       case 'link':      if (a.url) Linking.openURL(a.url).catch(() => {}); break
     }
+  }
+
+  // ─── An ad's in-app destination ─────────────────────────────────────────────
+  //
+  // Reuses moduleHandlers, which is the same map the tile grid and the favourites row go
+  // through — so an ad routed to a DARK module lands on Coming Soon via the App.js gate,
+  // exactly as tapping its tile would. That is correct: a banner must not be a back door
+  // into a gated screen.
+  //
+  // The vocabulary is AD_ROUTES in constants/ads.js, enforced at INSERT by
+  // ad_banners_route_check and re-checked client-side by isRenderable — an ad whose route
+  // this bundle has no handler for is dropped rather than drawn, because a paid banner
+  // that does nothing when tapped reads to the advertiser as the app being broken.
+  // scripts/check-ad-placement.mjs asserts every AD_ROUTES id resolves in the map below.
+  //
+  // ⚠ recordModuleOpen IS DELIBERATELY NOT CALLED. The favourites row answers "which module
+  //   TILES do you reach for"; an ad tap is a response to something we were paid to show,
+  //   not a choice the user navigated to. Letting it feed the shortcut row would let an
+  //   advertiser buy a permanent place on somebody's Home. Strip taps are excluded from
+  //   that counter for the same reason.
+  function openAdRoute(route) {
+    moduleHandlers[route]?.()
   }
 
   async function handleResultPress(result) {
@@ -725,7 +747,7 @@ export default function HomeScreen({
             <Text style={s.v2SectionTitle}>{t('homeAllModules', lang)}</Text>
             <ModuleGrid lang={lang} onPress={openModule} />
 
-            <HomeFooterSlot />
+            <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />
           </View>
         </ScrollView>
 

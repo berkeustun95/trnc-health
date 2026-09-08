@@ -122,6 +122,18 @@ const EXPECTED_SCALARS = {
   // is compared ON DEVICE by flipping it, and a working-tree flip is exactly what
   // `eas update` bundles. Baselined so the comparison cannot ship by accident.
   TILE_FONT_MANROPE:     false,
+  // Banner advertising. Unlike the flags above it does not by itself reveal or replace
+  // anything: every slot is unsold until a row is INSERTed by hand and ad_banners.is_active
+  // DEFAULTs to false, so a flip against an empty table changes nothing a user can see.
+  // Baselined anyway, for the reason every scalar here is — `eas update` bundles the
+  // WORKING TREE, and the day there IS a live row this becomes the one boolean between a
+  // paying advertiser's banner and every user's Home screen. A flip left over from a device
+  // check would ship it early, or (worse, mid-campaign) unship it.
+  //
+  // NOT a MODULE_FLAGS key: advertising has no waitlist and cannot be notified about, so
+  // that map's WAITLIST_BLAST_DONE and notify-path checks would fail against a perfectly
+  // correct app. Same resolution as HOME_V2_LIVE and PROFILE_GATE_LIVE.
+  AD_BANNERS_LIVE:       false,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

@@ -1,3 +1,7 @@
+import EventsListTopSlot from '../components/ads/EventsListTopSlot'
+import EventsListInlineSlot from '../components/ads/EventsListInlineSlot'
+import EventsListBottomSlot from '../components/ads/EventsListBottomSlot'
+import EventsDetailBottomSlot from '../components/ads/EventsDetailBottomSlot'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView,
@@ -316,7 +320,7 @@ function ImageViewer({ images, startIndex, onClose }) {
 const HERO_MIN_RATIO = 3 / 4
 const HERO_MAX_RATIO = 16 / 9
 
-function EventDetailScreen({ event, lang, onBack }) {
+function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
   const [imgIndex, setImgIndex] = useState(0)
   const [viewerIndex, setViewerIndex] = useState(null)
   const [heroRatio, setHeroRatio] = useState(1)
@@ -369,6 +373,18 @@ function EventDetailScreen({ event, lang, onBack }) {
         data={[{ key: 'detail' }]}
         keyExtractor={i => i.key}
         showsVerticalScrollIndicator={false}
+        ListFooterComponent={
+          // detail_bottom. A FOOTER on the single-item list rather than an extra child
+          // inside the detail body — the body is one long JSX block whose last element is
+          // conditional (Buy Ticket, else description, else price row), so appending
+          // inside it would mean picking one of those branches to sit under. This seam
+          // does not care which branch rendered.
+          //
+          // EventDetailScreen is defined INSIDE EventsScreen.js, so a file-level allowlist
+          // cannot tell this mount from the list's three. The guard pins this wrapper to
+          // this function's span; that is why the wrapper exists as its own file.
+          <EventsDetailBottomSlot lang={lang} onNavigate={onAdNavigate} />
+        }
         renderItem={() => (
           <View>
             {images.length > 0 ? (
@@ -498,7 +514,7 @@ export { EventDetailScreen }
 // city-welcome card. The events table has no district column — only lat/lng — so
 // the district is derived from the coordinates with resolveRegion. An event with
 // no coordinates cannot be placed, so it drops out while a district filter is on.
-export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
+export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistrict = null }) {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -661,7 +677,23 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
                   </Text>
                 </TouchableOpacity>
               </ScrollView>
+              {/* list_top, INSIDE the existing header so it scrolls with the chips.
+                  ⚠ GATED ON A NON-EMPTY FEED, and that is not a nicety. `filtered` goes
+                    to zero two ways here — a category/date filter that matches nothing,
+                    and a feed with no approved rows at all. An ad sitting above "no
+                    upcoming events" is worse than no ad: it is the only content on the
+                    screen, so the screen becomes an advert with an apology under it. */}
+              {filtered.length > 0 && (
+                <EventsListTopSlot lang={lang} onNavigate={onAdNavigate} />
+              )}
             </View>
+          }
+          ListFooterComponent={
+            // list_bottom. The list already reserves insets+96 below its content for a FAB
+            // that is not visible on this screen, so the space exists without retuning it.
+            filtered.length > 0
+              ? <EventsListBottomSlot lang={lang} onNavigate={onAdNavigate} />
+              : null
           }
           ListEmptyComponent={
             <View style={s.emptyWrap}>
@@ -671,8 +703,12 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
               </View>
             </View>
           }
-          renderItem={({ item }) => (
-            <EventCard event={item} lang={lang} onPress={() => setSelectedEvent(item)} />
+          renderItem={({ item, index }) => (
+            // list_inline — ONCE, after the 8th card. A point, not a modulus.
+            <>
+              <EventCard event={item} lang={lang} onPress={() => setSelectedEvent(item)} />
+              {index === 7 && <EventsListInlineSlot lang={lang} onNavigate={onAdNavigate} />}
+            </>
           )}
         />
       )}
@@ -715,7 +751,7 @@ export default function EventsScreen({ lang, onBack, initialDistrict = null }) {
         offset survives the round trip. */}
     {selectedEvent && (
       <View style={s.detailOverlay}>
-        <EventDetailScreen event={selectedEvent} lang={lang} onBack={() => setSelectedEvent(null)} />
+        <EventDetailScreen event={selectedEvent} lang={lang} onBack={() => setSelectedEvent(null)} onAdNavigate={onAdNavigate} />
       </View>
     )}
     </View>
