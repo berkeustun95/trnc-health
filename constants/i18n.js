@@ -5166,7 +5166,7 @@ const translations = {
     notifyMeHint: 'Θα σας ενημερώσουμε μόλις γίνει διαθέσιμο.',
     notifyMeError: 'Δεν μπορέσαμε να σας προσθέσουμε τώρα. Δοκιμάστε ξανά.',
     hsTitle: 'Οικιακές Υπηρεσίες', hsSubtitle: 'Βρείτε αξιόπιστους τεχνίτες στη Βόρεια Κύπρο',
-    hsCategoryPlumber: 'Υδραυλικός', hsCategoryElectrician: 'Ηλεκτρικά', hsCategoryCarpenter: 'Ξυλουργός',
+    hsCategoryPlumber: 'Υδραυλικός', hsCategoryElectrician: 'Ηλεκτρικός', hsCategoryCarpenter: 'Ξυλουργός',
     hsCategoryPainter: 'Βαφέας', hsCategorySewer: 'Αποχέτευση', hsCategoryAcTech: 'Τεχνικός Κλιματισμού',
     hsCategoryLocksmith: 'Κλειδαράς', hsCategoryTiler: 'Πλακάς', hsCategoryHandyman: 'Βοηθός Εργασιών',
     hsCategoryRenovation: 'Ανακαίνιση σπιτιού', hsCategoryBathroom: 'Ανακαίνιση μπάνιου',
