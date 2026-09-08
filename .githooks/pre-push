@@ -73,4 +73,24 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.m
 #
 # It FAILS (exit 1) inside web:deploy and ota, where drift becomes visible to a user.
 # Note what it can and cannot see: it compares the three FILES, never the three URLs.
+# Schema drift audit freshness. supabase/schema_drift_audit.sql is GENERATED from every
+# DDL statement in supabase/migrations/, and it went three migrations stale (1007, 1008,
+# 1009) with nothing anywhere saying so. A stale drift report is worse than none: it is
+# what you run FIRST against a database you are unsure about, so it answers confidently
+# about a schema that no longer exists.
+#
+# BLOCKING, not a warning, and the distinction is the privacy-parity note above. That one
+# warns because a committed-but-unshipped copy is a NORMAL state, so blocking would make
+# this hook red on a correct repo. This one has no normal stale state: the artifact is
+# derived from files in the same commit, so if it disagrees, the commit is wrong. There is
+# nothing to cry wolf about.
+#
+# It re-parses every migration and compares the WHOLE emitted artifact — derived, so it
+# cannot go green by forgetting one. Writes nothing.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.mjs --check || {
+  echo "  push blocked: the drift audit no longer matches supabase/migrations/."
+  echo "               npm run drift:regen   then include the file in this commit."
+  exit 1
+}
+
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs --warn
