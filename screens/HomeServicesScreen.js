@@ -12,7 +12,9 @@ import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import HomeServiceIcon from '../components/HomeServiceIcon'
+import HomeServicePartnerCard from '../components/HomeServicePartnerCard'
 import { HS_CATEGORIES, hsCategory, HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
+import { HS_PARTNERS, HS_PARTNER_IDS, hsPartner } from '../constants/partners'
 import HomeServiceProfileScreen from './HomeServiceProfileScreen'
 import HomeServiceOnboardingScreen from './HomeServiceOnboardingScreen'
 
@@ -111,6 +113,31 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   const [showOnboarding,   setShowOnboarding]   = useState(false)
   const [providers, setProviders]               = useState([])
   const [loading, setLoading]                   = useState(false)
+  // Landing-only. The CATEGORY lists take their pinned row out of `providers` instead,
+  // so the pin and the list can never disagree — see the note on `pinned` below.
+  const [partnerRows, setPartnerRows]           = useState([])
+
+  // status='active' is asserted HERE and not assumed from the config: a partner row
+  // seeded but not yet approved must produce no card at all. `.in()` on an empty array
+  // is a valid query returning nothing, so a build with no partners is not a special
+  // case.
+  useEffect(() => {
+    let alive = true
+    supabase
+      .from('home_services')
+      .select('*')
+      .in('id', HS_PARTNER_IDS)
+      .eq('status', 'active')
+      // BOTH handlers. A supabase-js query builder is a lazy thenable, and .then() with
+      // only a success arm turns a network failure into an unhandled rejection — the
+      // same reason utils/logContactEvent.js passes two. A failed fetch here means no
+      // partner card, which is the state the module already ships in.
+      .then(
+        ({ data }) => { if (alive) setPartnerRows(data || []) },
+        () => {},
+      )
+    return () => { alive = false }
+  }, [])
 
   const loadProviders = useCallback(async (category, district) => {
     setLoading(true)
@@ -179,6 +206,29 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   const headerTitle  = activeCat ? t(activeCat.labelKey, lang) : t('hsTitle', lang)
   const backLabel    = selectedCategory ? t('hsBackToCategories', lang) : t('back', lang)
 
+  // ─── The pinned partner, derived from the list itself ─────────────────────
+  //
+  // NOT from a separate lookup, and that is the whole design. `providers` has already
+  // been filtered by category AND by the active district chip
+  // (.contains('coverage_districts', [d])), so a partner appears here exactly when the
+  // pin should render — district-awareness is a property of the query, not a second rule
+  // that could disagree with it. Reading a config id and pinning unconditionally would
+  // put TadilArt at the top of Girne even on a day the partnership stopped covering it.
+  //
+  // The dedupe is the same expression, which makes the invariant structural: a row
+  // leaves the list body ONLY because its pin is rendering. A config-id dedupe paired
+  // with any independent fetch could remove the row and then fail to pin it, and the
+  // partner would silently vanish from the list.
+  const pinned    = providers.filter(pr => hsPartner(pr.id))
+  const pinnedIds = new Set(pinned.map(pr => pr.id))
+  const listBody  = providers.filter(pr => !pinnedIds.has(pr.id))
+
+  // The message is read by the FIRM, so the service name goes in the message's own
+  // language — never the user's. See constants/partners.js.
+  const serviceContext = activeCat
+    ? { tr: t(activeCat.labelKey, 'Turkish'), en: t(activeCat.labelKey, 'English') }
+    : null
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="home_services" />
@@ -194,6 +244,23 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
             subtitle={t('hsSubtitle', lang)}
             style={s.introCard}
           />
+
+          {HS_PARTNERS.map(partner => {
+            const row = partnerRows.find(r => r.id === partner.id)
+            if (!row) return null
+            return (
+              <View key={partner.id} style={s.partnerWrap}>
+                <HomeServicePartnerCard
+                  partner={partner}
+                  row={row}
+                  lang={lang}
+                  serviceContext={null}
+                  region={null}
+                />
+              </View>
+            )
+          })}
+
           <View style={s.grid}>
             {HS_CATEGORIES.map(cat => (
               <CategoryTile
@@ -254,17 +321,38 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
             ? <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
             : (
               <FlatList
-                data={providers}
+                data={listBody}
                 keyExtractor={item => item.id}
                 contentContainerStyle={s.listContent}
                 showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={s.emptyWrap}>
-                    <View style={s.emptyCard}>
-                      <Ionicons name="search-outline" size={42} color={colors.border} style={{ marginBottom: 10 }} />
-                      <Text style={s.emptyText}>{t('hsNoProviders', lang)}</Text>
+                ListHeaderComponent={
+                  pinned.length > 0 ? (
+                    <View style={s.pinnedWrap}>
+                      {pinned.map(row => (
+                        <HomeServicePartnerCard
+                          key={row.id}
+                          partner={hsPartner(row.id)}
+                          row={row}
+                          lang={lang}
+                          serviceContext={serviceContext}
+                          region={selectedDistrict}
+                        />
+                      ))}
                     </View>
-                  </View>
+                  ) : null
+                }
+                /* Keyed off `providers`, NOT off the FlatList's own data. listBody is
+                   empty whenever the partner is the only match, and FlatList would then
+                   render "no providers found" directly under a card showing one. */
+                ListEmptyComponent={
+                  providers.length === 0 ? (
+                    <View style={s.emptyWrap}>
+                      <View style={s.emptyCard}>
+                        <Ionicons name="search-outline" size={42} color={colors.border} style={{ marginBottom: 10 }} />
+                        <Text style={s.emptyText}>{t('hsNoProviders', lang)}</Text>
+                      </View>
+                    </View>
+                  ) : null
                 }
                 renderItem={({ item }) => (
                   <ProviderCard item={item} lang={lang} onPress={() => setSelectedProvider(item)} />
@@ -285,6 +373,8 @@ const s = StyleSheet.create({
   // Category picker
   catScroll:      { padding: 20, paddingBottom: 40 },
   introCard:      { marginBottom: 20 },
+  partnerWrap:    { marginBottom: 20 },
+  pinnedWrap:     { marginBottom: 12 },
   grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   catTile:        { width: '47%', backgroundColor: colors.cardBg, borderRadius: radius.card,
                     padding: 18, alignItems: 'center', gap: 10, ...shadow,
