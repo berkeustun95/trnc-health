@@ -11,33 +11,14 @@ import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import HomeServiceIcon from '../components/HomeServiceIcon'
+import { HS_CATEGORIES, hsCategory, HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 import HomeServiceProfileScreen from './HomeServiceProfileScreen'
 import HomeServiceOnboardingScreen from './HomeServiceOnboardingScreen'
 
-const CATEGORIES = [
-  { key: 'plumber',     icon: 'water-outline',        labelKey: 'hsCategoryPlumber' },
-  { key: 'electrician', icon: 'flash-outline',         labelKey: 'hsCategoryElectrician' },
-  { key: 'carpenter',   icon: 'construct-outline',     labelKey: 'hsCategoryCarpenter' },
-  { key: 'painter',     icon: 'color-palette-outline', labelKey: 'hsCategoryPainter' },
-  { key: 'sewer',       icon: 'funnel-outline',        labelKey: 'hsCategorySewer' },
-  { key: 'ac_tech',     icon: 'thermometer-outline',   labelKey: 'hsCategoryAcTech' },
-  { key: 'locksmith',   icon: 'key-outline',           labelKey: 'hsCategoryLocksmith' },
-  { key: 'tiler',       icon: 'grid-outline',          labelKey: 'hsCategoryTiler' },
-  { key: 'handyman',    icon: 'hammer-outline',        labelKey: 'hsCategoryHandyman' },
-]
-
-const DISTRICTS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke']
-
 function districtLabel(d, lang) {
-  const map = {
-    nicosia:   t('hsDistrictNicosia', lang),
-    kyrenia:   t('hsDistrictKyrenia', lang),
-    famagusta: t('hsDistrictFamagusta', lang),
-    morphou:   t('hsDistrictMorphou', lang),
-    iskele:    t('hsDistrictIskele', lang),
-    lefke:     t('hsDistrictLefke', lang),
-  }
-  return map[d] || d
+  const key = HS_DISTRICT_LABEL_KEY[d]
+  return key ? t(key, lang) : d
 }
 
 // ─── Category tile ────────────────────────────────────────────────────────────
@@ -46,7 +27,7 @@ function CategoryTile({ item, lang, onPress }) {
   return (
     <TouchableOpacity style={s.catTile} onPress={onPress} activeOpacity={0.75}>
       <View style={s.catIconWrap}>
-        <Ionicons name={item.icon} size={28} color={colors.primary} />
+        <HomeServiceIcon category={item} size={28} color={colors.primary} />
       </View>
       <Text style={s.catLabel} numberOfLines={2}>{t(item.labelKey, lang)}</Text>
     </TouchableOpacity>
@@ -85,7 +66,7 @@ function ProviderCard({ item, lang, onPress }) {
       {item.service_types.length > 0 && (
         <View style={s.tagRow}>
           {item.service_types.map(st => {
-            const cat = CATEGORIES.find(c => c.key === st)
+            const cat = hsCategory(st)
             return (
               <View key={st} style={s.tag}>
                 <Text style={s.tagText}>{cat ? t(cat.labelKey, lang) : st}</Text>
@@ -141,7 +122,11 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
       .order('verified', { ascending: false })
       .order('name')
 
-    if (district) query = query.eq('district', district)
+    // coverage_districts, NOT district. `district` is the BASE (where the provider is
+    // registered); coverage is where they actually work, and a multi-district provider
+    // must appear under every one of them. The base is always inside coverage
+    // (home_services_base_in_coverage_check), so this filter is a superset of the old one.
+    if (district) query = query.contains('coverage_districts', [district])
 
     const { data } = await query
     setProviders(data || [])
@@ -190,7 +175,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
     )
   }
 
-  const activeCat    = CATEGORIES.find(c => c.key === selectedCategory)
+  const activeCat    = hsCategory(selectedCategory)
   const headerTitle  = activeCat ? t(activeCat.labelKey, lang) : t('hsTitle', lang)
   const backLabel    = selectedCategory ? t('hsBackToCategories', lang) : t('back', lang)
 
@@ -210,7 +195,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
             style={s.introCard}
           />
           <View style={s.grid}>
-            {CATEGORIES.map(cat => (
+            {HS_CATEGORIES.map(cat => (
               <CategoryTile
                 key={cat.key}
                 item={cat}
@@ -236,7 +221,12 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0 }}
+            // flexShrink: 0 is not decoration. This row is a fixed-height sibling ABOVE a
+            // flex:1 list in a column; without it the row is vertically COMPRESSED once the
+            // list overflows and the chip text is cropped top and bottom. It only reproduces
+            // with enough results to make the list scroll, so it is invisible today and
+            // arrives the week the directory fills up.
+            style={{ flexGrow: 0, flexShrink: 0 }}
             contentContainerStyle={s.districtRow}
           >
             <TouchableOpacity
@@ -247,7 +237,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
                 {t('hsAllDistricts', lang)}
               </Text>
             </TouchableOpacity>
-            {DISTRICTS.map(d => (
+            {HS_DISTRICTS.map(d => (
               <TouchableOpacity
                 key={d}
                 style={[s.chip, selectedDistrict === d && s.chipActive]}

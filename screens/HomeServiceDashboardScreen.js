@@ -9,25 +9,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import HomeServiceIcon from '../components/HomeServiceIcon'
+import { HS_CATEGORIES, HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 
-const CATEGORIES = [
-  { key: 'plumber',     icon: 'water-outline',        labelKey: 'hsCategoryPlumber' },
-  { key: 'electrician', icon: 'flash-outline',         labelKey: 'hsCategoryElectrician' },
-  { key: 'carpenter',   icon: 'construct-outline',     labelKey: 'hsCategoryCarpenter' },
-  { key: 'painter',     icon: 'color-palette-outline', labelKey: 'hsCategoryPainter' },
-  { key: 'sewer',       icon: 'funnel-outline',        labelKey: 'hsCategorySewer' },
-  { key: 'ac_tech',     icon: 'thermometer-outline',   labelKey: 'hsCategoryAcTech' },
-  { key: 'locksmith',   icon: 'key-outline',           labelKey: 'hsCategoryLocksmith' },
-  { key: 'tiler',       icon: 'grid-outline',          labelKey: 'hsCategoryTiler' },
-  { key: 'handyman',    icon: 'hammer-outline',        labelKey: 'hsCategoryHandyman' },
-]
-
-const DISTRICTS     = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke']
-const DISTRICT_KEYS = {
-  nicosia: 'hsDistrictNicosia', kyrenia: 'hsDistrictKyrenia',
-  famagusta: 'hsDistrictFamagusta', morphou: 'hsDistrictMorphou',
-  iskele: 'hsDistrictIskele', lefke: 'hsDistrictLefke',
-}
 const CONTACT_PREFS = [
   { key: 'whatsapp', labelKey: 'hsContactPrefWA',   icon: 'logo-whatsapp' },
   { key: 'call',     labelKey: 'hsContactPrefCall',  icon: 'call-outline' },
@@ -117,6 +101,11 @@ export default function HomeServiceDashboardScreen({ session, lang = 'English' }
         whatsapp:         whatsapp.trim() || null,
         contact_pref:     contactPref,
         district,
+        // See the note in HomeServiceOnboardingScreen. Sent on every save, not only when
+        // the district changes: coverage_districts must contain district
+        // (home_services_base_in_coverage_check), so a district edit that left coverage
+        // behind would be rejected by the database with a raw Postgres message.
+        coverage_districts: [district],
         service_types:    serviceTypes,
         description:      description.trim() || null,
         status:           'pending',
@@ -235,26 +224,26 @@ export default function HomeServiceDashboardScreen({ session, lang = 'English' }
 
           <Text style={[s.fieldLabel, { marginTop: 14 }]}>District</Text>
           <View style={s.chipRow}>
-            {DISTRICTS.map(d => (
+            {HS_DISTRICTS.map(d => (
               <TouchableOpacity
                 key={d}
                 style={[s.chip, district === d && s.chipActive]}
                 onPress={() => setDistrict(d)}
               >
-                <Text style={[s.chipText, district === d && s.chipTextActive]}>{t(DISTRICT_KEYS[d], lang)}</Text>
+                <Text style={[s.chipText, district === d && s.chipTextActive]}>{t(HS_DISTRICT_LABEL_KEY[d], lang)}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           <Text style={[s.fieldLabel, { marginTop: 14 }]}>Services offered</Text>
           <View style={s.chipRow}>
-            {CATEGORIES.map(cat => (
+            {HS_CATEGORIES.map(cat => (
               <TouchableOpacity
                 key={cat.key}
                 style={[s.chip, serviceTypes.includes(cat.key) && s.chipActive]}
                 onPress={() => toggleService(cat.key)}
               >
-                <Ionicons name={cat.icon} size={13} color={serviceTypes.includes(cat.key) ? '#fff' : colors.textSecondary} style={{ marginRight: 4 }} />
+                <HomeServiceIcon category={cat} size={13} color={serviceTypes.includes(cat.key) ? '#fff' : colors.textSecondary} style={{ marginRight: 4 }} />
                 <Text style={[s.chipText, serviceTypes.includes(cat.key) && s.chipTextActive]}>{t(cat.labelKey, lang)}</Text>
               </TouchableOpacity>
             ))}

@@ -200,7 +200,12 @@ WITH report AS (
     ('1001_profile_completion','profiles','profile_completed_at'),
     ('1001_profile_completion','profiles','profile_schema_version'),
     ('1001_profile_completion','profiles','age_ineligible'),
-    ('1001_profile_completion','profiles','nationality_code')
+    ('1001_profile_completion','profiles','nationality_code'),
+    -- home_services gained multi-district coverage for the TadilArt partnership. If this
+    -- reads MISSING, HomeServicesScreen's district filter (.contains on this column)
+    -- matches nothing and EVERY district chip returns an empty list — which looks like
+    -- "no providers in this area", the module's own normal empty state.
+    ('1010_hs_coverage','home_services','coverage_districts')
 
   ) e(m,t,c)
 
@@ -489,7 +494,12 @@ WITH report AS (
     -- deleting a module out from under a live campaign must fail loudly rather than
     -- silently delete somebody's paid banner.
     ('1009_ad_position_module','ad_banners_position_check'),
-    ('1009_ad_position_module','ad_banners_module_fkey')
+    ('1009_ad_position_module','ad_banners_module_fkey'),
+    -- 1010. The vocabulary CHECK and the base-inside-coverage CHECK are ONE change:
+    -- without the second, a row can be registered in one district and serve only
+    -- another, and the directory lists it under neither in a way anyone predicts.
+    ('1010_hs_coverage','home_services_coverage_districts_check'),
+    ('1010_hs_coverage','home_services_base_in_coverage_check')
 
   ) e(m,o)
 
@@ -1762,6 +1772,27 @@ WITH report AS (
           -- The NULL arm. resident_status is NULL for every row whose owner has not
           -- finished the wizard, so losing it rejects every new signup.
           AND pg_get_constraintdef(c.oid) LIKE '%IS NULL%')
+    -- 1011. A CONTENT token, not a shape one — the failure class every other section
+    -- here is blind to. constants/partners.js pins the Ev Hizmetleri featured card to
+    -- this literal id; if the row is deleted the card renders nothing, errors nowhere,
+    -- and the module looks exactly as it did before the partnership existed.
+    --
+    -- Asserts only what survives go-live: the id, the two-district coverage and the four
+    -- service types. NOT status — that is 'pending' today and 'active' after AdminScreen
+    -- approves it, so a token asserting either value is a token built to go stale, and a
+    -- drift report carrying a known-stale row teaches the reader to skim.
+    UNION ALL SELECT '1011_tadilart_seed','TadilArt partner row present, covers nicosia+kyrenia, 4 services',
+    --
+    -- coverage_districts is read through to_jsonb(hs)-> rather than named directly, and
+    -- that is not style. QUERY 1 is ONE statement: naming a column that does not exist
+    -- yet fails at PLAN time with 42703 and kills the ENTIRE report — on precisely the
+    -- database you run this against to find out what is missing. `->` on an absent key
+    -- yields NULL, so a DB without 1010 reads STALE/MISSING here and every other row
+    -- still prints. service_types predates this work and is named normally.
+      (SELECT count(*) = 1 FROM public.home_services hs
+        WHERE hs.id = '0496fb4c-4e5d-4e35-a238-dd1fcb402541'
+          AND to_jsonb(hs)->'coverage_districts' = '["nicosia","kyrenia"]'::jsonb
+          AND cardinality(hs.service_types) = 4)
   ) z
 
   UNION ALL

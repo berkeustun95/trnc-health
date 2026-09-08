@@ -4,24 +4,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
-
-const CATEGORIES = [
-  { key: 'plumber',     icon: 'water-outline',        labelKey: 'hsCategoryPlumber' },
-  { key: 'electrician', icon: 'flash-outline',         labelKey: 'hsCategoryElectrician' },
-  { key: 'carpenter',   icon: 'construct-outline',     labelKey: 'hsCategoryCarpenter' },
-  { key: 'painter',     icon: 'color-palette-outline', labelKey: 'hsCategoryPainter' },
-  { key: 'sewer',       icon: 'funnel-outline',        labelKey: 'hsCategorySewer' },
-  { key: 'ac_tech',     icon: 'thermometer-outline',   labelKey: 'hsCategoryAcTech' },
-  { key: 'locksmith',   icon: 'key-outline',           labelKey: 'hsCategoryLocksmith' },
-  { key: 'tiler',       icon: 'grid-outline',          labelKey: 'hsCategoryTiler' },
-  { key: 'handyman',    icon: 'hammer-outline',        labelKey: 'hsCategoryHandyman' },
-]
-
-const DISTRICT_KEYS = {
-  nicosia: 'hsDistrictNicosia', kyrenia: 'hsDistrictKyrenia',
-  famagusta: 'hsDistrictFamagusta', morphou: 'hsDistrictMorphou',
-  iskele: 'hsDistrictIskele', lefke: 'hsDistrictLefke',
-}
+import HomeServiceIcon from '../components/HomeServiceIcon'
+import { hsCategory, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 
 export default function HomeServiceProfileScreen({ provider, lang, onBack }) {
   const canCall = provider.contact_pref === 'call'     || provider.contact_pref === 'both'
@@ -29,9 +13,8 @@ export default function HomeServiceProfileScreen({ provider, lang, onBack }) {
   const phone   = provider.phone.replace(/\s/g, '')
   const waNum   = (provider.whatsapp || provider.phone).replace(/[\s+]/g, '')
 
-  const primaryCat   = CATEGORIES.find(c => c.key === provider.service_types?.[0])
-  const heroIcon     = primaryCat?.icon ?? 'hammer-outline'
-  const districtKey  = DISTRICT_KEYS[provider.district]
+  const primaryCat   = hsCategory(provider.service_types?.[0]) ?? hsCategory('handyman')
+  const districtKey  = HS_DISTRICT_LABEL_KEY[provider.district]
 
   const footerHeight = canCall && canWA ? 90 : 70
 
@@ -50,7 +33,7 @@ export default function HomeServiceProfileScreen({ provider, lang, onBack }) {
           {/* Hero */}
           <View style={s.cover}>
             <View style={s.heroIconWrap}>
-              <Ionicons name={heroIcon} size={52} color={colors.primary} />
+              <HomeServiceIcon category={primaryCat} size={52} color={colors.primary} />
             </View>
           </View>
 
@@ -82,10 +65,10 @@ export default function HomeServiceProfileScreen({ provider, lang, onBack }) {
                 <Text style={s.sectionLabel}>{t('hsServicesOffered', lang)}</Text>
                 <View style={s.chipRow}>
                   {provider.service_types.map(st => {
-                    const cat = CATEGORIES.find(c => c.key === st)
+                    const cat = hsCategory(st)
                     return (
                       <View key={st} style={s.chip}>
-                        {cat && <Ionicons name={cat.icon} size={13} color={colors.primary} />}
+                        <HomeServiceIcon category={cat} size={13} color={colors.primary} />
                         <Text style={s.chipText}>{cat ? t(cat.labelKey, lang) : st}</Text>
                       </View>
                     )

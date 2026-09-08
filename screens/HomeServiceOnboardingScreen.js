@@ -10,25 +10,9 @@ import { supabase } from '../lib/supabase'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
+import HomeServiceIcon from '../components/HomeServiceIcon'
+import { HS_CATEGORIES, HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 
-const CATEGORIES = [
-  { key: 'plumber',     icon: 'water-outline',        labelKey: 'hsCategoryPlumber' },
-  { key: 'electrician', icon: 'flash-outline',         labelKey: 'hsCategoryElectrician' },
-  { key: 'carpenter',   icon: 'construct-outline',     labelKey: 'hsCategoryCarpenter' },
-  { key: 'painter',     icon: 'color-palette-outline', labelKey: 'hsCategoryPainter' },
-  { key: 'sewer',       icon: 'funnel-outline',        labelKey: 'hsCategorySewer' },
-  { key: 'ac_tech',     icon: 'thermometer-outline',   labelKey: 'hsCategoryAcTech' },
-  { key: 'locksmith',   icon: 'key-outline',           labelKey: 'hsCategoryLocksmith' },
-  { key: 'tiler',       icon: 'grid-outline',          labelKey: 'hsCategoryTiler' },
-  { key: 'handyman',    icon: 'hammer-outline',        labelKey: 'hsCategoryHandyman' },
-]
-
-const DISTRICTS     = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke']
-const DISTRICT_KEYS = {
-  nicosia: 'hsDistrictNicosia', kyrenia: 'hsDistrictKyrenia',
-  famagusta: 'hsDistrictFamagusta', morphou: 'hsDistrictMorphou',
-  iskele: 'hsDistrictIskele', lefke: 'hsDistrictLefke',
-}
 const CONTACT_PREFS = [
   { key: 'whatsapp', labelKey: 'hsContactPrefWA',   icon: 'logo-whatsapp' },
   { key: 'call',     labelKey: 'hsContactPrefCall',  icon: 'call-outline' },
@@ -162,6 +146,11 @@ export default function HomeServiceOnboardingScreen({ session, lang, onClose, on
         whatsapp:        whatsapp.trim() || null,
         contact_pref:    contactPref,
         district,
+        // Self-registration is single-district, so coverage IS the district. Sent
+        // explicitly rather than defaulted in the database: coverage_districts is NOT
+        // NULL with no DEFAULT, so a write path that forgets it fails loudly at the
+        // boundary instead of quietly landing a provider nobody can filter to.
+        coverage_districts: [district],
         service_types:   serviceTypes,
         description:     description.trim() || null,
         status:          'pending',
@@ -300,14 +289,14 @@ export default function HomeServiceOnboardingScreen({ session, lang, onClose, on
           {/* District */}
           <Field label={t('hsRegisterDistrict', lang)}>
             <View style={s.chipRow}>
-              {DISTRICTS.map(d => (
+              {HS_DISTRICTS.map(d => (
                 <TouchableOpacity
                   key={d}
                   style={[s.selChip, district === d && s.selChipActive]}
                   onPress={() => setDistrict(d)}
                 >
                   <Text style={[s.selChipText, district === d && s.selChipTextActive]}>
-                    {t(DISTRICT_KEYS[d], lang)}
+                    {t(HS_DISTRICT_LABEL_KEY[d], lang)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -317,7 +306,7 @@ export default function HomeServiceOnboardingScreen({ session, lang, onClose, on
           {/* Services (multi-select) */}
           <Field label={t('hsRegisterServices', lang)}>
             <View style={s.chipRow}>
-              {CATEGORIES.map(c => {
+              {HS_CATEGORIES.map(c => {
                 const selected = serviceTypes.includes(c.key)
                 return (
                   <TouchableOpacity
@@ -325,8 +314,8 @@ export default function HomeServiceOnboardingScreen({ session, lang, onClose, on
                     style={[s.selChip, selected && s.selChipActive]}
                     onPress={() => toggleService(c.key)}
                   >
-                    <Ionicons
-                      name={c.icon}
+                    <HomeServiceIcon
+                      category={c}
                       size={13}
                       color={selected ? colors.primary : colors.textSecondary}
                     />
