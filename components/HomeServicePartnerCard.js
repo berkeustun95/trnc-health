@@ -1,6 +1,8 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import HomeServiceIcon from './HomeServiceIcon'
+import PartnerLogoStrip from './PartnerLogoStrip'
+import { partnerLogo } from '../constants/partnerAssets'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { hsCategory, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
@@ -24,40 +26,17 @@ import { logContactEvent } from '../utils/logContactEvent'
 // link that goes nowhere tells the user the app is broken rather than that the firm has
 // no website.
 
-// Logos are bundled, not fetched: a partner logo on the first screen of a module must
-// not depend on a network round-trip, and there is no storage bucket for these.
-// The map lives HERE and not in constants/partners.js because require() is what would
-// stop plain Node importing that config — see its header.
-const LOGOS = {
-  // 'tadilart-cyprus': require('../assets/partners/tadilart-cyprus.png'),
-}
-
-function initials(name) {
-  const words = String(name || '').replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean)
-  if (!words.length) return '?'
-  if (words.length === 1) return words[0].slice(0, 2).toLocaleUpperCase('tr')
-  return (words[0][0] + words[1][0]).toLocaleUpperCase('tr')
-}
-
-function PartnerLogo({ slug, name, size }) {
-  const src = LOGOS[slug]
-  // overflow:'hidden' is required for borderRadius to clip an Image child on Android.
-  const box = [s.logoBox, { width: size, height: size, borderRadius: Math.round(size * 0.22) }]
-  if (src) {
-    return (
-      <View style={box}>
-        <Image source={src} style={s.logoImg} resizeMode="cover" accessibilityLabel={name} />
-      </View>
-    )
-  }
-  return (
-    <View style={[box, s.logoMono]}>
-      <Text style={[s.logoMonoText, { fontSize: Math.round(size * 0.36) }]} numberOfLines={1}>
-        {initials(name)}
-      </Text>
-    </View>
-  )
-}
+// ─── THE LOGO IS A WIDE STRIP, STACKED ABOVE THE NAME ──────────────────────
+//
+// It replaced a 46px square, which rendered TadilArt's 3.5:1 wordmark about 11pt tall
+// and unreadable. The strip is 140x40 here and 200x56 on the detail hero.
+//
+// STACKED, not beside the name, and that is a measurement fact rather than taste: the
+// card's inner width at 320dp is 244pt, so a 140pt strip in the identity ROW would have
+// left the name about 92pt — and "TadilArt Cyprus" measures ~128pt at 16/700. The name
+// would have ellipsised to "TadilArt Cyp…" on every narrow phone. Stacking gives both
+// the full width.
+const LOGO_STRIP = { width: 140, height: 40 }
 
 export default function HomeServicePartnerCard({
   partner,          // the constants/partners.js entry
@@ -65,7 +44,7 @@ export default function HomeServicePartnerCard({
   lang,
   serviceContext,   // { tr, en } service name for the WhatsApp draft, or null on the landing
   region,           // active district chip, for logContactEvent; null on the landing
-  logoSize = 46,
+  onPress,          // opens the partner detail screen; omit and the card is inert
 }) {
   // The row is the authority on existence. It is fetched with status='active', so a
   // partner that has not been approved yet simply has no card — which is the same
@@ -107,20 +86,30 @@ export default function HomeServicePartnerCard({
   // render as "hsPartnerTadilartTagline" on someone's phone. Absent, not raw.
   const showTagline = !!tagline && tagline !== partner.taglineKey
 
+  // The whole card opens the detail screen; the two buttons do not. No plumbing is
+  // needed for that — React Native's responder system gives the gesture to the INNERMOST
+  // touchable, so a tap on WhatsApp never reaches this wrapper. `Wrap` degrades to a
+  // plain View when no onPress is supplied, so a future inert mount is not a special case.
+  const Wrap = onPress ? TouchableOpacity : View
+  const wrapProps = onPress ? { onPress, activeOpacity: 0.9 } : {}
+
   return (
-    <View style={s.card}>
+    <Wrap style={s.card} {...wrapProps}>
       <View style={s.badge}>
         <Ionicons name="ribbon-outline" size={12} color={colors.accent} />
         <Text style={s.badgeText}>{t('hsPartnerBadge', lang)}</Text>
       </View>
 
-      <View style={s.identity}>
-        <PartnerLogo slug={partner.slug} name={row.name} size={logoSize} />
-        <View style={s.identityText}>
-          <Text style={s.name} numberOfLines={1}>{row.name}</Text>
-          {showTagline && <Text style={s.tagline} numberOfLines={2}>{tagline}</Text>}
-        </View>
-      </View>
+      <PartnerLogoStrip
+        source={partnerLogo(partner)}
+        name={row.name}
+        width={LOGO_STRIP.width}
+        height={LOGO_STRIP.height}
+        style={s.logoStrip}
+      />
+
+      <Text style={s.name} numberOfLines={1}>{row.name}</Text>
+      {showTagline && <Text style={s.tagline} numberOfLines={2}>{tagline}</Text>}
 
       {services.length > 0 && (
         <View style={s.chipRow}>
@@ -154,7 +143,7 @@ export default function HomeServicePartnerCard({
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </Wrap>
   )
 }
 
@@ -169,17 +158,10 @@ const s = StyleSheet.create({
                    borderRadius: 10, marginBottom: 10 },
   badgeText:     { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.accent },
 
-  identity:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  identityText:  { flex: 1 },
+  logoStrip:     { marginBottom: 10 },
   name:          { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   tagline:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                    lineHeight: 18, marginTop: 2 },
-
-  logoBox:       { backgroundColor: colors.sand, overflow: 'hidden', flexShrink: 0,
-                   alignItems: 'center', justifyContent: 'center' },
-  logoImg:       { width: '100%', height: '100%' },
-  logoMono:      { backgroundColor: colors.primary },
-  logoMonoText:  { color: '#FFFFFF', fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
 
   chipRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
   chip:          { flexDirection: 'row', alignItems: 'center', gap: 4,

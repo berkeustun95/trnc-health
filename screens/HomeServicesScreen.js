@@ -17,6 +17,7 @@ import { HS_CATEGORIES, hsCategory, HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from '
 import { HS_PARTNERS, HS_PARTNER_IDS, hsPartner } from '../constants/partners'
 import { PREVIEW_PENDING_PARTNERS } from '../constants/flags'
 import HomeServiceProfileScreen from './HomeServiceProfileScreen'
+import HomeServicePartnerScreen from './HomeServicePartnerScreen'
 import HomeServiceOnboardingScreen from './HomeServiceOnboardingScreen'
 
 // ─── The status every home_services read in this file filters on ────────────
@@ -129,6 +130,10 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [selectedDistrict, setSelectedDistrict] = useState(null)
   const [selectedProvider, setSelectedProvider] = useState(null)
+  // The partner detail overlay. Held as a { partner, row } pair rather than an id,
+  // because the row is already in hand at every tap site and re-fetching it would give
+  // the screen a loading state it does not need.
+  const [selectedPartner,  setSelectedPartner]  = useState(null)
   const [showOnboarding,   setShowOnboarding]   = useState(false)
   const [providers, setProviders]               = useState([])
   const [loading, setLoading]                   = useState(false)
@@ -189,7 +194,12 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   }
 
   function handleBack() {
-    if (selectedProvider) {
+    // The partner overlay is FIRST in the chain: it can be opened from the category
+    // landing, where selectedCategory is null, so any later branch would close the
+    // module instead of the overlay.
+    if (selectedPartner) {
+      setSelectedPartner(null)
+    } else if (selectedProvider) {
       setSelectedProvider(null)
     } else if (selectedCategory) {
       setSelectedCategory(null)
@@ -207,6 +217,19 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
         lang={lang}
         onClose={() => setShowOnboarding(false)}
         onSubmitted={() => setShowOnboarding(false)}
+      />
+    )
+  }
+
+  if (selectedPartner) {
+    return (
+      <HomeServicePartnerScreen
+        partner={selectedPartner.partner}
+        row={selectedPartner.row}
+        lang={lang}
+        serviceContext={selectedPartner.serviceContext}
+        region={selectedPartner.region}
+        onBack={() => setSelectedPartner(null)}
       />
     )
   }
@@ -275,6 +298,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
                   lang={lang}
                   serviceContext={null}
                   region={null}
+                  onPress={() => setSelectedPartner({ partner, row, serviceContext: null, region: null })}
                 />
               </View>
             )
@@ -355,6 +379,9 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
                           lang={lang}
                           serviceContext={serviceContext}
                           region={selectedDistrict}
+                          onPress={() => setSelectedPartner({
+                            partner: hsPartner(row.id), row, serviceContext, region: selectedDistrict,
+                          })}
                         />
                       ))}
                     </View>

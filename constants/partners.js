@@ -30,20 +30,105 @@ export const HS_PARTNERS = [
     // truth, and it is the one an admin can correct. This is for logs and asset lookup.
     name:       'TadilArt Cyprus',
     taglineKey: 'hsPartnerTadilartTagline',
-    // Phase 3 renders this on the partner detail screen. The key is declared now so the
-    // config shape is complete; the nine strings are NOT written yet, because partner
-    // marketing copy nobody has approved is not something to invent.
+    // Rendered by the partner detail screen. The nine strings exist as of Phase 3 and are
+    // a DRAFT pending the partner's approval — if they are ever pulled, deleting the key
+    // or the strings hides the block rather than printing the key name, because both the
+    // card and the detail screen compare t()'s result against the key itself.
     aboutKey:   'hsPartnerTadilartAbout',
-    // Pending. The card falls back to an initials monogram, which is the finished empty
-    // state and not a placeholder box — same posture as components/TowingLogo.js.
-    logo:       null,
-    // Deferred. The detail screen hides the whole gallery section when this is empty;
-    // it never renders empty frames.
-    gallery:    [],
+    // Asset KEYS, not files. constants/partnerAssets.js is the only place a key becomes
+    // a require(); an unwired key yields undefined and the logo falls back to a monogram.
+    logo:       'tadilart/logo',
+    logoOnDark: 'tadilart/logo-onDark',
+
+    // ─── Gallery: each project declares its OWN mode ──────────────────────
+    //
+    // Two modes because two projects genuinely differ in what the photos are FOR, and
+    // forcing one shape on both loses the point of the other. A bathroom is a
+    // TRANSFORMATION: the whole claim is this room became that room, and it only lands
+    // if the two frames are adjacent. An extension is a PROCESS: nobody doubts that a
+    // terrace can become a room, the question is whether these people can build it, and
+    // the answer is the steel going up in step 3 — which a before/after pair deletes.
+    //
+    // A third project gets whichever mode fits it; `mode` is per project, never per
+    // partner, so a firm can have both. An unknown mode renders nothing rather than
+    // guessing.
+    //
+    // LABELS ARE i18n KEYS. Never text in the image: the source posts had English
+    // "Before" and "In Progress" burned into the artwork, which is a label that seven of
+    // our nine locales cannot read and no translation can reach. Those crops are gone
+    // and must not come back.
+    gallery: [
+      {
+        id: 'bathroom',
+        mode: 'pairs',
+        titleKey: 'hsPartnerProjBathroom',
+        pairs: [
+          { labelKey: 'hsPartnerPairWc',     before: 'tadilart/bathroom/before_1_wc',     after: 'tadilart/bathroom/after_1_wide' },
+          { labelKey: 'hsPartnerPairShower', before: 'tadilart/bathroom/before_2_shower', after: 'tadilart/bathroom/after_3_shower' },
+          { labelKey: 'hsPartnerPairBasin',  before: 'tadilart/bathroom/before_3_basin',  after: 'tadilart/bathroom/after_5_basin' },
+        ],
+        // Frames with no counterpart. They are worth showing and they are NOT pairs —
+        // filing them as one would mean inventing a "before" for a finished vanity.
+        extra: [
+          'tadilart/bathroom/progress_1',
+          'tadilart/bathroom/after_2_vanity',
+          'tadilart/bathroom/after_4_wc',
+          'tadilart/bathroom/after_6_door',
+        ],
+      },
+      {
+        id: 'extension',
+        mode: 'sequence',
+        titleKey: 'hsPartnerProjExtension',
+        // ORDER IS THE CONTENT. Array order is the render order; there is no sort key,
+        // because a numeric field invites someone to renumber and lose the sequence.
+        steps: [
+          { labelKey: 'hsPartnerBefore',       image: 'tadilart/extension/01_oncesi' },
+          { labelKey: 'hsPartnerStepStart',    image: 'tadilart/extension/02_baslangic' },
+          { labelKey: 'hsPartnerStepSteel',    image: 'tadilart/extension/03_celik' },
+          { labelKey: 'hsPartnerStepBuild',    image: 'tadilart/extension/04_insa' },
+          { labelKey: 'hsPartnerStepFacade',   image: 'tadilart/extension/05_cephe' },
+          { labelKey: 'hsPartnerStepResult',   image: 'tadilart/extension/06_sonuc' },
+        ],
+      },
+    ],
   },
 ]
 
 export const HS_PARTNER_IDS = HS_PARTNERS.map(p => p.id)
+
+// ─── Gallery derivation — pure, and the ONLY place emptiness is decided ─────
+//
+// Takes the resolver (constants/partnerAssets.js's `partnerAsset`) rather than importing
+// it, so this stays require()-free and a Node harness can drive it with a stub map. The
+// screen renders exactly what this returns and makes no emptiness decisions of its own;
+// a section that is hidden is hidden HERE, once, for both modes.
+//
+// THE RULE FOR A HALF-MISSING PAIR: drop it. A pair whose `after` has not been wired
+// would otherwise render as a lone "before" photo captioned Öncesi — a picture of a
+// derelict bathroom presented as a partner's portfolio, which is worse than showing
+// nothing. A sequence, by contrast, keeps whatever steps resolve: it is a story with a
+// gap, not a claim inverted.
+export function partnerGallery(partner, resolve) {
+  const out = []
+  for (const project of partner?.gallery || []) {
+    if (project.mode === 'pairs') {
+      const pairs = (project.pairs || [])
+        .map(p => ({ labelKey: p.labelKey, before: resolve(p.before), after: resolve(p.after) }))
+        .filter(p => p.before && p.after)
+      const extra = (project.extra || []).map(resolve).filter(Boolean)
+      if (pairs.length || extra.length) out.push({ ...project, pairs, extra })
+    } else if (project.mode === 'sequence') {
+      const steps = (project.steps || [])
+        .map(st => ({ labelKey: st.labelKey, image: resolve(st.image) }))
+        .filter(st => st.image)
+      if (steps.length) out.push({ ...project, steps })
+    }
+    // An unrecognised mode contributes nothing. Silently rendering it as one of the two
+    // known shapes would show a partner's photos in an order nobody chose.
+  }
+  return out
+}
 
 const BY_ID = Object.fromEntries(HS_PARTNERS.map(p => [p.id, p]))
 export const hsPartner = id => BY_ID[id]

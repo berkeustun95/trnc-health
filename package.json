@@ -52,6 +52,7 @@
     "map:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-map-sources.mjs",
     "drift:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.mjs --check",
     "drift:regen": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.mjs",
+    "partners:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-partner-assets.mjs",
     "i18n:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-i18n-duplicates.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-i18n-coverage.mjs",
     "i18n:dupes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-i18n-duplicates.mjs",
     "duty:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duty-staleness.mjs",
