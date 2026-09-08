@@ -15,8 +15,27 @@ import HomeServiceIcon from '../components/HomeServiceIcon'
 import HomeServicePartnerCard from '../components/HomeServicePartnerCard'
 import { HS_CATEGORIES, hsCategory, HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 import { HS_PARTNERS, HS_PARTNER_IDS, hsPartner } from '../constants/partners'
+import { PREVIEW_PENDING_PARTNERS } from '../constants/flags'
 import HomeServiceProfileScreen from './HomeServiceProfileScreen'
 import HomeServiceOnboardingScreen from './HomeServiceOnboardingScreen'
+
+// ─── The status every home_services read in this file filters on ────────────
+//
+// ONE expression, read by BOTH the partner mount fetch and loadProviders, so previewing
+// an unapproved partner is a single boolean in constants/flags.js and not a hand-edit in
+// two places — one of which is the one that gets forgotten on the way back.
+//
+// `__DEV__ &&` is load-bearing, not decoration. Metro substitutes __DEV__ with the
+// literal `false` in a release bundle, so this whole expression constant-folds to
+// 'active' and the shipped code contains no branch: a stray `true` in flags.js cannot
+// reach a user through the app. scripts/check-module-flags.mjs holds the other half —
+// it stops the flip being pushed or riding out on `npm run ota`, which the fold cannot,
+// because `eas update` bundles the working tree.
+//
+// Do NOT approve the partner row to preview it instead. search_content selects
+// home_services on status='active' ALONE and ignores MODULE_FLAGS, so an approved row is
+// findable in global search while this module still renders Coming Soon.
+const HS_READ_STATUS = __DEV__ && PREVIEW_PENDING_PARTNERS ? 'pending' : 'active'
 
 function districtLabel(d, lang) {
   const key = HS_DISTRICT_LABEL_KEY[d]
@@ -117,17 +136,17 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   // so the pin and the list can never disagree — see the note on `pinned` below.
   const [partnerRows, setPartnerRows]           = useState([])
 
-  // status='active' is asserted HERE and not assumed from the config: a partner row
-  // seeded but not yet approved must produce no card at all. `.in()` on an empty array
-  // is a valid query returning nothing, so a build with no partners is not a special
-  // case.
+  // The status filter is asserted HERE and not assumed from the config: a partner row
+  // seeded but not yet approved must produce no card at all in a release build. `.in()`
+  // on an empty array is a valid query returning nothing, so a build with no partners is
+  // not a special case.
   useEffect(() => {
     let alive = true
     supabase
       .from('home_services')
       .select('*')
       .in('id', HS_PARTNER_IDS)
-      .eq('status', 'active')
+      .eq('status', HS_READ_STATUS)
       // BOTH handlers. A supabase-js query builder is a lazy thenable, and .then() with
       // only a success arm turns a network failure into an unhandled rejection — the
       // same reason utils/logContactEvent.js passes two. A failed fetch here means no
@@ -144,7 +163,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
     let query = supabase
       .from('home_services')
       .select('*')
-      .eq('status', 'active')
+      .eq('status', HS_READ_STATUS)
       .contains('service_types', [category])
       .order('verified', { ascending: false })
       .order('name')

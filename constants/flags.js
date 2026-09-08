@@ -182,3 +182,31 @@ export const HOME_V2_LIVE = true   // live 2026-09-08
 //   is_active DEFAULT, and not this flag, is what keeps a draft campaign invisible.
 export const AD_BANNERS_LIVE = false
 
+
+// Ev Hizmetleri partner preview. false = the module reads home_services rows with
+// status='active', which is what production does and the only thing users ever see.
+// true = it reads status='pending' instead, so a seeded-but-unapproved partner row
+// renders and the pinned card, the district-awareness and the list dedupe can all be
+// checked on device before the partner is approved.
+//
+// ⚠ IT REPLACES A HAND-EDIT, WHICH IS THE POINT. Previewing used to mean editing
+//   `.eq('status', 'active')` in TWO places in HomeServicesScreen and remembering to
+//   revert BOTH. One of those reverts is the one that gets forgotten, and a forgotten
+//   one ships a directory that shows nothing — every active provider filtered out by a
+//   status nobody has.
+//
+// ⚠ UNREACHABLE IN PRODUCTION, NOT MERELY DEFAULTED OFF. HomeServicesScreen reads it as
+//   `__DEV__ && PREVIEW_PENDING_PARTNERS`. Metro substitutes `__DEV__` with the literal
+//   `false` in a release bundle, so the whole expression constant-folds and the shipped
+//   code contains the string 'active' and no branch at all. A stray `true` left here
+//   cannot reach a user through the app, only through a dev build.
+//
+//   That is TWO independent guards, deliberately, because they fail differently: the
+//   dead-code fold protects USERS (a flip cannot change a release bundle), and the
+//   EXPECTED_SCALARS baseline in scripts/check-module-flags.mjs protects the REPO (a
+//   flip cannot be pushed or ride out on `npm run ota`). Neither substitutes for the
+//   other — `eas update` bundles the working tree and never runs a release fold.
+//
+// NOT a MODULE_FLAGS key: it gates nothing and reveals nothing. It changes which rows a
+// developer's own build queries. Same resolution as SHOW_WIZARD_HEADINGS.
+export const PREVIEW_PENDING_PARTNERS = false
