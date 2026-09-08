@@ -117,7 +117,7 @@ const EXPECTED_SCALARS = {
   // It is a scalar and not a MODULE_FLAGS key on purpose — see the note in flags.js.
   // Putting it in that map would fail this script's own waitlist and notify-path checks
   // against a perfectly correct app.
-  HOME_V2_LIVE:          false,
+  HOME_V2_LIVE:          true,   // live 2026-09-08 — first OTA that reaches users
   // Tile-label typeface experiment (Inter vs Manrope). Neither value is a launch, but it
   // is compared ON DEVICE by flipping it, and a working-tree flip is exactly what
   // `eas update` bundles. Baselined so the comparison cannot ship by accident.

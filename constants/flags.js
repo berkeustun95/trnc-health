@@ -155,7 +155,7 @@ export const TILE_FONT_MANROPE = false
 //   ever reached that path, an incomplete profile would be handed the whole app. Both
 //   flag states must leave that path byte-identical, and `npm run profile:check` is what
 //   says so.
-export const HOME_V2_LIVE = false
+export const HOME_V2_LIVE = true   // live 2026-09-08
 
 // Banner advertising (ad_banners). false = no banner slot renders anywhere, whatever is in
 // the table — AdSlot returns null before it even reads. true = a sold, active, in-window ad
