@@ -6101,7 +6101,7 @@ const translations = {
     hsTitle: 'Services à domicile', hsSubtitle: 'Trouvez des artisans de confiance à Chypre du Nord',
     hsCategoryPlumber: 'Plombier', hsCategoryElectrician: 'Électricien', hsCategoryCarpenter: 'Charpentier',
     hsCategoryPainter: 'Peintre', hsCategorySewer: 'Débouchage', hsCategoryAcTech: 'Technicien climatisation',
-    hsCategoryLocksmith: 'Serrurier', hsCategoryTiler: 'Carreleur', hsCategoryHandyman: 'Homme à tout faire',
+    hsCategoryLocksmith: 'Serrurier', hsCategoryTiler: 'Carreleur', hsCategoryHandyman: 'Bricoleur',
     hsCategoryRenovation: 'Rénovation de maison', hsCategoryBathroom: 'Rénovation salle de bains',
     hsCategoryKitchen: 'Rénovation de cuisine',
     hsDistrictAll: 'Tous', hsAllDistricts: 'Tous les quartiers',
