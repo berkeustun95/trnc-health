@@ -218,3 +218,33 @@ export const AD_BANNERS_LIVE = false
 // NOT a MODULE_FLAGS key: it gates nothing and reveals nothing. It changes where a
 // developer's own build gets one row from. Same resolution as SHOW_WIZARD_HEADINGS.
 export const PREVIEW_PENDING_PARTNERS = false
+
+// Ev Hizmetleri self-registration. false = the module is PARTNER-ONLY: no "List your
+// services" CTA, no onboarding form, no provider dashboard route, and no admin approval
+// queue. true restores the open directory.
+//
+// A POLICY, EXPRESSED AS A FLAG, and the flag is only the app half. The database half
+// shipped in 20261012 and is not reversed by flipping this: hs_insert_self is
+// WITH CHECK (false), so the API refuses a self-registration INSERT whatever the UI
+// shows, and hs_select_public requires is_partner, so a non-partner row is unreadable
+// even if one existed. Flipping this back to true gives you the FORMS again and a
+// database that still rejects what they submit — reverting the policy properly means
+// reverting that migration too. Deliberate: a UI-only revert would otherwise look like
+// it worked and fail at the moment a real tradesperson pressed Submit.
+//
+// ⚠ APPROVING THE PARTNER IS NO LONGER A BUTTON. The AdminScreen tab this hides was the
+//   only surface that could move a home_services row from pending to active, because
+//   hs_guard_owner_update raises on a NULL auth.uid() and so blocks a plain UPDATE from
+//   the SQL editor. Going live with TadilArt is therefore a reviewed SQL step —
+//   DISABLE TRIGGER / UPDATE / ENABLE TRIGGER, the same shape 20261010 and 20261012 both
+//   use — and that is the right shape for a commercial act that happens once, rather
+//   than a queue action somebody could take by reflex.
+//
+// Nothing is stranded by the provider-route gate: confirmed 2026-09-09 that NO account
+// anywhere holds role='home_service_provider'. If one ever does while this is false,
+// they fall through to the ordinary customer hub rather than to a dashboard for a
+// listing they cannot have.
+//
+// NOT a MODULE_FLAGS key: it does not gate a module, it gates a FLOW inside one that is
+// itself still dark. Same resolution as PREVIEW_PENDING_PARTNERS.
+export const HS_SELF_REGISTRATION = false

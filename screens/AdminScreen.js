@@ -9,6 +9,7 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { HS_SELF_REGISTRATION } from '../constants/flags'
 import { storageObjectPath } from '../utils/facilityUtils'
 import { invalidateBlockedTerms } from '../utils/profanity'
 import { normalizeForModeration } from '../utils/moderationNormalize'
@@ -56,7 +57,18 @@ async function updateOrAlert(table, patch, id, label) {
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Broadcast', 'Events', 'Properties', 'Agents', 'HomeServices', 'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Moderation']
+// HomeServices is spread in rather than listed, because it is the one tab whose presence
+// is a policy question. It is the ADMIN half of a flow whose user half is hidden — an
+// approval queue for submissions that can no longer be made, since hs_insert_self has
+// been WITH CHECK (false) since 20261012.
+//
+// ⚠ HIDING IT REMOVES THE ONLY BUTTON THAT CAN ACTIVATE A home_services ROW.
+//   hs_guard_owner_update raises on a NULL auth.uid(), so a plain UPDATE from the SQL
+//   editor cannot do it either. Taking TadilArt live is now a reviewed
+//   DISABLE TRIGGER / UPDATE / ENABLE TRIGGER step — see constants/flags.js.
+const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Broadcast', 'Events', 'Properties', 'Agents',
+  ...(HS_SELF_REGISTRATION ? ['HomeServices'] : []),
+  'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Moderation']
 
 async function sendPushNotification(token, title, body, data = {}) {
   try {
@@ -400,7 +412,12 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingEvents ?? 0)   > 0 && { label: 'Events awaiting approval',      count: stats.pendingEvents,          tab: 'Events',      color: colors.primary },
     (stats.pendingProperties ?? 0) > 0 && { label: 'Property listings to review', count: stats.pendingProperties,      tab: 'Properties',  color: colors.primary },
     (stats.pendingAgents ?? 0)      > 0 && { label: 'Agent applications pending',       count: stats.pendingAgents,         tab: 'Agents',       color: '#7C3AED' },
-    (stats.pendingHomeServices ?? 0) > 0 && { label: 'Home service providers pending',  count: stats.pendingHomeServices,   tab: 'HomeServices', color: colors.primary },
+    // The COUNT is still queried — it sits at a fixed position in a 20-entry positional
+    // Promise.all destructure and removing it would shift every later binding for no gain.
+    // Only the ROW is gated, which is the half a human sees. Without this the dashboard
+    // advertises a queue of 1 (TadilArt, seeded pending) pointing at a tab that is no
+    // longer in TABS.
+    HS_SELF_REGISTRATION && (stats.pendingHomeServices ?? 0) > 0 && { label: 'Home service providers pending',  count: stats.pendingHomeServices,   tab: 'HomeServices', color: colors.primary },
     (stats.pendingTransport ?? 0)    > 0 && { label: 'Transport providers pending',      count: stats.pendingTransport,       tab: 'Transport',    color: colors.primary },
     (stats.pendingInsurance ?? 0)    > 0 && { label: 'Insurance companies pending',      count: stats.pendingInsurance,       tab: 'Insurance',    color: colors.primary },
     (stats.pendingGrooming ?? 0)     > 0 && { label: 'Grooming providers pending',       count: stats.pendingGrooming,        tab: 'Grooming',     color: colors.primary },

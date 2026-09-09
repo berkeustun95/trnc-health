@@ -141,6 +141,11 @@ const EXPECTED_SCALARS = {
   // without ever asking whether the flag was meant to be on. Belt and braces, and the
   // braces are the ones that hold for OTA.
   PREVIEW_PENDING_PARTNERS: false,
+  // Ev Hizmetleri self-registration. Unlike the scalars above it is not a preview or a
+  // look experiment — it expresses a commercial POLICY, and its database half (20261012)
+  // cannot be reversed by flipping a boolean. Baselined so a flip cannot be pushed or
+  // ride out on `npm run ota` without somebody deciding the directory is open again.
+  HS_SELF_REGISTRATION:  false,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

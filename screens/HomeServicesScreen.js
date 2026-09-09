@@ -15,7 +15,7 @@ import HomeServiceIcon from '../components/HomeServiceIcon'
 import HomeServicePartnerCard from '../components/HomeServicePartnerCard'
 import { HS_CATEGORIES, hsCategory, HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 import { HS_PARTNERS, HS_PARTNER_IDS, hsPartner } from '../constants/partners'
-import { PREVIEW_PENDING_PARTNERS } from '../constants/flags'
+import { PREVIEW_PENDING_PARTNERS, HS_SELF_REGISTRATION } from '../constants/flags'
 import { PREVIEW_PARTNER_ROWS, withPreviewPartners } from '../constants/partnerPreview'
 import HomeServiceProfileScreen from './HomeServiceProfileScreen'
 import HomeServicePartnerScreen from './HomeServicePartnerScreen'
@@ -222,7 +222,12 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
     }
   }
 
-  if (showOnboarding) {
+  // HS_SELF_REGISTRATION guards the RENDER, not only the button that sets the state.
+  // Gating the CTA alone would leave the form one stale `showOnboarding` away — and it
+  // would submit into an API that now refuses it (hs_insert_self is WITH CHECK (false)
+  // since 20261012), so the user would fill the whole thing in and be rejected by a raw
+  // Postgres error at the last step.
+  if (HS_SELF_REGISTRATION && showOnboarding) {
     return (
       <HomeServiceOnboardingScreen
         session={session}
@@ -327,16 +332,21 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
             ))}
           </View>
 
-          <TouchableOpacity style={s.ctaCard} onPress={() => { if (onRequireAccount?.('gateHomeService')) return; setShowOnboarding(true) }} activeOpacity={0.8}>
-            <View style={s.ctaIconWrap}>
-              <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.ctaCardTitle}>{t('hsRegisterCTA', lang)}</Text>
-              <Text style={s.ctaCardSub}>{t('hsRegisterCTASub', lang)}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          {/* Absent, not disabled. A greyed-out "List your services" would tell a
+              tradesperson the door exists and is shut on them; nothing at all says the
+              module is a curated list, which is what it now is. */}
+          {HS_SELF_REGISTRATION && (
+            <TouchableOpacity style={s.ctaCard} onPress={() => { if (onRequireAccount?.('gateHomeService')) return; setShowOnboarding(true) }} activeOpacity={0.8}>
+              <View style={s.ctaIconWrap}>
+                <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.ctaCardTitle}>{t('hsRegisterCTA', lang)}</Text>
+                <Text style={s.ctaCardSub}>{t('hsRegisterCTASub', lang)}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
         </ScrollView>
       ) : (
         <View style={{ flex: 1 }}>

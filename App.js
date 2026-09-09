@@ -19,7 +19,7 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION } from './constants/flags'
 import { promosAllowed } from './constants/homeStrip'
 import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
@@ -1370,7 +1370,12 @@ export default function App() {
     content = <EstateAgentDashboardScreen session={session} lang={lang} />
   } else if (profile.role === 'organizer') {
     content = <OrganizerScreen session={session} lang={lang} />
-  } else if (profile.role === 'home_service_provider') {
+  // Gated with the rest of self-registration. Nothing is stranded: confirmed 2026-09-09
+  // that no account anywhere holds this role. If one ever does while the flag is false it
+  // falls through to the ordinary customer hub, which is the right landing for someone
+  // who cannot have a listing — a dashboard for a listing that cannot exist is the broken
+  // outcome, not the safe one.
+  } else if (HS_SELF_REGISTRATION && profile.role === 'home_service_provider') {
     content = <HomeServiceDashboardScreen session={session} lang={lang} />
   } else if (profile.role === 'insurance_provider') {
     content = <InsuranceDashboardScreen session={session} lang={lang} />
