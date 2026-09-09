@@ -16,27 +16,28 @@ import HomeServicePartnerCard from '../components/HomeServicePartnerCard'
 import { HS_CATEGORIES, hsCategory, HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 import { HS_PARTNERS, HS_PARTNER_IDS, hsPartner } from '../constants/partners'
 import { PREVIEW_PENDING_PARTNERS } from '../constants/flags'
+import { PREVIEW_PARTNER_ROWS, withPreviewPartners } from '../constants/partnerPreview'
 import HomeServiceProfileScreen from './HomeServiceProfileScreen'
 import HomeServicePartnerScreen from './HomeServicePartnerScreen'
 import HomeServiceOnboardingScreen from './HomeServiceOnboardingScreen'
 
-// ─── The status every home_services read in this file filters on ────────────
-//
-// ONE expression, read by BOTH the partner mount fetch and loadProviders, so previewing
-// an unapproved partner is a single boolean in constants/flags.js and not a hand-edit in
-// two places — one of which is the one that gets forgotten on the way back.
+// ─── Partner preview ────────────────────────────────────────────────────────
 //
 // `__DEV__ &&` is load-bearing, not decoration. Metro substitutes __DEV__ with the
-// literal `false` in a release bundle, so this whole expression constant-folds to
-// 'active' and the shipped code contains no branch: a stray `true` in flags.js cannot
-// reach a user through the app. scripts/check-module-flags.mjs holds the other half —
-// it stops the flip being pushed or riding out on `npm run ota`, which the fold cannot,
-// because `eas update` bundles the working tree.
+// literal `false` in a release bundle, so every branch below constant-folds away and the
+// shipped code contains no preview path at all. scripts/check-module-flags.mjs holds the
+// other half — it stops the flag being pushed or riding out on `npm run ota`, which the
+// fold cannot, because `eas update` bundles the working tree.
 //
-// Do NOT approve the partner row to preview it instead. search_content selects
-// home_services on status='active' ALONE and ignores MODULE_FLAGS, so an approved row is
-// findable in global search while this module still renders Coming Soon.
-const HS_READ_STATUS = __DEV__ && PREVIEW_PENDING_PARTNERS ? 'pending' : 'active'
+// ⚠ THIS USED TO SWAP THE QUERY'S STATUS FILTER TO 'pending'. That could never work:
+//   hs_select_public exposes only status='active' rows, the caller's own rows, and
+//   everything to admins — and the seeded partner row is pending with owner_id NULL, so
+//   no customer and no anon session can read it at all. Verified against the live
+//   database: even a query with NO status filter returned zero rows, while a control
+//   asking for any active row returned three. The status-swapping mechanism is gone
+//   rather than left in place looking plausible; the fixture in constants/partnerPreview.js
+//   replaced it. See that file's header.
+const PARTNER_PREVIEW = __DEV__ && PREVIEW_PENDING_PARTNERS
 
 function districtLabel(d, lang) {
   const key = HS_DISTRICT_LABEL_KEY[d]
@@ -139,25 +140,33 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   const [loading, setLoading]                   = useState(false)
   // Landing-only. The CATEGORY lists take their pinned row out of `providers` instead,
   // so the pin and the list can never disagree — see the note on `pinned` below.
-  const [partnerRows, setPartnerRows]           = useState([])
+  const [fetchedPartnerRows, setFetchedPartnerRows] = useState([])
+  // The landing has no list query, so this is the one place the fixture is substituted
+  // wholesale. Everything downstream — the card, the detail screen, the assets, the
+  // strings — is the real thing.
+  const partnerRows = PARTNER_PREVIEW ? PREVIEW_PARTNER_ROWS : fetchedPartnerRows
 
   // The status filter is asserted HERE and not assumed from the config: a partner row
   // seeded but not yet approved must produce no card at all in a release build. `.in()`
   // on an empty array is a valid query returning nothing, so a build with no partners is
   // not a special case.
   useEffect(() => {
+    // In preview the fixture REPLACES this fetch rather than supplementing it. Leaving
+    // the query running would send a request that is guaranteed to return nothing and
+    // would make a real fetch failure indistinguishable from the normal preview state.
+    if (PARTNER_PREVIEW) return
     let alive = true
     supabase
       .from('home_services')
       .select('*')
       .in('id', HS_PARTNER_IDS)
-      .eq('status', HS_READ_STATUS)
+      .eq('status', 'active')
       // BOTH handlers. A supabase-js query builder is a lazy thenable, and .then() with
       // only a success arm turns a network failure into an unhandled rejection — the
       // same reason utils/logContactEvent.js passes two. A failed fetch here means no
       // partner card, which is the state the module already ships in.
       .then(
-        ({ data }) => { if (alive) setPartnerRows(data || []) },
+        ({ data }) => { if (alive) setFetchedPartnerRows(data || []) },
         () => {},
       )
     return () => { alive = false }
@@ -168,7 +177,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
     let query = supabase
       .from('home_services')
       .select('*')
-      .eq('status', HS_READ_STATUS)
+      .eq('status', 'active')
       .contains('service_types', [category])
       .order('verified', { ascending: false })
       .order('name')
@@ -180,7 +189,10 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
     if (district) query = query.contains('coverage_districts', [district])
 
     const { data } = await query
-    setProviders(data || [])
+    // The fixture goes INTO `providers`, not beside it, so the pin and the dedupe below
+    // run on it unchanged. Previewing a partner card through a second code path would
+    // prove nothing about the path that ships.
+    setProviders(PARTNER_PREVIEW ? withPreviewPartners(data || [], category, district) : (data || []))
     setLoading(false)
   }, [])
 

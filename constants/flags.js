@@ -183,23 +183,31 @@ export const HOME_V2_LIVE = true   // live 2026-09-08
 export const AD_BANNERS_LIVE = false
 
 
-// Ev Hizmetleri partner preview. false = the module reads home_services rows with
-// status='active', which is what production does and the only thing users ever see.
-// true = it reads status='pending' instead, so a seeded-but-unapproved partner row
-// renders and the pinned card, the district-awareness and the list dedupe can all be
+// Ev Hizmetleri partner preview. false = the module shows only what the database
+// returns, which is what production does and the only thing users ever see. true = the
+// pinned card and the partner detail screen render from a LOCAL FIXTURE
+// (constants/partnerPreview.js) that mirrors the seeded row, so the card, the district
+// awareness, the list pin and dedupe, the gallery and the contact handoff can all be
 // checked on device before the partner is approved.
 //
-// ⚠ IT REPLACES A HAND-EDIT, WHICH IS THE POINT. Previewing used to mean editing
-//   `.eq('status', 'active')` in TWO places in HomeServicesScreen and remembering to
-//   revert BOTH. One of those reverts is the one that gets forgotten, and a forgotten
-//   one ships a directory that shows nothing — every active provider filtered out by a
-//   status nobody has.
+// ⚠ IT IS A FIXTURE AND NOT A QUERY, AND THAT IS NOT A SHORTCUT. This flag used to swap
+//   the query's status filter to 'pending'. It could never have worked: hs_select_public
+//   exposes status='active' rows, the caller's own rows, and everything to admins — and
+//   the seeded row is pending with owner_id NULL, so no customer and no anon session can
+//   read it. Measured against the live database, even a query with NO status filter
+//   returned zero rows while a control asking for any active row returned three. And the
+//   one role that CAN read it, admin, never reaches this screen, because App.js is
+//   role-first and renders AdminScreen instead. See constants/partnerPreview.js.
+//
+// ⚠ IT DOES NOT APPROVE THE ROW, and must not be "fixed" by doing so. search_content
+//   gates on status='active' ALONE and has never heard of MODULE_FLAGS, so an approved
+//   row is findable in global search while the module is still dark for everyone else.
 //
 // ⚠ UNREACHABLE IN PRODUCTION, NOT MERELY DEFAULTED OFF. HomeServicesScreen reads it as
 //   `__DEV__ && PREVIEW_PENDING_PARTNERS`. Metro substitutes `__DEV__` with the literal
-//   `false` in a release bundle, so the whole expression constant-folds and the shipped
-//   code contains the string 'active' and no branch at all. A stray `true` left here
-//   cannot reach a user through the app, only through a dev build.
+//   `false` in a release bundle, so the whole branch constant-folds and the shipped
+//   module contains no reference to the fixture at all — verified by running Metro's own
+//   inliner and constant folder over the file.
 //
 //   That is TWO independent guards, deliberately, because they fail differently: the
 //   dead-code fold protects USERS (a flip cannot change a release bundle), and the
@@ -207,6 +215,6 @@ export const AD_BANNERS_LIVE = false
 //   flip cannot be pushed or ride out on `npm run ota`). Neither substitutes for the
 //   other — `eas update` bundles the working tree and never runs a release fold.
 //
-// NOT a MODULE_FLAGS key: it gates nothing and reveals nothing. It changes which rows a
-// developer's own build queries. Same resolution as SHOW_WIZARD_HEADINGS.
+// NOT a MODULE_FLAGS key: it gates nothing and reveals nothing. It changes where a
+// developer's own build gets one row from. Same resolution as SHOW_WIZARD_HEADINGS.
 export const PREVIEW_PENDING_PARTNERS = false
