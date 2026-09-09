@@ -30,6 +30,15 @@ import { logContactEvent } from '../utils/logContactEvent'
 
 const HERO_LOGO = { width: 200, height: 56 }
 
+// A project that does not declare `aspect` still renders. Square is the neutral choice —
+// it favours neither orientation, so an undeclared project is cropped evenly rather than
+// gutted on whichever axis a guess happened to pick. A non-positive or non-finite value
+// is treated as absent for the same reason: a container with aspectRatio 0 or NaN
+// collapses to nothing and the photo silently disappears.
+const ASPECT_FALLBACK = 1
+const projectAspect = p =>
+  (Number.isFinite(p?.aspect) && p.aspect > 0 ? p.aspect : ASPECT_FALLBACK)
+
 function Block({ title, children }) {
   return (
     <View style={s.block}>
@@ -160,8 +169,8 @@ export default function HomeServicePartnerScreen({
                       <View key={pair.labelKey} style={s.pairWrap}>
                         <Text style={s.pairLabel}>{t(pair.labelKey, lang)}</Text>
                         <View style={s.pairRow}>
-                          <Shot source={pair.before} label={t('hsPartnerBefore', lang)} width={PAIR_W} aspect={1} />
-                          <Shot source={pair.after}  label={t('hsPartnerAfter', lang)}  width={PAIR_W} aspect={1} />
+                          <Shot source={pair.before} label={t('hsPartnerBefore', lang)} width={PAIR_W} aspect={projectAspect(project)} />
+                          <Shot source={pair.after}  label={t('hsPartnerAfter', lang)}  width={PAIR_W} aspect={projectAspect(project)} />
                         </View>
                       </View>
                     ))}
@@ -171,7 +180,7 @@ export default function HomeServicePartnerScreen({
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}
                           contentContainerStyle={s.strip}>
                           {project.extra.map((src, i) => (
-                            <Shot key={i} source={src} label={null} width={STEP_W} aspect={1} />
+                            <Shot key={i} source={src} label={null} width={STEP_W} aspect={projectAspect(project)} />
                           ))}
                         </ScrollView>
                       </>
@@ -187,7 +196,7 @@ export default function HomeServicePartnerScreen({
                     contentContainerStyle={s.strip}>
                     {project.steps.map((step, i) => (
                       <View key={step.labelKey} style={{ width: STEP_W }}>
-                        <Shot source={step.image} label={null} width={STEP_W} aspect={4 / 3} />
+                        <Shot source={step.image} label={null} width={STEP_W} aspect={projectAspect(project)} />
                         <Text style={s.stepLabel} numberOfLines={1}>
                           {i + 1}. {t(step.labelKey, lang)}
                         </Text>

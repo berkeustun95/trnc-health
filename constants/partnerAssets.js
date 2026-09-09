@@ -43,26 +43,26 @@
 
 export const PARTNER_ASSETS = {
   // ─── TadilArt Cyprus ──────────────────────────────────────────────────────
-  // 'tadilart/logo':                 require('../assets/partners/tadilart-logo.png'),
-  // 'tadilart/logo-onDark':          require('../assets/partners/tadilart-logo-onDark.png'),
+  'tadilart/logo':                 require('../assets/partners/tadilart-logo.png'),
+  'tadilart/logo-onDark':          require('../assets/partners/tadilart-logo-onDark.png'),
 
-  // 'tadilart/bathroom/before_1_wc':     require('../assets/partners/tadilart/bathroom/before_1_wc.jpg'),
-  // 'tadilart/bathroom/before_2_shower': require('../assets/partners/tadilart/bathroom/before_2_shower.jpg'),
-  // 'tadilart/bathroom/before_3_basin':  require('../assets/partners/tadilart/bathroom/before_3_basin.jpg'),
-  // 'tadilart/bathroom/after_1_wide':    require('../assets/partners/tadilart/bathroom/after_1_wide.jpg'),
-  // 'tadilart/bathroom/after_2_vanity':  require('../assets/partners/tadilart/bathroom/after_2_vanity.jpg'),
-  // 'tadilart/bathroom/after_3_shower':  require('../assets/partners/tadilart/bathroom/after_3_shower.jpg'),
-  // 'tadilart/bathroom/after_4_wc':      require('../assets/partners/tadilart/bathroom/after_4_wc.jpg'),
-  // 'tadilart/bathroom/after_5_basin':   require('../assets/partners/tadilart/bathroom/after_5_basin.jpg'),
-  // 'tadilart/bathroom/after_6_door':    require('../assets/partners/tadilart/bathroom/after_6_door.jpg'),
-  // 'tadilart/bathroom/progress_1':      require('../assets/partners/tadilart/bathroom/progress_1.jpg'),
+  'tadilart/bathroom/before_1_wc':     require('../assets/partners/tadilart/bathroom/before_1_wc.jpg'),
+  'tadilart/bathroom/before_2_shower': require('../assets/partners/tadilart/bathroom/before_2_shower.jpg'),
+  'tadilart/bathroom/before_3_basin':  require('../assets/partners/tadilart/bathroom/before_3_basin.jpg'),
+  'tadilart/bathroom/after_1_wide':    require('../assets/partners/tadilart/bathroom/after_1_wide.jpg'),
+  'tadilart/bathroom/after_2_vanity':  require('../assets/partners/tadilart/bathroom/after_2_vanity.jpg'),
+  'tadilart/bathroom/after_3_shower':  require('../assets/partners/tadilart/bathroom/after_3_shower.jpg'),
+  'tadilart/bathroom/after_4_wc':      require('../assets/partners/tadilart/bathroom/after_4_wc.jpg'),
+  'tadilart/bathroom/after_5_basin':   require('../assets/partners/tadilart/bathroom/after_5_basin.jpg'),
+  'tadilart/bathroom/after_6_door':    require('../assets/partners/tadilart/bathroom/after_6_door.jpg'),
+  'tadilart/bathroom/progress_1':      require('../assets/partners/tadilart/bathroom/progress_1.jpg'),
 
-  // 'tadilart/extension/01_oncesi':      require('../assets/partners/tadilart/extension/01_oncesi.jpg'),
-  // 'tadilart/extension/02_baslangic':   require('../assets/partners/tadilart/extension/02_baslangic.jpg'),
-  // 'tadilart/extension/03_celik':       require('../assets/partners/tadilart/extension/03_celik.jpg'),
-  // 'tadilart/extension/04_insa':        require('../assets/partners/tadilart/extension/04_insa.jpg'),
-  // 'tadilart/extension/05_cephe':       require('../assets/partners/tadilart/extension/05_cephe.jpg'),
-  // 'tadilart/extension/06_sonuc':       require('../assets/partners/tadilart/extension/06_sonuc.jpg'),
+  'tadilart/extension/01_oncesi':      require('../assets/partners/tadilart/extension/01_oncesi.jpg'),
+  'tadilart/extension/02_baslangic':   require('../assets/partners/tadilart/extension/02_baslangic.jpg'),
+  'tadilart/extension/03_celik':       require('../assets/partners/tadilart/extension/03_celik.jpg'),
+  'tadilart/extension/04_insa':        require('../assets/partners/tadilart/extension/04_insa.jpg'),
+  'tadilart/extension/05_cephe':       require('../assets/partners/tadilart/extension/05_cephe.jpg'),
+  'tadilart/extension/06_sonuc':       require('../assets/partners/tadilart/extension/06_sonuc.jpg'),
 }
 
 export const partnerAsset = key => (key ? PARTNER_ASSETS[key] : undefined)

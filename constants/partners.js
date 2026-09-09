@@ -62,6 +62,13 @@ export const HS_PARTNERS = [
         id: 'bathroom',
         mode: 'pairs',
         titleKey: 'hsPartnerProjBathroom',
+        // Written as the DIVISION, not as a decimal, so the number carries where it came
+        // from: every one of these ten frames is 1080x1225. All shots render with
+        // resizeMode 'cover', so a container aspect that disagrees with the source
+        // centre-crops — and for a bathroom the dimension being trimmed is the one the
+        // photo exists to show, floor to ceiling. The screen's old hardcoded 1 was a
+        // guess made before the files existed and cost ~12% of the height.
+        aspect: 1080 / 1225,
         pairs: [
           { labelKey: 'hsPartnerPairWc',     before: 'tadilart/bathroom/before_1_wc',     after: 'tadilart/bathroom/after_1_wide' },
           { labelKey: 'hsPartnerPairShower', before: 'tadilart/bathroom/before_2_shower', after: 'tadilart/bathroom/after_3_shower' },
@@ -80,6 +87,12 @@ export const HS_PARTNERS = [
         id: 'extension',
         mode: 'sequence',
         titleKey: 'hsPartnerProjExtension',
+        // This set is NOT uniform: four frames are 1080x921, 01_oncesi is 1080x889 and
+        // 06_sonuc is 1080x885. One container aspect has to serve all six, so this is the
+        // dominant one — exact for four, and the other two lose about 4% off the sides,
+        // which is the smallest total crop available. There is no single "real" value to
+        // take here and pretending otherwise would be the rounding this avoids.
+        aspect: 1080 / 921,
         // ORDER IS THE CONTENT. Array order is the render order; there is no sort key,
         // because a numeric field invites someone to renumber and lose the sequence.
         steps: [
