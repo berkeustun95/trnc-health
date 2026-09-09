@@ -31,7 +31,7 @@ const FLAGS_FILE = 'constants/flags.js'
 
 // ─── EXPECTED STATE — update this ONLY when a module genuinely launches ──────
 const EXPECTED_MODULES = {
-  homeServices:  false,
+  homeServices:  true,   // live 2026-09-09 — partner-only, TadilArt Cyprus
   grooming:      false,
   garages:       false,
   transport:     false,
@@ -65,6 +65,21 @@ const EXPECTED_MODULES = {
 //   actually sent. Pair it with supabase/audit_module_waitlist_owed.sql, which is the
 //   part that checks reality.
 const WAITLIST_BLAST_DONE = new Set([
+  // 3 OWED, NOT YET SENT. Measured 2026-09-09 as postgres: 3 signups, all 3
+  //    never_notified, the first waiting since 2026-08-12 — a month before launch.
+  //    Send with notify_module_waitlist('homeServices') at step 7, AFTER the OTA is
+  //    verified on device; notifying earlier sends people to a screen that has not
+  //    updated yet, which is the one thing worse than not notifying them.
+  //
+  //    This entry being present is an ACKNOWLEDGEMENT, not proof of delivery — the guard
+  //    runs offline and cannot reach the database. Update this line to "3 notified
+  //    <date>" once the blast has run, the way pets and events read.
+  //
+  //    The figure had to come from a human: module_waitlist has no anon SELECT policy at
+  //    all (mw_read_own and mw_admin_read_all are both TO authenticated), so a read with
+  //    the repo's anon key returns 0 whether the table holds nothing or hundreds —
+  //    structurally pinned, the same trap as the pending partner row.
+  'homeServices',
   'pets',    // 4 notified 2026-08-23, 16 days late — see the note above
   'events',  // 1 signup
   'towing',  // 0 signups: every entry point was flag-gated, so nobody could reach

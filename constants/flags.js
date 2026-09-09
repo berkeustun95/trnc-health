@@ -82,7 +82,19 @@ export const SHOW_WIZARD_HEADINGS = false
 // stable identifier, reused verbatim by the gate here, and (Slices 2-3) the
 // waitlist `module` column + its CHECK and the go-live notify RPC.
 export const MODULE_FLAGS = {
-  homeServices: false,
+  // LIVE 2026-09-09 — PARTNER-ONLY. This is not the open directory the key originally
+  // gated: the tile grid and the filterable list are gone, hs_select_public requires
+  // is_partner, and hs_insert_self is closed. What flipping this reveals is a curated
+  // list of firms ADA has agreements with.
+  //
+  // ⚠ IT DOES NOT MAKE THE PARTNER VISIBLE. TadilArt is still status='pending', so the
+  //   module opens on its empty state until the go-live UPDATE runs. That ordering is
+  //   deliberate — see HS_SELF_REGISTRATION below for the block and why it runs LAST.
+  //
+  // ⚠ AND IT IS THE OFF SWITCH. Turning the module off needs no SQL and no rollback of
+  //   anything: flip this back to false and OTA. That is why activation is allowed to be
+  //   a paste — the emergency direction is one boolean.
+  homeServices: true,
   grooming:     false,
   garages:      false,
   transport:    false,
