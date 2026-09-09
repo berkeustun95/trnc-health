@@ -7,6 +7,19 @@ import BackButton from '../components/BackButton'
 import HomeServiceIcon from '../components/HomeServiceIcon'
 import { hsCategory, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 
+// ⚠ UNREFERENCED AS OF THE PARTNER-ONLY CHANGE (2026-09-09). Nothing imports this file.
+//
+// It was the profile for a SELF-REGISTERED provider, reached by tapping a card in the
+// category list — and that list is gone: hs_select_public now requires is_partner, so a
+// directory could only ever have shown partner rows, which have their own richer screen
+// (HomeServicePartnerScreen). Metro bundles from the require graph, so an unreferenced
+// module costs nothing at runtime.
+//
+// KEPT, NOT DELETED, because it is half the revert path: restoring the open directory
+// means restoring the grid, the list and this screen together. If the policy is ever
+// made permanent, delete it then — but delete it deliberately rather than finding it
+// years later and wondering.
+
 export default function HomeServiceProfileScreen({ provider, lang, onBack }) {
   const canCall = provider.contact_pref === 'call'     || provider.contact_pref === 'both'
   const canWA   = provider.contact_pref === 'whatsapp' || provider.contact_pref === 'both'

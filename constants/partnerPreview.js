@@ -58,26 +58,11 @@ export const PREVIEW_PARTNER_ROWS = [
   },
 ]
 
-// The rows a category list would contain if the database could return them — the same two
-// predicates the SQL applies, and nothing else. Kept to exactly those two so the mirror
-// stays checkable by eye against loadProviders' query:
-//   .contains('service_types', [category])  and  .contains('coverage_districts', [district])
-// The status arm is not mirrored because these rows never travel any other path.
-export function previewRowsMatching(category, district) {
-  return PREVIEW_PARTNER_ROWS.filter(r =>
-    (!category || (r.service_types || []).includes(category)) &&
-    (!district || (r.coverage_districts || []).includes(district)))
-}
-
-// Prepends the matching fixture rows to a real result set, without duplicating a row the
-// database already returned. The dedupe is not theoretical: the day the partner IS
-// approved, the same id arrives from both sides, and two TadilArt cards in one list is a
-// worse preview artefact than none.
-export function withPreviewPartners(rows, category, district) {
-  const fixture = previewRowsMatching(category, district)
-  const have = new Set(rows.map(r => r.id))
-  return [...fixture.filter(r => !have.has(r.id)), ...rows]
-}
+// The category list these two helpers served was REMOVED by the partner-only landing:
+// with hs_select_public requiring is_partner, a category list could only ever return
+// partner rows, so the twelve-tile grid became twelve doors onto one firm. Deleted
+// rather than left as unreferenced exports — git holds them if the directory ever comes
+// back, and an export nothing calls is a thing the next reader has to rule out.
 
 // ─── One honest caveat about "cannot ship" ──────────────────────────────────
 //
