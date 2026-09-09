@@ -179,6 +179,7 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('home_services', 'created_at', false, 'now()', 'timestamp with time zone'),
     ('home_services', 'updated_at', false, 'now()', 'timestamp with time zone'),
     ('home_services', 'coverage_districts', true, NULL, 'text[]'),
+    ('home_services', 'is_partner', true, 'false', 'boolean'),
     ('transport_providers', 'id', true, 'gen_random_uuid()', 'uuid'),
     ('transport_providers', 'owner_id', false, NULL, 'uuid'),
     ('transport_providers', 'type', true, NULL, 'text'),

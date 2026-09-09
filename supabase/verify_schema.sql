@@ -205,7 +205,11 @@ WITH report AS (
     -- reads MISSING, HomeServicesScreen's district filter (.contains on this column)
     -- matches nothing and EVERY district chip returns an empty list — which looks like
     -- "no providers in this area", the module's own normal empty state.
-    ('1010_hs_coverage','home_services','coverage_districts')
+    ('1010_hs_coverage','home_services','coverage_districts'),
+    -- Partner-only visibility. If this reads MISSING, hs_select_public references a
+    -- column that is not there and EVERY read of home_services errors — the module and
+    -- the home-services arm of global search both fail, not degrade.
+    ('1012_hs_partner_only','home_services','is_partner')
 
   ) e(m,t,c)
 
@@ -1781,6 +1785,40 @@ WITH report AS (
     -- service types. NOT status — that is 'pending' today and 'active' after AdminScreen
     -- approves it, so a token asserting either value is a token built to go stale, and a
     -- drift report carrying a known-stale row teaches the reader to skim.
+    -- ── 1012 partner-only. THREE tokens, none of which any other section can see:
+    -- two policy BODIES (the names did not change, so existence proves nothing) and a
+    -- DEFAULT. The read policy is the load-bearing one — it is what makes a non-partner
+    -- row unreadable, and because search_content is SECURITY INVOKER it is also the only
+    -- thing keeping non-partner rows out of global search. If it goes red, the open
+    -- directory is back and nothing else in this file would notice.
+    UNION ALL SELECT '1012_hs_partner_only','hs_select_public public arm requires is_partner',
+      EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='home_services'
+          AND policyname='hs_select_public'
+          AND qual LIKE '%is_partner%'
+          -- Both surviving arms, because the is_partner clause alone would also be
+          -- satisfied by a policy that had lost them: an owner must still see their own
+          -- row and an admin must still see the queue.
+          AND qual LIKE '%owner_id%'
+          AND qual LIKE '%admin%')
+    -- Self-registration is closed at the API, not only in the UI. A gated form over an
+    -- open endpoint means rows arriving into a queue that is also hidden.
+    UNION ALL SELECT '1012_hs_partner_only','hs_insert_self WITH CHECK is false (self-registration closed)',
+      EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='home_services'
+          AND policyname='hs_insert_self' AND with_check = 'false')
+    -- The inversion, same as towing_companies.is_active. A revert creates no named object
+    -- and is otherwise undetectable; without it a row that omits the column publishes
+    -- itself.
+    UNION ALL SELECT '1012_hs_partner_only','home_services.is_partner DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='home_services'
+          AND column_name='is_partner' AND column_default = 'false')
+    -- EXACTLY ONE partner. A count, not a name: if a second partner is added legitimately
+    -- this goes red and that edit is the review moment. Bump it in the same commit.
+    UNION ALL SELECT '1012_hs_partner_only','exactly 1 home_services row is is_partner',
+      (SELECT count(*) = 1 FROM public.home_services
+        WHERE to_jsonb(home_services)->'is_partner' = 'true'::jsonb)
     UNION ALL SELECT '1011_tadilart_seed','TadilArt partner row present, covers nicosia+kyrenia, 4 services',
     --
     -- coverage_districts is read through to_jsonb(hs)-> rather than named directly, and
