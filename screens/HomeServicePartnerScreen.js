@@ -30,6 +30,10 @@ import { logContactEvent } from '../utils/logContactEvent'
 
 const HERO_LOGO = { width: 200, height: 56 }
 
+// One source for the horizontal gallery gap. The style and the snap interval must agree,
+// and they cannot if the number is typed twice.
+const STRIP_GAP = 10
+
 // A project that does not declare `aspect` still renders. Square is the neutral choice —
 // it favours neither orientation, so an undeclared project is cropped evenly rather than
 // gutted on whichever axis a guess happened to pick. A non-positive or non-finite value
@@ -92,6 +96,11 @@ export default function HomeServicePartnerScreen({
   const CONTENT_W = winW - 32               // s.content padding, both sides
   const PAIR_W    = (CONTENT_W - 8) / 2     // two shots + s.pairRow gap
   const STEP_W    = Math.min(240, CONTENT_W * 0.62)
+  // The snap interval is the item plus the gap, and it has to be DERIVED from the same
+  // two numbers the layout uses — a hardcoded interval drifts the moment either changes
+  // and the strip stops landing on a frame, which looks like the scroll is broken rather
+  // than mistuned.
+  const SNAP      = STEP_W + STRIP_GAP
 
   const openWhatsApp = () => {
     if (!waNum) return
@@ -177,8 +186,14 @@ export default function HomeServicePartnerScreen({
                     {project.extra.length > 0 && (
                       <>
                         <Text style={s.extraTitle}>{t('hsPartnerMorePhotos', lang)}</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={s.strip}>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          snapToInterval={SNAP}
+                          snapToAlignment="start"
+                          decelerationRate="fast"
+                          contentContainerStyle={s.strip}
+                        >
                           {project.extra.map((src, i) => (
                             <Shot key={i} source={src} label={null} width={STEP_W} aspect={projectAspect(project)} />
                           ))}
@@ -192,12 +207,23 @@ export default function HomeServicePartnerScreen({
                   // Horizontal, because the ORDER is the content — a vertical stack of six
                   // frames reads as six unrelated photos, and swiping left is the gesture
                   // that says "and then".
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={s.strip}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    snapToInterval={SNAP}
+                    snapToAlignment="start"
+                    decelerationRate="fast"
+                    contentContainerStyle={s.strip}
+                  >
                     {project.steps.map((step, i) => (
                       <View key={step.labelKey} style={{ width: STEP_W }}>
                         <Shot source={step.image} label={null} width={STEP_W} aspect={projectAspect(project)} />
-                        <Text style={s.stepLabel} numberOfLines={1}>
+                        {/* TWO lines, not one. The measured worst case is 95.5pt in a
+                            178.6pt box so nothing should ever clip — but a label that
+                            silently loses its last word is a bad way to find out the
+                            measurement was wrong, and a step called "4. Constructi"
+                            reads as a broken app rather than as tight copy. */}
+                        <Text style={s.stepLabel} numberOfLines={2}>
                           {i + 1}. {t(step.labelKey, lang)}
                         </Text>
                       </View>
@@ -299,7 +325,10 @@ const s = StyleSheet.create({
   pairRow:      { flexDirection: 'row', gap: 8 },
   extraTitle:   { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                   marginTop: 2, marginBottom: 8 },
-  strip:        { gap: 10, paddingRight: 4 },
+  // paddingRight equals the gap so the last frame has the same breathing room as the
+  // space between frames; without it the strip ends flush against the screen edge and
+  // reads as cut off rather than finished.
+  strip:        { gap: STRIP_GAP, paddingRight: STRIP_GAP },
   stepLabel:    { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: colors.textPrimary,
                   marginTop: 6 },
 
