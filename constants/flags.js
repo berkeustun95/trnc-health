@@ -232,13 +232,49 @@ export const PREVIEW_PENDING_PARTNERS = false
 // reverting that migration too. Deliberate: a UI-only revert would otherwise look like
 // it worked and fail at the moment a real tradesperson pressed Submit.
 //
-// ⚠ APPROVING THE PARTNER IS NO LONGER A BUTTON. The AdminScreen tab this hides was the
-//   only surface that could move a home_services row from pending to active, because
-//   hs_guard_owner_update raises on a NULL auth.uid() and so blocks a plain UPDATE from
-//   the SQL editor. Going live with TadilArt is therefore a reviewed SQL step —
-//   DISABLE TRIGGER / UPDATE / ENABLE TRIGGER, the same shape 20261010 and 20261012 both
-//   use — and that is the right shape for a commercial act that happens once, rather
-//   than a queue action somebody could take by reflex.
+// ⚠ APPROVING THE PARTNER IS NO LONGER A BUTTON, AND THIS IS THE BLOCK THAT REPLACES IT.
+//   The AdminScreen tab this flag hides was the only surface that could move a
+//   home_services row from pending to active — hs_guard_owner_update raises on a NULL
+//   auth.uid(), so a plain UPDATE from the SQL editor is refused too. That is the right
+//   shape for a rare commercial act rather than a queue action taken by reflex, and the
+//   emergency direction is covered without SQL at all: turning a partner OFF is
+//   MODULE_FLAGS.homeServices over OTA.
+//
+//   GO-LIVE — SQL editor, Role = postgres, whole block:
+//
+//     SET ROLE postgres;
+//     BEGIN;
+//       ALTER TABLE public.home_services DISABLE TRIGGER hs_guard_owner_update;
+//       UPDATE public.home_services SET status = 'active'
+//        WHERE id = '0496fb4c-4e5d-4e35-a238-dd1fcb402541';   -- TadilArt Cyprus
+//       ALTER TABLE public.home_services ENABLE TRIGGER hs_guard_owner_update;
+//       -- Assert before COMMIT. status='active' AND is_partner is what makes the row
+//       -- publicly readable, and search_content is SECURITY INVOKER, so this is also the
+//       -- moment it becomes findable in global search.
+//       DO $$ DECLARE n int; BEGIN
+//         SELECT count(*) INTO n FROM public.home_services
+//          WHERE status='active' AND is_partner;
+//         IF n <> 1 THEN RAISE EXCEPTION 'expected exactly 1 live partner, found %', n; END IF;
+//         IF (SELECT tgenabled FROM pg_trigger
+//              WHERE tgrelid='public.home_services'::regclass
+//                AND tgname='hs_guard_owner_update') <> 'O'
+//         THEN RAISE EXCEPTION 'the update guard did not come back on'; END IF;
+//       END $$;
+//     COMMIT;
+//     RESET ROLE;
+//
+//   Do this LAST, after the OTA carrying the module flag has been confirmed on device —
+//   the module go-live SOP's ordering applies unchanged.
+//
+// ⚠ REVERTING THE POLICY IS TWO STEPS, AND THIS FLAG IS ONLY THE FIRST. Setting it back
+//   to true restores the CTA, the onboarding form, the provider route and the admin tab
+//   over a database that STILL refuses what they submit: hs_insert_self is
+//   WITH CHECK (false) and hs_select_public requires is_partner. The second step is the
+//   REVERT block at the bottom of
+//   supabase/migrations/20261012_home_services_partner_only.sql, and it must be applied
+//   in the order written there — the read policy comes back before the column is dropped,
+//   because the policy depends on it. A UI-only revert looks like it worked and fails at
+//   the moment a real tradesperson presses Submit.
 //
 // Nothing is stranded by the provider-route gate: confirmed 2026-09-09 that NO account
 // anywhere holds role='home_service_provider'. If one ever does while this is false,

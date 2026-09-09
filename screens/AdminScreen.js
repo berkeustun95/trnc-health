@@ -64,8 +64,15 @@ const ROLES = ['customer', 'provider', 'organizer', 'admin']
 //
 // ⚠ HIDING IT REMOVES THE ONLY BUTTON THAT CAN ACTIVATE A home_services ROW.
 //   hs_guard_owner_update raises on a NULL auth.uid(), so a plain UPDATE from the SQL
-//   editor cannot do it either. Taking TadilArt live is now a reviewed
-//   DISABLE TRIGGER / UPDATE / ENABLE TRIGGER step — see constants/flags.js.
+//   editor is refused too. Taking a partner live is now a reviewed
+//   DISABLE TRIGGER / UPDATE / ENABLE TRIGGER block.
+//
+//   THE BLOCK ITSELF LIVES IN constants/flags.js, under HS_SELF_REGISTRATION — one copy,
+//   beside the flag that removed the button. Pasting it here as well would be two copies
+//   of an id and a predicate that must agree, which is the drift this repo keeps paying
+//   for. If you are here because the tab is missing, that is the file.
+//
+//   Turning a partner OFF needs no SQL at all: MODULE_FLAGS.homeServices over OTA.
 const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Broadcast', 'Events', 'Properties', 'Agents',
   ...(HS_SELF_REGISTRATION ? ['HomeServices'] : []),
   'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Moderation']
