@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url'
 import {
   ACCOM_SEGMENTS, ACCOM_LANDING, accomSegments, accomLanding,
   DORM_PARTNERS, PENDING_KEYS, GALLERY_ORDER, SECTION_ORDER, COLLAPSIBLE,
-  dormDeal, dormWaCode, dormWaMessage, dormWebsiteUrl,
+  dormDeal, dormSections, dormWaCode, dormWaMessage, dormWebsiteUrl,
 } from '../constants/dorms.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
 import { colors, readableOn, contrastRatio } from '../constants/theme.js'
@@ -518,6 +518,40 @@ for (const l of LANGS) {
   check(COLLAPSIBLE.includes('services') && COLLAPSIBLE.includes('shuttles'),
     `services and shuttles must both be collapsible — 22 rows and six route cards open by `
     + `default is what buried the room cards.`)
+}
+
+// ─── 3a2b. THE GALLERY MUST RENDER DORM PHOTOS FIRST ────────────────────────
+//
+// ⚠ ASSERTED ON dormSections()'s ACTUAL OUTPUT, not on the config and not on a copy of its
+//   sort. The config being right while the render is reversed is the same shape as a config
+//   nothing reads: everything looks settled and the screen is wrong. A descending sort, or
+//   a GALLERY_ORDER with 'transport' first, would leave the config identical and flip the
+//   page.
+//
+// For a dormitory the first swipe must be where the student will LIVE. A photo of the
+// shuttle is a photo of getting somewhere else.
+for (const p of DORM_PARTNERS) {
+  const who = p.slug || p.name
+  if (!(p.gallery || []).length) continue
+  const rendered = dormSections(p, { resolveAsset: k => k }).gallery
+  const kindOf = k => (p.gallery.find(g => g.key === k) || {}).kind
+
+  check(rendered.length === p.gallery.length,
+    `${who}: dormSections returned ${rendered.length} gallery image(s) for ${p.gallery.length} configured — `
+    + `one is being dropped by the resolver or the sort`)
+
+  check(kindOf(rendered[0]) !== 'transport',
+    `${who}: the gallery OPENS on a 'transport' photo (${rendered[0]}). For a dormitory the first `
+    + `swipe must be where the student will live — a shuttle is a photo of getting somewhere else. `
+    + `Either the sort is descending or GALLERY_ORDER ranks transport before property.`)
+
+  // The whole sequence must be non-decreasing in GALLERY_ORDER. Catches a reversed sort even
+  // when the first image happens to be right.
+  const ranks = rendered.map(k => GALLERY_ORDER.indexOf(kindOf(k)))
+  const ascending = ranks.every((r, i) => i === 0 || ranks[i - 1] <= r)
+  check(ascending,
+    `${who}: the rendered gallery is not ordered by GALLERY_ORDER — ranks came back [${ranks.join(', ')}] `
+    + `for [${rendered.map(k => kindOf(k)).join(', ')}]. Expected non-decreasing (${GALLERY_ORDER.join(' → ')}).`)
 }
 
 // ─── 3a3. THE SCREEN MUST ACTUALLY READ SECTION_ORDER ───────────────────────
