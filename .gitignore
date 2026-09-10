@@ -52,3 +52,8 @@ scripts/send-test-duty-push.js
 # needing a pin is `facilities WHERE latitude IS NULL`. The untimestamped legacy name is
 # matched too: it predates the timestamping and was overwritten by every run.
 hand-place-queue*.csv
+
+# Dorm showcase maximum-content fixture (scripts/dev/dorm-fixture.mjs --apply).
+# Generated solid-colour PNGs, never real photographs, never committed. The config edits
+# the fixture makes are caught by scripts/check-dorms.mjs and .githooks/pre-commit.
+assets/partners/_fixture/

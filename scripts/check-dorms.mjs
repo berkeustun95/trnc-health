@@ -42,6 +42,23 @@ const LANGS = Object.keys(LANG_CODES)
 let assertions = 0
 const check = (cond, msg) => { assertions++; if (!cond) problems.push(msg) }
 
+// ─── THE FIXTURE MARKER — checked FIRST and fatal on its own ────────────────
+//
+// scripts/dev/dorm-fixture.mjs fills every null field with obviously fake values so the
+// showcase can be seen at maximum content. It must never be committed: the values are
+// visibly fake, but a magenta brand colour and 9999 prices shipped to users would be worse
+// than either. This is checked before anything else and exits immediately, because every
+// assertion below would be measuring the fixture rather than the config.
+for (const f of ['constants/dorms.js', 'constants/partnerAssets.js']) {
+  if (readFileSync(resolve(ROOT, f), 'utf8').includes('ZZ-DORM-FIXTURE')) {
+    console.error(`\n  ┌─ DORM FIXTURE IS APPLIED ──────────────────────────────────────┐`)
+    console.error(`  │ ${f} carries the local-only maximum-content fixture.`)
+    console.error(`  │ Revert before committing:  node scripts/dev/dorm-fixture.mjs --revert`)
+    console.error(`  └────────────────────────────────────────────────────────────────┘\n`)
+    process.exit(1)
+  }
+}
+
 // ─── 0. CONTROLS. If these fail, nothing below means anything ───────────────
 //
 // Asked BEFORE the run rather than after a surprising result: what would this print if

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Refuse a commit that carries the dorm maximum-content fixture.
+#
+# The fixture (scripts/dev/dorm-fixture.mjs --apply) fills every null field with visibly
+# fake values — magenta brand colour, 9999 prices, ZZ-prefixed strings — so the showcase
+# can be seen at full content before a real partner is on it. It is a working-tree tool and
+# nothing more. pre-push would be too late: the point is that it cannot be STAGED.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-dorms.mjs || {
+  echo ""
+  echo "  pre-commit: refused. See above."
+  echo "  If this is the dorm fixture: node scripts/dev/dorm-fixture.mjs --revert"
+  exit 1
+}
