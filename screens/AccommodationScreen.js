@@ -12,6 +12,7 @@ import AccommodationListTopSlot from '../components/ads/AccommodationListTopSlot
 import AccommodationListInlineSlot from '../components/ads/AccommodationListInlineSlot'
 import AccommodationListBottomSlot from '../components/ads/AccommodationListBottomSlot'
 import PropertyDetailScreen from './PropertyDetailScreen'
+import DormPartnerScreen from './DormPartnerScreen'
 import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { colors, shadow } from '../constants/theme'
@@ -324,9 +325,9 @@ function PropertyCard({ item, lang, onPress }) {
 // Defined at module scope like PropertyCard, not inline in the screen — a component
 // declared inside its parent is a new type on every render and remounts its subtree.
 //
-// SLICE 1 IS DELIBERATELY NOT TAPPABLE. The showcase lands in slice 2, and a card styled
-// as a press target that does nothing reads as broken rather than as unfinished. It
-// becomes a TouchableOpacity in the same commit that gives it somewhere to go.
+// TAPPABLE AS OF SLICE 2, and not before: it became a TouchableOpacity in the same commit
+// that gave it somewhere to go (DormPartnerScreen). A card styled as a press target that
+// does nothing reads as broken rather than as unfinished.
 //
 // No image, no price. The "From €2490" anchor is held back until Özok says what a dönem
 // is — see the priceFrom comment in constants/dorms.js.
@@ -337,14 +338,14 @@ function PropertyCard({ item, lang, onPress }) {
 // Alasia asset still owed, the card is a compact two-line block rather than a full-size
 // one with an empty band across the top. Nothing here sets a height, a minHeight or an
 // aspect: each absent field simply costs its own rows.
-function DormCard({ item, lang }) {
+function DormCard({ item, lang, onPress }) {
   const districtName = REGION_LABEL_KEY[item.district] ? t(REGION_LABEL_KEY[item.district], lang) : item.district
   // Area is a proper noun and untranslated (constants/areas.js states the rule); the
   // district is translated. Either half may be absent without leaving a stray separator.
   const place = [item.area, districtName].filter(Boolean).join(' · ')
 
   return (
-    <View style={[cs.card, cs.dormCard]}>
+    <TouchableOpacity style={[cs.card, cs.dormCard]} onPress={onPress} activeOpacity={0.9}>
       {/* partnerLogo(), never partnerAsset(item.logo) directly. The variant seam is the one
           place the light/dark choice lives, and partnerAssets.js says why: the day a dark
           surface appears is not the day anyone will remember that a partner's mark is pure
@@ -364,7 +365,7 @@ function DormCard({ item, lang }) {
           <Text style={cs.dormMetaText} numberOfLines={1}>{place}</Text>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   )
 }
 
@@ -404,7 +405,11 @@ function FilterPill({ label, active, disabled, onPress }) {
 // App.js:490 already reads `if (openedProperty) { setOpenedProperty(null); return true }`
 // BEFORE its showAccommodation line, so the correct two-step back — detail, then module —
 // is preserved by construction rather than by winning a registration race.
-export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpenProperty, selectedProperty, onCloseProperty }) {
+export default function AccommodationScreen({
+  onAdNavigate, lang, onClose,
+  onOpenProperty, selectedProperty, onCloseProperty,
+  onOpenDorm, selectedDorm, onCloseDorm,
+}) {
   const [items, setItems]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -743,7 +748,7 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
                   At today's N=1 it never fires; it starts working at the ninth partner
                   without anyone remembering to wire it. */}
               {isDorm
-                ? <DormCard item={item} lang={lang} />
+                ? <DormCard item={item} lang={lang} onPress={() => onOpenDorm(item)} />
                 : <PropertyCard item={item} lang={lang} onPress={() => onOpenProperty(item)} />}
               {index === 7 && <AccommodationListInlineSlot lang={lang} onNavigate={onAdNavigate} />}
             </>
@@ -831,7 +836,17 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
         </KeyboardAwareForm>
       </Modal>
 
-      {/* Above everything, and the list beneath it is never unmounted. */}
+      {/* Above everything, and the list beneath it is never unmounted. Both overlays take
+          their open state from App.js rather than from local state, so Android hardware
+          back closes the OVERLAY and not the whole module — App.js's back chain checks
+          openedDorm/openedProperty before showAccommodation, which makes the two-step back
+          correct by construction rather than by winning a registration race. */}
+      {selectedDorm && (
+        <View style={cs.detailOverlay}>
+          <DormPartnerScreen partner={selectedDorm} lang={lang} region={null} onBack={onCloseDorm} />
+        </View>
+      )}
+
       {selectedProperty && (
         <View style={cs.detailOverlay}>
           <PropertyDetailScreen property={selectedProperty} lang={lang} onBack={onCloseProperty} onAdNavigate={onAdNavigate} />

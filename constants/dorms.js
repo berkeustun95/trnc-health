@@ -115,8 +115,10 @@ export const DORM_PARTNERS = [
     coords: null,
 
     // Asset KEYS, not files. constants/partnerAssets.js is the only place a key becomes a
-    // require(). An unwired key yields undefined and PartnerLogoStrip falls back to a
-    // monogram — a finished state, not a placeholder box.
+    // require(). An unwired key yields undefined and PartnerLogoStrip renders NOTHING —
+    // it used to draw an initials monogram, which read as an "AD" ad badge on a partner's
+    // own card and was removed in fa0abb4. So the logo slot costs no height until the
+    // asset lands.
     logo:       'alasia/logo',
     logoOnDark: 'alasia/logo-onDark',
 
@@ -131,6 +133,13 @@ export const DORM_PARTNERS = [
     // guess at. Currency is also unconfirmed (€ only, or GBP/TL too).
     priceFrom: { amount: 2490, currency: 'EUR', periodKey: null },
 
+    // ⚠ REFERENCED BUT DELIBERATELY UNWRITTEN. Özok has supplied no "about" copy, and this
+    //   is a real business — inventing nine locales of marketing prose about somebody
+    //   else's dorm is not a placeholder, it is fabrication with their name on it.
+    //   t() returns the KEY when a string is missing, so the screen compares the result
+    //   against the key name and the section collapses. scripts/check-dorms.mjs asserts
+    //   this key does NOT resolve, so the day the copy is written the guard goes red and
+    //   somebody has to consciously graduate it — see PENDING_KEYS below.
     aboutKey: 'dormAlasiaAbout',
 
     // Owed: { textKey, expiry: 'YYYY-MM-DD' }. BOTH are required — the band renders only
@@ -140,12 +149,17 @@ export const DORM_PARTNERS = [
 
     // ⚠ VERIFIED AS MINUTES, NOT AS DESTINATIONS. Özok gave "5 dk Lefkoşa / 15 dk Girne /
     //   15 dk Ercan" — but a student picks a dorm by which UNIVERSITY the shuttle reaches,
-    //   and a city is not a campus. The labels below are the cities as given; naming the
-    //   universities is on the owed list and will replace these keys, not add to them.
+    //   and a city is not a campus. These are the CITIES as given; naming the universities
+    //   is owed item 7 and will REPLACE these entries, not be appended to them.
+    //
+    // The two city labels reuse REGION_LABEL_KEY's own keys (constants/regions.js) rather
+    // than minting dorm-prefixed duplicates: they are the same two nouns the district
+    // filter already translates, and these entries are known-temporary, so nine new
+    // strings each would be written to be thrown away.
     transport: [
-      { icon: 'bus-outline',      labelKey: 'dormShuttleNicosia', minutes: 5  },
-      { icon: 'bus-outline',      labelKey: 'dormShuttleKyrenia', minutes: 15 },
-      { icon: 'airplane-outline', labelKey: 'dormShuttleErcan',   minutes: 15 },
+      { icon: 'bus-outline',      labelKey: 'blDistrictNicosia', minutes: 5  },
+      { icon: 'bus-outline',      labelKey: 'blDistrictKyrenia', minutes: 15 },
+      { icon: 'airplane-outline', labelKey: 'dormShuttleErcan',  minutes: 15 },
     ],
 
     amenities: [],   // owed
@@ -177,3 +191,111 @@ export const DORM_PARTNER_IDS = DORM_PARTNERS.map(p => p.id)
 
 const BY_ID = Object.fromEntries(DORM_PARTNERS.map(p => [p.id, p]))
 export const dormPartner = id => BY_ID[id]
+
+// ─── EMPTINESS AND DERIVATION LIVE HERE, NOT IN THE SCREEN ──────────────────
+//
+// Same discipline partnerGallery() established for TadilArt: a section that is hidden is
+// hidden HERE, once, by a pure function — never by an `&&` chain in the JSX. Two reasons
+// it matters more than tidiness. A screen-side condition cannot be tested without
+// rendering, and a screen-side condition gets copied wrong when the second partner
+// arrives.
+//
+// Every function below takes what it needs as an argument — including the CLOCK — so
+// scripts/check-dorms.mjs can drive them with a fake date and assert both sides of the
+// expiry, which no `&&` in a component could ever offer.
+
+// The deal band renders only when there IS text AND the expiry is still ahead. Returning
+// null rather than false so the caller destructures one shape or nothing.
+//
+// ⚠ `now` IS INJECTED. A config entry nobody touches again expires itself with no OTA,
+//   which is the whole reason expiry is a date in config rather than a boolean somebody
+//   has to remember to flip.
+export function dormDeal(partner, now = new Date()) {
+  const d = partner?.deal
+  if (!d || !d.textKey || !d.expiry) return null
+  // Compare at day granularity: an expiry of '2026-12-31' means the band is live all of
+  // that day, not until midnight at the start of it.
+  const end = new Date(`${d.expiry}T23:59:59`)
+  if (Number.isNaN(end.getTime()) || end <= now) return null
+  return { textKey: d.textKey, expiry: d.expiry }
+}
+
+// "From €2490" renders ONLY once Özok says what a dönem is. periodKey null is the hold.
+// Returning null keeps that decision in one place instead of at every call site.
+export function dormPriceFrom(partner) {
+  const p = partner?.priceFrom
+  if (!p || p.amount == null || !p.currency || !p.periodKey) return null
+  return p
+}
+
+// A section list the screen maps over, so "which sections have content" is answered once.
+// Order is the render order and is the order the brief specifies.
+export function dormSections(partner, { now = new Date(), resolveAsset = () => undefined } = {}) {
+  const has = v => Array.isArray(v) && v.length > 0
+  return {
+    gallery:   (partner?.gallery || []).map(resolveAsset).filter(Boolean),
+    deal:      dormDeal(partner, now),
+    transport: has(partner?.transport) ? partner.transport : null,
+    amenities: has(partner?.amenities) ? partner.amenities : null,
+    rooms:     has(partner?.rooms)     ? partner.rooms     : null,
+    included:  has(partner?.servicesIncluded) ? partner.servicesIncluded : null,
+    extra:     has(partner?.servicesExtra)    ? partner.servicesExtra    : null,
+    coords:    partner?.coords || null,
+    ringTimes: has(partner?.ringTimes) ? partner.ringTimes : null,
+    events:    has(partner?.events)    ? partner.events    : null,
+    priceFrom: dormPriceFrom(partner),
+  }
+}
+
+// ─── The WhatsApp handoff — TR and EN only, and not in i18n.js ──────────────
+//
+// Identical reasoning to constants/partners.js, which states it at length: the message is
+// read by the RECEPTION DESK, not by the user who sends it, so nine translations of it is
+// work with no reader. A key sitting in i18n.js would invite the next person to "finish"
+// the set. The consequence is chosen, not discovered — a Russian speaker's compose box
+// opens in English, and they can edit it.
+const WA = {
+  tr: code => `Merhaba, ADA uygulamasından yazıyorum. Yurt hakkında bilgi almak istiyorum.\nKaynak: ADA · Kod: ${code}`,
+  en: code => `Hello, I'm contacting you from the ADA app. I'd like information about the dormitory.\nKaynak: ADA · Kod: ${code}`,
+}
+
+// `lang` is a FULL NAME ('Turkish'), never a code — the same trap partners.js documents.
+// Comparing against 'tr' here would send English to every Turkish speaker and look correct
+// in review. LANG_CODES is not imported (this module stays dependency-free), so the caller
+// passes the two-letter code it already has.
+export const dormWaLocale = langCode => (langCode === 'tr' ? 'tr' : 'en')
+
+// ⚠ THE CODE IS DERIVED FROM partner.code, NEVER INLINED. This and dormWebsiteUrl() are
+//   the only two places `ALS` reaches the outside world, and they must agree — a room
+//   enquiry quoting ADA-ALS-BNG1 while the click-through says utm_campaign=alasia would
+//   make the two halves of the partner report impossible to join.
+export function dormWaCode(partner, roomCode) {
+  const base = `ADA-${partner?.code || ''}`
+  return roomCode ? `${base}-${roomCode}` : base
+}
+
+export function dormWaMessage(partner, langCode, roomCode) {
+  return WA[dormWaLocale(langCode)](dormWaCode(partner, roomCode))
+}
+
+// utm_content carries the room only when the tap came FROM a room, per the brief.
+export function dormWebsiteUrl(partner, roomCode) {
+  if (!partner?.website) return null
+  const u = new URL(partner.website)
+  u.searchParams.set('utm_source', 'ada')
+  u.searchParams.set('utm_medium', 'app')
+  u.searchParams.set('utm_campaign', String(partner.code || '').toLowerCase())
+  if (roomCode) u.searchParams.set('utm_content', String(roomCode).toLowerCase())
+  return u.toString()
+}
+
+// ─── Keys that are REFERENCED and must NOT resolve yet ──────────────────────
+//
+// scripts/check-dorms.mjs asserts these are missing from all nine locales, which is the
+// opposite direction from every other key it checks. The point is that writing the string
+// turns the guard RED — so graduating a placeholder into real content is a deliberate act
+// somebody reviews, not something that happens because a translator filled a gap.
+//
+// dormAlasiaAbout: Özok has supplied no about copy and this is a real business. When they
+// do, write the nine locales and delete the entry here in the same commit.
+export const PENDING_KEYS = ['dormAlasiaAbout']

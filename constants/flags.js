@@ -324,5 +324,15 @@ export const HS_SELF_REGISTRATION = false
 //   shape was chosen — the usual "a flag hides a SURFACE, never a table" hazard has no
 //   table to apply to here.
 //
+// ⚠ PRECONDITION — APPLY 20261014_contact_events_website_action.sql BEFORE FLIPPING THIS.
+//   The showcase's website CTA calls logContactEvent(..., 'website'), and until that
+//   migration is applied `contact_events_action_check` rejects the row. logContactEvent is
+//   fire-and-forget and CANNOT THROW by design — it runs before Linking.openURL so a
+//   hanging write never costs somebody their tap — so the rejection is swallowed. Nothing
+//   errors, nothing crashes, and website taps read as a permanent ZERO that is
+//   indistinguishable from nobody tapping. Verify with supabase/verify_schema.sql's
+//   20261014_website_action tokens, which assert the constraint DEFINITION rather than its
+//   name (the name never went away, so the E-section token cannot see this).
+//
 // Reverting is this one boolean, and so is the emergency direction.
 export const DORMS_LIVE = false

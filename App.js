@@ -439,6 +439,11 @@ export default function App() {
   const [showGames, setShowGames] = useState(false)
   const [gamesSubScreen, setGamesSubScreen] = useState(null)
   const [openedProperty, setOpenedProperty] = useState(null)
+  // The dorm showcase overlay. State lives HERE and not in AccommodationScreen for one
+  // reason: the Android back chain below. If it were local to that screen, hardware back
+  // would fall through to `showAccommodation` and close the whole module instead of the
+  // overlay — the same shape as the events-detail back bug that is still open.
+  const [openedDorm, setOpenedDorm] = useState(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   // Ask Oli's sheet is a root overlay now, not a <Modal>: the root has to know it is
@@ -687,6 +692,7 @@ export default function App() {
       // button that does nothing at all reads as a frozen screen.
       if (gateHealthList) { setGateHealthList(false); return true }
       if (showEvents) { setShowEvents(false); return true }
+      if (openedDorm) { setOpenedDorm(null); return true }
       if (openedProperty) { setOpenedProperty(null); return true }
       if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
       if (showAccommodation) { setShowAccommodation(false); return true }
@@ -717,7 +723,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -1428,6 +1434,9 @@ export default function App() {
         onOpenProperty={prop => setOpenedProperty(prop)}
         selectedProperty={openedProperty}
         onCloseProperty={() => setOpenedProperty(null)}
+        onOpenDorm={d => setOpenedDorm(d)}
+        selectedDorm={openedDorm}
+        onCloseDorm={() => setOpenedDorm(null)}
       />
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="accommodation" titleKey="menuAccommodations" session={session} onBack={() => setShowAccommodation(false)} />

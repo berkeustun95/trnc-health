@@ -1373,6 +1373,31 @@ WITH report AS (
       to_regclass('public.contact_events') IS NOT NULL
       AND NOT EXISTS(SELECT 1 FROM pg_constraint
         WHERE conrelid = to_regclass('public.contact_events') AND contype='f')
+    -- ── 20261014 contact_events action = 'website'. A DROP-then-ADD of the SAME
+    -- constraint NAME, so the E-section token for contact_events_action_check stays
+    -- green whether or not the migration was applied — it asserts a name exists, and
+    -- the name never went away. That is precisely the `facilities.area` failure this
+    -- register exists to catch, so the DEFINITION is asserted here instead.
+    --
+    -- The dorm showcase's website CTA logs action='website'. logContactEvent is
+    -- fire-and-forget and cannot throw, so an unapplied migration does not error — the
+    -- INSERT is rejected and swallowed, and website taps read as a permanent zero that
+    -- is indistinguishable from nobody tapping. Apply BEFORE flipping DORMS_LIVE.
+    --
+    -- Asserts the ADDITION and the SURVIVAL of the original three separately: a file
+    -- that replaced the vocabulary rather than extending it would pass a check that
+    -- only looked for 'website'.
+    UNION ALL SELECT '20261014_website_action','contact_events action CHECK permits website',
+      COALESCE(position('website' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_action_check')) > 0, false)
+    UNION ALL SELECT '20261014_website_action','contact_events action CHECK kept call/whatsapp/call_secondary',
+      COALESCE((SELECT position('''call''' in d) > 0
+                   AND position('''whatsapp''' in d) > 0
+                   AND position('''call_secondary''' in d) > 0
+                FROM (SELECT pg_get_constraintdef(oid) d FROM pg_constraint
+                       WHERE conrelid = to_regclass('public.contact_events')
+                         AND conname  = 'contact_events_action_check') x), false)
     -- ── 0925 moderation normalization. Behaviour-only CREATE OR REPLACE on
     -- contains_blocked_term(), so section C sees the NAME and cannot see the CHANGE.
     -- Without these tokens a database still on the old body reads 100% OK while the
