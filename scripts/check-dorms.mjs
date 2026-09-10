@@ -117,6 +117,8 @@ for (const p of DORM_PARTNERS) {
 
   check(!!p.name, `${who}: no name`)
   check(!p.website || /^https:\/\//.test(p.website), `${who}: website must be https, got ${p.website}`)
+  check(!p.email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email), `${who}: email ${JSON.stringify(p.email)} is malformed`)
+  check(!p.mapsUrl || /^https:\/\//.test(p.mapsUrl), `${who}: mapsUrl must be https, got ${p.mapsUrl}`)
 
   // Phone/WhatsApp reach a real business. A malformed number fails at the moment somebody
   // taps call, which is the worst place to find out.
@@ -155,6 +157,10 @@ for (const p of DORM_PARTNERS) {
     check(/^[A-Z0-9]{2,6}$/.test(r.code), `${who}: room code ${JSON.stringify(r.code)} is not 2-6 uppercase alphanumerics`)
     check(!roomCodes.has(r.code), `${who}: duplicate room code ${r.code}`)
     roomCodes.add(r.code)
+    // ⚠ ROOM PHOTOS WERE NOT COLLECTED UNTIL 2026-09-10, so a typo in one was invisible to
+    //   the asset cross-check — it resolved to undefined and the row simply rendered
+    //   without a picture, which is also the legitimate no-photo state. Indistinguishable.
+    if (r.photo) referencedAssets.add(r.photo)
     // available is a BOOLEAN when known. If Özok's data turns out to be a COUNT the shape
     // changes, and this is the place that should say so — not the sheet, on device.
     check(r.available === null || r.available === undefined || typeof r.available === 'boolean',
@@ -453,6 +459,10 @@ const SCREEN_KEYS = [
   // Slice 3 — the room sheet.
   'dormRoomPrice', 'dormRoomSize', 'dormRoomAvailability', 'dormRoomAvailable',
   'dormRoomFull', 'dormRoomEnquire', 'cancel',
+  // 7B-2 / 7B-3 — services, shuttles, contact, source foot.
+  'dormShuttleProvidedBy', 'dormShuttleWeekend', 'dormShuttleOut', 'dormShuttleBack',
+  'dormSourceTitle', 'dormSourceBody', 'dormSourcePrices', 'dormSourcePdf',
+  'dormSourceShuttles', 'dormEmail', 'dormAddress',
 ]
 for (const key of SCREEN_KEYS) {
   const gone = missingIn(key)

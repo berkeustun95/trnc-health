@@ -81,6 +81,13 @@ for (const [file, exportName] of CONFIGS) {
   for (const p of list) {
     if (p.logo) declared.add(p.logo)
     if (p.logoOnDark) declared.add(p.logoOnDark)
+    // ⚠ PER-ITEM PHOTOS, and this guard was blind to them until 2026-09-10. A dorm's six
+    //   room types each carry their own `photo` key; a typo in one resolved to undefined
+    //   and the row rendered without a picture — which is ALSO the legitimate no-photo
+    //   state (the Single Bungalow genuinely has none). Indistinguishable, and silent.
+    //   scripts/check-dorms.mjs caught it from the other side; this one, whose entire job
+    //   is asset wiring, did not.
+    for (const r of p.rooms || []) if (r.photo) declared.add(r.photo)
     for (const proj of p.gallery || []) {
       // A dorm gallery is a flat list of KEYS; a home-services gallery is a list of
       // PROJECTS holding pairs/extra/steps. Handle both rather than assuming one shape.

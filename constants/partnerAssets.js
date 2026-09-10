@@ -74,11 +74,37 @@ export const PARTNER_ASSETS = {
   // Until then the keys resolve to undefined, which PartnerLogoStrip renders as a
   // monogram: a finished state, not a placeholder box. Wiring them is deleting `// `.
   //
-  // ⚠ WRITTEN PERMISSION FIRST. The logo and photos are Özok's, and permission to use
-  //   them inside ADA is on the owed list — same precedent as TadilArt. Do not uncomment
-  //   on the strength of the files merely having arrived.
-  // 'alasia/logo':        require('../assets/partners/alasia-logo.png'),
-  // 'alasia/logo-onDark': require('../assets/partners/alasia-logo-onDark.png'),
+  // ⚠ WRITTEN PERMISSION. The logo and photos are Özok's. These were wired on Berke's
+  //   instruction; the permission item stays on the owed list until it is in writing.
+  //
+  // ⚠ THERE IS NO INVERTED LOGO, and the brief expected one. Alasia's site carries three
+  //   logo files — logo512.png plus a theme pair — and the theme pair turns out to be
+  //   `class="logo desktop"` and `class="logo mobile"`: the SAME wordmark at two sizes,
+  //   not light and inverted. All three share a 2.65:1 aspect, which is the giveaway.
+  //   So `alasia/logo-onDark` is deliberately absent. PartnerLogoStrip already resolves
+  //   the dark variant as `logoOnDark || logo`, so a dark surface falls back to this one
+  //   — correct today because every surface it sits on is light, and a real problem the
+  //   day one is not. Ask Özok for an inverted file before building a dark surface.
+  'alasia/logo':      require('../assets/partners/alasia/logo512.png'),
+
+  // ⚠ ALASIA'S OWN PUBLISHED SMALLER VARIANTS, NOT THE FULL-RESOLUTION ORIGINALS.
+  //   The originals are 2560x1710 and 2048-wide: seven of those decode to 103 MB of
+  //   ARGB8888, and this repo already caps a pager at five images because 45 x 10 x 3.5 MB
+  //   was untenable on a mid-range Android. At the sizes below the same seven decode to
+  //   24.4 MB and occupy 1.00 MB on disk.
+  //   These are files ALASIA PUBLISHES (WordPress emits -1024x684 and -1536x*), so nothing
+  //   was resized, re-encoded or edited here — the smaller file is theirs too.
+  'alasia/hero-1':    require('../assets/partners/alasia/hero-1.jpg'),
+  'alasia/hero-2':    require('../assets/partners/alasia/hero-2.jpg'),
+
+  // Paired to rooms by the alt text on alasiadorm.com/rooms/, which names each one — not
+  // by document order, which would have been a guess. There is NO photo for the Single
+  // Bungalow on their site; that row renders without one.
+  'alasia/room-blk1': require('../assets/partners/alasia/room-blk1.jpg'),
+  'alasia/room-blk2': require('../assets/partners/alasia/room-blk2.jpg'),
+  'alasia/room-blk3': require('../assets/partners/alasia/room-blk3.jpg'),
+  'alasia/room-bng2': require('../assets/partners/alasia/room-bng2.jpg'),
+  'alasia/room-bng4': require('../assets/partners/alasia/room-bng4.jpg'),
 }
 
 export const partnerAsset = key => (key ? PARTNER_ASSETS[key] : undefined)

@@ -92,6 +92,14 @@ export const DORM_PARTNERS = [
     name: 'Alasia Dorm',
 
     website:  'https://alasiadorm.com',
+    email:    'info@alasiadorm.com',
+    // Verbatim, as they publish it. A street address is a proper noun and is not translated.
+    address:  'Lefkoşa Caddesi No:80, Aşağı Dikmen, Lefkoşa',
+    // ⚠ THEIR OWN MAPS LINK, used as the directions target rather than a coordinate we
+    //   resolved ourselves. A short link resolves to a pin Alasia chose; a lat/lng we
+    //   derived is our guess at where they mean. `coords` stays null until they send one,
+    //   so the embedded map still does not render — this is the DIRECTIONS button only.
+    mapsUrl:  'https://maps.app.goo.gl/W5MWpGWm8aNHw5gq8',
     // ⚠ ONE NUMBER SERVING BOTH BUTTONS, PENDING CONFIRMATION. Özok has not yet said
     //   whether reception takes calls on the WhatsApp line or a separate landline. If a
     //   landline arrives, `phone` changes and `whatsapp` does not.
@@ -120,7 +128,13 @@ export const DORM_PARTNERS = [
     // own card and was removed in fa0abb4. So the logo slot costs no height until the
     // asset lands.
     logo:       'alasia/logo',
-    logoOnDark: 'alasia/logo-onDark',
+    // ⚠ NULL BECAUSE ALASIA HAS NO INVERTED LOGO, not because nobody looked. Their site
+    //   carries logo512.png plus a theme pair that turns out to be `logo desktop` and
+    //   `logo mobile` — the same wordmark at two sizes; all three share a 2.65:1 aspect.
+    //   partnerLogo() resolves the dark variant as `logoOnDark || logo`, so this falls back
+    //   to the light mark. Correct today (every surface it sits on is light) and a real
+    //   problem the day one is not. Ask Özok for an inverted file before building one.
+    logoOnDark: null,
 
     // Owed. Null falls back to ADA teal wherever an accent is drawn.
     accent: null,
@@ -410,7 +424,13 @@ export const DORM_PARTNERS = [
         } },
     ],
 
-    gallery:          [],   // owed — hero gallery does not render while empty
+    // Hero gallery, from their property photos.
+    // ⚠ MIXED ASPECTS, AND THE CONTAINER HARDCODES 16/9: hero-1 is 1536x864 (16:9) and
+    //   hero-2 is 1536x1026 (3:2), so `cover` centre-crops the second. Same shape as the
+    //   TadilArt `aspect: 1` note in constants/partners.js — an aspect guessed before the
+    //   files existed. Now that they exist it can be measured. Flagged for 7C, not fixed
+    //   here: this slice wires assets and changes no layout.
+    gallery: ['alasia/hero-1', 'alasia/hero-2'],
     ringTimes:        [],   // owed
     events:           [],   // owed
 

@@ -118,6 +118,16 @@ function DormRoomRow({ room, lang, holding, onPress }) {
 // One service. Name left, value right when there is one — and nothing at all when there is
 // not. NO TICK COLUMN: a tick on every row of a list headed "included" carries no
 // information and costs a column the longer locales need.
+function SourceLink({ label, url }) {
+  return (
+    <TouchableOpacity style={s.sourceLinkRow} activeOpacity={0.6}
+      onPress={() => Linking.openURL(url).catch(() => {})}>
+      <Ionicons name="open-outline" size={13} color={colors.primary} />
+      <Text style={s.sourceLinkLabel}>{label}</Text>
+    </TouchableOpacity>
+  )
+}
+
 function DormServiceRow({ item, lang }) {
   const value = item.value || (item.valueKey ? t(item.valueKey, lang) : null)
   return (
@@ -445,6 +455,16 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
               </View>
             </TouchableOpacity>
           )}
+          {!!partner.email && (
+            <TouchableOpacity style={s.row} activeOpacity={0.6}
+              onPress={() => Linking.openURL(`mailto:${partner.email}`).catch(() => {})}>
+              <Text style={s.rowLabel}>{t('dormEmail', lang)}</Text>
+              <View style={s.rowRight}>
+                <Text style={[s.rowValue, s.rowValueLink]}>{partner.email}</Text>
+                <Ionicons name="mail-outline" size={15} color={colors.primary} />
+              </View>
+            </TouchableOpacity>
+          )}
           {!!partner.website && (
             <TouchableOpacity style={s.row} onPress={openWebsite} activeOpacity={0.6}>
               <Text style={s.rowLabel}>{t('dormWebsite', lang)}</Text>
@@ -453,7 +473,44 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
               </View>
             </TouchableOpacity>
           )}
+          {/* The street address, verbatim, with THEIR OWN Maps link as the directions
+              target. Not a coordinate we resolved: a short link resolves to the pin Alasia
+              chose, where a lat/lng we derived is our guess at where they meant. */}
+          {!!partner.address && (
+            <View style={s.addressRow}>
+              <Text style={s.rowLabel}>{t('dormAddress', lang)}</Text>
+              <Text style={s.addressText}>{partner.address}</Text>
+            </View>
+          )}
+          {!!partner.mapsUrl && (
+            <TouchableOpacity style={s.directionsBtn} activeOpacity={0.85}
+              onPress={() => Linking.openURL(partner.mapsUrl).catch(() => {})}>
+              <Ionicons name="navigate-outline" size={16} color="#fff" />
+              <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
+            </TouchableOpacity>
+          )}
         </Block>
+
+        {/* ─── WHERE THIS INFORMATION COMES FROM ────────────────────────────
+            The obligation that comes with being a directory rather than an editor: say so,
+            in the page, and link the authority. If ADA reproduces Alasia's numbers then a
+            reader must be able to reach Alasia's numbers — and when the two disagree, the
+            source wins and the reader can see that for themselves. */}
+        {!!partner.priceSource?.url && (
+          <View style={s.sourceBlock}>
+            <Text style={s.sourceTitle}>{t('dormSourceTitle', lang)}</Text>
+            <Text style={s.sourceBody}>{t('dormSourceBody', lang)}</Text>
+            <View style={s.sourceLinks}>
+              <SourceLink label={t('dormSourcePrices', lang)} url={partner.priceSource.url} />
+              {!!partner.priceSource.pdfUrl && (
+                <SourceLink label={t('dormSourcePdf', lang)} url={partner.priceSource.pdfUrl} />
+              )}
+              {!!partner.shuttleSource && (
+                <SourceLink label={t('dormSourceShuttles', lang)} url={partner.shuttleSource} />
+              )}
+            </View>
+          </View>
+        )}
 
         {/* 11. OPERATOR FOOTER */}
         {!!partner.operatorKey && (
@@ -535,6 +592,18 @@ const s = StyleSheet.create({
   roomPrice:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 4 },
   roomPriceLabel: { fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   yearNote:    { marginTop: 10, fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+
+  addressRow:  { paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  addressText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginTop: 3, lineHeight: 18 },
+
+  sourceBlock: { marginTop: 4, marginBottom: 10, padding: 14, borderRadius: radius.md,
+                 backgroundColor: colors.surface },
+  sourceTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  sourceBody:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+                 lineHeight: 17, marginTop: 5 },
+  sourceLinks: { marginTop: 9, gap: 2 },
+  sourceLinkRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5 },
+  sourceLinkLabel: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   svcRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                  gap: 12, paddingVertical: 7 },
