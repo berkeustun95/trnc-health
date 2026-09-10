@@ -115,6 +115,40 @@ function DormRoomRow({ room, lang, holding, onPress }) {
   )
 }
 
+// One service. Name left, value right when there is one — and nothing at all when there is
+// not. NO TICK COLUMN: a tick on every row of a list headed "included" carries no
+// information and costs a column the longer locales need.
+function DormServiceRow({ item, lang }) {
+  const value = item.value || (item.valueKey ? t(item.valueKey, lang) : null)
+  return (
+    <View style={s.svcRow}>
+      <Text style={s.svcName} numberOfLines={2}>{t(item.labelKey, lang)}</Text>
+      {!!value && <Text style={s.svcValue}>{value}</Text>}
+    </View>
+  )
+}
+
+// One shuttle route. Name, stop list, departure times as wrapped chips.
+//
+// ⚠ A CARD RATHER THAN A TABLE ROW, and that is the whole point: routes have different
+//   numbers of departures (six, five, five, three), so a grid needs a dash in every gap.
+//   A dash is a table artifact, not information Alasia published. Chips wrap instead.
+//
+// Route names, stop lists and times are PROPER NOUNS and figures — verbatim, untranslated.
+function DormRouteCard({ route, lang }) {
+  return (
+    <View style={s.routeCard}>
+      <Text style={s.routeName}>{route.name}</Text>
+      {!!route.stops && <Text style={s.routeStops} numberOfLines={2}>{route.stops}</Text>}
+      <View style={s.timeWrap}>
+        {route.times.map(tm => (
+          <View key={tm} style={s.timeChip}><Text style={s.timeChipText}>{tm}</Text></View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
 export default function DormPartnerScreen({ partner, lang, region, onBack, onAdNavigate }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
@@ -260,15 +294,49 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
           </Block>
         )}
 
-        {/* 5. TRANSPORT + AMENITIES */}
-        {!!sec.transport && (
+        {/* 5. SHUTTLES — ROUTE CARDS, NOT A TABLE.
+               Their own page presents this as a grid, which needs a dash wherever a route
+               has fewer departures than the widest one. A DASH IS A TABLE ARTIFACT, not
+               something Alasia published. One card per route instead: name, stops, and the
+               departure times as wrapped chips — no empty cells to fill.
+
+               TWO SERVICES, SEPARATELY ATTRIBUTED. The free one is the university's, not
+               the dorm's. Presenting them as two distinct services is faithful
+               reproduction and happens to leave no apparent contradiction to trip over. */}
+        {!!sec.shuttles && (
           <Block title={t('dormTransport', lang)}>
-            <View style={s.chipWrap}>
-              {sec.transport.map((tr, i) => (
-                <Chip key={i} icon={tr.icon}
-                  label={`${t(tr.labelKey, lang)} · ${t('dormMinutes', lang).replace('{n}', tr.minutes)}`} />
-              ))}
-            </View>
+            {sec.shuttles.map((sv, i) => (
+              <View key={sv.id} style={i > 0 ? s.svcGroupGap : null}>
+                <View style={s.shuttleHead}>
+                  <Text style={s.shuttleName}>{t(sv.nameKey, lang)}</Text>
+                  {/* The attribution is the load-bearing field on this whole section. */}
+                  <Text style={s.shuttleProvider}>
+                    {t('dormShuttleProvidedBy', lang)}: {sv.providerName}
+                  </Text>
+                </View>
+                {sv.routes.map(rt => <DormRouteCard key={rt.name} route={rt} lang={lang} />)}
+                {!!sv.weekend && (
+                  <View style={s.routeCard}>
+                    <Text style={s.routeName}>{sv.weekend.name}</Text>
+                    <Text style={s.routeStops}>{t('dormShuttleWeekend', lang)}</Text>
+                    <View style={s.timeWrap}>
+                      <View style={s.timeChip}>
+                        <Text style={s.timeChipText}>
+                          <Text style={s.timeChipLabel}>{t('dormShuttleOut', lang)} </Text>
+                          {sv.weekend.out}
+                        </Text>
+                      </View>
+                      <View style={s.timeChip}>
+                        <Text style={s.timeChipText}>
+                          <Text style={s.timeChipLabel}>{t('dormShuttleBack', lang)} </Text>
+                          {sv.weekend.back}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </View>
+            ))}
           </Block>
         )}
         {!!sec.amenities && (
@@ -300,23 +368,22 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
           </Block>
         )}
 
-        {/* 7. SERVICES — two lists, each collapsing independently. */}
+        {/* 7. SERVICES — ALASIA'S OWN ORDER, VALUES RIGHT-ALIGNED, NO TICK COLUMN.
+               A tick beside every row of a list titled "included" says nothing, and it
+               costs a column the longer locales need. Rows with no value are just a name;
+               nothing renders a dash or an empty cell. */}
         {(!!sec.included || !!sec.extra) && (
           <Block title={t('dormServices', lang)}>
             {!!sec.included && (
               <>
                 <Text style={s.subTitle}>{t('dormIncluded', lang)}</Text>
-                <View style={s.chipWrap}>
-                  {sec.included.map((x, i) => <Chip key={i} label={t(x.labelKey, lang)} />)}
-                </View>
+                {sec.included.map(x => <DormServiceRow key={x.labelKey} item={x} lang={lang} />)}
               </>
             )}
             {!!sec.extra && (
               <>
-                <Text style={s.subTitle}>{t('dormExtra', lang)}</Text>
-                <View style={s.chipWrap}>
-                  {sec.extra.map((x, i) => <Chip key={i} label={t(x.labelKey, lang)} />)}
-                </View>
+                <Text style={[s.subTitle, s.svcGroupGap]}>{t('dormExtra', lang)}</Text>
+                {sec.extra.map(x => <DormServiceRow key={x.labelKey} item={x} lang={lang} />)}
               </>
             )}
           </Block>
@@ -468,6 +535,23 @@ const s = StyleSheet.create({
   roomPrice:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 4 },
   roomPriceLabel: { fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   yearNote:    { marginTop: 10, fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+
+  svcRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                 gap: 12, paddingVertical: 7 },
+  svcName:     { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  svcValue:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  svcGroupGap: { marginTop: 14 },
+
+  shuttleHead:    { marginBottom: 8 },
+  shuttleName:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  shuttleProvider:{ fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 1 },
+  routeCard:   { backgroundColor: colors.surface, borderRadius: radius.md, padding: 10, marginBottom: 8 },
+  routeName:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  routeStops:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 1, marginBottom: 7 },
+  timeWrap:    { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  timeChip:    { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9, backgroundColor: colors.cardBg },
+  timeChipText:{ fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  timeChipLabel:{ fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   row:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                  paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },

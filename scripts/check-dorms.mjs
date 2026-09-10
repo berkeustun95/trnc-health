@@ -167,7 +167,50 @@ for (const p of DORM_PARTNERS) {
   if (p.priceFrom?.periodKey) referencedKeys.add(p.priceFrom.periodKey)
   if (p.deal?.textKey) referencedKeys.add(p.deal.textKey)
   for (const g of ['transport', 'amenities', 'servicesIncluded', 'servicesExtra', 'ringTimes']) {
-    for (const item of p[g] || []) if (item.labelKey) referencedKeys.add(item.labelKey)
+    for (const item of p[g] || []) {
+      if (item.labelKey) referencedKeys.add(item.labelKey)
+      // A value is either VERBATIM (language-neutral: "24/7", "Fiber") or a key. Never both,
+      // or the screen has two answers for one cell.
+      if (item.valueKey) referencedKeys.add(item.valueKey)
+      check(!(item.value && item.valueKey),
+        `${who}: ${g} item ${item.labelKey} has BOTH value and valueKey — the screen would have two answers for one cell`)
+    }
+  }
+
+  // ─── SHUTTLES — the attribution is the load-bearing field ────────────────
+  //
+  // The free service is Alasia International University's, not the dorm's. Their homepage
+  // markets it as "our" network; that sentence is dropped, and this is what keeps the
+  // correction from quietly rotting: a shuttle with no providerName must not render.
+  for (const sv of p.shuttles || []) {
+    if (sv.nameKey) referencedKeys.add(sv.nameKey)
+    check(!!sv.nameKey, `${who}: shuttle ${sv.id} has no nameKey`)
+    check(!!sv.providerName,
+      `${who}: shuttle ${sv.id} has no providerName. WHO RUNS IT IS THE POINT — the free service is `
+      + `Alasia International University's, not the dorm's, and an unattributed shuttle re-tells `
+      + `exactly the misattribution their homepage makes.`)
+    check(Array.isArray(sv.routes) && sv.routes.length > 0,
+      `${who}: shuttle ${sv.id} has no routes — a service with no timetable is a heading with nothing under it`)
+    for (const rt of sv.routes || []) {
+      check(!!rt.name, `${who}: a ${sv.id} route has no name`)
+      check(Array.isArray(rt.times) && rt.times.length > 0, `${who}: route ${rt.name} has no departure times`)
+      for (const tm of rt.times || []) {
+        check(/^\d{2}:\d{2}$/.test(tm),
+          `${who}: route ${rt.name} time ${JSON.stringify(tm)} is not HH:MM — times are verbatim from Alasia's page`)
+      }
+    }
+    if (sv.weekend) {
+      for (const f of ['out', 'back']) {
+        check(/^\d{2}:\d{2}$/.test(sv.weekend[f] || ''),
+          `${who}: ${sv.id} weekend.${f} ${JSON.stringify(sv.weekend[f])} is not HH:MM`)
+      }
+    }
+  }
+  check((p.shuttles || []).every(sv => sv.providerName !== undefined),
+    `${who}: a shuttle is missing providerName entirely`)
+  if (p.shuttleSource) {
+    check(/^https:\/\//.test(p.shuttleSource) && !p.shuttleSource.includes('/tr/'),
+      `${who}: shuttleSource must be the English page over https — one canonical source`)
   }
   for (const e of p.events || []) if (e.titleKey) referencedKeys.add(e.titleKey)
   for (const a of ['logo', 'logoOnDark']) if (p[a]) referencedAssets.add(p[a])

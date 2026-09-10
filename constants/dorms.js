@@ -224,7 +224,98 @@ export const DORM_PARTNERS = [
       { icon: 'airplane-outline', labelKey: 'dormShuttleErcan',  minutes: 15 },
     ],
 
-    amenities: [],   // owed
+    // ─── SERVICES — ALASIA'S OWN ORDER, NOT REGROUPED ───────────────────────
+    //
+    // 22 items exactly as their homepage lists them, in the order it lists them. Not sorted,
+    // not grouped by kind, not reordered so the impressive ones come first — reordering a
+    // partner's list is a small edit, and ADA does not edit.
+    //
+    // Some carry a VALUE and most do not. Value renders right-aligned; absent, the row is
+    // just the name. NO TICK COLUMN: a tick beside every row of a list titled "included"
+    // says nothing, and it costs a column that the longer locales need.
+    //
+    // `value` is verbatim where it is language-neutral ("24/7", "Fiber"); `valueKey` where
+    // it is words. Names are i18n keys — a label translates, a figure never does.
+    //
+    // ⚠ "Shuttle service" APPEARS HERE, IN THE INCLUDED LIST, while their shuttles page
+    //   describes a PAID dorm shuttle alongside the free university one. Their two pages
+    //   disagree. Reproduced as published — ADA does not reconcile a partner's
+    //   inconsistencies, and it does not annotate them either.
+    servicesIncluded: [
+      { labelKey: 'dormSvcHotWater',    value: '24/7' },
+      { labelKey: 'dormSvcInternet',    value: 'Fiber' },
+      { labelKey: 'dormSvcAircon' },
+      { labelKey: 'dormSvcEnsuite' },
+      { labelKey: 'dormSvcSatelliteTv' },
+      { labelKey: 'dormSvcWifi' },
+      { labelKey: 'dormSvcFridge' },
+      { labelKey: 'dormSvcKitchen' },
+      { labelKey: 'dormSvcLockers' },
+      { labelKey: 'dormSvcCoworking',   value: '24/7' },
+      { labelKey: 'dormSvcFaceId' },
+      { labelKey: 'dormSvcShuttle' },
+      { labelKey: 'dormSvcFrontDesk',   value: '24/7' },
+      { labelKey: 'dormSvcGarden' },
+      { labelKey: 'dormSvcParking' },
+      { labelKey: 'dormSvcLuggage' },
+    ],
+    servicesExtra: [
+      { labelKey: 'dormSvcMarket' },
+      { labelKey: 'dormSvcLaundry' },
+      { labelKey: 'dormSvcCleaning' },
+      { labelKey: 'dormSvcGym' },
+      { labelKey: 'dormSvcElectricity', valueKey: 'dormSvcElectricityValue' },
+      { labelKey: 'dormSvcDining' },
+    ],
+
+    // ─── SHUTTLES — TWO SERVICES, DIFFERENT PROVIDERS ───────────────────────
+    //
+    // ⚠ THE FREE SHUTTLE IS NOT THE DORM'S. It is provided by Alasia International
+    //   University. Their homepage markets "our advanced transportation network… straight
+    //   from your doorstep", which reads as the dorm's own — that sentence is DROPPED, both
+    //   because it is marketing copy and because it is the exact line that misattributes a
+    //   university service. The attribution is the load-bearing field here.
+    //
+    // Presented as two distinct services, which is faithful reproduction and happens to
+    // leave no apparent contradiction for a user to trip over. No note is added pointing
+    // out that their pages disagree.
+    //
+    // Route names and stop lists are PROPER NOUNS, verbatim and untranslated. Times are
+    // verbatim. Only the service names, the attribution and the day labels translate.
+    shuttles: [
+      {
+        id: 'free',
+        nameKey: 'dormShuttleFree',
+        providerName: 'Alasia International University',   // NOT the dorm
+        routes: [
+          { name: 'Yakındoğu',  stops: 'Near East University',
+            times: ['07:00', '08:00', '10:00', '12:00', '14:00', '18:00'] },
+          { name: 'UKÜ',        stops: 'Ring Road · Cyprus International University',
+            times: ['07:45', '10:10', '12:00', '14:00', '17:00'] },
+          { name: 'Bahçeşehir', stops: 'Alayköy · Bahçeşehir Cyprus University',
+            times: ['08:40', '10:50', '12:40', '14:40', '17:40'] },
+          { name: 'Girne',      stops: 'Cyprus Aydın University · Girne University',
+            times: ['07:30', '11:30', '16:30'] },
+        ],
+        // Saturday and Sunday, one out and one back. A separate shape because it is a
+        // different KIND of row — not a route with a timetable, a pair of times.
+        weekend: { name: 'Lefkoşa · Girne', out: '13:00', back: '19:00' },
+      },
+      {
+        id: 'paid',
+        nameKey: 'dormShuttlePaid',
+        providerName: 'Alasia Dorm',                       // theirs, and it is paid
+        routes: [
+          { name: 'Lefkoşa',
+            stops: 'Dikmen · Yakın Doğu · Fuar · Terminal · Girne Kapısı · Hastaneler · Dikmen',
+            times: ['07:05', '08:45', '10:00', '11:00', '12:45', '13:45',
+                    '15:00', '16:00', '17:35', '19:00', '20:00', '21:00'] },
+        ],
+      },
+    ],
+    shuttleSource: 'https://alasiadorm.com/shuttles/',
+
+    amenities: [],   // owed — the site publishes services, not a separate amenity list
 
     // The six room types are verified; every field on them except the code and the name
     // is owed. `code` is what reaches reception in the WhatsApp message as
@@ -320,8 +411,6 @@ export const DORM_PARTNERS = [
     ],
 
     gallery:          [],   // owed — hero gallery does not render while empty
-    servicesIncluded: [],   // owed
-    servicesExtra:    [],   // owed
     ringTimes:        [],   // owed
     events:           [],   // owed
 
@@ -374,6 +463,7 @@ export function dormSections(partner, { now = new Date(), resolveAsset = () => u
     rooms:     has(partner?.rooms)     ? partner.rooms     : null,
     included:  has(partner?.servicesIncluded) ? partner.servicesIncluded : null,
     extra:     has(partner?.servicesExtra)    ? partner.servicesExtra    : null,
+    shuttles:  has(partner?.shuttles)         ? partner.shuttles         : null,
     coords:    partner?.coords || null,
     ringTimes: has(partner?.ringTimes) ? partner.ringTimes : null,
     events:    has(partner?.events)    ? partner.events    : null,
