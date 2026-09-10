@@ -63,6 +63,22 @@ export const PARTNER_ASSETS = {
   'tadilart/extension/04_insa':        require('../assets/partners/tadilart/extension/04_insa.jpg'),
   'tadilart/extension/05_cephe':       require('../assets/partners/tadilart/extension/05_cephe.jpg'),
   'tadilart/extension/06_sonuc':       require('../assets/partners/tadilart/extension/06_sonuc.jpg'),
+
+  // ─── Alasia Dorm (Yurtlar) ────────────────────────────────────────────────
+  // COMMENTED FOR THE SAME REASON TadilArt's ENTRIES ONCE WERE, and it is worth
+  // restating because the failure is not a runtime one: Metro resolves require() at BUILD
+  // time, so a require() of a file that is not on disk is a bundler error. Uncommenting
+  // these before Özok delivers does not render a broken image — it stops `npx expo start`
+  // for everyone.
+  //
+  // Until then the keys resolve to undefined, which PartnerLogoStrip renders as a
+  // monogram: a finished state, not a placeholder box. Wiring them is deleting `// `.
+  //
+  // ⚠ WRITTEN PERMISSION FIRST. The logo and photos are Özok's, and permission to use
+  //   them inside ADA is on the owed list — same precedent as TadilArt. Do not uncomment
+  //   on the strength of the files merely having arrived.
+  // 'alasia/logo':        require('../assets/partners/alasia-logo.png'),
+  // 'alasia/logo-onDark': require('../assets/partners/alasia-logo-onDark.png'),
 }
 
 export const partnerAsset = key => (key ? PARTNER_ASSETS[key] : undefined)

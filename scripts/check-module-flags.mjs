@@ -161,6 +161,16 @@ const EXPECTED_SCALARS = {
   // cannot be reversed by flipping a boolean. Baselined so a flip cannot be pushed or
   // ride out on `npm run ota` without somebody deciding the directory is open again.
   HS_SELF_REGISTRATION:  false,
+  // Yurtlar — the dorm-partner segment of Emlak & Konaklama. Not a MODULE_FLAGS key: it
+  // gates a SEGMENT inside a module that is already live, so there is no Coming Soon
+  // screen to collect a waitlist from and nothing for the notify path to send. Putting it
+  // in that map would fail this script's own WAITLIST_BLAST_DONE and notify checks against
+  // a perfectly correct app — the same reason HOME_V2_LIVE and AD_BANNERS_LIVE are here.
+  //
+  // Baselined because a flip does two visible things at once: it adds the promoted chip
+  // AND moves the tab the module opens on, so a working-tree flip left over from a device
+  // check would ship Yurtlar early to every user AND change where Emlak & Konaklama lands.
+  DORMS_LIVE:            false,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

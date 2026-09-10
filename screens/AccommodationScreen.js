@@ -13,10 +13,14 @@ import AccommodationListInlineSlot from '../components/ads/AccommodationListInli
 import AccommodationListBottomSlot from '../components/ads/AccommodationListBottomSlot'
 import PropertyDetailScreen from './PropertyDetailScreen'
 import ScreenHeader from '../components/ScreenHeader'
+import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
+import { DORMS_LIVE } from '../constants/flags'
+import { accomSegments, accomLanding, DORM_PARTNERS } from '../constants/dorms'
+import { partnerLogo } from '../constants/partnerAssets'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 const CARD_W  = SCREEN_W - 32
@@ -27,6 +31,12 @@ const CARD_W  = SCREEN_W - 32
 // this brings the card to ~310pt and just over 2 per screen, with the third peeking so
 // the list still reads as scrollable.
 const CARD_IMAGE_H = Math.round(CARD_W / 2)
+
+// The partner logo strip on a dorm card. Same 140x40 the Ev Hizmetleri partner card uses,
+// so one logo file serves both surfaces and a partner never has to supply two crops.
+// PartnerLogoStrip fits INSIDE this box and left-aligns, so a square mark lands as a
+// 40x40 square with the remaining width unused rather than being blown up.
+const DORM_LOGO = { width: 140, height: 40 }
 
 // ─── THE IN-CARD PAGER IS BOUNDED AT 5, AND THE BOUND IS THE POINT ──────────
 //
@@ -52,23 +62,31 @@ const CARD_PAGER_MAX = 5
 // Mirrors ReviewsScreen's PAGE. One pagination idiom in this repo, not two.
 const PAGE = 20
 
-// ─── LANDING TAB ─────────────────────────────────────────────────────────────
-// The 'all' tab cannot be coherently sorted: it interleaves intents (every £500/mo
-// rental outranks every £107,500 sale on a price sort), currencies (£107k vs ₺4.75m
-// is not a comparison — no FX by product decision) and rent periods (£6,000/year vs
-// £500/month). Landing on a SINGLE intent makes price sort mean something.
+// ─── SEGMENT ROW AND LANDING TAB ─────────────────────────────────────────────
+// Both come from constants/dorms.js, where the ORDER and the PROMOTED flag are config so
+// the Yurtlar promotion reverts without a code change. 'all' stays last because it is the
+// least coherent view.
 //
-// Set to 'sale' by decision. NOTE the counter-argument, unresolved: every rent-specific
-// keyword in Oli's accommodation intent (kiralık, kiralamak, аренда, снять, miete,
-// location, alquiler, ايجار, اجاره) points at renting and there are zero purchase
-// keywords; oliMsgAccommodation says "a place to stay"; ADA is for newcomers. If the
-// real Novest inventory turns out rent-heavy, flip this one line —
+// The 'all' tab cannot be coherently sorted: it interleaves intents (every £500/mo rental
+// outranks every £107,500 sale on a price sort), currencies (£107k vs ₺4.75m is not a
+// comparison — no FX by product decision) and rent periods (£6,000/year vs £500/month).
+// Landing on a SINGLE intent makes price sort mean something. That is still true and is
+// what sortOpts below is built on.
+//
+// LANDING MOVED FROM 'sale' TO 'dorm' (2026-09-10, by decision). The old note argued
+// 'sale' against a rent-heavy counter-argument; that debate is now moot for the landing
+// tab, though it still applies if Yurtlar is ever unpromoted — the fallback is 'sale', not
+// 'rent'. If the Novest inventory question is ever reopened,
 //   SELECT intent, count(*) FROM properties WHERE source IS NOT NULL GROUP BY intent;
 // settles it with data instead of intuition.
-const LANDING_INTENT = 'sale'
-
-// Landing intent first; 'all' last because it is the least coherent view.
-const INTENTS    = ['sale', 'rent', 'short_term', 'all']
+//
+// ⚠ BOTH ARE DERIVED FROM DORMS_LIVE, NEVER READ STRAIGHT OFF THE CONFIG. ACCOM_LANDING
+//   is 'dorm' and the flag ships false, so a literal read would open the module on a tab
+//   that is not in the chip row — an empty list under a selection the user can neither
+//   see nor change. accomLanding() falls back to the first VISIBLE segment, which is
+//   'sale'. Module scope is correct: both are constant for a given bundle.
+const SEGMENTS       = accomSegments(DORMS_LIVE)
+const LANDING_INTENT = accomLanding(DORMS_LIVE)
 const PROP_TYPES = ['apartment', 'villa', 'studio', 'house', 'land', 'commercial']
 const BED_OPTS   = [1, 2, 3, 4]
 const PERIODS    = ['monthly', 'weekly', 'yearly', 'nightly']
@@ -103,6 +121,7 @@ function intentLabel(intent, lang) {
   if (intent === 'sale')       return t('accomSale', lang)
   if (intent === 'short_term') return t('accomShortTerm', lang)
   if (intent === 'all')        return t('accomAll', lang)
+  if (intent === 'dorm')       return t('accomDorms', lang)
   return intent
 }
 
@@ -300,6 +319,55 @@ function PropertyCard({ item, lang, onPress }) {
   )
 }
 
+// ─── DORM PARTNER CARD ───────────────────────────────────────────────────────
+//
+// Defined at module scope like PropertyCard, not inline in the screen — a component
+// declared inside its parent is a new type on every render and remounts its subtree.
+//
+// SLICE 1 IS DELIBERATELY NOT TAPPABLE. The showcase lands in slice 2, and a card styled
+// as a press target that does nothing reads as broken rather than as unfinished. It
+// becomes a TouchableOpacity in the same commit that gives it somewhere to go.
+//
+// No image, no price. The "From €2490" anchor is held back until Özok says what a dönem
+// is — see the priceFrom comment in constants/dorms.js.
+//
+// THE CARD'S HEIGHT IS ITS CONTENT, with nothing reserved. PartnerLogoStrip returns null
+// when no asset is wired (it used to draw an initials monogram — see the note there for
+// why that had to go), and returning null takes its margin with it. So today, with every
+// Alasia asset still owed, the card is a compact two-line block rather than a full-size
+// one with an empty band across the top. Nothing here sets a height, a minHeight or an
+// aspect: each absent field simply costs its own rows.
+function DormCard({ item, lang }) {
+  const districtName = REGION_LABEL_KEY[item.district] ? t(REGION_LABEL_KEY[item.district], lang) : item.district
+  // Area is a proper noun and untranslated (constants/areas.js states the rule); the
+  // district is translated. Either half may be absent without leaving a stray separator.
+  const place = [item.area, districtName].filter(Boolean).join(' · ')
+
+  return (
+    <View style={[cs.card, cs.dormCard]}>
+      {/* partnerLogo(), never partnerAsset(item.logo) directly. The variant seam is the one
+          place the light/dark choice lives, and partnerAssets.js says why: the day a dark
+          surface appears is not the day anyone will remember that a partner's mark is pure
+          black. This card sits on colors.cardBg so it resolves to 'light' today — the point
+          is that a second call site does not bypass the seam. */}
+      <PartnerLogoStrip
+        source={partnerLogo(item)}
+        name={item.name}
+        width={DORM_LOGO.width}
+        height={DORM_LOGO.height}
+        style={{ marginBottom: 10 }}
+      />
+      <Text style={cs.dormName} numberOfLines={2}>{item.name}</Text>
+      {!!place && (
+        <View style={cs.dormMetaRow}>
+          <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+          <Text style={cs.dormMetaText} numberOfLines={1}>{place}</Text>
+        </View>
+      )}
+    </View>
+  )
+}
+
 function FilterPill({ label, active, disabled, onPress }) {
   return (
     <TouchableOpacity
@@ -361,6 +429,10 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
 
   const isSale = intent === 'sale'
   const isRent = intent === 'rent' || intent === 'short_term'
+  // The dorm segment is not a properties view at all: no query, no filters, no sort, no
+  // pagination. Everything below branches on this rather than on intent === 'dorm', so
+  // there is one name to search for when the second partner type arrives.
+  const isDorm = intent === 'dorm'
 
   // 'all' mixes intents, currencies and rent periods, so a price sort there is
   // meaningless. Offer it only on a single-intent tab.
@@ -411,6 +483,20 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
       plotMin, furnished, period, effectiveSort, isSale, isRent])
 
   const load = useCallback(async (pageNum = 0) => {
+    // ─── THE DORM SEGMENT NEVER TOUCHES SUPABASE ──────────────────────────────
+    // Partners are config, so there is no fetch, no error path and no second page. This
+    // returning BEFORE buildQuery() is also what guarantees a pseudo-intent can never
+    // reach .eq('intent', 'dorm') against a CHECK constraint that has never heard of it —
+    // the guarantee is structural rather than a filter somebody has to remember.
+    // `done` is set so onEndReached cannot start a page that does not exist.
+    if (isDorm) {
+      setItems(DORM_PARTNERS)
+      setTotal(DORM_PARTNERS.length)
+      setDone(true)
+      setLoading(false)
+      setLoadingMore(false)
+      return
+    }
     if (pageNum === 0) setLoading(true); else setLoadingMore(true)
     const from = pageNum * PAGE
     const { data, count, error } = await buildQuery().range(from, from + PAGE - 1)
@@ -420,7 +506,7 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
       if (data.length < PAGE) setDone(true)
     }
     if (pageNum === 0) setLoading(false); else setLoadingMore(false)
-  }, [buildQuery])
+  }, [buildQuery, isDorm])
 
   // Any filter or sort change resets to page 0 and fetches ONE page — not the whole
   // table, which is what this screen used to do on every keystroke.
@@ -437,6 +523,11 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
   // cannot silently narrow a sale list.
   function changeIntent(next) {
     setIntent(next)
+    // Yurtlar applies no filter and no sort, so ENTERING it must disturb neither —
+    // otherwise a plot or price filter set before the detour is silently thrown away and
+    // the user comes back to a list they did not ask for. Leaving it falls through to the
+    // destination intent's own rules below, which are unchanged.
+    if (next === 'dorm') return
     if (next !== 'sale') setPlotMin('')
     if (next === 'sale' || next === 'all') { setFurnished(null); setPeriod(null) }
     if (next === 'all' && sort !== 'updated') setSort('updated')
@@ -475,16 +566,43 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
           compressed once the list overflows, cropping its text top and bottom. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={cs.intentBar} contentContainerStyle={cs.intentBarContent}>
-        {INTENTS.map(i => (
-          <TouchableOpacity key={i} style={[cs.intentTab, intent === i && cs.intentTabActive]}
-            onPress={() => changeIntent(i)}>
-            <Text style={[cs.intentTabText, intent === i && cs.intentTabTextActive]}>
-              {intentLabel(i, lang)}
+        {SEGMENTS.map(seg => (
+          <TouchableOpacity key={seg.id} style={[cs.intentTab, intent === seg.id && cs.intentTabActive]}
+            onPress={() => changeIntent(seg.id)}>
+            <Text style={[cs.intentTabText, intent === seg.id && cs.intentTabTextActive]}>
+              {intentLabel(seg.id, lang)}
             </Text>
+            {/* The promoted marker. ABSOLUTELY POSITIONED, and that is the whole
+                requirement: laid out inline it would add its own width and gap to the
+                chip and break "same shape and size as the other chips".
+                ─────────────────────────────────────────────────────────────────────
+                SHOWN IN BOTH STATES. It was previously gated on `intent !== seg.id`, on
+                the theory that the nudge has done its job once you are on the tab. That
+                was wrong the moment the landing moved to Yurtlar: the chip is SELECTED on
+                first paint, so the dot never rendered at all — which is why the device
+                check found no dot rather than a dim one. Absent, not invisible.
+                ─────────────────────────────────────────────────────────────────────
+                THE COLOUR IS STATE-AWARE BECAUSE NO SINGLE COLOUR WORKS. Measured against
+                both chip backgrounds (#FFFFFF unselected, colors.primary #0E7C7B
+                selected), nothing in the palette clears 3:1 on both — colors.accent is
+                2.41 and 2.08, which is the "unreadable at icon size" problem theme.js
+                already records for accent at this size. So: tintLifestyleFg (the repo's
+                own deepened accent) at 5.18:1 on white, and plain white at 5.01:1 on
+                teal. */}
+            {seg.promoted && (
+              <View pointerEvents="none"
+                style={[cs.intentDot, intent === seg.id && cs.intentDotOnActive]} />
+            )}
           </TouchableOpacity>
         ))}
       </ScrollView>
 
+      {/* HIDDEN ENTIRELY ON YURTLAR, not disabled. Every pill here filters or sorts a
+          `properties` query the dorm segment does not run — district, bedrooms, m², price
+          period. A greyed-out bar reads as broken (the same reasoning the area pill's own
+          comment gives for never being disabled), and sorting one partner is not a
+          feature. */}
+      {!isDorm && (
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={cs.pillBar} contentContainerStyle={cs.pillBarContent}>
         <FilterPill label={district ? districtLabel(district, lang) : t('accomFilterDistrict', lang)}
@@ -531,6 +649,7 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
           </TouchableOpacity>
         )}
       </ScrollView>
+      )}
 
       {loading ? (
         <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
@@ -570,13 +689,22 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
           maxToRenderPerBatch={4}
           removeClippedSubviews
           ListEmptyComponent={
-            <View style={cs.emptyWrap}>
-              <View style={cs.emptyCard}>
-                <Ionicons name="home-outline" size={44} color={colors.border} style={{ marginBottom: 10 }} />
-                <Text style={cs.emptyTitle}>{t('accomNoResults', lang)}</Text>
-                <Text style={cs.emptySub}>{t('accomNoResultsSub', lang)}</Text>
+            // NOTHING ON YURTLAR, by instruction: no empty-state text and no placeholder
+            // rows. The property empty state is "no results, try widening your filters",
+            // which is the wrong sentence entirely for a curated partner list — there are
+            // no filters to widen, and the honest reading of an empty one is that ADA has
+            // not signed a dorm yet. It is also unreachable today (DORM_PARTNERS holds
+            // one entry and the list is not a query), so this is what the list does at
+            // N=0, not something a user can currently see.
+            isDorm ? null : (
+              <View style={cs.emptyWrap}>
+                <View style={cs.emptyCard}>
+                  <Ionicons name="home-outline" size={44} color={colors.border} style={{ marginBottom: 10 }} />
+                  <Text style={cs.emptyTitle}>{t('accomNoResults', lang)}</Text>
+                  <Text style={cs.emptySub}>{t('accomNoResultsSub', lang)}</Text>
+                </View>
               </View>
-            </View>
+            )
           }
           ListFooterComponent={
             loadingMore
@@ -597,7 +725,14 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
             // turn a directory into an ad feed. Below 8 results it never renders, which is
             // correct on a heavily filtered list.
             <>
-              <PropertyCard item={item} lang={lang} onPress={() => onOpenProperty(item)} />
+              {/* Only the CARD branches. The inline slot's rule is shared deliberately,
+                  so "banners render on partner showcases exactly as anywhere else in the
+                  module" stays true by construction rather than by being re-implemented.
+                  At today's N=1 it never fires; it starts working at the ninth partner
+                  without anyone remembering to wire it. */}
+              {isDorm
+                ? <DormCard item={item} lang={lang} />
+                : <PropertyCard item={item} lang={lang} onPress={() => onOpenProperty(item)} />}
               {index === 7 && <AccommodationListInlineSlot lang={lang} onNavigate={onAdNavigate} />}
             </>
           )}
@@ -742,6 +877,14 @@ const cs = StyleSheet.create({
   intentTabActive:     { backgroundColor: colors.primary },
   intentTabText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   intentTabTextActive: { fontFamily: 'Inter_700Bold', color: '#fff' },
+  // The promoted marker. `position: 'absolute'` is the requirement, not the styling
+  // choice: it takes the dot out of the chip's layout so the chip measures exactly as it
+  // did before, which is what "same shape and size as the other chips" means. RN views
+  // are position:'relative' by default, so this anchors to the chip with no other change.
+  // 7px, not 6: at 6 the dot reads as a rendering artefact rather than a mark. Still well
+  // inside the chip's 8pt horizontal / 8pt vertical padding, so it cannot touch the label.
+  intentDot:           { position: 'absolute', top: 6, right: 7, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.tintLifestyleFg },
+  intentDotOnActive:   { backgroundColor: '#FFFFFF' },
 
   pillBar:             { flexGrow: 0, flexShrink: 0 },
   pillBarContent:      { paddingHorizontal: 16, gap: 8, paddingBottom: 12 },
@@ -757,6 +900,14 @@ const cs = StyleSheet.create({
   listContent:         { paddingHorizontal: 16, paddingBottom: 24 },
 
   card:                { backgroundColor: colors.cardBg, borderRadius: 20, marginBottom: 16, overflow: 'hidden', ...shadow },
+  // A dorm card carries no edge-to-edge image, so unlike a property card it needs its own
+  // padding — `card` has none because its image is meant to bleed to the corners.
+  dormCard:            { padding: 16 },
+  dormName:            { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 22 },
+  dormMetaRow:         { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  // flex:1 so a long Turkish area/district pair truncates inside the row instead of
+  // pushing the icon off the card.
+  dormMetaText:        { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   cardImage:           { width: CARD_W, height: CARD_IMAGE_H },
   imagePlaceholder:    { width: CARD_W, height: CARD_IMAGE_H, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
 

@@ -491,7 +491,7 @@ const translations = {
     insErrorGeneric: 'Something went wrong. Please try again.',
     insTypesOffered: 'Insurance offered', insAbout: 'About', insContact: 'Contact',
     // Accommodation module
-    accomTitle: 'Property & Accommodation', accomAll: 'All', accomRent: 'Rent', accomSale: 'Sale', accomShortTerm: 'Short-term',
+    accomTitle: 'Property & Accommodation', accomAll: 'All', accomRent: 'Rent', accomSale: 'Sale', accomShortTerm: 'Short-term', accomDorms: 'Dormitories',
     accomTypeApartment: 'Apartment', accomTypeVilla: 'Villa', accomTypeStudio: 'Studio',
     accomTypeHouse: 'House', accomTypeLand: 'Land', accomTypeCommercial: 'Commercial',
     accomDistrictNicosia: 'Nicosia', accomDistrictKyrenia: 'Kyrenia', accomDistrictFamagusta: 'Famagusta',
@@ -2254,7 +2254,7 @@ const translations = {
     'Small Animals': 'Küçük Hayvanlar', 'Large Animals': 'Büyük Hayvanlar', 'Exotic Animals': 'Egzotik Hayvanlar',
     'Surgery': 'Cerrahi', 'Dentistry': 'Diş Hekimliği', 'Emergency & Critical Care': 'Acil & Yoğun Bakım',
     // ─── Accommodation module ─────────────────────────────────────────────────
-    accomTitle: 'Emlak ve Konaklama', accomAll: 'Tümü', accomRent: 'Kiralık', accomSale: 'Satılık', accomShortTerm: 'Kısa süreli',
+    accomTitle: 'Emlak ve Konaklama', accomAll: 'Tümü', accomRent: 'Kiralık', accomSale: 'Satılık', accomShortTerm: 'Kısa süreli', accomDorms: 'Yurtlar',
     accomTypeApartment: 'Daire', accomTypeVilla: 'Villa', accomTypeStudio: 'Stüdyo',
     accomTypeHouse: 'Ev', accomTypeLand: 'Arsa', accomTypeCommercial: 'Ticari',
     accomDistrictNicosia: 'Lefkoşa', accomDistrictKyrenia: 'Girne', accomDistrictFamagusta: 'Gazimağusa',
@@ -3302,7 +3302,7 @@ const translations = {
     'Small Animals': 'الحيوانات الصغيرة', 'Large Animals': 'الحيوانات الكبيرة', 'Exotic Animals': 'الحيوانات الغريبة',
     'Surgery': 'الجراحة', 'Dentistry': 'طب الأسنان', 'Emergency & Critical Care': 'الطوارئ والرعاية الحرجة',
     // ─── Accommodation module ─────────────────────────────────────────────────
-    accomTitle: 'عقارات وإقامة', accomAll: 'الكل', accomRent: 'إيجار', accomSale: 'بيع', accomShortTerm: 'إيجار قصير الأمد',
+    accomTitle: 'عقارات وإقامة', accomAll: 'الكل', accomRent: 'إيجار', accomSale: 'بيع', accomShortTerm: 'إيجار قصير الأمد', accomDorms: 'سكن طلابي',
     accomTypeApartment: 'شقة', accomTypeVilla: 'فيلا', accomTypeStudio: 'ستوديو',
     accomTypeHouse: 'منزل', accomTypeLand: 'أرض', accomTypeCommercial: 'تجاري',
     accomDistrictNicosia: 'نيقوسيا', accomDistrictKyrenia: 'كيرينيا', accomDistrictFamagusta: 'فاماغوستا',
@@ -4311,7 +4311,7 @@ const translations = {
     'Small Animals': 'Мелкие животные', 'Large Animals': 'Крупные животные', 'Exotic Animals': 'Экзотические животные',
     'Surgery': 'Хирургия', 'Dentistry': 'Стоматология', 'Emergency & Critical Care': 'Неотложная помощь',
     // ─── Accommodation module ─────────────────────────────────────────────────
-    accomTitle: 'Недвижимость и жильё', accomAll: 'Все', accomRent: 'Аренда', accomSale: 'Продажа', accomShortTerm: 'Краткосрочно',
+    accomTitle: 'Недвижимость и жильё', accomAll: 'Все', accomRent: 'Аренда', accomSale: 'Продажа', accomShortTerm: 'Краткосрочно', accomDorms: 'Общежития',
     accomTypeApartment: 'Квартира', accomTypeVilla: 'Вилла', accomTypeStudio: 'Студия',
     accomTypeHouse: 'Дом', accomTypeLand: 'Земля', accomTypeCommercial: 'Коммерческая',
     accomDistrictNicosia: 'Никосия', accomDistrictKyrenia: 'Кирения', accomDistrictFamagusta: 'Фамагуста',
@@ -5320,7 +5320,7 @@ const translations = {
     'Small Animals': 'Μικρά Ζώα', 'Large Animals': 'Μεγάλα Ζώα', 'Exotic Animals': 'Εξωτικά Ζώα',
     'Surgery': 'Χειρουργική', 'Dentistry': 'Οδοντιατρική', 'Emergency & Critical Care': 'Επείγοντα & Εντατική Φροντίδα',
     // ─── Accommodation module ─────────────────────────────────────────────────
-    accomTitle: 'Ακίνητα & Διαμονή', accomAll: 'Όλα', accomRent: 'Ενοίκιο', accomSale: 'Πώληση', accomShortTerm: 'Βραχυπρόθεσμο',
+    accomTitle: 'Ακίνητα & Διαμονή', accomAll: 'Όλα', accomRent: 'Ενοίκιο', accomSale: 'Πώληση', accomShortTerm: 'Βραχυπρόθεσμο', accomDorms: 'Εστίες',
     accomTypeApartment: 'Διαμέρισμα', accomTypeVilla: 'Βίλα', accomTypeStudio: 'Στούντιο',
     accomTypeHouse: 'Σπίτι', accomTypeLand: 'Οικόπεδο', accomTypeCommercial: 'Εμπορικό',
     accomDistrictNicosia: 'Λευκωσία', accomDistrictKyrenia: 'Κερύνεια', accomDistrictFamagusta: 'Αμμόχωστος',
@@ -6332,7 +6332,7 @@ const translations = {
     'Small Animals': 'Petits animaux', 'Large Animals': 'Grands animaux', 'Exotic Animals': 'Animaux exotiques',
     'Surgery': 'Chirurgie', 'Dentistry': 'Dentisterie', 'Emergency & Critical Care': 'Urgences & Soins intensifs',
     // ─── Accommodation module ─────────────────────────────────────────────────
-    accomTitle: 'Immobilier & Logement', accomAll: 'Tout', accomRent: 'Location', accomSale: 'Vente', accomShortTerm: 'Court séjour',
+    accomTitle: 'Immobilier & Logement', accomAll: 'Tout', accomRent: 'Location', accomSale: 'Vente', accomShortTerm: 'Court séjour', accomDorms: 'Résidences',
     accomTypeApartment: 'Appartement', accomTypeVilla: 'Villa', accomTypeStudio: 'Studio',
     accomTypeHouse: 'Maison', accomTypeLand: 'Terrain', accomTypeCommercial: 'Commercial',
     accomDistrictNicosia: 'Nicosie', accomDistrictKyrenia: 'Kyrenia', accomDistrictFamagusta: 'Famagouste',
@@ -7341,7 +7341,7 @@ const translations = {
     'Small Animals': 'Animales pequeños', 'Large Animals': 'Animales grandes', 'Exotic Animals': 'Animales exóticos',
     'Surgery': 'Cirugía', 'Dentistry': 'Odontología', 'Emergency & Critical Care': 'Urgencias & Cuidados intensivos',
     // ─── Accommodation module ─────────────────────────────────────────────────
-    accomTitle: 'Inmuebles y Alojamiento', accomAll: 'Todo', accomRent: 'Alquiler', accomSale: 'Venta', accomShortTerm: 'Corto plazo',
+    accomTitle: 'Inmuebles y Alojamiento', accomAll: 'Todo', accomRent: 'Alquiler', accomSale: 'Venta', accomShortTerm: 'Corto plazo', accomDorms: 'Residencias',
     accomTypeApartment: 'Apartamento', accomTypeVilla: 'Villa', accomTypeStudio: 'Estudio',
     accomTypeHouse: 'Casa', accomTypeLand: 'Terreno', accomTypeCommercial: 'Comercial',
     accomDistrictNicosia: 'Nicosia', accomDistrictKyrenia: 'Kyrenia', accomDistrictFamagusta: 'Famagusta',
@@ -8351,7 +8351,7 @@ const translations = {
     'Small Animals': 'Kleintiere', 'Large Animals': 'Großtiere', 'Exotic Animals': 'Exotische Tiere',
     'Surgery': 'Chirurgie', 'Dentistry': 'Zahnmedizin', 'Emergency & Critical Care': 'Notfall & Intensivpflege',
     // ─── Accommodation module ─────────────────────────────────────────────────
-    accomTitle: 'Immobilien & Unterkünfte', accomAll: 'Alle', accomRent: 'Miete', accomSale: 'Kauf', accomShortTerm: 'Kurzfristig',
+    accomTitle: 'Immobilien & Unterkünfte', accomAll: 'Alle', accomRent: 'Miete', accomSale: 'Kauf', accomShortTerm: 'Kurzfristig', accomDorms: 'Wohnheime',
     accomTypeApartment: 'Wohnung', accomTypeVilla: 'Villa', accomTypeStudio: 'Studio',
     accomTypeHouse: 'Haus', accomTypeLand: 'Grundstück', accomTypeCommercial: 'Gewerbe',
     accomDistrictNicosia: 'Nikosia', accomDistrictKyrenia: 'Kyrenia', accomDistrictFamagusta: 'Famagusta',
@@ -9360,7 +9360,7 @@ const translations = {
     'Small Animals': 'حیوانات کوچک', 'Large Animals': 'حیوانات بزرگ', 'Exotic Animals': 'حیوانات اگزوتیک',
     'Surgery': 'جراحی', 'Dentistry': 'دندانپزشکی', 'Emergency & Critical Care': 'اورژانس و مراقبت ویژه',
     // ─── Accommodation module ─────────────────────────────────────────────────
-    accomTitle: 'املاک و اقامتگاه', accomAll: 'همه', accomRent: 'اجاره', accomSale: 'فروش', accomShortTerm: 'کوتاه‌مدت',
+    accomTitle: 'املاک و اقامتگاه', accomAll: 'همه', accomRent: 'اجاره', accomSale: 'فروش', accomShortTerm: 'کوتاه‌مدت', accomDorms: 'خوابگاه‌ها',
     accomTypeApartment: 'آپارتمان', accomTypeVilla: 'ویلا', accomTypeStudio: 'استودیو',
     accomTypeHouse: 'خانه', accomTypeLand: 'زمین', accomTypeCommercial: 'تجاری',
     accomDistrictNicosia: 'نیکوزیا', accomDistrictKyrenia: 'کیرنیا', accomDistrictFamagusta: 'فاماگوستا',

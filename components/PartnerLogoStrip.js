@@ -1,5 +1,4 @@
-import { View, Text, Image, StyleSheet } from 'react-native'
-import { colors } from '../constants/theme'
+import { View, Image, StyleSheet } from 'react-native'
 
 // A partner's wordmark in a WIDE STRIP, left-aligned.
 //
@@ -35,20 +34,28 @@ export default function PartnerLogoStrip({
   const meta   = source ? Image.resolveAssetSource(source) : null
   const aspect = meta && meta.height ? meta.width / meta.height : null
 
-  if (!source || !aspect) {
-    // Finished state, not a placeholder box — same posture as components/TowingLogo.js.
-    // A square monogram at the strip's height, left-aligned, so the row is the same
-    // height whether or not a logo has been wired.
-    return (
-      <View style={[s.row, { width, height }, style]}>
-        <View style={[s.mono, { width: height, height, borderRadius: Math.round(height * 0.22) }]}>
-          <Text style={[s.monoText, { fontSize: Math.round(height * 0.36) }]} numberOfLines={1}>
-            {initials(name)}
-          </Text>
-        </View>
-      </View>
-    )
-  }
+  // ─── NO LOGO RENDERS NOTHING AT ALL ────────────────────────────────────────
+  //
+  // This used to draw an initials monogram: a teal rounded box with the partner's two
+  // initials in white, on the argument that it was a finished state rather than a
+  // placeholder. THAT ARGUMENT WAS WRONG, and device testing is what showed it.
+  //
+  // "Alasia Dorm" resolves to the initials **AD**, and ADA serves labelled banner
+  // advertising. A teal badge reading AD, sitting at the top of a partner's own card, is
+  // indistinguishable from an ad marker — so the monogram did not merely fail to help,
+  // it actively mislabelled a paying partner's listing as an advert. No other partner
+  // name is safe from this either: the failure is that a two-letter mark on a coloured
+  // chip is ad-shaped, and which two letters it happens to be is luck.
+  //
+  // Returning null takes the `style` prop's margin with it, so the card closes up and its
+  // height follows its content. That is deliberate — a reserved empty slot was the other
+  // half of the same finding.
+  //
+  // ⚠ components/TowingLogo.js STILL HAS ITS OWN MONOGRAM, a separate implementation with
+  //   the same shape. It was left alone because towing is a different module and was not
+  //   in scope, not because it is safe — the same "AD"-shaped reading is available there
+  //   the moment a firm's initials land badly.
+  if (!source || !aspect) return null
 
   // Fit INSIDE the box on both axes and never upscale past it. min() is what makes a
   // square mark a square and a wordmark a full-width strip, with one expression.
@@ -67,16 +74,6 @@ export default function PartnerLogoStrip({
   )
 }
 
-function initials(name) {
-  const words = String(name || '').replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean)
-  if (!words.length) return '?'
-  if (words.length === 1) return words[0].slice(0, 2).toLocaleUpperCase('tr')
-  return (words[0][0] + words[1][0]).toLocaleUpperCase('tr')
-}
-
 const s = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' },
-  mono:     { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
-              overflow: 'hidden' },
-  monoText: { color: '#FFFFFF', fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' },
 })

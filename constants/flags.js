@@ -296,3 +296,33 @@ export const PREVIEW_PENDING_PARTNERS = false
 // NOT a MODULE_FLAGS key: it does not gate a module, it gates a FLOW inside one that is
 // itself still dark. Same resolution as PREVIEW_PENDING_PARTNERS.
 export const HS_SELF_REGISTRATION = false
+
+// Yurtlar (dorm partners) — the fifth segment of Emlak & Konaklama. false = the chip is
+// absent from the segment row, the showcase is unreachable, and the module opens on
+// Satılık exactly as it does today. true = the chip appears FIRST with its accent dot and
+// the module opens on it.
+//
+// NOT a MODULE_FLAGS key, and the reason is mechanical rather than stylistic. A true
+// entry in that map trips three checks in scripts/check-module-flags.mjs — the
+// WAITLIST_BLAST_DONE requirement, the notify_module_waitlist whitelist and the
+// module_notif_text display name — plus the module_waitlist.module CHECK. All four exist
+// to make sure a module that goes live can notify the people who asked to be told. This
+// gates a SEGMENT inside a module that is already live (MODULE_FLAGS.accommodation is
+// true), so there is no Coming Soon screen to collect a waitlist from and nothing to
+// notify. Same resolution, and the same reasoning, as HOME_V2_LIVE, AD_BANNERS_LIVE and
+// PROFILE_GATE_LIVE above; carried in EXPECTED_SCALARS so a working-tree flip still
+// cannot ride out on an unrelated `eas update`.
+//
+// ⚠ IT ALSO MOVES THE LANDING TAB, WHICH IS WHY constants/dorms.js DERIVES IT.
+//   ACCOM_LANDING is 'dorm'. With this false, accomLanding() falls back to the first
+//   VISIBLE segment — 'sale' — so the dark state is correct by construction. Reading
+//   ACCOM_LANDING directly would open the module on a tab that is not in the chip row.
+//
+// ⚠ IT DOES NOT GATE ANY DATA, because there is no data to gate. Dorm partners live in
+//   constants/dorms.js, not in a table, so nothing is publicly readable and nothing is
+//   findable in search whatever this is set to. That is the whole reason the config-only
+//   shape was chosen — the usual "a flag hides a SURFACE, never a table" hazard has no
+//   table to apply to here.
+//
+// Reverting is this one boolean, and so is the emergency direction.
+export const DORMS_LIVE = false
