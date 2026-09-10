@@ -1,4 +1,4 @@
-import { View, Text, Modal, Pressable, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, Text, Modal, Pressable, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, radius } from '../constants/theme'
@@ -35,6 +35,69 @@ function availabilityLabel(available, lang) {
 // mounted with `visible={false}` — PickerSheet's idiom — so the sheet animates OUT as well
 // as in, which unmounting it would lose. And a component declared inside its parent is a
 // new type on every render, which remounts its subtree.
+// A cash plan as a LEFT-TO-RIGHT PAYMENT SEQUENCE, which is what it actually is:
+// €500 kapora → €940 → €450 → €450 → €450.
+//
+// ⚠ THE SEQUENCE IS NEVER SUMMED. Alasia publishes the instalments and not their total;
+//   adding them would be ADA's arithmetic. Reproduce, do not compute.
+// ⚠ AND NO FIGURE STANDS ALONE — every one sits under its plan's own header, which is what
+//   stops €2,490 being read as a total when it is a balance, or the reverse.
+function CashPlan({ plan, lang, holding }) {
+  return (
+    <View style={s.plan}>
+      <View style={s.planHead}>
+        <Text style={s.planTitle}>{t(plan.labelKey, lang)}</Text>
+        {/* The discount is Alasia's own string, in their own "%10" form. Not reformatted. */}
+        {!!plan.discount && (
+          <View style={s.discount}><Text style={s.discountText}>{plan.discount}</Text></View>
+        )}
+      </View>
+      <View style={s.seq}>
+        {!!holding?.amount && (
+          <>
+            <Text style={s.seqItem}>{holding.amount} <Text style={s.seqUnit}>{t('dormKapora', lang)}</Text></Text>
+            <Ionicons name="chevron-forward" size={11} color={colors.textSecondary} />
+          </>
+        )}
+        {plan.amounts.map((a, i) => (
+          <View key={i} style={s.seqPair}>
+            <Text style={s.seqItem}>{a}</Text>
+            {i < plan.amounts.length - 1 && (
+              <Ionicons name="chevron-forward" size={11} color={colors.textSecondary} />
+            )}
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
+// A bank plan as MONTHLY CHIPS: "€385.83 × 6 ay".
+//
+// ⚠ months IS PER BANK — İşbank runs 6/8/10/12 and Ziraat 7/8/10/12. The chip pairs each
+//   amount with ITS OWN month count by index, so the two can never be crossed.
+function BankPlan({ plan, lang }) {
+  return (
+    <View style={s.plan}>
+      <View style={s.planHead}>
+        {/* A bank name is a proper noun and is not translated. */}
+        <Text style={s.planTitle}>{plan.bankName}</Text>
+      </View>
+      <View style={s.chipWrap}>
+        {plan.amounts.map((a, i) => (
+          <View key={i} style={s.monthChip}>
+            <Text style={s.monthChipText}>
+              {a} <Text style={s.monthChipUnit}>
+                {t('dormPlanMonthsShort', lang).replace('{n}', plan.months[i])}
+              </Text>
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
 function SheetBody({ room, partner, lang, region, onClose, insets }) {
   const langCode = LANG_CODES[lang] || 'en'
 
@@ -51,10 +114,14 @@ function SheetBody({ room, partner, lang, region, onClose, insets }) {
   }
 
   const rows = [
-    { label: t('dormRoomPrice', lang),        value: room.price != null ? String(room.price) : null },
     { label: t('dormRoomSize', lang),         value: room.sqm != null ? `${room.sqm} m²` : null },
     { label: t('dormRoomAvailability', lang), value: availabilityLabel(room.available, lang) },
   ].filter(r => r.value != null)
+
+  const p = room.plans || {}
+  const cashPlans = [p.full, p.two, p.four].filter(Boolean)
+  const bankPlans = [p.isbank, p.ziraat].filter(Boolean)
+  const dep = partner.deposits || {}
 
   // ⚠ entity_id IS THE PARTNER, NOT THE ROOM. contact_events.entity_id is a uuid and rooms
   //   have no uuid — they have a short code the reception desk reads. Minting per-room uuids
@@ -82,18 +149,76 @@ function SheetBody({ room, partner, lang, region, onClose, insets }) {
       {/* Swallows the tap so pressing inside the sheet does not close it. */}
       <Pressable style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 20) + 20 }]}>
         <View style={s.header}>
-          <Text style={s.title} numberOfLines={2}>{name}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.title} numberOfLines={2}>{name}</Text>
+            {/* Alasia's OWN name for this room, verbatim and untranslated — it is the label
+                attached to these figures on their prices page, and somebody comparing the
+                two pages needs the word they will see there. */}
+            {!!room.sourceName && (
+              <Text style={s.sourceName} numberOfLines={1}>
+                {t('dormListedAs', lang)}: {room.sourceName}
+              </Text>
+            )}
+          </View>
           <TouchableOpacity onPress={onClose} hitSlop={10} accessibilityLabel={t('cancel', lang)}>
             <Ionicons name="close" size={22} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
-        {rows.map(r => (
-          <View key={r.label} style={s.row}>
-            <Text style={s.rowLabel}>{r.label}</Text>
-            <Text style={s.rowValue}>{r.value}</Text>
-          </View>
-        ))}
+        <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}
+          showsVerticalScrollIndicator={false}>
+          {rows.map(r => (
+            <View key={r.label} style={s.row}>
+              <Text style={s.rowLabel}>{r.label}</Text>
+              <Text style={s.rowValue}>{r.value}</Text>
+            </View>
+          ))}
+
+          {/* ─── PRICING ─────────────────────────────────────────────────────
+              FIVE PLANS, EACH ITS OWN BLOCK, NEVER A TABLE. A table of five plans by up
+              to five columns needs empty cells, and an empty cell has to be filled with a
+              dash — which is a table artifact, not information Alasia published.
+
+              The academic year sits at the top so a stale table is visibly stale rather
+              than silently wrong. */}
+          {(cashPlans.length > 0 || bankPlans.length > 0) && (
+            <>
+              <Text style={s.yearLabel}>
+                {t('dormAcademicYear', lang)} {partner.academicYear}
+              </Text>
+
+              {cashPlans.map(pl => (
+                <CashPlan key={pl.labelKey} plan={pl} lang={lang} holding={dep.holding} />
+              ))}
+              {bankPlans.map(pl => (
+                <BankPlan key={pl.bankName} plan={pl} lang={lang} />
+              ))}
+
+              {/* DEPOSITS ARE ALWAYS VISIBLE and never inside a collapse. Both notes
+                  travel with the numbers — without them the prices are misleading. */}
+              <View style={s.notes}>
+                {!!dep.holding?.noteKey && (
+                  <Text style={s.note}>{t(dep.holding.noteKey, lang)}</Text>
+                )}
+                {/* ⚠ THE SECURITY DEPOSIT AMOUNT IS OMITTED ON PURPOSE — Alasia's EN page
+                    says ₺8,000 and their TR page says €8,000, ~€180 vs €8,000. The FACT is
+                    reproduced, the AMOUNT is not, and their page is linked. Do not "fix"
+                    this by filling in the likelier figure. */}
+                {!!dep.security?.noteKey && (
+                  <Text style={s.note}>{t(dep.security.noteKey, lang)}</Text>
+                )}
+              </View>
+
+              {!!partner.priceSource?.url && (
+                <TouchableOpacity style={s.sourceLink} activeOpacity={0.6}
+                  onPress={() => Linking.openURL(partner.priceSource.url).catch(() => {})}>
+                  <Ionicons name="open-outline" size={13} color={colors.primary} />
+                  <Text style={s.sourceLinkText}>alasiadorm.com/prices</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </ScrollView>
 
         {!!waNum && (
           <TouchableOpacity style={s.waBtn} onPress={openWhatsApp} activeOpacity={0.85}>
@@ -131,7 +256,31 @@ const s = StyleSheet.create({
   overlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:    { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
   header:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
-  title:    { flex: 1, fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  title:    { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  sourceName: { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+  // The sheet scrolls: five plans plus the deposit notes do not fit a fixed height on a
+  // small screen, and capping it here is what stops the buttons being pushed off.
+  scroll:   { maxHeight: 420 },
+  scrollContent: { paddingBottom: 4 },
+  yearLabel: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
+               textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 14, marginBottom: 8 },
+  plan:     { backgroundColor: colors.cardBg, borderRadius: radius.md, padding: 12, marginBottom: 8 },
+  planHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  planTitle:{ flex: 1, fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  discount: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: colors.successLight },
+  discountText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.success },
+  seq:      { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 },
+  seqPair:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  seqItem:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  seqUnit:  { fontFamily: 'Inter_400Regular', color: colors.textSecondary, fontSize: 12 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  monthChip:{ paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, backgroundColor: colors.surface },
+  monthChipText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  monthChipUnit: { fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  notes:    { marginTop: 6, marginBottom: 4, gap: 4 },
+  note:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 15 },
+  sourceLink: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6 },
+  sourceLinkText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
   row:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
               paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   rowLabel: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },

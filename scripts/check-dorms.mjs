@@ -241,11 +241,76 @@ for (const p of DORM_PARTNERS) {
   check(dormDeal({ ...p, deal: { textKey: 'x' } }) === null, `${who}: a deal with no expiry rendered — both halves are required`)
   check(dormDeal({ ...p, deal: null }) === null, `${who}: a null deal rendered`)
 
-  // priceFrom is held until Özok says what a dönem is; periodKey null means DO NOT RENDER.
-  check(dormPriceFrom({ ...p, priceFrom: { amount: 1, currency: 'EUR', periodKey: null } }) === null,
-    `${who}: priceFrom rendered with a null periodKey — the dönem question is still open`)
-  check(dormPriceFrom({ ...p, priceFrom: { amount: 1, currency: 'EUR', periodKey: 'k' } }) !== null,
-    `${who}: priceFrom refused to render even with a periodKey`)
+  // ─── PRICING — reproduced, never edited ─────────────────────────────────
+  check(!!p.academicYear && /^\d{4}-\d{4}$/.test(p.academicYear),
+    `${who}: academicYear ${JSON.stringify(p.academicYear)} is not YYYY-YYYY — prices with no year cannot be shown to be stale`)
+
+  // ⚠ THE PRICES EXPIRE. This is the duty_list failure class: content with a shelf life
+  //   behind checks that only ever verified SHAPE. An empty roster has a perfectly correct
+  //   schema, and so does a year-old price table.
+  if (/^\d{4}-\d{4}$/.test(p.academicYear || '')) {
+    const endsJul = new Date(`${p.academicYear.split('-')[1]}-07-31T23:59:59`)
+    check(new Date() <= endsJul,
+      `${who}: the ${p.academicYear} prices ended ${endsJul.toISOString().slice(0, 10)} and are now STALE. `
+      + `Re-fetch from ${p.priceSource?.url || 'alasiadorm.com/prices'} and update academicYear in the same commit.`)
+  }
+
+  for (const f of ['url', 'pdfUrl']) {
+    check(/^https:\/\//.test(p.priceSource?.[f] || ''),
+      `${who}: priceSource.${f} must be an https URL — the numbers must be one tap from their authority`)
+  }
+
+  // ⚠⚠ THE SECURITY DEPOSIT AMOUNT IS OMITTED ON PURPOSE, NOT BY OVERSIGHT.
+  //   Alasia's EN page says ₺8,000; their TR page says €8,000 — ~€180 versus €8,000, which
+  //   is more than the whole annual fee on four of the six room types. ADA reproduces the
+  //   FACT and omits the AMOUNT until Özok confirms which is right.
+  //   This assertion exists because a bare null reads as something to fill in.
+  const sec2 = p.deposits?.security || {}
+  check(sec2.amount == null || (!!sec2.confirmedBy && !!sec2.confirmedOn),
+    `${who}: deposits.security.amount is set to ${JSON.stringify(sec2.amount)} without confirmedBy/confirmedOn. `
+    + `THAT FIELD IS EMPTY ON PURPOSE — Alasia publishes ₺8,000 on their EN page and €8,000 on their TR page, `
+    + `a ~30x difference on money a student hands over. Do not fill it in from the likelier reading. `
+    + `Record who at Özok confirmed it and when, in the same commit as the number.`)
+  check(!!p.deposits?.holding?.amount, `${who}: the holding deposit amount is missing — it is published and unambiguous`)
+  for (const d of ['holding', 'security']) {
+    check(!!p.deposits?.[d]?.noteKey, `${who}: deposits.${d} has no noteKey — the numbers are misleading without their note`)
+    if (p.deposits?.[d]?.noteKey) referencedKeys.add(p.deposits[d].noteKey)
+  }
+
+  // ─── The plan grid ──────────────────────────────────────────────────────
+  const MONTHS = { isbank: [6, 8, 10, 12], ziraat: [7, 8, 10, 12] }
+  // Verbatim strings in ALASIA'S OWN format: comma thousands, dot decimals. Storing these
+  // as numbers would lose `€480.00`'s trailing zeros and let a formatter re-render them as
+  // `€2.490` in Turkish, which is the conversion the directory rule forbids.
+  const MONEY = /^€[\d]{1,3}(,[\d]{3})*(\.[\d]{2})?$/
+  for (const r of p.rooms || []) {
+    check(!!r.sourceName, `${who}: room ${r.code} has no sourceName — Alasia's own label must travel with their figures`)
+    const plans = r.plans || {}
+    const names = Object.keys(plans)
+    check(names.length === 5,
+      `${who}: room ${r.code} has ${names.length} plan(s) [${names.join(',')}], expected 5 (full, two, four, isbank, ziraat)`)
+    for (const [name, pl] of Object.entries(plans)) {
+      check(Array.isArray(pl.amounts) && pl.amounts.length > 0,
+        `${who}: ${r.code}/${name} has no amounts — an empty plan renders a heading with nothing under it`)
+      for (const a of pl.amounts || []) {
+        check(MONEY.test(a),
+          `${who}: ${r.code}/${name} amount ${JSON.stringify(a)} is not a verbatim € string in Alasia's format `
+          + `(comma thousands, dot decimals). Figures are never parsed, formatted, localised or rounded.`)
+      }
+      // Every plan must carry a LABEL, because no figure may ever render bare.
+      check(!!pl.labelKey || !!pl.bankName,
+        `${who}: ${r.code}/${name} has neither labelKey nor bankName — its figures would render without a plan label`)
+      if (pl.labelKey) referencedKeys.add(pl.labelKey)
+      if (MONTHS[name]) {
+        check(JSON.stringify(pl.months) === JSON.stringify(MONTHS[name]),
+          `${who}: ${r.code}/${name} months ${JSON.stringify(pl.months)} != ${JSON.stringify(MONTHS[name])} — `
+          + `İşbank runs 6/8/10/12 and Ziraat 7/8/10/12; a shared month set would mislabel every figure`)
+        check((pl.months || []).length === (pl.amounts || []).length,
+          `${who}: ${r.code}/${name} has ${(pl.months||[]).length} month(s) for ${(pl.amounts||[]).length} amount(s) — `
+          + `they are paired by index, so a mismatch crosses a price with the wrong term`)
+      }
+    }
+  }
 }
 
 // ─── 3. i18n keys, in BOTH directions ───────────────────────────────────────
@@ -401,6 +466,45 @@ for (const l of LANGS) {
     `DormPartnerScreen draws the accent AS TEXT in ${asText} place(s). readableOn() cannot help there — `
     + `there is no fill to read against — and accent-on-white is 1.43:1 for a brand yellow. `
     + `Fill the surface and derive the foreground, as the badge and the deal band both do.`)
+}
+
+// ─── 3c. NO FIGURE RENDERS BARE ─────────────────────────────────────────────
+//
+// €2,490 is simultaneously the Quad Bungalow's full-payment TOTAL and the Triple Room's
+// balance after deposit. Both are correct, so a mix-up cannot be caught by sanity-checking
+// the figure — only by never letting it appear without its room and plan label.
+//
+// Asserted as a SHAPE, with comments stripped: wherever a surface prints `amounts`, the
+// same surface must print a plan label. Comments here and in those files discuss `amounts`
+// in prose, and forbidding the WORD would mean deleting the notes to go green.
+{
+  const strip = src => src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+    .map(l => l.replace(/(^|\s)\/\/.*$/, '')).join('\n')
+
+  for (const [file, labelToken] of [
+    ['screens/DormPartnerScreen.js', "t('dormPlanFull', lang)"],   // the room row's headline
+    ['components/DormRoomSheet.js',  't(plan.labelKey, lang)'],    // every cash plan header
+  ]) {
+    const src = strip(readFileSync(resolve(ROOT, file), 'utf8'))
+    if (/\.amounts\b/.test(src)) {
+      check(src.includes(labelToken),
+        `${file} renders plan amounts but never renders ${labelToken}. A figure without its plan label `
+        + `is exactly the €2,490 ambiguity: the same number is a total in one room and a balance in another.`)
+    }
+  }
+  // The bank plans label themselves with the bank's own name rather than an i18n key.
+  const sheet = strip(readFileSync(resolve(ROOT, 'components/DormRoomSheet.js'), 'utf8'))
+  check(sheet.includes('plan.bankName'),
+    `components/DormRoomSheet.js never renders plan.bankName — İşbank and Ziraat figures would be unlabelled`)
+
+  // ⚠ AND NOTHING SUMS THEM. Alasia publishes the instalments and not their total; a
+  //   directory that adds them up has started editing. Catches the obvious shapes.
+  for (const file of ['screens/DormPartnerScreen.js', 'components/DormRoomSheet.js']) {
+    const src = strip(readFileSync(resolve(ROOT, file), 'utf8'))
+    check(!/(reduce\s*\(|parseFloat|parseInt|Number\s*\()/.test(src),
+      `${file} parses or accumulates a number. Alasia's figures are verbatim strings and are never `
+      + `parsed, summed, formatted or rounded — publishing a total they do not publish is editing.`)
+  }
 }
 
 // ─── 4. Assets, also in two directions ──────────────────────────────────────

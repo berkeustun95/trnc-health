@@ -125,13 +125,68 @@ export const DORM_PARTNERS = [
     // Owed. Null falls back to ADA teal wherever an accent is drawn.
     accent: null,
 
-    // ─── VERIFIED, BUT NOT YET RENDERABLE ───────────────────────────────────
-    // "From €2490" is the one price Özok has given, and it is meaningless until they say
-    // what a dönem is — academic year, semester, or a month count differ by up to 12x.
-    // periodKey null therefore means DO NOT RENDER, by the same collapse-when-absent rule
-    // every other section follows, rather than shipping a number a reader would have to
-    // guess at. Currency is also unconfirmed (€ only, or GBP/TL too).
-    priceFrom: { amount: 2490, currency: 'EUR', periodKey: null },
+    // ─── PRICING — VERBATIM STRINGS, NEVER NUMBERS ──────────────────────────
+    //
+    // ADA is a DIRECTORY for Alasia, not an editor of their information. It reproduces what
+    // Özok publishes. That rules out storing figures as numbers, and not pedantically:
+    //   · `480.00` cannot survive as a JS number — the trailing zeros are gone
+    //   · rendering `2490` through any formatter is OUR formatting, not theirs
+    //   · Turkish convention would print `€2.490`, which is a CONVERSION
+    // So every figure below is the exact string Özok published. Nothing parses, formats,
+    // localises, rounds or sums them. Plan and room LABELS translate; FIGURES never do.
+    //
+    // ⚠ NO TOTALS ARE STORED OR COMPUTED. Özok publishes "€500 kapora" and "€1.990 bakiye"
+    //   as two figures and does not publish their sum. Adding them is OUR arithmetic, and a
+    //   directory that does arithmetic has started editing.
+    // ⚠ THE FIGURES KEEP ALASIA'S OWN NUMBER FORMAT: comma thousands, dot decimals —
+    //   `€2,490` and `€480.00`, exactly as published. An earlier draft of this file
+    //   silently rewrote them European-style (`€2.490`, `€480,00`) which is precisely the
+    //   CONVERSION the directory rule forbids, and it read as harmless because the digits
+    //   were unchanged.
+    //
+    //   The brief's two examples disagree with each other on this — "€385.83 keeps its dot
+    //   even in Turkish" is Anglo, "€500 kapora + €1.990 bakiye" is European — so the
+    //   source format is what settles it, and PDF verification will confirm which one
+    //   Özok actually publishes. If it turns out to be European, these strings change and
+    //   nothing else does, which is the point of storing them verbatim.
+    //
+    // Bank names are PROPER NOUNS and live here rather than in i18n: "İş Bankası" is the
+    // same in all nine locales, and a key would invite somebody to "translate" it.
+    academicYear: '2026-2027',
+
+    // The homepage's own headline claim, reproduced verbatim.
+    // ⚠ €2,490 HAS TWO TRUE MEANINGS IN THIS DATASET: it is the cheapest all-in total
+    //   (Quad Bungalow, €500 + €1,990) AND the Triple Room's balance after deposit. Both
+    //   are correct, so a mix-up cannot be caught by sanity-checking the figure. It must
+    //   NEVER render bare — always with its room and plan label. check-dorms.mjs asserts it.
+    priceFromLabel: 'Starting From € 2490',
+
+    priceSource: {
+      url:     'https://alasiadorm.com/prices/',
+      pdfUrl:  'https://alasiadorm.com/wp-content/uploads/2026/08/alasiadorm-prices-payment-plans-en-1.pdf',
+      fetched: '2026-09-10',
+    },
+
+    // ─── DEPOSITS ───────────────────────────────────────────────────────────
+    // The holding deposit is the same €500 on every plan, so it lives here once rather than
+    // being repeated into thirty plan rows.
+    //
+    // ⚠⚠ THE SECURITY DEPOSIT AMOUNT IS OMITTED ON PURPOSE. NOT AN OVERSIGHT. ⚠⚠
+    //   alasiadorm.com/prices/ (EN) says ₺8,000. alasiadorm.com/tr/fiyatlar/ (TR) says
+    //   €8,000. That is ~€180 versus €8,000 — MORE THAN THE ENTIRE ANNUAL FEE on four of
+    //   the six room types. Two sources say ₺ and the TR reading looks like a rendering
+    //   artefact, but "likelier" is not a basis for putting a sum a student must hand over
+    //   in front of them, and showing both would make ADA the place that told them it might
+    //   be either.
+    //   So: reproduce the FACT (refundable, per person, separate from the fee), omit the
+    //   AMOUNT, link their page. Berke is asking Özok directly.
+    //   check-dorms.mjs goes RED if `amount` becomes non-null without `confirmedBy` and
+    //   `confirmedOn` recorded in the same commit. Do not simply fill it in.
+    deposits: {
+      holding:  { amount: '€500', noteKey: 'dormDepositHoldingNote' },
+      security: { amount: null, confirmedBy: null, confirmedOn: null,
+                  noteKey: 'dormDepositSecurityNote' },
+    },
 
     // ⚠ REFERENCED BUT DELIBERATELY UNWRITTEN. Özok has supplied no "about" copy, and this
     //   is a real business — inventing nine locales of marketing prose about somebody
@@ -168,17 +223,93 @@ export const DORM_PARTNERS = [
     // is owed. `code` is what reaches reception in the WhatsApp message as
     // ADA-ALS-<CODE>, so it is pending their sign-off — a code the desk does not
     // recognise makes the handoff worse than no code at all.
+    // ─── ROOM TYPES ─────────────────────────────────────────────────────────
+    //
+    // `nameKey` is ADA's translated label, from Özok's own navigation menu.
+    // `sourceName` is the name on their PRICES page, VERBATIM and untranslated — because
+    //   that is the label attached to these figures, and a user comparing our page against
+    //   theirs needs the word they will see there.
+    //
+    // ⚠ ALASIA PUBLISHES FOUR NAMES FOR EACH ROOM and they do not agree:
+    //     prices page   Triple Room / Quad Bungalow
+    //     nav menu      3-Person Dorm Block / 4-Person Bungalow
+    //     descriptions  "Dorm Block 3 Person" / "Dorm Bungalov 4 Person"  (sic)
+    //     TR page       Üç Kişilik Oda / Dört Kişilik Bungalov
+    //   The mismatch is THEIRS to resolve. ADA carries both and picks neither.
+    //   OCCUPANCY is what makes that safe: the names disagree, the head counts never do.
+    //
+    // `available` is a BOOLEAN when known. Still owed; if counts arrive instead, the guard
+    // fails on the type, which is the intended place to find out.
+    //
+    // ⚠ months IS PER BANK. İşbank is 6/8/10/12; Ziraat is 7/8/10/12. One shared array
+    //   would silently mislabel every Ziraat figure.
     rooms: [
-      // `available` is a BOOLEAN when known (true = rooms free, false = full). Özok has not
-      // supplied it and owed item 6 asks for it per room — if what arrives is a COUNT
-      // rather than a yes/no, this shape changes and check-dorms.mjs fails on the type,
-      // which is the intended place to find out.
-      { code: 'BNG1', nameKey: 'dormRoomBungalow1', price: null, sqm: null, available: null },
-      { code: 'BNG2', nameKey: 'dormRoomBungalow2', price: null, sqm: null, available: null },
-      { code: 'BNG4', nameKey: 'dormRoomBungalow4', price: null, sqm: null, available: null },
-      { code: 'BLK1', nameKey: 'dormRoomBlock1',    price: null, sqm: null, available: null },
-      { code: 'BLK2', nameKey: 'dormRoomBlock2',    price: null, sqm: null, available: null },
-      { code: 'BLK3', nameKey: 'dormRoomBlock3',    price: null, sqm: null, available: null },
+      { code: 'BNG1', nameKey: 'dormRoomBungalow1', sourceName: 'Single Bungalow',
+        photo: null, sqm: null, available: null,
+        plans: {
+          full:   { labelKey: 'dormPlanFull',   discount: '%10', amounts: ['€8,500'] },
+          two:    { labelKey: 'dormPlanTwo',    discount: '%5',  amounts: ['€4,245', '€4,745'] },
+          four:   { labelKey: 'dormPlanFour',   discount: null,  amounts: ['€4,600', '€1,600', '€1,600', '€1,600'] },
+          isbank: { bankName: 'İş Bankası', months: [6, 8, 10, 12],
+                    amounts: ['€1,624.17', '€1,251.88', '€1,035.00', '€890.83'] },
+          ziraat: { bankName: 'Ziraat Bankası', months: [7, 8, 10, 12],
+                    amounts: ['€1,392.14', '€1,250.00', '€1,030.00', '€875.00'] },
+        } },
+      { code: 'BNG2', nameKey: 'dormRoomBungalow2', sourceName: 'Twin Bungalow',
+        photo: 'alasia/room-bng2', sqm: null, available: null,
+        plans: {
+          full:   { labelKey: 'dormPlanFull',   discount: '%10', amounts: ['€4,250'] },
+          two:    { labelKey: 'dormPlanTwo',    discount: '%5',  amounts: ['€2,045', '€2,545'] },
+          four:   { labelKey: 'dormPlanFour',   discount: null,  amounts: ['€2,300', '€850', '€850', '€850'] },
+          isbank: { bankName: 'İş Bankası', months: [6, 8, 10, 12],
+                    amounts: ['€818.33', '€631.25', '€523.00', '€450.42'] },
+          ziraat: { bankName: 'Ziraat Bankası', months: [7, 8, 10, 12],
+                    amounts: ['€701.43', '€618.75', '€515.00', '€437.50'] },
+        } },
+      { code: 'BNG4', nameKey: 'dormRoomBungalow4', sourceName: 'Quad Bungalow',
+        photo: 'alasia/room-bng4', sqm: null, available: null,
+        plans: {
+          full:   { labelKey: 'dormPlanFull',   discount: '%10', amounts: ['€1,990'] },
+          two:    { labelKey: 'dormPlanTwo',    discount: '%5',  amounts: ['€825', '€1,325'] },
+          four:   { labelKey: 'dormPlanFour',   discount: null,  amounts: ['€940', '€450', '€450', '€450'] },
+          isbank: { bankName: 'İş Bankası', months: [6, 8, 10, 12],
+                    amounts: ['€385.83', '€301.25', '€250.00', '€216.25'] },
+          ziraat: { bankName: 'Ziraat Bankası', months: [7, 8, 10, 12],
+                    amounts: ['€330.71', '€293.75', '€240.00', '€204.17'] },
+        } },
+      { code: 'BLK1', nameKey: 'dormRoomBlock1', sourceName: 'Single Room',
+        photo: 'alasia/room-blk1', sqm: null, available: null,
+        plans: {
+          full:   { labelKey: 'dormPlanFull',   discount: '%10', amounts: ['€6,990'] },
+          two:    { labelKey: 'dormPlanTwo',    discount: '%5',  amounts: ['€3,495', '€3,995'] },
+          four:   { labelKey: 'dormPlanFour',   discount: null,  amounts: ['€3,690', '€1,400', '€1,400', '€1,400'] },
+          isbank: { bankName: 'İş Bankası', months: [6, 8, 10, 12],
+                    amounts: ['€1,328.33', '€1,031.25', '€853.00', '€734.17'] },
+          ziraat: { bankName: 'Ziraat Bankası', months: [7, 8, 10, 12],
+                    amounts: ['€1,138.57', '€1,006.25', '€815.00', '€691.67'] },
+        } },
+      { code: 'BLK2', nameKey: 'dormRoomBlock2', sourceName: 'Twin Room',
+        photo: 'alasia/room-blk2', sqm: null, available: null,
+        plans: {
+          full:   { labelKey: 'dormPlanFull',   discount: '%10', amounts: ['€3,490'] },
+          two:    { labelKey: 'dormPlanTwo',    discount: '%5',  amounts: ['€1,625', '€2,125'] },
+          four:   { labelKey: 'dormPlanFour',   discount: null,  amounts: ['€1,700', '€750', '€750', '€750'] },
+          isbank: { bankName: 'İş Bankası', months: [6, 8, 10, 12],
+                    amounts: ['€668.33', '€520.00', '€431.00', '€371.67'] },
+          ziraat: { bankName: 'Ziraat Bankası', months: [7, 8, 10, 12],
+                    amounts: ['€572.86', '€512.50', '€420.00', '€358.33'] },
+        } },
+      { code: 'BLK3', nameKey: 'dormRoomBlock3', sourceName: 'Triple Room',
+        photo: 'alasia/room-blk3', sqm: null, available: null,
+        plans: {
+          full:   { labelKey: 'dormPlanFull',   discount: '%10', amounts: ['€2,490'] },
+          two:    { labelKey: 'dormPlanTwo',    discount: '%5',  amounts: ['€1,095', '€1,595'] },
+          four:   { labelKey: 'dormPlanFour',   discount: null,  amounts: ['€1,200', '€550', '€550', '€550'] },
+          isbank: { bankName: 'İş Bankası', months: [6, 8, 10, 12],
+                    amounts: ['€480.00', '€373.75', '€310.50', '€267.92'] },
+          ziraat: { bankName: 'Ziraat Bankası', months: [7, 8, 10, 12],
+                    amounts: ['€411.43', '€368.75', '€302.50', '€258.33'] },
+        } },
     ],
 
     gallery:          [],   // owed — hero gallery does not render while empty
@@ -224,12 +355,13 @@ export function dormDeal(partner, now = new Date()) {
   return { textKey: d.textKey, expiry: d.expiry }
 }
 
-// "From €2490" renders ONLY once Özok says what a dönem is. periodKey null is the hold.
-// Returning null keeps that decision in one place instead of at every call site.
+// The homepage's own headline claim, reproduced verbatim or not at all.
+//
+// ⚠ IT IS NEVER SYNTHESISED. ADA does not compute a from-price out of the room grid — that
+//   would be selecting a representative number, which is what an editor does. Alasia
+//   publishes "Starting From € 2490" and this returns exactly that string or null.
 export function dormPriceFrom(partner) {
-  const p = partner?.priceFrom
-  if (!p || p.amount == null || !p.currency || !p.periodKey) return null
-  return p
+  return partner?.priceFromLabel || null
 }
 
 // A section list the screen maps over, so "which sections have content" is answered once.
@@ -247,7 +379,7 @@ export function dormSections(partner, { now = new Date(), resolveAsset = () => u
     coords:    partner?.coords || null,
     ringTimes: has(partner?.ringTimes) ? partner.ringTimes : null,
     events:    has(partner?.events)    ? partner.events    : null,
-    priceFrom: dormPriceFrom(partner),
+    priceFromLabel: dormPriceFrom(partner),
   }
 }
 

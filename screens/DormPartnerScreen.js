@@ -67,6 +67,42 @@ function Chip({ icon, label }) {
   )
 }
 
+// One room in the vertical list. Thumbnail, both of Alasia's names, and the headline
+// payment line.
+//
+// ⚠ THE PAYMENT LINE IS NEVER A SUM. Alasia publishes "€500" and "€2,490" as two figures
+//   and does not publish their total. Adding them would be ADA's arithmetic, and a
+//   directory that does arithmetic has started editing. So: "€500 kapora + €2,490 bakiye".
+//
+// ⚠ AND THE FIGURE NEVER APPEARS BARE. €2,490 is simultaneously the Quad Bungalow's
+//   full-payment total and the Triple Room's balance after deposit — both true, so a
+//   mix-up cannot be caught by checking whether the number is right. It always carries its
+//   plan label and sits inside its room's own row.
+function DormRoomRow({ room, lang, onPress }) {
+  const src  = partnerAsset(room.photo)
+  const full = room.plans?.full
+  return (
+    <TouchableOpacity style={s.roomRow} onPress={onPress} activeOpacity={0.7}>
+      {!!src && <Image source={src} style={s.roomThumb} resizeMode="cover" />}
+      <View style={s.roomBody}>
+        <Text style={s.roomName} numberOfLines={2}>{t(room.nameKey, lang)}</Text>
+        {!!room.sourceName && (
+          <Text style={s.roomAlt} numberOfLines={1}>
+            {t('dormListedAs', lang)}: {room.sourceName}
+          </Text>
+        )}
+        {!!full && (
+          <Text style={s.roomPrice} numberOfLines={2}>
+            <Text style={s.roomPriceLabel}>{t('dormPlanFull', lang)} · </Text>
+            €500 {t('dormKapora', lang)} + {full.amounts[0]} {t('dormBalance', lang)}
+          </Text>
+        )}
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+    </TouchableOpacity>
+  )
+}
+
 export default function DormPartnerScreen({ partner, lang, region, onBack, onAdNavigate }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
@@ -196,12 +232,13 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
               <Text style={s.placeText}>{place}</Text>
             </View>
           )}
-          {/* Held back until Özok says what a dönem is — see dormPriceFrom(). */}
-          {!!sec.priceFrom && (
-            <Text style={s.priceFrom}>
-              {sec.priceFrom.currency === 'EUR' ? '€' : ''}{sec.priceFrom.amount}
-              {t(sec.priceFrom.periodKey, lang)}
-            </Text>
+          {/* Alasia's own headline claim, VERBATIM. ADA does not compute a from-price.
+              ⚠ THIS IS THE ONE PLACE €2,490 APPEARS WITHOUT A ROOM AND PLAN LABEL, and it
+                is allowed only because it is quoted as THEIR sentence, not presented as
+                ADA's summary of the grid. Everywhere else the figure carries its
+                qualifier — see the guard. */}
+          {!!sec.priceFromLabel && (
+            <Text style={s.priceFrom}>{sec.priceFromLabel}</Text>
           )}
         </View>
 
@@ -238,41 +275,23 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
           </Block>
         )}
 
-        {/* 6. ROOM TYPES. Names only today — price, m² and availability are all owed, and
-               each collapses on its own row rather than printing a dash.
-               TAPPABLE AS OF SLICE 3, and not before: the rows became press targets in the
-               same commit that gave them the detail sheet, same rule the list card followed.
-               The chevron is what makes the affordance readable — a row that is tappable
-               only by convention is a row most people never tap. */}
+        {/* 6. ROOM TYPES — A VERTICAL LIST, NOT A CAROUSEL.
+               Six types each carrying a price cannot live in a horizontal strip: three sit
+               off-screen, and comparing prices is the one thing somebody is here to do.
+               Thumbnail left, names and payment line right.
+               NULL-SAFE PER ROW: the Single Bungalow has no photo on Alasia's site, so its
+               card renders without one and must still look finished — no grey box, no
+               placeholder icon, the text simply takes the full width. */}
         {!!sec.rooms && (
           <Block title={t('dormRooms', lang)}>
-            {sec.rooms.map(r => {
-              const meta = [
-                r.price != null ? String(r.price) : null,
-                r.sqm != null ? `${r.sqm} m²` : null,
-              ].filter(Boolean).join(' · ')
-              return (
-                <TouchableOpacity key={r.code} style={s.row} activeOpacity={0.6}
-                  onPress={() => setOpenRoom(r)}>
-                  {/* ⚠ NO numberOfLines, AND THAT IS A DECISION — do not "fix" it.
-                      Measured 2026-09-10 with a full-content fixture: once price and m²
-                      populate, the meta column takes 91pt and the label has 141pt at 320dp.
-                      Five of nine locales exceed that — el by 18pt, fr 15, de 8, es 6, ar 4
-                      (`Μπανγκαλόου, 4 άτομα` is the worst). At 393dp every locale fits with
-                      55-102pt spare, which is why it has never shown.
-                      DECIDED: let it WRAP. The row grows taller; nothing is lost. Adding
-                      numberOfLines={1} would clip a room name or push the price out of view,
-                      and a truncated price is worse than a taller sheet.
-                      Re-verify the wrapped row at 320dp in all nine locales when real prices
-                      land — the wrap is chosen, its appearance is not yet confirmed. */}
-                  <Text style={s.rowLabel}>{t(r.nameKey, lang)}</Text>
-                  <View style={s.rowRight}>
-                    {!!meta && <Text style={s.rowValue}>{meta}</Text>}
-                    <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-                  </View>
-                </TouchableOpacity>
-              )
-            })}
+            {sec.rooms.map(r => (
+              <DormRoomRow key={r.code} room={r} lang={lang} onPress={() => setOpenRoom(r)} />
+            ))}
+            {/* The academic year travels WITH the prices, so a stale table is visibly stale
+                rather than silently wrong. */}
+            <Text style={s.yearNote}>
+              {t('dormAcademicYear', lang)} {partner.academicYear}
+            </Text>
           </Block>
         )}
 
@@ -433,6 +452,18 @@ const s = StyleSheet.create({
   chip:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10,
                  paddingVertical: 6, borderRadius: 14, backgroundColor: colors.surface },
   chipText:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+
+  roomRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10,
+                 borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  // 64x64. No placeholder when absent — the body simply takes the width, which is what
+  // keeps a photo-less room looking finished rather than broken.
+  roomThumb:   { width: 64, height: 64, borderRadius: radius.sm, backgroundColor: colors.surface },
+  roomBody:    { flex: 1 },
+  roomName:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  roomAlt:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 1 },
+  roomPrice:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 4 },
+  roomPriceLabel: { fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  yearNote:    { marginTop: 10, fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   row:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                  paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
