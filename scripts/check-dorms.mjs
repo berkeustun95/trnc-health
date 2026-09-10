@@ -35,6 +35,7 @@ import {
   dormDeal, dormPriceFrom, dormWaCode, dormWaMessage, dormWebsiteUrl,
 } from '../constants/dorms.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
+import { colors, readableOn, contrastRatio } from '../constants/theme.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const problems = []
@@ -125,6 +126,28 @@ for (const p of DORM_PARTNERS) {
 
   check(!p.coords || (typeof p.coords.latitude === 'number' && typeof p.coords.longitude === 'number'),
     `${who}: coords must be {latitude, longitude} numbers or null`)
+
+  // ─── The accent must be able to carry readable text ─────────────────────
+  //
+  // The deal band fills with partner.accent and draws text on it. readableOn() picks the
+  // better of white and ink, but "better" is not "readable": for some mid-tone colours
+  // NEITHER reaches 4.5:1 and no function can invent a third option. This is the check
+  // with teeth, and it is why the screen may derive its foreground without also having to
+  // decide what to do when both options fail — that cannot reach the screen.
+  //
+  // Generic on purpose: it runs over every partner in the array, so partner #2's colour is
+  // covered with no further work.
+  const acc = p.accent || colors.primary
+  const fg  = readableOn(acc)
+  const cr  = contrastRatio(fg, acc)
+  check(cr != null,
+    `${who}: accent ${JSON.stringify(p.accent)} is not a readable hex — contrast cannot be computed, so nothing can promise the deal band is legible`)
+  if (cr != null) {
+    check(cr >= 4.5,
+      `${who}: accent ${acc} gives at best ${cr.toFixed(2)}:1 with ${fg} — under the 4.5:1 body-text minimum. `
+      + `NEITHER white nor ink is readable on it; the deal band would ship unreadable text. `
+      + `Ask the partner for a darker or lighter brand colour, or do not fill a surface with this one.`)
+  }
 
   // Room codes reach the reception desk inside the WhatsApp message as ADA-<CODE>-<ROOM>.
   const roomCodes = new Set()

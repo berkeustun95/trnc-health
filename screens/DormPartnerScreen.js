@@ -7,7 +7,7 @@ import BackButton from '../components/BackButton'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import DormRoomSheet from '../components/DormRoomSheet'
 import AccommodationDetailBottomSlot from '../components/ads/AccommodationDetailBottomSlot'
-import { colors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius, readableOn } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { dormSections, dormWaMessage, dormWebsiteUrl } from '../constants/dorms'
@@ -94,6 +94,15 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
   const showAbout = !!about && about !== partner.aboutKey
 
   const accent = partner.accent || colors.primary
+  // ⚠ THE DEAL BAND'S TEXT COLOUR IS DERIVED, NEVER HARDCODED. It used to be '#fff', which
+  //   is correct on the ADA teal fallback (5.01:1) and invisible on a light brand colour —
+  //   white on a brand yellow measures 1.43:1. The fallback hid it: the band had never once
+  //   rendered against a real accent, because Özok's hex has not arrived. readableOn() picks
+  //   white or ink by luminance, so partner #2's colour needs no further work.
+  //   scripts/check-dorms.mjs refuses any configured accent whose best foreground is under
+  //   4.5:1 — there are colours (mid greys) where neither option reaches it and no function
+  //   can invent a third.
+  const onAccent = readableOn(accent)
 
   // ─── Contact handoff ──────────────────────────────────────────────────────
   // logContactEvent is fire-and-forget and can never throw — it is called on the line
@@ -193,8 +202,8 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
         {/* 4. DEAL BAND — text AND a future expiry, or nothing. */}
         {!!sec.deal && (
           <View style={[s.dealBand, { backgroundColor: accent }]}>
-            <Ionicons name="pricetag-outline" size={15} color="#fff" />
-            <Text style={s.dealText}>{t(sec.deal.textKey, lang)}</Text>
+            <Ionicons name="pricetag-outline" size={15} color={onAccent} />
+            <Text style={[s.dealText, { color: onAccent }]}>{t(sec.deal.textKey, lang)}</Text>
           </View>
         )}
 
@@ -239,6 +248,17 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
               return (
                 <TouchableOpacity key={r.code} style={s.row} activeOpacity={0.6}
                   onPress={() => setOpenRoom(r)}>
+                  {/* ⚠ NO numberOfLines, AND THAT IS A DECISION — do not "fix" it.
+                      Measured 2026-09-10 with a full-content fixture: once price and m²
+                      populate, the meta column takes 91pt and the label has 141pt at 320dp.
+                      Five of nine locales exceed that — el by 18pt, fr 15, de 8, es 6, ar 4
+                      (`Μπανγκαλόου, 4 άτομα` is the worst). At 393dp every locale fits with
+                      55-102pt spare, which is why it has never shown.
+                      DECIDED: let it WRAP. The row grows taller; nothing is lost. Adding
+                      numberOfLines={1} would clip a room name or push the price out of view,
+                      and a truncated price is worse than a taller sheet.
+                      Re-verify the wrapped row at 320dp in all nine locales when real prices
+                      land — the wrap is chosen, its appearance is not yet confirmed. */}
                   <Text style={s.rowLabel}>{t(r.nameKey, lang)}</Text>
                   <View style={s.rowRight}>
                     {!!meta && <Text style={s.rowValue}>{meta}</Text>}
@@ -390,7 +410,10 @@ const s = StyleSheet.create({
 
   dealBand:    { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12,
                  borderRadius: radius.md, marginBottom: 14 },
-  dealText:    { flex: 1, fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
+  // No `color` here on purpose — it is set inline from readableOn(accent). A default white
+  // would be the value that is right on teal and wrong on every light brand colour, sitting
+  // in the stylesheet waiting for somebody to delete the inline override as redundant.
+  dealText:    { flex: 1, fontSize: 13, fontFamily: 'Inter_700Bold' },
 
   block:       { backgroundColor: colors.cardBg, borderRadius: radius.md, padding: 14, marginBottom: 12, ...shadow },
   blockTitle:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary,

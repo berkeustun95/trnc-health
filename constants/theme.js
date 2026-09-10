@@ -132,3 +132,56 @@ export const radius = {
   lg:   20,
   xl:   28,
 }
+
+// ─── Readable foreground on an arbitrary colour ─────────────────────────────
+//
+// WHY THIS EXISTS. A partner supplies their own brand hex and it is drawn as a filled
+// surface with text on it — the dorm showcase's deal band is the first. Hardcoding white
+// works right up until the brand is light, and then the text is simply gone: white on a
+// brand yellow measures 1.43:1 against the 4.5:1 body text needs. The ADA teal fallback
+// had hidden that since the band was written, because the band had never once rendered
+// against a real accent.
+//
+// This is the same problem the `tintLifestyleFg` note above records — accent is unreadable
+// at icon size on accentLight — solved once as a function instead of once per surface by
+// hand. It is deliberately NOT partner-specific: any future partner's colour goes through
+// the same call and needs no further work.
+//
+// No react-native import: constants/theme.js is plain data and a Node-side guard imports
+// these to assert every configured accent produces a readable foreground.
+
+const srgb = c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
+
+// WCAG relative luminance. Accepts #rgb or #rrggbb; returns null for anything else rather
+// than guessing, so a malformed hex fails loudly at the guard instead of silently
+// resolving to black and looking like a design decision.
+export function luminance(hex) {
+  let h = String(hex || '').trim().replace(/^#/, '')
+  if (h.length === 3) h = h.split('').map(c => c + c).join('')
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null
+  const [r, g, b] = [0, 2, 4].map(i => srgb(parseInt(h.slice(i, i + 2), 16) / 255))
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+// WCAG contrast ratio, 1..21. null if either colour is unreadable as a hex.
+export function contrastRatio(a, b) {
+  const la = luminance(a), lb = luminance(b)
+  if (la == null || lb == null) return null
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+// The better of white and ink for text sitting ON `bg`. Returns whichever scores higher —
+// it does NOT promise 4.5:1, because for some mid-tone colours neither reaches it and this
+// function cannot invent a third option. `scripts/check-dorms.mjs` asserts that every
+// accent actually CONFIGURED clears 4.5:1, which is the check that has teeth; this just
+// picks the best available.
+//
+// Falls back to white on an unparseable hex — the same thing the old hardcoded behaviour
+// did, so a bad value degrades to the previous state rather than to black-on-black.
+export function readableOn(bg, { light = '#FFFFFF', dark = colors.textPrimary } = {}) {
+  const cl = contrastRatio(light, bg)
+  const cd = contrastRatio(dark, bg)
+  if (cl == null || cd == null) return light
+  return cl >= cd ? light : dark
+}
