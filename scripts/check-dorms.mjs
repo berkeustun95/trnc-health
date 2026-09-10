@@ -520,6 +520,61 @@ for (const l of LANGS) {
     + `default is what buried the room cards.`)
 }
 
+// ─── 3a3. THE SCREEN MUST ACTUALLY READ SECTION_ORDER ───────────────────────
+//
+// ⚠ THIS IS THE "CONFIG PRESENT BUT UNUSED" CLASS, and it is the same shape as the deleted
+//   components: correct-looking code that no instrument was pointed at. A SECTION_ORDER
+//   array that nothing maps over passes EVERY other check here — the vocabulary assertions
+//   above are satisfied, the file parses, every reference resolves, and the sections still
+//   render, just in whatever order the JSX happens to sit in.
+//
+//   A config nothing reads is WORSE than no config, because it looks settled. Somebody
+//   edits the array, the guard goes green, and the screen does not move.
+//
+// So: locate the SECTION_ORDER.map( callback by brace matching, and require every section
+// branch to live INSIDE it. A branch outside is a section rendered by JSX position.
+{
+  const raw = readFileSync(resolve(ROOT, 'screens/DormPartnerScreen.js'), 'utf8')
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+    .map(l => l.replace(/(^|\s)\/\/.*$/, '')).join('\n')
+
+  const at = src.indexOf('SECTION_ORDER.map(')
+  check(at !== -1,
+    `screens/DormPartnerScreen.js never maps over SECTION_ORDER. The array exists and nothing `
+    + `reads it, so the order on screen is whatever the JSX happens to be — and every other `
+    + `check here still passes. That is the failure this assertion exists for.`)
+
+  if (at !== -1) {
+    // Brace-match the callback so the span is derived, not guessed at by line count.
+    let i = src.indexOf('{', at), depth = 0, end = -1
+    while (i < src.length) {
+      if (src[i] === '{') depth++
+      else if (src[i] === '}') { depth--; if (depth === 0) { end = i; break } }
+      i++
+    }
+    check(end > at && end - at > 200,
+      `the SECTION_ORDER.map( callback spans ${at}..${end} — too small to hold the sections. `
+      + `Refusing to conclude anything from it.`)
+
+    if (end > at) {
+      const branches = [...src.matchAll(/id === '([a-z]+)'/g)]
+      check(branches.length > 0, `no \`id === '…'\` section branches found at all — this check is measuring nothing`)
+      const outside = branches.filter(m => m.index < at || m.index > end).map(m => m[1])
+      check(outside.length === 0,
+        `section branch(es) [${[...new Set(outside)].join(', ')}] sit OUTSIDE the SECTION_ORDER.map( callback. `
+        + `A section rendered outside the map is ordered by its JSX position, not by config.`)
+      const ids = [...new Set(branches.map(m => m[1]))]
+      check(ids.length === SECTION_ORDER.length,
+        `the screen has ${ids.length} section branch(es) [${ids.join(', ')}] but SECTION_ORDER has `
+        + `${SECTION_ORDER.length} [${SECTION_ORDER.join(', ')}]. An id with no branch renders nothing; `
+        + `a branch with no id never runs.`)
+      for (const id of ids) {
+        check(SECTION_ORDER.includes(id), `the screen branches on '${id}', which is not in SECTION_ORDER — it never runs`)
+      }
+    }
+  }
+}
+
 // ─── 3b. Accent-filled surfaces derive their foreground ─────────────────────
 //
 // The numeric assertion — "the best foreground for this accent clears 4.5:1" — is made in

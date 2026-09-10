@@ -440,7 +440,10 @@ export const DORM_PARTNERS = [
     //   them. Both are marked 'property' below. If one is the bus, change that one word;
     //   the ordering then happens on its own.
     gallery: [
-      { key: 'alasia/hero-1', kind: 'property' },
+      // DSC06370 — the shot Alasia's own site uses on its shuttle section. Confirmed by
+      // Berke on device; neither hero file carries alt text, so it could not be read from
+      // the source.
+      { key: 'alasia/hero-1', kind: 'transport' },
       { key: 'alasia/hero-2', kind: 'property' },
     ],
     ringTimes:        [],   // owed
@@ -463,7 +466,9 @@ export const GALLERY_ORDER = ['property', 'room', 'transport']
 // Rooms first because PRICE IS THE QUESTION AFTER THE PHOTOS. Services and shuttles are
 // what you read once you have decided the price is plausible; putting them above the
 // rooms made the page answer a question nobody had asked yet.
-export const SECTION_ORDER = ['rooms', 'services', 'shuttles', 'location', 'ring', 'events', 'contact', 'source']
+// Tail is location → source → contact, per Berke's enumeration ("konum, kaynak, iletişim").
+// The committed order had contact before source; that was the mismatch.
+export const SECTION_ORDER = ['rooms', 'services', 'shuttles', 'location', 'ring', 'events', 'source', 'contact']
 
 // Sections that open CLOSED and expand on tap. Both are long — 22 service rows and six
 // route cards — and a page that opens with 28 rows of detail buries the six room cards
