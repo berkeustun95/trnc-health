@@ -154,13 +154,20 @@ export const DORM_PARTNERS = [
     // same in all nine locales, and a key would invite somebody to "translate" it.
     academicYear: '2026-2027',
 
-    // The homepage's own headline claim, reproduced verbatim.
-    // ⚠ €2,490 HAS TWO TRUE MEANINGS IN THIS DATASET: it is the cheapest all-in total
-    //   (Quad Bungalow, €500 + €1,990) AND the Triple Room's balance after deposit. Both
-    //   are correct, so a mix-up cannot be caught by sanity-checking the figure. It must
-    //   NEVER render bare — always with its room and plan label. check-dorms.mjs asserts it.
-    priceFromLabel: 'Starting From € 2490',
-
+    // ─── THE SINGLE CANONICAL SOURCE FOR EVERY FIGURE ───────────────────────
+    //
+    // The ENGLISH prices page and the PDF it links. Nothing else.
+    //
+    // ⚠ alasiadorm.com/tr/fiyatlar/ IS NOT A SOURCE AND MUST NOT BE USED — not for figures,
+    //   not for formatting, not for anything. It is a second source already known to
+    //   DIVERGE: it is where the €8,000 security-deposit reading came from, against ₺8,000
+    //   on the English page. With two sources, "verbatim" has two answers and the word
+    //   stops meaning anything.
+    //   It stays useful for exactly one thing — cross-CHECKING a transcription — and even
+    //   then a disagreement is resolved in the English page's favour or escalated to Özok,
+    //   never merged.
+    //
+    // Number format follows that page: COMMA thousands, DOT decimals (€2,490 · €480.00).
     priceSource: {
       url:     'https://alasiadorm.com/prices/',
       pdfUrl:  'https://alasiadorm.com/wp-content/uploads/2026/08/alasiadorm-prices-payment-plans-en-1.pdf',
@@ -355,15 +362,6 @@ export function dormDeal(partner, now = new Date()) {
   return { textKey: d.textKey, expiry: d.expiry }
 }
 
-// The homepage's own headline claim, reproduced verbatim or not at all.
-//
-// ⚠ IT IS NEVER SYNTHESISED. ADA does not compute a from-price out of the room grid — that
-//   would be selecting a representative number, which is what an editor does. Alasia
-//   publishes "Starting From € 2490" and this returns exactly that string or null.
-export function dormPriceFrom(partner) {
-  return partner?.priceFromLabel || null
-}
-
 // A section list the screen maps over, so "which sections have content" is answered once.
 // Order is the render order and is the order the brief specifies.
 export function dormSections(partner, { now = new Date(), resolveAsset = () => undefined } = {}) {
@@ -379,7 +377,6 @@ export function dormSections(partner, { now = new Date(), resolveAsset = () => u
     coords:    partner?.coords || null,
     ringTimes: has(partner?.ringTimes) ? partner.ringTimes : null,
     events:    has(partner?.events)    ? partner.events    : null,
-    priceFromLabel: dormPriceFrom(partner),
   }
 }
 

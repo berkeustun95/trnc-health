@@ -74,11 +74,22 @@ function Chip({ icon, label }) {
 //   and does not publish their total. Adding them would be ADA's arithmetic, and a
 //   directory that does arithmetic has started editing. So: "€500 kapora + €2,490 bakiye".
 //
-// ⚠ AND THE FIGURE NEVER APPEARS BARE. €2,490 is simultaneously the Quad Bungalow's
-//   full-payment total and the Triple Room's balance after deposit — both true, so a
-//   mix-up cannot be caught by checking whether the number is right. It always carries its
-//   plan label and sits inside its room's own row.
-function DormRoomRow({ room, lang, onPress }) {
+// ⚠ AND THE FIGURE NEVER APPEARS BARE — WITH NO EXCEPTIONS ANYWHERE IN THIS FILE.
+//   2,490 is simultaneously the Quad Bungalow's full-payment total and the Triple Room's
+//   balance after deposit — both true, so a mix-up cannot be caught by checking whether the
+//   number is right. Every figure carries its plan label and sits inside its room's row.
+//
+//   The hero used to quote Alasia's own "Starting From € 2490" under a deliberate
+//   carve-out. It is GONE. On device in Turkish it rendered an English sentence, because a
+//   QUOTATION CANNOT BE LOCALISED — translating it stops it being a quotation — so it
+//   shipped English into all nine locales. The six qualified prices below carry the same
+//   information properly, and a rule with no exceptions is easier to keep true than a rule
+//   with one.
+//
+//   No currency symbol is hardcoded here either: the holding deposit arrives from
+//   partner.deposits.holding.amount. A figure typed into a component is a figure nobody
+//   updates when the source changes.
+function DormRoomRow({ room, lang, holding, onPress }) {
   const src  = partnerAsset(room.photo)
   const full = room.plans?.full
   return (
@@ -94,7 +105,8 @@ function DormRoomRow({ room, lang, onPress }) {
         {!!full && (
           <Text style={s.roomPrice} numberOfLines={2}>
             <Text style={s.roomPriceLabel}>{t('dormPlanFull', lang)} · </Text>
-            €500 {t('dormKapora', lang)} + {full.amounts[0]} {t('dormBalance', lang)}
+            {!!holding && <>{holding} {t('dormKapora', lang)} + </>}
+            {full.amounts[0]} {t('dormBalance', lang)}
           </Text>
         )}
       </View>
@@ -232,14 +244,6 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
               <Text style={s.placeText}>{place}</Text>
             </View>
           )}
-          {/* Alasia's own headline claim, VERBATIM. ADA does not compute a from-price.
-              ⚠ THIS IS THE ONE PLACE €2,490 APPEARS WITHOUT A ROOM AND PLAN LABEL, and it
-                is allowed only because it is quoted as THEIR sentence, not presented as
-                ADA's summary of the grid. Everywhere else the figure carries its
-                qualifier — see the guard. */}
-          {!!sec.priceFromLabel && (
-            <Text style={s.priceFrom}>{sec.priceFromLabel}</Text>
-          )}
         </View>
 
         {/* 4. DEAL BAND — text AND a future expiry, or nothing. */}
@@ -285,7 +289,8 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
         {!!sec.rooms && (
           <Block title={t('dormRooms', lang)}>
             {sec.rooms.map(r => (
-              <DormRoomRow key={r.code} room={r} lang={lang} onPress={() => setOpenRoom(r)} />
+              <DormRoomRow key={r.code} room={r} lang={lang}
+                holding={partner.deposits?.holding?.amount} onPress={() => setOpenRoom(r)} />
             ))}
             {/* The academic year travels WITH the prices, so a stale table is visibly stale
                 rather than silently wrong. */}
@@ -433,7 +438,6 @@ const s = StyleSheet.create({
   heroName:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   placeRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   placeText:   { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  priceFrom:   { marginTop: 8, fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
 
   dealBand:    { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12,
                  borderRadius: radius.md, marginBottom: 14 },

@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url'
 import {
   ACCOM_SEGMENTS, ACCOM_LANDING, accomSegments, accomLanding,
   DORM_PARTNERS, PENDING_KEYS,
-  dormDeal, dormPriceFrom, dormWaCode, dormWaMessage, dormWebsiteUrl,
+  dormDeal, dormWaCode, dormWaMessage, dormWebsiteUrl,
 } from '../constants/dorms.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
 import { colors, readableOn, contrastRatio } from '../constants/theme.js'
@@ -259,6 +259,13 @@ for (const p of DORM_PARTNERS) {
     check(/^https:\/\//.test(p.priceSource?.[f] || ''),
       `${who}: priceSource.${f} must be an https URL — the numbers must be one tap from their authority`)
   }
+  // ⚠ ONE CANONICAL SOURCE. The Turkish page is a second source already known to diverge —
+  //   it is where the €8,000 security deposit came from, against ₺8,000 on the English
+  //   page. With two sources "verbatim" has two answers.
+  check(!JSON.stringify(p.priceSource || {}).includes('/tr/'),
+    `${who}: priceSource points at a /tr/ page. The ENGLISH prices page and its PDF are the only `
+    + `canonical source for figures and formatting; alasiadorm.com/tr/fiyatlar/ disagrees with it on `
+    + `the security deposit currency and must not be used.`)
 
   // ⚠⚠ THE SECURITY DEPOSIT AMOUNT IS OMITTED ON PURPOSE, NOT BY OVERSIGHT.
   //   Alasia's EN page says ₺8,000; their TR page says €8,000 — ~€180 versus €8,000, which
@@ -496,6 +503,25 @@ for (const l of LANGS) {
   const sheet = strip(readFileSync(resolve(ROOT, 'components/DormRoomSheet.js'), 'utf8'))
   check(sheet.includes('plan.bankName'),
     `components/DormRoomSheet.js never renders plan.bankName — İşbank and Ziraat figures would be unlabelled`)
+
+  // ⚠ NO CURRENCY LITERAL IN COMPONENT CODE, AND NO CARVE-OUTS.
+  //
+  // The hero used to quote Alasia's "Starting From € 2490" under a deliberate exception.
+  // It shipped an English sentence into all nine locales, because a QUOTATION CANNOT BE
+  // LOCALISED — translating it stops it being a quotation. The exception is gone and this
+  // is what replaces it: every figure reaches the screen from config, none is typed in.
+  //
+  // A hardcoded '€500' also silently outlives the source: nobody edits a component when a
+  // partner changes their deposit.
+  for (const file of ['screens/DormPartnerScreen.js', 'components/DormRoomSheet.js']) {
+    const src = strip(readFileSync(resolve(ROOT, file), 'utf8'))
+    const lit = src.match(/[€₺£$]\s?[\d]/g) || []
+    check(lit.length === 0,
+      `${file} hardcodes ${lit.length} currency literal(s) (${[...new Set(lit)].join(', ')}). `
+      + `Every figure comes from constants/dorms.js — a number typed into a component is a number `
+      + `nobody updates when the source changes, and the from-price carve-out that used to live here `
+      + `shipped an English sentence into nine locales.`)
+  }
 
   // ⚠ AND NOTHING SUMS THEM. Alasia publishes the instalments and not their total; a
   //   directory that adds them up has started editing. Catches the obvious shapes.
