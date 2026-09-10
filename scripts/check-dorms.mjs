@@ -353,6 +353,56 @@ for (const l of LANGS) {
     `i18n: dormMinutes in ${LANG_CODES[l]} has lost its {n} placeholder: ${JSON.stringify(t('dormMinutes', l))}`)
 }
 
+// ─── 3b. Accent-filled surfaces derive their foreground ─────────────────────
+//
+// The numeric assertion — "the best foreground for this accent clears 4.5:1" — is made in
+// §2 and is SHARED by both accent-filled surfaces, because after the badge was filled they
+// are the same computation against the same background. Repeating it per surface would be
+// two tokens counting one thing, which is how a check goes stale on its own.
+//
+// What is NOT shared, and is what this asserts, is that the SCREEN still routes both
+// surfaces through readableOn(). The badge's original defect was not a bad contrast
+// function — it was accent drawn AS TEXT on white, where no fill exists to read against and
+// readableOn() has nothing to say. That regression is a source shape, not a number.
+//
+// ⚠ ANCHORED ON CODE SHAPE, AND COMMENTS ARE STRIPPED FIRST. This file's own prose contains
+//   the phrase `color: accent` while describing what is forbidden, and the screen's comments
+//   do too. A naive scan would forbid the WORDS and the only way to green would be deleting
+//   the notes that tell the next reader why. Same trap the 0902 pg_get_functiondef token
+//   documents.
+{
+  const raw = readFileSync(resolve(ROOT, 'screens/DormPartnerScreen.js'), 'utf8')
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+    .map(l => l.replace(/(^|\s)\/\/.*$/, '')).join('\n')
+
+  const fills   = (src.match(/backgroundColor:\s*accent\b/g)   || []).length
+  // ⚠ COUNT THE ASSIGNMENTS, NOT THE IDENTIFIER. A bare /onAccent/ count includes the
+  //   `const onAccent = readableOn(accent)` declaration, so a surface that went back to
+  //   hardcoding its colour still cleared a `>= fills * 2` floor — measured: that exact
+  //   regression stayed GREEN. Matching `color: onAccent` / `color={onAccent}` counts only
+  //   the places it is actually USED, and the assertion below is an equality, not a floor.
+  const derived = (src.match(/color(?::\s*|=\{)onAccent\b/g)    || []).length
+  const asText  = (src.match(/color:\s*accent\b/g)             || []).length
+                + (src.match(/color=\{accent\}/g)               || []).length
+
+  // A COUNT, printed, not a remembered name list. A third accent-filled surface takes this
+  // to 3 and the bump is the review moment — which is the point.
+  check(fills === 2,
+    `DormPartnerScreen has ${fills} accent-filled surface(s), expected 2 (the partner badge and the deal band). `
+    + `If a third was added deliberately, bump this count in the same commit and say why.`)
+
+  // Each filled surface carries an icon AND a label, so two derived colours each.
+  check(derived === fills * 2,
+    `DormPartnerScreen assigns onAccent to ${derived} colour(s) for ${fills} accent-filled surface(s) — `
+    + `expected exactly ${fills * 2} (an icon and a label on each). `
+    + `Fewer means one is hardcoding its foreground again; more means a surface was added without bumping the count above.`)
+
+  check(asText === 0,
+    `DormPartnerScreen draws the accent AS TEXT in ${asText} place(s). readableOn() cannot help there — `
+    + `there is no fill to read against — and accent-on-white is 1.43:1 for a brand yellow. `
+    + `Fill the surface and derive the foreground, as the badge and the deal band both do.`)
+}
+
 // ─── 4. Assets, also in two directions ──────────────────────────────────────
 //
 // partnerAssets.js cannot be imported here: it is the one file that require()s PNGs, which

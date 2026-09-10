@@ -170,9 +170,15 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
 
         {/* 2 + 3. LOGO, BADGE, NAME, LOCATION */}
         <View style={s.hero}>
-          <View style={[s.badge, { borderColor: accent }]}>
-            <Ionicons name="ribbon-outline" size={12} color={accent} />
-            <Text style={[s.badgeText, { color: accent }]}>{t('dormPartnerBadge', lang)}</Text>
+          {/* FILLED with the accent, text derived — not accent-coloured text on white.
+              That earlier shape was the same defect the deal band had, in its inverse:
+              accent AS TEXT on cardBg is 1.43:1 on a brand yellow, and readableOn() does not
+              apply to it because there is no fill to read against.
+              Filling reuses the one primitive instead of introducing a second contrast rule,
+              and it gives the brand colour more surface area than thin text would. */}
+          <View style={[s.badge, { backgroundColor: accent }]}>
+            <Ionicons name="ribbon-outline" size={12} color={onAccent} />
+            <Text style={[s.badgeText, { color: onAccent }]}>{t('dormPartnerBadge', lang)}</Text>
           </View>
 
           <PartnerLogoStrip
@@ -399,9 +405,11 @@ const s = StyleSheet.create({
   content:     { paddingHorizontal: 16 },
 
   hero:        { alignItems: 'flex-start', marginBottom: 14 },
+  // No borderWidth and no `backgroundColor` default: the fill is set inline from the accent.
+  // The Android borderRadius + borderWidth gotcha that forces an explicit transparent
+  // background does not apply once the border is gone and the fill is real.
   badge:       { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
-                 paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10, borderWidth: 1,
-                 backgroundColor: 'transparent', marginBottom: 10 },
+                 paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10, marginBottom: 10 },
   badgeText:   { fontSize: 11, fontFamily: 'Inter_700Bold' },
   heroName:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   placeRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
