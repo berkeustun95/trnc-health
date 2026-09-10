@@ -12,7 +12,7 @@
 // app can see them" are two separate events and only the first one is visible.
 //
 // ─── WHAT IS *NOT* AN ERROR, deliberately ───────────────────────────────────
-// A key declared in constants/partners.js whose file has not arrived yet is the NORMAL
+// A key declared in a partner config whose file has not arrived yet is the NORMAL
 // pre-drop state — it is the state this repo is in today, and the whole gallery is
 // designed to render nothing for it. Failing on that would make this guard red from the
 // moment it was written, and a guard that cries wolf gets ignored or deleted. Reported,
@@ -49,15 +49,46 @@ const walk = d => !existsSync(resolve(ROOT, d)) ? [] : readdirSync(resolve(ROOT,
 const onDisk = walk(DIR).filter(f => /\.(png|jpe?g|webp)$/i.test(f))
 const mapped = new Set(entries.map(e => e.path))
 
-const { HS_PARTNERS } = await import(resolve(ROOT, 'constants/partners.js'))
+// ─── EVERY config that names asset keys, not just the first one ─────────────
+//
+// ⚠ THIS READ constants/partners.js ALONE UNTIL 2026-09-10, and constants/dorms.js had
+//   been naming keys for three slices by then. The consequence was narrow but real: the
+//   `notInMap` check below — "a declared key with no map entry", the typo catcher — could
+//   not see a dorm key at all, so a typo in one was invisible to this guard. It was
+//   covered only because scripts/check-dorms.mjs happens to assert the same thing from the
+//   other side. Relying on that was luck, not design.
+//
+//   The reported count was wrong too, and wrong in the direction that misleads: "declared
+//   in partners.js: 18" against 20 map entries reads as two orphaned entries.
+//
+// A THIRD partner config must be added here the day it is created. There is no way to
+// discover them automatically that is not worse than this list.
+const CONFIGS = [
+  ['constants/partners.js', 'HS_PARTNERS'],
+  ['constants/dorms.js',    'DORM_PARTNERS'],
+]
 const declared = new Set()
-for (const p of HS_PARTNERS) {
-  if (p.logo) declared.add(p.logo)
-  if (p.logoOnDark) declared.add(p.logoOnDark)
-  for (const proj of p.gallery || []) {
-    for (const pr of proj.pairs || []) { declared.add(pr.before); declared.add(pr.after) }
-    for (const k of proj.extra || []) declared.add(k)
-    for (const st of proj.steps || []) declared.add(st.image)
+let configCount = 0
+for (const [file, exportName] of CONFIGS) {
+  const mod = await import(resolve(ROOT, file))
+  const list = mod[exportName]
+  if (!Array.isArray(list)) {
+    console.error(`\n  partners: ${file} does not export ${exportName} as an array — this guard `
+      + `cannot see the keys it declares, so it would pass by checking less than it thinks.\n`)
+    process.exit(1)
+  }
+  configCount += list.length
+  for (const p of list) {
+    if (p.logo) declared.add(p.logo)
+    if (p.logoOnDark) declared.add(p.logoOnDark)
+    for (const proj of p.gallery || []) {
+      // A dorm gallery is a flat list of KEYS; a home-services gallery is a list of
+      // PROJECTS holding pairs/extra/steps. Handle both rather than assuming one shape.
+      if (typeof proj === 'string') { declared.add(proj); continue }
+      for (const pr of proj.pairs || []) { declared.add(pr.before); declared.add(pr.after) }
+      for (const k of proj.extra || []) declared.add(k)
+      for (const st of proj.steps || []) declared.add(st.image)
+    }
   }
 }
 
@@ -73,13 +104,14 @@ console.log('')
 console.log(`  partner assets: ${entries.length} map entries · ${onDisk.length} image file(s) under ${DIR}/`)
 console.log(`    live (wired + on disk) : ${live.length}`)
 console.log(`    waiting for the file   : ${waiting.length}   <- normal before a drop`)
-console.log(`    declared in partners.js: ${declared.size}`)
+console.log(`    declared in config      : ${declared.size} key(s) across `
+  + `${configCount} partner(s) in ${CONFIGS.map(c => c[0].replace('constants/', '')).join(' + ')}`)
 
 const fatal = []
 for (const f of unwired) fatal.push(`${f} is on disk but NO map entry references it — it will never render`)
 for (const e of readyToWire) fatal.push(`${e.path} has arrived but its entry is still COMMENTED in ${MAPSRC}`)
 for (const e of brokenReq) fatal.push(`${MAPSRC} require()s ${e.path}, which does not exist — the bundler will fail`)
-for (const k of notInMap) fatal.push(`constants/partners.js declares key '${k}' with no entry in ${MAPSRC} — a typo here renders nothing and errors nowhere`)
+for (const k of notInMap) fatal.push(`a partner config declares key '${k}' with no entry in ${MAPSRC} — a typo here renders nothing and errors nowhere`)
 
 if (fatal.length) {
   console.error('')
