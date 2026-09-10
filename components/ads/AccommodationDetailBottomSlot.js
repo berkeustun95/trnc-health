@@ -1,10 +1,16 @@
 import AdSlot from '../AdSlot'
 
-// detail_bottom on accommodation — mounted in screens/PropertyDetailScreen.js.
+// detail_bottom on accommodation — mounted in TWO hosts:
+//   screens/PropertyDetailScreen.js   an ordinary property listing
+//   screens/DormPartnerScreen.js      a dorm partner showcase
 //
-// Last child of the PropertyDetailScreen ScrollView. It clears the 146pt contact bar
-// because contentContainerStyle already reserves that space AFTER the last child — no
-// constant was touched.
+// ⚠ ONE SOLD ROW RENDERS ON BOTH. That is what "same slot, same rules" means and it is
+//   deliberate — see the note beside this placement in constants/ads.js, which is also the
+//   only warning that a rival's banner can land on a partner's own page. There is no
+//   code-level competitor suppression by design; that is handled commercially.
+//
+// Last child of each host's ScrollView. In both, contentContainerStyle already reserves the
+// contact-bar space AFTER the last child, so no constant was touched in either.
 //
 // ⚠ THIS FILE EXISTS SO THE ALLOWLIST CAN BE PER-FILE. constants/ads.js names it in
 //   AD_PLACEMENTS, and scripts/check-ad-placement.mjs refuses a push if any OTHER file

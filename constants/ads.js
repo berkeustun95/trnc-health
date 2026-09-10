@@ -66,39 +66,61 @@ export const AD_DEFERRED_MODULES = {
 // its detail screen is fine": FacilityProfileScreen is reachable from Explore's map and
 // is excluded BY FILE, and the module being allowed does not reach it.
 //
-// `host` is the screen the wrapper may be mounted in. `span` pins it to one function
-// inside that screen, for the files that host more than one surface — EventsScreen holds
-// the list AND EventDetailScreen (defined at its line 319), and HomeScreen holds the hub,
-// the global search results and the gated facility list. A whole-file rule cannot tell
+// `hosts` is the LIST of screens the wrapper may be mounted in. `span` pins it to one
+// function inside that screen, for the files that host more than one surface — EventsScreen
+// holds the list AND EventDetailScreen (defined at its line 319), and HomeScreen holds the
+// hub, the global search results and the gated facility list. A whole-file rule cannot tell
 // those apart, and two of HomeScreen's three surfaces are on the exclusion list.
+//
+// ⚠ WHY `hosts` IS A LIST AND NOT A STRING. One position/module pair is ONE slot and one
+//   sold row — the guard enforces that pair is unique, and that uniqueness is what keeps
+//   this allowlist a 1:1 map. But one slot can legitimately appear on two SCREENS of the
+//   same module: an accommodation detail_bottom belongs at the foot of a property listing
+//   AND at the foot of a partner showcase. The alternative was a second wrapper claiming
+//   the same pair, which the uniqueness rule exists to forbid, or a new AD_POSITION, which
+//   is a migration and would describe the same component shape twice.
+//
+//   A placement carrying a `span` must declare exactly ONE host: a span is a byte offset
+//   inside one file and has no meaning across two.
 export const AD_PLACEMENTS = [
   { file: 'components/ads/HomeListBottomSlot.js',            position: 'list_bottom',   module: 'home',
-    host: 'screens/HomeScreen.js',            span: 'renderHubV2' },
+    hosts: ['screens/HomeScreen.js'],            span: 'renderHubV2' },
 
   { file: 'components/ads/AccommodationListTopSlot.js',      position: 'list_top',      module: 'accommodation',
-    host: 'screens/AccommodationScreen.js' },
+    hosts: ['screens/AccommodationScreen.js'] },
   { file: 'components/ads/AccommodationListInlineSlot.js',   position: 'list_inline',   module: 'accommodation',
-    host: 'screens/AccommodationScreen.js' },
+    hosts: ['screens/AccommodationScreen.js'] },
   { file: 'components/ads/AccommodationListBottomSlot.js',   position: 'list_bottom',   module: 'accommodation',
-    host: 'screens/AccommodationScreen.js' },
+    hosts: ['screens/AccommodationScreen.js'] },
+  // ─── TWO HOSTS, AND WHOEVER SELLS THIS SLOT NEEDS TO KNOW ─────────────────
+  //
+  // ⚠ AN ACCOMMODATION detail_bottom ROW RENDERS ON PARTNER SHOWCASE PAGES TOO, not only on
+  //   ordinary property listings. One sold row, both surfaces — that is what "same slots,
+  //   same rules" means, and it is deliberate.
+  //
+  //   THERE IS NO CODE-LEVEL COMPETITOR SUPPRESSION AND THERE WILL NOT BE ONE. Nothing here
+  //   stops a rival dorm's banner rendering at the foot of Alasia's own page. That question
+  //   is handled COMMERCIALLY, by not selling it, and this comment is the only thing
+  //   standing between the two — the ad table has no way to tell anyone. If you are about
+  //   to INSERT a detail_bottom/accommodation row, this is where it lands.
   { file: 'components/ads/AccommodationDetailBottomSlot.js', position: 'detail_bottom', module: 'accommodation',
-    host: 'screens/PropertyDetailScreen.js' },
+    hosts: ['screens/PropertyDetailScreen.js', 'screens/DormPartnerScreen.js'] },
 
   { file: 'components/ads/EventsListTopSlot.js',             position: 'list_top',      module: 'events',
-    host: 'screens/EventsScreen.js',          span: 'EventsScreen' },
+    hosts: ['screens/EventsScreen.js'],          span: 'EventsScreen' },
   { file: 'components/ads/EventsListInlineSlot.js',          position: 'list_inline',   module: 'events',
-    host: 'screens/EventsScreen.js',          span: 'EventsScreen' },
+    hosts: ['screens/EventsScreen.js'],          span: 'EventsScreen' },
   { file: 'components/ads/EventsListBottomSlot.js',          position: 'list_bottom',   module: 'events',
-    host: 'screens/EventsScreen.js',          span: 'EventsScreen' },
+    hosts: ['screens/EventsScreen.js'],          span: 'EventsScreen' },
   { file: 'components/ads/EventsDetailBottomSlot.js',        position: 'detail_bottom', module: 'events',
-    host: 'screens/EventsScreen.js',          span: 'EventDetailScreen' },
+    hosts: ['screens/EventsScreen.js'],          span: 'EventDetailScreen' },
 
   { file: 'components/ads/ExploreListTopSlot.js',            position: 'list_top',      module: 'explore',
-    host: 'screens/ExploreScreen.js' },
+    hosts: ['screens/ExploreScreen.js'] },
   { file: 'components/ads/ExploreListInlineSlot.js',         position: 'list_inline',   module: 'explore',
-    host: 'screens/ExploreScreen.js' },
+    hosts: ['screens/ExploreScreen.js'] },
   { file: 'components/ads/ExploreDetailBottomSlot.js',       position: 'detail_bottom', module: 'explore',
-    host: 'screens/ExploreProfileScreen.js' },
+    hosts: ['screens/ExploreProfileScreen.js'] },
 ]
 
 // ─── PLACEMENTS CONSIDERED AND REJECTED ─────────────────────────────────────

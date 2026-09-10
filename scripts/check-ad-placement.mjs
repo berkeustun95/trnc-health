@@ -207,7 +207,23 @@ const CHECKS = [
     for (const p of ads.AD_PLACEMENTS) {
       if (!ads.AD_POSITIONS.includes(p.position)) return `placement ${p.file} uses position "${p.position}", not in AD_POSITIONS`
       if (!ads.AD_MODULES.includes(p.module))     return `placement ${p.file} uses module "${p.module}", not in AD_MODULES`
-      if (!p.host) return `placement ${p.file} declares no host screen`
+      if (!Array.isArray(p.hosts) || p.hosts.length === 0) {
+        return `placement ${p.file} declares no hosts[] — it is `
+          + (p.host ? `still on the old singular \`host\` field; that field is gone, use hosts: ['...']`
+                    : `dead inventory: a wrapper no screen may mount`)
+      }
+      // A span is a byte offset inside ONE file. Two hosts and it is measuring one of them
+      // and silently ignoring the other, which is worse than not checking at all.
+      if (p.span && p.hosts.length !== 1) {
+        return `placement ${p.file} declares a span (${p.span}) with ${p.hosts.length} hosts — `
+          + `a span pins a mount to a function inside one file and has no meaning across two`
+      }
+      for (const h of p.hosts) {
+        if (typeof h !== 'string' || !h) return `placement ${p.file} has a non-string entry in hosts[]`
+      }
+      if (new Set(p.hosts).size !== p.hosts.length) {
+        return `placement ${p.file} lists the same host twice — the mount-count check below would then demand two mounts in one file`
+      }
     }
     const seen = new Set()
     for (const p of ads.AD_PLACEMENTS) {
@@ -263,7 +279,7 @@ const CHECKS = [
     //   detail screen is fine": FacilityProfileScreen is an excluded surface BY FILE, and
     //   no amount of the module being allowed reaches it.
     for (const p of ads.AD_PLACEMENTS) {
-      for (const rel of [p.file, p.host]) {
+      for (const rel of [p.file, ...(p.hosts || [])]) {
         if (rel in ads.AD_EXCLUDED_SURFACES) {
           return `${p.position}/${p.module} would put an ad on ${rel}, which is on the PERMANENT exclusion list.\n`
             + `      Excluded because: ${ads.AD_EXCLUDED_SURFACES[rel]}\n`
@@ -293,17 +309,26 @@ const CHECKS = [
     for (const p of ads.AD_PLACEMENTS) {
       const n = wrapperName(p.file)
       const re = new RegExp(`<\\s*${n}\\b`, 'g')
-      const hosts = Object.entries(files)
+      const found = Object.entries(files)
         .filter(([rel, src]) => rel !== p.file && re.test(stripComments(src)))
         .map(([rel]) => rel)
-      if (!hosts.includes(p.host)) {
-        return `<${n}> is not mounted in its declared host ${p.host} (found in: ${hosts.join(', ') || 'nowhere'}).\n`
+      // EVERY declared host must actually mount it. A host listed but never mounted is the
+      // dangerous direction: it reads as an approved placement that renders nothing, and
+      // nobody notices until an advertiser asks why their banner is missing on one screen.
+      // (p.hosts || []) everywhere below: every check runs even after another has failed,
+      // so a placement still on the old singular `host` field must not CRASH here. A
+      // TypeError reads as a broken guard and buries the vocabulary check's clean message.
+      const unmounted = (p.hosts || []).filter(h => !found.includes(h))
+      if (unmounted.length) {
+        return `<${n}> is not mounted in declared host(s) ${unmounted.join(', ')} (found in: ${found.join(', ') || 'nowhere'}).\n`
           + `      A wrapper nobody mounts is dead inventory; a wrapper mounted elsewhere is an unreviewed placement.`
       }
-      const stray = hosts.filter(h => h !== p.host)
-      if (stray.length) return `<${n}> is mounted outside its declared host: ${stray.join(', ')}`
-      const count = [...stripComments(files[p.host]).matchAll(re)].length
-      if (count !== 1) return `expected exactly 1 <${n}> in ${p.host}, found ${count}`
+      const stray = found.filter(h => !(p.hosts || []).includes(h))
+      if (stray.length) return `<${n}> is mounted outside its declared hosts: ${stray.join(', ')}`
+      for (const h of (p.hosts || [])) {
+        const count = [...stripComments(files[h] || '').matchAll(re)].length
+        if (count !== 1) return `expected exactly 1 <${n}> in ${h}, found ${count}`
+      }
     }
     return null
   }],
@@ -314,29 +339,32 @@ const CHECKS = [
     // facility list. Only an offset comparison separates them.
     for (const p of ads.AD_PLACEMENTS) {
       if (!p.span) continue
-      const clean = stripComments(files[p.host] || '')
-      if (!clean) return `${p.host} is missing`
+      // Safe to take hosts[0]: the vocabulary check above refuses a span with anything
+      // other than exactly one host, so this is not a silent pick of the first of several.
+      const host = (p.hosts || [])[0]
+      const clean = stripComments(files[host] || '')
+      if (!clean) return `${host} is missing`
       const span = functionSpan(clean, p.span)
       if (!span) {
         // Name the likelier culprit first. If the declaration is in the RAW file but not
         // the stripped one, the stripper ate it and the screen is innocent.
-        const inRaw = new RegExp(`function\\s+${p.span}\\s*\\(`).test(files[p.host])
-        return `could not locate function ${p.span}() in ${p.host} for ${p.position}/${p.module}.\n`
+        const inRaw = new RegExp(`function\\s+${p.span}\\s*\\(`).test(files[host])
+        return `could not locate function ${p.span}() in ${host} for ${p.position}/${p.module}.\n`
           + (inRaw
               ? `      ⚠ IT IS PRESENT IN THE RAW FILE — so this is the COMMENT STRIPPER, not the screen.\n`
-                + `        Fix stripComments(); do not touch ${p.host}.`
+                + `        Fix stripComments(); do not touch ${host}.`
               : `      If it was renamed this check is measuring NOTHING — repoint it rather than deleting it.`)
       }
       const [start, end] = span
       // CONTROL: a slice whose end precedes its start returns '' and passes on everything.
       if (end <= start || end - start < 100) {
-        return `the ${p.span}() span in ${p.host} looks wrong (${start}..${end}, ${end - start} chars). Refusing to conclude anything from it.`
+        return `the ${p.span}() span in ${host} looks wrong (${start}..${end}, ${end - start} chars). Refusing to conclude anything from it.`
       }
       const n = wrapperName(p.file)
       const m = new RegExp(`<\\s*${n}\\b`).exec(clean)
-      if (!m) return `<${n}> not found in ${p.host}`
+      if (!m) return `<${n}> not found in ${host}`
       if (m.index < start || m.index > end) {
-        return `<${n}> is at offset ${m.index}, OUTSIDE ${p.span}() (${start}..${end}) in ${p.host}.\n`
+        return `<${n}> is at offset ${m.index}, OUTSIDE ${p.span}() (${start}..${end}) in ${host}.\n`
           + `      That file hosts more than one surface and some of them are on the exclusion list.`
       }
     }
@@ -351,10 +379,13 @@ const CHECKS = [
     // return, and after <ModuleGrid>, which appears only in the hub's own body.
     const p = ads.AD_PLACEMENTS.find(x => x.module === 'home')
     if (!p) return null
-    const clean = stripComments(files[p.host] || '')
-    if (!clean) return `${p.host} is missing`
+    // hosts[0] is safe: this placement carries a span, and the vocabulary check refuses a
+    // span with anything other than exactly one host.
+    const pHost = (p.hosts || [])[0]
+    const clean = stripComments(files[pHost] || '')
+    if (!clean) return `${pHost} is missing`
     const span = functionSpan(clean, p.span)
-    if (!span) return `renderHubV2() not found in ${p.host} — this check is measuring nothing`
+    if (!span) return `renderHubV2() not found in ${pHost} — this check is measuring nothing`
     const [start, end] = span
     const body = clean.slice(start, end)
     if (!body.includes('<ModuleGrid')) {
@@ -392,13 +423,17 @@ const CHECKS = [
     // if a host changes its inset, the strip stops being flush and starts being crooked,
     // which reads as a rendering bug rather than as a config mismatch.
     const inset = ads.AD_PAGE_INSET
+    // EVERY host, not just the first: a second host with a different list inset would put
+    // the same sold strip flush on one screen and crooked on the other.
     for (const p of ads.AD_PLACEMENTS.filter(x => x.position === 'list_inline')) {
-      const src = files[p.host] || ''
-      const m = /listContent:\s*\{[^}]*paddingHorizontal:\s*(\d+)/.exec(src)
-      if (!m) return `could not read listContent's paddingHorizontal in ${p.host} — refusing to assume it matches AD_PAGE_INSET (${inset})`
-      if (Number(m[1]) !== inset) {
-        return `${p.host} insets its list by ${m[1]} but AD_PAGE_INSET is ${inset}.\n`
-          + `      The full-bleed inline strip breaks out by exactly -AD_PAGE_INSET, so it would sit ${Math.abs(Number(m[1]) - inset)}pt off on each edge.`
+      for (const h of (p.hosts || [])) {
+        const src = files[h] || ''
+        const m = /listContent:\s*\{[^}]*paddingHorizontal:\s*(\d+)/.exec(src)
+        if (!m) return `could not read listContent's paddingHorizontal in ${h} — refusing to assume it matches AD_PAGE_INSET (${inset})`
+        if (Number(m[1]) !== inset) {
+          return `${h} insets its list by ${m[1]} but AD_PAGE_INSET is ${inset}.\n`
+            + `      The full-bleed inline strip breaks out by exactly -AD_PAGE_INSET, so it would sit ${Math.abs(Number(m[1]) - inset)}pt off on each edge.`
+        }
       }
     }
     return null
@@ -578,8 +613,8 @@ const CASES = [
   ['no wrapper file is an excluded surface', () => {
     const i = clone()
     const p = i.ads.AD_PLACEMENTS.find(x => x.position === 'detail_bottom' && x.module === 'explore')
-    p.host = 'screens/FacilityProfileScreen.js'
-    return [i, s => s.ads.AD_PLACEMENTS.some(x => x.host === 'screens/FacilityProfileScreen.js')]
+    p.hosts = ['screens/FacilityProfileScreen.js']
+    return [i, s => s.ads.AD_PLACEMENTS.some(x => (x.hosts || []).includes('screens/FacilityProfileScreen.js'))]
   }],
   ['no ad is mounted in an excluded surface', () => {
     const i = clone()
@@ -616,7 +651,7 @@ const CASES = [
   }],
   ['rejected placements stay rejected', () => {
     const i = clone()
-    i.ads.AD_PLACEMENTS.push({ file: 'components/ads/ExploreListBottomSlot.js', position: 'list_bottom', module: 'explore', host: 'screens/ExploreScreen.js' })
+    i.ads.AD_PLACEMENTS.push({ file: 'components/ads/ExploreListBottomSlot.js', position: 'list_bottom', module: 'explore', hosts: ['screens/ExploreScreen.js'] })
     return [i, s => s.ads.AD_PLACEMENTS.some(p => p.position === 'list_bottom' && p.module === 'explore')]
   }],
   ['no excluded destination is reachable', () => {

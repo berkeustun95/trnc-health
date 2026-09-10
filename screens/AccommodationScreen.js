@@ -843,7 +843,8 @@ export default function AccommodationScreen({
           correct by construction rather than by winning a registration race. */}
       {selectedDorm && (
         <View style={cs.detailOverlay}>
-          <DormPartnerScreen partner={selectedDorm} lang={lang} region={null} onBack={onCloseDorm} />
+          <DormPartnerScreen partner={selectedDorm} lang={lang} region={null}
+            onBack={onCloseDorm} onAdNavigate={onAdNavigate} />
         </View>
       )}
 

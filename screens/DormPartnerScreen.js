@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import BackButton from '../components/BackButton'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import DormRoomSheet from '../components/DormRoomSheet'
+import AccommodationDetailBottomSlot from '../components/ads/AccommodationDetailBottomSlot'
 import { colors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
@@ -38,12 +39,12 @@ import { logContactEvent } from '../utils/logContactEvent'
 // What survives with everything absent: badge, name, location, room types, the shuttle
 // row, the operator line, and the contact bar. That is a usable page.
 //
-// ⚠ NO AD SLOT IN THIS FILE YET. detail_bottom x accommodation is already claimed by
-//   AccommodationDetailBottomSlot (host: PropertyDetailScreen), and check-ad-placement
-//   enforces one wrapper per position/module AND "mounted only in its declared host", so
-//   mounting it here today fails the guard twice. Slice 4 widens `host` to `hosts: []` and
-//   this screen becomes the second host — it lands directly above the contact bar, inside
-//   the ScrollView, which is what the 120pt bottom padding below already leaves room for.
+// ⚠ THIS SCREEN IS THE SECOND HOST OF detail_bottom x accommodation. The same sold row
+//   renders here and on PropertyDetailScreen — one slot, two surfaces, which is what
+//   amendment 2's "same slots, same rules" asks for. There is NO code-level competitor
+//   suppression: a rival dorm's banner can render at the foot of this page, and that is
+//   handled commercially rather than in code. constants/ads.js carries the warning where
+//   somebody inserting a row will see it.
 
 const HERO_LOGO = { width: 200, height: 56 }
 const MAP_H     = 160
@@ -66,7 +67,7 @@ function Chip({ icon, label }) {
   )
 }
 
-export default function DormPartnerScreen({ partner, lang, region, onBack }) {
+export default function DormPartnerScreen({ partner, lang, region, onBack, onAdNavigate }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
   // The room sheet is a Modal, so its own onRequestClose consumes Android back — unlike the
@@ -341,6 +342,12 @@ export default function DormPartnerScreen({ partner, lang, region, onBack }) {
         {!!partner.operatorKey && (
           <Text style={s.operator}>{t(partner.operatorKey, lang)}</Text>
         )}
+
+        {/* Last child of the ScrollView, exactly as on PropertyDetailScreen. The 120pt
+            contentContainerStyle padding above already reserves the contact bar's space
+            AFTER the last child, so the banner clears it with no constant touched.
+            Unsold renders null: zero height, no placeholder. */}
+        <AccommodationDetailBottomSlot lang={lang} onNavigate={onAdNavigate} />
       </ScrollView>
 
       <View style={[s.contactBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
