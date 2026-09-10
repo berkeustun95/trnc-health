@@ -49,6 +49,29 @@ import { logContactEvent } from '../utils/logContactEvent'
 const HERO_LOGO = { width: 200, height: 56 }
 const MAP_H     = 160
 
+// ─── PHOTO ASPECT, TAKEN FROM ALASIA'S OWN FILES ────────────────────────────
+//
+// SIX OF THEIR SEVEN PHOTOS ARE 1.4971 — five room shots at 1024x684 and hero-2 at
+// 1536x1026. Only hero-1 (1536x864) differs. So this is their camera's native aspect, not
+// a ratio anybody chose, and a container matching it crops six of seven by NOTHING.
+//
+// hero-1 loses 15.8% of its WIDTH here. A 16:9 container would invert that — hero-1 exact
+// and the other six losing 15.8% of their HEIGHT — which is the worse trade twice over:
+// it damages six images instead of one, and on a room photo the height is where the sense
+// of space lives (ceiling to floor), while a wide landscape survives losing its sides.
+//
+// ⚠ FIXED, NOT PER-IMAGE, AND THAT IS DELIBERATE. Per-image aspect removes the crop but
+//   makes the container height change between pages, so everything below the hero jumps
+//   during a swipe — worse than losing 15.8% of one photo, and it breaks at the moment
+//   stability matters most.
+//
+// ⚠ AND IT IS MEASURED, NOT GUESSED. constants/partners.js records TadilArt shipping a
+//   hardcoded `aspect: 1` chosen before the files existed, which cost ~12% of the height on
+//   the dimension the photos existed to show. The number below came from the files.
+//   If a future image cannot survive this crop, DROP THAT IMAGE rather than bending the
+//   layout around it.
+const PHOTO_ASPECT = 1024 / 684
+
 function Block({ title, children }) {
   return (
     <View style={s.block}>
@@ -67,34 +90,34 @@ function Chip({ icon, label }) {
   )
 }
 
-// One room in the vertical list. Thumbnail, both of Alasia's names, and the headline
-// payment line.
+// One room, as a CARD. Photo, both of Alasia's names, and the headline payment line.
 //
 // ⚠ THE PAYMENT LINE IS NEVER A SUM. Alasia publishes "€500" and "€2,490" as two figures
 //   and does not publish their total. Adding them would be ADA's arithmetic, and a
-//   directory that does arithmetic has started editing. So: "€500 kapora + €2,490 bakiye".
+//   directory that does arithmetic has started editing.
 //
-// ⚠ AND THE FIGURE NEVER APPEARS BARE — WITH NO EXCEPTIONS ANYWHERE IN THIS FILE.
-//   2,490 is simultaneously the Quad Bungalow's full-payment total and the Triple Room's
-//   balance after deposit — both true, so a mix-up cannot be caught by checking whether the
-//   number is right. Every figure carries its plan label and sits inside its room's row.
+// ⚠ AND THE FIGURE NEVER APPEARS BARE — no exceptions anywhere in this file. 2,490 is
+//   simultaneously the Quad Bungalow's full-payment total and the Triple Room's balance
+//   after deposit, both true, so a mix-up cannot be caught by checking the number. Every
+//   figure carries its plan label and sits inside its room's card.
 //
-//   The hero used to quote Alasia's own "Starting From € 2490" under a deliberate
-//   carve-out. It is GONE. On device in Turkish it rendered an English sentence, because a
-//   QUOTATION CANNOT BE LOCALISED — translating it stops it being a quotation — so it
-//   shipped English into all nine locales. The six qualified prices below carry the same
-//   information properly, and a rule with no exceptions is easier to keep true than a rule
-//   with one.
-//
-//   No currency symbol is hardcoded here either: the holding deposit arrives from
+//   No currency symbol is hardcoded either: the holding deposit arrives from
 //   partner.deposits.holding.amount. A figure typed into a component is a figure nobody
 //   updates when the source changes.
-function DormRoomRow({ room, lang, holding, onPress }) {
+function DormRoomRow({ room, lang, holding, width, onPress }) {
   const src  = partnerAsset(room.photo)
   const full = room.plans?.full
   return (
-    <TouchableOpacity style={s.roomRow} onPress={onPress} activeOpacity={0.7}>
-      {!!src && <Image source={src} style={s.roomThumb} resizeMode="cover" />}
+    <TouchableOpacity style={s.roomCard} onPress={onPress} activeOpacity={0.9}>
+      {/* An image sized to SELL THE ROOM rather than to label it. A 64pt thumbnail against
+          a 1024x684 photo told you a room existed; this shows you what it is.
+          NULL-SAFE: the Single Bungalow has no photo on Alasia's site, so its card renders
+          text-only — no grey box, no placeholder icon, no reserved band. */}
+      {!!src && (
+        <Image source={src}
+          style={{ width, height: Math.round(width / PHOTO_ASPECT), borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md }}
+          resizeMode="cover" />
+      )}
       <View style={s.roomBody}>
         <Text style={s.roomName} numberOfLines={2}>{t(room.nameKey, lang)}</Text>
         {!!room.sourceName && (
@@ -103,21 +126,19 @@ function DormRoomRow({ room, lang, holding, onPress }) {
           </Text>
         )}
         {!!full && (
-          <Text style={s.roomPrice} numberOfLines={2}>
-            <Text style={s.roomPriceLabel}>{t('dormPlanFull', lang)} · </Text>
-            {!!holding && <>{holding} {t('dormKapora', lang)} + </>}
-            {full.amounts[0]} {t('dormBalance', lang)}
-          </Text>
+          <View style={s.roomPriceRow}>
+            <Text style={s.roomPriceLabel}>{t('dormPlanFull', lang)}</Text>
+            <Text style={s.roomPrice} numberOfLines={2}>
+              {!!holding && <>{holding} {t('dormKapora', lang)} + </>}
+              {full.amounts[0]} {t('dormBalance', lang)}
+            </Text>
+          </View>
         )}
       </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
     </TouchableOpacity>
   )
 }
 
-// One service. Name left, value right when there is one — and nothing at all when there is
-// not. NO TICK COLUMN: a tick on every row of a list headed "included" carries no
-// information and costs a column the longer locales need.
 function SourceLink({ label, url }) {
   return (
     <TouchableOpacity style={s.sourceLinkRow} activeOpacity={0.6}
@@ -128,6 +149,16 @@ function SourceLink({ label, url }) {
   )
 }
 
+// One service. Name left, value right when there is one — and nothing at all when there is
+// not. NO TICK COLUMN: a tick on every row of a list headed "included" carries no
+// information and costs a column the longer locales need.
+//
+// ⚠ SOLVED AS A ROW-DESIGN PROBLEM, NOT A LAYOUT ONE, and the alternative is worth
+//   recording. Two columns would fit 22 items in half the height and BREAK ALASIA'S ORDER
+//   whichever way they are read: down-then-across defeats normal left-right scanning,
+//   across-then-down silently changes the sequence. The order is theirs, so neither is
+//   available. The single column was made to read instead — taller rows, a lighter
+//   divider, the value set hard against the label.
 function DormServiceRow({ item, lang }) {
   const value = item.value || (item.valueKey ? t(item.valueKey, lang) : null)
   return (
@@ -165,6 +196,7 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
   // The room sheet is a Modal, so its own onRequestClose consumes Android back — unlike the
   // showcase overlay, this state is correctly local. See the note in DormRoomSheet.js.
   const [openRoom, setOpenRoom] = useState(null)
+  const [heroIdx, setHeroIdx]   = useState(0)
   if (!partner) return null
 
   const phone = String(partner.phone || '').replace(/\s/g, '')
@@ -247,17 +279,25 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
           bars. It is also where slice 4's ad slot lands. */}
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: 120 + insets.bottom }]}>
 
-        {/* 1. HERO GALLERY — absent today. Not a placeholder box: with no photos the page
-               simply starts at the logo, which is a normal-looking page. */}
+        {/* 1. HERO GALLERY — full-bleed, fixed ratio, swipeable. */}
         {sec.gallery.length > 0 && (
-          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}
-            style={{ marginBottom: 14 }}>
-            {sec.gallery.map((src, i) => (
-              <Image key={i} source={src}
-                style={{ width: CONTENT_W, height: Math.round(CONTENT_W / HERO_ASPECT), borderRadius: radius.md }}
-                resizeMode="cover" />
-            ))}
-          </ScrollView>
+          <View style={[s.heroWrap, { width: winW, marginLeft: -16 }]}>
+            <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={e => setHeroIdx(Math.round(e.nativeEvent.contentOffset.x / winW))}>
+              {sec.gallery.map((src, i) => (
+                <Image key={i} source={src}
+                  style={{ width: winW, height: Math.round(winW / PHOTO_ASPECT) }}
+                  resizeMode="cover" />
+              ))}
+            </ScrollView>
+            {sec.gallery.length > 1 && (
+              <View style={s.heroDots}>
+                {sec.gallery.map((_, i) => (
+                  <View key={i} style={[s.heroDot, i === heroIdx && s.heroDotOn]} />
+                ))}
+              </View>
+            )}
+          </View>
         )}
 
         {/* 2 + 3. LOGO, BADGE, NAME, LOCATION */}
@@ -367,7 +407,7 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
         {!!sec.rooms && (
           <Block title={t('dormRooms', lang)}>
             {sec.rooms.map(r => (
-              <DormRoomRow key={r.code} room={r} lang={lang}
+              <DormRoomRow key={r.code} room={r} lang={lang} width={winW - 32}
                 holding={partner.deposits?.holding?.amount} onPress={() => setOpenRoom(r)} />
             ))}
             {/* The academic year travels WITH the prices, so a stale table is visibly stale
@@ -545,95 +585,124 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
   )
 }
 
+// ─── TYPE SCALE ─────────────────────────────────────────────────────────────
+//
+// Measured before this pass: 25 of the 29 font sizes on this screen sat between 11pt and
+// 14pt. One 22, one 16, and everything else — section headings, room names, prices, service
+// rows, shuttle times, source links — inside a 4pt band. That is why the page read as a
+// document rather than a screen, and it is a HIERARCHY problem, not a decoration one.
+//
+// Five steps with assigned roles. A size outside this set is a decision somebody should
+// have to make deliberately.
+const TYPE = {
+  title:   22,   // the partner's name. Once per page.
+  section: 17,   // a Block heading. The thing you scan for.
+  item:    15,   // a room name, a plan name, a route name — the unit of content.
+  body:    13,   // service names, row labels, prices in a row.
+  meta:    11,   // source names, notes, captions, attribution.
+}
+
 const s = StyleSheet.create({
   safe:        { flex: 1, backgroundColor: colors.bg },
   navbar:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 },
-  navTitle:    { flex: 1, textAlign: 'center', fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  navTitle:    { flex: 1, textAlign: 'center', fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   navSpacer:   { width: 40 },
   content:     { paddingHorizontal: 16 },
 
-  hero:        { alignItems: 'flex-start', marginBottom: 14 },
-  // No borderWidth and no `backgroundColor` default: the fill is set inline from the accent.
-  // The Android borderRadius + borderWidth gotcha that forces an explicit transparent
-  // background does not apply once the border is gone and the fill is real.
+  // ─── Hero ────────────────────────────────────────────────────────────────
+  heroWrap:    { marginBottom: 18 },
+  heroDots:    { flexDirection: 'row', gap: 5, alignSelf: 'center', marginTop: 10 },
+  heroDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
+  heroDotOn:   { backgroundColor: colors.textSecondary },
+
+  hero:        { alignItems: 'flex-start', marginBottom: 22 },
   badge:       { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
-                 paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10, marginBottom: 10 },
-  badgeText:   { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  heroName:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  placeRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  placeText:   { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+                 paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10, marginBottom: 12 },
+  badgeText:   { fontSize: TYPE.meta, fontFamily: 'Inter_700Bold' },
+  heroName:    { fontSize: TYPE.title, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 28 },
+  placeRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  placeText:   { flex: 1, fontSize: TYPE.body, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   dealBand:    { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12,
-                 borderRadius: radius.md, marginBottom: 14 },
-  // No `color` here on purpose — it is set inline from readableOn(accent). A default white
-  // would be the value that is right on teal and wrong on every light brand colour, sitting
-  // in the stylesheet waiting for somebody to delete the inline override as redundant.
-  dealText:    { flex: 1, fontSize: 13, fontFamily: 'Inter_700Bold' },
+                 borderRadius: radius.md, marginBottom: 18 },
+  dealText:    { flex: 1, fontSize: TYPE.body, fontFamily: 'Inter_700Bold' },
 
-  block:       { backgroundColor: colors.cardBg, borderRadius: radius.md, padding: 14, marginBottom: 12, ...shadow },
-  blockTitle:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-                 textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
-  subTitle:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 4, marginBottom: 6 },
-  about:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 20 },
+  // ─── Section rhythm ──────────────────────────────────────────────────────
+  // 22pt between blocks, not 12. The eleven sections were near-uniform slabs with the same
+  // gap inside them as between them, so nothing read as a boundary.
+  block:       { marginBottom: 22 },
+  blockTitle:  { fontSize: TYPE.section, fontFamily: 'Inter_700Bold', color: colors.textPrimary,
+                 marginBottom: 12 },
+  subTitle:    { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
+                 textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4, marginBottom: 8 },
+  about:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 21 },
+
+  // ─── Room cards ──────────────────────────────────────────────────────────
+  roomCard:    { backgroundColor: colors.cardBg, borderRadius: radius.md, marginBottom: 14,
+                 overflow: 'hidden', ...shadow },
+  roomBody:    { padding: 14 },
+  roomName:    { fontSize: TYPE.item, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  roomAlt:     { fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+  roomPriceRow:{ marginTop: 10 },
+  roomPriceLabel: { fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+                    textTransform: 'uppercase', letterSpacing: 0.4 },
+  roomPrice:   { fontSize: TYPE.item, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 2 },
+  yearNote:    { marginTop: 2, fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+
+  // ─── Services — a ROW DESIGN problem, solved as one ───────────────────────
+  // Two columns were rejected: down-then-across defeats normal left-right scanning,
+  // across-then-down silently changes Alasia's order. Neither is safe, and the order is
+  // theirs. So the single column was made to read instead — taller rows, a lighter
+  // divider, the value set against the label rather than floating.
+  svcRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                 gap: 12, paddingVertical: 11,
+                 borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  svcName:     { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  svcValue:    { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  svcGroupGap: { marginTop: 22 },
+
+  // ─── Shuttles ────────────────────────────────────────────────────────────
+  shuttleHead:    { marginBottom: 10 },
+  shuttleName:    { fontSize: TYPE.item, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  shuttleProvider:{ fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+  routeCard:   { backgroundColor: colors.cardBg, borderRadius: radius.md, padding: 12, marginBottom: 10, ...shadow },
+  routeName:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  routeStops:  { fontSize: TYPE.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+                 marginTop: 2, marginBottom: 9, lineHeight: 15 },
+  timeWrap:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  timeChip:    { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9, backgroundColor: colors.surface },
+  timeChipText:{ fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  timeChipLabel:{ fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   chipWrap:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10,
                  paddingVertical: 6, borderRadius: 14, backgroundColor: colors.surface },
   chipText:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
-  roomRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10,
-                 borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  // 64x64. No placeholder when absent — the body simply takes the width, which is what
-  // keeps a photo-less room looking finished rather than broken.
-  roomThumb:   { width: 64, height: 64, borderRadius: radius.sm, backgroundColor: colors.surface },
-  roomBody:    { flex: 1 },
-  roomName:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  roomAlt:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 1 },
-  roomPrice:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginTop: 4 },
-  roomPriceLabel: { fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  yearNote:    { marginTop: 10, fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-
-  addressRow:  { paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  addressText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginTop: 3, lineHeight: 18 },
-
-  sourceBlock: { marginTop: 4, marginBottom: 10, padding: 14, borderRadius: radius.md,
-                 backgroundColor: colors.surface },
-  sourceTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  sourceBody:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
-                 lineHeight: 17, marginTop: 5 },
-  sourceLinks: { marginTop: 9, gap: 2 },
-  sourceLinkRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5 },
-  sourceLinkLabel: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
-
-  svcRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                 gap: 12, paddingVertical: 7 },
-  svcName:     { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  svcValue:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
-  svcGroupGap: { marginTop: 14 },
-
-  shuttleHead:    { marginBottom: 8 },
-  shuttleName:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  shuttleProvider:{ fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 1 },
-  routeCard:   { backgroundColor: colors.surface, borderRadius: radius.md, padding: 10, marginBottom: 8 },
-  routeName:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  routeStops:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 1, marginBottom: 7 },
-  timeWrap:    { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  timeChip:    { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9, backgroundColor: colors.cardBg },
-  timeChipText:{ fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
-  timeChipLabel:{ fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-
+  // ─── Contact + source ────────────────────────────────────────────────────
   row:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                 paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+                 paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   rowLabel:    { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  rowValue:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  rowValue:    { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   rowValueLink:{ color: colors.primary },
   rowRight:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  addressRow:  { paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  addressText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary, marginTop: 4, lineHeight: 19 },
 
   directionsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-                   marginTop: 10, paddingVertical: 11, borderRadius: radius.md, backgroundColor: colors.primary },
+                   marginTop: 14, paddingVertical: 12, borderRadius: radius.md, backgroundColor: colors.primary },
   directionsBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
 
-  operator:    { marginTop: 4, marginBottom: 8, textAlign: 'center', fontSize: 12,
+  sourceBlock: { marginTop: 4, marginBottom: 14, padding: 14, borderRadius: radius.md,
+                 backgroundColor: colors.surface },
+  sourceTitle: { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  sourceBody:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+                 lineHeight: 18, marginTop: 6 },
+  sourceLinks: { marginTop: 10, gap: 2 },
+  sourceLinkRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
+  sourceLinkLabel: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
+
+  operator:    { marginTop: 2, marginBottom: 10, textAlign: 'center', fontSize: TYPE.meta,
                  fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   contactBar:  { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 10,
@@ -643,5 +712,5 @@ const s = StyleSheet.create({
                  paddingVertical: 13, borderRadius: radius.md, backgroundColor: '#25D366' },
   callBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
                  paddingVertical: 13, borderRadius: radius.md, backgroundColor: colors.primary },
-  barBtnText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+  barBtnText:  { fontSize: TYPE.item, fontFamily: 'Inter_700Bold', color: '#fff' },
 })
