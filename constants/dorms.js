@@ -169,6 +169,10 @@ export const DORM_PARTNERS = [
     // ADA-ALS-<CODE>, so it is pending their sign-off — a code the desk does not
     // recognise makes the handoff worse than no code at all.
     rooms: [
+      // `available` is a BOOLEAN when known (true = rooms free, false = full). Özok has not
+      // supplied it and owed item 6 asks for it per room — if what arrives is a COUNT
+      // rather than a yes/no, this shape changes and check-dorms.mjs fails on the type,
+      // which is the intended place to find out.
       { code: 'BNG1', nameKey: 'dormRoomBungalow1', price: null, sqm: null, available: null },
       { code: 'BNG2', nameKey: 'dormRoomBungalow2', price: null, sqm: null, available: null },
       { code: 'BNG4', nameKey: 'dormRoomBungalow4', price: null, sqm: null, available: null },
@@ -259,6 +263,14 @@ const WA = {
   en: code => `Hello, I'm contacting you from the ADA app. I'd like information about the dormitory.\nKaynak: ADA · Kod: ${code}`,
 }
 
+// Sent from a ROOM. Naming the room is the whole value of the room-level handoff — the desk
+// gets "which room" without having to ask, and the code is the machine-readable half of the
+// same fact.
+const WA_ROOM = {
+  tr: (room, code) => `Merhaba, ADA uygulamasından yazıyorum. "${room}" hakkında bilgi almak istiyorum.\nKaynak: ADA · Kod: ${code}`,
+  en: (room, code) => `Hello, I'm contacting you from the ADA app. I'd like information about "${room}".\nKaynak: ADA · Kod: ${code}`,
+}
+
 // `lang` is a FULL NAME ('Turkish'), never a code — the same trap partners.js documents.
 // Comparing against 'tr' here would send English to every Turkish speaker and look correct
 // in review. LANG_CODES is not imported (this module stays dependency-free), so the caller
@@ -274,8 +286,20 @@ export function dormWaCode(partner, roomCode) {
   return roomCode ? `${base}-${roomCode}` : base
 }
 
-export function dormWaMessage(partner, langCode, roomCode) {
-  return WA[dormWaLocale(langCode)](dormWaCode(partner, roomCode))
+// ⚠ THE ROOM NAME MUST BE IN THE MESSAGE'S LANGUAGE, NOT THE READER'S. This is the same
+//   trap constants/partners.js documents for service names: a Turkish message naming
+//   "Bungalow, twin" is worse than either language on its own, and a Russian user's compose
+//   box must still hand the desk something they can act on.
+//
+//   So the caller passes `roomByLocale = { tr, en }`, resolved with t(nameKey, 'Turkish')
+//   and t(nameKey, 'English') — this module stays dependency-free and never imports i18n,
+//   the same injection the asset resolver uses. Omit it and the message falls back to the
+//   generic property-level text, which is correct rather than broken.
+export function dormWaMessage(partner, langCode, roomCode, roomByLocale) {
+  const loc  = dormWaLocale(langCode)
+  const code = dormWaCode(partner, roomCode)
+  const room = roomByLocale?.[loc]
+  return room ? WA_ROOM[loc](room, code) : WA[loc](code)
 }
 
 // utm_content carries the room only when the tap came FROM a room, per the brief.

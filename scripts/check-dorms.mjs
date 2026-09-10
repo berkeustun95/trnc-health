@@ -115,6 +115,10 @@ for (const p of DORM_PARTNERS) {
     check(/^[A-Z0-9]{2,6}$/.test(r.code), `${who}: room code ${JSON.stringify(r.code)} is not 2-6 uppercase alphanumerics`)
     check(!roomCodes.has(r.code), `${who}: duplicate room code ${r.code}`)
     roomCodes.add(r.code)
+    // available is a BOOLEAN when known. If Özok's data turns out to be a COUNT the shape
+    // changes, and this is the place that should say so — not the sheet, on device.
+    check(r.available === null || r.available === undefined || typeof r.available === 'boolean',
+      `${who}: room ${r.code} has available=${JSON.stringify(r.available)}; expected true, false or null`)
     if (r.nameKey) referencedKeys.add(r.nameKey)
   }
 
@@ -156,6 +160,37 @@ for (const p of DORM_PARTNERS) {
   check(tr !== en, `${who}: the tr and en WhatsApp messages are identical — one language is not being selected`)
   check(ru === en, `${who}: a non-tr locale did not fall back to English`)
   check(tr.includes(waNoRoom) && en.includes(waNoRoom), `${who}: the WhatsApp message does not carry ${waNoRoom}`)
+
+  // ─── The ROOM-level handoff (slice 3) ────────────────────────────────────
+  if (firstRoom) {
+    const roomCode = `ADA-${p.code}-${firstRoom.code}`
+    // Stand-in names, so this tests the SELECTION rather than any real translation.
+    const byLocale = { tr: 'ZZ_TR_ROOM', en: 'ZZ_EN_ROOM' }
+
+    // ⚠ THE CLAIM THAT MATTERS: the room name is rendered in the MESSAGE's language, never
+    //   the reader's. A Greek user's enquiry naming a Greek room type is unactionable at a
+    //   Turkish reception desk, and it would look completely correct in review.
+    const msgTr = dormWaMessage(p, 'tr', firstRoom.code, byLocale)
+    const msgEl = dormWaMessage(p, 'el', firstRoom.code, byLocale)
+    check(msgTr.includes('ZZ_TR_ROOM') && !msgTr.includes('ZZ_EN_ROOM'),
+      `${who}: the Turkish room message did not use the Turkish room name`)
+    check(msgEl.includes('ZZ_EN_ROOM') && !msgEl.includes('ZZ_TR_ROOM'),
+      `${who}: a Greek user's room message did not fall back to the ENGLISH room name`)
+    check(msgTr.includes(roomCode) && msgEl.includes(roomCode),
+      `${who}: the room message does not carry ${roomCode}`)
+
+    // Omitting the names must degrade to the property-level text, not to a broken string.
+    const bare = dormWaMessage(p, 'en', firstRoom.code)
+    check(bare.includes(roomCode), `${who}: a room message with no names lost its code`)
+    check(!bare.includes('undefined') && !bare.includes('null'),
+      `${who}: a room message with no names leaked a placeholder: ${bare}`)
+
+    if (p.website) {
+      const withRoom = new URL(dormWebsiteUrl(p, firstRoom.code))
+      check(withRoom.searchParams.get('utm_content') === firstRoom.code.toLowerCase(),
+        `${who}: utm_content is ${withRoom.searchParams.get('utm_content')}, expected ${firstRoom.code.toLowerCase()}`)
+    }
+  }
 
   // ─── Deal expiry, driven from BOTH sides of the clock ────────────────────
   // Only possible because dormDeal takes `now` as an argument. A screen-side && chain
@@ -260,6 +295,9 @@ const SCREEN_KEYS = [
   'accomDorms', 'dormPartnerBadge', 'dormWebsite', 'dormAbout', 'dormRooms', 'dormTransport',
   'dormAmenities', 'dormServices', 'dormIncluded', 'dormExtra', 'dormLocation', 'dormRing',
   'dormEvents', 'dormContact', 'dormMinutes', 'accomCall', 'accomWhatsApp', 'getDirections',
+  // Slice 3 — the room sheet.
+  'dormRoomPrice', 'dormRoomSize', 'dormRoomAvailability', 'dormRoomAvailable',
+  'dormRoomFull', 'dormRoomEnquire', 'cancel',
 ]
 for (const key of SCREEN_KEYS) {
   const gone = missingIn(key)

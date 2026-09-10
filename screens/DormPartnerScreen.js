@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import MapView, { Marker } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import BackButton from '../components/BackButton'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
+import DormRoomSheet from '../components/DormRoomSheet'
 import { colors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
@@ -67,6 +69,9 @@ function Chip({ icon, label }) {
 export default function DormPartnerScreen({ partner, lang, region, onBack }) {
   const insets = useSafeAreaInsets()
   const { width: winW } = useWindowDimensions()
+  // The room sheet is a Modal, so its own onRequestClose consumes Android back — unlike the
+  // showcase overlay, this state is correctly local. See the note in DormRoomSheet.js.
+  const [openRoom, setOpenRoom] = useState(null)
   if (!partner) return null
 
   const phone = String(partner.phone || '').replace(/\s/g, '')
@@ -219,9 +224,10 @@ export default function DormPartnerScreen({ partner, lang, region, onBack }) {
 
         {/* 6. ROOM TYPES. Names only today — price, m² and availability are all owed, and
                each collapses on its own row rather than printing a dash.
-               ⚠ INERT ON PURPOSE until slice 3 gives them the detail sheet, same reasoning
-                 as the list card: a row styled as a press target that does nothing reads as
-                 broken rather than unfinished. */}
+               TAPPABLE AS OF SLICE 3, and not before: the rows became press targets in the
+               same commit that gave them the detail sheet, same rule the list card followed.
+               The chevron is what makes the affordance readable — a row that is tappable
+               only by convention is a row most people never tap. */}
         {!!sec.rooms && (
           <Block title={t('dormRooms', lang)}>
             {sec.rooms.map(r => {
@@ -230,10 +236,14 @@ export default function DormPartnerScreen({ partner, lang, region, onBack }) {
                 r.sqm != null ? `${r.sqm} m²` : null,
               ].filter(Boolean).join(' · ')
               return (
-                <View key={r.code} style={s.row}>
+                <TouchableOpacity key={r.code} style={s.row} activeOpacity={0.6}
+                  onPress={() => setOpenRoom(r)}>
                   <Text style={s.rowLabel}>{t(r.nameKey, lang)}</Text>
-                  {!!meta && <Text style={s.rowValue}>{meta}</Text>}
-                </View>
+                  <View style={s.rowRight}>
+                    {!!meta && <Text style={s.rowValue}>{meta}</Text>}
+                    <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                  </View>
+                </TouchableOpacity>
               )
             })}
           </Block>
@@ -347,6 +357,9 @@ export default function DormPartnerScreen({ partner, lang, region, onBack }) {
           </TouchableOpacity>
         )}
       </View>
+
+      <DormRoomSheet room={openRoom} partner={partner} lang={lang} region={region}
+        onClose={() => setOpenRoom(null)} />
     </SafeAreaView>
   )
 }
