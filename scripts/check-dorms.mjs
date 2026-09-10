@@ -31,7 +31,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   ACCOM_SEGMENTS, ACCOM_LANDING, accomSegments, accomLanding,
-  DORM_PARTNERS, PENDING_KEYS,
+  DORM_PARTNERS, PENDING_KEYS, GALLERY_ORDER, SECTION_ORDER, COLLAPSIBLE,
   dormDeal, dormWaCode, dormWaMessage, dormWebsiteUrl,
 } from '../constants/dorms.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
@@ -220,7 +220,18 @@ for (const p of DORM_PARTNERS) {
   }
   for (const e of p.events || []) if (e.titleKey) referencedKeys.add(e.titleKey)
   for (const a of ['logo', 'logoOnDark']) if (p[a]) referencedAssets.add(p[a])
-  for (const g of p.gallery || []) referencedAssets.add(g)
+  // Gallery entries are { key, kind } objects, not bare strings — kind drives the render
+  // ORDER (property/room shots before transport), so it is data and not array position.
+  for (const g of p.gallery || []) {
+    check(g && typeof g.key === 'string',
+      `${who}: a gallery entry is ${JSON.stringify(g)} — expected { key, kind }. `
+      + `Bare strings were the old shape; the order rule needs the kind.`)
+    check(GALLERY_ORDER.includes(g?.kind),
+      `${who}: gallery entry ${JSON.stringify(g?.key)} has kind ${JSON.stringify(g?.kind)}, `
+      + `not one of ${GALLERY_ORDER.join(' / ')} — an unknown kind sorts to the front and puts `
+      + `a photo of the bus where the building should be.`)
+    if (typeof g?.key === 'string') referencedAssets.add(g.key)
+  }
 
   // ─── The two derived strings must agree on `code` ─────────────────────────
   // They are the only two places the partner code reaches the outside world, and if they
@@ -476,6 +487,37 @@ for (const key of SCREEN_KEYS) {
 for (const l of LANGS) {
   check(t('dormMinutes', l).includes('{n}'),
     `i18n: dormMinutes in ${LANG_CODES[l]} has lost its {n} placeholder: ${JSON.stringify(t('dormMinutes', l))}`)
+}
+
+// ─── 3a2. Section order and collapse are DATA ───────────────────────────────
+//
+// The order lives in config rather than in JSX position so it can change without a
+// component edit. These assert the vocabulary agrees with what the screen can render — an
+// id in SECTION_ORDER that the screen has no branch for renders NOTHING, silently, and a
+// section missing from the order disappears the same way.
+{
+  const RENDERABLE = ['rooms', 'services', 'shuttles', 'location', 'ring', 'events', 'contact', 'source']
+  for (const id of SECTION_ORDER) {
+    check(RENDERABLE.includes(id),
+      `SECTION_ORDER contains ${JSON.stringify(id)}, which DormPartnerScreen has no branch for — `
+      + `it would render nothing, silently.`)
+  }
+  for (const id of RENDERABLE) {
+    check(SECTION_ORDER.includes(id),
+      `${id} is renderable but missing from SECTION_ORDER — it would never appear.`)
+  }
+  for (const id of COLLAPSIBLE) {
+    check(SECTION_ORDER.includes(id), `COLLAPSIBLE names ${JSON.stringify(id)}, which is not a section`)
+  }
+  // Rooms before services and shuttles: price is the question after the photos, and a page
+  // that opens with 28 rows of detail buries the six room cards.
+  check(SECTION_ORDER.indexOf('rooms') < SECTION_ORDER.indexOf('services') &&
+        SECTION_ORDER.indexOf('rooms') < SECTION_ORDER.indexOf('shuttles'),
+    `SECTION_ORDER puts rooms after services or shuttles (${SECTION_ORDER.join(' → ')}). `
+    + `Price is the question after the photos.`)
+  check(COLLAPSIBLE.includes('services') && COLLAPSIBLE.includes('shuttles'),
+    `services and shuttles must both be collapsible — 22 rows and six route cards open by `
+    + `default is what buried the room cards.`)
 }
 
 // ─── 3b. Accent-filled surfaces derive their foreground ─────────────────────

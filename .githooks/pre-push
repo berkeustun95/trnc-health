@@ -59,6 +59,16 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitme
 # Only a file path identifies a surface, so this is a mount-point allowlist. It also fails
 # if the slot/route vocabularies in constants/ads.js and the migration disagree.
 # `npm run ads:selftest` proves every one of its checks can go red.
+# Component references — a file that PARSES but does not RESOLVE. An undefined component is
+# a runtime ReferenceError, so the screen crashes on first render and no syntax check sees
+# it coming; this repo shipped exactly that on 2026-09-10 when a scripted edit deleted three
+# components a screen still referenced. `npm run refs:selftest` proves it can go red AND
+# that its five known false-positive classes stay clean.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs.mjs || {
+  echo "  push blocked: a JSX component reference does not resolve."
+  exit 1
+}
+
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.mjs || {
   echo "  push blocked: an advert would land on an excluded surface."
   exit 1

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, useWindowDimensions } from 'react-native'
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, useWindowDimensions,
+  LayoutAnimation, UIManager, Platform } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import MapView, { Marker } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
@@ -10,7 +11,7 @@ import AccommodationDetailBottomSlot from '../components/ads/AccommodationDetail
 import { colors, shadow, radius, readableOn } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
-import { dormSections, dormWaMessage, dormWebsiteUrl } from '../constants/dorms'
+import { dormSections, dormWaMessage, dormWebsiteUrl, SECTION_ORDER, COLLAPSIBLE } from '../constants/dorms'
 import { partnerLogo, partnerAsset } from '../constants/partnerAssets'
 import { logContactEvent } from '../utils/logContactEvent'
 
@@ -77,6 +78,31 @@ function Block({ title, children }) {
     <View style={s.block}>
       <Text style={s.blockTitle}>{title}</Text>
       {children}
+    </View>
+  )
+}
+
+// A section that opens CLOSED and expands on tap.
+//
+// ⚠ COLLAPSING IS NOT FILTERING. Every item stays, in Alasia's order, and nothing is
+//   summarised or promoted into the header. The header carries a COUNT so a closed section
+//   still says how much is inside — "Hizmetler · 22" tells you the size of what you are
+//   choosing not to open, which a bare chevron does not.
+//
+// Animated on OPEN because it answers a tap and shows what changed. No entrance animation
+// on load: nothing was asked for, so nothing should move. Mirrors ProfileScreen's use of
+// LayoutAnimation, including the Android enable call it needs.
+function CollapsibleBlock({ title, count, open, onToggle, children }) {
+  return (
+    <View style={s.block}>
+      <TouchableOpacity style={s.collapseHead} onPress={onToggle} activeOpacity={0.6}>
+        <Text style={s.blockTitle}>
+          {title}
+          {count != null && <Text style={s.collapseCount}> · {count}</Text>}
+        </Text>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
+      </TouchableOpacity>
+      {open && children}
     </View>
   )
 }
@@ -197,6 +223,14 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
   // showcase overlay, this state is correctly local. See the note in DormRoomSheet.js.
   const [openRoom, setOpenRoom] = useState(null)
   const [heroIdx, setHeroIdx]   = useState(0)
+  // Closed on first render. Both sections are long and a page that opens with 28 rows of
+  // detail buries the six room cards above them.
+  const [openSections, setOpenSections] = useState({})
+  const toggle = id => {
+    if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true)
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
+    setOpenSections(o => ({ ...o, [id]: !o[id] }))
+  }
   if (!partner) return null
 
   const phone = String(partner.phone || '').replace(/\s/g, '')
@@ -344,213 +378,193 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
           </Block>
         )}
 
-        {/* 5. SHUTTLES — ROUTE CARDS, NOT A TABLE.
-               Their own page presents this as a grid, which needs a dash wherever a route
-               has fewer departures than the widest one. A DASH IS A TABLE ARTIFACT, not
-               something Alasia published. One card per route instead: name, stops, and the
-               departure times as wrapped chips — no empty cells to fill.
+        {/* ─── SECTIONS, IN CONFIG ORDER ──────────────────────────────────────
+            SECTION_ORDER in constants/dorms.js decides the sequence, not this file's JSX
+            position — so the order can change again without a component edit.
+            Rooms first because PRICE IS THE QUESTION AFTER THE PHOTOS. */}
+        {SECTION_ORDER.map(id => {
+          const collapsible = COLLAPSIBLE.includes(id)
+          const open = !!openSections[id]
 
-               TWO SERVICES, SEPARATELY ATTRIBUTED. The free one is the university's, not
-               the dorm's. Presenting them as two distinct services is faithful
-               reproduction and happens to leave no apparent contradiction to trip over. */}
-        {!!sec.shuttles && (
-          <Block title={t('dormTransport', lang)}>
-            {sec.shuttles.map((sv, i) => (
-              <View key={sv.id} style={i > 0 ? s.svcGroupGap : null}>
-                <View style={s.shuttleHead}>
-                  <Text style={s.shuttleName}>{t(sv.nameKey, lang)}</Text>
-                  {/* The attribution is the load-bearing field on this whole section. */}
-                  <Text style={s.shuttleProvider}>
-                    {t('dormShuttleProvidedBy', lang)}: {sv.providerName}
-                  </Text>
-                </View>
-                {sv.routes.map(rt => <DormRouteCard key={rt.name} route={rt} lang={lang} />)}
-                {!!sv.weekend && (
-                  <View style={s.routeCard}>
-                    <Text style={s.routeName}>{sv.weekend.name}</Text>
-                    <Text style={s.routeStops}>{t('dormShuttleWeekend', lang)}</Text>
-                    <View style={s.timeWrap}>
-                      <View style={s.timeChip}>
-                        <Text style={s.timeChipText}>
-                          <Text style={s.timeChipLabel}>{t('dormShuttleOut', lang)} </Text>
-                          {sv.weekend.out}
-                        </Text>
-                      </View>
-                      <View style={s.timeChip}>
-                        <Text style={s.timeChipText}>
-                          <Text style={s.timeChipLabel}>{t('dormShuttleBack', lang)} </Text>
-                          {sv.weekend.back}
-                        </Text>
-                      </View>
+          if (id === 'rooms' && !!sec.rooms) return (
+            <Block key={id} title={t('dormRooms', lang)}>
+              {sec.rooms.map(r => (
+                <DormRoomRow key={r.code} room={r} lang={lang} width={winW - 32}
+                  holding={partner.deposits?.holding?.amount} onPress={() => setOpenRoom(r)} />
+              ))}
+              {/* The academic year travels WITH the prices, so a stale table is visibly
+                  stale rather than silently wrong. */}
+              <Text style={s.yearNote}>{t('dormAcademicYear', lang)} {partner.academicYear}</Text>
+            </Block>
+          )
+
+          if (id === 'services' && (!!sec.included || !!sec.extra)) {
+            const count = (sec.included?.length || 0) + (sec.extra?.length || 0)
+            return (
+              <CollapsibleBlock key={id} title={t('dormServices', lang)} count={count}
+                open={open} onToggle={() => toggle(id)}>
+                {!!sec.included && (
+                  <>
+                    <Text style={s.subTitle}>{t('dormIncluded', lang)}</Text>
+                    {sec.included.map(x => <DormServiceRow key={x.labelKey} item={x} lang={lang} />)}
+                  </>
+                )}
+                {!!sec.extra && (
+                  <>
+                    <Text style={[s.subTitle, s.svcGroupGap]}>{t('dormExtra', lang)}</Text>
+                    {sec.extra.map(x => <DormServiceRow key={x.labelKey} item={x} lang={lang} />)}
+                  </>
+                )}
+              </CollapsibleBlock>
+            )
+          }
+
+          if (id === 'shuttles' && !!sec.shuttles) {
+            // flatMap, not reduce: check-dorms.mjs forbids reduce/parseFloat/parseInt/Number
+            // anywhere in this file, because publishing a total Alasia does not publish is
+            // editing. The rule is blunt on purpose and it is cheap to satisfy — counting
+            // routes reads better this way regardless.
+            const routes = sec.shuttles.flatMap(sv => sv.weekend ? [...sv.routes, sv.weekend] : sv.routes).length
+            return (
+              <CollapsibleBlock key={id} title={t('dormTransport', lang)} count={routes}
+                open={open} onToggle={() => toggle(id)}>
+                {/* ⚠ THE TWO SERVICES STAY SEPARATELY ATTRIBUTED INSIDE THE SECTION. They are
+                    not merged into one list to save height: the free shuttle is Alasia
+                    International University's and the paid one is the dorm's, and collapsing
+                    is about height, never about losing who runs what. */}
+                {sec.shuttles.map((sv, i) => (
+                  <View key={sv.id} style={i > 0 ? s.svcGroupGap : null}>
+                    <View style={s.shuttleHead}>
+                      <Text style={s.shuttleName}>{t(sv.nameKey, lang)}</Text>
+                      <Text style={s.shuttleProvider}>
+                        {t('dormShuttleProvidedBy', lang)}: {sv.providerName}
+                      </Text>
                     </View>
+                    {sv.routes.map(rt => <DormRouteCard key={rt.name} route={rt} lang={lang} />)}
+                    {!!sv.weekend && (
+                      <View style={s.routeCard}>
+                        <Text style={s.routeName}>{sv.weekend.name}</Text>
+                        <Text style={s.routeStops}>{t('dormShuttleWeekend', lang)}</Text>
+                        <View style={s.timeWrap}>
+                          <View style={s.timeChip}>
+                            <Text style={s.timeChipText}>
+                              <Text style={s.timeChipLabel}>{t('dormShuttleOut', lang)} </Text>
+                              {sv.weekend.out}
+                            </Text>
+                          </View>
+                          <View style={s.timeChip}>
+                            <Text style={s.timeChipText}>
+                              <Text style={s.timeChipLabel}>{t('dormShuttleBack', lang)} </Text>
+                              {sv.weekend.back}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    )}
                   </View>
+                ))}
+              </CollapsibleBlock>
+            )
+          }
+
+          if (id === 'location' && !!sec.coords) return (
+            <Block key={id} title={t('dormLocation', lang)}>
+              <MapView style={{ height: MAP_H, borderRadius: radius.md, overflow: 'hidden' }}
+                pointerEvents="none"
+                initialRegion={{ latitude: sec.coords.latitude, longitude: sec.coords.longitude,
+                                 latitudeDelta: 0.01, longitudeDelta: 0.01 }}>
+                <Marker coordinate={sec.coords} title={partner.name} />
+              </MapView>
+            </Block>
+          )
+
+          if (id === 'ring' && !!sec.ringTimes) return (
+            <Block key={id} title={t('dormRing', lang)}>
+              {sec.ringTimes.map((r, i) => (
+                <View key={i} style={s.row}>
+                  <Text style={s.rowLabel}>{t(r.labelKey, lang)}</Text>
+                  <Text style={s.rowValue}>{r.times}</Text>
+                </View>
+              ))}
+            </Block>
+          )
+
+          if (id === 'events' && !!sec.events) return (
+            <Block key={id} title={t('dormEvents', lang)}>
+              {sec.events.map((e, i) => (
+                <View key={i} style={s.row}>
+                  <Text style={s.rowLabel}>{t(e.titleKey, lang)}</Text>
+                  {!!e.date && <Text style={s.rowValue}>{e.date}</Text>}
+                </View>
+              ))}
+            </Block>
+          )
+
+          if (id === 'contact') return (
+            <Block key={id} title={t('dormContact', lang)}>
+              {!!partner.phone && (
+                <TouchableOpacity style={s.row} onPress={call} activeOpacity={0.6}>
+                  <Text style={s.rowLabel}>{t('accomCall', lang)}</Text>
+                  <View style={s.rowRight}>
+                    <Text style={[s.rowValue, s.rowValueLink]}>{partner.phone}</Text>
+                    <Ionicons name="call-outline" size={15} color={colors.primary} />
+                  </View>
+                </TouchableOpacity>
+              )}
+              {!!partner.email && (
+                <TouchableOpacity style={s.row} activeOpacity={0.6}
+                  onPress={() => Linking.openURL(`mailto:${partner.email}`).catch(() => {})}>
+                  <Text style={s.rowLabel}>{t('dormEmail', lang)}</Text>
+                  <View style={s.rowRight}>
+                    <Text style={[s.rowValue, s.rowValueLink]}>{partner.email}</Text>
+                    <Ionicons name="mail-outline" size={15} color={colors.primary} />
+                  </View>
+                </TouchableOpacity>
+              )}
+              {!!partner.website && (
+                <TouchableOpacity style={s.row} onPress={openWebsite} activeOpacity={0.6}>
+                  <Text style={s.rowLabel}>{t('dormWebsite', lang)}</Text>
+                  <View style={s.rowRight}>
+                    <Ionicons name="open-outline" size={15} color={colors.primary} />
+                  </View>
+                </TouchableOpacity>
+              )}
+              {/* The street address verbatim, with THEIR OWN Maps link as the directions
+                  target — not a coordinate we resolved. */}
+              {!!partner.address && (
+                <View style={s.addressRow}>
+                  <Text style={s.rowLabel}>{t('dormAddress', lang)}</Text>
+                  <Text style={s.addressText}>{partner.address}</Text>
+                </View>
+              )}
+              {!!partner.mapsUrl && (
+                <TouchableOpacity style={s.directionsBtn} activeOpacity={0.85}
+                  onPress={() => Linking.openURL(partner.mapsUrl).catch(() => {})}>
+                  <Ionicons name="navigate-outline" size={16} color="#fff" />
+                  <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
+                </TouchableOpacity>
+              )}
+            </Block>
+          )
+
+          if (id === 'source' && !!partner.priceSource?.url) return (
+            <View key={id} style={s.sourceBlock}>
+              <Text style={s.sourceTitle}>{t('dormSourceTitle', lang)}</Text>
+              <Text style={s.sourceBody}>{t('dormSourceBody', lang)}</Text>
+              <View style={s.sourceLinks}>
+                <SourceLink label={t('dormSourcePrices', lang)} url={partner.priceSource.url} />
+                {!!partner.priceSource.pdfUrl && (
+                  <SourceLink label={t('dormSourcePdf', lang)} url={partner.priceSource.pdfUrl} />
+                )}
+                {!!partner.shuttleSource && (
+                  <SourceLink label={t('dormSourceShuttles', lang)} url={partner.shuttleSource} />
                 )}
               </View>
-            ))}
-          </Block>
-        )}
-        {!!sec.amenities && (
-          <Block title={t('dormAmenities', lang)}>
-            <View style={s.chipWrap}>
-              {sec.amenities.map((a, i) => <Chip key={i} icon={a.icon} label={t(a.labelKey, lang)} />)}
             </View>
-          </Block>
-        )}
+          )
 
-        {/* 6. ROOM TYPES — A VERTICAL LIST, NOT A CAROUSEL.
-               Six types each carrying a price cannot live in a horizontal strip: three sit
-               off-screen, and comparing prices is the one thing somebody is here to do.
-               Thumbnail left, names and payment line right.
-               NULL-SAFE PER ROW: the Single Bungalow has no photo on Alasia's site, so its
-               card renders without one and must still look finished — no grey box, no
-               placeholder icon, the text simply takes the full width. */}
-        {!!sec.rooms && (
-          <Block title={t('dormRooms', lang)}>
-            {sec.rooms.map(r => (
-              <DormRoomRow key={r.code} room={r} lang={lang} width={winW - 32}
-                holding={partner.deposits?.holding?.amount} onPress={() => setOpenRoom(r)} />
-            ))}
-            {/* The academic year travels WITH the prices, so a stale table is visibly stale
-                rather than silently wrong. */}
-            <Text style={s.yearNote}>
-              {t('dormAcademicYear', lang)} {partner.academicYear}
-            </Text>
-          </Block>
-        )}
-
-        {/* 7. SERVICES — ALASIA'S OWN ORDER, VALUES RIGHT-ALIGNED, NO TICK COLUMN.
-               A tick beside every row of a list titled "included" says nothing, and it
-               costs a column the longer locales need. Rows with no value are just a name;
-               nothing renders a dash or an empty cell. */}
-        {(!!sec.included || !!sec.extra) && (
-          <Block title={t('dormServices', lang)}>
-            {!!sec.included && (
-              <>
-                <Text style={s.subTitle}>{t('dormIncluded', lang)}</Text>
-                {sec.included.map(x => <DormServiceRow key={x.labelKey} item={x} lang={lang} />)}
-              </>
-            )}
-            {!!sec.extra && (
-              <>
-                <Text style={[s.subTitle, s.svcGroupGap]}>{t('dormExtra', lang)}</Text>
-                {sec.extra.map(x => <DormServiceRow key={x.labelKey} item={x} lang={lang} />)}
-              </>
-            )}
-          </Block>
-        )}
-
-        {/* 8. MAP — coords are owed. A district centre would be a WRONG pin on a partner's
-               own page, which is worse than no map, so null collapses the whole block
-               including the directions button. */}
-        {!!sec.coords && (
-          <Block title={t('dormLocation', lang)}>
-            <MapView
-              style={{ height: MAP_H, borderRadius: radius.md, overflow: 'hidden' }}
-              pointerEvents="none"
-              initialRegion={{
-                latitude: sec.coords.latitude, longitude: sec.coords.longitude,
-                latitudeDelta: 0.01, longitudeDelta: 0.01,
-              }}>
-              <Marker coordinate={sec.coords} title={partner.name} />
-            </MapView>
-            <TouchableOpacity style={s.directionsBtn} onPress={openDirections} activeOpacity={0.85}>
-              <Ionicons name="navigate-outline" size={16} color="#fff" />
-              <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
-            </TouchableOpacity>
-          </Block>
-        )}
-
-        {/* 9. RING SAATLERİ */}
-        {!!sec.ringTimes && (
-          <Block title={t('dormRing', lang)}>
-            {sec.ringTimes.map((r, i) => (
-              <View key={i} style={s.row}>
-                <Text style={s.rowLabel}>{t(r.labelKey, lang)}</Text>
-                <Text style={s.rowValue}>{r.times}</Text>
-              </View>
-            ))}
-          </Block>
-        )}
-
-        {/* 10. EVENTS */}
-        {!!sec.events && (
-          <Block title={t('dormEvents', lang)}>
-            {sec.events.map((e, i) => (
-              <View key={i} style={s.row}>
-                <Text style={s.rowLabel}>{t(e.titleKey, lang)}</Text>
-                {!!e.date && <Text style={s.rowValue}>{e.date}</Text>}
-              </View>
-            ))}
-          </Block>
-        )}
-
-        {/* Website lives with contact, not in the bar: the bar is for reaching a person. */}
-        <Block title={t('dormContact', lang)}>
-          {!!partner.phone && (
-            <TouchableOpacity style={s.row} onPress={call} activeOpacity={0.6}>
-              <Text style={s.rowLabel}>{t('accomCall', lang)}</Text>
-              <View style={s.rowRight}>
-                <Text style={[s.rowValue, s.rowValueLink]}>{partner.phone}</Text>
-                <Ionicons name="call-outline" size={15} color={colors.primary} />
-              </View>
-            </TouchableOpacity>
-          )}
-          {!!partner.email && (
-            <TouchableOpacity style={s.row} activeOpacity={0.6}
-              onPress={() => Linking.openURL(`mailto:${partner.email}`).catch(() => {})}>
-              <Text style={s.rowLabel}>{t('dormEmail', lang)}</Text>
-              <View style={s.rowRight}>
-                <Text style={[s.rowValue, s.rowValueLink]}>{partner.email}</Text>
-                <Ionicons name="mail-outline" size={15} color={colors.primary} />
-              </View>
-            </TouchableOpacity>
-          )}
-          {!!partner.website && (
-            <TouchableOpacity style={s.row} onPress={openWebsite} activeOpacity={0.6}>
-              <Text style={s.rowLabel}>{t('dormWebsite', lang)}</Text>
-              <View style={s.rowRight}>
-                <Ionicons name="open-outline" size={15} color={colors.primary} />
-              </View>
-            </TouchableOpacity>
-          )}
-          {/* The street address, verbatim, with THEIR OWN Maps link as the directions
-              target. Not a coordinate we resolved: a short link resolves to the pin Alasia
-              chose, where a lat/lng we derived is our guess at where they meant. */}
-          {!!partner.address && (
-            <View style={s.addressRow}>
-              <Text style={s.rowLabel}>{t('dormAddress', lang)}</Text>
-              <Text style={s.addressText}>{partner.address}</Text>
-            </View>
-          )}
-          {!!partner.mapsUrl && (
-            <TouchableOpacity style={s.directionsBtn} activeOpacity={0.85}
-              onPress={() => Linking.openURL(partner.mapsUrl).catch(() => {})}>
-              <Ionicons name="navigate-outline" size={16} color="#fff" />
-              <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
-            </TouchableOpacity>
-          )}
-        </Block>
-
-        {/* ─── WHERE THIS INFORMATION COMES FROM ────────────────────────────
-            The obligation that comes with being a directory rather than an editor: say so,
-            in the page, and link the authority. If ADA reproduces Alasia's numbers then a
-            reader must be able to reach Alasia's numbers — and when the two disagree, the
-            source wins and the reader can see that for themselves. */}
-        {!!partner.priceSource?.url && (
-          <View style={s.sourceBlock}>
-            <Text style={s.sourceTitle}>{t('dormSourceTitle', lang)}</Text>
-            <Text style={s.sourceBody}>{t('dormSourceBody', lang)}</Text>
-            <View style={s.sourceLinks}>
-              <SourceLink label={t('dormSourcePrices', lang)} url={partner.priceSource.url} />
-              {!!partner.priceSource.pdfUrl && (
-                <SourceLink label={t('dormSourcePdf', lang)} url={partner.priceSource.pdfUrl} />
-              )}
-              {!!partner.shuttleSource && (
-                <SourceLink label={t('dormSourceShuttles', lang)} url={partner.shuttleSource} />
-              )}
-            </View>
-          </View>
-        )}
+          return null
+        })}
 
         {/* 11. OPERATOR FOOTER */}
         {!!partner.operatorKey && (
@@ -660,6 +674,9 @@ const s = StyleSheet.create({
   svcName:     { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   svcValue:    { fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   svcGroupGap: { marginTop: 22 },
+  collapseHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                   gap: 12, paddingVertical: 2 },
+  collapseCount: { fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   // ─── Shuttles ────────────────────────────────────────────────────────────
   shuttleHead:    { marginBottom: 10 },

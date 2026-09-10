@@ -430,13 +430,49 @@ export const DORM_PARTNERS = [
     //   TadilArt `aspect: 1` note in constants/partners.js — an aspect guessed before the
     //   files existed. Now that they exist it can be measured. Flagged for 7C, not fixed
     //   here: this slice wires assets and changes no layout.
-    gallery: ['alasia/hero-1', 'alasia/hero-2'],
+    // ⚠ ORDER IS EXPLICIT, NOT FILE ORDER. The first thing a student swipes through should
+    //   be where they will LIVE, so dorm and property shots come first and transport last.
+    //   `kind` drives it (see GALLERY_ORDER below) rather than array position, so the rule
+    //   survives new photos being added by someone who does not know it.
+    //
+    // ⚠ NEITHER HERO FILE CARRIES ALT TEXT ON ALASIA'S SITE, so which of the two is the
+    //   shuttle photograph could not be determined from the source — only from looking at
+    //   them. Both are marked 'property' below. If one is the bus, change that one word;
+    //   the ordering then happens on its own.
+    gallery: [
+      { key: 'alasia/hero-1', kind: 'property' },
+      { key: 'alasia/hero-2', kind: 'property' },
+    ],
     ringTimes:        [],   // owed
     events:           [],   // owed
 
     operatorKey: 'dormOperatorOzok',
   },
 ]
+
+// ─── GALLERY ORDER ──────────────────────────────────────────────────────────
+// Sorted by kind, not by array position. A photo of the shuttle is a photo of getting
+// somewhere else; a student deciding where to live wants the building first.
+export const GALLERY_ORDER = ['property', 'room', 'transport']
+
+// ─── SECTION ORDER ──────────────────────────────────────────────────────────
+//
+// Driven from here rather than from JSX position, so it can change again without a
+// component edit — which is the whole reason it is data.
+//
+// Rooms first because PRICE IS THE QUESTION AFTER THE PHOTOS. Services and shuttles are
+// what you read once you have decided the price is plausible; putting them above the
+// rooms made the page answer a question nobody had asked yet.
+export const SECTION_ORDER = ['rooms', 'services', 'shuttles', 'location', 'ring', 'events', 'contact', 'source']
+
+// Sections that open CLOSED and expand on tap. Both are long — 22 service rows and six
+// route cards — and a page that opens with 28 rows of detail buries the six room cards
+// above them.
+//
+// ⚠ COLLAPSING IS NOT FILTERING. Every item stays, in Alasia's order, and nothing is
+//   summarised or promoted into the header. The header carries a COUNT so a closed section
+//   still says how much is inside.
+export const COLLAPSIBLE = ['services', 'shuttles']
 
 export const DORM_PARTNER_IDS = DORM_PARTNERS.map(p => p.id)
 
@@ -476,7 +512,9 @@ export function dormDeal(partner, now = new Date()) {
 export function dormSections(partner, { now = new Date(), resolveAsset = () => undefined } = {}) {
   const has = v => Array.isArray(v) && v.length > 0
   return {
-    gallery:   (partner?.gallery || []).map(resolveAsset).filter(Boolean),
+    gallery:   [...(partner?.gallery || [])]
+                 .sort((a, b) => GALLERY_ORDER.indexOf(a.kind) - GALLERY_ORDER.indexOf(b.kind))
+                 .map(g => resolveAsset(g.key)).filter(Boolean),
     deal:      dormDeal(partner, now),
     transport: has(partner?.transport) ? partner.transport : null,
     amenities: has(partner?.amenities) ? partner.amenities : null,
