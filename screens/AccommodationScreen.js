@@ -562,10 +562,22 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
       <PageBackground topic="accommodation" />
       <ScreenHeader onBack={onClose} title={t('accomTitle', lang)} lang={lang} />
 
-      {/* flexShrink:0 — a fixed-height row above a scrolling list gets vertically
-          compressed once the list overflows, cropping its text top and bottom. */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        style={cs.intentBar} contentContainerStyle={cs.intentBarContent}>
+      {/* ─── A WRAPPING ROW, NOT A HORIZONTAL SCROLL ────────────────────────
+          Five chips do not fit on one line in ANY of the nine locales at 393dp, and four
+          did not fit in ar/ru/el/fr before Yurtlar existed — so the row has been
+          scrolling unannounced since the module shipped. Scrolling was never the problem;
+          DISCOVERY was: measured, the last chip is 0% visible in seven of nine locales,
+          because the viewport edge lands in the GAP between chips rather than across one.
+          A horizontal ScrollView's only free affordance is a partially-cut item, and there
+          is not one.
+          Wrapping shows every chip in every locale instead of signalling that something is
+          hidden. See the plan note for the measurements and for why the other two options
+          were rejected.
+
+          flexShrink:0 — a fixed-height row above a scrolling list gets vertically
+          compressed once the list overflows, cropping its text top and bottom. It matters
+          MORE now than it did as one line: there is twice as much height to squeeze. */}
+      <View style={cs.intentBar}>
         {SEGMENTS.map(seg => (
           <TouchableOpacity key={seg.id} style={[cs.intentTab, intent === seg.id && cs.intentTabActive]}
             onPress={() => changeIntent(seg.id)}>
@@ -595,7 +607,7 @@ export default function AccommodationScreen({ onAdNavigate, lang, onClose, onOpe
             )}
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </View>
 
       {/* HIDDEN ENTIRELY ON YURTLAR, not disabled. Every pill here filters or sorts a
           `properties` query the dorm segment does not run — district, bedrooms, m², price
@@ -871,8 +883,13 @@ const cs = StyleSheet.create({
   safe:                { flex: 1, backgroundColor: colors.bg },
   detailOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bg, zIndex: 20 },
 
-  intentBar:           { flexGrow: 0, flexShrink: 0 },
-  intentBarContent:    { paddingHorizontal: 16, gap: 8, paddingBottom: 10 },
+  // ONE style now, not a style + contentContainerStyle pair: this is a plain wrapping View
+  // rather than a ScrollView, so there is no inner content container to configure.
+  // `gap` supplies BOTH the column gap between chips and the row gap between wrapped
+  // lines, which is why one wrapped line costs 32.9pt (chip) + 8pt (gap) = 40.9pt.
+  // flexShrink:0 is load-bearing and more so than before — see the comment at the markup.
+  intentBar:           { flexDirection: 'row', flexWrap: 'wrap', flexGrow: 0, flexShrink: 0,
+                         paddingHorizontal: 16, gap: 8, paddingBottom: 10 },
   intentTab:           { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.cardBg },
   intentTabActive:     { backgroundColor: colors.primary },
   intentTabText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
