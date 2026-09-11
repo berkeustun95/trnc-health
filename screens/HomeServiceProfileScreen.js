@@ -10,10 +10,19 @@ import { hsCategory, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 // ⚠ UNREFERENCED AS OF THE PARTNER-ONLY CHANGE (2026-09-09). Nothing imports this file.
 //
 // It was the profile for a SELF-REGISTERED provider, reached by tapping a card in the
-// category list — and that list is gone: hs_select_public now requires is_partner, so a
-// directory could only ever have shown partner rows, which have their own richer screen
-// (HomeServicePartnerScreen). Metro bundles from the require graph, so an unreferenced
-// module costs nothing at runtime.
+// category list.
+//
+// ⚠ THE CATEGORY LIST CAME BACK (2026-09-11) AND THIS SCREEN DID NOT — on purpose. The
+//   first version of this note said the list was gone, which was true for two days and is
+//   the wrong reason to remember. The durable reason is the POLICY, not the screen:
+//   hs_select_public requires is_partner, so a category view can only ever surface partner
+//   rows, and those have their own richer screen (HomeServicePartnerScreen). There is no
+//   query anywhere that can produce a row this file would render.
+//
+//   So restoring a category list is NOT the thing that brings this back. Reopening
+//   self-registration is — HS_SELF_REGISTRATION plus the hs_insert_self revert block in
+//   20261012. Until then it stays unimported; Metro bundles from the require graph, so it
+//   costs nothing at runtime, and it is half the revert path.
 //
 // KEPT, NOT DELETED, because it is half the revert path: restoring the open directory
 // means restoring the grid, the list and this screen together. If the policy is ever
