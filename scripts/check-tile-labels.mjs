@@ -176,6 +176,34 @@ export function wrap(str, px, maxW) {
 }
 
 
+// ─── headroom: how much NARROWER the box could get before the string FAILS ──
+//
+// ⚠ NOT `box - widestLine`. That figure is ~0 BY CONSTRUCTION for anything that wraps,
+//   because greedy wrap fills line 1 as full as it will go whatever the box is — so it
+//   measures LINE FULLNESS, not risk, and it reports the safest strings in the grid as the
+//   most fragile. It cost a real decision once: on 2026-09-08 the French handyman label
+//   was shortened to "Bricoleur" on a reported 0.3pt, and reverted the same day (cef3746)
+//   once the true figure turned out to be 31.2pt. "Bricoleur" also means a DIY hobbyist
+//   rather than the paid odd-job man the category means, so a bad metric came within one
+//   commit of degrading the copy it was supposed to protect.
+//
+//   The two coincide ONLY for a single-word label, which cannot wrap — there, spare IS
+//   headroom, and the next stop really is a mid-word break.
+//
+// Returns -1 for a string that already fails at full width. A binary search rather than a
+// formula because the failure condition is greedy wrap's own output, which is what RN
+// actually does; deriving it in closed form would be a second model to keep in step.
+export function headroom(str, px, box, maxLines) {
+  const ok = W => {
+    const { lines, midWord } = wrap(str, px, W)
+    return !midWord && lines.length <= maxLines
+  }
+  if (!ok(box)) return -1
+  let lo = 0, hi = box
+  for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (ok(mid)) hi = mid; else lo = mid }
+  return box - hi
+}
+
 // ═══ THE CHECK ══════════════════════════════════════════════════════════════
 import { HOME_MODULES, GRID_COLUMNS } from '../constants/homeModules.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
@@ -260,10 +288,12 @@ let tightestLatin = { spare: Infinity }
 function assess(label, str, px, box, where, cursive) {
   checked++
   const { lines, midWord } = wrap(str, px, box)
-  const widest = Math.max(...lines.map(l => width(l, px)))
-  const spare = box - widest
-  if (spare < tightest.spare) tightest = { spare, where, str, box }
-  if (!cursive && spare < tightestLatin.spare) tightestLatin = { spare, where, str, box }
+  // PASS/FAIL is unchanged and has never used the slack figure — it is midWord and the
+  // line count, below. The slack is REPORTING only, which is exactly why it was able to
+  // stay wrong for so long without any check going red.
+  const spare = headroom(str, px, box, 2)
+  if (spare >= 0 && spare < tightest.spare) tightest = { spare, where, str, box }
+  if (!cursive && spare >= 0 && spare < tightestLatin.spare) tightestLatin = { spare, where, str, box }
   if (midWord) {
     problems.push(`${where}: ${JSON.stringify(str)} BREAKS MID-WORD -> ${lines.map(l => JSON.stringify(l)).join(' / ')}`)
   } else if (lines.length > 2) {
@@ -312,7 +342,7 @@ console.log(`  geometry read from source: page inset ${G.pageInset}, tile pad ${
   + `card gap ${G.cardGap}/band pad ${G.bandPad}/gap ${G.bandGap}/chevron ${G.chevron} `
   + `-> label box ${labelBox(320).toFixed(1)}pt, card band ${cardBox(320).toFixed(1)}pt at 320dp`)
 console.log(`  tightest (shaped scripts excluded): ${JSON.stringify(tightestLatin.str)} `
-  + `at ${tightestLatin.where}, ${tightestLatin.spare.toFixed(1)}pt spare of ${tightestLatin.box.toFixed(1)}pt`)
+  + `at ${tightestLatin.where}, ${tightestLatin.spare.toFixed(1)}pt HEADROOM of a ${tightestLatin.box.toFixed(1)}pt box`)
 console.log(`  tightest overall:                   ${JSON.stringify(tightest.str)} `
-  + `at ${tightest.where}, ${tightest.spare.toFixed(1)}pt spare `
+  + `at ${tightest.where}, ${tightest.spare.toFixed(1)}pt HEADROOM `
   + `${CURSIVE.has(tightest.where.split(' ')[1]) ? '(UPPER BOUND — cursive, real width is narrower)' : ''}`)
