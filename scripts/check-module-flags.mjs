@@ -255,7 +255,7 @@ for (const [k, live] of Object.entries(actualModules)) {
 // one, so a migration that adds a module to the notify path MUST repoint this constant in
 // the same commit — otherwise the guard reads a superseded file and blocks every push
 // complaining about a module the database already knows about.
-const NOTIFY_SQL = 'supabase/migrations/20260918_notify_waitlist_add_checkins.sql'
+const NOTIFY_SQL = 'supabase/migrations/20261015_home_services_rename.sql'
 try {
   const sql = readFileSync(resolve(ROOT, NOTIFY_SQL), 'utf8')
 

@@ -1197,6 +1197,36 @@ WITH report AS (
           -- row, Check-ins proves the English fallback the other 7 locales resolve to.
           AND pg_get_functiondef(p.oid) ILIKE '%Buradayım%'
           AND pg_get_functiondef(p.oid) ILIKE '%Check-ins%')
+    -- The Ev Hizmetleri display name. CREATE OR REPLACE creates NO named object, so the
+    -- rename is invisible to every other section of this file — the function keeps its
+    -- name, signature and owner whichever set of strings is inside it. Only a body token
+    -- can tell the new names from the old.
+    --
+    -- ⚠ THE NEGATIVES ARE THE LOAD-BEARING HALF, because a POSITIVE CANNOT SEE A
+    --   HALF-APPLIED PASTE. There are two VALUES tables — nine per-language rows and an
+    --   English fallback — and a paste that lands the first but not the second still
+    --   contains both new names, so both positives below would pass while the seven
+    --   locales with no row of their own quietly resolve to "Home Services". A blast that
+    --   reads correctly in Turkish and ships the old name to everyone else.
+    --
+    -- ⚠ AND THE NEGATIVES ARE ANCHORED TO A TUPLE, NOT TO THE BARE WORDS.
+    --   pg_get_functiondef RETURNS THE COMMENTS. `NOT ILIKE '%Home Services%'` would
+    --   forbid the PHRASE anywhere in the definition, so the day someone writes "renamed
+    --   from Home Services" in a comment above these tables, this token goes red against a
+    --   database that is exactly right — and the only way to green it would be to delete
+    --   the comment explaining the rename. This repo has already shipped that bug once, on
+    --   the '%appointments%' token. A tuple with its quotes and commas is a CODE SHAPE; no
+    --   prose contains it.
+    UNION ALL SELECT '1015_home_services_rename','module_notif_text carries the renamed Ev Hizmetleri',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='module_notif_text'
+          -- positives: both tables were reached
+          AND pg_get_functiondef(p.oid) ILIKE '%Tadilat · Bakım · Onarım%'
+          AND pg_get_functiondef(p.oid) ILIKE '%Renovation · Maintenance · Repair%'
+          -- negatives: neither old tuple survives. Top one is the per-language row, bottom
+          -- one the English fallback; each catches the half-paste the other cannot.
+          AND pg_get_functiondef(p.oid) NOT LIKE '%(''homeServices'',''English'',''Home Services'')%'
+          AND pg_get_functiondef(p.oid) NOT LIKE '%(''homeServices'',''Home Services'')%')
     -- The notify path must know every module that can collect signups. CREATE OR REPLACE
     -- adds no named object, so only a body token can tell the new lists from the old.
     -- If this goes red, a module's waitlist can be filled but never notified.
