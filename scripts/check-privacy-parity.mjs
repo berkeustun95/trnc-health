@@ -71,9 +71,16 @@ const COPIES = [
 //   that is itself mojibake in a consistent way. Reading the raw bytes and looking for
 //   4d c5 9e … is the only form of this check that cannot be satisfied by a corrupted
 //   file, because it is asking what is actually on disk.
+// ALL SEVEN published copies, not only the in-app four. The corruption this exists to
+// catch happens in TRANSFER, and the HTML copies are produced by the same hand-off from
+// the same source — so checking only the JS would leave the two store-registered URLs
+// and the GitHub Pages copies unguarded against exactly the failure that already
+// happened once.
 const LEGAL_BODIES = [
   'constants/legal/privacy.en.js', 'constants/legal/privacy.tr.js',
   'constants/legal/terms.en.js',   'constants/legal/terms.tr.js',
+  'docs/privacy.html',             'docs/terms.html',
+  'web/privacy.html',
 ]
 // MŞ29454 — the TRNC company number, as UTF-8 bytes.
 const COMPANY_NO_BYTES = Buffer.from('4d c59e 32 39 34 35 34'.replace(/ /g, ''), 'hex')
