@@ -317,4 +317,4 @@ export const HS_SELF_REGISTRATION = false
 //   name (the name never went away, so the E-section token cannot see this).
 //
 // Reverting is this one boolean, and so is the emergency direction.
-export const DORMS_LIVE = false
+export const DORMS_LIVE = true   // live 2026-09-13
