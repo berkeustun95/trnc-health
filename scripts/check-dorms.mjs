@@ -84,7 +84,7 @@ check(liveIds.includes('dorm'),  `live chip row is missing 'dorm': ${liveIds.joi
 check(liveIds[0] === 'dorm',     `'dorm' is not first when live: ${liveIds.join(',')}`)
 check(liveIds.length === darkIds.length + 1, `live row should be exactly one longer than dark (${liveIds.length} vs ${darkIds.length})`)
 
-// THE BUG THIS EXISTS FOR. ACCOM_LANDING is 'dorm' and the flag ships false, so a literal
+// THE BUG THIS EXISTS FOR. ACCOM_LANDING was 'dorm' while the flag shipped false, so a literal
 // read would open the module on a tab that is not in the chip row.
 check(accomLanding(true) === ACCOM_LANDING, `accomLanding(true) is ${accomLanding(true)}, expected the declared ${ACCOM_LANDING}`)
 check(darkIds.includes(accomLanding(false)),

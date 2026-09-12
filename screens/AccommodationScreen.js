@@ -74,10 +74,11 @@ const PAGE = 20
 // Landing on a SINGLE intent makes price sort mean something. That is still true and is
 // what sortOpts below is built on.
 //
-// LANDING MOVED FROM 'sale' TO 'dorm' (2026-09-10, by decision). The old note argued
-// 'sale' against a rent-heavy counter-argument; that debate is now moot for the landing
-// tab, though it still applies if Yurtlar is ever unpromoted — the fallback is 'sale', not
-// 'rent'. If the Novest inventory question is ever reopened,
+// LANDING WENT TO 'dorm' (2026-09-10) AND BACK TO 'sale' (2026-09-12), before the flag
+// was ever flipped — no user saw either state. Yurtlar keeps its FIRST position in the
+// chip row; only the selected-on-open tab moved back. The reasoning lives on
+// ACCOM_LANDING in constants/dorms.js, next to the value. If the Novest inventory
+// question is ever reopened,
 //   SELECT intent, count(*) FROM properties WHERE source IS NOT NULL GROUP BY intent;
 // settles it with data instead of intuition.
 //

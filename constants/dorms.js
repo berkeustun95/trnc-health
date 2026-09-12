@@ -46,8 +46,24 @@ export const ACCOM_SEGMENTS = [
   { id: 'all' },
 ]
 
-// The tab the module OPENS on. Config, so reverting to 'sale' is one word here.
-export const ACCOM_LANDING = 'dorm'
+// The tab the module OPENS on.
+//
+// ─── 'sale', AND THE CHIP IS STILL FIRST ───────────────────────────────────
+//
+// Set to 'dorm' on 2026-09-10 (fa0abb4) and moved back on 2026-09-12, BEFORE the flag
+// was ever flipped, so no user has seen either. The two decisions are separable and were
+// being made as one: ACCOM_SEGMENTS puts Yurtlar first in the chip row, which is the
+// prominence Özok were promised, and this constant decides which chip is SELECTED when
+// the module opens, which is a cost paid by everyone who is not looking for a dorm.
+//
+// WHY IT MOVED BACK. `deal` is null — Özok's exclusive-deal text has not arrived — so the
+// deal band does not render. Landing on Yurtlar would put a permanent one-tap detour in
+// front of every user hunting a flat, to reach a promotion with nothing in it. The detour
+// is not free and not dismissible: there is no "remember my last tab".
+//
+// WHEN THE DEAL TEXT ARRIVES, THIS IS ONE WORD. That is the moment the detour is earning
+// something, and the moment to make it — not before.
+export const ACCOM_LANDING = 'sale'
 
 // DORMS_LIVE is INJECTED rather than imported, so this module stays pure data a Node
 // harness can drive with either value — the same reason partnerGallery() takes its
