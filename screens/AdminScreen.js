@@ -9,7 +9,6 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, placeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { HS_SELF_REGISTRATION } from '../constants/flags'
 import { storageObjectPath } from '../utils/facilityUtils'
 import { invalidateBlockedTerms } from '../utils/profanity'
 import { normalizeForModeration } from '../utils/moderationNormalize'
@@ -57,24 +56,33 @@ async function updateOrAlert(table, patch, id, label) {
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const ROLES = ['customer', 'provider', 'organizer', 'admin']
-// HomeServices is spread in rather than listed, because it is the one tab whose presence
-// is a policy question. It is the ADMIN half of a flow whose user half is hidden — an
-// approval queue for submissions that can no longer be made, since hs_insert_self has
-// been WITH CHECK (false) since 20261012.
+// ─── HomeServices is UNCONDITIONAL, and it was not always ──────────────────
 //
-// ⚠ HIDING IT REMOVES THE ONLY BUTTON THAT CAN ACTIVATE A home_services ROW.
-//   hs_guard_owner_update raises on a NULL auth.uid(), so a plain UPDATE from the SQL
-//   editor is refused too. Taking a partner live is now a reviewed
-//   DISABLE TRIGGER / UPDATE / ENABLE TRIGGER block.
+// It used to be spread in behind HS_SELF_REGISTRATION, on the reasoning that an approval
+// queue is pointless when nobody can submit — hs_insert_self has been WITH CHECK (false)
+// since 20261012. True about SELF-registrations, and it missed that the same tab is the
+// only surface that can take a PARTNER live.
 //
-//   THE BLOCK ITSELF LIVES IN constants/flags.js, under HS_SELF_REGISTRATION — one copy,
-//   beside the flag that removed the button. Pasting it here as well would be two copies
-//   of an id and a predicate that must agree, which is the drift this repo keeps paying
-//   for. If you are here because the tab is missing, that is the file.
+// ⚠ THIS TAB IS THE GO-LIVE PATH FOR A home_services PARTNER, and for a while there was
+//   no working one at all. hs_guard_owner_update raises 'no system-context updates
+//   allowed' when auth.uid() IS NULL — which is always true in the SQL editor — and it
+//   raises BEFORE its own is_admin check, so an admin could not promote a row from SQL
+//   either. Approving from HERE works because the request carries a session: auth.uid()
+//   is non-null, the guard reaches its is_admin branch, and returns NEW.
 //
-//   Turning a partner OFF needs no SQL at all: MODULE_FLAGS.homeServices over OTA.
+//   A SECURITY DEFINER RPC does NOT solve the SQL-editor case and was rejected for that
+//   reason: DEFINER changes the ROLE a function runs as, it does not populate auth.uid(),
+//   which reads request.jwt.claims and is null there whatever wraps the call.
+//
+// NO FLAG. AdminScreen is already reachable only by role='admin' (App.js selects it
+// role-first), and there is no state in which an admin should be unable to approve a
+// partner — so a scalar that must always be true is one more thing to baseline, keep in
+// step and eventually get wrong. Every other entry in this array is listed plainly; this
+// one now is too.
+//
+// Turning a partner OFF still needs no SQL at all: MODULE_FLAGS.homeServices over OTA.
 const TABS = ['Dashboard', 'Reports', 'Changes', 'Claims', 'Providers', 'Credentials', 'Facilities', 'Duty', 'Users', 'Broadcast', 'Events', 'Properties', 'Agents',
-  ...(HS_SELF_REGISTRATION ? ['HomeServices'] : []),
+  'HomeServices',
   'Transport', 'Insurance', 'Grooming', 'Garages', 'Featured', 'BusRoutes', 'Places', 'PlaceClaims', 'JobPostings', 'Moderation']
 
 async function sendPushNotification(token, title, body, data = {}) {
@@ -419,12 +427,12 @@ function DashboardTab({ onNavigate }) {
     (stats.pendingEvents ?? 0)   > 0 && { label: 'Events awaiting approval',      count: stats.pendingEvents,          tab: 'Events',      color: colors.primary },
     (stats.pendingProperties ?? 0) > 0 && { label: 'Property listings to review', count: stats.pendingProperties,      tab: 'Properties',  color: colors.primary },
     (stats.pendingAgents ?? 0)      > 0 && { label: 'Agent applications pending',       count: stats.pendingAgents,         tab: 'Agents',       color: '#7C3AED' },
-    // The COUNT is still queried — it sits at a fixed position in a 20-entry positional
-    // Promise.all destructure and removing it would shift every later binding for no gain.
-    // Only the ROW is gated, which is the half a human sees. Without this the dashboard
-    // advertises a queue of 1 (TadilArt, seeded pending) pointing at a tab that is no
-    // longer in TABS.
-    HS_SELF_REGISTRATION && (stats.pendingHomeServices ?? 0) > 0 && { label: 'Home service providers pending',  count: stats.pendingHomeServices,   tab: 'HomeServices', color: colors.primary },
+    // Ungated with the tab. While the tab was hidden this row had to be suppressed or the
+    // dashboard advertised a queue pointing nowhere; now it points at the tab that
+    // actions it. A pending count here no longer means a self-registration waiting — it
+    // means a PARTNER row seeded and not yet taken live, which is exactly the thing worth
+    // surfacing on the dashboard.
+    (stats.pendingHomeServices ?? 0) > 0 && { label: 'Home service providers pending',  count: stats.pendingHomeServices,   tab: 'HomeServices', color: colors.primary },
     (stats.pendingTransport ?? 0)    > 0 && { label: 'Transport providers pending',      count: stats.pendingTransport,       tab: 'Transport',    color: colors.primary },
     (stats.pendingInsurance ?? 0)    > 0 && { label: 'Insurance companies pending',      count: stats.pendingInsurance,       tab: 'Insurance',    color: colors.primary },
     (stats.pendingGrooming ?? 0)     > 0 && { label: 'Grooming providers pending',       count: stats.pendingGrooming,        tab: 'Grooming',     color: colors.primary },
