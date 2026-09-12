@@ -366,6 +366,32 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
                     region={selectedDistrict}
                     onPress={() => setSelectedPartner({ partner, row, serviceContext, region: selectedDistrict })}
                   />
+                  {/* ─── THE COVERAGE LINE ─────────────────────────────────
+                      Rendered ONLY where this partner does not cover the category the
+                      user tapped — on the four they do cover it would restate the page
+                      title.
+
+                      It says what they DO, never what they do not. A reader on the
+                      Plumber page seeing a renovation firm needs to know why it is
+                      there; "not a plumber" is a smaller, ruder version of the same
+                      sentence and invites the question of who is.
+
+                      ⚠ DERIVED FROM row.service_types, never a written list. Add a
+                        service to the row and this line grows by itself — a hardcoded
+                        string would keep advertising the old four and be wrong in the
+                        direction nobody checks. Ordered by HS_CATEGORIES so it reads in
+                        the same order as the grid the user just came from, not in
+                        whatever order the column happens to hold. */}
+                  {!rowCovers && (
+                    <Text style={s.coverNote}>
+                      {t('hsPartnerCovers', lang)
+                        .replace('{partner}', row.name)
+                        .replace('{services}', HS_CATEGORIES
+                          .filter(c => (row.service_types || []).includes(c.key))
+                          .map(c => t(c.labelKey, lang))
+                          .join(' · '))}
+                    </Text>
+                  )}
                 </View>
               )
             })}
@@ -405,6 +431,8 @@ const s = StyleSheet.create({
   introCard:    { marginBottom: 20 },
   spinner:      { marginTop: 32 },
   partnerWrap:  { marginBottom: 16 },
+  coverNote:    { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
+                  lineHeight: 18, marginTop: 8, paddingHorizontal: 4 },
 
   grid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
   catTile:      { width: '47%', backgroundColor: colors.cardBg, borderRadius: radius.card,
