@@ -46,6 +46,11 @@ export default function ModuleGrid({ lang, onPress }) {
           // rotation or a split-screen resize without a re-measure, and GRID_COLUMNS stays
           // the single number that decides the shape.
           width={`${100 / GRID_COLUMNS}%`}
+          // THE GRID IS THE ONLY SURFACE THAT PASSES THIS. A module may carry a different
+          // label here from the one it shows in the favourites row — today exactly one
+          // does, and its reasoning is on the config row. Undefined for every other
+          // module, which is the normal path.
+          labelOverride={mod.gridLabel}
         />
       ))}
     </View>

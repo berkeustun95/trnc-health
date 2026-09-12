@@ -205,7 +205,7 @@ export function headroom(str, px, box, maxLines) {
 }
 
 // ═══ THE CHECK ══════════════════════════════════════════════════════════════
-import { HOME_MODULES, GRID_COLUMNS } from '../constants/homeModules.js'
+import { HOME_MODULES, GRID_COLUMNS, GRID_LABEL_HEIGHT } from '../constants/homeModules.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
 
 // Both widths that matter: a typical modern phone, and the narrowest device in the fold
@@ -285,19 +285,23 @@ const CURSIVE = new Set(['Arabic', 'Persian'])
 let tightest = { spare: Infinity }
 let tightestLatin = { spare: Infinity }
 
-function assess(label, str, px, box, where, cursive) {
+// maxLines is a PARAMETER, not the literal 2 it used to be. One grid tile renders its
+// label on three lines at a smaller size (see `gridLabel` in constants/homeModules.js),
+// and a checker that assumed 2 would have failed that tile for needing the third line it
+// is designed to take — then been "fixed" by loosening the rule for every other label.
+function assess(label, str, px, box, where, cursive, maxLines = 2) {
   checked++
   const { lines, midWord } = wrap(str, px, box)
   // PASS/FAIL is unchanged and has never used the slack figure — it is midWord and the
   // line count, below. The slack is REPORTING only, which is exactly why it was able to
   // stay wrong for so long without any check going red.
-  const spare = headroom(str, px, box, 2)
+  const spare = headroom(str, px, box, maxLines)
   if (spare >= 0 && spare < tightest.spare) tightest = { spare, where, str, box }
   if (!cursive && spare >= 0 && spare < tightestLatin.spare) tightestLatin = { spare, where, str, box }
   if (midWord) {
     problems.push(`${where}: ${JSON.stringify(str)} BREAKS MID-WORD -> ${lines.map(l => JSON.stringify(l)).join(' / ')}`)
-  } else if (lines.length > 2) {
-    problems.push(`${where}: ${JSON.stringify(str)} needs ${lines.length} lines, the box holds 2 -> `
+  } else if (lines.length > maxLines) {
+    problems.push(`${where}: ${JSON.stringify(str)} needs ${lines.length} lines, the box holds ${maxLines} -> `
       + lines.map(l => JSON.stringify(l)).join(' / '))
   }
 }
@@ -305,7 +309,21 @@ function assess(label, str, px, box, where, cursive) {
 for (const W of WIDTHS) {
   for (const L of Object.keys(LANG_CODES)) {
     for (const m of HOME_MODULES) {
+      // BOTH labels, and dropping either would leave a real surface unmeasured.
+      //
+      // labelKey is what the FAVOURITES row and the edit sheet's picker render — they do
+      // not receive the override — so it stays measured at 11pt / 2 lines for every
+      // module including the one that overrides.
       assess('tile', t(m.labelKey, L), 11, labelBox(W), `${W}dp ${L} tile:${m.id}`, CURSIVE.has(L))
+      // gridLabel is what the GRID renders. Size and line count are READ FROM THE CONFIG,
+      // never assumed here: if this file hardcoded 8.5 and 3 it would be a second copy of
+      // a number that lives in constants/homeModules.js, and the day somebody tuned one
+      // the guard would be measuring a tile that no longer exists — the standing
+      // frame-of-reference hazard this file documents at length.
+      if (m.gridLabel) {
+        assess('tile', t(m.gridLabel.key, L), m.gridLabel.size, labelBox(W),
+               `${W}dp ${L} gridLabel:${m.id}`, CURSIVE.has(L), m.gridLabel.lines)
+      }
     }
     // ─── The strip's card copy ──────────────────────────────────────────────
     // Titles at 14pt over two lines; subtitles at 11pt, which the card renders on ONE, so a
@@ -333,8 +351,14 @@ if (problems.length) {
   console.error('\n  ┌─ TILE LABEL CHECK FAILED ──────────────────────────────────────┐')
   for (const p of problems) console.error('  │ ' + p)
   console.error('  └────────────────────────────────────────────────────────────────┘\n')
-  console.error(`  ${problems.length} of ${checked} strings do not fit. Shorten the copy — the box is a `
-    + `fixed two lines so the grid keeps one shape in all nine locales.\n`)
+  // The old wording said "the box is a fixed two lines", which stopped being true for
+  // every label when gridLabel arrived. It is the HEIGHT that is fixed — 32pt — while the
+  // line count is per label and the lineHeight is derived from it. A failure message that
+  // misdescribes the constraint sends the reader to change the wrong number.
+  console.error(`  ${problems.length} of ${checked} strings do not fit. The label box is a fixed `
+    + `${GRID_LABEL_HEIGHT}pt in every locale; a label's line count divides it rather than `
+    + `growing it, so the grid keeps one row rhythm. Shorten the copy, or — for a gridLabel `
+    + `— lower its \`size\` in constants/homeModules.js.\n`)
   process.exit(1)
 }
 console.log(`tile labels: OK — ${checked} strings from ${ACTIVE_FAMILY} (the face ModuleTile actually renders) at ${WIDTHS.join('dp / ')}dp`)

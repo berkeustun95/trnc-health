@@ -48,18 +48,37 @@ export const TINTS = {
 // `${100/GRID_COLUMNS}%`, but the grid's width is a consequence of GRID_COLUMNS while the
 // row's is a consequence of FAVOURITE_SLOTS — two numbers that happen to be equal, not one
 // number used twice. Passing it keeps that honest.
-export default function ModuleTile({ mod, lang, onPress, width = `${100 / GRID_COLUMNS}%`, trailing }) {
+// ─── labelOverride: A PROP, NEVER A LOOKUP ──────────────────────────────────
+//
+// One module (Ev Hizmetleri) shows a partner's full phrase on the GRID and its short name
+// everywhere else. This file could have read `mod.gridLabel` itself — and must not. The
+// header above commits to carrying no knowledge of any module and no knowledge of which
+// row it is drawn in; reading a field named `grid*` here would quietly break the second
+// half of that, because the favourites row renders this same component and would then
+// have to be told to ignore it. So ModuleGrid passes the override and the two favourites
+// surfaces simply do not.
+//
+// ⚠ lineHeight is DERIVED from GRID_LABEL_HEIGHT, not supplied. That is what guarantees a
+//   3-line label occupies exactly the same 32pt box as a 2-line one, so an override can
+//   never change a row's height and the grid keeps one rhythm in all nine locales. An
+//   override that could set its own lineHeight would be an override that could push one
+//   tile taller than its neighbours — the thing the fixed box exists to prevent.
+export default function ModuleTile({ mod, lang, onPress, width = `${100 / GRID_COLUMNS}%`, trailing, labelOverride }) {
   // Falls back to `standard`, which is the one that still exists — an older fallback
   // named `service`, a key the two-family rewrite removed, so an unknown tint would have
   // crashed on `tint.bg` instead of degrading to teal.
-  const tint = TINTS[mod.tint] || TINTS.standard
+  const tint     = TINTS[mod.tint] || TINTS.standard
+  const labelKey = labelOverride?.key ?? mod.labelKey
+  const lines    = labelOverride?.lines ?? 2
   return (
     <TouchableOpacity
       style={[s.tile, { width }]}
       onPress={() => onPress(mod)}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={t(mod.labelKey, lang)}
+      // The RESOLVED label, not mod.labelKey: a screen reader must announce the tile a
+      // sighted user is looking at, and on the grid that is the partner's full phrase.
+      accessibilityLabel={t(labelKey, lang)}
     >
       <View style={[s.icon, { backgroundColor: tint.bg }]}>
         <Ionicons name={mod.icon} size={24} color={tint.fg} />
@@ -68,7 +87,15 @@ export default function ModuleTile({ mod, lang, onPress, width = `${100 / GRID_C
           file never learns what a pin is — it only knows something may sit on the icon. */}
       {trailing}
       <View style={s.labelBox}>
-        <Text style={s.label} numberOfLines={2}>{t(mod.labelKey, lang)}</Text>
+        <Text
+          style={[s.label, labelOverride && {
+            fontSize: labelOverride.size,
+            lineHeight: GRID_LABEL_HEIGHT / lines,
+          }]}
+          numberOfLines={lines}
+        >
+          {t(labelKey, lang)}
+        </Text>
       </View>
     </TouchableOpacity>
   )

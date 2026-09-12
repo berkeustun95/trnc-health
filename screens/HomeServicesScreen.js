@@ -286,14 +286,16 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
 
   // ─── One category ─────────────────────────────────────────────────────────
   //
-  // `visible` applies the district rule; `covered` asks whether any visible partner
-  // genuinely does this work. Both read the ROW, never the config — coverage_districts
-  // and service_types are what an admin can correct, and constants/partners.js carries
-  // neither on purpose.
+  // `visible` applies the district rule. It reads the ROW, never the config —
+  // coverage_districts is what an admin can correct, and constants/partners.js does not
+  // carry it on purpose.
+  //
+  // There is deliberately no list-level `covered` flag any more: whether the partner
+  // covers this category no longer changes what is RENDERED, only what goes into the
+  // WhatsApp draft, which is a per-row question answered at the card below.
   const visible = selectedDistrict
     ? cards.filter(({ row }) => (row.coverage_districts || []).includes(selectedDistrict))
     : cards
-  const covered = visible.some(({ row }) => (row.service_types || []).includes(selectedCategory))
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -368,13 +370,18 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
               )
             })}
 
-            {/* Four cases, and the one that renders NOTHING is deliberate: a visible
-                partner that genuinely does this work is the answer to the category, and
-                putting "no other listings" under it would undersell the result we have. */}
-            {visible.length > 0 && covered ? null
-              : visible.length > 0 ? (
-                <EmptyNote titleKey="hsCatEmptyOtherTitle" bodyKey="hsCatEmptyBody" lang={lang} />
-              ) : selectedDistrict ? (
+            {/* ⚠ A RENDERED CARD ENDS THE QUESTION. If anything is on screen, nothing is
+                said about what is not — including in the eight categories the partner
+                does not cover. The card carries its own service chips and its ADA-partner
+                badge, so a reader can see exactly what the firm does; adding "no other
+                listings in this category" underneath tells them nothing the card has not
+                already told them, and spends the space arguing about absence instead.
+                (An earlier build showed it for the eight. Removed on the partner's read of
+                the page, and it is the better call on its own merits.)
+
+                So the copy survives ONLY where the screen would otherwise be BLANK. */}
+            {visible.length > 0 ? null
+              : selectedDistrict ? (
                 <EmptyNote titleKey="hsCatEmptyDistrictTitle" bodyKey="hsCatEmptyBody" lang={lang} />
               ) : (
                 // No rows and no filter to blame — the partner list is empty, or the

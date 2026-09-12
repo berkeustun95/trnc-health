@@ -128,7 +128,31 @@ export const HOME_MODULES = [
 
   // Getting things done.
   { id: 'jobPostings',        icon: 'briefcase-outline',        tint: 'standard', labelKey: 'menuJobPostings' },
-  { id: 'homeServices',       icon: 'hammer-outline',           tint: 'standard', labelKey: 'menuHomeServices' },
+  // ─── THE ONE TILE THAT CARRIES A PHRASE INSTEAD OF A NAME ────────────────
+  //
+  // `gridLabel` is read ONLY by the module grid (ModuleGrid passes it; ModuleTile takes
+  // it as a prop and never looks a module up). Everywhere else this module appears —
+  // the favourites row, the edit sheet's picker, the edit sheet's slot preview — falls
+  // back to labelKey and shows the short form.
+  //
+  // ⚠ THAT SPLIT IS FORCED, NOT A PREFERENCE. The partner requires the full phrase; the
+  //   slot preview is a 56pt box at 320dp and would need SEVEN-POINT-THREE type to hold
+  //   it. There is no single size that serves both surfaces, so there are two labels.
+  //
+  // ⚠ THE KEY IS hsTitle, THE SCREEN HEADER'S OWN KEY — deliberately not a second copy.
+  //   This is a phrase a commercial partner signed off; two copies of it in i18n.js is
+  //   two things to keep in step across nine locales, and the tile and the screen it
+  //   opens must never disagree about the partner's name. One string, one place.
+  //
+  // `lines` and `size` are the price of a 32-char phrase in a quarter-width box. The
+  // blocker is NOT the line count — it is the longest single WORD: Russian
+  // "Обслуживание" is 84.2pt at 11pt against a 68pt box at 320dp, so it breaks mid-word
+  // however many lines it is given (4 lines measures identical to 3). 8.5pt is the
+  // largest size that clears all nine locales at 320dp; the true floor is 8.88pt,
+  // Russian. ModuleTile DERIVES lineHeight as GRID_LABEL_HEIGHT / lines, so the label box
+  // stays exactly 32pt and this tile cannot alter the grid's row rhythm.
+  { id: 'homeServices',       icon: 'hammer-outline',           tint: 'standard', labelKey: 'menuHomeServices',
+    gridLabel: { key: 'hsTitle', lines: 3, size: 8.5 } },
   { id: 'transport',          icon: 'bus-outline',              tint: 'standard', labelKey: 'menuTransportation' },
   { id: 'garages',            icon: 'car-sport-outline',        tint: 'standard', labelKey: 'menuGarages' },
   { id: 'insurance',          icon: 'shield-checkmark-outline', tint: 'standard', labelKey: 'menuInsurance' },
