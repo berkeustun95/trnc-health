@@ -679,6 +679,7 @@ const translations = {
     // Profile
     privacyPolicy: 'Privacy Policy',
     termsOfService: 'Terms of Service',
+    legalAvailableInEnTr: 'Our legal documents are published in English and Turkish. You are reading the English version.',
     signupLegalNotice: 'By creating an account you agree to our {terms} and {privacy}.',
     // Unclaimed facility sheet
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
@@ -1937,6 +1938,7 @@ const translations = {
     passwordUpdated: 'Şifre güncellendi! Giriş yapılıyor…',
     privacyPolicy: 'Gizlilik Politikası',
     termsOfService: 'Kullanım Koşulları',
+    legalAvailableInEnTr: 'Hukuki belgelerimiz İngilizce ve Türkçe olarak yayımlanır. Türkçe sürümü okuyorsunuz.',
     signupLegalNotice: 'Hesap oluşturarak {terms} ve {privacy} belgelerimizi kabul etmiş olursunuz.',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
@@ -3265,6 +3267,7 @@ const translations = {
     passwordUpdated: 'تم تحديث كلمة المرور! جارٍ تسجيل الدخول…',
     privacyPolicy: 'سياسة الخصوصية',
     termsOfService: 'شروط الخدمة',
+    legalAvailableInEnTr: 'مستنداتنا القانونية منشورة بالإنجليزية والتركية. أنت تطالع النسخة الإنجليزية.',
     signupLegalNotice: 'بإنشاء حساب فإنك توافق على {terms} و{privacy} الخاصة بنا.',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
@@ -4357,6 +4360,7 @@ const translations = {
     passwordUpdated: 'Пароль обновлён! Выполняется вход…',
     privacyPolicy: 'Политика конфиденциальности',
     termsOfService: 'Условия использования',
+    legalAvailableInEnTr: 'Наши юридические документы публикуются на английском и турецком языках. Вы читаете английскую версию.',
     signupLegalNotice: 'Создавая аккаунт, вы соглашаетесь с нашими {terms} и {privacy}.',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
@@ -5448,6 +5452,7 @@ const translations = {
     passwordUpdated: 'Ο κωδικός ενημερώθηκε! Σύνδεση…',
     privacyPolicy: 'Πολιτική Απορρήτου',
     termsOfService: 'Όροι Χρήσης',
+    legalAvailableInEnTr: 'Τα νομικά μας έγγραφα δημοσιεύονται στα Αγγλικά και στα Τουρκικά. Διαβάζετε την αγγλική έκδοση.',
     signupLegalNotice: 'Δημιουργώντας λογαριασμό, αποδέχεστε τους {terms} και την {privacy} μας.',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
@@ -6541,6 +6546,7 @@ const translations = {
     passwordUpdated: 'Mot de passe mis à jour ! Connexion en cours…',
     privacyPolicy: 'Politique de confidentialité',
     termsOfService: 'Conditions d\'utilisation',
+    legalAvailableInEnTr: 'Nos documents juridiques sont publiés en anglais et en turc. Vous lisez la version anglaise.',
     signupLegalNotice: 'En créant un compte, vous acceptez nos {terms} et notre {privacy}.',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
@@ -7633,6 +7639,7 @@ const translations = {
     passwordUpdated: '¡Contraseña actualizada! Iniciando sesión…',
     privacyPolicy: 'Política de privacidad',
     termsOfService: 'Términos de uso',
+    legalAvailableInEnTr: 'Nuestros documentos legales se publican en inglés y turco. Estás leyendo la versión en inglés.',
     signupLegalNotice: 'Al crear una cuenta aceptas nuestros {terms} y nuestra {privacy}.',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
@@ -8724,6 +8731,7 @@ const translations = {
     passwordUpdated: 'Passwort aktualisiert! Anmeldung läuft…',
     privacyPolicy: 'Datenschutzrichtlinie',
     termsOfService: 'Nutzungsbedingungen',
+    legalAvailableInEnTr: 'Unsere Rechtsdokumente werden auf Englisch und Türkisch veröffentlicht. Du liest die englische Fassung.',
     signupLegalNotice: 'Mit der Erstellung eines Kontos stimmst du unseren {terms} und unserer {privacy} zu.',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
@@ -9816,6 +9824,7 @@ const translations = {
     passwordUpdated: 'رمز عبور به‌روز شد! در حال ورود…',
     privacyPolicy: 'سیاست حریم خصوصی',
     termsOfService: 'شرایط استفاده',
+    legalAvailableInEnTr: 'اسناد حقوقی ما به انگلیسی و ترکی منتشر می‌شود. شما نسخهٔ انگلیسی را می‌خوانید.',
     signupLegalNotice: 'با ایجاد حساب کاربری، {terms} و {privacy} ما را می‌پذیرید.',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,

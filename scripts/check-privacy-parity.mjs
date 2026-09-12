@@ -15,7 +15,7 @@
 //
 //   docs/privacy.html        → GitHub Pages, on `git push`
 //   web/privacy.html         → `npm run web:deploy` (Cloudflare Worker `getadaapp`)
-//   LegalScreen.js PRIVACY   → `npm run ota`        (EAS Update)
+//   constants/legal/privacy.en.js → `npm run ota`   (EAS Update)
 //
 // so all three files can be identical in the repo while three different versions are
 // live. That is exactly how they reached June 2026 / July 2026 / July 11 2026
@@ -43,12 +43,61 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const COPIES = [
   { label: 'docs/privacy.html',      path: 'docs/privacy.html',      publishes: 'GitHub Pages, on `git push`',      extract: s => s },
   { label: 'web/privacy.html',       path: 'web/privacy.html',       publishes: '`npm run web:deploy`',             extract: s => s },
-  { label: 'LegalScreen.js PRIVACY', path: 'screens/LegalScreen.js', publishes: '`npm run ota`',                    extract: s => {
-      const m = s.match(/const PRIVACY = `([\s\S]*?)`\n/)
-      if (!m) throw new Error('could not locate the PRIVACY template literal in LegalScreen.js')
+  // MOVED 2026-09-12 out of screens/LegalScreen.js, where it was a 13KB template literal
+  // inside a screen component. Repointed in the same commit as the move: this extract
+  // THROWS rather than returning empty when the literal is absent, so a forgotten repoint
+  // is a loud failure and not a guard quietly comparing nothing.
+  { label: 'constants/legal/privacy.en.js', path: 'constants/legal/privacy.en.js', publishes: '`npm run ota`', extract: s => {
+      const m = s.match(/export default `([\s\S]*)`\n$/)
+      if (!m) throw new Error('could not locate the default-export template literal in constants/legal/privacy.en.js')
       return m[1]
     } },
 ]
+
+// ─── ENCODING. All four bodies, not just the privacy pair. ──────────────────
+//
+// WHY THIS LIVES IN THE PRIVACY GUARD. It is not about privacy — it is about all four
+// legal documents — but this is the only guard that already loads one of them, runs at
+// both publish actions, and exists to stop a legal document going out wrong. A fifth
+// script asserting one thing would be a script nobody remembers to run.
+//
+// WHAT IT CATCHES. The bodies reached this repo once as UTF-8 that had been read back as
+// cp1252: every accented character doubled, and the company number lost a byte outright —
+// MŞ29454 arrived as MÅ29454, which no decoder can repair because the 0x9E is simply
+// gone. That is a legal entity identifier, and it would have shipped looking like a typo
+// rather than like corruption.
+//
+// ⚠ IT ASSERTS BYTES, NOT CHARACTERS. `MŞ29454` compared as a STRING passes on a file
+//   that is itself mojibake in a consistent way. Reading the raw bytes and looking for
+//   4d c5 9e … is the only form of this check that cannot be satisfied by a corrupted
+//   file, because it is asking what is actually on disk.
+const LEGAL_BODIES = [
+  'constants/legal/privacy.en.js', 'constants/legal/privacy.tr.js',
+  'constants/legal/terms.en.js',   'constants/legal/terms.tr.js',
+]
+// MŞ29454 — the TRNC company number, as UTF-8 bytes.
+const COMPANY_NO_BYTES = Buffer.from('4d c59e 32 39 34 35 34'.replace(/ /g, ''), 'hex')
+
+function checkEncoding(problems, log) {
+  log('\n  encoding (raw bytes, so a consistently-mojibake file cannot pass)')
+  for (const rel of LEGAL_BODIES) {
+    const abs = join(ROOT, rel)
+    if (!existsSync(abs)) { problems.push(`${rel} is missing`); log(`    ✗ ${rel} missing`); continue }
+    const raw = readFileSync(abs)
+    // Strict UTF-8: Node's decoder substitutes U+FFFD rather than throwing, so the
+    // round-trip is what makes this strict. A file with an invalid sequence re-encodes
+    // to different bytes and fails here.
+    const strict = Buffer.compare(Buffer.from(raw.toString('utf8'), 'utf8'), raw) === 0
+    const hasNo  = raw.includes(COMPANY_NO_BYTES)
+    // Mojibake signature: 'Ã' or 'Â' immediately before another high character is what
+    // UTF-8-read-as-latin1 always produces, and never occurs in correct Turkish.
+    const moji   = /[\u00c2\u00c3\u00c5][\u0080-\u00bf\u017e\u0178]/.test(raw.toString('utf8'))
+    if (!strict) { problems.push(`${rel} is not valid UTF-8`); log(`    ✗ ${rel} not valid UTF-8`) }
+    else if (!hasNo) { problems.push(`${rel} does not contain the company number MŞ29454 as UTF-8 bytes — the document is corrupted or the entity block was dropped`); log(`    ✗ ${rel} company number bytes absent`) }
+    else if (moji) { problems.push(`${rel} carries a mojibake signature`); log(`    ✗ ${rel} mojibake signature`) }
+    else log(`    ✓ ${rel.padEnd(30)} utf-8, MŞ29454 intact`)
+  }
+}
 
 const flatten = s => s.replace(/<[^>]+>/g, ' ').replace(/&mdash;/g, '—').replace(/&amp;/g, '&').replace(/\s+/g, ' ')
 
@@ -121,6 +170,7 @@ function loadCopies() {
 
 function check(copies, columns, log = console.log) {
   const problems = []
+  checkEncoding(problems, log)
 
   // ── 1. same "Last updated" ──
   log('  dates')

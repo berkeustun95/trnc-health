@@ -6,7 +6,7 @@
 //
 // ─── THE FAILURE CLASS THIS CLOSES ──────────────────────────────────────────
 //
-// docs/terms.html and the TERMS const in screens/LegalScreen.js are TWO copies of the
+// docs/terms.html and constants/legal/terms.en.js are TWO copies of the
 // same document, and they drifted: the hosted copy sat at June 2026 with no user-content
 // section at all, while the in-app copy had been publishing a 24-hour removal commitment
 // to every production user since July. Nobody noticed, because nothing compared them.
@@ -55,10 +55,11 @@ const COMMITMENT = /remov\w*[^.]{0,160}within 24 hours|within 24 hours[^.]{0,160
 
 const TERMS_COPIES = [
   { label: 'docs/terms.html',       path: 'docs/terms.html',       extract: (s) => s },
-  { label: 'LegalScreen.js TERMS',  path: 'screens/LegalScreen.js',
+  // MOVED 2026-09-12 out of screens/LegalScreen.js — see constants/legal/index.js.
+  { label: 'constants/legal/terms.en.js', path: 'constants/legal/terms.en.js',
     extract: (s) => {
-      const m = s.match(/const TERMS = `([\s\S]*?)`\s*\n/)
-      if (!m) throw new Error('could not locate the TERMS template literal in LegalScreen.js')
+      const m = s.match(/export default `([\s\S]*)`\s*\n$/)
+      if (!m) throw new Error('could not locate the default-export template literal in constants/legal/terms.en.js')
       return m[1]
     } },
 ]
