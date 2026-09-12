@@ -344,10 +344,20 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
   const isComplete = profile?.profile_completed_at != null
   const studentLevel = form.resident_status === 'student' ? form.student_level : null
+  // ⚠ THIS LIST IS THE CLIENT'S COPY OF profiles_completion_requires_fields_check AND
+  //   MUST MATCH IT EXACTLY. Require more than the constraint and the Save button is dead
+  //   with nothing on screen to say why; require less and the write returns a raw 23514.
+  //   The same set is duplicated in ProfileSetupScreen.js's step1Ok/step2Ok — two screens
+  //   write these columns, so both have to move together.
+  //
+  //   phone is NOT in it: removed from the constraint on 2026-09-12 and from both clients
+  //   in the same change. Line 295 already persisted NULL for an empty phone, so rows
+  //   written by this screen were ALREADY legal under the loosened constraint — it was
+  //   only this check that kept the button disabled.
   const missingRequired =
     !form.first_name.trim() || !form.last_name.trim() || !form.display_name.trim() ||
     !form.dobY || !form.dobM || !form.dobD || !form.region || !form.resident_status ||
-    !form.nationality.trim() || !form.phone.trim() ||
+    !form.nationality.trim() ||
     (form.resident_status === 'student' && !form.student_level) ||
     (INSTITUTION_REQUIRED_LEVELS.includes(studentLevel) && !form.institution_id)
 

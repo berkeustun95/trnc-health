@@ -52,7 +52,7 @@ import { COUNTRY_CODES } from '../constants/countryCodes'
 import { monthNames } from '../constants/months'
 import {
   MIN_SIGNUP_AGE, MAX_SIGNUP_AGE, CURRENT_PROFILE_SCHEMA_VERSION,
-  RESIDENT_STATUSES, STUDENT_LEVELS, INSTITUTION_REQUIRED_LEVELS,
+  RESIDENT_STATUSES, STUDENT_LEVELS, INSTITUTION_REQUIRED_LEVELS, RESIDENT_STATUS_STUDENT,
   RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
   DISPLAY_NAME_MAX, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY,
 } from '../constants/profileGate'
@@ -153,9 +153,23 @@ function SelectField({ value, placeholder, onPress, flex }) {
 // why. Delete it only once no row can predate the merge.
 function resumeStep(p) {
   if (!p || !p.display_name) return 0                       // intro, then Step 1
-  if (!p.date_of_birth || !p.nationality_code || !p.phone) return 1
+  // ⚠ phone is NOT here. It became optional on 2026-09-12, and this line is the one that
+  // would have TRAPPED existing accounts: a row completed before that change with no
+  // phone would be sent back to Step 1 on every open, and Step 1 would then refuse to
+  // advance because step1Ok also required it. The two together are a closed loop with no
+  // error message — the user sees the wizard reopen forever. Keep this list identical to
+  // the columns profiles_completion_requires_fields_check actually demands.
+  if (!p.date_of_birth || !p.nationality_code) return 1
   return 2
 }
+
+// ─── Turning a 23514 into a sentence ────────────────────────────────────────
+//
+// profiles_completion_requires_fields_check is the SOLE server-side guard on completeness
+// (no RPC and no trigger touches it), so a client whose required set drifts from it gets a
+// raw Postgres error inside a mandatory gate — a dead end with no way forward.
+const completionViolation = err =>
+  err?.code === '23514' && String(err?.message ?? '').includes('profiles_completion_requires_fields_check')
 
 export default function ProfileSetupScreen({
   session, lang, profile, prefillRegion, onDone,
@@ -163,7 +177,10 @@ export default function ProfileSetupScreen({
 }) {
   const [step, setStep] = useState(() => resumeStep(profile))
   const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState(false)
+  // An i18n KEY or null, not a boolean. 'Check your connection' is the wrong sentence
+  // for a 23514 — the write was received and REJECTED, so retrying does nothing, and
+  // telling someone to check their signal sends them to fix the one thing that is fine.
+  const [saveError, setSaveError] = useState(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const [ageBlocked, setAgeBlocked] = useState(false)
 
@@ -213,8 +230,16 @@ export default function ProfileSetupScreen({
 
   // ─── Validity per step ────────────────────────────────────────────────────
   const nameOk = nameState?.status === 'available'
+  // PHONE IS OPTIONAL. Empty passes; non-empty must still be 4-15 digits, so a typo is
+  // caught rather than silently stored. `cc` is not required either — a dial code with no
+  // number is not a phone number, and the write below turns that pair into NULL.
+  //
+  // This set must equal what profiles_completion_requires_fields_check demands. If the
+  // client requires MORE, the user is blocked by a button with no explanation; if it
+  // requires LESS, the final write fails with a raw 23514. Both were live bugs.
+  const phoneOk = !phone.trim() || /^\d{4,15}$/.test(phone.trim())
   const step1Ok = firstName.trim() && lastName.trim() && nameOk &&
-    dobY && dobM && dobD && nationality && cc && /^\d{4,15}$/.test(phone.trim())
+    dobY && dobM && dobD && nationality && phoneOk
   const step2Ok = region && status &&
     (status !== 'student' || level) &&
     (!INSTITUTION_REQUIRED_LEVELS.includes(level) || institution)
@@ -225,6 +250,45 @@ export default function ProfileSetupScreen({
     const { error } = await supabase.from('profiles').update(patch).eq('id', session.user.id)
     setSaving(false)
     return error
+  }
+
+  // Names the first field the constraint would reject, from the values in hand.
+  //
+  // ⚠ IT REFUSES TO GUESS. If the client believes every required field is filled and the
+  //   server rejected the row anyway, the client's list is the thing that is wrong — and
+  //   naming a field at random would send the user to correct something that is already
+  //   correct. That case returns the honest message instead, which is also the signal to
+  //   whoever reads the report that COMPLETION_FIELDS has drifted from the constraint.
+  function missingFieldMessage() {
+    // ⚠ THIS ORDER AND THIS SET MUST AGREE WITH THE CONSTRAINT. Written from it as it
+    //   stands after the 2026-09-12 change: phone was removed there and is absent here.
+    //
+    //   The value sits beside its label rather than in a lookup keyed by column name —
+    //   partly so the two cannot drift, and partly because the column IS the vocabulary:
+    //   'display_name' is also a DISPLAY_PREFERENCES value, so a bare column-name literal
+    //   in this file trips scripts/check-profile-gate.mjs's inlined-vocabulary check. It
+    //   caught exactly that on the first draft, which is the check working.
+    // Conditional in the constraint too: a level is demanded only for a student, and an
+    // institution only for the two levels that have one. Both are computed OUT HERE and
+    // not inside the array below, because check-profile-gate.mjs forbids a vocabulary
+    // value inside an array literal — that is how it catches somebody pasting
+    // ['student','working',…] in place of the imported list, and the check is right to
+    // be blunt about it. `true` means "not demanded", never "supplied".
+    const levelDemanded = status === RESIDENT_STATUS_STUDENT
+    const instDemanded  = INSTITUTION_REQUIRED_LEVELS.includes(level)
+    const checks = [
+      [firstName.trim(),                        'pgFirstName'],
+      [lastName.trim(),                         'pgLastName'],
+      [displayName.trim(),                      'pgDisplayName'],
+      [dobY && dobM && dobD,                    'pgDob'],
+      [nationality,                             'pgNationality'],
+      [region,                                  'pgRegion'],
+      [status,                                  'pgResidentStatus'],
+      [levelDemanded ? level : true,            'pgStudentLevel'],
+      [instDemanded ? institution : true,       'pgInstitution'],
+    ]
+    const hit = checks.find(([v]) => !v)
+    return hit ? { key: 'pgIncompleteField', field: hit[1] } : 'pgIncompleteUnknown'
   }
 
   async function advance() {
@@ -254,16 +318,21 @@ export default function ProfileSetupScreen({
         date_of_birth: `${dobY}-${pad(dobM)}-${pad(dobD)}`,
         nationality,                                   // legacy English label
         nationality_code: NATIONALITY_CODES[nationality] ?? null,
-        phone: cc + phone.trim(),
+        // NULL, never a bare '+90'. A dial code alone is not a phone number: it is
+        // unusable, it is indistinguishable from a real value to every future reader, and
+        // it would make `!p.phone` false — quietly re-arming the resume trap above.
+        // Same expression ProfileScreen.js already uses; the two write one column.
+        phone: phone.trim() ? cc + phone.trim() : null,
       })
       if (!error) { setStep(2); return }
+      if (completionViolation(error)) { setSaveError(missingFieldMessage()); return }
       // The race this whole inline check exists to avoid, arriving anyway: somebody took
       // the name between the check and the write. displayNameSaveError re-asks and
       // returns fresh suggestions rather than surfacing a raw Postgres error inside a
       // mandatory gate; a null back from it means the failure was not about the name.
       const nameErr = await displayNameSaveError(error, displayName.trim())
       if (nameErr) { setNameState(nameErr); return }
-      setSaveError(true)
+      setSaveError('pgSaveError')
       return
     }
 
@@ -275,7 +344,13 @@ export default function ProfileSetupScreen({
       profile_completed_at: new Date().toISOString(),
       profile_schema_version: CURRENT_PROFILE_SCHEMA_VERSION,
     })
-    if (error) { setSaveError(true); return }
+    if (error) {
+      // The final write is the ONE that can trip the completion constraint, because it is
+      // the write that sets profile_completed_at. Everything before it is a partial row
+      // the constraint deliberately ignores.
+      setSaveError(completionViolation(error) ? missingFieldMessage() : 'pgSaveError')
+      return
+    }
     onDone()
   }
 
@@ -444,7 +519,7 @@ export default function ProfileSetupScreen({
             </>
           )}
 
-          {saveError && <Text style={s.err}>{t('pgSaveError', lang)}</Text>}
+          {saveError && <Text style={s.err}>{t(saveError.key ?? saveError, lang).replace('{field}', saveError.field ? t(saveError.field, lang) : '')}</Text>}
         </ScrollView>
 
         <View style={s.footer}>

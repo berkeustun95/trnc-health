@@ -68,6 +68,19 @@ export const GATE_FORBIDDEN_PROP = 'onBook'
 // WIZARD RENDERS THEM IN and is a product decision, not alphabetical.
 export const RESIDENT_STATUSES = ['student', 'working', 'resident', 'visiting']
 
+// The one status that carries conditional logic: it is the only value of the four that
+// makes student_level required, in the CHECK constraint and in both screens. Named HERE
+// rather than written as a literal in the screens, for the same reason
+// INSTITUTION_REQUIRED_LEVELS is a named subset — and because
+// scripts/check-profile-gate.mjs forbids a vocabulary literal inside an array in either
+// screen, which is what caught the first attempt at this.
+//
+// Derived from the list, so it cannot name a status the vocabulary no longer contains.
+// NOT RESIDENT_STATUSES[0]: the order above is documented as the wizard's render order and
+// is a product decision, so an index would quietly become 'working' the day someone
+// reorders the chips.
+export const RESIDENT_STATUS_STUDENT = RESIDENT_STATUSES.find(s => s === 'student')
+
 export const STUDENT_LEVELS = ['university', 'postgraduate', 'high_school', 'language_course', 'vocational']
 
 // The two levels that require an institution. A language course or a high school is not
