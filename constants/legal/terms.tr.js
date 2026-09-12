@@ -11,7 +11,7 @@
 //   at generation time; if either ever appears the document silently becomes code.
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
-// sha256 of the source at generation: 8b82248f9eadfb3f350dd596b5a11f44788eb348bdb1d8f71d3b2564c0617a90
+// sha256 of the source at generation: c39dac725f057d5121f2d1a27bc543677c3836209d26ab3438af3e3ccdbe5286
 export default `Sürüm: 2026-09
 Son güncelleme: Eylül 2026
 
@@ -23,9 +23,9 @@ Hesap oluşturarak veya ADA'yı kullanarak bu koşulları kabul etmiş olursunuz
 
 1. ADA NEDİR
 
-ADA, Kuzey Kıbrıs'ta (KKTC) yaşayanlar ve buraya yeni gelenler için hazırlanmış bir rehber ve hizmetler uygulamasıdır. Sağlık kuruluşları ve nöbetçi eczaneler, yerel mekânlar ve gezilecek yerler, etkinlikler, konaklama, araç hizmetleri ve yol yardımı, bağlantı hizmetleri ve diğer yerel hizmetleri kapsayan listeler ve araçlar içerir. Özellikler bölgeye göre değişebilir ve zaman içinde değişebilir.
+ADA, Kuzey Kıbrıs'ta (KKTC) yaşayanlar ve buraya yeni gelenler için hazırlanmış bir rehber ve hizmetler uygulamasıdır. Yerel bilgi ve hizmetleri tek bir yerde toplar. Uygulamadaki modüller zaman içinde eklendikçe ve kaldırıldıkça değişir ve bölgeye göre farklılık gösterir — güncel liste her zaman uygulamada gördüğünüzdür. Yukarıdaki tarih itibarıyla bunlar arasında sağlık kuruluşları ve nöbetçi eczaneler, yerel mekânlar ve gezilecek yerler, etkinlikler, emlak ve konaklama, araç hizmetleri ve yol yardımı, toplu taşıma saatleri ve bağlantı hizmetleri yer alır.
 
-ADA bir sağlık kuruluşu, sigorta şirketi, teletıp hizmeti, acil yardım hizmeti, emlak acentesi, seyahat acentesi, mobil operatör veya işveren değildir. Sizi üçüncü taraflarla buluştururuz; onlarla kurduğunuz hiçbir işlemin, rezervasyonun, kiralamanın veya sözleşmenin tarafı değiliz.
+ADA bir sağlık kuruluşu, sigorta şirketi, teletıp hizmeti, acil yardım hizmeti, emlak acentesi, seyahat acentesi, mobil operatör, ulaşım operatörü, müteahhit veya usta, işe alım acentesi ya da işveren değildir. Sizi üçüncü taraflarla buluştururuz; onlarla kurduğunuz hiçbir işlemin, rezervasyonun, kiralamanın veya sözleşmenin tarafı değiliz.
 
 2. TIBBİ TAVSİYE DEĞİLDİR
 
@@ -37,7 +37,7 @@ ADA'daki hiçbir içerik tıbbi tavsiye, teşhis veya tedavi niteliği taşımaz
 
 Kurum bilgileri — çalışma saatleri, adresler, telefon numaraları ve hizmetler dâhil — kayıtlı hizmet sağlayıcılar veya iş ortakları tarafından sağlanır ya da kamuya açık kaynaklardan alınır ve her zaman güncel veya eksiksiz olmayabilir. Kritik bilgileri gitmeden önce doğrudan ilgili kurumdan teyit ediniz.
 
-Bu uyarı özellikle nöbetçi eczane çizelgeleri ile acil ve mesai dışı hizmetler için geçerlidir. Bu bilgileri doğru tutmak için makul özeni gösteririz; ancak nöbet çizelgesi üçüncü bir taraf tarafından yayımlanır ve bize ulaştıktan sonra değişebilir. Bilginin yanlış olmasının sonucu ağırsa yalnızca ADA'ya güvenmeyiniz.
+Bu uyarı özellikle nöbetçi eczane çizelgeleri, toplu taşıma saatleri ile acil ve mesai dışı hizmetler için geçerlidir. Bu bilgileri doğru tutmak için makul özeni gösteririz; ancak nöbet çizelgeleri ve toplu taşıma saatleri üçüncü taraflarca yayımlanır ve bize ulaştıktan sonra değişebilir. Bilginin yanlış olmasının sonucu ağırsa yalnızca ADA'ya güvenmeyiniz.
 
 4. HESAPLAR
 

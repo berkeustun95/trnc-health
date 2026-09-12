@@ -11,7 +11,7 @@
 //   at generation time; if either ever appears the document silently becomes code.
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
-// sha256 of the source at generation: fee5dc5dac2a24aff2cda69302ba9a4f9301e8bfcda7e090b4892bd1047031c9
+// sha256 of the source at generation: bab387b487750ef9b3a9eb2e895d6a96e860ebd68e7eba6cc74f1b6a5512a52a
 export default `Version: 2026-09
 Last updated: September 2026
 
@@ -23,9 +23,9 @@ By creating an account or using ADA you agree to these terms. If you do not agre
 
 1. WHAT ADA IS
 
-ADA is a directory and services app for residents of and newcomers to Northern Cyprus (TRNC). It includes listings and tools covering healthcare facilities and duty pharmacies, local places and points of interest, events, accommodation, vehicle services and roadside assistance, connectivity, and other local services. Features vary by region and may change over time.
+ADA is a directory and services app for residents of and newcomers to Northern Cyprus (TRNC). It brings local information and services together in one place. The modules available change over time as we add and retire them, and they vary by region — what you see in the app is always the current set. At the date above they include health facilities and duty pharmacies, local places and points of interest, events, property and accommodation, vehicle services and roadside assistance, public transport timetables, and connectivity.
 
-ADA is not a medical provider, insurer, telehealth service, emergency service, estate agent, travel agent, mobile network operator, or employer. We connect you with third parties; we are not a party to any transaction, booking, tenancy or agreement you enter into with them.
+ADA is not a medical provider, insurer, telehealth service, emergency service, estate agent, travel agent, mobile network operator, transport operator, contractor or tradesperson, recruitment agency, or employer. We connect you with third parties; we are not a party to any transaction, booking, tenancy or agreement you enter into with them.
 
 2. NOT MEDICAL ADVICE
 
@@ -37,7 +37,7 @@ Nothing in ADA constitutes medical advice, diagnosis, or treatment. Facility lis
 
 Facility details — including hours, addresses, phone numbers, and services — are provided by registered providers, by partners, or drawn from public sources, and may not always be current or complete. Verify critical information directly with the facility before visiting.
 
-This applies with particular force to duty pharmacy rotas and to emergency and out-of-hours services. We take reasonable care to keep these accurate, but a rota is published by a third party and can change after we receive it. Do not rely on ADA alone when the consequence of the information being wrong is serious.
+This applies with particular force to duty pharmacy rotas, public transport timetables, and emergency and out-of-hours services. We take reasonable care to keep these accurate, but a rota or timetable is published by a third party and can change after we receive it. Do not rely on ADA alone when the consequence of the information being wrong is serious.
 
 4. ACCOUNTS
 

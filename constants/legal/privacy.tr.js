@@ -11,7 +11,7 @@
 //   at generation time; if either ever appears the document silently becomes code.
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
-// sha256 of the source at generation: 8d94262b69eb6db4abcdde65c21da4d1b88f36e79bf7b8f53ab617b4305513c2
+// sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
 export default `Sürüm: 2026-09
 Son güncelleme: Eylül 2026
 
@@ -23,7 +23,7 @@ Bu politikada açıklanan kişisel veriler bakımından veri sorumlusu Astarte D
 
 Bu politikayla ilgili her konuda bize getadaapp@gmail.com adresinden ulaşabilirsiniz.
 
-ADA, Kuzey Kıbrıs'ta yaşayanlar ve buraya yeni gelenler için hazırlanmış bir rehber ve hizmetler uygulamasıdır — sağlık kuruluşları ve nöbetçi eczaneler, yerel mekânlar ve gezilecek yerler, etkinlikler, konaklama, araç hizmetleri ve yol yardımı, bağlantı hizmetleri ve diğer yerel hizmetler. Bu politika, hangi verileri topladığımızı, bunları neden ve hangi hukuki dayanakla işlediğimizi ve nasıl koruduğumuzu açıklar.
+ADA, Kuzey Kıbrıs'ta yaşayanlar ve buraya yeni gelenler için hazırlanmış bir rehber ve hizmetler uygulamasıdır. Yerel bilgi ve hizmetleri tek bir yerde toplar. Uygulamadaki modüller zaman içinde eklendikçe ve kaldırıldıkça değişir ve bölgeye göre farklılık gösterir — güncel liste her zaman uygulamada gördüğünüzdür. Yukarıdaki tarih itibarıyla bunlar arasında sağlık kuruluşları ve nöbetçi eczaneler, yerel mekânlar ve gezilecek yerler, etkinlikler, emlak ve konaklama, araç hizmetleri ve yol yardımı, toplu taşıma saatleri ve bağlantı hizmetleri yer alır. Bu politika, hangi verileri topladığımızı, bunları neden ve hangi hukuki dayanakla işlediğimizi ve nasıl koruduğumuzu açıklar.
 
 1. TOPLADIĞIMIZ VERİLER
 

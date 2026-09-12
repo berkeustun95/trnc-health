@@ -11,7 +11,7 @@
 //   at generation time; if either ever appears the document silently becomes code.
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
-// sha256 of the source at generation: 0e635f798340cffaa35f805c72b23fbdade72bb3e4da24a650e9165bf1c9c19f
+// sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
 export default `Version: 2026-09
 Last updated: September 2026
 
@@ -23,7 +23,7 @@ Astarte Digital Trading Ltd. is the data controller for the personal data descri
 
 You can contact us about anything in this policy at getadaapp@gmail.com.
 
-ADA is a directory and services app for residents of and newcomers to Northern Cyprus — healthcare facilities and duty pharmacies, local places and points of interest, events, accommodation, vehicle services and roadside assistance, connectivity, and other local services. This policy explains what data we collect, why, on what legal basis, and how we protect it.
+ADA is a directory and services app for residents of and newcomers to Northern Cyprus. It brings local information and services together in one place. The modules available change over time as we add and retire them, and they vary by region — what you see in the app is always the current set. At the date above they include health facilities and duty pharmacies, local places and points of interest, events, property and accommodation, vehicle services and roadside assistance, public transport timetables, and connectivity. This policy explains what data we collect, why, on what legal basis, and how we protect it.
 
 1. DATA WE COLLECT
 
