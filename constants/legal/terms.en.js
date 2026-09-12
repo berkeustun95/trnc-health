@@ -11,7 +11,7 @@
 //   at generation time; if either ever appears the document silently becomes code.
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
-// sha256 of the source at generation: 1dbfa281d87a4ced929c8a3b3a895b0a2537c8aaa19a5180b759e246a8e95f08
+// sha256 of the source at generation: fee5dc5dac2a24aff2cda69302ba9a4f9301e8bfcda7e090b4892bd1047031c9
 export default `Version: 2026-09
 Last updated: September 2026
 
@@ -29,7 +29,9 @@ ADA is not a medical provider, insurer, telehealth service, emergency service, e
 
 2. NOT MEDICAL ADVICE
 
-Some of what ADA lists is health-related — pharmacies, clinics, hospitals, and dentists. Nothing in ADA constitutes medical advice, diagnosis, or treatment. Facility listings, opening hours, and other information are provided for reference only. Always consult a qualified healthcare professional for medical decisions. In an emergency, call 112.
+Some of what ADA lists is health-related — principally state hospitals and other state health facilities, and the duty pharmacy roster. ADA does not currently operate an open directory of private clinics or dentists.
+
+Nothing in ADA constitutes medical advice, diagnosis, or treatment. Facility listings, opening hours, and other information are provided for reference only. Always consult a qualified healthcare professional for medical decisions. In an emergency, call 112.
 
 3. FACILITY AND LISTING INFORMATION
 

@@ -11,7 +11,7 @@
 //   at generation time; if either ever appears the document silently becomes code.
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
-// sha256 of the source at generation: 817af89e979c08454f1101c3e4b3ae697d16276237de81827b836d4166af33e3
+// sha256 of the source at generation: 8b82248f9eadfb3f350dd596b5a11f44788eb348bdb1d8f71d3b2564c0617a90
 export default `Sürüm: 2026-09
 Son güncelleme: Eylül 2026
 
@@ -29,7 +29,9 @@ ADA bir sağlık kuruluşu, sigorta şirketi, teletıp hizmeti, acil yardım hiz
 
 2. TIBBİ TAVSİYE DEĞİLDİR
 
-ADA'da listelenen içeriklerin bir kısmı sağlıkla ilgilidir — eczaneler, klinikler, hastaneler ve diş hekimleri. ADA'daki hiçbir içerik tıbbi tavsiye, teşhis veya tedavi niteliği taşımaz. Kurum bilgileri, çalışma saatleri ve diğer bilgiler yalnızca bilgilendirme amaçlıdır. Tıbbi kararlar için her zaman nitelikli bir sağlık çalışanına danışınız. Acil durumlarda 112'yi arayınız.
+ADA'da listelenen içeriklerin bir kısmı sağlıkla ilgilidir — başlıca devlet hastaneleri ve diğer devlet sağlık kuruluşları ile nöbetçi eczane listesi. ADA şu anda özel klinikler veya diş hekimleri için açık bir rehber sunmamaktadır.
+
+ADA'daki hiçbir içerik tıbbi tavsiye, teşhis veya tedavi niteliği taşımaz. Kurum bilgileri, çalışma saatleri ve diğer bilgiler yalnızca bilgilendirme amaçlıdır. Tıbbi kararlar için her zaman nitelikli bir sağlık çalışanına danışınız. Acil durumlarda 112'yi arayınız.
 
 3. KURUM VE LİSTELEME BİLGİLERİ
 
