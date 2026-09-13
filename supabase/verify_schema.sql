@@ -798,6 +798,63 @@ WITH report AS (
     UNION ALL SELECT '0912_search_tokenised','search_fold covers Â Î Û as well as the base set',
       (SELECT public.search_fold('Kâğıt Îhsan Ûlker Çağla Gökçe İzmir ılık')
               = 'kagit ihsan ulker cagla gokce izmir ilik')
+    -- ─── search_fold MUST STAY IMMUTABLE, AND NOTHING ELSE GUARDS THE MARKER ───
+    --
+    -- The token above proves the BEHAVIOUR. This one proves the DECLARATION, and they
+    -- fail independently: a locale-aware rewrite can keep ılık → ilik working perfectly
+    -- and still have to drop to STABLE, at which point nothing goes red, no user notices,
+    -- and the only index path this search has is quietly closed. provolatile 'i' is the
+    -- marker itself, read from pg_proc rather than inferred from the body.
+    --
+    -- WHY THE FUNCTION IS AN ENUMERATED translate() MAP AND NOT unaccent(), AND WHY THAT
+    -- ARGUMENT SURVIVES EVEN IF IMMUTABILITY STOPS MATTERING:
+    --
+    --   YOU CAN READ translate's MAP AND KNOW WHAT IT DOES. 'İIıŞşĞğÇçÖöÜüÂâÎîÛû' ->
+    --   'IIiSsGgCcOoUuAaIiUu' is nineteen pairs on one line, and every one of them is
+    --   there because somebody typed it. unaccent() reads a rules file: its coverage is a
+    --   property of a file on the server, so it has to be QUERIED to be known, and the
+    --   answer can change under a Postgres upgrade with nothing in this repo to notice.
+    --
+    --   Measured 2026-09-13, and it caught us out in the reassuring direction: the default
+    --   unaccent rules DO cover ı and İ — unaccent('Kıbrıs') = 'Kibris'. Both of us
+    --   predicted they would not. The prediction being wrong is the argument: a dependency
+    --   whose behaviour you can only learn by asking it is one you cannot reason about
+    --   while writing the query.
+    --
+    --   The client's own fold (utils/searchFold.js) needed ı mapped EXPLICITLY for the
+    --   mirror-image reason: it uses NFD + strip-combining-marks, a GENERAL algorithm,
+    --   and U+0131 is its own base letter that no general rule can reach. Enumerated maps
+    --   have no blind spots to discover; general algorithms do. Same fold, opposite
+    --   failure modes, and the asymmetry is worth knowing before changing either.
+    UNION ALL SELECT '0912_search_tokenised','search_fold is still declared IMMUTABLE (the GIN index path depends on it)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public' AND p.proname = 'search_fold' AND p.provolatile = 'i')
+    -- ─── WHEN TO GIVE search_all_tokens AN INDEX, AND WHAT KIND ────────────────
+    --
+    -- Today: NONE, deliberately. search_all_tokens is STABLE (LIKE is collation-dependent)
+    -- so it cannot be indexed at all, and every arm of search_content sequential-scans.
+    -- That is correct at current size — measured 2026-09-13, as anon, which is what
+    -- search_content sees since it is SECURITY INVOKER:
+    --
+    --   facilities 393 · places 42 · landmarks 38 · beaches 4 · towing 4 · home_services 1
+    --   ~482 rows across all eight arms
+    --
+    -- A translate()+lower() per row over 482 rows is sub-millisecond. An index would take
+    -- longer to plan than the scan takes to run.
+    --
+    -- ⚠ REVISIT AT ~50,000 ROWS IN ANY SINGLE ARM, or a measured search_content p95 above
+    --   ~200ms. facilities would have to grow 127x, so the realistic trigger is a BULK
+    --   IMPORT, not organic growth — which means it arrives suddenly rather than
+    --   gradually, and nobody will be watching for it.
+    --
+    -- THE ANSWER THEN IS A GIN TRIGRAM INDEX ON search_fold(name), NOT A STORED COLUMN.
+    -- The index is available precisely because search_fold is honestly IMMUTABLE (the
+    -- token above). A stored normalized column maintained by trigger looks equivalent and
+    -- is worse here: this repo uses DISABLE TRIGGER for backfills in three migrations, and
+    -- a stored column silently goes stale for exactly those rows — producing MISSING
+    -- SEARCH RESULTS, not errors, which is the facilities.area failure class again. The
+    -- stored column only becomes the right answer if the fold ever stops being expressible
+    -- as a pure function of the input.
     -- Both placeholder tiers are one-offs. No CHECK can express "at most one row"; Slices
     -- 3 and 4 reconcile ~27 more rows for which both values are the easiest thing to type.
     UNION ALL SELECT '0912_search_tokenised','tier=not_applicable is still exactly 1 row (Kronik)',
