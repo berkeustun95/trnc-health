@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { searchMatch } from '../utils/searchFold'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, FlatList, ActivityIndicator, Image
@@ -73,7 +74,7 @@ export default function ProviderOnboardingScreen({ session, lang = 'English', on
   const filtered = unclaimedFacilities.filter(f => {
     if (!searchText.trim()) return true
     const q = searchText.trim().toLowerCase()
-    return f.name.toLowerCase().includes(q) || (f.address && f.address.toLowerCase().includes(q))
+    return searchMatch(f.name, q) || (f.address && searchMatch(f.address, q))
   })
 
   async function pickDocument(docType) {

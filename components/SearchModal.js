@@ -5,6 +5,7 @@
 // MOVED OUT OF ProfileSetupScreen VERBATIM when Slice 3a gave ProfileScreen the same ten
 // fields the wizard collects. Left where it was, the second screen needed either an
 // import from a screen file or a copy — and a copy of a list that renders CHECK-
+import { searchMatch } from '../utils/searchFold'
 // constrained vocabularies is the drift this repo keeps paying for: the two screens write
 // the same columns, so a divergence between their pickers is a divergence in what reaches
 // the database. Same argument as components/DisplayNameCheck.js.
@@ -80,8 +81,10 @@ export default function SearchModal({
 
   const list = useMemo(() => {
     if (!searchable || !q.trim()) return options
-    const needle = q.trim().toLocaleLowerCase()
-    return options.filter(o => o.label.toLocaleLowerCase().includes(needle))
+    // searchMatch folds BOTH sides, so "turkiye" finds Türkiye and "Kıbrıs" typed on a
+    // Turkish keyboard finds an entry stored as "Kibris". Folding one side only matches
+    // in one direction, which is worse than not folding because it looks like it works.
+    return options.filter(o => searchMatch(o.label, q))
   }, [options, q, searchable])
 
   // ─── POSITION FIRST, THEN HEIGHT ──────────────────────────────────────────

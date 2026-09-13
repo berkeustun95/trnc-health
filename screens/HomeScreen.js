@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { searchMatch } from '../utils/searchFold'
 import {
   View, Text, Image, ImageBackground, FlatList, StyleSheet,
   TouchableOpacity, TextInput, ScrollView, Linking, ActivityIndicator,
@@ -532,7 +533,7 @@ export default function HomeScreen({
     .filter(f => {
       const q = searchText.trim().toLowerCase()
       if (!q) return true
-      return f.name.toLowerCase().includes(q) || (f.address && f.address.toLowerCase().includes(q))
+      return searchMatch(f.name, q) || (f.address && searchMatch(f.address, q))
     })
 
   const locale = LANG_LOCALE[lang] || 'en'

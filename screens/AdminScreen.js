@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { searchMatch } from '../utils/searchFold'
 import {
   View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
   Modal, TextInput, Switch, ScrollView, Alert, Linking,
@@ -1224,7 +1225,7 @@ function DutyTab() {
           placeholder="Search pharmacies…"
           placeholderTextColor={colors.textSecondary}
         />
-        {pharmacies.filter(p => p.name.toLowerCase().includes(pharmacySearch.toLowerCase())).map(p => (
+        {pharmacies.filter(p => searchMatch(p.name, pharmacySearch)).map(p => (
           <TouchableOpacity key={p.id} style={[s.card, selectedId === p.id && s.cardSelected]} onPress={() => setSelectedId(p.id)}>
             <Text style={[s.cardTitle, selectedId === p.id && { color: colors.primary }]}>{p.name}</Text>
           </TouchableOpacity>
@@ -1295,7 +1296,7 @@ function DutyTab() {
                 placeholderTextColor={colors.textSecondary}
               />
               {pharmacies
-                .filter(p => p.name.toLowerCase().includes(swapSearch.toLowerCase()))
+                .filter(p => searchMatch(p.name, swapSearch))
                 .map(p => (
                   <TouchableOpacity
                     key={p.id}
