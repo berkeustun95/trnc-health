@@ -178,6 +178,20 @@ const EXPECTED_SCALARS = {
   // screen still works. Consent is not a thing you can quietly un-collect, and it is not
   // a thing you can quietly stop collecting either.
   TERMS_CHECKBOX_LIVE:   true,   // live 2026-09-13
+  // Bağlantı & eSIM (KKTCELL partner module). Not a MODULE_FLAGS key for this script's
+  // OWN reasons: the notify-path loop below iterates every key in that map with no
+  // live-filter, so even `connectivity: false` would demand the key in both SQL lists
+  // inside notify_module_waitlist and module_notif_text — blocking every push and every
+  // OTA to buy nothing, because the module never renders ComingSoonScreen and so never
+  // writes a module_waitlist row. Its demand lives in `esim_waitlist`, a separate table
+  // the RPC cannot see; notifying those signups on go-live is MANUAL.
+  //
+  // Baselined for the usual reason, with one extra edge: flipping it needs a NATIVE build,
+  // not an OTA. Screen 3 handoff uses expo-web-browser, absent from every binary built
+  // before 2026-09-13, and runtimeVersion.policy 'appVersion' does not fence them. A
+  // working-tree flip riding out on an unrelated `npm run ota` would expose a module whose
+  // primary CTA cannot work on any install that has not taken the new build.
+  CONNECTIVITY_LIVE:     false,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

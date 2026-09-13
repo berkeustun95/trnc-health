@@ -387,3 +387,51 @@ export const TERMS_CHECKBOX_LIVE = true   // live 2026-09-13
 //
 // The same reasoning applies to any future control that exists because a store or a
 // regulator requires it: give it no lever, or give it its own.
+
+// Bağlantı & eSIM (KKTCELL partner module). false = the Home "esim" tile keeps opening
+// EsimScreen, the waitlist/coming-soon screen it has opened since 20260725. true = that
+// same tile opens ConnectivityLandingScreen and the three-screen partner module behind it.
+//
+// NOT a MODULE_FLAGS key, and the reason is mechanical rather than stylistic — the same
+// one recorded for HOME_V2_LIVE, AD_BANNERS_LIVE and DORMS_LIVE above.
+// scripts/check-module-flags.mjs loops over EVERY key in that map with no live-filter
+// (the `for (const k of Object.keys(actualModules))` at the notify-path check), so even
+// `connectivity: false` would demand the key appear in BOTH hardcoded SQL lists inside
+// notify_module_waitlist and module_notif_text. Adding it would block every `git push`
+// and every `npm run ota` until a migration added it there — and that migration would be
+// buying nothing, because this module never renders ComingSoonScreen and therefore never
+// writes a module_waitlist row. There is nothing for the notify path to notify.
+//
+// ⚠ DEMAND FOR THIS MODULE IS ALREADY CAPTURED, AND NOT WHERE THE NOTIFY PATH LOOKS.
+//   The esim tile is UNGATED (constants/homeFavourites.js UNGATED_MODULES) and has been
+//   since launch, so EsimScreen has been collecting real signups into `esim_waitlist` —
+//   its own table, keyed by user_id, with no `module` column and unknown to
+//   notify_module_waitlist. Those people CANNOT be reached by the RPC. Notifying them on
+//   go-live is a MANUAL step and nothing in this repo will remind you of it; see the
+//   slice-1 journal entry, where it is recorded as an open launch-day item.
+//
+// ⚠ FLIPPING THIS IS NOT AN OTA-ONLY CHANGE, UNLIKE EVERY OTHER FLAG IN THIS FILE.
+//   Screen 3's handoff needs `expo-web-browser`, a NATIVE module added 2026-09-13. It is
+//   absent from every production binary shipped before that date, and
+//   expo-web-browser/build/ExpoWebBrowser.js calls requireNativeModule('ExpoWebBrowser')
+//   at MODULE TOP LEVEL — so a static import would throw while the bundle evaluates, on
+//   launch, for every existing install. runtimeVersion.policy is 'appVersion'
+//   (app.config.js), which does NOT fence those binaries unless the version is bumped.
+//   Two independent defences, and neither replaces the other:
+//     1. screens/ConnectivityPackageScreen.js `require`s it INSIDE the CTA handler, never
+//        at import scope, so an OTA carrying this code cannot crash an old binary at
+//        launch — the worst case is one tap that fails on a screen nobody can reach.
+//     2. this flag, which keeps the screen unreachable regardless.
+//   The real fix is the native build + Play submission that carries the module; do not
+//   flip this until that build is LIVE IN PRODUCTION, not merely uploaded.
+//
+// ⚠ IT DOES NOT GATE THE DATA — but here that costs nothing, and it was checked rather
+//   than assumed. connectivity_operators / _packages / _stores are publicly readable and
+//   all three seeded rows are is_active = true TODAY. search_content has never heard of
+//   them: measured against the live database 2026-09-13, control query "Lefkoşa" returned
+//   3 rows while "KKTCELL", "Turist", "esim" and "Hoş Geldin" each returned 0. So unlike
+//   the towing seed, there is no pre-launch window in which a user can find this content
+//   through global search and land on a screen that will not open.
+//
+// Reverting is this one boolean, and so is the emergency direction.
+export const CONNECTIVITY_LIVE = false

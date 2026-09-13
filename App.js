@@ -19,7 +19,7 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE } from './constants/flags'
 import { promosAllowed } from './constants/homeStrip'
 import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
@@ -55,6 +55,7 @@ import GroomingScreen from './screens/GroomingScreen'
 import GaragesScreen from './screens/GaragesScreen'
 import TowingScreen from './screens/TowingScreen'
 import EsimScreen from './screens/EsimScreen'
+import ConnectivityLandingScreen from './screens/ConnectivityLandingScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import ExploreScreen from './screens/ExploreScreen'
 import ExploreProfileScreen from './screens/ExploreProfileScreen'
@@ -491,6 +492,9 @@ export default function App() {
   const [showTowing, setShowTowing] = useState(false)
   const [showStudentHub, setShowStudentHub] = useState(false)
   const [showEsim, setShowEsim] = useState(false)
+  // Sub-screen within Bağlantı & eSIM: null = landing, 'operator' = package list,
+  // { pkg } = package detail. Mirrors petsSubScreen / gamesSubScreen.
+  const [connectivitySub, setConnectivitySub] = useState(null)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
@@ -766,6 +770,7 @@ export default function App() {
       if (showGarages) { setShowGarages(false); return true }
       if (showTowing) { setShowTowing(false); return true }
       if (showStudentHub) { setShowStudentHub(false); return true }
+      if (connectivitySub) { setConnectivitySub(null); return true }
       if (showEsim) { setShowEsim(false); return true }
       if (showLegal) { setShowLegal(false); return true }
       if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
@@ -781,7 +786,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -1564,7 +1569,16 @@ export default function App() {
       ? <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowInsurance(false)} />
       : <ComingSoonScreen lang={lang} moduleKey="insurance" titleKey="menuInsurance" session={session} onBack={() => setShowInsurance(false)} />
   } else if (showEsim) {
-    content = <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowEsim(false)} />
+    // The Home "esim" tile is UNGATED and has opened EsimScreen (waitlist) since 20260725.
+    // CONNECTIVITY_LIVE swaps that same tile to the KKTCELL partner module — the tile, the
+    // route case, the back handler and both closeAll sites are reused unchanged.
+    content = CONNECTIVITY_LIVE
+      ? <ConnectivityLandingScreen
+          lang={lang}
+          onBack={() => { setConnectivitySub(null); setShowEsim(false) }}
+          onOpenOperator={() => setConnectivitySub('operator')}
+        />
+      : <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowEsim(false)} />
   } else if (showLegal) {
     content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
   } else if (selectedExplorePlace) {
@@ -2007,7 +2021,7 @@ export default function App() {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
-    setShowInsurance(false); setShowEsim(false); setShowTowing(false)
+    setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
@@ -2036,7 +2050,7 @@ export default function App() {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
-    setShowInsurance(false); setShowEsim(false); setShowTowing(false)
+    setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
