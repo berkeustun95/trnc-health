@@ -100,11 +100,14 @@ function CategoryTile({ item, lang, onPress }) {
 //
 // So the third case falls back to the landing's own copy, which is the one honest
 // statement when we have no rows and no filter to blame.
-function EmptyNote({ titleKey, bodyKey, lang }) {
+// `title` overrides `titleKey` when the caller has already resolved it — the context
+// card interpolates the category name and the other two do not, and a component that
+// takes both a key and its substitutions would be doing i18n on behalf of one caller.
+function EmptyNote({ titleKey, title, bodyKey, lang }) {
   return (
     <View style={s.emptyCard}>
       <Ionicons name="ribbon-outline" size={30} color={colors.border} style={s.emptyIcon} />
-      <Text style={s.emptyTitle}>{t(titleKey, lang)}</Text>
+      <Text style={s.emptyTitle}>{title ?? t(titleKey, lang)}</Text>
       <Text style={s.emptyHint}>{t(bodyKey, lang)}</Text>
     </View>
   )
@@ -372,7 +375,27 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
                 No third surface invented for this. */}
             {!anyCovers && (
               <View style={s.contextWrap}>
-                <EmptyNote titleKey="hsCatNoPartnerTitle" bodyKey="hsCatNoPartnerBody" lang={lang} />
+                {/* ⚠ THE CATEGORY NAME COMES FROM activeCat.labelKey — the SAME
+                    expression the ScreenHeader above renders. Not a second string: a
+                    banner naming a category the header spells differently is worse than
+                    the unscoped version it replaces.
+
+                    Scoping the negation is the whole point. "No ADA partner in this
+                    category" sat directly above a card badged "ADA partner" and read as
+                    a bug in the app — it was reported as one. Naming the category makes
+                    the two sentences obviously about different things.
+
+                    activeCat is guarded exactly as the ScreenHeader guards it: hsCategory()
+                    returns undefined for a key it does not know, and an unguarded
+                    activeCat.labelKey would throw rather than degrade. Unreachable today —
+                    selectedCategory is only ever set from HS_CATEGORIES — but the header
+                    does not assume that either. */}
+                <EmptyNote
+                  title={t('hsCatNoPartnerTitle', lang)
+                    .replace('{category}', activeCat ? t(activeCat.labelKey, lang) : '')}
+                  bodyKey="hsCatNoPartnerBody"
+                  lang={lang}
+                />
               </View>
             )}
 
