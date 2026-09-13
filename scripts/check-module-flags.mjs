@@ -303,8 +303,29 @@ if (problems.length) {
   for (const p of problems) console.error(`  │ ${p}`)
   console.error('  └────────────────────────────────────────────────────────────────┘')
   console.error('')
-  console.error(`  If you flipped a flag to preview a screen, revert it:`)
-  console.error(`      git checkout -- ${FLAGS_FILE}`)
+  // ⚠ THIS USED TO PRINT `git checkout -- constants/flags.js`, AND THAT WAS DANGEROUS.
+  //   That file is edited in almost every feature branch — it is where new flags are
+  //   declared, with their reasoning — so it routinely holds UNCOMMITTED WORK at the exact
+  //   moment somebody is previewing a screen. A discard-the-file command handed to someone
+  //   who is mid-preview and just wants the guard to go quiet is how a day's work
+  //   disappears, and the guard would have been the thing that suggested it.
+  //
+  //   So it names the offending variable and asks for a one-character edit instead. The
+  //   guard already knows exactly which flag is wrong; telling the user to reset the whole
+  //   file was always more than the situation required.
+  const flipped = problems
+    .map(p => (p.match(/^((?:MODULE_FLAGS\.)?[A-Za-z0-9_]+) is (?:true|false), baseline says (true|false)/) || []).slice(1))
+    .filter(m => m.length)
+  console.error(`  If you flipped a flag to preview a screen, set it back BY HAND:`)
+  if (flipped.length) {
+    for (const [name, want] of flipped) console.error(`      ${name} = ${want}      (in ${FLAGS_FILE})`)
+  } else {
+    console.error(`      edit ${FLAGS_FILE} and restore the value(s) named above`)
+  }
+  console.error('')
+  console.error(`  Do NOT run \`git checkout -- ${FLAGS_FILE}\` to fix this. That file often`)
+  console.error(`  carries uncommitted work — a new flag and its reasoning — and the checkout`)
+  console.error(`  would discard it silently along with your preview flip.`)
   console.error('')
   console.error(`  If a module is genuinely launching, update BOTH files in one commit:`)
   console.error(`      ${FLAGS_FILE}  and  scripts/check-module-flags.mjs`)
