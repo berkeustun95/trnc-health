@@ -175,6 +175,43 @@ const SURFACES = [
 //   are fine, the scan just stopped looking at three of them. That is the exact shape the
 //   DisplayNameCheck paragraph above records, hit a second time in the file that records
 //   it — which is the argument for deriving the SOURCE LIST rather than naming one file.
+// ─── KEYS CARRIED IN A *Key PROP OR FIELD, INSIDE A SURFACE FILE ─────────────
+//
+// Same blind spot as the tile labels above, but local: a key held in a file-level array or
+// passed as a prop is invisible to a literal t('x') scan. MEASURED when the connectivity
+// screens were added — 9 of their 31 keys were outside the scan while the guard reported a
+// clean pass:
+//   • the three-step rail holds { titleKey, bodyKey } in a local STEPS array and renders
+//     them as t(step.titleKey, lang)          -> 6 keys
+//   • screen 2 passes titleKey="connPkgErrorTitle" as a JSX prop   -> 1 key
+//   • the error card names its own defaults as titleKey = 'connErrorTitle' -> 2 keys
+//
+// So this matches ANY identifier ending in "Key" bound to a string literal, in all three
+// syntaxes — object field, JSX prop, default parameter. Deliberately general: the next
+// component to invent `headingKey` or `emptyKey` is covered without anybody remembering
+// to widen a list, which is the failure this file has now recorded three times.
+//
+// ⚠ NOT EVERY *Key PROP IS AN i18n KEY, and the first run of this widening proved it by
+//   going red: ComingSoonScreen takes moduleKey="checkins" — a MODULE identifier that has
+//   no business in the translation table — and the guard correctly reported it as "not
+//   present in English at all". That failure was in this scan, not in the app.
+//
+//   Excluded BY PROP NAME, never by value. Denying the string 'checkins' would also hide a
+//   genuinely missing key that happened to be called that, which is the same mistake as a
+//   hardcoded expected-set: it would go quiet about exactly the thing it is for.
+//
+//   Measured across all surfaces before choosing the deny-list, rather than guessed:
+//   moduleKey is the ONLY *Key prop in scope whose values are not i18n keys (1 value, 0
+//   resolving). titleKey (6), labelKey (20), templateKey (1) and bodyKey (4) all resolve
+//   100%. If a future prop joins moduleKey here, add it with its own measured reason.
+const NON_I18N_KEY_PROPS = new Set(['moduleKey'])
+
+const PROP_KEY_RE = /\b(\w*Key)\s*[:=]\s*['"]([a-zA-Z][a-zA-Z0-9_]*)['"]/g
+const SURFACE_PROP_KEYS = [...new Set(SURFACES.flatMap(f =>
+  [...readFileSync(resolve(ROOT, f), 'utf8').matchAll(PROP_KEY_RE)]
+    .filter(m => !NON_I18N_KEY_PROPS.has(m[1]))
+    .map(m => m[2])))]
+
 const TILE_LABEL_SOURCES = ['screens/HomeScreen.js', 'constants/homeModules.js']
 const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
   [...readFileSync(resolve(ROOT, f), 'utf8')
@@ -332,7 +369,7 @@ const viaVariable = [
   ...Object.values(REGION_LABEL_KEY),
 ]
 
-const KEYS = [...new Set([...literal, ...viaVariable])].filter(Boolean).sort()
+const KEYS = [...new Set([...literal, ...viaVariable, ...SURFACE_PROP_KEYS])].filter(Boolean).sort()
 const LANGS = Object.keys(LANG_CODES).filter(l => l !== 'English')
 
 // ─── Check ───────────────────────────────────────────────────────────────────
@@ -385,6 +422,14 @@ if (stale.length) {
 const i18nSrc = readFileSync(resolve(ROOT, 'constants/i18n.js'), 'utf8')
 const enBlock = i18nSrc.slice(i18nSrc.indexOf('\n  en: {'), i18nSrc.indexOf('\n  tr: {'))
 const enTotal = (enBlock.match(/\b[A-Za-z0-9_]+:\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g) ?? []).length
+// The scope line is DERIVED from SURFACES, never written out. It used to name four
+// surfaces in prose — "Explore map, check-in, duty roster and Home" — and was stale from
+// the moment ProfileSetupScreen was added, describing a scan that already covered more than
+// it claimed. A guard that misdescribes its own scope teaches the reader to skim it, and the
+// next real MISSING gets skimmed with it. Same rule this repo applies to any measured
+// figure in a comment: regenerate it, do not remember it.
+const scopeNames = SURFACES.map(f => f.split('/').pop().replace(/\.js$/, '')).join(', ')
 console.log(`i18n coverage: OK — ${KEYS.length} key(s) × ${LANGS.length} locale(s), `
-  + `${allowanceCount} declared same-as-English (scope: Explore map, check-in, `
-  + `duty roster and Home — ${KEYS.length} of the ${enTotal} keys in the table)`)
+  + `${allowanceCount} declared same-as-English`)
+console.log(`  scope: ${SURFACES.length} surface(s) — ${scopeNames}`)
+console.log(`  ${KEYS.length} of the ${enTotal} keys in the table`)
