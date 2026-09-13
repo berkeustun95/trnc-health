@@ -201,6 +201,13 @@ WITH report AS (
     ('1001_profile_completion','profiles','profile_schema_version'),
     ('1001_profile_completion','profiles','age_ineligible'),
     ('1001_profile_completion','profiles','nationality_code'),
+    -- Consent (1016). Four columns, and the wizard does NOT write them — the signup
+    -- checkbox does. If they read MISSING the consent write fails with 42703 inside the
+    -- signup flow, which is the one place a user cannot route around.
+    ('1016_profile_consent','profiles','terms_version'),
+    ('1016_profile_consent','profiles','terms_accepted_at'),
+    ('1016_profile_consent','profiles','terms_locale'),
+    ('1016_profile_consent','profiles','marketing_opt_in_at'),
     -- home_services gained multi-district coverage for the TadilArt partnership. If this
     -- reads MISSING, HomeServicesScreen's district filter (.contains on this column)
     -- matches nothing and EVERY district chip returns an empty list — which looks like
@@ -1819,11 +1826,74 @@ WITH report AS (
     -- blind to whether it exists at all. This token is the only thing that can see it.
     -- Mirrors MIN_SIGNUP_AGE in constants/profileGate.js; npm run profile:check reads
     -- both and fails on disagreement.
+    -- ─── 1016 CONSENT STAMPING, AND WHY A COLUMN CHECK CANNOT SEE IT ──────────
+    --
+    -- Section B proves the four columns exist. It cannot see WHO IS ALLOWED TO WRITE
+    -- them, and that is the whole design: terms_accepted_at and marketing_opt_in_at are
+    -- stamped by check_profile_name_content branches (g) and (h), so a client-supplied
+    -- timestamp is overwritten rather than honoured. CREATE OR REPLACE creates no named
+    -- object, so only a body token can tell the stamping version from the one before it.
+    --
+    -- If this goes red the columns are still there and writes still succeed — they just
+    -- start recording whatever the DEVICE said the time was. Silent, and it is the exact
+    -- value an acceptance record exists to be trusted on.
+    --
+    -- Anchored on the assignment SHAPE, never on a bare word: pg_get_functiondef returns
+    -- the COMMENTS, and the branches' own prose mentions both column names repeatedly.
+    UNION ALL SELECT '1016_profile_consent','consent timestamps are server-stamped in the trigger, not client-supplied',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_name_content'
+          AND pg_get_functiondef(p.oid) LIKE '%NEW.terms_accepted_at := now()%'
+          AND pg_get_functiondef(p.oid) LIKE '%NEW.marketing_opt_in_at := now()%'
+          -- The pass-through arms are what stop an unrelated UPDATE re-dating a consent
+          -- given months ago. Without them the token above would pass on a trigger that
+          -- stamped now() on every write.
+          AND pg_get_functiondef(p.oid) LIKE '%NEW.terms_accepted_at := OLD.terms_accepted_at%'
+          AND pg_get_functiondef(p.oid) LIKE '%NEW.marketing_opt_in_at := OLD.marketing_opt_in_at%')
+    -- Withdrawal must reach NULL exactly. A trigger that only ever stamped forward would
+    -- satisfy every clause above and leave consent impossible to withdraw, which is the
+    -- half that is non-compliant rather than merely wrong.
+    UNION ALL SELECT '1016_profile_consent','marketing withdrawal can reach NULL',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_name_content'
+          AND pg_get_functiondef(p.oid) LIKE '%NEW.marketing_opt_in_at := NULL%')
     UNION ALL SELECT '1001_profile_completion','MIN_SIGNUP_AGE 13 is enforced in the trigger',
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='check_profile_name_content'
           AND pg_get_functiondef(p.oid) ILIKE '%interval ''13 years''%'
           AND pg_get_functiondef(p.oid) ILIKE '%UNDERAGE%')
+    -- ─── BRANCH (f): age_ineligible IS ONE-WAY, AND A CLIENT FIX NOW LEANS ON IT ──
+    --
+    -- Registered 2026-09-13, when App.js stopped deriving the under-13 block from
+    -- session state and started deriving it from profiles.age_ineligible. Before that,
+    -- the flag gated nothing — the block died with the process — so nobody had reason to
+    -- assert the guard that keeps the flag honest. Now the whole control is: the client
+    -- writes the flag once, and cannot write it back.
+    --
+    -- If this goes red, a modified client clears its own flag and the age screen becomes
+    -- a formality again. Section C sees the function NAME; a CREATE OR REPLACE that drops
+    -- one branch creates no named object and is invisible to every other section here.
+    --
+    -- Anchored on CODE SHAPES, never bare words: pg_get_functiondef returns the comments,
+    -- and this branch's own prose says "the client sets the flag, and the same client
+    -- clears it" — which contains every word a loose token would look for. The two-column
+    -- comparison and the quoted RAISE literal appear in code and nowhere else.
+    --
+    -- NULL-safety is structural rather than asserted: 20261001 declares the column
+    -- `boolean NOT NULL DEFAULT false`, so `OLD.age_ineligible AND NOT NEW...` can never
+    -- evaluate to NULL and silently skip the RAISE. If that NOT NULL is ever dropped,
+    -- section B still reports the column as present and this token still passes — so drop
+    -- it and this guard goes quiet without going red. Keep the two together.
+    UNION ALL SELECT '1001_profile_completion','age_ineligible is one-way for non-admins (the under-13 block leans on it)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_name_content'
+          AND pg_get_functiondef(p.oid) LIKE '%OLD.age_ineligible AND NOT NEW.age_ineligible%'
+          AND pg_get_functiondef(p.oid) LIKE '%age_ineligible is admin-only once set%')
+    -- The NOT NULL the branch above depends on, asserted where it can actually go red.
+    UNION ALL SELECT '1001_profile_completion','profiles.age_ineligible is NOT NULL (branch (f) is NULL-blind without it)',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='profiles'
+          AND column_name='age_ineligible' AND is_nullable='NO')
     -- (5) An ABSENCE, and the loudest failure in this slice lands on SIX UNRELATED
     -- SURFACES. blocked_terms feeds contains_blocked_term(), which every UGC content
     -- trigger calls, so a reserved role word in there rejects ordinary reviews,

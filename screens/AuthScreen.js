@@ -9,6 +9,10 @@ import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import LegalScreen from './LegalScreen'
+import LegalLinkedText from '../components/LegalLinkedText'
+import { TERMS_CHECKBOX_LIVE } from '../constants/flags'
+import { isLegalFallback, LEGAL_VERSION, legalLocaleFor } from '../constants/legal'
+import { savePendingConsent } from '../utils/pendingConsent'
 
 const LANGUAGES = [
   { key: 'English', code: 'EN' }, { key: 'Turkish', code: 'TR' }, { key: 'Arabic', code: 'AR' },
@@ -30,6 +34,13 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
   const [resetSent, setResetSent] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
   const [legalTab, setLegalTab] = useState(null)
+  // Unticked, always. Never persisted, never pre-filled from a previous attempt: a
+  // consent box that remembers is a consent box the user did not tick this time.
+  const [termsOk, setTermsOk] = useState(false)
+  // Only signup is gated. Login must never be — an existing user cannot be locked out of
+  // their own account by a checkbox introduced after they created it, and a reset link is
+  // not a consent moment either.
+  const blockedByTerms = TERMS_CHECKBOX_LIVE && mode === 'signup' && !termsOk
 
   function changeLang(l) { setLang(l); onLangChange?.(l) }
 
@@ -54,7 +65,35 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
       ? await supabase.auth.signUp({ email: trimmedEmail, password, options: { emailRedirectTo: 'ada://' } })
       : await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
     if (error) setError(error.message)
-    else if (mode === 'signup') setSignupDone(true)
+    else if (mode === 'signup') {
+      // ─── THE TICK IS RECORDED HERE, AND THE ROW IS WRITTEN LATER ──────────
+      //
+      // Email confirmation is on, so the call above returns NO SESSION — there is
+      // nothing to write profiles with at this point, and there will not be until the
+      // user confirms and signs in. The tick is held on the device and flushed by
+      // App.js on the first authenticated session; profiles.terms_accepted_at therefore
+      // records that session and not this moment, which is stated on the column itself.
+      //
+      // AFTER the signup succeeds, never on the tap. A box ticked on a form that then
+      // fails validation, or against an address already registered, is not an
+      // acceptance of anything and must leave nothing behind.
+      //
+      // The VERSION and the LOCALE are captured here and are exact: they name the
+      // document that was on screen. legalLocaleFor resolves the seven fallback locales
+      // to the English body they were actually shown, which is the legally operative
+      // one and is frequently not their UI language.
+      if (TERMS_CHECKBOX_LIVE) {
+        await savePendingConsent({
+          email: trimmedEmail,
+          version: LEGAL_VERSION,
+          // One value covers both documents because they are versioned as a pair and
+          // today carry the same two bodies. If terms and privacy ever diverge in
+          // coverage, this becomes two columns, not a guess between them.
+          locale: legalLocaleFor('terms', lang),
+        })
+      }
+      setSignupDone(true)
+    }
     setLoading(false)
   }
 
@@ -254,23 +293,48 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
 
           {error && <Text style={styles.error}>{error}</Text>}
 
-          <TouchableOpacity style={styles.submit} onPress={submit} disabled={loading}>
+          <TouchableOpacity
+            style={[styles.submit, blockedByTerms && styles.submitOff]}
+            onPress={submit}
+            disabled={loading || blockedByTerms}
+          >
             {loading
               ? <ActivityIndicator color="#fff" />
               : <Text style={styles.submitText}>{mode === 'login' ? t('login', lang) : t('createAccount', lang)}</Text>
             }
           </TouchableOpacity>
 
-          {mode === 'signup' && (
-            <Text style={styles.legalNotice}>
-              {t('signupLegalNotice', lang).split(/(\{terms\}|\{privacy\})/).map((part, i) =>
-                part === '{terms}' ? (
-                  <Text key={i} style={styles.legalNoticeLink} onPress={() => setLegalTab('terms')}>{t('termsOfService', lang)}</Text>
-                ) : part === '{privacy}' ? (
-                  <Text key={i} style={styles.legalNoticeLink} onPress={() => setLegalTab('privacy')}>{t('privacyPolicy', lang)}</Text>
-                ) : part
-              )}
-            </Text>
+          {/* ─── CONSENT: A CHECKBOX, OR THE NOTICE — NEVER BOTH ────────────────
+              Two legal statements on one screen means the user reads neither, so the
+              passive notice that shipped 2026-08-21 is REPLACED rather than joined.
+              TERMS_CHECKBOX_LIVE picks which one ships; both render the same two links
+              through the same keys, so the tab, the link text and the document title
+              cannot drift apart.
+
+              Both branches render through LegalLinkedText, which owns the RTL-safe
+              placeholder split and the reason for it. */}
+          {mode === 'signup' && (TERMS_CHECKBOX_LIVE ? (
+            <TouchableOpacity
+              style={styles.termsRow}
+              onPress={() => setTermsOk(v => !v)}
+              activeOpacity={0.7}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: termsOk }}
+            >
+              <View style={[styles.checkbox, termsOk && styles.checkboxOn]}>
+                {termsOk && <Feather name="check" size={13} color="#fff" />}
+              </View>
+              <LegalLinkedText templateKey="signupTermsCheckbox" lang={lang}
+                style={styles.termsText} linkStyle={styles.legalNoticeLink} onOpen={setLegalTab} />
+            </TouchableOpacity>
+          ) : (
+            <LegalLinkedText templateKey="signupLegalNotice" lang={lang}
+              style={styles.legalNotice} linkStyle={styles.legalNoticeLink} onOpen={setLegalTab} />
+          ))}
+          {/* The fallback line, shown only where the reader is about to accept a document
+              in a language that is not theirs. Derived, never a list of seven locales. */}
+          {mode === 'signup' && TERMS_CHECKBOX_LIVE && isLegalFallback('terms', lang) && (
+            <Text style={styles.legalFallback}>{t('legalAvailableInEnTr', lang)}</Text>
           )}
 
           <View style={styles.langRow}>
@@ -315,6 +379,17 @@ const styles = StyleSheet.create({
   submit:            { backgroundColor: colors.primary, borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 4 },
   submitText:        { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.2 },
   legalNotice:       { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, textAlign: 'center', marginTop: 14 },
+  termsRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 16,
+                   paddingHorizontal: 2 },
+  checkbox:      { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5,
+                   borderColor: colors.border, backgroundColor: 'transparent',
+                   alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  checkboxOn:    { backgroundColor: colors.primary, borderColor: colors.primary },
+  termsText:     { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19,
+                   color: colors.textSecondary },
+  legalFallback: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, color: colors.textSecondary,
+                   marginTop: 8, paddingHorizontal: 2, opacity: 0.85 },
+  submitOff:     { opacity: 0.45 },
   legalNoticeLink:   { fontFamily: 'Inter_700Bold', color: colors.primary, textDecorationLine: 'underline' },
   langRow:           { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border },
   langChip:          { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, backgroundColor: 'transparent' },

@@ -318,3 +318,61 @@ export const HS_SELF_REGISTRATION = false
 //
 // Reverting is this one boolean, and so is the emergency direction.
 export const DORMS_LIVE = true   // live 2026-09-13
+
+// The signup terms checkbox. false = the signup screen keeps the passive legal NOTICE it
+// has shown since 2026-08-21; true = that notice becomes a required, unticked checkbox
+// and Create account is disabled until it is ticked.
+//
+// ⚠ IT GATES A CONSENT RECORD, NOT A SCREEN. With it false nothing writes
+//   profiles.terms_version / terms_locale, so terms_accepted_at is never stamped. The
+//   columns and the trigger branches ship regardless (20261016) — schema first, client
+//   second, flag last — so flipping this is the only step that changes what is recorded.
+//
+// ⚠ DO NOT FLIP UNTIL THE TURKISH DOCUMENT BODIES ARE LIVE. The checkbox asks a user to
+//   accept documents; constants/legal/ carries English and Turkish today and English
+//   fallback for the other seven, with legalAvailableInEnTr saying so above the tick.
+//   That is the agreed shape, but it is a judgement that should be re-made deliberately
+//   at flip time rather than inherited from this comment.
+//
+// ⚠ AND THE FREE WINDOW CLOSES WHEN IT DOES. LEGAL_VERSION is 2026-09 and nobody has
+//   accepted it, so document edits are still free. The first tick ends that: the same
+//   edit then becomes a material change to an accepted document and needs a
+//   re-acceptance round.
+//
+// ─── WHAT IT GATES, AND THE ONE THING IT DELIBERATELY DOES NOT ──────────────
+//
+// GATED — four surfaces, all of them things a user SEES:
+//   screens/AuthScreen.js         the signup checkbox (false keeps the passive notice)
+//   screens/ProfileSetupScreen.js the wizard's legal footer
+//   screens/ProfileSetupScreen.js the wizard's marketing opt-in
+//   screens/ProfileScreen.js      the marketing withdrawal switch
+//
+// NOT GATED — App.js's flushPendingConsent, and that asymmetry is the point. The flush
+// acts on EVIDENCE THAT A TICK ALREADY HAPPENED, and a tick can only exist if this flag
+// was true when it was given. Gating it would strand a real acceptance on the device the
+// moment the flag went back to false — which is exactly the situation in which the record
+// matters most. A flag that hides a screen must not also discard what the screen collected.
+//
+// ⚠ NOT GATED EITHER: the four consent columns in App.js PROFILE_COLUMNS. A select list
+//   is not a feature. Against a database without 20261016 that select fails for every
+//   user regardless of this flag, so the migration is a hard prerequisite of the OTA and
+//   not of the flip.
+//
+// NOT a MODULE_FLAGS key: it gates a flow inside the signup screen, not a module. Same
+// resolution as PROFILE_GATE_LIVE and HS_SELF_REGISTRATION.
+export const TERMS_CHECKBOX_LIVE = false
+
+// ─── AND WHAT NO FLAG IN THIS FILE GATES: THE UNDER-13 BLOCK ────────────────
+//
+// screens/AgeIneligibleScreen.js is rendered by App.js from profiles.age_ineligible, and
+// it is deliberately behind NO FLAG AT ALL — not PROFILE_GATE_LIVE, not a new one.
+//
+// ⚠ A COMPLIANCE CONTROL AND A PRODUCT KILL-SWITCH MUST NOT SHARE A LEVER. PROFILE_GATE_LIVE
+//   exists to be flipped FALSE in a hurry: its own comment above says flipping it hard-blocks
+//   every existing customer, so the emergency direction is off. If the age block hung off it,
+//   turning the wizard off during an incident would re-admit under-13 accounts as a silent
+//   side effect of an unrelated decision, on an app that declares 13-15 / 16-17 / 18+ to
+//   Google Play. Nobody flipping a gate flag at speed is thinking about that.
+//
+// The same reasoning applies to any future control that exists because a store or a
+// regulator requires it: give it no lever, or give it its own.

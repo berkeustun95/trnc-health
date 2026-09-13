@@ -34,7 +34,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  ActivityIndicator, Modal, Platform,
+  ActivityIndicator, Modal, Platform, BackHandler, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
@@ -44,7 +44,9 @@ import { pad, ageOn, daysInMonth } from '../utils/profileFields'
 import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../components/DisplayNameCheck'
 import { supabase } from '../lib/supabase'
 import { colors, shadow, radius } from '../constants/theme'
-import { SHOW_WIZARD_HEADINGS } from '../constants/flags'
+import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE } from '../constants/flags'
+import LegalScreen from './LegalScreen'
+import LegalLinkedText from '../components/LegalLinkedText'
 import { t, LANGUAGES, LANG_CODES } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { NATIONALITIES, NATIONALITY_CODES, getNatLabel } from '../constants/nationalityTranslations'
@@ -213,7 +215,7 @@ const completionViolation = err =>
   err?.code === '23514' && String(err?.message ?? '').includes('profiles_completion_requires_fields_check')
 
 export default function ProfileSetupScreen({
-  session, lang, profile, prefillRegion, onDone,
+  session, lang, profile, prefillRegion, onDone, onAgeIneligible,
   onEmergencyNumbers, onDutyList, onHealthDirectory, onLangChange,
 }) {
   const [step, setStep] = useState(() => resumeStep(profile))
@@ -223,7 +225,13 @@ export default function ProfileSetupScreen({
   // telling someone to check their signal sends them to fix the one thing that is fine.
   const [saveError, setSaveError] = useState(null)
   const [helpOpen, setHelpOpen] = useState(false)
-  const [ageBlocked, setAgeBlocked] = useState(false)
+  const [legalTab, setLegalTab] = useState(null)
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState(false)
+  // Optional, separate, and unticked. NEVER pre-filled from the row: the wizard re-runs
+  // on any future profile_schema_version bump, and a box that arrives already ticked
+  // because of a decision made months ago is not a decision made now.
+  const [marketingOk, setMarketingOk] = useState(false)
 
   // Step 1 — name half
   const [firstName, setFirstName] = useState(profile?.first_name ?? '')
@@ -332,6 +340,41 @@ export default function ProfileSetupScreen({
     return hit ? { key: 'pgIncompleteField', field: hit[1] } : 'pgIncompleteUnknown'
   }
 
+  // ─── THE WAY OUT ──────────────────────────────────────────────────────────
+  //
+  // Added 2026-09-13. Until then a new account that reached this wizard had NO exit at
+  // all — no back, no close, no sign out — and the only ways to leave were finishing it
+  // or uninstalling. Two problems with that, and the second is the expensive one: a user
+  // who decides not to hand over a date of birth is trapped in the app, and mandatory
+  // registration with no escape is the shape App Store guideline 5.1.1 is written about.
+  //
+  // ⚠ THIS IS AN EXIT, NOT A BYPASS. It signs the account out; it does not skip the gate.
+  //   Nothing here makes the wizard optional, and the gate is waiting at the next sign-in.
+  //
+  // ⚠ AND error === null WOULD NOT MEAN IT WORKED. supabase.auth.signOut() returns before
+  //   clearing the local session on a network failure — see lib/supabase.js — so offline
+  //   this button would otherwise do nothing at all, silently, on the screen somebody is
+  //   trying to get out of. The error is caught and shown.
+  async function confirmSignOut() {
+    if (signingOut) return
+    // Empty title is this app's confirm convention (FacilityProfileScreen's delete flows).
+    // The body says progress is SAVED, which is both true — Step 1 persists on advance —
+    // and the thing that stops somebody hesitating over an exit they are entitled to.
+    Alert.alert('', t('pgSignOutConfirm', lang), [
+      { text: t('cancel', lang), style: 'cancel' },
+      { text: t('signOut', lang), style: 'destructive', onPress: async () => {
+        setSigningOut(true)
+        setSignOutError(false)
+        const { error } = await supabase.auth.signOut()
+        // On success App.js unmounts this screen on SIGNED_OUT, so there is nothing to
+        // reset. pendingConsent is deliberately NOT cleared: if one is still on the
+        // device the flush failed, and dropping it would discard an acceptance that was
+        // never recorded. Its email match and 7-day expiry already make it safe to leave.
+        if (error) { setSignOutError(true); setSigningOut(false) }
+      } },
+    ])
+  }
+
   async function advance() {
     if (saving) return
     if (step === 0) { setStep(1); return }
@@ -343,8 +386,14 @@ export default function ProfileSetupScreen({
       // a client that sends it anyway, and profiles_age_ineligible_no_dob_check
       // backstops both.
       if (ageOn(dobY, dobM, dobD) < MIN_SIGNUP_AGE) {
-        await save({ age_ineligible: true })
-        setAgeBlocked(true)
+        // ⚠ THE ERROR IS CHECKED NOW, AND IT WAS NOT BEFORE. The old code awaited this
+        //   write, ignored whatever came back and set a local `ageBlocked` boolean — so
+        //   a write that FAILED still produced the block, for this session only, and the
+        //   next launch let the account straight in with no flag on the row at all. The
+        //   block has to follow the flag landing, not the attempt being made.
+        const error = await save({ age_ineligible: true })
+        if (error) { setSaveError('pgSaveError'); return }
+        onAgeIneligible()
         return
       }
       // ONE patch for all six fields. The merge makes this atomic rather than two
@@ -384,6 +433,18 @@ export default function ProfileSetupScreen({
       institution_id: INSTITUTION_REQUIRED_LEVELS.includes(level) ? institution : null,
       profile_completed_at: new Date().toISOString(),
       profile_schema_version: CURRENT_PROFILE_SCHEMA_VERSION,
+      // ⚠ THE COLUMN IS SENT ONLY WHEN TICKED, AND OMITTING IT IS NOT THE SAME AS
+      //   SENDING NULL. Branch (h) of check_profile_name_content reads a NULL as a
+      //   WITHDRAWAL, and this wizard re-runs for everybody on any future
+      //   profile_schema_version bump — with the box correctly unticked. Sending
+      //   `null` here would therefore silently withdraw the marketing consent of every
+      //   user who had opted in, on a screen that never mentions marketing.
+      //   Omitted, NEW carries OLD through the trigger's ELSE arm and nothing moves.
+      //   Withdrawal is an explicit act and lives on ProfileScreen alone.
+      //
+      // The value is a placeholder the server replaces: the client says WHETHER, the
+      // trigger says WHEN.
+      ...(TERMS_CHECKBOX_LIVE && marketingOk ? { marketing_opt_in_at: new Date().toISOString() } : {}),
     })
     if (error) {
       // The final write is the ONE that can trip the completion constraint, because it is
@@ -395,28 +456,28 @@ export default function ProfileSetupScreen({
     onDone()
   }
 
-  async function signOutIneligible() {
-    await supabase.auth.signOut()
+  // Registered only while the legal sheet is open so it runs before App.js's handler
+  // (RN fires listeners newest-first). Without it, back on the sheet falls through to
+  // App.js, matches nothing on the wizard, and CLOSES THE APP with the sheet still up.
+  useEffect(() => {
+    if (!legalTab) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setLegalTab(null); return true })
+    return () => sub.remove()
+  }, [legalTab])
+
+  // Same component instance, different render — every value already typed into the form
+  // survives opening a document and coming back.
+  if (legalTab) {
+    return <LegalScreen lang={lang} initialTab={legalTab} onBack={() => setLegalTab(null)} />
   }
 
-  // ─── The age screen ───────────────────────────────────────────────────────
-  // Reached only AFTER a disqualifying date was submitted. Nothing before this point
-  // states or hints at a minimum age — that is the Google Play neutral-age-screen rule,
-  // and it is why the message lives here and not beside the field.
-  if (ageBlocked) {
-    return (
-      <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-        <View style={s.ageWrap}>
-          <View style={s.ageIcon}><Ionicons name="information-circle-outline" size={30} color={colors.textSecondary} /></View>
-          <Text style={s.ageTitle}>{t('pgAgeTitle', lang)}</Text>
-          <Text style={s.ageBody}>{t('pgAgeMessage', lang)}</Text>
-          <TouchableOpacity style={s.primaryBtn} onPress={signOutIneligible} activeOpacity={0.85}>
-            <Text style={s.primaryBtnText}>{t('pgAgeSignOut', lang)}</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    )
-  }
+  // ─── The age screen USED TO BE HERE ───────────────────────────────────────
+  // It is screens/AgeIneligibleScreen.js now, rendered by App.js from
+  // profiles.age_ineligible. Do not bring it back: a copy inside this component can only
+  // be driven by session state, and session state is exactly what made the flag
+  // escapable by force-quitting. Nothing before the under-13 branch above states or
+  // hints at a minimum age — the Google Play neutral-age-screen rule — and that is
+  // unchanged by the move.
 
   const statusOptions = RESIDENT_STATUSES.map(v => ({ value: v, label: t(RESIDENT_STATUS_LABEL_KEY[v], lang) }))
   const levelOptions = STUDENT_LEVELS.map(v => ({ value: v, label: t(STUDENT_LEVEL_LABEL_KEY[v], lang) }))
@@ -557,10 +618,67 @@ export default function ProfileSetupScreen({
                   />
                 </Field>
               )}
+
+              {/* ─── THE LAST STEP CARRIES A POINTER AND AN OFFER, NOT A CONSENT ───
+                  NO CHECKBOX FOR THE DOCUMENTS, DELIBERATELY, AND DO NOT ADD ONE. The
+                  wizard collects the fields ADA needs in order to function on a CONTRACT
+                  basis, not on consent — the acceptance already happened at signup, and
+                  a second tick here would manufacture a second acceptance event on a
+                  flow whose legal basis is not consent at all. The footer POINTS at the
+                  documents; it does not ask for anything, and its wording must stay that
+                  way ("how this is used is set out in…", never "by continuing you
+                  agree…").
+
+                  The marketing opt-in below is the opposite and that is why it looks
+                  different: genuinely optional, genuinely consent, and therefore an
+                  unticked box on its own tinted surface rather than a line of small
+                  grey text. Two things that are legally unalike must not look alike. */}
+              {TERMS_CHECKBOX_LIVE && (
+                <>
+                  <TouchableOpacity
+                    style={s.optIn}
+                    onPress={() => setMarketingOk(v => !v)}
+                    activeOpacity={0.75}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: marketingOk }}
+                  >
+                    <View style={[s.optInBox, marketingOk && s.optInBoxOn]}>
+                      {marketingOk && <Feather name="check" size={13} color="#fff" />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.optInText}>{t('pgMarketingOptIn', lang)}</Text>
+                      <Text style={s.optInHint}>{t('pgMarketingHint', lang)}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <LegalLinkedText templateKey="pgLegalFooter" lang={lang}
+                    style={s.legalFooter} linkStyle={s.legalFooterLink} onOpen={setLegalTab} />
+                </>
+              )}
             </>
           )}
 
           {saveError && <Text style={s.err}>{t(saveError.key ?? saveError, lang).replace('{field}', saveError.field ? t(saveError.field, lang) : '')}</Text>}
+
+          {/* ⚠ BOTTOM OF THE SCROLL, NOT THE HEADER — AND THAT WAS MEASURED, not chosen.
+              The header already carries the progress dots, the language pill and the
+              emergency pill, and at 320dp those two pills alone occupy 212pt of the 236pt
+              available IN GREEK. Adding a third item overflowed in 5 of 9 locales —
+              Greek by 63pt, Spanish 36, French 29, Arabic 17, and English by 2 — while
+              fitting comfortably at 393dp, so it would have looked correct on the test
+              phone and broken on a small device in five languages. Full width here means
+              no locale can overflow at all. Measured with the TTF parser from
+              scripts/check-tile-labels.mjs; the figures are in the journal entry.
+
+              Every step, including the intro: someone deciding not to continue does it
+              at the first screen as often as the last. */}
+          <TouchableOpacity style={s.exitRow} onPress={confirmSignOut}
+            disabled={signingOut} activeOpacity={0.6}>
+            {signingOut
+              ? <ActivityIndicator color={colors.textSecondary} />
+              : <Text style={s.exitText}>{t('signOut', lang)}</Text>}
+          </TouchableOpacity>
+          {signOutError && <Text style={[s.err, { textAlign: 'center' }]}>{t('signOutFailed', lang)}</Text>}
         </ScrollView>
 
         <View style={s.footer}>
@@ -720,6 +838,29 @@ const s = StyleSheet.create({
 
   err: { color: colors.danger, fontSize: 13, marginTop: 7, lineHeight: 19 },
 
+  // Plain secondary text, centred, underlined. Deliberately NOT a button: it must be
+  // findable by somebody looking for a way out and invisible to everybody else, so it
+  // competes with Continue for nothing.
+  exitRow:  { alignSelf: 'center', paddingVertical: 14, paddingHorizontal: 24, marginTop: 20 },
+  exitText: { color: colors.textSecondary, fontSize: 14, textDecorationLine: 'underline' },
+
+  // Its own tinted surface, because it is the one OPTIONAL thing on a mandatory screen
+  // and it must not read as another field to fill in.
+  optIn: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 11, marginTop: 6, padding: 14,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  optInBox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.border,
+    backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', marginTop: 1,
+  },
+  optInBoxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  optInText: { color: colors.textPrimary, fontSize: 14, lineHeight: 20 },
+  optInHint: { color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
+  legalFooter: { color: colors.textSecondary, fontSize: 12.5, lineHeight: 19, marginTop: 16 },
+  legalFooterLink: { color: colors.primary, fontWeight: '700', textDecorationLine: 'underline' },
+
   footer: {
     flexShrink: 0, flexDirection: 'row', gap: 10,
     paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
@@ -756,11 +897,4 @@ const s = StyleSheet.create({
   helpRowText: { flex: 1, fontSize: 15, color: colors.textPrimary, fontWeight: '600' },
   helpNote: { color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, marginTop: 14 },
 
-  ageWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  ageIcon: {
-    width: 62, height: 62, borderRadius: 31, backgroundColor: colors.bg,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 18,
-  },
-  ageTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginBottom: 10 },
-  ageBody: { fontSize: 14.5, color: colors.textSecondary, textAlign: 'center', lineHeight: 21, marginBottom: 26 },
 })

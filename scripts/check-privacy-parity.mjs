@@ -158,6 +158,22 @@ const EXEMPT = {
   profile_completed_at:    'internal flag, derived from fields already disclosed',
   profile_schema_version:  'internal versioning, no personal content',
   age_ineligible:          'the under-13 marker; disclosed as prose, not as a field',
+  // ─── The four consent columns (20261016) ──────────────────────────────────
+  //
+  // Disclosed as ONE PROSE BULLET rather than four field entries. Section 1 of the
+  // privacy body already carries it, and it is the sentence these exemptions point at:
+  //
+  //   "Consent records: which version of our Terms of Service and Privacy Policy you
+  //    accepted, in which language, and when. If you opt in to marketing messages, we
+  //    record when you did so, and when you withdrew it if you later do."
+  //
+  // That one sentence covers all four. Four separate field entries would describe the
+  // SCHEMA rather than the event, and a reader does not have four consent facts about
+  // themselves — they have one, recorded four ways.
+  terms_version:           'part of the consent record, disclosed as one prose bullet in section 1',
+  terms_accepted_at:       'part of the consent record; the "when" in that bullet',
+  terms_locale:            'part of the consent record; the "in which language" in that bullet',
+  marketing_opt_in_at:     'part of the consent record; the marketing sentence in that bullet',
 }
 
 function readColumns() {

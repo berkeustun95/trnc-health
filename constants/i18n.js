@@ -152,6 +152,8 @@ const translations = {
     profileDetailsHint: 'What you told us when you set up your profile. Change anything that is wrong.',
     preferences: 'Preferences', preferredLanguage: 'Preferred language',
     signOut: 'Sign out',
+    signOutFailed: 'Couldn\'t sign out. Check your connection and try again.',
+    pgSignOutConfirm: 'Sign out? Everything you have filled in so far is saved — you can sign back in and carry on where you left off.',
     dutyPharmacies: 'Duty Pharmacies',
     noDutyToday: 'No duty pharmacies listed for today.',
     // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
@@ -681,6 +683,11 @@ const translations = {
     termsOfService: 'Terms of Service',
     legalAvailableInEnTr: 'Our legal documents are published in English and Turkish. You are reading the English version.',
     signupLegalNotice: 'By creating an account you agree to our {terms} and {privacy}.',
+    signupTermsCheckbox: 'I have read and accept the {terms} and the {privacy}',
+    pgLegalFooter: 'How this information is used is set out in our {privacy} and our {terms}.',
+    pgMarketingOptIn: 'Send me occasional updates about new ADA features and services.',
+    pgMarketingHint: 'Optional. You can turn this off at any time in your profile.',
+    marketingSectionTitle: 'Updates and offers',
     // Unclaimed facility sheet
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
@@ -1556,6 +1563,8 @@ const translations = {
     profileDetailsHint: 'Profilinizi oluştururken bize verdiğiniz bilgiler. Yanlış olan bir şey varsa değiştirin.',
     preferences: 'Tercihler', preferredLanguage: 'Tercih edilen dil',
     signOut: 'Çıkış yap',
+    signOutFailed: 'Çıkış yapılamadı. Bağlantınızı kontrol edip tekrar deneyin.',
+    pgSignOutConfirm: 'Çıkış yapılsın mı? Şu ana kadar doldurduklarınız kaydedildi; tekrar giriş yapıp kaldığınız yerden devam edebilirsiniz.',
     dutyPharmacies: 'Nöbetçi Eczaneler',
     noDutyToday: 'Bugün için nöbetçi eczane listelenmemiş.',
     // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
@@ -1943,6 +1952,11 @@ const translations = {
     termsOfService: 'Kullanım Koşulları',
     legalAvailableInEnTr: 'Hukuki belgelerimiz İngilizce ve Türkçe olarak yayımlanır. Türkçe sürümü okuyorsunuz.',
     signupLegalNotice: 'Hesap oluşturarak {terms} ve {privacy} belgelerimizi kabul etmiş olursunuz.',
+    signupTermsCheckbox: '{terms} ve {privacy} belgelerini okudum ve kabul ediyorum',
+    pgLegalFooter: 'Bu bilgilerin nasıl kullanıldığı {privacy} ve {terms} belgelerimizde açıklanmıştır.',
+    pgMarketingOptIn: 'Yeni ADA özellikleri ve hizmetleri hakkında ara sıra bilgilendirme almak istiyorum.',
+    pgMarketingHint: 'İsteğe bağlı. Bunu profilinizden istediğiniz zaman kapatabilirsiniz.',
+    marketingSectionTitle: 'Bilgilendirmeler ve fırsatlar',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
     // map pins and favourites: every facility that can still reach the unclaimed sheet
@@ -2997,6 +3011,8 @@ const translations = {
     profileDetailsHint: 'ما أخبرتنا به عند إعداد ملفك الشخصي. غيّر أي معلومة غير صحيحة.',
     preferences: 'التفضيلات', preferredLanguage: 'اللغة المفضلة',
     signOut: 'تسجيل الخروج',
+    signOutFailed: 'تعذّر تسجيل الخروج. تحقق من اتصالك وحاول مرة أخرى.',
+    pgSignOutConfirm: 'هل تريد تسجيل الخروج؟ تم حفظ كل ما أدخلته حتى الآن، ويمكنك تسجيل الدخول مرة أخرى ومتابعة ما بدأته.',
     dutyPharmacies: 'صيدليات المناوبة',
     noDutyToday: 'لا توجد صيدليات مناوبة مدرجة اليوم.',
     // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
@@ -3275,6 +3291,11 @@ const translations = {
     termsOfService: 'شروط الخدمة',
     legalAvailableInEnTr: 'مستنداتنا القانونية منشورة بالإنجليزية والتركية. أنت تطالع النسخة الإنجليزية.',
     signupLegalNotice: 'بإنشاء حساب فإنك توافق على {terms} و{privacy} الخاصة بنا.',
+    signupTermsCheckbox: 'لقد قرأت {terms} و{privacy} وأوافق عليهما',
+    pgLegalFooter: 'كيفية استخدام هذه المعلومات موضَّحة في {privacy} و{terms} الخاصة بنا.',
+    pgMarketingOptIn: 'أرسلوا لي تحديثات من حين لآخر حول ميزات وخدمات ADA الجديدة.',
+    pgMarketingHint: 'اختياري. يمكنك إيقافه في أي وقت من ملفك الشخصي.',
+    marketingSectionTitle: 'التحديثات والعروض',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
     // map pins and favourites: every facility that can still reach the unclaimed sheet
@@ -4093,6 +4114,8 @@ const translations = {
     profileDetailsHint: 'То, что вы указали при настройке профиля. Измените всё, что неверно.',
     preferences: 'Настройки', preferredLanguage: 'Предпочтительный язык',
     signOut: 'Выйти',
+    signOutFailed: 'Не удалось выйти. Проверьте соединение и попробуйте снова.',
+    pgSignOutConfirm: 'Выйти? Всё, что вы уже заполнили, сохранено — вы сможете снова войти и продолжить с того же места.',
     dutyPharmacies: 'Дежурные аптеки',
     noDutyToday: 'Дежурных аптек на сегодня нет.',
     // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
@@ -4371,6 +4394,11 @@ const translations = {
     termsOfService: 'Условия использования',
     legalAvailableInEnTr: 'Наши юридические документы публикуются на английском и турецком языках. Вы читаете английскую версию.',
     signupLegalNotice: 'Создавая аккаунт, вы соглашаетесь с нашими {terms} и {privacy}.',
+    signupTermsCheckbox: 'Я прочитал(а) «{terms}» и «{privacy}» и принимаю их',
+    pgLegalFooter: 'Как используются эти данные, описано в наших документах «{privacy}» и «{terms}».',
+    pgMarketingOptIn: 'Присылайте мне время от времени новости о новых функциях и услугах ADA.',
+    pgMarketingHint: 'Необязательно. Вы можете отключить это в любой момент в своём профиле.',
+    marketingSectionTitle: 'Новости и предложения',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
     // map pins and favourites: every facility that can still reach the unclaimed sheet
@@ -5188,6 +5216,8 @@ const translations = {
     profileDetailsHint: 'Όσα μας δηλώσατε κατά τη ρύθμιση του προφίλ σας. Αλλάξτε ό,τι είναι λάθος.',
     preferences: 'Προτιμήσεις', preferredLanguage: 'Προτιμώμενη γλώσσα',
     signOut: 'Αποσύνδεση',
+    signOutFailed: 'Δεν έγινε αποσύνδεση. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.',
+    pgSignOutConfirm: 'Αποσύνδεση; Ό,τι έχετε συμπληρώσει μέχρι τώρα έχει αποθηκευτεί — μπορείτε να συνδεθείτε ξανά και να συνεχίσετε από εκεί που μείνατε.',
     dutyPharmacies: 'Εφημερεύοντα Φαρμακεία',
     noDutyToday: 'Δεν υπάρχουν εφημερεύοντα φαρμακεία σήμερα.',
     // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
@@ -5466,6 +5496,11 @@ const translations = {
     termsOfService: 'Όροι Χρήσης',
     legalAvailableInEnTr: 'Τα νομικά μας έγγραφα δημοσιεύονται στα Αγγλικά και στα Τουρκικά. Διαβάζετε την αγγλική έκδοση.',
     signupLegalNotice: 'Δημιουργώντας λογαριασμό, αποδέχεστε τους {terms} και την {privacy} μας.',
+    signupTermsCheckbox: 'Έχω διαβάσει και αποδέχομαι τα έγγραφα «{terms}» και «{privacy}»',
+    pgLegalFooter: 'Ο τρόπος χρήσης αυτών των πληροφοριών περιγράφεται στα έγγραφά μας «{privacy}» και «{terms}».',
+    pgMarketingOptIn: 'Να λαμβάνω περιστασιακά ενημερώσεις για νέες λειτουργίες και υπηρεσίες του ADA.',
+    pgMarketingHint: 'Προαιρετικό. Μπορείτε να το απενεργοποιήσετε ανά πάσα στιγμή από το προφίλ σας.',
+    marketingSectionTitle: 'Ενημερώσεις και προσφορές',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
     // map pins and favourites: every facility that can still reach the unclaimed sheet
@@ -6283,6 +6318,8 @@ const translations = {
     profileDetailsHint: 'Ce que vous nous avez indiqué lors de la création de votre profil. Modifiez ce qui est inexact.',
     preferences: 'Préférences', preferredLanguage: 'Langue préférée',
     signOut: 'Se déconnecter',
+    signOutFailed: 'Échec de la déconnexion. Vérifiez votre connexion et réessayez.',
+    pgSignOutConfirm: 'Se déconnecter ? Tout ce que vous avez déjà rempli est enregistré : vous pourrez vous reconnecter et reprendre où vous en étiez.',
     dutyPharmacies: 'Pharmacies de garde',
     noDutyToday: "Aucune pharmacie de garde répertoriée aujourd'hui.",
     // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
@@ -6563,6 +6600,11 @@ const translations = {
     termsOfService: 'Conditions d\'utilisation',
     legalAvailableInEnTr: 'Nos documents juridiques sont publiés en anglais et en turc. Vous lisez la version anglaise.',
     signupLegalNotice: 'En créant un compte, vous acceptez nos {terms} et notre {privacy}.',
+    signupTermsCheckbox: 'J’ai lu et j’accepte les {terms} et la {privacy}',
+    pgLegalFooter: 'L’usage de ces informations est décrit dans notre {privacy} et nos {terms}.',
+    pgMarketingOptIn: 'Envoyez-moi de temps en temps des nouvelles des fonctionnalités et services ADA.',
+    pgMarketingHint: 'Facultatif. Vous pouvez le désactiver à tout moment dans votre profil.',
+    marketingSectionTitle: 'Actualités et offres',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
     // map pins and favourites: every facility that can still reach the unclaimed sheet
@@ -7381,6 +7423,8 @@ const translations = {
     profileDetailsHint: 'Lo que nos indicaste al crear tu perfil. Cambia lo que no sea correcto.',
     preferences: 'Preferencias', preferredLanguage: 'Idioma preferido',
     signOut: 'Cerrar sesión',
+    signOutFailed: 'No se pudo cerrar sesión. Comprueba tu conexión e inténtalo de nuevo.',
+    pgSignOutConfirm: '¿Cerrar sesión? Todo lo que has rellenado hasta ahora está guardado: puedes volver a entrar y seguir donde lo dejaste.',
     dutyPharmacies: 'Farmacias de guardia',
     noDutyToday: 'No hay farmacias de guardia registradas hoy.',
     // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
@@ -7659,6 +7703,11 @@ const translations = {
     termsOfService: 'Términos de uso',
     legalAvailableInEnTr: 'Nuestros documentos legales se publican en inglés y turco. Estás leyendo la versión en inglés.',
     signupLegalNotice: 'Al crear una cuenta aceptas nuestros {terms} y nuestra {privacy}.',
+    signupTermsCheckbox: 'He leído y acepto los {terms} y la {privacy}',
+    pgLegalFooter: 'El uso de esta información se explica en nuestra {privacy} y nuestros {terms}.',
+    pgMarketingOptIn: 'Quiero recibir novedades ocasionales sobre nuevas funciones y servicios de ADA.',
+    pgMarketingHint: 'Opcional. Puedes desactivarlo cuando quieras en tu perfil.',
+    marketingSectionTitle: 'Novedades y ofertas',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
     // map pins and favourites: every facility that can still reach the unclaimed sheet
@@ -8476,6 +8525,8 @@ const translations = {
     profileDetailsHint: 'Das hast du uns beim Einrichten deines Profils angegeben. Ändere alles, was nicht stimmt.',
     preferences: 'Einstellungen', preferredLanguage: 'Bevorzugte Sprache',
     signOut: 'Abmelden',
+    signOutFailed: 'Abmelden fehlgeschlagen. Prüfe deine Verbindung und versuche es erneut.',
+    pgSignOutConfirm: 'Abmelden? Alles, was du bisher ausgefüllt hast, ist gespeichert — du kannst dich wieder anmelden und dort weitermachen, wo du aufgehört hast.',
     dutyPharmacies: 'Apotheken-Bereitschaftsdienst',
     noDutyToday: 'Heute keine Bereitschaftsapotheken eingetragen.',
     // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
@@ -8754,6 +8805,11 @@ const translations = {
     termsOfService: 'Nutzungsbedingungen',
     legalAvailableInEnTr: 'Unsere Rechtsdokumente werden auf Englisch und Türkisch veröffentlicht. Du liest die englische Fassung.',
     signupLegalNotice: 'Mit der Erstellung eines Kontos stimmst du unseren {terms} und unserer {privacy} zu.',
+    signupTermsCheckbox: 'Ich habe die {terms} und die {privacy} gelesen und akzeptiere sie',
+    pgLegalFooter: 'Wie diese Angaben verwendet werden, steht in unserer {privacy} und unseren {terms}.',
+    pgMarketingOptIn: 'Schick mir gelegentlich Neuigkeiten zu neuen ADA-Funktionen und -Diensten.',
+    pgMarketingHint: 'Optional. Du kannst das jederzeit in deinem Profil ausschalten.',
+    marketingSectionTitle: 'Neuigkeiten und Angebote',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
     // map pins and favourites: every facility that can still reach the unclaimed sheet
@@ -9572,6 +9628,8 @@ const translations = {
     profileDetailsHint: 'آنچه هنگام تنظیم نمایه به ما گفتید. هر چیزی که نادرست است را تغییر دهید.',
     preferences: 'تنظیمات', preferredLanguage: 'زبان مورد نظر',
     signOut: 'خروج',
+    signOutFailed: 'خروج انجام نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.',
+    pgSignOutConfirm: 'خارج می‌شوید؟ هر آنچه تا کنون پر کرده‌اید ذخیره شده است؛ می‌توانید دوباره وارد شوید و از همان‌جا ادامه دهید.',
     dutyPharmacies: 'داروخانه‌های نوبت‌دار',
     noDutyToday: 'هیچ داروخانه نوبت‌داری برای امروز ثبت نشده است.',
     // Duty roster unavailable. ZERO ROWS IS NEVER A LEGITIMATE STATE — there is always
@@ -9850,6 +9908,11 @@ const translations = {
     termsOfService: 'شرایط استفاده',
     legalAvailableInEnTr: 'اسناد حقوقی ما به انگلیسی و ترکی منتشر می‌شود. شما نسخهٔ انگلیسی را می‌خوانید.',
     signupLegalNotice: 'با ایجاد حساب کاربری، {terms} و {privacy} ما را می‌پذیرید.',
+    signupTermsCheckbox: '{terms} و {privacy} را خوانده‌ام و می‌پذیرم',
+    pgLegalFooter: 'نحوهٔ استفاده از این اطلاعات در {privacy} و {terms} ما توضیح داده شده است.',
+    pgMarketingOptIn: 'گاهی اوقات دربارهٔ قابلیت‌ها و خدمات جدید ADA به من اطلاع دهید.',
+    pgMarketingHint: 'اختیاری است. هر زمان بخواهید می‌توانید آن را از نمایهٔ خود خاموش کنید.',
+    marketingSectionTitle: 'به‌روزرسانی‌ها و پیشنهادها',
     // The ONLY variant since 2026-08-28. notOnAda/notOnAdaDesc were deleted from all 9
     // locales when unclaimed pharmacies stopped appearing in the browse list, search,
     // map pins and favourites: every facility that can still reach the unclaimed sheet

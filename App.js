@@ -25,6 +25,9 @@ import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
 } from './constants/profileGate'
 import { REGIONS } from './constants/regions'
+import { LEGAL_VERSION } from './constants/legal'
+import { readPendingConsent, clearPendingConsent } from './utils/pendingConsent'
+import { decidePendingConsent } from './utils/pendingConsentRules'
 import { resolveRegion } from './utils/resolveRegion'
 import AuthScreen from './screens/AuthScreen'
 import FacilityProfileScreen from './screens/FacilityProfileScreen'
@@ -35,6 +38,7 @@ import ExploreMapScreen from './screens/ExploreMapScreen'
 import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import ProfileSetupScreen from './screens/ProfileSetupScreen'
+import AgeIneligibleScreen from './screens/AgeIneligibleScreen'
 import DutyListScreen from './screens/DutyListScreen'
 import EventsScreen from './screens/EventsScreen'
 import OrganizerScreen from './screens/OrganizerScreen'
@@ -113,7 +117,61 @@ function TypeSVGIcon({ type, size, color }) {
 // profile_completed_at and profile_schema_version, so a column present in the initial
 // load but missing from the post-wizard refetch would leave the gate reading `undefined`
 // and firing forever.
-const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, institution_id, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible'
+//
+// ⚠ THIS LIST IS A HARD DEPENDENCY ON THE MIGRATIONS BEING APPLIED, AND IT IS NOT GATED
+//   BY ANY FLAG. A column named here that does not exist in the database makes the whole
+//   select return 42703, `data` null, and profile loading broken for EVERY user on the
+//   bundle — not just the feature the column belongs to. The four consent columns arrive
+//   with 20261016, so that migration must be applied BEFORE the OTA that carries this
+//   line, never after. A select list is not a feature and TERMS_CHECKBOX_LIVE does not
+//   protect it.
+//
+// terms_locale is read by nothing today. It is here so the loaded row carries the whole
+// consent record rather than three quarters of it — the flush compares terms_version, the
+// toggle reads marketing_opt_in_at, and a future re-acceptance round needs all four
+// without a second query. scripts/check-privacy-parity.mjs derives its field list from
+// this constant, so each of the four also had to be justified there.
+const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, institution_id, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible, terms_version, terms_accepted_at, terms_locale, marketing_opt_in_at'
+
+
+// ─── The signup tick, written now that there is a session to write it with ──
+//
+// utils/pendingConsent.js owns the DECISION — identity, expiry, document version — as a
+// pure function with no storage and no clock in it. This owns the WRITE.
+//
+// ⚠ DELIBERATELY NOT GATED ON TERMS_CHECKBOX_LIVE. It acts on evidence that a tick
+//   happened, and a tick can only exist if the flag was true when it was given. Gating
+//   the flush would strand a real acceptance on the device the moment the flag went back
+//   to false, which is precisely when the record would matter most.
+//
+// ⚠ error === null IS NOT PROOF THE WRITE LANDED. An update that RLS filters to zero rows
+//   comes back without an error, so clearing the entry on `!error` would throw away a tick
+//   that was never recorded — this repo has shipped that family of bug before. The write
+//   asks for the row back and the entry is cleared only when the returned version is the
+//   one we sent. The `owner read` policy is what makes that read-back legitimate.
+//
+// terms_accepted_at is never sent. Branch (g) of check_profile_name_content would
+// overwrite it anyway; not sending it is what makes that impossible to get wrong here.
+async function flushPendingConsent(session, profile) {
+  const decision = decidePendingConsent({
+    pending:         await readPendingConsent(),
+    email:           session.user.email,
+    currentVersion:  LEGAL_VERSION,
+    recordedVersion: profile?.terms_version ?? null,
+    now:             Date.now(),
+  })
+  if (decision.clear) await clearPendingConsent()
+  if (!decision.write) return null
+
+  const { data, error } = await supabase.from('profiles')
+    .update({ terms_version: decision.version, terms_locale: decision.locale })
+    .eq('id', session.user.id)
+    .select('terms_version, terms_locale, terms_accepted_at')
+    .single()
+  if (error || data?.terms_version !== decision.version) return null
+  await clearPendingConsent()
+  return data
+}
 
 
 // The `map` tab's identity follows EXPLORE_MAP_LIVE, label AND icon together. A tab
@@ -814,6 +872,16 @@ export default function App() {
           if (!syncErr) setProfile(prev => (prev ? { ...prev, preferred_language: storedLang } : prev))
         }
 
+        // The signup tick, if one is waiting. Guests are excluded EXPLICITLY rather than
+        // left to the RESTRICTIVE no_anon_update_profiles policy to reject silently —
+        // same reasoning as the language self-heal above. `data` must exist: without the
+        // row there is no recorded version to compare against, and the decision would be
+        // made against `undefined`.
+        if (data && !isGuest(session)) {
+          const consent = await flushPendingConsent(session, data)
+          if (consent) setProfile(prev => (prev ? { ...prev, ...consent } : prev))
+        }
+
         if (data?.role === 'provider') {
           loadProviderFacility()
         } else if (!data?.role || data?.role === 'customer') {
@@ -1166,6 +1234,31 @@ export default function App() {
     }
   }
 
+  // ─── AGE INELIGIBILITY IS TERMINAL, AND IS READ FROM THE ROW ──────────────
+  //
+  // Until 2026-09-13 this was session state inside the wizard, and the flag therefore
+  // gated NOTHING: an account that declared an under-13 date of birth got the block
+  // until it force-quit, then came back with age_ineligible = true — which made
+  // gateActive read FALSE, because gateActive REQUIRED !age_ineligible — and fell
+  // through to the customer tab shell. On an app that declares 13-15 / 16-17 / 18+ to
+  // Google Play. Deriving it from the row is what makes relaunching not an escape.
+  //
+  // ⚠ DELIBERATELY NOT GATED ON PROFILE_GATE_LIVE. That flag is the emergency lever for
+  //   the WIZARD — flipping it false unblocks every customer stuck at the door — and it
+  //   must not also re-admit under-13 accounts as a side effect. A compliance control
+  //   and a product kill-switch are different things and are not wired to each other.
+  //
+  // Scoped to `customer` for the same reason the wizard is: this flag has exactly one
+  // writer in the app (ProfileSetupScreen's under-13 branch) and it only ever runs on a
+  // customer. An admin is never locked out of the console by it.
+  const ageIneligible =
+    !!session && !isGuest(session) && !!profile &&
+    profile.role === 'customer' && !!profile.age_ineligible
+
+  // The `!profile.age_ineligible` clause below is now REDUNDANT — the branch above
+  // short-circuits first — and it stays on purpose. It is the second of two independent
+  // reasons the wizard cannot render for an ineligible account, so reordering the
+  // content chain cannot quietly undo this fix.
   const gateActive =
     PROFILE_GATE_LIVE &&
     !!session && !isGuest(session) && !!profile &&
@@ -1220,6 +1313,13 @@ export default function App() {
         </View>
       </SafeAreaView>
     )
+  } else if (ageIneligible) {
+    // BEFORE the gate, and before every exempt screen it renders. An ineligible account
+    // reaches nothing else: no duty roster, no health directory, no facility profile.
+    // That is a change from the old in-session block only in that it now survives a
+    // relaunch — the old screen returned early inside the wizard and reached none of
+    // them either.
+    content = <AgeIneligibleScreen lang={lang} />
   } else if (gateActive) {
     // ONE READABLE ALLOW-LIST of what a gated user may reach. This block renders the
     // exempt screens ITSELF rather than falling through to the ~25-branch chain below:
@@ -1279,6 +1379,12 @@ export default function App() {
         profile={profile}
         prefillRegion={deviceRegion}
         onDone={() => { setGateHealthList(false); reloadProfile() }}
+        /* The under-13 branch writes the flag and then hands over HERE rather than
+           rendering its own screen. Updating the row we already hold is enough — the
+           write has already succeeded by this point, and the branch above re-derives
+           from it on this render and on every launch after. No second code path, and
+           no network call standing between the flag and the block it causes. */
+        onAgeIneligible={() => setProfile(p => (p ? { ...p, age_ineligible: true } : p))}
         onEmergencyNumbers={() => setShowEmergencyModal(true)}
         onDutyList={() => setShowDutyList(true)}
         onHealthDirectory={() => setGateHealthList(true)}

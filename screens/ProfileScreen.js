@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, FlatList, ActivityIndicator, Platform,
-  Modal, LayoutAnimation, UIManager,
+  Modal, LayoutAnimation, UIManager, Switch,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
@@ -24,6 +24,7 @@ import {
   DISPLAY_NAME_MAX,
 } from '../constants/profileGate'
 import LegalScreen from './LegalScreen'
+import { TERMS_CHECKBOX_LIVE } from '../constants/flags'
 import { PRESET_AVATARS, getPreset } from '../constants/avatars'
 import BackButton from '../components/BackButton'
 
@@ -124,6 +125,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [deleteError, setDeleteError]           = useState(null)
   const [selectedCC, setSelectedCC]             = useState('+90')
   const [personalOpen, setPersonalOpen]         = useState(false)
+  // Mirrors the column, not a form field: it is written the moment it is switched, with
+  // no Save button between the decision and the record. Withdrawing a consent must be at
+  // least as easy as giving it, and a withdrawal that waits for a second tap is not.
+  const [marketingOn, setMarketingOn]           = useState(false)
+  const [marketingBusy, setMarketingBusy]       = useState(false)
 
   function toggleSection(setter) {
     if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true)
@@ -138,13 +144,18 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         const { data, error } = await supabase.from('profiles')
           .select('first_name, last_name, display_name, date_of_birth, region, resident_status, ' +
                   'student_level, institution_id, full_name, phone, nationality, nationality_code, ' +
-                  'preferred_language, role, avatar_url, profile_completed_at')
+                  'preferred_language, role, avatar_url, profile_completed_at, ' +
+                  // Hand-written list, NOT App.js's PROFILE_COLUMNS — this screen has
+                  // always had its own. Both now name marketing_opt_in_at and both
+                  // therefore depend on 20261016 being applied before the OTA.
+                  'marketing_opt_in_at')
           .eq('id', session.user.id)
           .single()
         if (error) { setLoadError(true); return }
         if (data) {
           setProfile(data)
           setAvatarUrl(data.avatar_url ?? null)
+          setMarketingOn(data.marketing_opt_in_at != null)
           const stored = data.phone ?? ''
           const matched = COUNTRY_CODES.find(c => stored.startsWith(c.code))
           if (matched) setSelectedCC(matched.code)
@@ -203,6 +214,29 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       .eq('blocker_id', session.user.id)
       .eq('blocked_id', blockedId)
     if (!error) setBlocks(prev => prev.filter(b => b.blocked_id !== blockedId))
+  }
+
+  // ⚠ THE CLIENT SENDS THE INTENT, THE SERVER SUPPLIES THE TIME. A non-NULL value is read
+  //   by branch (h) of check_profile_name_content as "opted in" and replaced with now();
+  //   NULL is a withdrawal and is honoured exactly. The ISO string below is a placeholder
+  //   that never reaches the row, which is why it does not matter that it comes from a
+  //   device clock.
+  //
+  // ⚠ error === null IS NOT PROOF THE WRITE LANDED — an update RLS filters to zero rows
+  //   returns no error. The row is read back and the switch follows what the DATABASE
+  //   says, not what was sent, so a write that silently did nothing shows as unchanged
+  //   rather than as success.
+  async function toggleMarketing(next) {
+    if (marketingBusy) return
+    setMarketingBusy(true)
+    setMarketingOn(next)                       // optimistic; reconciled below either way
+    const { data, error } = await supabase.from('profiles')
+      .update({ marketing_opt_in_at: next ? new Date().toISOString() : null })
+      .eq('id', session.user.id)
+      .select('marketing_opt_in_at')
+      .single()
+    setMarketingOn(error ? !next : data?.marketing_opt_in_at != null)
+    setMarketingBusy(false)
   }
 
   async function savePresetAvatar(id) {
@@ -664,6 +698,26 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             </View>
           )}
 
+          {/* Optional and withdrawable, in the one place a user goes looking for a
+              setting. It ships WITH the opt-in rather than after it: an opt-in whose
+              off switch is scheduled for a later release is not a consent, and the
+              wizard's hint already promises this row exists. */}
+          {TERMS_CHECKBOX_LIVE && (
+            <View style={s.marketingSection}>
+              <Text style={s.sectionTitle}>{t('marketingSectionTitle', lang)}</Text>
+              <View style={s.marketingRow}>
+                <Text style={s.marketingLabel}>{t('pgMarketingOptIn', lang)}</Text>
+                <Switch
+                  value={marketingOn}
+                  onValueChange={toggleMarketing}
+                  disabled={marketingBusy}
+                  trackColor={{ true: colors.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
+          )}
+
           <View style={s.legalRow}>
             <TouchableOpacity onPress={() => setLegalTab('privacy')}>
               <Text style={s.legalLink}>{t('privacyPolicy', lang)}</Text>
@@ -801,6 +855,9 @@ const s = StyleSheet.create({
   unblockBtn:       { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.primaryLight },
   unblockText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
   errorText:        { fontFamily: 'Inter_400Regular', color: colors.danger, fontSize: 13, marginBottom: 12 },
+  marketingSection: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, marginTop: 8, marginBottom: 16 },
+  marketingRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 },
+  marketingLabel:   { flex: 1, fontSize: 13.5, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19 },
   legalRow:         { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 16 },
   legalLink:        { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textDecorationLine: 'underline' },
   legalDot:         { fontSize: 13, color: colors.textSecondary },
