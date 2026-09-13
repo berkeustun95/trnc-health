@@ -58,6 +58,7 @@ import EsimScreen from './screens/EsimScreen'
 import ConnectivityLandingScreen from './screens/ConnectivityLandingScreen'
 import ConnectivityOperatorScreen from './screens/ConnectivityOperatorScreen'
 import ConnectivityPackageScreen from './screens/ConnectivityPackageScreen'
+import ConnectivityStoresScreen from './screens/ConnectivityStoresScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import ExploreScreen from './screens/ExploreScreen'
 import ExploreProfileScreen from './screens/ExploreProfileScreen'
@@ -777,7 +778,7 @@ export default function App() {
       if (showStudentHub) { setShowStudentHub(false); return true }
       // Walks the module one level at a time: package -> package list -> landing. A bare
       // pop to null would skip the list entirely and read as the app losing its place.
-      if (connectivitySub?.view === 'package') { setConnectivitySub('operator'); return true }
+      if (connectivitySub?.view === 'package' || connectivitySub === 'stores') { setConnectivitySub('operator'); return true }
       if (connectivitySub) { setConnectivitySub(null); return true }
       if (showEsim) { setShowEsim(false); setConnectivityOperator(null); return true }
       if (showLegal) { setShowLegal(false); return true }
@@ -1582,6 +1583,14 @@ export default function App() {
     // route case, the back handler and both closeAll sites are reused unchanged.
     content = !CONNECTIVITY_LIVE
       ? <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowEsim(false)} />
+      : connectivitySub === 'stores'
+        ? <ConnectivityStoresScreen
+            operator={connectivityOperator}
+            lang={lang}
+            userLocation={userLocation}
+            locationDenied={locationDenied}
+            onBack={() => setConnectivitySub('operator')}
+          />
       : connectivitySub?.view === 'package'
         ? <ConnectivityPackageScreen
             pkg={connectivitySub.pkg}
@@ -1593,8 +1602,11 @@ export default function App() {
         ? <ConnectivityOperatorScreen
             operator={connectivityOperator}
             lang={lang}
+            userLocation={userLocation}
+            locationDenied={locationDenied}
             onBack={() => setConnectivitySub(null)}
             onOpenPackage={pkg => setConnectivitySub({ view: 'package', pkg })}
+            onOpenStores={() => setConnectivitySub('stores')}
           />
         : <ConnectivityLandingScreen
             lang={lang}

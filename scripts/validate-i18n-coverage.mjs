@@ -162,6 +162,9 @@ const SURFACES = [
   'screens/ConnectivityOperatorScreen.js',
   'screens/ConnectivityPackageScreen.js',
   'components/ConnectivityErrorState.js',
+  // Slice 7, added IN THE COMMIT THAT CREATES THE SCREEN — the fourth time this file has
+  // had to record that lesson, and the first time it was applied without being relearned.
+  'screens/ConnectivityStoresScreen.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —

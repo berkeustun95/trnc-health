@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { colors, readableOn, brandInk, withAlpha } from '../constants/theme'
+import { Ionicons } from '@expo/vector-icons'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import ConnectivityErrorState from '../components/ConnectivityErrorState'
 import OperatorWordmark from '../components/OperatorWordmark'
-import { fetchPackages, latestPriceUpdate } from '../lib/connectivity'
+import { fetchPackages, fetchStores, latestPriceUpdate, nearestStore } from '../lib/connectivity'
 
 // Bağlantı & eSIM — the operator's own screen (screen 2 of 3).
 //
@@ -106,8 +107,11 @@ function formatPrice(value) {
   return `${body} ₺`
 }
 
-export default function ConnectivityOperatorScreen({ operator, lang, onBack, onOpenPackage }) {
+export default function ConnectivityOperatorScreen({
+  operator, lang, onBack, onOpenPackage, onOpenStores, userLocation, locationDenied,
+}) {
   const [packages, setPackages] = useState([])
+  const [stores, setStores]     = useState([])
   const [loading, setLoading]   = useState(true)
   const [retrying, setRetrying] = useState(false)
   const [failed, setFailed]     = useState(false)
@@ -135,6 +139,38 @@ export default function ConnectivityOperatorScreen({ operator, lang, onBack, onO
     await load()
     setRetrying(false)
   }, [load])
+
+  // Stores are fetched HERE rather than lifted into App.js, unlike the operator row. The
+  // operator is one record three screens all render; this is a list two screens query for
+  // different purposes — a single nearest here, the whole set over there — and the stores
+  // screen is required to own its retry. Lifting it would give one screen's retry the power
+  // to refetch the other's data.
+  //
+  // A failure is treated exactly like an empty result: zero stores is LEGITIMATE here (the
+  // branch list has not arrived from KKTCELL), so there is no fault to report and the line
+  // simply does not render. This is the one place in the module where absence is not an
+  // error, and keeping it that way is deliberate.
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      const { data } = await fetchStores(operator?.id)
+      if (active) setStores(data ?? [])
+    })()
+    return () => { active = false }
+  }, [operator?.id])
+
+  // Copied verbatim from DutyListScreen: the two are checked separately because they mean
+  // different things — a denied permission leaves userLocation null too, but "the user said
+  // no" and "we have no fix yet" are different states, and only the second may still resolve.
+  const sortByDistance = !!userLocation && !locationDenied
+
+  // DERIVED in a memo keyed on the coordinates, never at fetch time. userLocation resolves
+  // asynchronously in App.js and can land after this screen mounts; computing during the
+  // fetch would leave a line that never gains its distance on a slow fix.
+  const nearest = useMemo(
+    () => nearestStore(stores, sortByDistance ? userLocation : null),
+    [stores, sortByDistance, userLocation?.latitude, userLocation?.longitude],
+  )
 
   const primary   = operator?.brand_primary   || colors.primary
   const secondary = operator?.brand_secondary || colors.textPrimary
@@ -184,8 +220,45 @@ export default function ConnectivityOperatorScreen({ operator, lang, onBack, onO
           />
         )}
 
+        {/* ⚠ ABSENT ENTIRELY when the operator has no stores — the same rule as the card on
+            screen 3, and the same reason: zero stores is legitimate here, not a fault, so
+            there is nothing to announce. Never an empty-looking row.
+
+            Tappable whether or not a distance could be computed. A missing fix must not
+            block the route to the branch list — the user who cannot be located is exactly
+            the one who needs to look at a map. */}
+        {!!nearest && (
+          <TouchableOpacity
+            style={s.nearestRow}
+            onPress={onOpenStores}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+          >
+            <Ionicons name="location-outline" size={16} color={colors.primary} style={s.nearestIcon} />
+            <View style={s.nearestTextWrap}>
+              {/* The branch NAME is never truncated — it is the thing the user needs in order
+                  to find the door. The row wraps to a second line instead. */}
+              <Text style={s.nearestText}>
+                {t('connNearestStore', lang).replace('{name}', nearest.name ?? '')}
+              </Text>
+              {/* LABELLED STRAIGHT-LINE, reusing duty's own key. Haversine is not a driving
+                  distance and matters more here than it does there: "nearest" is itself a
+                  crow-flies claim, so across the Girne range the named branch may not be the
+                  closest by road. Rendered only when a distance exists — no placeholder,
+                  no zero. */}
+              {nearest._dist != null && (
+                <Text style={s.nearestDist}>
+                  {nearest._dist.toFixed(1)} km · {t('dutyStraightLine', lang)}
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
         {/* Derived from max(price_updated_at) across the packages actually on screen, so it
-            cannot go stale independently of the prices it describes. */}
+            cannot go stale independently of the prices it describes. The stamp is a footnote
+            and nothing sits below it. */}
         <View style={s.stamp}>
           <Text style={s.stampText}>
             {t('connStampSource', lang).replace('{operator}', operator?.name ?? '')}
@@ -256,6 +329,13 @@ const s = StyleSheet.create({
   // 1080x420 = 2.571:1. aspectRatio rather than a fixed height so the artwork is never
   // cropped or letterboxed on a narrow device.
   promo:         { width: '100%', aspectRatio: 1080 / 420, borderRadius: 13, marginTop: 6, backgroundColor: colors.border },
+
+  nearestRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, marginTop: 12 },
+  nearestIcon:   { flexShrink: 0 },
+  // flex:1 so a long branch name wraps inside the row instead of pushing the chevron off it.
+  nearestTextWrap: { flex: 1 },
+  nearestText:   { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  nearestDist:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
 
   stamp:         { marginTop: 11, alignItems: 'center' },
   stampText:     { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: '#93A2AB', textAlign: 'center', lineHeight: 16 },

@@ -13,11 +13,21 @@ import { mappableStores } from '../lib/connectivity'
 //   react-native-maps, which is already a dependency (1.20.1) and already the map
 //   everywhere else in the app. No second map implementation is introduced.
 //
-// The read-only treatment is lifted verbatim from screens/DormPartnerScreen.js — a
-// MapView with `pointerEvents="none"` and Markers. That is what makes it read-only: the
-// map does not pan, zoom or intercept a touch, so it reads as a picture of where the
-// stores are and the surrounding card stays scrollable. A gesture-enabled map inside a
-// ScrollView steals vertical drags and makes the page feel broken.
+// ─── TWO MODES, ONE MAP ─────────────────────────────────────────────────────
+//
+// `interactive` defaults to FALSE, which is the read-only treatment lifted verbatim from
+// screens/DormPartnerScreen.js: a MapView with `pointerEvents="none"` and Markers. The map
+// does not pan, zoom or intercept a touch, so it reads as a picture of where the stores are
+// and the surrounding card stays scrollable. That matters because a gesture-enabled map
+// inside a ScrollView steals vertical drags and makes the whole page feel broken.
+//
+// `interactive` = TRUE is for a DEDICATED map screen, where that reasoning does not apply:
+// there is no scrolling parent competing for the gesture, and a full-screen map that will
+// not pan reads as broken rather than as deliberate. The user is there to look at the map.
+//
+// One component with one boolean rather than two components, because everything else —
+// the region maths, the null-on-no-coordinates rule, the marker set — must not diverge
+// between the two surfaces. Two maps would drift.
 //
 // ⚠ RENDERS NOTHING when no store has coordinates. An address-only store row is legitimate
 //   and still belongs in the LIST beside this map — it just cannot be a pin. Returning null
@@ -43,23 +53,25 @@ function regionFor(stores) {
   }
 }
 
-export default function StoreMap({ stores, height = 120, pinColor, style }) {
+export default function StoreMap({ stores, height = 120, pinColor, style, interactive = false }) {
   const pins = mappableStores(stores)
   if (!pins.length) return null
 
   return (
-    <View style={[{ height }, style]} pointerEvents="none">
+    // pointerEvents is set on the WRAPPER as well as the MapView in read-only mode: the
+    // wrapper alone is what stops a touch reaching the map at all, and the per-gesture
+    // flags below are the belt to its braces — a future caller that drops one still gets a
+    // map that does not move.
+    <View style={[{ height }, style]} pointerEvents={interactive ? 'auto' : 'none'}>
       <MapView
         style={StyleSheet.absoluteFill}
-        pointerEvents="none"
+        pointerEvents={interactive ? 'auto' : 'none'}
         initialRegion={regionFor(pins)}
-        // Belt and braces: pointerEvents already blocks touches, but a future caller that
-        // drops the wrapper should not silently get an interactive map back.
-        scrollEnabled={false}
-        zoomEnabled={false}
-        rotateEnabled={false}
-        pitchEnabled={false}
-        toolbarEnabled={false}
+        scrollEnabled={interactive}
+        zoomEnabled={interactive}
+        rotateEnabled={interactive}
+        pitchEnabled={interactive}
+        toolbarEnabled={interactive}
       >
         {pins.map(store => (
           <Marker
