@@ -43,6 +43,30 @@ export default function FavouritesRow({ ids, lang, onPress }) {
             lang={lang}
             onPress={onPress}
             width={`${100 / FAVOURITE_SLOTS}%`}
+            // ─── THE FULL PHRASE, SAME AS THE GRID ──────────────────────────
+            //
+            // Added 2026-09-13. The module has two names and users were hitting the seam:
+            // the grid read "Tadilat · Bakım · Onarım" and this row, ten lines above it on
+            // the same screen, read "Tadilat".
+            //
+            // The original split was drawn in the wrong place. It was justified by the
+            // edit sheet's slot PREVIEW, a 56pt box at 320dp that would need 7.31pt type —
+            // and that constraint is real, but it belongs to the sheet, not here. This row
+            // is a surface a user READS; the sheet's slots are chips inside a picker. They
+            // do not have to agree, and the row should agree with the grid instead.
+            //
+            // ⚠ NO EXTRA WIDTH HERE, DESPITE APPEARANCES. Four tiles rather than sixteen
+            //   suggests a wider tile, and it is not: FAVOURITE_SLOTS and GRID_COLUMNS are
+            //   both 4, both rows sit inside the same page inset, so the label box is the
+            //   SAME 86.25pt at 393dp and 68.0pt at 320dp. This works because the phrase
+            //   already fits that box — measured across all nine locales — not because
+            //   there is room to spare.
+            //
+            // Tile height does not move. ModuleTile derives lineHeight from
+            // GRID_LABEL_HEIGHT / lines, so three lines occupy the same 32pt two do, and
+            // this tile stays uniform with the other three by construction rather than by
+            // luck.
+            labelOverride={mod.gridLabel}
           />
         )
       })}
