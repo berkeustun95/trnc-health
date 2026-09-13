@@ -321,8 +321,13 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
               accessibilityRole="checkbox"
               accessibilityState={{ checked: termsOk }}
             >
+              {/* The TouchableOpacity wraps the box AND the label, so the whole row
+                  toggles — a bare <Text> is not a touch responder and its taps fall
+                  through to the parent. The two document links ARE responders and keep
+                  their own taps, which is the behaviour you want: tap the phrase, read
+                  the document; tap anywhere else on the row, tick the box. */}
               <View style={[styles.checkbox, termsOk && styles.checkboxOn]}>
-                {termsOk && <Feather name="check" size={13} color="#fff" />}
+                {termsOk && <Feather name="check" size={14} color="#fff" />}
               </View>
               <LegalLinkedText templateKey="signupTermsCheckbox" lang={lang}
                 style={styles.termsText} linkStyle={styles.legalNoticeLink} onOpen={setLegalTab} />
@@ -379,10 +384,46 @@ const styles = StyleSheet.create({
   submit:            { backgroundColor: colors.primary, borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 4 },
   submitText:        { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.2 },
   legalNotice:       { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, textAlign: 'center', marginTop: 14 },
-  termsRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 16,
-                   paddingHorizontal: 2 },
-  checkbox:      { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5,
-                   borderColor: colors.border, backgroundColor: 'transparent',
+  // ─── THE UNTICKED BOX HAS TO READ AS A CONTROL, AND IT DID NOT ────────────
+  //
+  // Shipped first as a 1.5pt colors.border (#E8EDF2) outline with a transparent fill.
+  // MEASURED against the real backdrop it was 1.18:1 at best and 1.04:1 at worst —
+  // WCAG 1.4.11 asks 3:1 for the boundary of a UI component. It was not faint, it was
+  // invisible, and on a device it read as decoration beside a disabled submit button.
+  //
+  // The backdrop is bounded and that is worth knowing before picking a colour: the card
+  // is 0.88 white over a 0.55 white overlay over the photograph, and white-over-white is
+  // affine, so ANY photo lands the card between #F1F1F1 and #FFFFFF. The asset confirms
+  // it (auth-bg.png spans the full 0..255). So the box is always on near-white and the
+  // border alone decides whether it is visible.
+  //
+  // ⚠ THE OPAQUE FILL IS NOT THE FIX AND MUST NOT BE MISTAKEN FOR IT. #FFFFFF against
+  //   that backdrop measures 1.00:1 to 1.13:1 — no edge at all where the photo is bright.
+  //   It is here so the 88%-alpha card cannot show photo texture through the inside of
+  //   the box, which keeps both the empty state and the tick on a clean ground. The
+  //   BORDER carries the affordance.
+  //
+  // THREE CUES, ONLY ONE OF THEM COLOUR, because someone who cannot separate the border
+  // hue from the card is exactly the user the old version failed:
+  //   · WEIGHT  1.5 -> 2pt
+  //   · SIZE    22 -> 24pt, radius 6 -> 7 to match
+  //   · COLOUR  colors.border -> colors.textSecondary, 4.76:1 / 4.21:1
+  //
+  // textSecondary and NOT colors.primary, though primary measures marginally better
+  // (5.01 / 4.44): a teal outline sitting next to a teal-FILLED ticked state invites the
+  // reading "already on", and primary means exactly two things on this screen — the two
+  // document links and the submit action. A neutral grey empty box is the conventional
+  // unticked checkbox and borrows that recognition instead of competing with it.
+  //
+  // No shadow: the repo's `shadow` is 0.07 opacity at 12pt radius, which on a 24pt square
+  // is invisible on iOS and muddy on Android. A cue that only half-renders is not a cue.
+  //
+  // paddingVertical takes the row to ~54pt tall against Apple's 44pt guidance; it was
+  // ~38pt. The WHOLE ROW is the target, label included — see the comment on the JSX.
+  termsRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 12,
+                   paddingHorizontal: 2, paddingVertical: 8 },
+  checkbox:      { width: 24, height: 24, borderRadius: 7, borderWidth: 2,
+                   borderColor: colors.textSecondary, backgroundColor: '#FFFFFF',
                    alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   checkboxOn:    { backgroundColor: colors.primary, borderColor: colors.primary },
   termsText:     { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19,
