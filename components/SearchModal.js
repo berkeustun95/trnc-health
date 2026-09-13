@@ -84,19 +84,49 @@ export default function SearchModal({
     return options.filter(o => o.label.toLocaleLowerCase().includes(needle))
   }, [options, q, searchable])
 
-  // ─── How tall the card may be ─────────────────────────────────────────────
+  // ─── POSITION FIRST, THEN HEIGHT ──────────────────────────────────────────
   //
-  // Two cases, and the closed-keyboard one is deliberately IDENTICAL to the old behaviour
-  // so nothing changes for the four pickers that never open a keyboard (day, month, year,
-  // language).
+  // ⚠ THE 2026-09-12 FIX WAS ARITHMETIC ON THE WRONG AXIS, AND IT MADE THIS WORSE.
+  //   The card is a flow child of a flex:1 backdrop with justifyContent:'flex-end', so it
+  //   is anchored to the WINDOW bottom — and an RN <Modal> is its own window which does
+  //   not resize for the keyboard on either platform. Visible height is therefore
+  //   cardHeight MINUS keyboardHeight, so SHRINKING the card moves its top edge down and
+  //   removes visible area 1:1. Measured against real metrics, the shrink took an
+  //   iPhone 15 from 303pt of visible card to 97pt — less than the ~98pt of header and
+  //   search box above the list, i.e. not one result row. Reported as "no card at all",
+  //   which is what it looks like.
   //
-  // With the keyboard UP the card takes everything above it rather than 75% of that:
-  // searching is the moment the user most needs rows on screen, and 75% of an already
-  // halved space is a list two rows tall. The top gap keeps it from becoming a full-screen
-  // sheet, which would lose the "a picker over your form" reading.
-  const cardMaxHeight = kbHeight > 0
-    ? Math.max(winHeight - kbHeight - insets.top - 24, 220)
-    : winHeight * 0.75
+  //   Height was never the problem. POSITION was.
+  //
+  // So the backdrop RESERVES the keyboard's space (paddingBottom below) and the card's
+  // bottom lands at winHeight - kbHeight instead of winHeight. Nothing here needs the OS
+  // to tell the Modal about the keyboard — the height is already known from a global
+  // Keyboard listener, and we simply decline to lay content out underneath it. That is
+  // KeyboardAvoidingView's behaviour done by hand, which is the point: KAV's own
+  // plumbing is what does not reach reliably inside a Modal window.
+  //
+  // min(), not a branch: with kbHeight 0 the second term is far larger, so this returns
+  // exactly the 75% the four keyboard-less pickers have always had. No floor — a floor
+  // taller than the space above the keyboard would push the card back under it, which is
+  // the bug this replaces.
+  const cardMaxHeight = Math.min(winHeight * 0.75, winHeight - kbHeight - insets.top - 24)
+
+  // ─── Measured, not described ──────────────────────────────────────────────
+  // Two numbers settle the two ways this can still be wrong, and neither is guessable
+  // from a screenshot:
+  //   kbHeight 0 while the keyboard is up  -> the listener does not fire inside a Modal,
+  //                                           paddingBottom is 0, and the card does not move.
+  //   winHeight SHRINKS when the keyboard opens -> Android is already resizing the Dialog
+  //                                           window, so subtracting kbHeight double-counts.
+  // Folded out of a release bundle by __DEV__.
+  useEffect(() => {
+    if (!__DEV__ || !visible) return
+    console.log('[SearchModal]', JSON.stringify({
+      title, kbHeight, winHeight, insetTop: insets.top,
+      cardMaxHeight: Math.round(cardMaxHeight),
+      cardBottomAt: winHeight - kbHeight,
+    }))
+  }, [visible, kbHeight, winHeight, insets.top, cardMaxHeight, title])
 
   // Dismiss BEFORE the parent unmounts this modal. Selecting a country closes the sheet,
   // and a keyboard whose input has just been unmounted is left hanging over the screen
@@ -109,7 +139,10 @@ export default function SearchModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={s.modalBackdrop}>
+      {/* paddingBottom is the whole fix: it lifts the flex-end child clear of the
+          keyboard. Applied inline because it is the one value here that depends on
+          runtime state. */}
+      <View style={[s.modalBackdrop, { paddingBottom: kbHeight }]}>
         <View style={[s.modalCard, { maxHeight: cardMaxHeight }]}>
           <View style={s.modalHeader}>
             <Text style={s.modalTitle}>{title}</Text>
