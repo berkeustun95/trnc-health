@@ -172,10 +172,12 @@ const EXPECTED_SCALARS = {
   // check would ship Yurtlar early to every user AND change where Emlak & Konaklama lands.
   DORMS_LIVE:            true,   // live 2026-09-13
   // The signup terms checkbox. Baselined for the usual reason — `eas update` bundles the
-  // WORKING TREE — and with more force than most: a flip left over from a device check
-  // would start writing consent records for users who were shown a checkbox nobody had
-  // reviewed, and consent is not a thing you can quietly un-collect.
-  TERMS_CHECKBOX_LIVE:   false,
+  // WORKING TREE — and it still matters now that it is TRUE, in the other direction: a
+  // working-tree revert left over from a comparison would ship a signup screen that
+  // silently stops recording consent, which is the failure nobody notices because the
+  // screen still works. Consent is not a thing you can quietly un-collect, and it is not
+  // a thing you can quietly stop collecting either.
+  TERMS_CHECKBOX_LIVE:   true,   // live 2026-09-13
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

@@ -328,16 +328,25 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //   columns and the trigger branches ship regardless (20261016) — schema first, client
 //   second, flag last — so flipping this is the only step that changes what is recorded.
 //
-// ⚠ DO NOT FLIP UNTIL THE TURKISH DOCUMENT BODIES ARE LIVE. The checkbox asks a user to
-//   accept documents; constants/legal/ carries English and Turkish today and English
-//   fallback for the other seven, with legalAvailableInEnTr saying so above the tick.
-//   That is the agreed shape, but it is a judgement that should be re-made deliberately
-//   at flip time rather than inherited from this comment.
+// FLIPPED TRUE 2026-09-13, after the device pass. The precondition this comment
+// used to carry — that the Turkish bodies be live before asking anyone to accept
+// anything — was met and re-judged at flip time rather than inherited: constants/legal/
+// carries English and Turkish, the other seven fall back to English, and
+// legalAvailableInEnTr says so directly above the tick.
 //
-// ⚠ AND THE FREE WINDOW CLOSES WHEN IT DOES. LEGAL_VERSION is 2026-09 and nobody has
-//   accepted it, so document edits are still free. The first tick ends that: the same
-//   edit then becomes a material change to an accepted document and needs a
-//   re-acceptance round.
+// ⚠ THE FREE-EDIT WINDOW ON constants/legal/ IS CLOSING, AND NOT ON THIS LINE. It closes
+//   at THE FIRST TICK THAT LANDS — the first row to carry terms_version — which is some
+//   minutes or hours after this flag ships, not at the moment it flips. Until then
+//   LEGAL_VERSION 2026-09 is accepted by nobody and the four documents can be edited
+//   freely. After it, the same edit is A MATERIAL CHANGE TO AN ACCEPTED DOCUMENT and
+//   needs a re-acceptance round: bump LEGAL_VERSION, republish all three copies
+//   (`git push` for docs/, `npm run web:deploy` for web/, `npm run ota` for in-app) and
+//   decide what to do about everyone already on the old version.
+//
+//   The boundary is a DATA fact, not a code one, so nothing in this repo can tell you
+//   which side of it you are on. Ask the database:
+//     SELECT count(*) FROM profiles WHERE terms_version IS NOT NULL;
+//   Zero means the window is still open. Any other number means it is not.
 //
 // ─── WHAT IT GATES, AND THE ONE THING IT DELIBERATELY DOES NOT ──────────────
 //
@@ -355,12 +364,14 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //
 // ⚠ NOT GATED EITHER: the four consent columns in App.js PROFILE_COLUMNS. A select list
 //   is not a feature. Against a database without 20261016 that select fails for every
-//   user regardless of this flag, so the migration is a hard prerequisite of the OTA and
-//   not of the flip.
+//   user regardless of this flag, so the migration was a prerequisite of the OTA that
+//   carried the client half, not of this flip. 20261016 applied 2026-09-13; verify_schema
+//   569/569 with both 1016_profile_consent H-tokens green and the ledger row matching
+//   checksum 870af4d5.
 //
 // NOT a MODULE_FLAGS key: it gates a flow inside the signup screen, not a module. Same
 // resolution as PROFILE_GATE_LIVE and HS_SELF_REGISTRATION.
-export const TERMS_CHECKBOX_LIVE = false
+export const TERMS_CHECKBOX_LIVE = true   // live 2026-09-13
 
 // ─── AND WHAT NO FLAG IN THIS FILE GATES: THE UNDER-13 BLOCK ────────────────
 //
