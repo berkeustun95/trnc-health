@@ -45,6 +45,15 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-i18n-covera
 # already making the promise unbacked for weeks before anything compared the two.
 # Checks COMMITTED, not APPLIED: only the anon key exists here, so pg_policies is out of
 # reach. verify_schema.sql owns the applied half. See the script header.
+# A native module imported at the top of a file runs requireNativeModule while the BUNDLE
+# IS EVALUATED — at launch, on every device — so an OTA carrying one crashes every binary
+# built before that module was added. runtimeVersion 'appVersion' does not fence them.
+# See the header of scripts/check-native-import-safety.mjs.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs || {
+  echo "pre-push BLOCKED: a guarded native module is imported at module scope."
+  exit 1
+}
+
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs || {
   echo "  push blocked: the Terms promise 24h removal that the database cannot deliver."
   exit 1
