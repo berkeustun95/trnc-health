@@ -297,6 +297,17 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
     ? cards.filter(({ row }) => (row.coverage_districts || []).includes(selectedDistrict))
     : cards
 
+  // ⚠ ONE PREDICATE, TWO READERS, AND THEY MUST NOT DRIFT. `rowCovers` decides both
+  //   whether the WhatsApp draft may name the category and whether the context card
+  //   above says nobody covers it. Written as a named function rather than inlined twice
+  //   so the card cannot claim "no partner here" while the draft simultaneously tells the
+  //   firm the user wants exactly this job.
+  const rowCovers = row => (row.service_types || []).includes(selectedCategory)
+  // LIST-LEVEL. "No ADA partner in this category" is a statement about the whole list,
+  // not about one card — per-card it would repeat N times and each copy would be a
+  // weaker claim than the one the reader needs.
+  const anyCovers = visible.some(({ row }) => rowCovers(row))
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="home_services" />
@@ -342,6 +353,29 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
           <ActivityIndicator size="large" color={colors.primary} style={s.spinner} />
         ) : (
           <>
+            {/* ─── CONTEXT, ABOVE THE CARD AND ON A READABLE SURFACE ──────────────
+                The first version of this was a grey line BELOW the card, and it failed
+                twice over on a real device:
+
+                  • it rendered over the hero background photo — a busy mid-tone workshop
+                    image — in secondary grey, which made it effectively invisible;
+                  • it listed what TadilArt DOES, which is exactly what the four service
+                    chips one line above it already said. A duplicate, rendered worse.
+
+                What a reader on the Tesisatçı page actually needs is not what this firm
+                does — the chips have that covered — but that NOBODY covers the category
+                they tapped. That is the fact the screen was missing.
+
+                So it moved above the card, onto s.emptyCard: the same white bordered
+                surface the module landing already uses for its empty state, which is
+                known readable over the same photo because it is already shipping there.
+                No third surface invented for this. */}
+            {!anyCovers && (
+              <View style={s.contextWrap}>
+                <EmptyNote titleKey="hsCatNoPartnerTitle" bodyKey="hsCatNoPartnerBody" lang={lang} />
+              </View>
+            )}
+
             {visible.map(({ partner, row }) => {
               // ⚠ COVERED-ONLY, and this is the honesty hinge of the whole promotion.
               // The context goes into the WhatsApp draft the user sends the firm. Passing
@@ -352,8 +386,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
               //
               // Read in the message's OWN language, never the user's: it is the FIRM that
               // reads it. See constants/partners.js.
-              const rowCovers = (row.service_types || []).includes(selectedCategory)
-              const serviceContext = rowCovers && activeCat
+              const serviceContext = rowCovers(row) && activeCat
                 ? { tr: t(activeCat.labelKey, 'Turkish'), en: t(activeCat.labelKey, 'English') }
                 : null
               return (
@@ -366,32 +399,6 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
                     region={selectedDistrict}
                     onPress={() => setSelectedPartner({ partner, row, serviceContext, region: selectedDistrict })}
                   />
-                  {/* ─── THE COVERAGE LINE ─────────────────────────────────
-                      Rendered ONLY where this partner does not cover the category the
-                      user tapped — on the four they do cover it would restate the page
-                      title.
-
-                      It says what they DO, never what they do not. A reader on the
-                      Plumber page seeing a renovation firm needs to know why it is
-                      there; "not a plumber" is a smaller, ruder version of the same
-                      sentence and invites the question of who is.
-
-                      ⚠ DERIVED FROM row.service_types, never a written list. Add a
-                        service to the row and this line grows by itself — a hardcoded
-                        string would keep advertising the old four and be wrong in the
-                        direction nobody checks. Ordered by HS_CATEGORIES so it reads in
-                        the same order as the grid the user just came from, not in
-                        whatever order the column happens to hold. */}
-                  {!rowCovers && (
-                    <Text style={s.coverNote}>
-                      {t('hsPartnerCovers', lang)
-                        .replace('{partner}', row.name)
-                        .replace('{services}', HS_CATEGORIES
-                          .filter(c => (row.service_types || []).includes(c.key))
-                          .map(c => t(c.labelKey, lang))
-                          .join(' · '))}
-                    </Text>
-                  )}
                 </View>
               )
             })}
@@ -431,8 +438,7 @@ const s = StyleSheet.create({
   introCard:    { marginBottom: 20 },
   spinner:      { marginTop: 32 },
   partnerWrap:  { marginBottom: 16 },
-  coverNote:    { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
-                  lineHeight: 18, marginTop: 8, paddingHorizontal: 4 },
+  contextWrap:  { marginBottom: 16 },
 
   grid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
   catTile:      { width: '47%', backgroundColor: colors.cardBg, borderRadius: radius.card,
