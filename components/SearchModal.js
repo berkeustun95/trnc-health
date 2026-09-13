@@ -182,9 +182,27 @@ export default function SearchModal({
             // would leave a gap the size of the keyboard under the final row.
             contentContainerStyle={{ paddingBottom: insets.bottom + 12 }}
             renderItem={({ item }) => (
+              // ⚠ THE SAME CONSTRUCT THAT CLIPPED THE WIZARD'S RESIDENT-STATUS LABELS
+              //   TO ONE WORD (f1a7b99). Identical shape: a flexShrink Text as the sole
+              //   child of a justifyContent:'space-between' row, with the check rendered
+              //   only when selected — so Yoga measures the label's HEIGHT at max-content
+              //   width, Android draws the wrapped second line outside that box, and an
+              //   Android View clips its children by default.
+              //
+              //   Not observed here yet, and that is not reassurance: the wizard's
+              //   NATIONALITY picker is this list, it is a required field in the same
+              //   mandatory gate, it holds 190 rows, and the longest Turkish label is
+              //   "Amerika Birleşik Devletleri" at 27 characters. It is the same bug
+              //   waiting on a narrow enough screen.
               <TouchableOpacity style={s.modalItem} onPress={() => choose(item.value)}>
                 <Text style={[s.modalItemText, value === item.value && s.modalItemTextOn]}>{item.label}</Text>
-                {value === item.value && <Feather name="check" size={15} color={colors.primary} />}
+                <Feather
+                  name="check"
+                  size={15}
+                  color={value === item.value ? colors.primary : 'transparent'}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                />
               </TouchableOpacity>
             )}
           />
@@ -214,6 +232,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  modalItemText: { fontSize: 15, color: colors.textPrimary, flexShrink: 1, paddingRight: 10 },
+  // flex:1, not flexShrink:1 — see the note on renderItem above and f1a7b99.
+  modalItemText: { fontSize: 15, color: colors.textPrimary, flex: 1, paddingRight: 10 },
   modalItemTextOn: { color: colors.primary, fontWeight: '700' },
 })
