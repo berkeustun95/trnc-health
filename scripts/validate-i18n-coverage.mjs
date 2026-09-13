@@ -151,6 +151,17 @@ const SURFACES = [
   'components/home/FavouritesRow.js',
   'components/home/FavouritesEditSheet.js',
   'components/home/ModuleTile.js',
+  // Widened 2026-09-13 for Bağlantı & eSIM, BEFORE CONNECTIVITY_LIVE flips rather than
+  // after — the same reasoning as the explore go-live above. These three screens are the
+  // first thing a newcomer reaches on the day they land, in whatever language they chose,
+  // and the module's whole promise is that it works for people who do not read Turkish.
+  // The warning card in particular ("a generic Cyprus eSIM will not work in the north") is
+  // the single most expensive string in the module to render in the wrong language: a
+  // visitor who cannot read it buys the wrong product at the airport.
+  'screens/ConnectivityLandingScreen.js',
+  'screens/ConnectivityOperatorScreen.js',
+  'screens/ConnectivityPackageScreen.js',
+  'components/ConnectivityErrorState.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
@@ -175,6 +186,24 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // "eSIM" is a product term, not a word — it is written in Latin script and left
+  // untranslated by the industry in every locale ADA supports, including the two RTL ones,
+  // exactly as "Wi-Fi" and "SIM" are. KKTCELL's own Turkish pages say "eSIM". Translating
+  // it would invent a term no shop assistant would recognise, which on a screen whose whole
+  // job is getting somebody a working line at the airport is the opposite of helpful.
+  //
+  // NOTE this is the TAG on a package card, which is ADA's own label for a capability. The
+  // package NAMES beside it are never translated at all and never reach this file — they
+  // come from connectivity_packages and render exactly as the partner wrote them.
+  'connTagEsim': { Turkish: 'product term, Latin script in all locales',
+                   Arabic:  'product term, stays Latin even in RTL copy',
+                   Russian: 'product term, Latin script in Russian tech copy',
+                   Greek:   'product term, Latin script in Greek tech copy',
+                   French:  'product term, untranslated',
+                   Spanish: 'product term, untranslated',
+                   German:  'product term, untranslated',
+                   Persian: 'product term, stays Latin even in RTL copy' },
+
   // Place names. The English strings are already the local exonyms the app uses, so a
   // locale "translating" them would be inventing a name the signage does not use.
   'blDistrictIskele':     { Turkish: 'the English value IS the Turkish name',

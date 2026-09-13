@@ -185,3 +185,34 @@ export function readableOn(bg, { light = '#FFFFFF', dark = colors.textPrimary } 
   if (cl == null || cd == null) return light
   return cl >= cd ? light : dark
 }
+
+// A BRAND colour used as TEXT on one of our own surfaces — the inverse problem to
+// readableOn(). There the background is the brand and we pick the text; here the text is
+// the brand and the background is ours, so the brand is what has to give way.
+//
+// Returns the brand colour when it is legible on `on`, and `fallback` when it is not. The
+// partner design sets package names and prices in the operator's dark navy, which measures
+// 15.59:1 on a white card and is exactly right — but brand_secondary is a SQL-swappable
+// column, and the same markup handed a pale brand would render near-invisible text with
+// nothing to say it had happened. Decorative use of a brand colour must never be the reason
+// a price cannot be read.
+export function brandInk(brand, { on = colors.cardBg, fallback = colors.textPrimary, min = 4.5 } = {}) {
+  const c = contrastRatio(brand, on)
+  return (c != null && c >= min) ? brand : fallback
+}
+
+// A brand colour at reduced opacity, as an 8-digit hex.
+//
+// Written because `brand + '33'` — the obvious inline form — is only correct for a 6-digit
+// value. `luminance()` above accepts #rgb and expands it; string concatenation does not, so
+// a perfectly valid `#FC0` in the operators table would produce `#FC033`, which React Native
+// cannot parse: the wash silently disappears and the tag renders on nothing. The whole
+// premise of this module is that brand values are swapped by SQL, so the short form WILL
+// arrive eventually and it must not fail silently when it does.
+export function withAlpha(hex, alpha = 0.2) {
+  let h = String(hex || '').trim().replace(/^#/, '')
+  if (h.length === 3) h = h.split('').map(c => c + c).join('')
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return 'transparent'
+  const a = Math.round(Math.min(Math.max(alpha, 0), 1) * 255).toString(16).padStart(2, '0')
+  return `#${h}${a}`
+}

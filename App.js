@@ -56,6 +56,8 @@ import GaragesScreen from './screens/GaragesScreen'
 import TowingScreen from './screens/TowingScreen'
 import EsimScreen from './screens/EsimScreen'
 import ConnectivityLandingScreen from './screens/ConnectivityLandingScreen'
+import ConnectivityOperatorScreen from './screens/ConnectivityOperatorScreen'
+import ConnectivityPackageScreen from './screens/ConnectivityPackageScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import ExploreScreen from './screens/ExploreScreen'
 import ExploreProfileScreen from './screens/ExploreProfileScreen'
@@ -495,6 +497,9 @@ export default function App() {
   // Sub-screen within Bağlantı & eSIM: null = landing, 'operator' = package list,
   // { pkg } = package detail. Mirrors petsSubScreen / gamesSubScreen.
   const [connectivitySub, setConnectivitySub] = useState(null)
+  // The operator row, lifted out of the landing screen so screen 2 does not re-query for a
+  // row screen 1 has already loaded. Cleared with the module, not with the sub-screen.
+  const [connectivityOperator, setConnectivityOperator] = useState(null)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
@@ -770,8 +775,11 @@ export default function App() {
       if (showGarages) { setShowGarages(false); return true }
       if (showTowing) { setShowTowing(false); return true }
       if (showStudentHub) { setShowStudentHub(false); return true }
+      // Walks the module one level at a time: package -> package list -> landing. A bare
+      // pop to null would skip the list entirely and read as the app losing its place.
+      if (connectivitySub?.view === 'package') { setConnectivitySub('operator'); return true }
       if (connectivitySub) { setConnectivitySub(null); return true }
-      if (showEsim) { setShowEsim(false); return true }
+      if (showEsim) { setShowEsim(false); setConnectivityOperator(null); return true }
       if (showLegal) { setShowLegal(false); return true }
       if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
       if (showExploreBeach)     { setShowExploreBeach(false); return true }
@@ -1572,13 +1580,28 @@ export default function App() {
     // The Home "esim" tile is UNGATED and has opened EsimScreen (waitlist) since 20260725.
     // CONNECTIVITY_LIVE swaps that same tile to the KKTCELL partner module — the tile, the
     // route case, the back handler and both closeAll sites are reused unchanged.
-    content = CONNECTIVITY_LIVE
-      ? <ConnectivityLandingScreen
-          lang={lang}
-          onBack={() => { setConnectivitySub(null); setShowEsim(false) }}
-          onOpenOperator={() => setConnectivitySub('operator')}
-        />
-      : <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowEsim(false)} />
+    content = !CONNECTIVITY_LIVE
+      ? <EsimScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowEsim(false)} />
+      : connectivitySub?.view === 'package'
+        ? <ConnectivityPackageScreen
+            pkg={connectivitySub.pkg}
+            operator={connectivityOperator}
+            lang={lang}
+            onBack={() => setConnectivitySub('operator')}
+          />
+      : connectivitySub === 'operator'
+        ? <ConnectivityOperatorScreen
+            operator={connectivityOperator}
+            lang={lang}
+            onBack={() => setConnectivitySub(null)}
+            onOpenPackage={pkg => setConnectivitySub({ view: 'package', pkg })}
+          />
+        : <ConnectivityLandingScreen
+            lang={lang}
+            onBack={() => { setConnectivitySub(null); setConnectivityOperator(null); setShowEsim(false) }}
+            onOperatorLoaded={setConnectivityOperator}
+            onOpenOperator={() => setConnectivitySub('operator')}
+          />
   } else if (showLegal) {
     content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
   } else if (selectedExplorePlace) {
@@ -2021,7 +2044,7 @@ export default function App() {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
-    setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setShowTowing(false)
+    setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
@@ -2050,7 +2073,7 @@ export default function App() {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
-    setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setShowTowing(false)
+    setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {

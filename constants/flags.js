@@ -433,5 +433,28 @@ export const TERMS_CHECKBOX_LIVE = true   // live 2026-09-13
 //   the towing seed, there is no pre-launch window in which a user can find this content
 //   through global search and land on a screen that will not open.
 //
+// ─── SWAPPING THE OPERATOR IS A SQL UPDATE AND NOTHING ELSE — BY CONSTRUCTION ─
+//
+// This briefly was not true, and the fix is worth recording because the tempting one was
+// worse. Two Turkish keys spliced a suffix onto the operator's name — "{operator}'de devam
+// et" and "{operator}'e aktarılır" — which are FRONT-vowel forms. Correct for KKTCELL and
+// Telsim, silently wrong for a back-vowel name, where Turkish requires "'da" / "'a"
+// ("Vodafone'da", not "Vodafone'de"). Nothing could have detected it: the string renders,
+// the layout fits, and only a Turkish reader sees it.
+//
+// The obvious fix was a per-operator suffix column. REJECTED — that is one more field that
+// must be maintained and can be maintained wrongly, on a swap that may happen once. Both
+// keys were reworded around "ile", which takes NO vowel harmony and is therefore correct
+// for any operator name in any vowel class:
+//     connCtaPrimary  "{operator} ile devam et"
+//     connStep1Body   "Seçiminiz {operator} ile paylaşılır."
+//
+// So there is no swap-day copy caveat. This is RETIRED, not outstanding.
+//
+// ⚠ THE RULE IT LEAVES BEHIND: never attach a Turkish suffix to an interpolated value.
+//   Reword around a particle that does not inflect. Audited across the whole connectivity
+//   namespace on 2026-09-13 — "{operator} mağazasında" and "{operator} tarafından" are
+//   separate words and were already safe; those two were the only offenders.
+//
 // Reverting is this one boolean, and so is the emergency direction.
 export const CONNECTIVITY_LIVE = false
