@@ -110,20 +110,61 @@ function ChipGroup({ options, value, onSelect }) {
   )
 }
 
+// ─── EVERY ROW RENDERS THE CHECK, SELECTED OR NOT ───────────────────────────
+//
+// ⚠ THIS IS HALF A BUG FIX, NOT A STYLE PREFERENCE. On a Xiaomi Redmi Note 14 Pro 5G
+//   (Android, EN) two of the four resident-status labels rendered as a single capital
+//   "A" — "A student" and "A tourist" — while "Living here" rendered in full. The one
+//   that worked was the SELECTED row, and the only structural difference was that the
+//   selected row rendered a SECOND child: this icon.
+//
+//   That asymmetry is what rules out every width explanation. The row with MORE content
+//   and BOLDER text (rowTextOn adds fontWeight 600) laid out correctly; the rows with
+//   less content failed. Font scale, long labels and narrow screens all predict the
+//   opposite.
+//
+//   The mechanism, and it is Android-specific: with one child under
+//   justifyContent:'space-between', Yoga measures the Text at max-content width — one
+//   line — then shrinks it. Android's TextView then draws TWO lines into a box measured
+//   for one, and an Android View CLIPS ITS CHILDREN TO ITS BOUNDS BY DEFAULT where iOS
+//   does not. Line two is drawn and thrown away. s.row carries no height and no
+//   overflow, so nothing in the style sheet suggests clipping — the clip is the platform
+//   default.
+//
+//   Rendering the icon unconditionally gives all four rows ONE child count and one
+//   layout path, so selected and unselected can no longer measure differently.
+//   'transparent' rather than a grey tick: an unselected row must not look half-chosen.
+//   Hidden from accessibility because it is a spacer in that state, and the row's own
+//   selected state is what a screen reader should hear.
+//
+// Shipped together with the flex:1 change on rowText, knowingly: either alone might be
+// sufficient and we will not learn which. A mandatory gate where half the options are
+// one letter is not the place to run a clean experiment.
 function RowGroup({ options, value, onSelect }) {
   return (
     <View>
-      {options.map(o => (
-        <TouchableOpacity
-          key={o.value}
-          style={[s.row, value === o.value && s.rowOn]}
-          onPress={() => onSelect(o.value)}
-          activeOpacity={0.8}
-        >
-          <Text style={[s.rowText, value === o.value && s.rowTextOn]}>{o.label}</Text>
-          {value === o.value && <Feather name="check" size={16} color={colors.primary} />}
-        </TouchableOpacity>
-      ))}
+      {options.map(o => {
+        const on = value === o.value
+        return (
+          <TouchableOpacity
+            key={o.value}
+            style={[s.row, on && s.rowOn]}
+            onPress={() => onSelect(o.value)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+          >
+            <Text style={[s.rowText, on && s.rowTextOn]}>{o.label}</Text>
+            <Feather
+              name="check"
+              size={16}
+              color={on ? colors.primary : 'transparent'}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+          </TouchableOpacity>
+        )
+      })}
     </View>
   )
 }
@@ -668,7 +709,13 @@ const s = StyleSheet.create({
     borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 8,
   },
   rowOn: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  rowText: { fontSize: 14.5, color: colors.textPrimary, flexShrink: 1, paddingRight: 8 },
+  // flex:1, NOT flexShrink:1 — see the note on RowGroup. flexShrink alone lets Yoga
+  // measure the Text at max-content width and then squeeze it, so the HEIGHT is computed
+  // for a line count the final width does not produce. flex:1 is grow 1 / shrink 1 /
+  // basis 0%, which hands the Text its final width BEFORE measurement, so the height it
+  // reports is the height it needs. s.row has no height and no maxHeight, so once the
+  // measurement is right the row grows and a wrapped label is fully visible.
+  rowText: { fontSize: 14.5, color: colors.textPrimary, flex: 1, paddingRight: 8 },
   rowTextOn: { color: colors.primaryDark, fontWeight: '600' },
 
   err: { color: colors.danger, fontSize: 13, marginTop: 7, lineHeight: 19 },
