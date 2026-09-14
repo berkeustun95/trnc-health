@@ -207,6 +207,10 @@ const SURFACES = [
   'components/PetsRegulatoryNotice.js',
   'components/PetsStaleNotice.js',
   'components/VetDeptActions.js',
+  // Widened with the Student Hub port, while MODULE_FLAGS.studentHub is still false — guarded
+  // before the flip, not after. Its region chips are t(REGION_LABEL_KEY[city]), already read
+  // from the key map above.
+  'screens/StudentHubScreen.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —

@@ -77,6 +77,7 @@ import WelcomeScreen from './screens/WelcomeScreen'
 import HomeScreen from './screens/HomeScreen'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
+import StudentHubScreen from './screens/StudentHubScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import GamesHubScreen from './screens/games/GamesHubScreen'
 import XoxGameScreen from './screens/games/XoxGameScreen'
@@ -484,7 +485,7 @@ export default function App() {
   const [showJobPostings,  setShowJobPostings]  = useState(false)
   const [showExploreBeach, setShowExploreBeach] = useState(false)
   const [showExplore, setShowExplore] = useState(false)   // the full Explore module tile (dark until MODULE_FLAGS.explore)
-  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | (future preview keys). Admins never reach HomeScreen /
+  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'studentHub'. Admins never reach HomeScreen /
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
                                                                          // not a per-surface boolean.
@@ -777,7 +778,6 @@ export default function App() {
       if (showGrooming) { setShowGrooming(false); return true }
       if (showGarages) { setShowGarages(false); return true }
       if (showTowing) { setShowTowing(false); return true }
-      if (showStudentHub) { setShowStudentHub(false); return true }
       // Walks the module one level at a time: package -> package list -> landing. A bare
       // pop to null would skip the list entirely and read as the app losing its place.
       if (connectivitySub?.view === 'package' || connectivitySub === 'stores') { setConnectivitySub('operator'); return true }
@@ -787,9 +787,12 @@ export default function App() {
       if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
       if (showExploreBeach)     { setShowExploreBeach(false); return true }
       if (showExplore)          { setShowExplore(false); return true }
-      if (adminPreview)         { setAdminPreview(null); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
+      // Below eSIM, Welcome Guide and Exchange Rates: Student Hub opens those ON TOP of itself
+      // (they render earlier in the content chain), so Back must pop them before the hub.
+      if (showStudentHub) { setShowStudentHub(false); return true }
+      if (adminPreview)         { setAdminPreview(null); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
       if (showGames) { setShowGames(false); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
@@ -1414,7 +1417,7 @@ export default function App() {
       />
     }
   } else if (profile.role === 'admin' && !adminPreview) {
-    content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} />
+    content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')} />
   } else if (profile.role === 'provider') {
     if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
       content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
@@ -1853,11 +1856,16 @@ export default function App() {
       ? <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} />
       : <ComingSoonScreen lang={lang} moduleKey="towing" titleKey="menuTowing" session={session} onBack={() => setShowTowing(false)} />
   } else if (showStudentHub) {
-    // No StudentHubScreen in main yet (it lives on the unmerged feat/student-hub
-    // branch). Route ALL users — admins included — to Coming Soon; the flag exists
-    // so a future merge can restore the standard gate:
-    //   (MODULE_FLAGS.studentHub || isAdmin) ? <StudentHubScreen/> : <ComingSoonScreen/>
-    content = <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
+    // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
+    // earlier in this chain, so Back returns here.
+    content = (MODULE_FLAGS.studentHub || isAdmin)
+      ? <StudentHubScreen lang={lang} onBack={() => setShowStudentHub(false)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)} />
+      : <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
+  } else if (adminPreview === 'studentHub') {
+    // After showEsim and showNewcomerEssentials, not beside the Explore preview — the
+    // cross-links only stack if their targets render first. Never clear adminPreview to
+    // open them: an admin with no preview set short-circuits to AdminScreen.
+    content = <StudentHubScreen lang={lang} onBack={() => setAdminPreview(null)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)} />
   } else {
     inTabShell = true
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
@@ -2092,7 +2100,7 @@ export default function App() {
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
-    setShowNewcomerEssentials(false); setShowExchangeRates(false)
+    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
       case 'pharmacy':      setActiveTab('home'); setShowDutyList(true); break
@@ -2121,7 +2129,7 @@ export default function App() {
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
-    setShowNewcomerEssentials(false); setShowExchangeRates(false)
+    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
       case 'beaches': setExploreBeachRegion(region); setShowExploreBeach(true); break

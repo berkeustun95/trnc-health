@@ -4305,7 +4305,7 @@ function ModerationTab() {
   )
 }
 
-export default function AdminScreen({ session, lang, onShowExplore }) {
+export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub }) {
   const [tab, setTab] = useState('Dashboard')
   const navigateTo = t => setTab(t)
 
@@ -4329,6 +4329,15 @@ export default function AdminScreen({ session, lang, onShowExplore }) {
           <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowExplore} activeOpacity={0.85}>
             <Ionicons name="map-outline" size={16} color={colors.primary} />
             <Text style={s.explorePreviewText}>Open Explore (preview)</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Same reason as Explore above: admins never reach the customer module chain, so
+            the dark Student Hub (MODULE_FLAGS.studentHub) is previewed from here. */}
+        {onShowStudentHub && (
+          <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowStudentHub} activeOpacity={0.85}>
+            <Ionicons name="school-outline" size={16} color={colors.primary} />
+            <Text style={s.explorePreviewText}>Open Student Hub (preview)</Text>
           </TouchableOpacity>
         )}
 
