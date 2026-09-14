@@ -182,6 +182,12 @@ const EXPECTED_SCALARS = {
   // WORKING TREE, so a flag left flipped after a device pass is a partnership announced
   // early — to everyone, with no way to take it back except another OTA.
   PET_HOTEL_LIVE:        false,
+  // The pets import timeline calculator. Baselined for the usual `eas update` reason, and
+  // with a sharper one of its own: the screen was UNREACHABLE before this flag existed, so
+  // flipping it does not restore something — it publishes a calculator whose waiting
+  // intervals have not been verified since June 2026. It converts an unverified rule into
+  // a confident date somebody books a flight against.
+  PETS_TIMELINE_LIVE:    false,
   // The signup terms checkbox. Baselined for the usual reason — `eas update` bundles the
   // WORKING TREE — and it still matters now that it is TRUE, in the other direction: a
   // working-tree revert left over from a comparison would ship a signup screen that

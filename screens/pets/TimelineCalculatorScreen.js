@@ -6,6 +6,7 @@ import DateTimePicker from '@react-native-community/datetimepicker'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import BackButton from '../../components/BackButton'
+import { formatPetDate } from '../../constants/petsContent'
 
 const MS_DAY = 86400000
 
@@ -13,8 +14,13 @@ function addDays(date, n) {
   return new Date(date.getTime() + n * MS_DAY)
 }
 
+// Locale-aware, and pinned to the GREGORIAN calendar. The old body was
+// toLocaleDateString('en-GB', …), which printed English dates to all nine locales; the
+// naive fix would have printed Persian readers a JALALI date — a real date, correctly
+// formatted, and not the day this screen calculated. formatPetDate carries both fixes and
+// the runtime trust control. See the note on it in constants/petsContent.js.
 function formatDate(date, lang) {
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  return formatPetDate(date, lang)
 }
 
 function startOfDay(date) {

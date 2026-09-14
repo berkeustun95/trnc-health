@@ -1,17 +1,16 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import BackButton from '../../components/BackButton'
+import PetsRegulatoryNotice from '../../components/PetsRegulatoryNotice'
+import PetsStaleNotice from '../../components/PetsStaleNotice'
+import VetDeptActions from '../../components/VetDeptActions'
+import { verifiedLabel } from '../../constants/petsContent'
 import { PET_HOTEL_LIVE } from '../../constants/flags'
 import PetHotelCrossLink from '../../components/PetHotelCrossLink'
 
-const LAST_VERIFIED = 'June 2026'
-
-// Verify contact details with TRNC Veterinary Department before shipping
-const VET_DEPT_PHONE = '03922283795'
-const VET_DEPT_EMAIL = 'veteriner@gov.ct.tr'
 
 function SectionHeader({ title }) {
   return <Text style={s.sectionHeader}>{title}</Text>
@@ -38,7 +37,7 @@ function PetsDisclaimer({ lang }) {
     <View style={s.disclaimer}>
       <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} style={{ marginTop: 1, flexShrink: 0 }} />
       <Text style={s.disclaimerText}>
-        {t('petsDisclaimerText', lang).replace('{date}', LAST_VERIFIED)}
+        {t('petsDisclaimerText', lang).replace('{date}', verifiedLabel(lang))}
       </Text>
     </View>
   )
@@ -54,6 +53,9 @@ export default function OwningPetScreen({ lang, onBack, onNavigate }) {
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+
+        <PetsStaleNotice lang={lang} />
+        <PetsRegulatoryNotice lang={lang} />
 
         {/* TRNC law / registration */}
         <SectionHeader title={t('petsRegistrationTitle', lang)} />
@@ -90,16 +92,7 @@ export default function OwningPetScreen({ lang, onBack, onNavigate }) {
         <SectionHeader title={t('petsCrueltyTitle', lang)} />
         <InfoCard>
           <Text style={s.infoCardBody}>{t('petsCrueltyBody', lang)}</Text>
-          <View style={s.contactActions}>
-            <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL(`tel:${VET_DEPT_PHONE}`)} activeOpacity={0.8}>
-              <Ionicons name="call-outline" size={16} color={colors.primary} />
-              <Text style={s.contactBtnText}>{t('call', lang)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL(`mailto:${VET_DEPT_EMAIL}`)} activeOpacity={0.8}>
-              <Ionicons name="mail-outline" size={16} color={colors.primary} />
-              <Text style={s.contactBtnText}>Email</Text>
-            </TouchableOpacity>
-          </View>
+          <VetDeptActions lang={lang} />
         </InfoCard>
 
         {/* Apartment rules */}

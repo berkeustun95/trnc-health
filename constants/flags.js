@@ -383,6 +383,28 @@ export const DORMS_LIVE = true   // live 2026-09-13
 // Reverting is this one boolean, and so is the emergency direction.
 export const PET_HOTEL_LIVE = false
 
+// The pets import TIMELINE CALCULATOR (screens/pets/TimelineCalculatorScreen.js).
+// false = the entry point inside BringingPetScreen does not render and the route falls
+// through to the module root.
+//
+// ⚠ THE SCREEN HAS BEEN UNREACHABLE SINCE IT WAS WRITTEN, not gated — nothing anywhere set
+//   petsSubScreen = 'timeline'. App.js had a branch for it, PetsHomeScreen never navigated
+//   to it, and neither did any other screen. So this flag does not hide something users
+//   had; it gates something they never had a route to.
+//
+// ⚠ IT SHIPS DARK BECAUSE ITS INTERVALS ARE UNVERIFIED. The calculator derives dates from
+//   the same waiting periods the import steps state — 12 weeks minimum age, 30 days after
+//   vaccination, 90 days after the titer draw — and those are exactly the REGULATORY
+//   strings that have not been checked with the Veterinary Department since June 2026
+//   (npm run pets:health is red on precisely that). A prose rule a reader can sanity-check
+//   against another source is one thing; a calculator that returns a CONFIDENT DATE is
+//   another. It converts an unverified interval into an instruction with a number on it,
+//   and somebody books a flight against that number.
+//
+//   So: this flips when verifiedOn is refreshed and reviewedBy is filled in — not before.
+//   The calculation itself was not touched by the slice that wired it up.
+export const PETS_TIMELINE_LIVE = false
+
 // The signup terms checkbox. false = the signup screen keeps the passive legal NOTICE it
 // has shown since 2026-08-21; true = that notice becomes a required, unticked checkbox
 // and Create account is disabled until it is ticked.

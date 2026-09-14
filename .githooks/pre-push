@@ -112,4 +112,19 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.m
   exit 1
 }
 
+# Pets content staleness — WARN ONLY, and deliberately, for the reason CLAUDE.md already
+# records about check-duty-staleness and check-novest-staleness: "a push must not be
+# blocked because a roster is running low; that is data operations, and a guard that
+# blocks unrelated work gets disabled." A disabled guard protects nobody.
+#
+# It FAILS (exit 1) inside `npm run ota`, which is where stale content actually reaches a
+# user. Same split as the privacy-parity line below, for the same reason — except that one
+# has a NORMAL stale state (a committed-but-unshipped copy) and this one does not: the
+# content really is out of date, and the fix really is one phone call.
+#
+# The pets module is live to every user and tells people what paperwork to bring to a
+# border. Every other check in this repo asks whether a column EXISTS; this asks whether
+# the CONTENT IS CURRENT, which is the question the duty roster taught us nobody was asking.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-pets-staleness.mjs --warn
+
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs --warn

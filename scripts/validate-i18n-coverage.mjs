@@ -55,6 +55,7 @@ import { RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY, STEP_TITLE_KEY, HEL
 import { STRIP_CARD_KEYS } from '../constants/homeStrip.js'
 import { AD_SPONSORED_KEY } from '../constants/ads.js'
 import { PET_PARTNERS, PENDING_KEYS as PET_PENDING_KEYS, petPartnerSections } from '../constants/petPartners.js'
+import { REGULATORY_KEYS as PETS_REGULATORY_KEYS, REGULATORY_LOCALES } from '../constants/petsContent.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -185,6 +186,27 @@ const SURFACES = [
   'screens/pets/PetHotelPartnerScreen.js',
   'components/PetHotelPartnerCard.js',
   'components/PetHotelCrossLink.js',
+  // ─── The pets module, added 2026-09-14 ───────────────────────────────────
+  //
+  // This module has been LIVE to every user since 2026-08-23 with all 117 of its strings
+  // in English and Turkish only — seven locales silently rendering English, two of them
+  // RTL, on the screens that tell somebody what paperwork to bring to a border. It could
+  // not be added before now because adding it would simply have gone red; the wrapper /
+  // regulatory split is what makes the question answerable.
+  //
+  // Its 39 REGULATORY keys are exempted from the locale comparison as a SET (see
+  // PETS_REGULATORY_EXEMPT below) — never as 273 allowlist lines. The other 83 are
+  // guarded normally and will fail if a locale is missing.
+  'screens/pets/PetsHomeScreen.js',
+  'screens/pets/BringingPetScreen.js',
+  'screens/pets/TravelWithPetScreen.js',
+  'screens/pets/OwningPetScreen.js',
+  'screens/pets/VetDirectoryScreen.js',
+  // Added in the commit that created them, for the reason the DisplayNameCheck paragraph
+  // above records: copy that moves into a component leaves this guard's scope with it.
+  'components/PetsRegulatoryNotice.js',
+  'components/PetsStaleNotice.js',
+  'components/VetDeptActions.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
@@ -227,7 +249,13 @@ const SURFACES = [
 //   moduleKey is the ONLY *Key prop in scope whose values are not i18n keys (1 value, 0
 //   resolving). titleKey (6), labelKey (20), templateKey (1) and bodyKey (4) all resolve
 //   100%. If a future prop joins moduleKey here, add it with its own measured reason.
-const NON_I18N_KEY_PROPS = new Set(['moduleKey'])
+//   Joined 2026-09-14 by two more, found the same way — by going red when the pets screens
+//   entered scope — and measured before being added, as the paragraph above requires:
+//     airlineKey  2 values [pegasus, ajet], 0 resolving   <- AIRLINE_ROWS lookup key
+//     animalKey   2 values [dogs, cats],    0 resolving   <- picks an icon, nothing more
+//   Both are RECORD SELECTORS that happen to end in "Key". Excluded by PROP NAME, never by
+//   value: denying the string 'dogs' would also hide a genuinely missing key called that.
+const NON_I18N_KEY_PROPS = new Set(['moduleKey', 'airlineKey', 'animalKey'])
 
 const PROP_KEY_RE = /\b(\w*Key)\s*[:=]\s*['"]([a-zA-Z][a-zA-Z0-9_]*)['"]/g
 const SURFACE_PROP_KEYS = [...new Set(SURFACES.flatMap(f =>
@@ -246,6 +274,50 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // ─── Pets module proper nouns, 2026-09-14 ─────────────────────────────────
+  //
+  // These surfaced the moment the pets screens entered SURFACES. None of them is an
+  // untranslated string — each is a NAME, and a name is the same word in every locale.
+  // Declared individually rather than as a set (unlike the 39 regulatory keys) because
+  // there are seven of them and each has its own distinct reason.
+  'petsAjetTitle': {
+                          Turkish: 'airline brand; AJet is a Turkish carrier and writes its own name in Latin script in every market',
+                          Arabic:  'airline brand; AJet is a Turkish carrier and writes its own name in Latin script in every market',
+                          Russian: 'airline brand; AJet is a Turkish carrier and writes its own name in Latin script in every market',
+                          Greek:   'airline brand; AJet is a Turkish carrier and writes its own name in Latin script in every market',
+                          French:  'airline brand; AJet is a Turkish carrier and writes its own name in Latin script in every market',
+                          Spanish: 'airline brand; AJet is a Turkish carrier and writes its own name in Latin script in every market',
+                          German:  'airline brand; AJet is a Turkish carrier and writes its own name in Latin script in every market',
+                          Persian: 'airline brand; AJet is a Turkish carrier and writes its own name in Latin script in every market' },
+  'petsPegasusTitle': {
+                          Arabic:  'airline brand; Pegasus Airlines writes its own name in Latin script in every market',
+                          Russian: 'airline brand; Pegasus Airlines writes its own name in Latin script in every market',
+                          Greek:   'airline brand; Pegasus Airlines writes its own name in Latin script in every market',
+                          French:  'airline brand; Pegasus Airlines writes its own name in Latin script in every market',
+                          Spanish: 'airline brand; Pegasus Airlines writes its own name in Latin script in every market',
+                          German:  'airline brand; Pegasus Airlines writes its own name in Latin script in every market',
+                          Persian: 'airline brand; Pegasus Airlines writes its own name in Latin script in every market' },
+  'petsVetDeptAddress': {
+                          Arabic:  'a street address is a proper noun and is not translated — the same rule constants/dorms.js states for Alasia. A reader shows this to a taxi driver in Lefkosa; translating it would make it undeliverable',
+                          Russian: 'a street address is a proper noun and is not translated — the same rule constants/dorms.js states for Alasia. A reader shows this to a taxi driver in Lefkosa; translating it would make it undeliverable',
+                          Greek:   'a street address is a proper noun and is not translated — the same rule constants/dorms.js states for Alasia. A reader shows this to a taxi driver in Lefkosa; translating it would make it undeliverable',
+                          French:  'a street address is a proper noun and is not translated — the same rule constants/dorms.js states for Alasia. A reader shows this to a taxi driver in Lefkosa; translating it would make it undeliverable',
+                          Spanish: 'a street address is a proper noun and is not translated — the same rule constants/dorms.js states for Alasia. A reader shows this to a taxi driver in Lefkosa; translating it would make it undeliverable',
+                          German:  'a street address is a proper noun and is not translated — the same rule constants/dorms.js states for Alasia. A reader shows this to a taxi driver in Lefkosa; translating it would make it undeliverable',
+                          Persian: 'a street address is a proper noun and is not translated — the same rule constants/dorms.js states for Alasia. A reader shows this to a taxi driver in Lefkosa; translating it would make it undeliverable' },
+  'petsCountryTurkiye': { Turkish: "the country's own endonym — 'Türkiye' IS the Turkish name",
+                          French:  'France officially adopted the endonym Türkiye; the older Turquie is being retired' },
+  // Shortened to the abbreviation after the font-metric pass: "Großbritannien" measured
+  // 96.4pt in a 66.0pt tab, so the German row rendered one tab two lines tall. "UK" is
+  // what German writes in a constrained label, and it is the same two letters as English.
+  'petsCountryUK':      { German:  'UK is the ordinary German abbreviation in a constrained label; Großbritannien overflows the tab' },
+  'petsCountryEU':      { German:  'EU is the standard German abbreviation for Europäische Union — identical letters, not an untranslated string' },
+  'petsStep1Title':     { Spanish: "'Microchip' is the Spanish word, spelled identically" },
+  // NOT a pets key and NOT new — `email` has been in the table all along. It entered
+  // scope because components/VetDeptActions.js renders it, which is a coverage GAIN: a key
+  // that nothing was checking is now checked. Greek uses the Latin loanword on interfaces.
+  'email':              { Greek:   'Greek interfaces use the Latin loanword "Email"; the calque «Ηλ. ταχυδρομείο» reads as officialese on a contact button' },
+
   // "WhatsApp" is a BRAND, not a word. It is written in Latin script on WhatsApp's own
   // localised interfaces in every one of these six locales, and on the partner's own
   // Turkish site. Translating it would invent a name for an app the user already has
@@ -450,6 +522,13 @@ const viaVariable = [
   // the entry exists. petPartners.js is import-safe (no require, no react-native) partly
   // so this import is possible.
   ...PET_PARTNER_KEYS,
+  // ─── The pets module's regulatory keys ────────────────────────────────────
+  //
+  // Pulled in so they are CHECKED FOR AN ENGLISH VALUE and COUNTED, then exempted below
+  // from the per-locale comparison. Four of them (petsEUNote, petsTurkiyeNote1/2,
+  // petsOtherNote) are bare strings in a NOTES_BY_COUNTRY array — not t('x'), not a *Key
+  // field — so nothing else in this file can see them at all.
+  ...PETS_REGULATORY_KEYS,
 ]
 
 const KEYS = [...new Set([...literal, ...viaVariable, ...SURFACE_PROP_KEYS])].filter(Boolean).sort()
@@ -457,14 +536,44 @@ const LANGS = Object.keys(LANG_CODES).filter(l => l !== 'English')
 
 // ─── Check ───────────────────────────────────────────────────────────────────
 
+// ─── THE ONE EXEMPTION THAT IS A SET, NOT A LIST OF PAIRS ───────────────────
+//
+// The pets module's regulatory copy — import steps, waiting intervals, fees, banned
+// breeds, airline policy, TRNC statute names — is deliberately English in the seven
+// locales that lack it, and deliberately Turkish in tr, which has carried it since before
+// this guard existed. A mistranslated "90 days after the titer blood draw" does not look
+// wrong in any language; it looks like an instruction, and somebody follows it to an
+// airport. That is the whole reason the split exists.
+//
+// ⚠ WHY THIS IS NOT 273 ALLOWLIST LINES. 39 keys x 7 locales, and this file's own header
+//   forbids exactly that: "a 2081-entry allowlist could only be GENERATED, never reviewed.
+//   A generated allowlist is a rubber stamp." One declared reason for one named set is
+//   reviewable; 273 lines saying the same sentence are not.
+//
+// ⚠ THE SET IS IMPORTED, NOT COPIED. constants/petsContent.js is the single source, and it
+//   is the same list the screens and PetsRegulatoryNotice read. Moving a key between
+//   wrapper and regulatory is therefore ONE edit, and it is the review moment — a key
+//   cannot drift into "deliberately untranslated" without somebody putting it there.
+//
+// ⚠ IT EXEMPTS ONLY THE PER-LOCALE COMPARISON. These keys are still required to exist in
+//   ENGLISH by the check below, and npm run pets:health separately asserts that every one
+//   of them names a real key. An exemption that also skipped the English check would let a
+//   typo'd key disappear entirely.
+const PETS_REGULATORY_EXEMPT = new Set(PETS_REGULATORY_KEYS)
+const PETS_REGULATORY_REASON =
+  'pets regulatory copy: legal requirements, kept in ' + REGULATORY_LOCALES.join('+')
+  + ' so a translation cannot introduce an error a reader would only discover at a border'
+
 const problems = []
 const usedAllowances = new Set()
+let regulatoryExempted = 0
 
 for (const key of KEYS) {
   const en = t(key, 'English')
   if (en === key) { problems.push(`${key}: not present in English at all — every locale falls back to the raw key`); continue }
   for (const lang of LANGS) {
     if (t(key, lang) !== en) continue
+    if (PETS_REGULATORY_EXEMPT.has(key)) { regulatoryExempted++; continue }
     const reason = SAME_AS_ENGLISH[key]?.[lang]
     if (reason) { usedAllowances.add(`${key}/${lang}`); continue }
     problems.push(`${key} / ${lang} is identical to English (${JSON.stringify(en)}) — `
@@ -483,6 +592,12 @@ for (const [key, langs] of Object.entries(SAME_AS_ENGLISH)) {
 }
 
 const allowanceCount = Object.values(SAME_AS_ENGLISH).reduce((n, o) => n + Object.keys(o).length, 0)
+
+// Printed on every run rather than asserted from memory: a reader can see how much of the
+// table is exempt and on what grounds, which is the reviewability the 273-line allowlist
+// would have destroyed.
+const regulatoryLine = `  ${PETS_REGULATORY_EXEMPT.size} pets regulatory key(s) exempt from the locale comparison `
+  + `(${regulatoryExempted} key x locale pair(s) matched)\n    reason: ${PETS_REGULATORY_REASON}`
 
 if (problems.length) {
   console.error('\n  ┌─ i18n COVERAGE FAILED ─────────────────────────────────────────┐')
@@ -516,3 +631,4 @@ console.log(`i18n coverage: OK — ${KEYS.length} key(s) × ${LANGS.length} loca
   + `${allowanceCount} declared same-as-English`)
 console.log(`  scope: ${SURFACES.length} surface(s) — ${scopeNames}`)
 console.log(`  ${KEYS.length} of the ${enTotal} keys in the table`)
+console.log(regulatoryLine)

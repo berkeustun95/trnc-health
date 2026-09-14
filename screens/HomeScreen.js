@@ -83,12 +83,25 @@ const HEALTH_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 // screen.
 const PLACE_COLS = 'id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until'
 
+// ⚠ V1's TILE LIST. It uses this file's OWN three-value tint vocabulary (urgent /
+//   service / lifestyle, TINTS above); constants/homeModules.js uses V2's two-value one
+//   (urgent / standard). The two arrays therefore DISAGREE on some tints — pets is
+//   'lifestyle' here and 'standard' there — and that is NOT drift. They are two design
+//   systems, each self-consistent, each rendered by its own hub. The two-family rewrite
+//   deliberately removed 'lifestyle' because the category split "said nothing"; V1 predates
+//   that decision and still renders correctly under it.
+//
+// ⚠ DO NOT DELETE ENTRIES FROM HERE AS DEAD CODE. renderHub() is unreachable only while
+//   HOME_V2_LIVE is true, and flags.js frames that as a one-boolean rollback. Removing a
+//   tile would make it vanish from Home on the revert path — and TINTS[mod.tint] below has
+//   NO fallback, unlike ModuleTile's `|| TINTS.standard`, so an unknown tint here crashes
+//   rather than degrades.
 const MODULES = [
   { id: 'exchangeRates',      icon: 'trending-up-outline', tint: 'service',   labelKey: 'menuExchangeRates'      },
   { id: 'newcomerEssentials', icon: 'compass-outline',     tint: 'service',   labelKey: 'menuNewcomerEssentials' },
   { id: 'studentHub',         icon: 'school-outline',      tint: 'service',   labelKey: 'menuStudentHub' },
   { id: 'accommodation', icon: 'home-outline',      tint: 'lifestyle', labelKey: 'menuAccommodations' },
-  { id: 'pets',          icon: 'paw-outline',       tint: 'lifestyle', labelKey: 'menuPets' },
+  { id: 'pets',          icon: 'paw-outline',       tint: 'lifestyle', labelKey: 'menuPets' },   // V1 vocabulary — see the note above MODULES
   { id: 'games',         icon: 'game-controller-outline', tint: 'lifestyle', labelKey: 'menuGames' },
   { id: 'homeServices',  icon: 'hammer-outline',    tint: 'service',   labelKey: 'menuHomeServices' },
   { id: 'jobPostings',  icon: 'briefcase-outline', tint: 'service',   labelKey: 'menuJobPostings' },

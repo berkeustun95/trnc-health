@@ -19,7 +19,7 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE } from './constants/flags'
 import { promosAllowed } from './constants/homeStrip'
 import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
@@ -1669,8 +1669,20 @@ export default function App() {
     if (!MODULE_FLAGS.pets && !isAdmin) {
       content = <ComingSoonScreen lang={lang} moduleKey="pets" titleKey="menuPets" session={session} onBack={() => setShowPets(false)} />
     } else if (petsSubScreen === 'bringing') {
-      content = <BringingPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
-    } else if (petsSubScreen === 'timeline') {
+      content = (
+        <BringingPetScreen
+          lang={lang}
+          onBack={() => setPetsSubScreen(null)}
+          onNavigate={dest => setPetsSubScreen(dest)}
+        />
+      )
+    } else if (petsSubScreen === 'timeline' && PETS_TIMELINE_LIVE) {
+      // ⚠ THE FLAG IS IN THE CONDITION, not only on the entry point — the same belt-to-
+      //   braces the pet hotel route carries. Dark, this branch is skipped and the state
+      //   falls through to PetsHomeScreen rather than rendering a blank screen.
+      //
+      //   Until 2026-09-14 this branch existed with NO WAY TO REACH IT: nothing anywhere
+      //   set petsSubScreen = 'timeline'. The screen and its ~24 i18n keys were dead code.
       content = <TimelineCalculatorScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
     } else if (petsSubScreen === 'vetdirectory') {
       content = (

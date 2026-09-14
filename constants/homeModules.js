@@ -123,7 +123,7 @@ export const HOME_MODULES = [
   // compass-outline either — that is the tab's icon.
   { id: 'explore',            icon: 'albums-outline',           tint: 'standard', labelKey: 'menuPlaces' },
   { id: 'accommodation',      icon: 'home-outline',             tint: 'standard', labelKey: 'menuAccommodations' },
-  { id: 'pets',               icon: 'paw-outline',              tint: 'standard', labelKey: 'menuPets' },
+  { id: 'pets',               icon: 'paw-outline',              tint: 'standard', labelKey: 'menuPets' },   // V2 vocabulary — screens/HomeScreen.js's V1 copy says 'lifestyle'; both are correct
   { id: 'games',              icon: 'game-controller-outline',  tint: 'standard', labelKey: 'menuGames' },
 
   // Getting things done.

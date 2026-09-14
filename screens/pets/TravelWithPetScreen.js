@@ -4,10 +4,12 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import BackButton from '../../components/BackButton'
+import PetsRegulatoryNotice from '../../components/PetsRegulatoryNotice'
+import PetsStaleNotice from '../../components/PetsStaleNotice'
+import { verifiedLabel } from '../../constants/petsContent'
 import { PET_HOTEL_LIVE } from '../../constants/flags'
 import PetHotelCrossLink from '../../components/PetHotelCrossLink'
 
-const LAST_VERIFIED = 'June 2026'
 
 const AIRLINES = [
   { key: 'pegasus', titleKey: 'petsPegasusTitle', url: 'https://www.flypgs.com' },
@@ -80,7 +82,7 @@ function PetsDisclaimer({ lang }) {
     <View style={s.disclaimer}>
       <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} style={{ marginTop: 1, flexShrink: 0 }} />
       <Text style={s.disclaimerText}>
-        {t('petsDisclaimerText', lang).replace('{date}', LAST_VERIFIED)}
+        {t('petsDisclaimerText', lang).replace('{date}', verifiedLabel(lang))}
       </Text>
     </View>
   )
@@ -96,6 +98,9 @@ export default function TravelWithPetScreen({ lang, onBack, onNavigate }) {
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+
+        <PetsStaleNotice lang={lang} />
+        <PetsRegulatoryNotice lang={lang} />
 
         {/* Airlines */}
         <SectionHeader title={t('petsAirlinesTitle', lang)} />
