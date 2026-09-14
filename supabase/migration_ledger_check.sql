@@ -135,7 +135,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261014_contact_events_website_action.sql', 'ea5070260f6e220259b51543113813d90cbf6365cee4a8bc01b904c17c219035'),
   ('20261015_home_services_rename.sql', 'e08cbfa7da07b1de45193502037c5b5193a20377dc47682142cef85fef2cc1fd'),
   ('20261016_profile_consent_columns.sql', '54cfa03874246ec1ea10af9c56db1a731cd4fadcc0c4f51d94bc7717b737f59f'),
-  ('20261017_student_tasks.sql', '7823d9faca7f36e82402a47527f0fa5a1fd24ad507d7f926ff04b7a61771a833')
+  ('20261017_student_tasks.sql', '503cdc7d776acdbc7f72ce080b7882a525df456d0cd77ef11635371c41ba5571')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

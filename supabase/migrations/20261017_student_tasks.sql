@@ -162,14 +162,17 @@ CREATE POLICY "student_task_i18n_read_authenticated" ON public.student_task_i18n
 
 -- ─── 5. Seed — structure only ───────────────────────────────────────────────
 -- Fixed ids so the content seed can reference a task without a lookup.
--- sim_line BEFORE mcks is a dependency, not a preference: the MCKS student exemption needs
--- a phone line already registered in the student's own name. The other three keep the
--- order they were given in; no further dependency between them is asserted here.
+-- Two orderings are dependencies, not preferences, and section 6 asserts both:
+--   • sim_line BEFORE mcks — the MCKS student exemption needs a phone line already
+--     registered in the student's own name.
+--   • health_check BEFORE residence_permit — the permit application requires the health
+--     screening result.
+-- The ids are fixed identities, not positions: ...0003 is residence_permit wherever it sorts.
 INSERT INTO public.student_tasks (id, slug, icon, sort_order, external_url, is_active) VALUES
   ('00000000-0000-4000-c000-000000000001','sim_line',         'cellular-outline',       10, NULL, true),
   ('00000000-0000-4000-c000-000000000002','mcks',             'phone-portrait-outline', 20, NULL, true),
-  ('00000000-0000-4000-c000-000000000003','residence_permit', 'id-card-outline',        30, NULL, true),
-  ('00000000-0000-4000-c000-000000000004','health_check',     'medkit-outline',         40, NULL, true),
+  ('00000000-0000-4000-c000-000000000004','health_check',     'medkit-outline',         30, NULL, true),
+  ('00000000-0000-4000-c000-000000000003','residence_permit', 'id-card-outline',        40, NULL, true),
   ('00000000-0000-4000-c000-000000000005','bank_account',     'card-outline',           50, NULL, true)
 ON CONFLICT (id) DO NOTHING;
 
@@ -270,12 +273,19 @@ BEGIN
     RAISE EXCEPTION 'probe rows survived the rollback';
   END IF;
 
-  -- (c) the seed's one hard ordering rule.
+  -- (c) the seed's two hard ordering rules. The count guard comes first so a missing slug
+  --     reports as missing rather than as a NULL comparison that silently passes.
+  IF (SELECT count(*) FROM public.student_tasks WHERE slug IN
+       ('sim_line','mcks','residence_permit','health_check','bank_account')) <> 5 THEN
+    RAISE EXCEPTION 'seed: the five task slugs are not all present';
+  END IF;
   IF (SELECT sort_order FROM public.student_tasks WHERE slug = 'sim_line')
-     >= (SELECT sort_order FROM public.student_tasks WHERE slug = 'mcks')
-     OR (SELECT count(*) FROM public.student_tasks WHERE slug IN
-          ('sim_line','mcks','residence_permit','health_check','bank_account')) <> 5 THEN
-    RAISE EXCEPTION 'seed: the five slugs are not all present, or sim_line does not sort before mcks';
+     >= (SELECT sort_order FROM public.student_tasks WHERE slug = 'mcks') THEN
+    RAISE EXCEPTION 'seed: sim_line must sort before mcks (the MCKS exemption needs a line in the student''s name)';
+  END IF;
+  IF (SELECT sort_order FROM public.student_tasks WHERE slug = 'health_check')
+     >= (SELECT sort_order FROM public.student_tasks WHERE slug = 'residence_permit') THEN
+    RAISE EXCEPTION 'seed: health_check must sort before residence_permit (the permit needs the screening result)';
   END IF;
 
   -- (d) RLS on, and DERIVED policy counts — printed, not remembered.
@@ -310,7 +320,7 @@ $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261017_student_tasks.sql', '7823d9faca7f36e82402a47527f0fa5a1fd24ad507d7f926ff04b7a61771a833')
+VALUES ('20261017_student_tasks.sql', '503cdc7d776acdbc7f72ce080b7882a525df456d0cd77ef11635371c41ba5571')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
