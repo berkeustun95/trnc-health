@@ -1492,6 +1492,40 @@ WITH report AS (
                 FROM (SELECT pg_get_constraintdef(oid) d FROM pg_constraint
                        WHERE conrelid = to_regclass('public.contact_events')
                          AND conname  = 'contact_events_action_check') x), false)
+    -- ── 0910 contact_events MODULE vocabulary. THE SAME BLIND SPOT THE TWO TOKENS
+    -- ABOVE CLOSE FOR `action`, left open for `module` until 2026-09-14.
+    --
+    -- The E-section token at ('0910_contact_events','contact_events_module_check')
+    -- asserts a constraint of that NAME exists. It says nothing about what the name
+    -- permits — and the module vocabulary is extended by DROP-then-ADD of the same
+    -- name, exactly like the action one, so that token stays green through any
+    -- redefinition. Found while wiring the Shiny Paw pet hotel surface, which logs
+    -- contact taps as module='pets': the repo could prove the migration FILE said
+    -- 'pets', and could not prove the DATABASE did.
+    --
+    -- Why it matters in the same way 'website' did: logContactEvent is
+    -- fire-and-forget and cannot throw, so a module the CHECK rejects does not error.
+    -- The INSERT is refused and swallowed, and every contact tap for that module reads
+    -- as a permanent zero — indistinguishable from nobody tapping.
+    --
+    -- Verified against the live database 2026-09-14 (pg_get_constraintdef, not the
+    -- migration file): twelve values, 'pets' among them.
+    --
+    -- A COUNT, not a remembered name list. A token phrased as "and these eleven others
+    -- are still there" goes quiet about whatever it forgot to name; a count has a red
+    -- to go to. If a legitimate new module takes this to 13, bump it HERE in the same
+    -- commit that adds it and say why — that edit is the review moment a name list
+    -- never creates.
+    UNION ALL SELECT '0910_contact_events','contact_events module CHECK permits pets',
+      COALESCE(position('''pets''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_module_check')) > 0, false)
+    UNION ALL SELECT '0910_contact_events','contact_events module CHECK carries exactly 12 modules',
+      COALESCE((SELECT count(*) = 12 FROM (
+        SELECT regexp_matches(d, '''([a-zA-Z]+)''::text', 'g')
+          FROM (SELECT pg_get_constraintdef(oid) d FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.contact_events')
+                   AND conname  = 'contact_events_module_check') x) y), false)
     -- ── 0925 moderation normalization. Behaviour-only CREATE OR REPLACE on
     -- contains_blocked_term(), so section C sees the NAME and cannot see the CHANGE.
     -- Without these tokens a database still on the old body reads 100% OK while the

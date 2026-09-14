@@ -1,0 +1,396 @@
+// Pet hotel partners — the partner surface inside the pets module.
+//
+// PARTNER-ONLY BY CONSTRUCTION, AND MODELLED ON constants/dorms.js RATHER THAN
+// constants/partners.js. The two precedents are not interchangeable and picking the wrong
+// one costs a rewrite, so the reason is recorded here:
+//
+//   partners.js (TadilArt) needs a `home_services` ROW. That table already existed as an
+//   open self-registered directory that had to be gated DOWN (is_partner, 20261012), so
+//   the row was already there to reuse. HomeServicePartnerScreen is welded to it — it
+//   reads service_types through hsCategory (the RENOVATION taxonomy), coverage through
+//   HS_DISTRICT_LABEL_KEY, and logs contact events as module 'homeServices'. It has no
+//   website, address, opening-hours or pricing affordance at all, by its own stated
+//   design. A dog boarding facility needs four of those five.
+//
+//   dorms.js (Alasia) has no table and never needed one. That is this shape exactly: a
+//   signed agreement, a config entry, assets, and nothing else.
+//
+// ─── WHY THERE IS NO TABLE ──────────────────────────────────────────────────
+// The decisive reason is i18n, the same one dorms.js reached. Service names and bodies
+// need all nine locales and a `text` column holds one. Every displayable string here is
+// therefore an i18n KEY, with the content in constants/i18n.js alongside every other
+// nine-locale string. A row would have held only the non-translatable scalars, leaving
+// the content in two places with nothing keeping them in step.
+//
+// THE COST, CHOSEN KNOWINGLY: a pet hotel is NOT in `search_content`, so a global search
+// for "köpek oteli" finds nothing. That is the SAFE direction, not a regression —
+// search_content ignores MODULE_FLAGS and (as of 20260924) ignores PET_HOTEL_LIVE too,
+// so a table would have made Shiny Paw globally findable while the surface was still
+// dark. That is the hazard CLAUDE.md records, and a config entry cannot trip it.
+//
+// No react-native import and NO require(): plain data only, so scripts/check-pet-partners.mjs
+// can import this module under plain Node. Assets are KEYS resolved by
+// constants/partnerAssets.js — the same split, for the same reason, that partners.js,
+// dorms.js and ads.js carry.
+
+// ─── SECTION ORDER ──────────────────────────────────────────────────────────
+//
+// Data, not JSX position, so the order can change without a component edit — the same
+// reason dorms.js keeps SECTION_ORDER out of its screen.
+//
+// ⚠ `practical` AND `pricing` ARE BOTH WHOLLY PENDING TODAY, so with the config as it
+//   stands this list renders as hero → services → location → contact. That is not a
+//   degraded page; it is the finished page for what Shiny Paw has actually told us.
+export const SECTION_ORDER = ['hero', 'about', 'services', 'practical', 'pricing', 'location', 'contact']
+
+// ─── WHAT WE DO NOT KNOW, DECLARED RATHER THAN GUESSED ──────────────────────
+//
+// Every field here is null on the partner entry below, and scripts/check-pet-partners.mjs
+// asserts it STAYS null until somebody removes it from this map in the same commit that
+// supplies the value. The point is that filling one in is a reviewed act.
+//
+// This is the "never invent a price, address, coordinate, phone number, or capacity" rule
+// turned into a data structure. Independently corroborated: their own site states none of
+// these (fetched 2026-09-14), so there is no source to copy from either.
+export const PENDING_FIELDS = {
+  email:                   'info@shiny-paw.com is on their site but their domain is shinypawhotel.com. The mismatch is UNCONFIRMED, and a mail button that silently goes nowhere reads as a broken app rather than as a wrong address. Excluded from the contact bar by decision, not by oversight — confirm with the partner.',
+  address:                 'Site says "Lefkoşa" and no more. A district is not a street address.',
+  coords:                  'No pin published. Geocoding "Lefkoşa" to a district centre would put a WRONG pin on a partner showcase, which is worse than no map. mapsUrl is THEIR link and carries the directions affordance instead.',
+  prices:                  'Not published. A boarding rate depends on nights, size and season — there is no single number to quote and guessing one is a promise we cannot keep.',
+  openingHours:            'Not published.',
+  dropOffPickUpHours:      'Not published, and NOT the same question as opening hours — boarding facilities routinely restrict handover to narrower windows. Two fields, so a later answer to one cannot be silently read as an answer to both.',
+  capacity:                'Not published.',
+  acceptedSizes:           'Not published.',
+  breedRestrictions:       'Not published. Note the TRNC banned-breed list already surfaces in BringingPetScreen; that is IMPORT law and says nothing about what this business accepts. Do not cross-wire them.',
+  vaccinationRequirements: 'Not published. OwningPetScreen carries a general TRNC vaccination schedule; that is not this facility\'s intake policy and must not be presented as it.',
+  acceptsCats:             'Not published. Everything they publish is dog-only, which is why displayType is dog_boarding — but "no cats mentioned" is not "cats refused", and stating either would be inventing their policy.',
+  cameraAccess:            'PENDING ON PURPOSE, AND THE DISTINCTION IS THE POINT. Their 7/24 İzleme copy says THEY monitor with a camera system. It does NOT say the owner gets a feed. Those are different products and merging them promises something the partner never offered.',
+  logo:                    'No usable logo file collected yet. Until one is, PartnerLogoStrip renders a monogram — a finished state, not a placeholder box.',
+  logoOnDark:              'No inverted wordmark. partnerLogo() already falls back to `logo`, which is correct while every surface this sits on is light.',
+  accent:                  'No brand colour agreed. The screen falls back to colors.primary, which check-pet-partners.mjs proves is readable; an unvetted hex could ship unreadable text.',
+  photoPermission:         'WRITTEN PERMISSION NOT YET HELD for the four placeholder photos below. Tracked as a field so it is owed rather than remembered.',
+}
+
+// ─── THE PARTNERS ───────────────────────────────────────────────────────────
+export const PET_PARTNERS = [
+  {
+    // ─── THE UUID IS contact_events.entity_id, AND NOTHING VERIFIES IT ──────
+    // A config-only partner still needs a stable id to log taps against. There is no seed
+    // migration, so no verify_schema H-token can assert it and nothing will notice if it
+    // changes.
+    //
+    // ⚠ ONCE TAPS HAVE LANDED THIS MUST NEVER CHANGE. contact_events.entity_id is
+    //   polymorphic and deliberately has NO foreign key, so a new id does not fail — it
+    //   silently orphans every row already counted against the old one and the partner
+    //   report quietly restarts from zero. Same warning dorms.js carries, for the same
+    //   reason.
+    id:   '86f811e9-bc1e-4a2a-a542-42b0631085dd',
+    slug: 'shiny-paw',
+
+    // ONE source for both the WhatsApp "Kod: ADA-SPW" suffix and utm_campaign, so the two
+    // cannot drift apart. Never inline the string in either builder.
+    code: 'SPW',
+
+    // The display name. No DB row owns it, so this is the only place it exists.
+    name: 'Shiny Paw & Trail Hotel',
+
+    // ─── DOG BOARDING, NEVER "PETS" ─────────────────────────────────────────
+    //
+    // Drives the hero subtitle key and nothing else. It is a field rather than a hardcoded
+    // string in the screen because it is the one claim on this page most likely to be
+    // wrong for partner #2, and because generalising it by accident is easy: the surface
+    // lives inside a module called "pets", every icon around it is a paw, and the drift
+    // from "dog boarding" to "pet hotel" costs nothing to make and misleads somebody with
+    // a cat at the moment they most need a straight answer.
+    //
+    // acceptsCats is PENDING and must stay that way. This field says what they advertise;
+    // it does not say what they refuse.
+    displayType: 'dog_boarding',
+
+    website:  'https://www.shinypawhotel.com',
+
+    // ⚠ VERBATIM AS SUPPLIED — not reformatted, not spaced, not prettified. The digits are
+    //   the thing that has to be right, and every transformation is a chance to lose one.
+    //   The same number serves both buttons: their WhatsApp link resolves to
+    //   phone=905338600278, which is these digits without the +.
+    phone:    '+905338600278',
+    whatsapp: '+905338600278',
+
+    // ⚠ THEIR OWN MAPS LINK, used as the directions target rather than a coordinate we
+    //   resolved ourselves — the same call dorms.js made for Alasia. A short link resolves
+    //   to a pin SHINY PAW chose; a lat/lng we derived is our guess at where they mean.
+    //   `coords` stays null (PENDING_FIELDS), so no embedded map renders — this is the
+    //   DIRECTIONS button only.
+    //
+    // It is also the ONLY review affordance on this screen, by decision: the partner has
+    // no ADA row to anchor a rating to, and their Wix testimonials are not imported.
+    mapsUrl:  'https://maps.app.goo.gl/mYcMS9PJCmoNn7177',
+
+    // ─── 'nicosia', NOT 'lefkosa' ───────────────────────────────────────────
+    //
+    // The brief says the district is Lefkoşa, which is the Turkish name for the same
+    // place. The canonical slug in this repo is `nicosia` (constants/regions.js), and it
+    // is what REGION_LABEL_KEY indexes — so it is what renders the district in all nine
+    // locales. Writing 'lefkosa' here would not throw; REGION_LABEL_KEY would return
+    // undefined, t() would be handed undefined, and the hero would simply show no
+    // district at all. A silent blank, which is why the guard asserts the slug resolves.
+    district: 'nicosia',
+    // No neighbourhood published. Deliberately not guessed from the maps link: an area
+    // name read off a pin is our inference, not their address.
+    area:     null,
+
+    // Referenced and deliberately UNWRITTEN — see PENDING_KEYS at the foot of this file.
+    // Shiny Paw has supplied no about copy, and writing nine locales of marketing prose
+    // about a real business is fabrication with their name on it.
+    aboutKey: 'petHotelShinyPawAbout',
+
+    // ─── THE SIX SERVICES ───────────────────────────────────────────────────
+    //
+    // Titles and bodies are THEIR OWN TURKISH COPY, taken verbatim from shinypawhotel.com
+    // (fetched 2026-09-14) and carried into constants/i18n.js as the `tr` values. The
+    // English is written by ADA from that Turkish; the other seven locales are translated
+    // from the English.
+    //
+    // Order is their site's order and is the render order. No sort key — a numeric field
+    // invites somebody to renumber and lose it.
+    //
+    // ⚠ THESE ARE DESCRIPTIONS OF A SERVICE, NOT COMMITMENTS WE CAN VERIFY. Nothing here
+    //   may grow into a structured claim — a body mentioning a camera system must not
+    //   become a `cameraAccess: true`, and a body mentioning walks must not become an
+    //   hours field. Prose the partner wrote is prose; a field is a promise ADA makes.
+    services: [
+      { id: 'monitoring', titleKey: 'petHotelSvcMonitoringTitle', bodyKey: 'petHotelSvcMonitoringBody', icon: 'videocam-outline' },
+      { id: 'dailycare',  titleKey: 'petHotelSvcDailyCareTitle',  bodyKey: 'petHotelSvcDailyCareBody',  icon: 'heart-outline' },
+      { id: 'stay',       titleKey: 'petHotelSvcStayTitle',       bodyKey: 'petHotelSvcStayBody',       icon: 'shield-checkmark-outline' },
+      { id: 'walks',      titleKey: 'petHotelSvcWalksTitle',      bodyKey: 'petHotelSvcWalksBody',      icon: 'walk-outline' },
+      { id: 'play',       titleKey: 'petHotelSvcPlayTitle',       bodyKey: 'petHotelSvcPlayBody',       icon: 'tennisball-outline' },
+      { id: 'attention',  titleKey: 'petHotelSvcAttentionTitle',  bodyKey: 'petHotelSvcAttentionBody',  icon: 'people-outline' },
+    ],
+
+    // ─── PHOTOS — PLACEHOLDERS, AND LABELLED AS SUCH IN THE DATA ────────────
+    //
+    // Four images lifted from their Wix site and bundled locally (constants/partnerAssets.js).
+    // NOT hotlinked: a Wix CDN URL is a dependency on somebody else's uptime, cache policy
+    // and willingness to keep a path stable, on a screen that is meant to work offline-ish
+    // on a phone.
+    //
+    // ⚠ EVERY ONE OF THESE IS AWAITING REPLACEMENT BY SHINY PAW'S OWN PHOTOGRAPHS.
+    //   `placeholder: true` is on each entry rather than stated once in this comment, so a
+    //   future reader who scrolls straight to the array still sees it, and so the guard can
+    //   COUNT them and print the number on every run.
+    //
+    // ⚠ THE REST OF THEIR SITE'S IMAGERY IS AI-GENERATED AND MUST NOT BE USED ANYWHERE.
+    //   These four were selected as the ones that are photographs. Do not add a fifth
+    //   without checking it against that rule — an AI-generated dog on a real boarding
+    //   facility's listing is a misrepresentation of the premises somebody is about to
+    //   leave their animal at.
+    //
+    // photoPermission is PENDING: these are wired on Berke's instruction and the written
+    // permission item stays owed until it is in writing.
+    // ─── `aspect` IS THE DIVISION, NOT A DECIMAL ────────────────────────────
+    //
+    // Written as w / h so the number carries where it came from, the same convention
+    // constants/partners.js uses. These are NOT uniform — three are 640x640 and
+    // dog-at-mesh is 512x640 — and every shot renders with resizeMode 'cover', so a
+    // container aspect that disagrees with the source centre-crops. TadilArt's old
+    // hardcoded `1` cost ~12% of the height of a bathroom photo; declaring per photo is
+    // what stops that here.
+    //
+    // ─── `provenance` IS A REQUIRED FIELD, AND ONE OF THEM IS DISPUTED ──────
+    //
+    // 'photograph' = looks like a real photograph of the real premises.
+    // 'disputed'   = shows AI-generation tells and needs the partner to confirm.
+    //
+    // ⚠ THERE WERE FOUR. `shinypaw/dog-at-mesh` WAS DROPPED 2026-09-14 as AI-generated —
+    //   the near foreleg bent where no joint is, the upper-left paw was not attached to a
+    //   visible leg, and there was an unexplained mid-body protrusion. An AI-generated dog
+    //   on a real boarding facility's listing misrepresents the premises somebody is about
+    //   to leave their animal at, which is the one thing this surface must not do.
+    //
+    //   HOW IT WAS NEARLY MISSED, because the next person will face the same test: the
+    //   selection evidence was the FILENAME — Wix preserves uploaded names, and this one
+    //   was not marked AI. That is not evidence of anything. Only looking at the image was.
+    //   Judge the pixels, never the path.
+    photos: [
+      { key: 'shinypaw/runs-collage', placeholder: true, aspect: 640 / 640, provenance: 'photograph',
+        note: 'Two-up composite of the kennel block, as they publish it — not two separate frames.' },
+      { key: 'shinypaw/runs-wide',    placeholder: true, aspect: 640 / 640, provenance: 'photograph',
+        note: 'Wide shot of the runs.' },
+      { key: 'shinypaw/entrance',     placeholder: true, aspect: 640 / 640, provenance: 'photograph',
+        note: 'Handler and dog at the entrance; the ridgeline behind is consistent with the north of the island.' },
+    ],
+
+    // ─── PENDING (see PENDING_FIELDS above for the reason on each) ──────────
+    //
+    // Written out in full rather than omitted. An absent key and a null one read the same
+    // to `?.`, but only the null one tells the next person the question was ASKED.
+    //
+    // ⚠ info@shiny-paw.com APPEARS ON THEIR SITE AND IS DELIBERATELY NOT WIRED. Their
+    //   domain is shinypawhotel.com; the shiny-paw.com mismatch is unconfirmed, and an
+    //   email button that silently goes nowhere is worse than no email button. Recorded
+    //   here rather than dropped so the question survives; confirm with the partner.
+    email:                   null,
+    address:                 null,
+    coords:                  null,
+    prices:                  null,
+    openingHours:            null,
+    dropOffPickUpHours:      null,
+    capacity:                null,
+    acceptedSizes:           null,
+    breedRestrictions:       null,
+    vaccinationRequirements: null,
+    acceptsCats:             null,
+    cameraAccess:            null,
+    logo:                    null,
+    logoOnDark:              null,
+    accent:                  null,
+    photoPermission:         null,
+  },
+]
+
+export const PET_PARTNER_IDS = PET_PARTNERS.map(p => p.id)
+
+const BY_ID = Object.fromEntries(PET_PARTNERS.map(p => [p.id, p]))
+export const petPartner = id => BY_ID[id]
+
+const BY_SLUG = Object.fromEntries(PET_PARTNERS.map(p => [p.slug, p]))
+export const petPartnerBySlug = slug => BY_SLUG[slug]
+
+// ─── EMPTINESS IS DECIDED HERE, ONCE, AND NEVER IN THE SCREEN ───────────────
+//
+// The discipline partnerGallery() established for TadilArt and dormSections() for Alasia.
+// A section that is hidden is hidden HERE, by a pure function — never by an `&&` chain in
+// the JSX. Two reasons it matters more than tidiness: a screen-side condition cannot be
+// tested without rendering, and a screen-side condition gets copied wrong when the second
+// partner arrives.
+//
+// The asset resolver is INJECTED rather than imported, so this module stays require()-free
+// and a Node harness can drive it with a stub map — the same injection dorms.js uses.
+//
+// ⚠ THE CONTRACT WITH THE SCREEN: a key whose value is null is a section that must not
+//   render AT ALL. No empty row, no "bilgi yok", no greyed placeholder. A greyed row tells
+//   the user the app is broken; an absent section tells them nothing, which is the honest
+//   answer when we know nothing.
+export function petPartnerSections(partner, { resolveAsset = () => undefined } = {}) {
+  const has = v => Array.isArray(v) && v.length > 0
+  // A pending scalar is null. Treating '' or 0 as present would let a future empty string
+  // render an empty row, which is the exact failure this function exists to prevent.
+  const val = v => (v === null || v === undefined || v === '' ? null : v)
+
+  // The aspect has to travel WITH the image or the screen has to guess one, and a guessed
+  // aspect centre-crops the dimension the photo exists to show. A non-positive or
+  // non-finite declared value is treated as absent and falls back to square — the same
+  // defence HomeServicePartnerScreen's projectAspect() applies, for the same reason: a
+  // container with aspectRatio 0 or NaN collapses and the photo silently disappears.
+  const photos = (partner?.photos || [])
+    .map(p => ({
+      source: resolveAsset(p.key),
+      aspect: (Number.isFinite(p.aspect) && p.aspect > 0) ? p.aspect : 1,
+      provenance: p.provenance || null,
+    }))
+    .filter(p => p.source)
+
+  // Every practical field is pending today, so `practical` is null and the section is
+  // absent. Built as a filtered list rather than an object so ONE answered question is
+  // enough to render the section with exactly that one row — and so adding a field later
+  // needs no change here.
+  const practical = [
+    { id: 'openingHours',            labelKey: 'petHotelHours',        value: val(partner?.openingHours) },
+    { id: 'dropOffPickUpHours',      labelKey: 'petHotelHandover',     value: val(partner?.dropOffPickUpHours) },
+    { id: 'capacity',                labelKey: 'petHotelCapacity',     value: val(partner?.capacity) },
+    { id: 'acceptedSizes',           labelKey: 'petHotelSizes',        value: val(partner?.acceptedSizes) },
+    { id: 'breedRestrictions',       labelKey: 'petHotelBreeds',       value: val(partner?.breedRestrictions) },
+    { id: 'vaccinationRequirements', labelKey: 'petHotelVaccination',  value: val(partner?.vaccinationRequirements) },
+    { id: 'cameraAccess',            labelKey: 'petHotelCameraAccess', value: val(partner?.cameraAccess) },
+  ].filter(r => r.value !== null)
+
+  // Location renders on EITHER half. Address is pending and mapsUrl is known, so today
+  // this is a directions button with no street line above it — which is correct: their
+  // pin is a fact and their street address is not one we hold.
+  const address = val(partner?.address)
+  const mapsUrl = val(partner?.mapsUrl)
+
+  return {
+    photos:    photos.length ? photos : null,
+    about:     partner?.aboutKey || null,
+    services:  has(partner?.services) ? partner.services : null,
+    practical: practical.length ? practical : null,
+    pricing:   val(partner?.prices),
+    location:  (address || mapsUrl) ? { address, mapsUrl, coords: partner?.coords || null } : null,
+    // Email is excluded BY DECISION, not by omission — see the note on the field above.
+    contact:   [
+      partner?.whatsapp && 'whatsapp',
+      partner?.phone    && 'call',
+      partner?.website  && 'website',
+      mapsUrl           && 'maps',
+    ].filter(Boolean),
+  }
+}
+
+// ─── The WhatsApp handoff — TR and EN only, and not in i18n.js ──────────────
+//
+// Identical reasoning to constants/partners.js and constants/dorms.js, which both state it
+// at length: the message is read by SHINY PAW'S DESK, not by the user who sends it, so
+// nine translations of it is work with no reader. A key sitting in i18n.js would invite
+// the next person to "finish" the set.
+//
+// The consequence is chosen, not discovered — a Russian speaker's compose box opens in
+// English, and they can edit it. An English sentence the facility can act on beats a
+// Russian one nobody there reads.
+//
+// ⚠ IT STATES THE CUSTOMER CAME FROM ADA. That is the whole point of the handoff: the desk
+//   can attribute the enquiry without asking, and `Kod:` is the machine-readable half of
+//   the same fact.
+const WA = {
+  tr: code => `Merhaba, ADA uygulamasından yazıyorum. Köpeğim için konaklama hakkında bilgi almak istiyorum.\nKaynak: ADA · Kod: ${code}`,
+  en: code => `Hello, I'm contacting you from the ADA app. I'd like information about boarding for my dog.\nKaynak: ADA · Kod: ${code}`,
+}
+
+// `lang` is a FULL NAME ('Turkish'), never a code — the trap partners.js and dorms.js both
+// document. Comparing against 'tr' here would send English to every Turkish speaker and
+// look completely correct in review. LANG_CODES is not imported (this module stays
+// dependency-free), so the caller passes the two-letter code it already has.
+export const petWaLocale = langCode => (langCode === 'tr' ? 'tr' : 'en')
+
+// ⚠ DERIVED FROM partner.code, NEVER INLINED. This and petPartnerWebsiteUrl() are the only
+//   two places `SPW` reaches the outside world and they must agree — an enquiry quoting
+//   ADA-SPW while the click-through says utm_campaign=shinypaw would make the two halves
+//   of the partner report impossible to join.
+export function petWaCode(partner) {
+  return `ADA-${partner?.code || ''}`
+}
+
+export function petWaMessage(partner, langCode) {
+  return WA[petWaLocale(langCode)](petWaCode(partner))
+}
+
+// ⚠ THE NUMBER IS DIGITS-ONLY FOR wa.me, AND THAT STRIP HAPPENS HERE. Doing it in the
+//   screen means doing it again, slightly differently, on the next surface — and a wa.me
+//   URL with a '+' in it opens WhatsApp on a blank chat, which looks like the partner's
+//   number is wrong rather than like our formatting is.
+export function petWaUrl(partner, langCode) {
+  const digits = String(partner?.whatsapp || '').replace(/\D/g, '')
+  if (!digits) return null
+  return `https://wa.me/${digits}?text=${encodeURIComponent(petWaMessage(partner, langCode))}`
+}
+
+export function petPartnerWebsiteUrl(partner) {
+  if (!partner?.website) return null
+  const u = new URL(partner.website)
+  u.searchParams.set('utm_source', 'ada')
+  u.searchParams.set('utm_medium', 'app')
+  u.searchParams.set('utm_campaign', String(partner.code || '').toLowerCase())
+  return u.toString()
+}
+
+// ─── Keys that are REFERENCED and must NOT resolve yet ──────────────────────
+//
+// scripts/check-pet-partners.mjs asserts these are missing from all nine locales, which is
+// the OPPOSITE direction from every other key it checks. The point is that writing the
+// string turns the guard RED — so graduating a placeholder into real content is a
+// deliberate act somebody reviews, not something that happens because a translator filled
+// a gap they found empty.
+//
+// petHotelShinyPawAbout: Shiny Paw has supplied no about copy. When they do, write the
+// nine locales and delete this entry in the same commit.
+export const PENDING_KEYS = ['petHotelShinyPawAbout']

@@ -58,6 +58,7 @@
     "partners:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-partner-assets.mjs",
     "preview:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-partner-preview.mjs",
     "dorms:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-dorms.mjs",
+    "pethotel:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-pet-partners.mjs",
     "refs:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs.mjs",
     "refs:selftest": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs.mjs --self",
     "i18n:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-i18n-duplicates.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-i18n-coverage.mjs",

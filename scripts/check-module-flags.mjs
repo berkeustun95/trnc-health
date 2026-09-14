@@ -171,6 +171,17 @@ const EXPECTED_SCALARS = {
   // AND moves the tab the module opens on, so a working-tree flip left over from a device
   // check would ship Yurtlar early to every user AND change where Emlak & Konaklama lands.
   DORMS_LIVE:            true,   // live 2026-09-13
+  // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar. Not a
+  // MODULE_FLAGS key for the same mechanical reason DORMS_LIVE is not: it gates a PARTNER
+  // inside a module that is already live, so there is no Coming Soon screen, no waitlist
+  // and nothing for the notify path to send — a true entry in that map would fail this
+  // script's own WAITLIST_BLAST_DONE and notify checks against a correct app.
+  //
+  // Baselined because a flip is user-visible the moment it ships: the partner card appears
+  // on PetsHomeScreen, which every user of a LIVE module reaches. `eas update` bundles the
+  // WORKING TREE, so a flag left flipped after a device pass is a partnership announced
+  // early — to everyone, with no way to take it back except another OTA.
+  PET_HOTEL_LIVE:        false,
   // The signup terms checkbox. Baselined for the usual reason — `eas update` bundles the
   // WORKING TREE — and it still matters now that it is TRUE, in the other direction: a
   // working-tree revert left over from a comparison would ship a signup screen that

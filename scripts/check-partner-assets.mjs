@@ -63,9 +63,17 @@ const mapped = new Set(entries.map(e => e.path))
 //
 // A THIRD partner config must be added here the day it is created. There is no way to
 // discover them automatically that is not worse than this list.
+//
+// Added 2026-09-14: constants/petPartners.js, ON THE DAY IT WAS CREATED, which is what the
+// paragraph above asks for and what did not happen for dorms.js. Measured before adding:
+// its four keys were on disk and in the map, so the "live" count was already right — the
+// gap was the `notInMap` direction, where a typo in a pet photo key would have been
+// invisible here and caught only by scripts/check-pet-partners.mjs asserting it from the
+// other side. That is the same luck-not-design the dorms note calls out.
 const CONFIGS = [
-  ['constants/partners.js', 'HS_PARTNERS'],
-  ['constants/dorms.js',    'DORM_PARTNERS'],
+  ['constants/partners.js',    'HS_PARTNERS'],
+  ['constants/dorms.js',       'DORM_PARTNERS'],
+  ['constants/petPartners.js', 'PET_PARTNERS'],
 ]
 const declared = new Set()
 let configCount = 0
@@ -88,6 +96,11 @@ for (const [file, exportName] of CONFIGS) {
     //   scripts/check-dorms.mjs caught it from the other side; this one, whose entire job
     //   is asset wiring, did not.
     for (const r of p.rooms || []) if (r.photo) declared.add(r.photo)
+    // A THIRD photo shape: petPartners.js carries `photos: [{ key, placeholder, aspect,
+    // provenance }]`. Neither of the other two configs has it, and a shape this guard does
+    // not know about contributes nothing silently — which is how the room photos above were
+    // missed for three slices.
+    for (const ph of p.photos || []) if (ph?.key) declared.add(ph.key)
     for (const proj of p.gallery || []) {
       // A dorm gallery is a flat list of KEYS; a home-services gallery is a list of
       // PROJECTS holding pairs/extra/steps. Handle both rather than assuming one shape.

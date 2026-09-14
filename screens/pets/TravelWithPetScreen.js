@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import BackButton from '../../components/BackButton'
+import { PET_HOTEL_LIVE } from '../../constants/flags'
+import PetHotelCrossLink from '../../components/PetHotelCrossLink'
 
 const LAST_VERIFIED = 'June 2026'
 
@@ -84,7 +86,7 @@ function PetsDisclaimer({ lang }) {
   )
 }
 
-export default function TravelWithPetScreen({ lang, onBack }) {
+export default function TravelWithPetScreen({ lang, onBack, onNavigate }) {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
@@ -133,6 +135,12 @@ export default function TravelWithPetScreen({ lang, onBack }) {
           <Text style={s.comingSoonTitle}>{t('petsFriendlyVenuesTitle', lang)}</Text>
           <Text style={s.comingSoonSub}>{t('petsFriendlyVenuesSub', lang)}</Text>
         </View>
+
+        {/* Above the disclaimer, so the last thing on a regulatory screen is still ADA's
+            "verify this yourself" line and not a partner. */}
+        {PET_HOTEL_LIVE && !!onNavigate && (
+          <PetHotelCrossLink lang={lang} onPress={() => onNavigate('pethotel')} />
+        )}
 
         <PetsDisclaimer lang={lang} />
       </ScrollView>

@@ -6,6 +6,9 @@ import ScreenHeader from '../../components/ScreenHeader'
 import ModuleMascotBadge from '../../components/ModuleMascotBadge'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
+import { PET_HOTEL_LIVE } from '../../constants/flags'
+import { PET_PARTNERS } from '../../constants/petPartners'
+import PetHotelPartnerCard from '../../components/PetHotelPartnerCard'
 
 const JOURNEYS = [
   {
@@ -50,6 +53,10 @@ function JourneyCard({ item, lang, onPress }) {
 }
 
 export default function PetsHomeScreen({ lang, onBack, onNavigate }) {
+  // Gated on PET_HOTEL_LIVE, not on the partner existing. The config ships whatever the
+  // flag says, so "is there a partner" and "may users see one" are separate questions —
+  // and only the second one is reversible with one boolean and an OTA.
+  const petHotel = PET_HOTEL_LIVE ? PET_PARTNERS[0] : null
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="pets" />
@@ -73,6 +80,18 @@ export default function PetsHomeScreen({ lang, onBack, onNavigate }) {
             onPress={() => onNavigate(item.dest)}
           />
         ))}
+
+        {/* BELOW the journeys and visually distinct from them. It is not a fourth journey:
+            the three above are ADA's own editorial guidance, this is a business that pays
+            us, and letting the two read alike would launder a paid placement into neutral
+            advice. */}
+        {!!petHotel && (
+          <PetHotelPartnerCard
+            partner={petHotel}
+            lang={lang}
+            onPress={() => onNavigate('pethotel')}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   )

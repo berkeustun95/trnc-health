@@ -105,6 +105,36 @@ export const PARTNER_ASSETS = {
   'alasia/room-blk3': require('../assets/partners/alasia/room-blk3.jpg'),
   'alasia/room-bng2': require('../assets/partners/alasia/room-bng2.jpg'),
   'alasia/room-bng4': require('../assets/partners/alasia/room-bng4.jpg'),
+
+  // ─── Shiny Paw & Trail Hotel (pet hotel, Evcil Hayvanlar) ─────────────────
+  //
+  // ⚠ ALL THREE ARE PLACEHOLDERS AWAITING SHINY PAW'S OWN PHOTOGRAPHS. A fourth
+  //   (dog-at-mesh) was dropped 2026-09-14 as AI-generated — see the note in
+  //   constants/petPartners.js.
+  //
+  //   They are lifted from their Wix site and BUNDLED rather than hotlinked: a
+  //   static.wixstatic.com URL
+  //   is a dependency on somebody else's uptime, cache policy and willingness to keep a
+  //   path stable, on a screen meant to work on a phone with one bar. The provenance and
+  //   the replacement obligation live in constants/petPartners.js's `photos` array, one
+  //   flag per entry, so the guard can COUNT them and print the number on every run —
+  //   a "temporary" recorded only in a comment is how temporary becomes permanent.
+  //
+  // ⚠ NOT RE-ENCODED, NOT RESIZED. Same call the Alasia block above makes: these are the
+  //   partner's files. Two of the three are PNG at ~700 KB for a 640x640 photograph, which is
+  //   wasteful encoding for photographic content — but re-encoding is a quality decision
+  //   about somebody else's imagery that nobody asked for, and these get replaced
+  //   wholesale. MEASURED rather than guessed, and RE-MEASURED after the drop: see the
+  //   figures printed by `npm run pethotel:check` — trust that output, not this sentence.
+  //   Both disk and decode sit comfortably inside the budget the Alasia note sets out (it
+  //   capped a pager at five images when seven were decoding to 103 MB).
+  //
+  // ⚠ THE REST OF THEIR SITE'S IMAGERY IS AI-GENERATED AND MUST NOT BE USED. Do not add a
+  //   fourth key here without LOOKING AT THE IMAGE. The filename proves nothing — Wix keeps
+  //   whatever name was uploaded, which is exactly how dog-at-mesh got onto the list.
+  'shinypaw/runs-collage': require('../assets/partners/shinypaw/runs-collage.png'),
+  'shinypaw/runs-wide':    require('../assets/partners/shinypaw/runs-wide.png'),
+  'shinypaw/entrance':     require('../assets/partners/shinypaw/entrance.jpg'),
 }
 
 export const partnerAsset = key => (key ? PARTNER_ASSETS[key] : undefined)

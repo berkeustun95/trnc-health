@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import BackButton from '../../components/BackButton'
+import { PET_HOTEL_LIVE } from '../../constants/flags'
+import PetHotelCrossLink from '../../components/PetHotelCrossLink'
 
 const LAST_VERIFIED = 'June 2026'
 
@@ -105,6 +107,10 @@ export default function OwningPetScreen({ lang, onBack, onNavigate }) {
         <InfoCard>
           <Text style={s.infoCardBody}>{t('petsApartmentBody', lang)}</Text>
         </InfoCard>
+
+        {PET_HOTEL_LIVE && !!onNavigate && (
+          <PetHotelCrossLink lang={lang} onPress={() => onNavigate('pethotel')} />
+        )}
 
         <PetsDisclaimer lang={lang} />
       </ScrollView>

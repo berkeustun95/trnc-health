@@ -54,6 +54,7 @@ import { REGION_LABEL_KEY } from '../constants/regions.js'
 import { RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY } from '../constants/profileGate.js'
 import { STRIP_CARD_KEYS } from '../constants/homeStrip.js'
 import { AD_SPONSORED_KEY } from '../constants/ads.js'
+import { PET_PARTNERS, PENDING_KEYS as PET_PENDING_KEYS, petPartnerSections } from '../constants/petPartners.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -165,6 +166,25 @@ const SURFACES = [
   // Slice 7, added IN THE COMMIT THAT CREATES THE SCREEN — the fourth time this file has
   // had to record that lesson, and the first time it was applied without being relearned.
   'screens/ConnectivityStoresScreen.js',
+  // ─── Shiny Paw pet hotel partner, added 2026-09-14 IN THE COMMIT THAT CREATES IT ──
+  //
+  // The fifth application of the lesson above, and the first where the SHAPE of the
+  // feature was chosen partly to make it possible. The pets module cannot join this list:
+  // its 117 `pets*` keys exist in English and Turkish only, so adding PetsHomeScreen would
+  // turn this guard red on 819 pre-existing key×locale pairs belonging to a different
+  // slice. So the partner's copy was deliberately NOT written inline on those screens —
+  // the card and the cross-link are components precisely so they can be guarded here on
+  // their own, while their hosts stay outside.
+  //
+  // That is the DisplayNameCheck paragraph above applied FORWARD instead of in hindsight:
+  // copy that lives in a component is only guarded if somebody puts the component here.
+  //
+  // Guarded BEFORE PET_HOTEL_LIVE flips, not after. Partner copy is the one kind of string
+  // where an English fallback is not merely poor service — it is a partnership ADA sold,
+  // rendered in a language the reader did not choose.
+  'screens/pets/PetHotelPartnerScreen.js',
+  'components/PetHotelPartnerCard.js',
+  'components/PetHotelCrossLink.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
@@ -226,6 +246,25 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // "WhatsApp" is a BRAND, not a word. It is written in Latin script on WhatsApp's own
+  // localised interfaces in every one of these six locales, and on the partner's own
+  // Turkish site. Translating it would invent a name for an app the user already has
+  // installed under this one — on a contact button, where the whole job of the label is to
+  // tell somebody which app is about to open.
+  //
+  // ⚠ ARABIC AND PERSIAN ARE DELIBERATELY NOT IN THIS LIST, and the asymmetry is the
+  //   decision rather than an oversight. Both scripts routinely transliterate this
+  //   particular brand — واتساب / واتساپ are what Arabic and Persian speakers read and
+  //   type — so they are TRANSLATED above and this guard checks them as normal. That is
+  //   the opposite call from connTagEsim below, which stays Latin even in RTL copy,
+  //   because "eSIM" is a technical product term nobody transliterates and this is a
+  //   consumer brand everybody does. Two entries, two reasons, not one rule about RTL.
+  'petHotelWhatsApp': { Turkish: 'brand name, Latin script on WhatsApp\'s own Turkish UI',
+                        Russian: 'brand name, Latin script in Russian copy',
+                        Greek:   'brand name, Latin script in Greek copy',
+                        French:  'brand name, Latin script in French copy',
+                        Spanish: 'brand name, Latin script in Spanish copy',
+                        German:  'brand name, Latin script in German copy' },
   // "eSIM" is a product term, not a word — it is written in Latin script and left
   // untranslated by the industry in every locale ADA supports, including the two RTL ones,
   // exactly as "Wi-Fi" and "SIM" are. KKTCELL's own Turkish pages say "eSIM". Translating
@@ -336,6 +375,30 @@ for (const f of SURFACES) {
   for (const m of src.matchAll(/(?<![A-Za-z0-9_])t\('([a-zA-Z][a-zA-Z0-9_]*)'/g)) literal.add(m[1])
 }
 
+// ⚠ PENDING_KEYS ARE SUBTRACTED, AND THAT IS NOT A CONVENIENCE. petHotelShinyPawAbout is
+//   referenced by the config and deliberately unwritten in all nine locales (the partner
+//   has supplied no about copy). This guard fails on a key absent from ENGLISH, so
+//   including it would go red on a state scripts/check-pet-partners.mjs asserts is
+//   correct — two guards contradicting each other over the same key. One owner each:
+//   pethotel:check owns "is it still unwritten", this file owns "is every written key
+//   present in all nine".
+const PET_PARTNER_KEYS = (() => {
+  const pending = new Set(PET_PENDING_KEYS)
+  const out = new Set()
+  for (const p of PET_PARTNERS) {
+    if (p.aboutKey) out.add(p.aboutKey)
+    for (const sv of p.services || []) { out.add(sv.titleKey); out.add(sv.bodyKey) }
+    // The practical rows are FILTERED OUT of petPartnerSections() while their values are
+    // pending, so driving it with a probe is the only way to see their labels. Every field
+    // is stubbed truthy; nothing here reaches the app.
+    const probe = { ...p }
+    for (const f of ['openingHours', 'dropOffPickUpHours', 'capacity', 'acceptedSizes',
+                     'breedRestrictions', 'vaccinationRequirements', 'cameraAccess']) probe[f] = 'ZZ'
+    for (const r of petPartnerSections(probe).practical || []) out.add(r.labelKey)
+  }
+  return [...out].filter(k => k && !pending.has(k))
+})()
+
 // Keys these surfaces reach THROUGH A VARIABLE. Pulled from the same maps the screens
 // index into, so a new category or group is covered the moment it is added.
 const viaVariable = [
@@ -370,6 +433,23 @@ const viaVariable = [
   ...Object.values(HELP_ROW_LABEL_KEY),
   ...Object.values(CATEGORY_LABEL_KEY),
   ...Object.values(REGION_LABEL_KEY),
+  // ─── The pet hotel partner's own copy — 19 of its 34 keys, and ALL of the selling ──
+  //
+  // Listing screens/pets/PetHotelPartnerScreen.js in SURFACES covers the 15 keys it calls
+  // literally. It covers NONE of the 12 service title/body keys or the 7 practical row
+  // labels, because those live in constants/petPartners.js and reach the screen as
+  // t(sv.titleKey, lang) and t(r.labelKey, lang) — the exact variable-lookup blind spot
+  // this file's header describes and the SURFACE_PROP_KEYS note measured once already.
+  //
+  // ⚠ THEY ARE THE LONGEST AND MOST TRANSLATION-SENSITIVE STRINGS ON THE SURFACE — the
+  //   partner's selling copy, six full sentences. Adding the screen to SURFACES while
+  //   leaving these out would have guarded the minority of the feature while the key
+  //   total went UP, which is this repo's named failure shape.
+  //
+  // DERIVED from the config, not listed, so partner #2's services are covered the moment
+  // the entry exists. petPartners.js is import-safe (no require, no react-native) partly
+  // so this import is possible.
+  ...PET_PARTNER_KEYS,
 ]
 
 const KEYS = [...new Set([...literal, ...viaVariable, ...SURFACE_PROP_KEYS])].filter(Boolean).sort()

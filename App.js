@@ -19,7 +19,7 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE } from './constants/flags'
 import { promosAllowed } from './constants/homeStrip'
 import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
@@ -62,12 +62,14 @@ import ConnectivityStoresScreen from './screens/ConnectivityStoresScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import ExploreScreen from './screens/ExploreScreen'
 import ExploreProfileScreen from './screens/ExploreProfileScreen'
+import { PET_PARTNERS } from './constants/petPartners'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
 import BringingPetScreen from './screens/pets/BringingPetScreen'
 import TimelineCalculatorScreen from './screens/pets/TimelineCalculatorScreen'
 import VetDirectoryScreen from './screens/pets/VetDirectoryScreen'
 import TravelWithPetScreen from './screens/pets/TravelWithPetScreen'
 import OwningPetScreen from './screens/pets/OwningPetScreen'
+import PetHotelPartnerScreen from './screens/pets/PetHotelPartnerScreen'
 import TutorialCoachMarks from './screens/TutorialCoachMarks'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
@@ -1679,7 +1681,28 @@ export default function App() {
         />
       )
     } else if (petsSubScreen === 'travel') {
-      content = <TravelWithPetScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
+      content = (
+        <TravelWithPetScreen
+          lang={lang}
+          onBack={() => setPetsSubScreen(null)}
+          onNavigate={dest => setPetsSubScreen(dest)}
+        />
+      )
+    } else if (petsSubScreen === 'pethotel' && PET_HOTEL_LIVE) {
+      // ⚠ THE FLAG IS IN THE CONDITION, not only on the entry points. Every way IN is
+      //   already gated, so this looks redundant — it is the belt to that braces. A route
+      //   reachable by state alone is one restored-navigation-state or one future deep
+      //   link away from rendering a dark partner surface, and the failure would be
+      //   silent. Dark, this branch is skipped and the state falls through to
+      //   PetsHomeScreen, which is the correct destination rather than a blank screen.
+      content = (
+        <PetHotelPartnerScreen
+          partner={PET_PARTNERS[0]}
+          lang={lang}
+          region={null}
+          onBack={() => setPetsSubScreen(null)}
+        />
+      )
     } else if (petsSubScreen === 'owning') {
       content = (
         <OwningPetScreen
