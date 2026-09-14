@@ -64,6 +64,8 @@ WITH report AS (
     ('1007_home_strip_pin','home_strip_pin'),
     ('1008_ad_banners','ad_banners'),
     ('1009_ad_position_module','ad_modules'),
+    ('1017_student_tasks','student_tasks'),
+    ('1017_student_tasks','student_task_i18n'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -312,7 +314,9 @@ WITH report AS (
     -- that table, so if this function is missing every view and tap counts ZERO — silently,
     -- and a silent zero reads as "nobody looks at the ads", which is a conclusion somebody
     -- would act on.
-    ('1008_ad_banners','bump_ad_counter')
+    ('1008_ad_banners','bump_ad_counter'),
+    -- The CHECK behind student_task_i18n.steps. Missing = the CHECK cannot exist either.
+    ('1017_student_tasks','student_task_steps_valid')
   ) e(m,o)
 
   UNION ALL
@@ -510,7 +514,17 @@ WITH report AS (
     -- without the second, a row can be registered in one district and serve only
     -- another, and the directory lists it under neither in a way anyone predicts.
     ('1010_hs_coverage','home_services_coverage_districts_check'),
-    ('1010_hs_coverage','home_services_base_in_coverage_check')
+    ('1010_hs_coverage','home_services_base_in_coverage_check'),
+    -- Student Hub tasks (1017). slug_unique is correctness, not tidiness: the slug is the
+    -- device-side progress key, so two rows sharing one would share every student's ticks.
+    ('1017_student_tasks','student_tasks_slug_unique'),
+    ('1017_student_tasks','student_tasks_slug_check'),
+    ('1017_student_tasks','student_tasks_icon_check'),
+    ('1017_student_tasks','student_tasks_link_scheme_check'),
+    ('1017_student_tasks','student_task_i18n_lang_check'),
+    ('1017_student_tasks','student_task_i18n_title_check'),
+    ('1017_student_tasks','student_task_i18n_steps_check'),
+    ('1017_student_tasks','student_task_i18n_documents_check')
 
   ) e(m,o)
 
@@ -1319,6 +1333,31 @@ WITH report AS (
       EXISTS(SELECT 1 FROM information_schema.columns
         WHERE table_schema='public' AND table_name='home_strip_pin'
           AND column_name='is_active' AND column_default = 'false')
+    -- ── 1017 student tasks. Read through the catalogs only: naming public.student_tasks
+    --    directly would fail at plan time on a database that has not applied 1017 and take
+    --    the whole report down with it.
+    -- (1) The is_active inversion again. No named object changes when a default does.
+    UNION ALL SELECT '1017_student_tasks','student_tasks.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='student_tasks'
+          AND column_name='is_active' AND column_default = 'false')
+    -- (2) The language key. The app stores 'Turkish', never 'tr' — an ISO-keyed CHECK
+    --     would load rows no client can find, and every task would read as pending. The
+    --     constraint NAME survives such a rewrite, so section E cannot see it.
+    UNION ALL SELECT '1017_student_tasks','student_task_i18n_lang_check = full names, no ISO codes',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='student_task_i18n_lang_check'
+        AND pg_get_constraintdef(c.oid) LIKE '%''Turkish''%'
+        AND pg_get_constraintdef(c.oid) LIKE '%''Persian''%'
+        AND pg_get_constraintdef(c.oid) NOT LIKE '%''tr''%'
+        AND pg_get_constraintdef(c.oid) NOT LIKE '%''en''%')
+    -- (3) DERIVED policy counts. One read policy each; a second is almost certainly a write
+    --     policy, which makes content only postgres should author client-writable.
+    UNION ALL SELECT '1017_student_tasks','student_tasks + student_task_i18n: exactly 1 policy each, SELECT to authenticated',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='student_tasks') = 1
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='student_task_i18n') = 1
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
+        AND tablename IN ('student_tasks','student_task_i18n')
+        AND (cmd <> 'SELECT' OR roles <> '{authenticated}'::name[]))
     -- ── 1008 ad_banners. FOUR tokens, because nothing that makes this system safe creates
     --    a named object sections A-G can see.
     --
@@ -2098,7 +2137,12 @@ WITH report AS (
     -- means any signed-in user can add a university, or delete every reserved name and
     -- then register "ADA Destek".
     'institutions',
-    'reserved_names'
+    'reserved_names',
+    -- Student Hub tasks: postgres-authored content, read by every signed-in session.
+    -- OFF here = any signed-in user can rewrite the steps a student follows to get a
+    -- residence permit.
+    'student_tasks',
+    'student_task_i18n'
   )
 )
 -- ─── THE VERDICT ROW ────────────────────────────────────────────────────────

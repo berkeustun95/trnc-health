@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, ActivityIndicator,
+  Alert, BackHandler, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -13,6 +14,10 @@ import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { normalize } from '../constants/oliIntents'
+import { readCachedTasks, fetchTasks, loadProgress, saveProgress } from '../utils/studentTasks'
+import {
+  pickContent, stepsOf, documentsOf, countDone, isTicked, toggleStep, resetTask,
+} from '../utils/studentTaskRules'
 
 // The profile wizard's escape hatch for students at an unlisted institution
 // (20261001 seed, sort_order 999). It is not a place, so it has no row in a directory.
@@ -20,18 +25,6 @@ const OTHER_INSTITUTION_ID = '00000000-0000-4000-b000-0000000000ff'
 
 function SectionTitle({ text }) {
   return <Text style={s.sectionTitle}>{text}</Text>
-}
-
-function BulletRow({ iconName, iconColor, title, text }) {
-  return (
-    <View style={s.bulletRow}>
-      <Ionicons name={iconName || 'checkmark-circle-outline'} size={18} color={iconColor || colors.primary} style={s.bulletIcon} />
-      <View style={s.bulletBody}>
-        {title ? <Text style={s.bulletTitle}>{title}</Text> : null}
-        <Text style={s.bulletText}>{text}</Text>
-      </View>
-    </View>
-  )
 }
 
 function UniversityRow({ uni, lang }) {
@@ -140,20 +133,24 @@ function UniversitiesTab({ lang, universities, failed, onRetry }) {
   )
 }
 
-function BasicsTab({ lang, onShowEsim, onShowNewcomerEssentials }) {
+function BasicsTab({ lang, tasks, tasksFailed, offline, progress, onRetryTasks, onOpenTask, onShowEsim, onShowNewcomerEssentials }) {
   return (
     <ScrollView style={s.tabScroll} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
-      <ContentCard>
-        <SectionTitle text={t('studentArrivalTitle', lang)} />
-        <BulletRow iconName="card-outline"   iconColor="#185FA5"       title={t('studentPermitTitle', lang)} text={t('studentPermitBody', lang)} />
-        <BulletRow iconName="wallet-outline"  iconColor={colors.accent} title={t('studentBankTitle', lang)}   text={t('studentBankBody', lang)} />
-        <BulletRow iconName="cellular-outline" iconColor="#0E7C7B"      title={t('studentSimTitle', lang)}    text={t('studentSimBody', lang)} />
-
-        <TouchableOpacity style={s.linkBtn} onPress={onShowEsim} activeOpacity={0.8}>
-          <Ionicons name="cellular-outline" size={18} color={colors.surface} />
-          <Text style={s.linkBtnText}>{t('studentSimBtn', lang)}</Text>
-        </TouchableOpacity>
-      </ContentCard>
+      {/* One opaque card, not five floating ones: the heading and the offline notice
+          would otherwise sit straight on the PageBackground photo. */}
+      {tasks === null && tasksFailed ? (
+        <LoadError lang={lang} onRetry={onRetryTasks} />
+      ) : (
+        <ContentCard>
+          <SectionTitle text={t('studentArrivalTitle', lang)} />
+          {offline ? <OfflineNotice lang={lang} /> : null}
+          {tasks === null
+            ? <ActivityIndicator color={colors.primary} style={s.tasksLoading} />
+            : tasks.map((task, i) => (
+                <TaskRow key={task.slug} task={task} lang={lang} progress={progress} first={i === 0} onOpen={() => onOpenTask(task.slug)} />
+              ))}
+        </ContentCard>
+      )}
 
       <ContentCard style={s.secondCard}>
         <SectionTitle text={t('studentNewcomerTitle', lang)} />
@@ -162,8 +159,168 @@ function BasicsTab({ lang, onShowEsim, onShowNewcomerEssentials }) {
           <Ionicons name="compass-outline" size={18} color={colors.primary} />
           <Text style={s.linkBtnGhostText}>{t('studentNewcomerBtn', lang)}</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={[s.linkBtnGhost, s.linkBtnStacked]} onPress={onShowEsim} activeOpacity={0.8}>
+          <Ionicons name="cellular-outline" size={18} color={colors.primary} />
+          <Text style={s.linkBtnGhostText}>{t('studentSimBtn', lang)}</Text>
+        </TouchableOpacity>
       </ContentCard>
     </ScrollView>
+  )
+}
+
+// Task content comes from the database, so its icon name can be anything; an unknown
+// glyph renders as '?' rather than failing, which is worse than a neutral dot.
+const taskIcon = name => (name && Ionicons.glyphMap?.[name] !== undefined ? name : 'ellipse-outline')
+
+function OfflineNotice({ lang }) {
+  return (
+    <View style={s.offline}>
+      <Ionicons name="cloud-offline-outline" size={16} color={colors.textSecondary} />
+      <Text style={s.offlineText}>{t('studentTasksOffline', lang)}</Text>
+    </View>
+  )
+}
+
+function TaskRow({ task, lang, progress, first, onOpen }) {
+  const content = pickContent(task, lang)
+
+  // No row in this language or in English yet: say so, and offer nothing to open.
+  if (!content) {
+    return (
+      <View style={[s.taskRow, !first && s.taskRowDivider]}>
+        <View style={s.taskIcon}>
+          <Ionicons name={taskIcon(task.icon)} size={22} color={colors.textSecondary} />
+        </View>
+        <Text style={s.taskPendingText}>{t('studentTaskPending', lang)}</Text>
+      </View>
+    )
+  }
+
+  const steps = stepsOf(content)
+  const done = countDone(progress, task.slug, steps)
+  const complete = steps.length > 0 && done === steps.length
+
+  return (
+    <TouchableOpacity style={[s.taskRow, !first && s.taskRowDivider]} onPress={onOpen} activeOpacity={0.7} accessibilityRole="button">
+      <View style={[s.taskIcon, complete && s.taskIconDone]}>
+        <Ionicons name={complete ? 'checkmark' : taskIcon(task.icon)} size={22} color={complete ? colors.success : colors.primary} />
+      </View>
+      <View style={s.taskBody}>
+        <Text style={s.taskTitle}>{content.title}</Text>
+        {content.summary ? <Text style={s.taskSummary} numberOfLines={2}>{content.summary}</Text> : null}
+      </View>
+      {steps.length > 0 ? <Text style={[s.taskCount, complete && s.taskCountDone]}>{done}/{steps.length}</Text> : null}
+      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+    </TouchableOpacity>
+  )
+}
+
+function TaskDetail({ task, lang, progress, offline, onToggle, onReset, onBack }) {
+  const content = pickContent(task, lang)
+  const steps = stepsOf(content)
+  const documents = documentsOf(content)
+  const done = countDone(progress, task.slug, steps)
+
+  const confirmReset = () => Alert.alert(t('studentTaskReset', lang), undefined, [
+    { text: t('cancel', lang), style: 'cancel' },
+    { text: t('studentTaskReset', lang), style: 'destructive', onPress: onReset },
+  ])
+
+  return (
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <PageBackground topic="newcomer_essentials" />
+      <ScreenHeader onBack={onBack} lang={lang} title={content?.title ?? t('menuStudentHub', lang)} />
+
+      <ScrollView style={s.tabScroll} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
+        {offline ? <OfflineNotice lang={lang} /> : null}
+
+        {!content ? (
+          <ContentCard>
+            <Text style={s.taskPendingText}>{t('studentTaskPending', lang)}</Text>
+          </ContentCard>
+        ) : (
+          <>
+            {content.summary || content.note ? (
+              <ContentCard>
+                {content.summary ? <Text style={s.crossText}>{content.summary}</Text> : null}
+                {content.note ? (
+                  <View style={s.noteRow}>
+                    <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+                    <Text style={s.noteText}>{content.note}</Text>
+                  </View>
+                ) : null}
+              </ContentCard>
+            ) : null}
+
+            {steps.length > 0 ? (
+              <ContentCard style={s.secondCard}>
+                <View style={s.sectionHead}>
+                  <SectionTitle text={t('studentTaskSteps', lang)} />
+                  <Text style={s.sectionCount}>{done}/{steps.length}</Text>
+                </View>
+                {steps.map((step, i) => {
+                  const ticked = isTicked(progress, task.slug, step.id)
+                  return (
+                    <TouchableOpacity
+                      key={step.id}
+                      style={s.stepRow}
+                      onPress={() => onToggle(step.id)}
+                      disabled={!progress}
+                      activeOpacity={0.7}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: ticked, disabled: !progress }}
+                    >
+                      <Ionicons name={ticked ? 'checkbox' : 'square-outline'} size={22} color={ticked ? colors.success : colors.textSecondary} />
+                      <Text style={[s.stepText, ticked && s.stepTextDone]}>{i + 1}. {step.text}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+                {done > 0 ? (
+                  <TouchableOpacity style={s.resetBtn} onPress={confirmReset} hitSlop={8} accessibilityRole="button">
+                    <Ionicons name="refresh" size={15} color={colors.textSecondary} />
+                    <Text style={s.resetText}>{t('studentTaskReset', lang)}</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </ContentCard>
+            ) : null}
+
+            {documents.length > 0 ? (
+              <ContentCard style={s.secondCard}>
+                <SectionTitle text={t('studentTaskDocuments', lang)} />
+                {documents.map((doc, i) => (
+                  <View key={i} style={s.docRow}>
+                    <Ionicons name="document-text-outline" size={17} color={colors.primary} />
+                    <Text style={s.docText}>{doc}</Text>
+                  </View>
+                ))}
+              </ContentCard>
+            ) : null}
+
+            {content.hours ? (
+              <ContentCard style={s.secondCard}>
+                <SectionTitle text={t('studentTaskHours', lang)} />
+                <View style={s.docRow}>
+                  <Ionicons name="time-outline" size={17} color={colors.primary} />
+                  <Text style={s.docText}>{content.hours}</Text>
+                </View>
+              </ContentCard>
+            ) : null}
+
+            {task.external_url ? (
+              <TouchableOpacity
+                style={[s.linkBtn, s.secondCard]}
+                onPress={() => Linking.openURL(task.external_url).catch(() => {})}
+                activeOpacity={0.8}
+                accessibilityRole="link"
+              >
+                <Ionicons name="open-outline" size={18} color={colors.surface} />
+                <Text style={s.linkBtnText}>{t('studentTaskOpenLink', lang)}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   )
 }
 
@@ -171,6 +328,36 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
   const [tab, setTab] = useState('universities')
   const [universities, setUniversities] = useState(null)
   const [failed, setFailed] = useState(false)
+
+  const [tasks, setTasks] = useState(null)
+  const [tasksFailed, setTasksFailed] = useState(false)
+  // null until read from the device — nothing is written back before that, or an early
+  // save would overwrite the stored ticks with an empty object.
+  const [progress, setProgress] = useState(null)
+  const [openSlug, setOpenSlug] = useState(null)
+
+  // Cache first, then the network. A student with no data yet sees the last copy
+  // immediately; a failed refresh keeps it on screen and says it is offline.
+  const loadTasks = useCallback(async () => {
+    setTasksFailed(false)
+    const cached = await readCachedTasks()
+    if (cached) setTasks(prev => prev ?? cached.tasks)
+    try {
+      setTasks(await fetchTasks())
+    } catch {
+      setTasksFailed(true)
+    }
+  }, [])
+
+  useEffect(() => { loadTasks() }, [loadTasks])
+  useEffect(() => { loadProgress().then(setProgress) }, [])
+  useEffect(() => { if (progress) saveProgress(progress) }, [progress])
+
+  useEffect(() => {
+    if (!openSlug) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setOpenSlug(null); return true })
+    return () => sub.remove()
+  }, [openSlug])
 
   // Loaded here rather than in the tab so switching tabs does not refetch.
   const load = useCallback(() => {
@@ -190,6 +377,21 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const openTask = openSlug ? tasks?.find(task => task.slug === openSlug) : null
+  if (openTask) {
+    return (
+      <TaskDetail
+        task={openTask}
+        lang={lang}
+        progress={progress}
+        offline={tasksFailed}
+        onToggle={stepId => setProgress(prev => toggleStep(prev, openTask.slug, stepId))}
+        onReset={() => setProgress(prev => resetTask(prev, openTask.slug))}
+        onBack={() => setOpenSlug(null)}
+      />
+    )
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -223,7 +425,19 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
 
       {tab === 'universities'
         ? <UniversitiesTab lang={lang} universities={universities} failed={failed} onRetry={load} />
-        : <BasicsTab lang={lang} onShowEsim={onShowEsim} onShowNewcomerEssentials={onShowNewcomerEssentials} />}
+        : (
+          <BasicsTab
+            lang={lang}
+            tasks={tasks}
+            tasksFailed={tasksFailed}
+            offline={tasksFailed && tasks !== null}
+            progress={progress}
+            onRetryTasks={loadTasks}
+            onOpenTask={setOpenSlug}
+            onShowEsim={onShowEsim}
+            onShowNewcomerEssentials={onShowNewcomerEssentials}
+          />
+        )}
     </SafeAreaView>
   )
 }
@@ -334,11 +548,53 @@ const s = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: 14,
   },
-  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16, gap: 10 },
-  bulletIcon: { marginTop: 1, flexShrink: 0 },
-  bulletBody: { flex: 1 },
-  bulletTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 3 },
-  bulletText: { fontSize: 14, color: colors.textPrimary, lineHeight: 21 },
+
+  tasksLoading: { marginVertical: 24 },
+  taskRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  taskRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  taskIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  taskIconDone: { backgroundColor: colors.successLight },
+  taskBody: { flex: 1 },
+  taskTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  taskSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: 2 },
+  taskCount: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, flexShrink: 0 },
+  taskCountDone: { color: colors.success },
+  taskPendingText: { flex: 1, fontSize: 14, fontStyle: 'italic', color: colors.textSecondary },
+
+  // Opaque, because the detail view shows it directly over the PageBackground photo.
+  offline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  offlineText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  sectionCount: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+  noteRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  noteText: { flex: 1, fontSize: 14, color: colors.textPrimary, lineHeight: 21 },
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8 },
+  stepText: { flex: 1, fontSize: 15, color: colors.textPrimary, lineHeight: 22 },
+  stepTextDone: { color: colors.textSecondary, textDecorationLine: 'line-through' },
+  resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 10 },
+  resetText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  docRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 5 },
+  docText: { flex: 1, fontSize: 14, color: colors.textPrimary, lineHeight: 21 },
 
   crossText: { fontSize: 14, color: colors.textPrimary, lineHeight: 21, marginBottom: 14 },
 
@@ -365,4 +621,5 @@ const s = StyleSheet.create({
     gap: 8,
   },
   linkBtnGhostText: { fontSize: 15, fontWeight: '600', color: colors.primary },
+  linkBtnStacked: { marginTop: 10 },
 })
