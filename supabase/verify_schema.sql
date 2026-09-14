@@ -1358,6 +1358,44 @@ WITH report AS (
       AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
         AND tablename IN ('student_tasks','student_task_i18n')
         AND (cmd <> 'SELECT' OR roles <> '{authenticated}'::name[]))
+    -- ── 1018 / 1020 institutions, reconciled to YÖDAK's list by hand on 2026-09-15. CONTENT
+    --    tokens, reading public.institutions directly — safe, 1001 is applied (the 1010
+    --    home_services tokens do the same). Everything is keyed on id or a count, never on a
+    --    name remembered from the file; the one name compared is the rename itself.
+    --    1019 has NO token, deliberately: 20 overwrote every value 19 set, so a token for
+    --    19's state would sit red forever against a correct database.
+    -- (1) THE COUNT, one owner. It moves when the three held universities (Altınbaş Kıbrıs,
+    --     Ankara Sosyal Bilimler, Uluslararası Alasya) are added: bump it IN THAT COMMIT and
+    --     say why. The 1018 file's own state check is history and must NOT be edited.
+    UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: 22 rows, 21 active',
+      (SELECT count(*) FROM public.institutions) = 22
+      AND (SELECT count(*) FROM public.institutions WHERE is_active) = 21
+    -- (2) Netkent stays deleted. 20261001's seed is ON CONFLICT (id) DO NOTHING, so
+    --     re-running 1001 re-inserts it at sort_order 140 without a word.
+    UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: Netkent (…000e) absent — a 20261001 re-run brings it back',
+      NOT EXISTS(SELECT 1 FROM public.institutions WHERE id = '00000000-0000-4000-b000-00000000000e')
+    -- (3) Kıbrıs İlim deactivated, NOT deleted — a profile references it and the FK is
+    --     ON DELETE SET NULL — and Final carries YÖDAK's wording.
+    UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: …0006 present and inactive, …0008 renamed',
+      EXISTS(SELECT 1 FROM public.institutions
+        WHERE id = '00000000-0000-4000-b000-000000000006' AND is_active = false)
+      AND EXISTS(SELECT 1 FROM public.institutions
+        WHERE id = '00000000-0000-4000-b000-000000000008' AND name = 'Uluslararası Final Üniversitesi')
+    UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: the 8 added ids …000f–…0016 all present',
+      (SELECT count(*) FROM public.institutions
+        WHERE id BETWEEN '00000000-0000-4000-b000-00000000000f' AND '00000000-0000-4000-b000-000000000016') = 8
+    -- (4) No short_name is a lowercase slug. 18's recorded INSERT is ON CONFLICT DO UPDATE,
+    --     so pasting it again resets all eight to 'metuncc', 'itukktc', … — the file's guard
+    --     refuses, the bare statement does not. Derived over the whole table: every real
+    --     short name (DAÜ, ARUCAD, BAU, İTÜ-KKTC …) carries a capital.
+    UNION ALL SELECT '1020_institutions_sort_prominence','institutions: no short_name is a lowercase slug',
+      NOT EXISTS(SELECT 1 FROM public.institutions WHERE short_name ~ '^[a-z]+$')
+    -- (5) Nothing buried. 19 put the eight rows at 150–220, under every existing university;
+    --     20 moved them into the order. 150 is where the burying started, so any active row
+    --     but Other at or past it means 19 was re-pasted or a new row was dropped at the bottom.
+    UNION ALL SELECT '1020_institutions_sort_prominence','institutions: no active row except Other sorts at 150 or later',
+      NOT EXISTS(SELECT 1 FROM public.institutions
+        WHERE is_active AND id <> '00000000-0000-4000-b000-0000000000ff' AND sort_order >= 150)
     -- ── 1008 ad_banners. FOUR tokens, because nothing that makes this system safe creates
     --    a named object sections A-G can see.
     --
