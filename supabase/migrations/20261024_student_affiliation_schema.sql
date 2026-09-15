@@ -345,17 +345,25 @@ ALTER TABLE public.institutions ADD  CONSTRAINT institutions_website_url_scheme_
 -- The CHECK probes run against the INSTALLED definitions, read back with
 -- pg_get_constraintdef and attached to a TEMP table shaped like profiles. No real profile
 -- row is written, read for a probe, or restored — the 20261001 lesson about probes that
--- borrow real rows does not arise. The temp tables die with the transaction.
-CREATE TEMP TABLE tmp_study_probe    AS SELECT * FROM public.profiles WITH NO DATA;
-CREATE TEMP TABLE tmp_end_year_probe AS SELECT * FROM public.profiles WITH NO DATA;
-CREATE TEMP TABLE tmp_inst_probe     AS SELECT * FROM public.institutions WITH NO DATA;
-
--- The trigger gets its OWN probe table. On tmp_study_probe it would reject "end 2199"
--- before the range CHECK could, and that CHECK would then go untested.
-CREATE TRIGGER check_profile_study_years
-  BEFORE INSERT OR UPDATE ON pg_temp.tmp_end_year_probe
-  FOR EACH ROW EXECUTE FUNCTION public.check_profile_study_years();
-
+-- borrow real rows does not arise.
+--
+-- ⚠ THE PROBE TABLES LIVE AND DIE INSIDE THIS ONE DO BLOCK, and every statement that
+--   touches them is an EXECUTE. The first version created them as top-level statements,
+--   used them from this block, and dropped them in top-level statements after it. Against
+--   production it failed with 42P01 naming "tmp_study_probe", and rolled back. What is
+--   known, measured 2026-09-15:
+--   • That identical file applied cleanly on stock PostgreSQL 15.18 and 17.10 (and PGlite)
+--     sent as one script. PostgreSQL behaviour is not the cause.
+--   • Inside the block every reference was pg_temp-qualified, and a missing one reports
+--     WITH the prefix ("pg_temp.tmp_study_probe"). The one statement in that version that
+--     reports the bare name is the trailing DROP TABLE pg_temp.tmp_study_probe
+--     ('table "tmp_study_probe" does not exist'). If that is where it stopped, the block
+--     had already passed and the table was gone by the next statement, i.e. the statements
+--     did not all reach the same session. Not established which.
+--   Either way nothing here now depends on a temp table outliving the statement that
+--   created it: no top-level CREATE, no reference from a later statement, ON COMMIT DROP,
+--   and an explicit drop before the block ends. EXECUTE also means no statement touching a
+--   probe table is planned before that table exists.
 DO $$
 DECLARE
   c        record;
@@ -367,6 +375,22 @@ DECLARE
   v_probe  uuid;
   v_year   int;
 BEGIN
+  -- Bare names, as 20261016 used in production. They are un-collidable, and a probe table
+  -- is refused unless it resolves to THIS session's temp schema.
+  EXECUTE 'CREATE TEMP TABLE tmp_study_probe    ON COMMIT DROP AS SELECT * FROM public.profiles     WITH NO DATA';
+  EXECUTE 'CREATE TEMP TABLE tmp_end_year_probe ON COMMIT DROP AS SELECT * FROM public.profiles     WITH NO DATA';
+  EXECUTE 'CREATE TEMP TABLE tmp_inst_probe     ON COMMIT DROP AS SELECT * FROM public.institutions WITH NO DATA';
+  SELECT string_agg(n || '=' || coalesce((SELECT relpersistence::text FROM pg_class WHERE oid = to_regclass(n)), '<missing>'), ', ' ORDER BY n)
+    INTO v_rows FROM unnest(ARRAY['tmp_study_probe','tmp_end_year_probe','tmp_inst_probe']) AS n;
+  IF v_rows IS DISTINCT FROM 'tmp_end_year_probe=t, tmp_inst_probe=t, tmp_study_probe=t' THEN
+    RAISE EXCEPTION 'probe tables do not resolve to temp relations: %', v_rows;
+  END IF;
+
+  -- The trigger gets its OWN probe table. On tmp_study_probe it would reject "end 2199"
+  -- before the range CHECK could, and that CHECK would then go untested.
+  EXECUTE 'CREATE TRIGGER check_profile_study_years BEFORE INSERT OR UPDATE ON tmp_end_year_probe
+           FOR EACH ROW EXECUTE FUNCTION public.check_profile_study_years()';
+
   -- Attach each new CHECK to the probe table exactly as the database holds it, after
   -- proving it is on profiles and VALIDATED (a NOT VALID CHECK would skip existing rows).
   FOR c IN SELECT * FROM (VALUES
@@ -383,7 +407,7 @@ BEGIN
     IF v_def IS NULL OR v_valid IS DISTINCT FROM true THEN
       RAISE EXCEPTION '% on % is % (validated=%)', c.conname, c.tbl, coalesce(v_def, '<missing>'), v_valid;
     END IF;
-    EXECUTE format('ALTER TABLE pg_temp.%I ADD CONSTRAINT %I %s', c.probe, c.conname, v_def);
+    EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I %s', c.probe, c.conname, v_def);
   END LOOP;
 
   -- (a) The case table. Each "false" row is a NULL case some naive form would admit on
@@ -412,9 +436,10 @@ BEGIN
     (NULL,       NULL,              NULL,           NULL,           NULL,              true,  NULL,              false, 'opted in, institution_id NULL')
   ) AS t(resident, level, start_y, end_y, subject, opt_in, inst, expected, label) LOOP
     BEGIN
-      INSERT INTO pg_temp.tmp_study_probe
-        (id, resident_status, student_level, study_start_year, study_end_year, subject_id, student_listing_opt_in, institution_id)
-      VALUES (gen_random_uuid(), c.resident, c.level, c.start_y, c.end_y, c.subject, c.opt_in, c.inst);
+      EXECUTE 'INSERT INTO tmp_study_probe
+                 (id, resident_status, student_level, study_start_year, study_end_year, subject_id, student_listing_opt_in, institution_id)
+               VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)'
+        USING c.resident, c.level, c.start_y, c.end_y, c.subject, c.opt_in, c.inst;
       v_got := true;
     EXCEPTION WHEN check_violation THEN
       v_got := false;
@@ -438,16 +463,16 @@ BEGIN
   END IF;
 
   v_year := extract(year FROM current_date)::int;
-  INSERT INTO pg_temp.tmp_end_year_probe (id, study_end_year) VALUES (gen_random_uuid(), v_year);   -- control
-  INSERT INTO pg_temp.tmp_end_year_probe (id, study_end_year) VALUES (gen_random_uuid(), NULL);     -- control
+  EXECUTE 'INSERT INTO tmp_end_year_probe (id, study_end_year) VALUES (gen_random_uuid(), $1)' USING v_year;   -- control
+  EXECUTE 'INSERT INTO tmp_end_year_probe (id, study_end_year) VALUES (gen_random_uuid(), NULL)';             -- control
   BEGIN
-    INSERT INTO pg_temp.tmp_end_year_probe (id, study_end_year) VALUES (gen_random_uuid(), v_year + 1);
+    EXECUTE 'INSERT INTO tmp_end_year_probe (id, study_end_year) VALUES (gen_random_uuid(), $1)' USING v_year + 1;
     RAISE EXCEPTION 'ASSERT: study_end_year % (next year) was ACCEPTED on INSERT', v_year + 1;
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM IS DISTINCT FROM 'STUDY_END_YEAR_IN_FUTURE' THEN RAISE; END IF;
   END;
   BEGIN
-    UPDATE pg_temp.tmp_end_year_probe SET study_end_year = v_year + 1 WHERE study_end_year IS NULL;
+    EXECUTE 'UPDATE tmp_end_year_probe SET study_end_year = $1 WHERE study_end_year IS NULL' USING v_year + 1;
     RAISE EXCEPTION 'ASSERT: study_end_year % (next year) was ACCEPTED on UPDATE', v_year + 1;
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM IS DISTINCT FROM 'STUDY_END_YEAR_IN_FUTURE' THEN RAISE; END IF;
@@ -455,9 +480,9 @@ BEGIN
   RAISE NOTICE 'end-year trigger: % accepted, % rejected on insert and update', v_year, v_year + 1;
 
   -- website_url, same shape: control first.
-  INSERT INTO pg_temp.tmp_inst_probe (id, name, website_url) VALUES (gen_random_uuid(), 'zz https', 'https://example.com');
+  EXECUTE 'INSERT INTO tmp_inst_probe (id, name, website_url) VALUES (gen_random_uuid(), ''zz https'', ''https://example.com'')';
   BEGIN
-    INSERT INTO pg_temp.tmp_inst_probe (id, name, website_url) VALUES (gen_random_uuid(), 'zz http', 'http://example.com');
+    EXECUTE 'INSERT INTO tmp_inst_probe (id, name, website_url) VALUES (gen_random_uuid(), ''zz http'', ''http://example.com'')';
     RAISE EXCEPTION 'ASSERT: an http:// institutions.website_url was ACCEPTED';
   EXCEPTION WHEN check_violation THEN NULL;
   END;
@@ -541,11 +566,9 @@ BEGIN
       current_setting('ada.profiles_policies_before'), v_rows;
   END IF;
   RAISE NOTICE 'profiles policies unchanged: %', v_rows;
-END $$;
 
-DROP TABLE pg_temp.tmp_study_probe;
-DROP TABLE pg_temp.tmp_end_year_probe;
-DROP TABLE pg_temp.tmp_inst_probe;
+  EXECUTE 'DROP TABLE tmp_study_probe, tmp_end_year_probe, tmp_inst_probe';
+END $$;
 
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
 -- Machine-generated by scripts/migration-ledger.mjs --stamp. Do not hand-edit.
@@ -558,7 +581,7 @@ DROP TABLE pg_temp.tmp_inst_probe;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261024_student_affiliation_schema.sql', '5e5238418a71821f25664f79c2a7eea0d8568030e0b051d2e458d0f09b06d175')
+VALUES ('20261024_student_affiliation_schema.sql', '5e53e4be84e9498473cac377f2d84412afc5cd816df0a09549bc73f65e408859')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
