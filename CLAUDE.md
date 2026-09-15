@@ -97,6 +97,13 @@ went missing). Two mandatory rules:
 - **Every ADD COLUMN migration ends with `NOTIFY pgrst, 'reload schema';`** (after
   `RESET ROLE;`). Without it, a stale PostgREST cache reports 42703 "column does
   not exist" through the REST API even though the column exists in Postgres.
+- **Migration filename prefixes are SEQUENCE NUMBERS, not dates.** The next file is the
+  highest existing prefix + 1 (`ls supabase/migrations | tail -1`), never today's date.
+  Prefixes matched the commit date through 20260801; from 20260802 they ran ahead of it,
+  almost without exception — +1 day at first, 34 days by 20261015, 35 by 20261020. So a
+  filename says nothing about when anything was written or applied; the only applied date
+  is `schema_migrations_applied.applied_at`. Re-measure rather than trust these figures:
+  compare the prefix with `git log --diff-filter=A --format=%ad --date=short -- <file>`.
 - **Changing `normalize_for_moderation()` now also changes the display-name uniqueness
   key.** `normalize_display_name()` wraps it, and `profiles.display_name_normalized` is
   a STORED column filled by `check_profile_name_content()` — so a redefinition leaves
@@ -112,6 +119,15 @@ went missing). Two mandatory rules:
 - Functional React components with hooks.
 - Keep components small; one screen per file.
 - Facility types are limited to: pharmacy, clinic, hospital, dentist.
+- **Languages are stored as FULL ENGLISH NAMES (`'Turkish'`, `'English'`), never ISO
+  codes.** The values are the `LANGUAGES` keys in `constants/i18n.js`; they flow through
+  `profiles.preferred_language` into `lang` (App.js), `t()`, `student_task_i18n.lang` and
+  `module_notif_text(p_lang)`. Prod on 2026-09-15: 31 Turkish, 19 English, 1 French,
+  1 Persian, 190 NULL — zero `'en'`/`'tr'`. An ISO comparison never errors; it just matches
+  nothing. Two bugs so far: `lang === 'tr'` in the feat/student-hub StudentHubScreen
+  (line 78), and a probe of `module_notif_text` keyed on an ISO code.
+  `student_task_i18n_lang_check` rejects `'tr'`/`'en'` for this reason — do the same on any
+  new per-language column.
 - Admins never reach HomeScreen or the customer module chain — the App.js content
   selector is role-first (`profile.role === 'admin'` renders AdminScreen and short-
   circuits everything below). Any admin preview surface must be entered from
