@@ -131,14 +131,17 @@ function TypeSVGIcon({ type, size, color }) {
 //   bundle — not just the feature the column belongs to. The four consent columns arrive
 //   with 20261016, so that migration must be applied BEFORE the OTA that carries this
 //   line, never after. A select list is not a feature and TERMS_CHECKBOX_LIVE does not
-//   protect it.
+//   protect it. The four study columns arrive with 20261024 (applied 2026-09-15; an anon
+//   select naming them returned 200 through PostgREST the same day). The wizard needs
+//   study_end_year even with the module dark: it is what keeps a graduate's institution
+//   through a re-gate.
 //
 // terms_locale is read by nothing today. It is here so the loaded row carries the whole
 // consent record rather than three quarters of it — the flush compares terms_version, the
 // toggle reads marketing_opt_in_at, and a future re-acceptance round needs all four
 // without a second query. scripts/check-privacy-parity.mjs derives its field list from
 // this constant, so each of the four also had to be justified there.
-const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, institution_id, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible, terms_version, terms_accepted_at, terms_locale, marketing_opt_in_at'
+const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, institution_id, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible, terms_version, terms_accepted_at, terms_locale, marketing_opt_in_at, study_start_year, study_end_year, subject_id, student_listing_opt_in'
 
 
 // ─── The signup tick, written now that there is a session to write it with ──

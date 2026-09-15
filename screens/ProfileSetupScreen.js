@@ -5,8 +5,9 @@
 // ─── THREE THINGS THAT ARE NOT NEGOTIABLE HERE ──────────────────────────────
 //
 // 1. NO SKIP, NO DISMISS. There is no close button, no "later", and the caller passes no
-//    onBack. Android's hardware back moves between steps and, on the first step, is left
-//    to close the app — see App.js. A back button that does nothing reads as a frozen
+//    onBack. (Steps 3–4 DO carry a Skip: they exist only after step 2 has written
+//    profile_completed_at, and every field on them is optional by decision.) Android's
+//    hardware back moves between steps and, on the first step, is left to close the app — see App.js. A back button that does nothing reads as a frozen
 //    screen; closing the app is honest and leaves the gate in place next launch.
 //
 // 2. THE EMERGENCY BUTTON IS ON EVERY STEP, INCLUDING THE INTRO. It is a HEADER button,
@@ -44,7 +45,7 @@ import { pad, ageOn, daysInMonth } from '../utils/profileFields'
 import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../components/DisplayNameCheck'
 import { supabase } from '../lib/supabase'
 import { colors, shadow, radius } from '../constants/theme'
-import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE } from '../constants/flags'
+import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
 import LegalScreen from './LegalScreen'
 import LegalLinkedText from '../components/LegalLinkedText'
 import { t, LANGUAGES, LANG_CODES } from '../constants/i18n'
@@ -57,7 +58,9 @@ import {
   RESIDENT_STATUSES, STUDENT_LEVELS, INSTITUTION_REQUIRED_LEVELS, RESIDENT_STATUS_STUDENT,
   RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
   DISPLAY_NAME_MAX, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY,
+  affiliationPatch, STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
 } from '../constants/profileGate'
+import { subjectOptions, fetchServerYear, studyYearOptions } from '../utils/studyFields'
 
 // TWO steps. What used to be Steps 1 and 2 — the six required identity fields — is now
 // one screen; the old Step 3 (region, status, the student conditional) became Step 2.
@@ -67,18 +70,24 @@ import {
 // why resumeStep() no longer has a landing place between them.
 const TOTAL_STEPS = 2
 
+// ─── STEPS 3–4: SUBJECT, THEN STUDY YEARS (Slice 2, behind MODULE_FLAGS.studentHub) ───
+// Only for a university/postgraduate student, and only AFTER step 2's completion write
+// has succeeded, so nothing on them can block completion — the gate's own constraint
+// does not know these columns exist. Each is skippable; a force-quit on either leaves a
+// completed profile, and the fields stay editable in ProfileScreen.
+const STUDY_STEPS = 2
+
 // ─── Presentational pieces, defined OUTSIDE the screen ──────────────────────
 // A component declared inside its parent is a new type on every render, so React
 // unmounts and remounts it — which blurs a TextInput mid-typing. House rule.
 
-// Derived from TOTAL_STEPS, never a literal — a hardcoded dot count is a decoration
-// that disagrees with the wizard the day the step count moves, and it moved today.
-const STEP_NUMBERS = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1)
-
-function Dots({ step }) {
+// Derived from the step count, never a literal — a hardcoded dot count is a decoration
+// that disagrees with the wizard the day the step count moves. `total` is 2, or 4 once a
+// university-level student is on step 2 and the study steps will follow.
+function Dots({ step, total }) {
   return (
     <View style={s.dots}>
-      {STEP_NUMBERS.map(i => (
+      {Array.from({ length: total }, (_, i) => i + 1).map(i => (
         <View key={i} style={[s.dot, i === step && s.dotOn, i < step && s.dotDone]} />
       ))}
     </View>
@@ -171,9 +180,10 @@ function RowGroup({ options, value, onSelect }) {
   )
 }
 
-function SelectField({ value, placeholder, onPress, flex }) {
+function SelectField({ value, placeholder, onPress, flex, disabled }) {
   return (
-    <TouchableOpacity style={[s.select, flex && { flex: 1 }]} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={[s.select, flex && { flex: 1 }, disabled && { opacity: 0.45 }]}
+      onPress={onPress} disabled={disabled} activeOpacity={0.7}>
       <Text style={[s.selectText, !value && s.selectPlaceholder]} numberOfLines={1}>
         {value || placeholder}
       </Text>
@@ -255,7 +265,14 @@ export default function ProfileSetupScreen({
   const [institution, setInstitution] = useState(profile?.institution_id ?? null)
   const [institutions, setInstitutions] = useState([])
 
-  const [picker, setPicker] = useState(null)  // 'day' | 'month' | 'year' | 'nat' | 'cc' | 'inst'
+  // Steps 3–4. Pre-filled from the row so a re-gated user sees what they already stored.
+  const [subjects, setSubjects] = useState([])
+  const [subjectId, setSubjectId] = useState(profile?.subject_id ?? null)
+  const [startYear, setStartYear] = useState(profile?.study_start_year ?? null)
+  const [endYear, setEndYear] = useState(profile?.study_end_year ?? null)
+  const [dbYear, setDbYear] = useState(() => new Date().getUTCFullYear())
+
+  const [picker, setPicker] = useState(null)  // 'day' | 'month' | 'year' | 'nat' | 'cc' | 'inst' | 'subject' | 'startYear' | 'endYear'
 
   const months = useMemo(() => monthNames(lang), [lang])
   const thisYear = new Date().getFullYear()
@@ -277,6 +294,16 @@ export default function ProfileSetupScreen({
       .then(({ data }) => setInstitutions(data ?? []))
   }, [])
 
+  useEffect(() => {
+    if (!MODULE_FLAGS.studentHub) return
+    supabase.from('subjects')
+      .select('id, sort_order, subject_i18n(lang, name)')
+      .eq('is_active', true)
+      .order('sort_order')
+      .then(({ data }) => setSubjects(data ?? []))
+    fetchServerYear().then(setDbYear)
+  }, [])
+
   // ─── Validity per step ────────────────────────────────────────────────────
   const nameOk = nameState?.status === 'available'
   // PHONE IS OPTIONAL. Empty passes; non-empty must still be 4-15 digits, so a typo is
@@ -292,6 +319,11 @@ export default function ProfileSetupScreen({
   const step2Ok = region && status &&
     (status !== 'student' || level) &&
     (!INSTITUTION_REQUIRED_LEVELS.includes(level) || institution)
+
+  const studyStepsOn = MODULE_FLAGS.studentHub && status === RESIDENT_STATUS_STUDENT &&
+    INSTITUTION_REQUIRED_LEVELS.includes(level) && !!institution
+  const lastStep = studyStepsOn ? TOTAL_STEPS + STUDY_STEPS : TOTAL_STEPS
+  const subjectOpts = useMemo(() => subjectOptions(subjects, lang), [subjects, lang])
 
   async function save(patch) {
     setSaving(true)
@@ -426,11 +458,32 @@ export default function ProfileSetupScreen({
       return
     }
 
+    if (step > TOTAL_STEPS) {
+      // Only what this step owns. endYear is passed as the STORED value on step 3 because
+      // it decides whether the institution survives, not because step 3 edits it.
+      const base = { status, level, institutionId: institution, endYear: profile?.study_end_year ?? null }
+      const patch = step === 3
+        ? (subjectId !== (profile?.subject_id ?? null) ? affiliationPatch({ ...base, subjectId }) : null)
+        : (startYear !== (profile?.study_start_year ?? null) || endYear !== (profile?.study_end_year ?? null)
+            ? affiliationPatch({ ...base, startYear, endYear }) : null)
+      if (patch) {
+        const error = await save(patch)
+        if (error) {
+          setSaveError(String(error.message ?? '').includes(STUDY_END_YEAR_IN_FUTURE) ? 'pgStudyEndFuture' : 'pgSaveError')
+          return
+        }
+      }
+      if (step === 3) { setStep(4); return }
+      onDone()
+      return
+    }
+
     const error = await save({
       region,
       resident_status: status,
-      student_level: status === 'student' ? level : null,
-      institution_id: INSTITUTION_REQUIRED_LEVELS.includes(level) ? institution : null,
+      // student_level, institution_id and — only when the institution goes — the four
+      // study columns. The stored end year is what keeps a graduate's institution.
+      ...affiliationPatch({ status, level, institutionId: institution, endYear: profile?.study_end_year ?? null }),
       profile_completed_at: new Date().toISOString(),
       profile_schema_version: CURRENT_PROFILE_SCHEMA_VERSION,
       // ⚠ THE COLUMN IS SENT ONLY WHEN TICKED, AND OMITTING IT IS NOT THE SAME AS
@@ -453,7 +506,18 @@ export default function ProfileSetupScreen({
       setSaveError(completionViolation(error) ? missingFieldMessage() : 'pgSaveError')
       return
     }
+    // Completion is written. The study steps come after it, never before. Step 3 even if
+    // the subject list has not arrived: Skip is there, and a jump to 4 on a slow network
+    // would drop the subject question without anyone deciding to.
+    if (studyStepsOn) { setStep(3); return }
     onDone()
+  }
+
+  function skipStudyStep() {
+    if (saving) return
+    setSaveError(null)
+    if (step === 3) setStep(4)
+    else onDone()
   }
 
   // Registered only while the legal sheet is open so it runs before App.js's handler
@@ -494,8 +558,15 @@ export default function ProfileSetupScreen({
   // currentYear-100 … currentYear-MIN_SIGNUP_AGE, newest first.
   const yearOptions = Array.from({ length: MAX_SIGNUP_AGE - MIN_SIGNUP_AGE + 1 },
     (_, i) => thisYear - MIN_SIGNUP_AGE - i).map(y => ({ value: y, label: String(y) }))
+  // Capped at the DATABASE's year: check_profile_study_years() rejects a future end year.
+  const startYearOptions = studyYearOptions(dbYear, STUDY_YEAR_MIN)
+  const endYearOptions = [
+    { value: null, label: t('pgStillStudying', lang) },
+    ...studyYearOptions(dbYear, startYear ?? STUDY_YEAR_MIN),
+  ]
 
-  const canAdvance = step === 0 || (step === 1 && step1Ok) || (step === 2 && step2Ok)
+  const canAdvance = step === 0 || (step === 1 && step1Ok) || (step === 2 && step2Ok) ||
+    (step === 3 && !!subjectId) || (step === 4 && !!startYear)
   const title = step === 0 ? '' : t(STEP_TITLE_KEY[step], lang)
 
   return (
@@ -506,7 +577,7 @@ export default function ProfileSetupScreen({
             It only reproduces once the form is long enough to scroll, which Turkish
             reaches before English does. House rule. */}
         <View style={s.header}>
-          {step > 0 ? <Dots step={step} /> : <View style={s.dots} />}
+          {step > 0 ? <Dots step={step} total={lastStep} /> : <View style={s.dots} />}
           <View style={s.headerActions}>
             <TouchableOpacity style={s.langBtn} onPress={() => setPicker('lang')} activeOpacity={0.8}>
               <Ionicons name="globe-outline" size={14} color={colors.textSecondary} />
@@ -532,7 +603,7 @@ export default function ProfileSetupScreen({
               the two screens reads better is a device judgement, and the flag makes it
               a one-line revert instead of an unpick. */}
           {step > 0 && SHOW_WIZARD_HEADINGS && (
-            <Text style={s.stepLabel}>{t('pgStep', lang).replace('{n}', step).replace('{total}', TOTAL_STEPS)}</Text>
+            <Text style={s.stepLabel}>{t('pgStep', lang).replace('{n}', step).replace('{total}', lastStep)}</Text>
           )}
           {step > 0 && SHOW_WIZARD_HEADINGS && <Text style={s.title}>{title}</Text>}
 
@@ -600,13 +671,14 @@ export default function ProfileSetupScreen({
                 <ChipGroup options={regionOptions} value={region} onSelect={setRegion} />
               </Field>
               <Field label={t('pgResidentStatus', lang)} hint={t('pgResidentHelper', lang)}>
+                {/* The institution is NOT cleared here or on a level change: the write's
+                    affiliationPatch() decides, because a graduate's end year keeps it. */}
                 <RowGroup options={statusOptions} value={status}
-                  onSelect={v => { setStatus(v); if (v !== 'student') { setLevel(null); setInstitution(null) } }} />
+                  onSelect={v => { setStatus(v); if (v !== 'student') setLevel(null) }} />
               </Field>
               {status === 'student' && (
                 <Field label={t('pgStudentLevel', lang)}>
-                  <RowGroup options={levelOptions} value={level}
-                    onSelect={v => { setLevel(v); if (!INSTITUTION_REQUIRED_LEVELS.includes(v)) setInstitution(null) }} />
+                  <RowGroup options={levelOptions} value={level} onSelect={setLevel} />
                 </Field>
               )}
               {status === 'student' && INSTITUTION_REQUIRED_LEVELS.includes(level) && (
@@ -658,6 +730,29 @@ export default function ProfileSetupScreen({
             </>
           )}
 
+          {step === 3 && (
+            <Field label={t('pgSubject', lang)} hint={t('pgStudyOptionalHint', lang)}>
+              <SelectField
+                value={subjectOpts.find(o => o.value === subjectId)?.label || ''}
+                placeholder={t('pgSubjectSearch', lang)}
+                onPress={() => setPicker('subject')}
+              />
+            </Field>
+          )}
+
+          {step === 4 && (
+            <>
+              <Field label={t('pgStudyStart', lang)}>
+                <SelectField value={startYear ? String(startYear) : ''} placeholder={t('pgYear', lang)}
+                  onPress={() => setPicker('startYear')} />
+              </Field>
+              <Field label={t('pgStudyEnd', lang)} hint={t('pgStudyOptionalHint', lang)}>
+                <SelectField value={endYear ? String(endYear) : ''} placeholder={t('pgStillStudying', lang)}
+                  onPress={() => setPicker('endYear')} disabled={!startYear} />
+              </Field>
+            </>
+          )}
+
           {saveError && <Text style={s.err}>{t(saveError.key ?? saveError, lang).replace('{field}', saveError.field ? t(saveError.field, lang) : '')}</Text>}
 
           {/* ⚠ BOTTOM OF THE SCROLL, NOT THE HEADER — AND THAT WAS MEASURED, not chosen.
@@ -682,9 +777,16 @@ export default function ProfileSetupScreen({
         </ScrollView>
 
         <View style={s.footer}>
-          {step > 1 && (
+          {step === TOTAL_STEPS && (
             <TouchableOpacity style={s.backBtn} onPress={() => setStep(step - 1)} activeOpacity={0.8}>
               <Text style={s.backBtnText}>{t('pgBack', lang)}</Text>
+            </TouchableOpacity>
+          )}
+          {/* No Back past completion: going back to step 2 would re-run the completion
+              write. Skip is the way on. */}
+          {step > TOTAL_STEPS && (
+            <TouchableOpacity style={s.backBtn} onPress={skipStudyStep} disabled={saving} activeOpacity={0.8}>
+              <Text style={s.backBtnText}>{t('pgSkip', lang)}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -696,7 +798,7 @@ export default function ProfileSetupScreen({
             {saving
               ? <ActivityIndicator color="#fff" />
               : <Text style={s.primaryBtnText}>
-                  {step === 0 ? t('pgIntroStart', lang) : step === TOTAL_STEPS ? t('pgFinish', lang) : t('pgContinue', lang)}
+                  {step === 0 ? t('pgIntroStart', lang) : step === lastStep ? t('pgFinish', lang) : t('pgContinue', lang)}
                 </Text>}
           </TouchableOpacity>
         </View>
@@ -717,6 +819,15 @@ export default function ProfileSetupScreen({
       <SearchModal visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
         searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
         value={institution} onSelect={v => { setInstitution(v); setPicker(null) }} onClose={() => setPicker(null)} />
+      <SearchModal visible={picker === 'subject'} searchable title={t('pgSubject', lang)}
+        searchPlaceholder={t('pgSubjectSearch', lang)} options={subjectOpts}
+        value={subjectId} onSelect={v => { setSubjectId(v); setPicker(null) }} onClose={() => setPicker(null)} />
+      <SearchModal visible={picker === 'startYear'} title={t('pgStudyStart', lang)} options={startYearOptions}
+        value={startYear}
+        onSelect={v => { setStartYear(v); if (endYear != null && endYear < v) setEndYear(null); setPicker(null) }}
+        onClose={() => setPicker(null)} />
+      <SearchModal visible={picker === 'endYear'} title={t('pgStudyEnd', lang)} options={endYearOptions}
+        value={endYear} onSelect={v => { setEndYear(v); setPicker(null) }} onClose={() => setPicker(null)} />
       {/* Nothing here is re-read from `profile` on a language change, so every value the
           user has typed survives it: the fields are component state, the screen is not
           remounted (same type, same slot in App.js's content chain), and the one effect

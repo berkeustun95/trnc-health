@@ -21,10 +21,11 @@ import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../comp
 import {
   MIN_SIGNUP_AGE, MAX_SIGNUP_AGE, RESIDENT_STATUSES, STUDENT_LEVELS,
   INSTITUTION_REQUIRED_LEVELS, RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
-  DISPLAY_NAME_MAX,
+  DISPLAY_NAME_MAX, affiliationPatch, STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
 } from '../constants/profileGate'
+import { subjectOptions, fetchServerYear, studyYearOptions } from '../utils/studyFields'
 import LegalScreen from './LegalScreen'
-import { TERMS_CHECKBOX_LIVE } from '../constants/flags'
+import { TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
 import { PRESET_AVATARS, getPreset } from '../constants/avatars'
 import BackButton from '../components/BackButton'
 
@@ -103,6 +104,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     dobY: null, dobM: null, dobD: null,
     phone: '', nationality: '', region: null, resident_status: null,
     student_level: null, institution_id: null, preferred_language: 'English',
+    study_start_year: null, study_end_year: null, subject_id: null,
   })
   const [institutions, setInstitutions]     = useState([])
   const [picker, setPicker]                 = useState(null)  // 'day'|'month'|'year'|'nat'|'cc'|'inst'|'region'|'status'|'level'
@@ -130,6 +132,12 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   // least as easy as giving it, and a withdrawal that waits for a second tap is not.
   const [marketingOn, setMarketingOn]           = useState(false)
   const [marketingBusy, setMarketingBusy]       = useState(false)
+  // Same shape as marketing, for the same reason: being LISTED is a visibility choice, and
+  // switching it off must not wait for a Save tap somebody may never make.
+  const [listingOn, setListingOn]               = useState(false)
+  const [listingBusy, setListingBusy]           = useState(false)
+  const [subjects, setSubjects]                 = useState([])
+  const [dbYear, setDbYear]                     = useState(() => new Date().getUTCFullYear())
 
   function toggleSection(setter) {
     if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true)
@@ -148,7 +156,9 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   // Hand-written list, NOT App.js's PROFILE_COLUMNS — this screen has
                   // always had its own. Both now name marketing_opt_in_at and both
                   // therefore depend on 20261016 being applied before the OTA.
-                  'marketing_opt_in_at')
+                  'marketing_opt_in_at, ' +
+                  // 20261024. Same dependency: applied before any OTA carrying this line.
+                  'study_start_year, study_end_year, subject_id, student_listing_opt_in')
           .eq('id', session.user.id)
           .single()
         if (error) { setLoadError(true); return }
@@ -156,6 +166,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           setProfile(data)
           setAvatarUrl(data.avatar_url ?? null)
           setMarketingOn(data.marketing_opt_in_at != null)
+          setListingOn(data.student_listing_opt_in === true)
           const stored = data.phone ?? ''
           const matched = COUNTRY_CODES.find(c => stored.startsWith(c.code))
           if (matched) setSelectedCC(matched.code)
@@ -182,6 +193,9 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             student_level: data.student_level ?? null,
             institution_id: data.institution_id ?? null,
             preferred_language: data.preferred_language ?? 'English',
+            study_start_year: data.study_start_year ?? null,
+            study_end_year: data.study_end_year ?? null,
+            subject_id: data.subject_id ?? null,
           }
           setForm(initialForm)
           setSavedForm(initialForm)
@@ -198,6 +212,14 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       .eq('is_active', true)
       .order('sort_order')
       .then(({ data }) => setInstitutions(data ?? []))
+    if (MODULE_FLAGS.studentHub) {
+      supabase.from('subjects')
+        .select('id, sort_order, subject_i18n(lang, name)')
+        .eq('is_active', true)
+        .order('sort_order')
+        .then(({ data }) => setSubjects(data ?? []))
+      fetchServerYear().then(setDbYear)
+    }
   }, [])
 
   // Deliberately NO names here. Reviews are anonymous, so showing "you blocked
@@ -237,6 +259,21 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       .single()
     setMarketingOn(error ? !next : data?.marketing_opt_in_at != null)
     setMarketingBusy(false)
+  }
+
+  // Written against the STORED institution (the switch is disabled without one), so the
+  // listing CHECK is the database's to enforce, and the read-back is what the switch shows.
+  async function toggleListing(next) {
+    if (listingBusy) return
+    setListingBusy(true)
+    setListingOn(next)
+    const { data, error } = await supabase.from('profiles')
+      .update({ student_listing_opt_in: next })
+      .eq('id', session.user.id)
+      .select('student_listing_opt_in')
+      .single()
+    setListingOn(error ? !next : data?.student_listing_opt_in === true)
+    setListingBusy(false)
   }
 
   async function savePresetAvatar(id) {
@@ -318,7 +355,12 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         !['available', 'checking'].includes(nameState.status)) return
 
     setSaving(true)
-    const level = form.resident_status === 'student' ? form.student_level : null
+    // The listing opt-in is omitted: it has its own immediate write. It is sent (false) only
+    // when the institution goes, which is when the CHECK demands it.
+    const aff = affiliationPatch({
+      status: form.resident_status, level: form.student_level, institutionId: form.institution_id,
+      startYear: form.study_start_year, endYear: form.study_end_year, subjectId: form.subject_id,
+    })
     const { error: err } = await supabase
       .from('profiles')
       .update({
@@ -332,10 +374,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         region: form.region,
         resident_status: form.resident_status,
         // The coupling CHECKs reject a student_level without a student status and an
-        // institution without a university-level one, so the clears must ride in the SAME
-        // patch as the change that causes them. Two sequential writes fail on the first.
-        student_level: level,
-        institution_id: INSTITUTION_REQUIRED_LEVELS.includes(level) ? form.institution_id : null,
+        // institution without a university-level one OR an end year, and every study field
+        // without an institution — so the clears must ride in the SAME patch as the change
+        // that causes them. Two sequential writes fail on the first. See affiliationPatch.
+        ...aff,
         preferred_language: form.preferred_language,
         // full_name is DERIVED by check_profile_name_content() from the two fields above.
         // resident_status_updated_at is stamped by the same trigger. Neither is sent.
@@ -345,10 +387,21 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       const nameErr = await displayNameSaveError(err, form.display_name.trim())
       if (nameErr) setNameState(nameErr)
       else if (err.message?.includes('UNDERAGE')) setError(t('pgDobInvalid', lang))
+      else if (err.message?.includes(STUDY_END_YEAR_IN_FUTURE)) setError(t('pgStudyEndFuture', lang))
       else setError(err.message)
     } else {
+      // The form is brought to what was WRITTEN: an institution the patch cleared must not
+      // linger in state, or the next save would not know it had already gone.
+      const written = {
+        ...form,
+        student_level: aff.student_level,
+        institution_id: aff.institution_id,
+        ...(aff.institution_id == null ? { study_start_year: null, study_end_year: null, subject_id: null } : {}),
+      }
+      if (aff.institution_id == null) setListingOn(false)
+      setForm(written)
       setSaved(true)
-      setSavedForm({ ...form })
+      setSavedForm(written)
       setSavedCC(selectedCC)
       setTimeout(() => setSaved(false), 2000)
     }
@@ -416,6 +469,23 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const thisYear = new Date().getFullYear()
   const yearOptions = Array.from({ length: MAX_SIGNUP_AGE - MIN_SIGNUP_AGE + 1 },
     (_, i) => thisYear - MIN_SIGNUP_AGE - i).map(y => ({ value: y, label: String(y) }))
+
+  // ─── Study fields (Slice 2, behind MODULE_FLAGS.studentHub) ───────────────
+  // Shown to a university-level student, and to a GRADUATE — anyone holding an institution
+  // with an end year, whatever resident_status now says. The saved end year counts too, so
+  // clearing it mid-edit does not hide the very field that explains what Save will do.
+  const isUniStudent = INSTITUTION_REQUIRED_LEVELS.includes(studentLevel)
+  const isGraduate = MODULE_FLAGS.studentHub && form.institution_id != null &&
+    (form.study_end_year != null || savedForm?.study_end_year != null)
+  const showStudy = MODULE_FLAGS.studentHub && form.institution_id != null && (isUniStudent || isGraduate)
+  // Saving now would drop the institution and every study field with it.
+  const studyWillClear = showStudy && !isUniStudent && form.study_end_year == null
+  const subjectOpts = [{ value: null, label: '—' }, ...subjectOptions(subjects, lang)]
+  const startYearOptions = [{ value: null, label: '—' }, ...studyYearOptions(dbYear, STUDY_YEAR_MIN)]
+  const endYearOptions = [
+    { value: null, label: t('pgStillStudying', lang) },
+    ...studyYearOptions(dbYear, form.study_start_year ?? STUDY_YEAR_MIN),
+  ]
 
   if (loading) {
     return (
@@ -666,7 +736,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 </View>
               )}
 
-              {form.resident_status === 'student' && INSTITUTION_REQUIRED_LEVELS.includes(form.student_level) && (
+              {(isUniStudent || isGraduate) && (
                 <View style={s.fieldGroup}>
                   <Text style={s.fieldLabel}>{t('pgInstitution', lang)}</Text>
                   <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('inst')} activeOpacity={0.7}>
@@ -678,7 +748,64 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 </View>
               )}
 
+              {showStudy && (
+                <>
+                  <View style={s.fieldGroup}>
+                    <Text style={s.fieldLabel}>{t('pgSubject', lang)}</Text>
+                    <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('subject')} activeOpacity={0.7}>
+                      <Text style={[s.pickerBtnText, !form.subject_id && s.pickerBtnPlaceholder]} numberOfLines={1}>
+                        {subjectOpts.find(o => o.value === form.subject_id && o.value)?.label || t('pgSubjectSearch', lang)}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={s.fieldGroup}>
+                    <Text style={s.fieldLabel}>{t('pgStudyStart', lang)}</Text>
+                    <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('startYear')} activeOpacity={0.7}>
+                      <Text style={[s.pickerBtnText, !form.study_start_year && s.pickerBtnPlaceholder]}>
+                        {form.study_start_year ? String(form.study_start_year) : '—'}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={s.fieldGroup}>
+                    <Text style={s.fieldLabel}>{t('pgStudyEnd', lang)}</Text>
+                    <TouchableOpacity
+                      style={[s.pickerBtn, !form.study_start_year && { opacity: 0.45 }]}
+                      onPress={() => setPicker('endYear')}
+                      disabled={!form.study_start_year}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.pickerBtnText}>
+                        {form.study_end_year ? String(form.study_end_year) : t('pgStillStudying', lang)}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                    {studyWillClear && <Text style={s.fieldHint}>{t('pgStudyRemovedOnSave', lang)}</Text>}
+                  </View>
+                </>
+              )}
+
               {error && <Text style={s.errorText}>{error}</Text>}
+            </View>
+          )}
+
+          {MODULE_FLAGS.studentHub && (
+            <View style={s.marketingSection}>
+              <Text style={s.sectionTitle}>{t('menuStudentHub', lang)}</Text>
+              <View style={s.marketingRow}>
+                <Text style={s.marketingLabel}>{t('pgListingOptIn', lang)}</Text>
+                <Switch
+                  value={listingOn}
+                  onValueChange={toggleListing}
+                  disabled={listingBusy || !savedForm?.institution_id}
+                  trackColor={{ true: colors.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {!savedForm?.institution_id && (
+                <Text style={s.fieldHint}>{t('pgListingNeedsInstitution', lang)}</Text>
+              )}
             </View>
           )}
 
@@ -763,8 +890,9 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               pickers this screen used to carry. The wizard already renders seven of these
               over the same vocabularies; a second implementation on the screen that edits
               the same columns is the drift class this repo keeps paying for. Selecting a
-              resident status other than 'student' clears the level and institution in the
-              SAME setForm call — the coupling CHECKs reject them as a later write. */}
+              resident status other than 'student' clears the level in the SAME setForm
+              call. The institution stays in state; affiliationPatch() clears it (and the
+              study fields) in the save patch when no level or end year keeps it. */}
           <SearchModal visible={picker === 'day'} title={t('pgDay', lang)} options={dayOptions}
             value={form.dobD} onSelect={v => { set('dobD')(v); setPicker(null) }} onClose={() => setPicker(null)} />
           <SearchModal visible={picker === 'month'} title={t('pgMonth', lang)} options={monthOptions}
@@ -786,7 +914,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 ...f,
                 resident_status: v,
                 student_level: v === 'student' ? f.student_level : null,
-                institution_id: v === 'student' ? f.institution_id : null,
+                // institution_id is KEPT: affiliationPatch decides at save, because a
+                // graduate's end year keeps it through a status change.
               }))
               setPicker(null)
             }}
@@ -794,17 +923,30 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           <SearchModal visible={picker === 'level'} title={t('pgStudentLevel', lang)} options={levelOptions}
             value={form.student_level}
             onSelect={v => {
-              setForm(f => ({
-                ...f,
-                student_level: v,
-                institution_id: INSTITUTION_REQUIRED_LEVELS.includes(v) ? f.institution_id : null,
-              }))
+              setForm(f => ({ ...f, student_level: v }))
               setPicker(null)
             }}
             onClose={() => setPicker(null)} />
           <SearchModal visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
             searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
             value={form.institution_id} onSelect={v => { set('institution_id')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'subject'} searchable title={t('pgSubject', lang)}
+            searchPlaceholder={t('pgSubjectSearch', lang)} options={subjectOpts}
+            value={form.subject_id} onSelect={v => { set('subject_id')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'startYear'} title={t('pgStudyStart', lang)} options={startYearOptions}
+            value={form.study_start_year}
+            onSelect={v => {
+              // profiles_study_years_order_check: no end without a start, no end before it.
+              setForm(f => ({
+                ...f,
+                study_start_year: v,
+                study_end_year: v == null || (f.study_end_year != null && f.study_end_year < v) ? null : f.study_end_year,
+              }))
+              setPicker(null)
+            }}
+            onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'endYear'} title={t('pgStudyEnd', lang)} options={endYearOptions}
+            value={form.study_end_year} onSelect={v => { set('study_end_year')(v); setPicker(null) }} onClose={() => setPicker(null)} />
         </ScrollView>
       </KeyboardAwareForm>
     </SafeAreaView>

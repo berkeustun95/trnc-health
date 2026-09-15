@@ -89,6 +89,46 @@ export const INSTITUTION_REQUIRED_LEVELS = ['university', 'postgraduate']
 
 export const DISPLAY_PREFERENCES = ['display_name', 'full_name']
 
+// ─── AFFILIATION PATCH (20261024) — the ONE writer both screens use ─────────
+//
+// Four CHECKs and a trigger couple these columns, and a patch that honours three of
+// them fails on the fourth with a 23514 on a LIVE screen. So the rule lives once, here:
+//   • institution_id stays only while the effective level is university/postgraduate
+//     OR a study_end_year is present (a graduate keeps their institution, whatever
+//     resident_status now says — profiles_institution_coupling_check's third arm).
+//   • when it goes, study_start_year, study_end_year, subject_id and
+//     student_listing_opt_in go with it IN THE SAME PATCH
+//     (profiles_study_fields_require_institution_check, …_listing_opt_in_requires_…).
+// A study value that is `undefined` is OMITTED, never sent as null: the wizard's
+// completion write owns none of them and must not wipe what ProfileScreen stored.
+// endYear decides whether the institution survives, so a caller that does not own it
+// passes the STORED value.
+export function affiliationPatch({ status, level, institutionId, startYear, endYear, subjectId, listingOptIn }) {
+  const student_level = status === RESIDENT_STATUS_STUDENT ? (level ?? null) : null
+  const keep = institutionId != null &&
+    (INSTITUTION_REQUIRED_LEVELS.includes(student_level) || endYear != null)
+  if (!keep) {
+    return {
+      student_level, institution_id: null,
+      study_start_year: null, study_end_year: null, subject_id: null, student_listing_opt_in: false,
+    }
+  }
+  const patch = { student_level, institution_id: institutionId }
+  if (startYear !== undefined) patch.study_start_year = startYear
+  if (endYear !== undefined) patch.study_end_year = endYear
+  if (subjectId !== undefined) patch.subject_id = subjectId
+  if (listingOptIn !== undefined) patch.student_listing_opt_in = listingOptIn
+  return patch
+}
+
+// Mirrors the static bound on both year CHECKs in 20261024. The upper bound a picker
+// offers is NOT 2100: it is the database's current year (utils/studyFields.js), because
+// check_profile_study_years() rejects a future end year.
+export const STUDY_YEAR_MIN = 1950
+
+// Raised by check_profile_study_years() as P0001, not 23514 — matched on the message.
+export const STUDY_END_YEAR_IN_FUTURE = 'STUDY_END_YEAR_IN_FUTURE'
+
 // i18n keys for the two single-select groups. They live HERE, not inside the wizard,
 // for the same reason REGION_LABEL_KEY lives in constants/regions.js:
 // scripts/validate-i18n-coverage.mjs finds keys by scanning surface files for a LITERAL
@@ -116,7 +156,9 @@ export const RESIDENT_STATUS_LABEL_KEY = {
 // gone from all nine locales; the surviving titles are the ones that still describe a
 // screen. Renumbering the keys would rewrite nine locales to say the same words under a
 // different name.
-export const STEP_TITLE_KEY = { 1: 'pgTitle1', 2: 'pgTitle3' }
+// Steps 3 and 4 are the OPTIONAL study steps (Slice 2), reached only after step 2 has
+// written profile_completed_at.
+export const STEP_TITLE_KEY = { 1: 'pgTitle1', 2: 'pgTitle3', 3: 'pgTitleSubject', 4: 'pgTitleStudyYears' }
 
 export const HELP_ROW_LABEL_KEY = {
   numbers:   'pgHelpNumbers',
