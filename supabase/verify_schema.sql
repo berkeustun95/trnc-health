@@ -1380,7 +1380,8 @@ WITH report AS (
       (SELECT count(*) FROM public.institutions) = 22
       AND (SELECT count(*) FROM public.institutions WHERE is_active) = 21
     -- (2) Netkent stays deleted. 20261001's seed is ON CONFLICT (id) DO NOTHING, so
-    --     re-running 1001 re-inserts it at sort_order 140 without a word.
+    --     re-running 1001 re-inserts it at sort_order 140 without a word. If this reads
+    --     MISSING: supabase/recovery_institutions_netkent.sql (not 20261018 — it refuses).
     UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: Netkent (…000e) absent — a 20261001 re-run brings it back',
       NOT EXISTS(SELECT 1 FROM public.institutions WHERE id = '00000000-0000-4000-b000-00000000000e')
     -- (3) Kıbrıs İlim deactivated, NOT deleted — a profile references it and the FK is
