@@ -60,7 +60,7 @@ import {
   DISPLAY_NAME_MAX, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY,
   affiliationPatch, STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
 } from '../constants/profileGate'
-import { subjectOptions, fetchServerYear, studyYearOptions } from '../utils/studyFields'
+import { subjectOptions, studyYearOptions, studyYearCeiling } from '../utils/studyFields'
 
 // TWO steps. What used to be Steps 1 and 2 — the six required identity fields — is now
 // one screen; the old Step 3 (region, status, the student conditional) became Step 2.
@@ -270,7 +270,6 @@ export default function ProfileSetupScreen({
   const [subjectId, setSubjectId] = useState(profile?.subject_id ?? null)
   const [startYear, setStartYear] = useState(profile?.study_start_year ?? null)
   const [endYear, setEndYear] = useState(profile?.study_end_year ?? null)
-  const [dbYear, setDbYear] = useState(() => new Date().getUTCFullYear())
 
   const [picker, setPicker] = useState(null)  // 'day' | 'month' | 'year' | 'nat' | 'cc' | 'inst' | 'subject' | 'startYear' | 'endYear'
 
@@ -301,7 +300,6 @@ export default function ProfileSetupScreen({
       .eq('is_active', true)
       .order('sort_order')
       .then(({ data }) => setSubjects(data ?? []))
-    fetchServerYear().then(setDbYear)
   }, [])
 
   // ─── Validity per step ────────────────────────────────────────────────────
@@ -558,11 +556,12 @@ export default function ProfileSetupScreen({
   // currentYear-100 … currentYear-MIN_SIGNUP_AGE, newest first.
   const yearOptions = Array.from({ length: MAX_SIGNUP_AGE - MIN_SIGNUP_AGE + 1 },
     (_, i) => thisYear - MIN_SIGNUP_AGE - i).map(y => ({ value: y, label: String(y) }))
-  // Capped at the DATABASE's year: check_profile_study_years() rejects a future end year.
-  const startYearOptions = studyYearOptions(dbYear, STUDY_YEAR_MIN)
+  // Capped at the UTC year: check_profile_study_years() rejects a future end year.
+  const studyYearMax = studyYearCeiling()
+  const startYearOptions = studyYearOptions(studyYearMax, STUDY_YEAR_MIN)
   const endYearOptions = [
     { value: null, label: t('pgStillStudying', lang) },
-    ...studyYearOptions(dbYear, startYear ?? STUDY_YEAR_MIN),
+    ...studyYearOptions(studyYearMax, startYear ?? STUDY_YEAR_MIN),
   ]
 
   const canAdvance = step === 0 || (step === 1 && step1Ok) || (step === 2 && step2Ok) ||

@@ -122,8 +122,8 @@ export function affiliationPatch({ status, level, institutionId, startYear, endY
 }
 
 // Mirrors the static bound on both year CHECKs in 20261024. The upper bound a picker
-// offers is NOT 2100: it is the database's current year (utils/studyFields.js), because
-// check_profile_study_years() rejects a future end year.
+// offers is NOT 2100: it is the current UTC year (studyYearCeiling in utils/studyFields.js),
+// because check_profile_study_years() rejects a future end year.
 export const STUDY_YEAR_MIN = 1950
 
 // Raised by check_profile_study_years() as P0001, not 23514 — matched on the message.

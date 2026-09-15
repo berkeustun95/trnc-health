@@ -23,7 +23,7 @@ import {
   INSTITUTION_REQUIRED_LEVELS, RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
   DISPLAY_NAME_MAX, affiliationPatch, STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
 } from '../constants/profileGate'
-import { subjectOptions, fetchServerYear, studyYearOptions } from '../utils/studyFields'
+import { subjectOptions, studyYearOptions, studyYearCeiling } from '../utils/studyFields'
 import LegalScreen from './LegalScreen'
 import { TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
 import { PRESET_AVATARS, getPreset } from '../constants/avatars'
@@ -107,7 +107,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     study_start_year: null, study_end_year: null, subject_id: null,
   })
   const [institutions, setInstitutions]     = useState([])
-  const [picker, setPicker]                 = useState(null)  // 'day'|'month'|'year'|'nat'|'cc'|'inst'|'region'|'status'|'level'
+  const [picker, setPicker]                 = useState(null)  // 'day'|'month'|'year'|'nat'|'cc'|'inst'|'region'|'status'|'level'|'pastInst'|'subject'|'startYear'|'endYear'
   const [nameState, setNameState]           = useDisplayNameCheck(form.display_name)
   const [savedForm, setSavedForm]           = useState(null)
   const [savedCC, setSavedCC]               = useState('+90')
@@ -137,7 +137,9 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [listingOn, setListingOn]               = useState(false)
   const [listingBusy, setListingBusy]           = useState(false)
   const [subjects, setSubjects]                 = useState([])
-  const [dbYear, setDbYear]                     = useState(() => new Date().getUTCFullYear())
+  // Opens the past-university fields for someone who has none yet. Once an institution is
+  // in the form the fields stay open on their own.
+  const [addingPastUni, setAddingPastUni]       = useState(false)
 
   function toggleSection(setter) {
     if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true)
@@ -218,7 +220,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         .eq('is_active', true)
         .order('sort_order')
         .then(({ data }) => setSubjects(data ?? []))
-      fetchServerYear().then(setDbYear)
     }
   }, [])
 
@@ -350,6 +351,12 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     // display_name only when NEW IS DISTINCT FROM OLD, and 20261001's header explains at
     // length why that guard exists. This mirrors it rather than re-inventing the trap it
     // was written to close.
+    // A past university is ONE atomic fact: the third arm of
+    // profiles_institution_coupling_check needs study_end_year beside institution_id,
+    // profiles_study_fields_require_institution_check needs the reverse, and
+    // profiles_study_years_order_check needs a start year under any end year. Anything less
+    // than all three would be silently dropped by affiliationPatch, so it is stopped here.
+    if (pastUniPartial) { setError(t('pgPastUniIncomplete', lang)); return }
     const nameChanged = form.display_name.trim() !== (savedForm?.display_name ?? '').trim()
     if (nameChanged && form.display_name.trim() && nameState &&
         !['available', 'checking'].includes(nameState.status)) return
@@ -398,7 +405,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         institution_id: aff.institution_id,
         ...(aff.institution_id == null ? { study_start_year: null, study_end_year: null, subject_id: null } : {}),
       }
-      if (aff.institution_id == null) setListingOn(false)
+      if (aff.institution_id == null) { setListingOn(false); setAddingPastUni(false) }
       setForm(written)
       setSaved(true)
       setSavedForm(written)
@@ -471,20 +478,33 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     (_, i) => thisYear - MIN_SIGNUP_AGE - i).map(y => ({ value: y, label: String(y) }))
 
   // ─── Study fields (Slice 2, behind MODULE_FLAGS.studentHub) ───────────────
-  // Shown to a university-level student, and to a GRADUATE — anyone holding an institution
-  // with an end year, whatever resident_status now says. The saved end year counts too, so
-  // clearing it mid-edit does not hide the very field that explains what Save will do.
+  // Two shapes over the same four columns:
+  //   • a university-level STUDENT edits their current studies under the institution the
+  //     gate already requires; the end year may be blank ("still studying").
+  //   • ANYONE ELSE may add a PAST university — the alumni case. student_level stays NULL
+  //     for a non-student (profiles_student_level_coupling_check), and the institution is
+  //     held by the end year alone (the third arm), so all three of university, start and
+  //     graduation year are required together. Not offered in the wizard: signup does not
+  //     ask a non-student about university.
+  // A uni student who changes status keeps their institution in the form, so it reappears
+  // here as a past university to complete or remove — never silently dropped on Save.
   const isUniStudent = INSTITUTION_REQUIRED_LEVELS.includes(studentLevel)
-  const isGraduate = MODULE_FLAGS.studentHub && form.institution_id != null &&
-    (form.study_end_year != null || savedForm?.study_end_year != null)
-  const showStudy = MODULE_FLAGS.studentHub && form.institution_id != null && (isUniStudent || isGraduate)
-  // Saving now would drop the institution and every study field with it.
-  const studyWillClear = showStudy && !isUniStudent && form.study_end_year == null
+  const showStudy = MODULE_FLAGS.studentHub && isUniStudent && form.institution_id != null
+  const showPastUni = MODULE_FLAGS.studentHub && !isUniStudent && (form.institution_id != null || addingPastUni)
+  const pastUniEmpty = form.institution_id == null && form.study_start_year == null &&
+    form.study_end_year == null && form.subject_id == null
+  const pastUniComplete = form.institution_id != null && form.study_start_year != null && form.study_end_year != null
+  const pastUniPartial = showPastUni && !pastUniEmpty && !pastUniComplete
+  const studyYearMax = studyYearCeiling()
   const subjectOpts = [{ value: null, label: '—' }, ...subjectOptions(subjects, lang)]
-  const startYearOptions = [{ value: null, label: '—' }, ...studyYearOptions(dbYear, STUDY_YEAR_MIN)]
+  // A student may clear either year; a past university may not, so its lists carry no blank.
+  const startYearOptions = [
+    ...(isUniStudent ? [{ value: null, label: '—' }] : []),
+    ...studyYearOptions(studyYearMax, STUDY_YEAR_MIN),
+  ]
   const endYearOptions = [
-    { value: null, label: t('pgStillStudying', lang) },
-    ...studyYearOptions(dbYear, form.study_start_year ?? STUDY_YEAR_MIN),
+    ...(isUniStudent ? [{ value: null, label: t('pgStillStudying', lang) }] : []),
+    ...studyYearOptions(studyYearMax, form.study_start_year ?? STUDY_YEAR_MIN),
   ]
 
   if (loading) {
@@ -736,7 +756,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 </View>
               )}
 
-              {(isUniStudent || isGraduate) && (
+              {isUniStudent && (
                 <View style={s.fieldGroup}>
                   <Text style={s.fieldLabel}>{t('pgInstitution', lang)}</Text>
                   <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('inst')} activeOpacity={0.7}>
@@ -781,9 +801,72 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                       </Text>
                       <Feather name="chevron-down" size={16} color={colors.textSecondary} />
                     </TouchableOpacity>
-                    {studyWillClear && <Text style={s.fieldHint}>{t('pgStudyRemovedOnSave', lang)}</Text>}
                   </View>
                 </>
+              )}
+
+              {MODULE_FLAGS.studentHub && !isUniStudent && !showPastUni && (
+                <TouchableOpacity style={s.pastUniAdd} onPress={() => setAddingPastUni(true)} activeOpacity={0.7}>
+                  <Feather name="plus" size={16} color={colors.primary} />
+                  <Text style={s.pastUniAddText}>{t('pgAddPastUniversity', lang)}</Text>
+                </TouchableOpacity>
+              )}
+
+              {showPastUni && (
+                <View style={s.pastUniSection}>
+                  <Text style={s.sectionTitle}>{t('pgPastUniversity', lang)}</Text>
+                  <View style={s.fieldGroup}>
+                    <Text style={s.fieldLabel}>{t('pgPastUniInstitution', lang)}</Text>
+                    <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('pastInst')} activeOpacity={0.7}>
+                      <Text style={[s.pickerBtnText, !form.institution_id && s.pickerBtnPlaceholder]} numberOfLines={1}>
+                        {instOptions.find(o => o.value === form.institution_id)?.label || t('pgInstitutionSearch', lang)}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={s.fieldGroup}>
+                    <Text style={s.fieldLabel}>{t('pgStudyStart', lang)}</Text>
+                    <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('startYear')} activeOpacity={0.7}>
+                      <Text style={[s.pickerBtnText, !form.study_start_year && s.pickerBtnPlaceholder]}>
+                        {form.study_start_year ? String(form.study_start_year) : '—'}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={s.fieldGroup}>
+                    <Text style={s.fieldLabel}>{t('pgStudyEnd', lang)}</Text>
+                    <TouchableOpacity
+                      style={[s.pickerBtn, !form.study_start_year && { opacity: 0.45 }]}
+                      onPress={() => setPicker('endYear')}
+                      disabled={!form.study_start_year}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[s.pickerBtnText, !form.study_end_year && s.pickerBtnPlaceholder]}>
+                        {form.study_end_year ? String(form.study_end_year) : '—'}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={s.fieldGroup}>
+                    <Text style={s.fieldLabel}>{t('pgPastSubject', lang)}</Text>
+                    <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('subject')} activeOpacity={0.7}>
+                      <Text style={[s.pickerBtnText, !form.subject_id && s.pickerBtnPlaceholder]} numberOfLines={1}>
+                        {subjectOpts.find(o => o.value === form.subject_id && o.value)?.label || t('pgSubjectSearch', lang)}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                  {pastUniPartial && <Text style={s.fieldHint}>{t('pgPastUniIncomplete', lang)}</Text>}
+                  <TouchableOpacity
+                    style={s.pastUniRemove}
+                    onPress={() => {
+                      setForm(f => ({ ...f, institution_id: null, study_start_year: null, study_end_year: null, subject_id: null }))
+                      setAddingPastUni(false)
+                    }}
+                  >
+                    <Text style={s.pastUniRemoveText}>{t('pgRemovePastUniversity', lang)}</Text>
+                  </TouchableOpacity>
+                </View>
               )}
 
               {error && <Text style={s.errorText}>{error}</Text>}
@@ -930,7 +1013,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           <SearchModal visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
             searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
             value={form.institution_id} onSelect={v => { set('institution_id')(v); setPicker(null) }} onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'subject'} searchable title={t('pgSubject', lang)}
+          <SearchModal visible={picker === 'pastInst'} searchable title={t('pgPastUniInstitution', lang)}
+            searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
+            value={form.institution_id} onSelect={v => { set('institution_id')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'subject'} searchable title={isUniStudent ? t('pgSubject', lang) : t('pgPastSubject', lang)}
             searchPlaceholder={t('pgSubjectSearch', lang)} options={subjectOpts}
             value={form.subject_id} onSelect={v => { set('subject_id')(v); setPicker(null) }} onClose={() => setPicker(null)} />
           <SearchModal visible={picker === 'startYear'} title={t('pgStudyStart', lang)} options={startYearOptions}
@@ -1038,5 +1124,12 @@ const s = StyleSheet.create({
   presetCircle:     { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center' },
   presetEmoji:      { fontSize: 30 },
   presetCheck:      { position: 'absolute', bottom: -2, right: -2, backgroundColor: colors.bg, borderRadius: 10 },
+
+  // Past university
+  pastUniAdd:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, marginBottom: 8 },
+  pastUniAddText:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
+  pastUniSection:   { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, marginTop: 4, marginBottom: 8 },
+  pastUniRemove:    { alignSelf: 'flex-start', paddingVertical: 8 },
+  pastUniRemoveText:{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger, textDecorationLine: 'underline' },
 
 })
