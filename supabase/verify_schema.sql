@@ -1373,12 +1373,15 @@ WITH report AS (
     --    name remembered from the file; the one name compared is the rename itself.
     --    1019 has NO token, deliberately: 20 overwrote every value 19 set, so a token for
     --    19's state would sit red forever against a correct database.
-    -- (1) THE COUNT, one owner. It moves when the three held universities (Altınbaş Kıbrıs,
-    --     Ankara Sosyal Bilimler, Uluslararası Alasya) are added: bump it IN THAT COMMIT and
-    --     say why. The 1018 file's own state check is history and must NOT be edited.
-    UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: 22 rows, 21 active',
-      (SELECT count(*) FROM public.institutions) = 22
-      AND (SELECT count(*) FROM public.institutions WHERE is_active) = 21
+    -- (1) THE COUNT, one owner, and it moves with whichever migration last changed it —
+    --     bump it IN THAT COMMIT and say why. 22/21 after 1018; 25/24 after 1021, which
+    --     added the three held universities (Ankara Sosyal Bilimler, Altınbaş Kıbrıs,
+    --     Uluslararası Alasia). The state checks inside 20261018/19/20 still pin 22/21 and
+    --     now fail permanently: they are historical records and must NOT be edited (their
+    --     ledger rows carry their current checksums). This token is the live count.
+    UNION ALL SELECT '1021_institutions_held_three','institutions: 25 rows, 24 active',
+      (SELECT count(*) FROM public.institutions) = 25
+      AND (SELECT count(*) FROM public.institutions WHERE is_active) = 24
     -- (2) Netkent stays deleted. 20261001's seed is ON CONFLICT (id) DO NOTHING, so
     --     re-running 1001 re-inserts it at sort_order 140 without a word. If this reads
     --     MISSING: supabase/recovery_institutions_netkent.sql (not 20261018 — it refuses).
@@ -1394,6 +1397,12 @@ WITH report AS (
     UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: the 8 added ids …000f–…0016 all present',
       (SELECT count(*) FROM public.institutions
         WHERE id BETWEEN '00000000-0000-4000-b000-00000000000f' AND '00000000-0000-4000-b000-000000000016') = 8
+    -- The three held universities (1021), by id. Nothing asserted about city: ASBÜ's NULL
+    --     is deliberate (district unconfirmed) and a token pinning it would go red the day
+    --     the district is confirmed and filled in correctly.
+    UNION ALL SELECT '1021_institutions_held_three','institutions: the 3 added ids …0017–…0019 all present',
+      (SELECT count(*) FROM public.institutions
+        WHERE id BETWEEN '00000000-0000-4000-b000-000000000017' AND '00000000-0000-4000-b000-000000000019') = 3
     -- (4) No short_name is a lowercase slug. 18's recorded INSERT is ON CONFLICT DO UPDATE,
     --     so pasting it again resets all eight to 'metuncc', 'itukktc', … — the file's guard
     --     refuses, the bare statement does not. Derived over the whole table: every real
