@@ -38,6 +38,7 @@ Profile data. Each field is listed with what it is for. Where a field is marked 
 • Phone number — optional. If you provide it, it is held on your account so that we can contact you about your account. It is not shown to other users and is not given to providers. You can use ADA fully without giving us a phone number.
 • Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Not used yet — nothing in the app reads it.
 • Resident status — student, working here, resident, or visiting — and, if you are a student, your study level and, for university and postgraduate study, your institution. This is intended to decide which parts of ADA are put in front of you, because someone who has just arrived needs different things from someone who has lived here ten years. Not used yet — nothing in the app reads it.
+• University details, if you add them — a university you study at now or studied at before (you do not need to be a student now), your field of study, the year you started and the year you graduated, and whether you have asked to appear in your university's student list. That setting is off unless you turn it on, and there is no student list in the app yet, so turning it on shows you to no one. Not used yet — nothing in the app reads them.
 • Preferred language — to show the app, and the notifications we send you, in your language.
 
 Profile picture: optional. Either a preset avatar you choose, or an image you upload, which is stored in our file storage.
@@ -77,7 +78,7 @@ Other users can see:
 • Your display name, next to reviews, questions and answers you post.
 • The content of the reviews, questions and answers you post, and the ratings you give.
 
-Other users cannot see: your first and last name, your date of birth, your nationality, your phone number, your region, your resident status, your study level or institution, or your email address.
+Other users cannot see: your first and last name, your date of birth, your nationality, your phone number, your region, your resident status, your study level, institution, field of study or study years, or your email address.
 
 Providers are not shown any of your personal data. When you ask a question on a facility's page, the provider sees the question and your display name — not your real name, your date of birth, your phone number, your region or your resident status.
 

@@ -38,6 +38,7 @@ Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listele
 • Telefon numarası — isteğe bağlıdır. Verirseniz, hesabınızla ilgili konularda sizinle iletişime geçebilmemiz için hesabınızda saklanır. Diğer kullanıcılara gösterilmez ve hizmet sağlayıcılara verilmez. Telefon numarası vermeden ADA'yı eksiksiz kullanabilirsiniz.
 • KKTC içindeki bölgeniz — listelerin, nöbetçi eczane çizelgelerinin ve arama sonuçlarının yalnızca telefonunuzun o anda bulunduğu yere göre değil, yaşadığınız yere göre sıralanabilmesi için. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
 • İkamet durumu — öğrenci, burada çalışıyor, ikamet ediyor veya ziyaretçi — ve öğrenciyseniz öğrenim düzeyiniz ile üniversite ve lisansüstü öğrenim için kurumunuz. Bu bilgi, ADA'nın hangi bölümlerinin önünüze çıkarılacağını belirlemek için düşünülmüştür; çünkü yeni gelmiş birinin ihtiyaçlarıyla on yıldır burada yaşayan birinin ihtiyaçları aynı değildir. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
+• Üniversite bilgileri (eklerseniz) — şu anda okuduğunuz ya da daha önce okuduğunuz bir üniversite (şu anda öğrenci olmanız gerekmez), öğrenim alanınız, başlama yılınız ve mezuniyet yılınız; ayrıca üniversitenizin öğrenci listesinde görünmek isteyip istemediğiniz. Bu ayar siz açmadıkça kapalıdır ve uygulamada henüz bir öğrenci listesi yoktur; bu nedenle ayarı açmanız sizi kimseye göstermez. Henüz kullanılmıyor — uygulamada bu verileri okuyan hiçbir bölüm yok.
 • Tercih ettiğiniz dil — uygulamayı ve size gönderdiğimiz bildirimleri kendi dilinizde gösterebilmek için.
 
 Profil fotoğrafı: isteğe bağlıdır. Ya hazır avatarlardan birini seçersiniz ya da kendi yüklediğiniz bir görsel kullanılır; yüklenen görsel dosya depolamamızda saklanır.
@@ -77,7 +78,7 @@ Diğer kullanıcıların görebildikleri:
 • Yazdığınız değerlendirmelerin, soruların ve cevapların yanında görünen adınız.
 • Yazdığınız değerlendirmelerin, soruların ve cevapların içeriği ile verdiğiniz puanlar.
 
-Diğer kullanıcıların göremedikleri: adınız ve soyadınız, doğum tarihiniz, uyruğunuz, telefon numaranız, bölgeniz, ikamet durumunuz, öğrenim düzeyiniz veya kurumunuz ve e-posta adresiniz.
+Diğer kullanıcıların göremedikleri: adınız ve soyadınız, doğum tarihiniz, uyruğunuz, telefon numaranız, bölgeniz, ikamet durumunuz, öğrenim düzeyiniz, kurumunuz, öğrenim alanınız veya öğrenim yıllarınız ve e-posta adresiniz.
 
 Hizmet sağlayıcılara hiçbir kişisel veriniz gösterilmez. Bir kurumun sayfasında soru sorduğunuzda hizmet sağlayıcı yalnızca soruyu ve görünen adınızı görür — gerçek adınızı, doğum tarihinizi, telefon numaranızı, bölgenizi veya ikamet durumunuzu görmez.
 

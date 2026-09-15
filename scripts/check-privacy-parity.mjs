@@ -149,6 +149,12 @@ const DISCLOSURE = {
   nationality_code:  /nationality/i,
   preferred_language:/preferred language/i,
   avatar_url:        /profile picture|profile photo|avatar/i,
+  // 20261024. "subject" alone is useless here — every copy already says "subject to the
+  // advertising restrictions" — so each rule names a phrase only the disclosure uses.
+  subject_id:             /field of study/i,
+  study_start_year:       /year you started/i,
+  study_end_year:         /year you graduated/i,
+  student_listing_opt_in: /student list/i,
 }
 
 // Columns that are not user-supplied personal data to itemise. Each needs a REASON.
@@ -174,30 +180,6 @@ const EXEMPT = {
   terms_accepted_at:       'part of the consent record; the "when" in that bullet',
   terms_locale:            'part of the consent record; the "in which language" in that bullet',
   marketing_opt_in_at:     'part of the consent record; the marketing sentence in that bullet',
-  // ─── Student affiliation (20261024, Slice 2) — exempt ONLY WHILE THE MODULE IS DARK ───
-  //
-  // App.js reads these so the wizard can keep a re-gated graduate's institution, but no
-  // screen can WRITE them until MODULE_FLAGS.studentHub is true, so nothing is collected
-  // yet. An exemption whose reason names a flag is enforced below: the guard FAILS the
-  // moment that flag is true in constants/flags.js, so this cannot outlive the dark launch.
-  // Disclose all four in the three copies before flipping — and the opt-in is the one
-  // that contradicts "what is public and what is not" once a student list exists.
-  study_start_year:        'not collected while MODULE_FLAGS.studentHub is false (no writer is reachable)',
-  study_end_year:          'not collected while MODULE_FLAGS.studentHub is false (no writer is reachable)',
-  subject_id:              'not collected while MODULE_FLAGS.studentHub is false (no writer is reachable)',
-  student_listing_opt_in:  'not collected while MODULE_FLAGS.studentHub is false (no writer is reachable)',
-}
-
-// The dark-launch flags as the WORKING TREE has them — the tree is what `npm run ota`
-// bundles, so that is the state an exemption must be true of.
-function readFlags() {
-  const src = readFileSync(join(ROOT, 'constants/flags.js'), 'utf8')
-  const block = src.match(/export const MODULE_FLAGS\s*=\s*\{([\s\S]*?)\n\}/)
-  if (!block) throw new Error('could not locate MODULE_FLAGS in constants/flags.js')
-  const flags = {}
-  for (const m of block[1].matchAll(/^\s*(\w+):\s*(true|false)\b/gm)) flags[m[1]] = m[2] === 'true'
-  if (!Object.keys(flags).length) throw new Error('MODULE_FLAGS parsed to nothing')
-  return flags
 }
 
 function readColumns() {
@@ -215,7 +197,7 @@ function loadCopies() {
   })
 }
 
-function check(copies, columns, log = console.log, flags = readFlags()) {
+function check(copies, columns, log = console.log) {
   const problems = []
   checkEncoding(problems, log)
 
@@ -260,18 +242,6 @@ function check(copies, columns, log = console.log, flags = readFlags()) {
   }
   log(`    · ${Object.keys(EXEMPT).length} column(s) exempt: ${Object.keys(EXEMPT).join(', ')}`)
 
-  // ── 4. an exemption that names a flag lapses when the flag is on ──
-  for (const col of columns) {
-    const flag = EXEMPT[col]?.match(/MODULE_FLAGS\.(\w+)/)?.[1]
-    if (!flag) continue
-    if (!(flag in flags)) {
-      problems.push(`profiles.${col} is exempt on MODULE_FLAGS.${flag}, which constants/flags.js does not define`)
-    } else if (flags[flag]) {
-      problems.push(`profiles.${col} was exempt only while MODULE_FLAGS.${flag} is false, and it is TRUE — disclose it in all three copies before this ships`)
-      log(`    ✗ ${col.padEnd(20)} exemption lapsed: MODULE_FLAGS.${flag} is on`)
-    } else log(`    · ${col.padEnd(20)} exempt while MODULE_FLAGS.${flag} is false`)
-  }
-
   return problems
 }
 
@@ -294,14 +264,12 @@ function self() {
       ([cs]) => !/date of birth/i.test(cs[0].text)],
     ['a NEW profile column appears', () => [copies, [...columns, 'passport_number']],
       ([,cols]) => cols.includes('passport_number')],
-    ['studentHub flips with study columns exempt', () => [copies, columns, { ...readFlags(), studentHub: true }],
-      ([, cols, fl]) => fl.studentHub === true && cols.includes('study_end_year')],
   ]
   let bad = 0
   for (const [name, build, landed] of cases) {
     const world = build()
     if (!landed(world)) { console.error(`    ✗ ${name.padEnd(46)} MUTATION DID NOT LAND — the test is broken, not the guard`); bad++; continue }
-    const found = check(world[0], world[1], quiet, world[2])
+    const found = check(world[0], world[1], quiet)
     if (!found.length) { console.error(`    ✗ ${name.padEnd(46)} mutation landed but the guard stayed GREEN`); bad++; continue }
     console.log(`    ✓ ${name.padEnd(46)} red: ${found[0].slice(0, 90)}`)
   }
