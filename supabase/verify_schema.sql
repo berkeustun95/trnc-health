@@ -1041,6 +1041,9 @@ WITH report AS (
     -- returning SELECT policy on profiles fails the check and has to be looked at.
     -- Expected set: owner read, admin read all, admin read profiles.
     -- If you add a legitimate fourth, bump this number IN THE SAME COMMIT and say why.
+    -- ⚠ OPEN GAP, filed 2026-09-15, not yet closed: this counts cmd='SELECT' only. A policy
+    --   written FOR ALL is stored with cmd='ALL', grants SELECT all the same, and does not
+    --   move this count — so a FOR ALL policy on profiles reads OK here.
     UNION ALL SELECT '0922_drop_grooming_profile_overshare','profiles has exactly 3 SELECT policies (derived count, not a name list)',
       (SELECT count(*) FROM pg_policies
         WHERE schemaname='public' AND tablename='profiles' AND cmd='SELECT') = 3
@@ -1390,6 +1393,20 @@ WITH report AS (
       AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
         AND tablename IN ('student_tasks','student_task_i18n')
         AND (cmd <> 'SELECT' OR roles <> '{authenticated}'::name[]))
+    -- ── 1022 profiles coupling CHECKs, hand-applied 2026-09-15. Section E lists both NAMES
+    --    under 1001, and a name survives every rewrite — including a re-run of 20261001, whose
+    --    DROP IF EXISTS / ADD restores the forms that pass on UNKNOWN and succeeds silently.
+    --    So this compares the catalog text to production's, character for character.
+    --    pg_get_constraintdef appends " NOT VALID" to an unvalidated CHECK, so equality also
+    --    proves both are validated. A deliberate later rewrite changes this string in the
+    --    same commit.
+    UNION ALL SELECT '1022_profiles_coupling_checks_null_safe','profiles coupling CHECKs = production definitions (null-guarded, validated)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
+        AND conname='profiles_institution_coupling_check'
+        AND pg_get_constraintdef(oid) = 'CHECK (((institution_id IS NULL) OR ((student_level IS NOT NULL) AND (student_level = ANY (ARRAY[''university''::text, ''postgraduate''::text])))))')
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
+        AND conname='profiles_student_level_coupling_check'
+        AND pg_get_constraintdef(oid) = 'CHECK (((student_level IS NULL) OR ((resident_status IS NOT NULL) AND (resident_status = ''student''::text))))')
     -- ── 1024 student affiliation. Catalogs only: naming public.subjects directly would fail
     --    at plan time on a database that has not applied 1024 and take the report down.
     -- (1) THE PRIVACY DEFAULT. A reverted DEFAULT creates no named object, and once a
