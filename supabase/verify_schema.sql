@@ -66,6 +66,8 @@ WITH report AS (
     ('1009_ad_position_module','ad_modules'),
     ('1017_student_tasks','student_tasks'),
     ('1017_student_tasks','student_task_i18n'),
+    ('1024_student_affiliation','subjects'),
+    ('1024_student_affiliation','subject_i18n'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -226,7 +228,14 @@ WITH report AS (
     -- file's footer staleness query.
     ('1017_student_tasks','student_task_i18n','external_url'),
     ('1017_student_tasks','student_tasks','source_name'),
-    ('1017_student_tasks','student_tasks','source_checked_at')
+    ('1017_student_tasks','student_tasks','source_checked_at'),
+    -- Student affiliation (1024). App.js PROFILE_COLUMNS is an explicit list, so these do
+    -- not break today's reads if MISSING — they break the slice-2 wizard's first write.
+    ('1024_student_affiliation','profiles','study_start_year'),
+    ('1024_student_affiliation','profiles','study_end_year'),
+    ('1024_student_affiliation','profiles','subject_id'),
+    ('1024_student_affiliation','profiles','student_listing_opt_in'),
+    ('1024_student_affiliation','institutions','website_url')
 
   ) e(m,t,c)
 
@@ -533,7 +542,20 @@ WITH report AS (
     ('1017_student_tasks','student_task_i18n_title_check'),
     ('1017_student_tasks','student_task_i18n_steps_check'),
     ('1017_student_tasks','student_task_i18n_documents_check'),
-    ('1017_student_tasks','student_task_i18n_link_scheme_check')
+    ('1017_student_tasks','student_task_i18n_link_scheme_check'),
+    -- 1024. Names only here — the H-token below is what tells a null-safe body from one
+    -- that passes on UNKNOWN, which a name cannot.
+    ('1024_student_affiliation','subjects_slug_unique'),
+    ('1024_student_affiliation','subjects_slug_check'),
+    ('1024_student_affiliation','subject_i18n_lang_check'),
+    ('1024_student_affiliation','subject_i18n_name_check'),
+    ('1024_student_affiliation','profiles_subject_id_fkey'),
+    ('1024_student_affiliation','profiles_study_start_year_range_check'),
+    ('1024_student_affiliation','profiles_study_end_year_range_check'),
+    ('1024_student_affiliation','profiles_study_years_order_check'),
+    ('1024_student_affiliation','profiles_study_fields_require_level_check'),
+    ('1024_student_affiliation','profiles_listing_opt_in_requires_institution_check'),
+    ('1024_student_affiliation','institutions_website_url_scheme_check')
 
   ) e(m,o)
 
@@ -594,6 +616,7 @@ WITH report AS (
     -- that it is built on the NORMALIZED column and not the raw string.
     ('1001_profile_completion','profiles_display_name_norm_uniq'),
     ('1001_profile_completion','idx_profiles_institution_id'),
+    ('1024_student_affiliation','idx_profiles_subject_id'),
     -- home_strip_pin (1007). The PARTIAL UNIQUE is the load-bearing one: rank 1 of
     -- the Home strip asks for "the pin for today", singular, and without this two
     -- active rows on one date make that answer depend on row order — a bug that
@@ -1366,6 +1389,47 @@ WITH report AS (
       AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='student_task_i18n') = 1
       AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
         AND tablename IN ('student_tasks','student_task_i18n')
+        AND (cmd <> 'SELECT' OR roles <> '{authenticated}'::name[]))
+    -- ── 1024 student affiliation. Catalogs only: naming public.subjects directly would fail
+    --    at plan time on a database that has not applied 1024 and take the report down.
+    -- (1) THE PRIVACY DEFAULT. A reverted DEFAULT creates no named object, and once a
+    --     student list exists it means every write that omits the column LISTS the user.
+    UNION ALL SELECT '1024_student_affiliation','profiles.student_listing_opt_in NOT NULL DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='profiles'
+          AND column_name='student_listing_opt_in' AND column_default='false' AND is_nullable='NO')
+    -- (2) The is_active inversion, as on student_tasks.
+    UNION ALL SELECT '1024_student_affiliation','subjects.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='subjects'
+          AND column_name='is_active' AND column_default='false')
+    -- (3) The coupling CHECKs are NULL-SAFE — tonight's lesson from
+    --     profiles_institution_coupling_check. Section E sees the names; only the body shows
+    --     whether the IS NOT NULL arm that stops UNKNOWN from passing is still there. Each
+    --     pattern is the null guard of that specific CHECK, so a naive rewrite reads MISSING.
+    UNION ALL SELECT '1024_student_affiliation','study/listing coupling CHECKs keep their IS NOT NULL guards',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
+        AND conname='profiles_study_years_order_check'
+        AND pg_get_constraintdef(oid) LIKE '%study_start_year IS NOT NULL%')
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
+        AND conname='profiles_study_fields_require_level_check'
+        AND pg_get_constraintdef(oid) LIKE '%student_level IS NOT NULL%')
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
+        AND conname='profiles_listing_opt_in_requires_institution_check'
+        AND pg_get_constraintdef(oid) LIKE '%institution_id IS NOT NULL%')
+    -- (4) Language key: full names, never ISO — same token shape as 1017's.
+    UNION ALL SELECT '1024_student_affiliation','subject_i18n_lang_check = full names, no ISO codes',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='subject_i18n_lang_check'
+        AND pg_get_constraintdef(c.oid) LIKE '%''Turkish''%'
+        AND pg_get_constraintdef(c.oid) LIKE '%''Persian''%'
+        AND pg_get_constraintdef(c.oid) NOT LIKE '%''tr''%'
+        AND pg_get_constraintdef(c.oid) NOT LIKE '%''en''%')
+    -- (5) DERIVED policy counts. One read policy each; a second is almost certainly a write.
+    UNION ALL SELECT '1024_student_affiliation','subjects + subject_i18n: exactly 1 policy each, SELECT to authenticated',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='subjects') = 1
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='subject_i18n') = 1
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
+        AND tablename IN ('subjects','subject_i18n')
         AND (cmd <> 'SELECT' OR roles <> '{authenticated}'::name[]))
     -- ── 1018 / 1020 institutions, reconciled to YÖDAK's list by hand on 2026-09-15. CONTENT
     --    tokens, reading public.institutions directly — safe, 1001 is applied (the 1010
@@ -2203,7 +2267,10 @@ WITH report AS (
     -- OFF here = any signed-in user can rewrite the steps a student follows to get a
     -- residence permit.
     'student_tasks',
-    'student_task_i18n'
+    'student_task_i18n',
+    -- Subjects (1024): same reasoning — OFF = any signed-in user can rename a subject.
+    'subjects',
+    'subject_i18n'
   )
 )
 -- ─── THE VERDICT ROW ────────────────────────────────────────────────────────
