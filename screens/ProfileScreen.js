@@ -856,7 +856,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                       <Feather name="chevron-down" size={16} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
-                  {pastUniPartial && <Text style={s.fieldHint}>{t('pgPastUniIncomplete', lang)}</Text>}
+                  {pastUniPartial && error !== t('pgPastUniIncomplete', lang) && <Text style={s.fieldHint}>{t('pgPastUniIncomplete', lang)}</Text>}
                   <TouchableOpacity
                     style={s.pastUniRemove}
                     onPress={() => {
