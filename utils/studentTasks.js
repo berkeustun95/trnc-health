@@ -16,7 +16,7 @@ export async function readCachedTasks() {
 export async function fetchTasks() {
   const { data, error } = await supabase
     .from('student_tasks')
-    .select('slug, icon, sort_order, external_url, student_task_i18n(lang, title, summary, steps, documents, hours, note)')
+    .select('slug, icon, sort_order, external_url, student_task_i18n(lang, title, summary, steps, documents, hours, note, external_url)')
     .eq('is_active', true)
     .order('sort_order')
   if (error) throw error

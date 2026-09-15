@@ -17,6 +17,13 @@ export function pickContent(task, lang) {
   return rows.find(r => r?.lang === lang) || rows.find(r => r?.lang === FALLBACK_LANG) || null
 }
 
+// The link follows the row pickContent chose: that row's own page if it has one, else the
+// task default. A language with a row but no override gets the default, never another
+// language's page; a language with no row reads the English row, so the English page.
+export function linkOf(task, content) {
+  return content?.external_url || task?.external_url || null
+}
+
 // The database CHECK guarantees this shape for fresh rows; the filter is for a cache
 // written by an older build.
 export function stepsOf(content) {

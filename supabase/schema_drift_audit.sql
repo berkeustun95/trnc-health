@@ -565,6 +565,8 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('student_tasks', 'external_url', false, NULL, 'text'),
     ('student_tasks', 'is_active', true, 'false', 'boolean'),
     ('student_tasks', 'created_at', true, 'now()', 'timestamp with time zone'),
+    ('student_tasks', 'source_name', false, NULL, 'text'),
+    ('student_tasks', 'source_checked_at', false, NULL, 'date'),
     ('student_task_i18n', 'task_id', true, NULL, 'uuid'),
     ('student_task_i18n', 'lang', true, NULL, 'text'),
     ('student_task_i18n', 'title', true, NULL, 'text'),
@@ -572,7 +574,8 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('student_task_i18n', 'steps', true, '''[]''::jsonb', 'jsonb'),
     ('student_task_i18n', 'documents', true, '''{}''::text[]', 'text[]'),
     ('student_task_i18n', 'hours', false, NULL, 'text'),
-    ('student_task_i18n', 'note', false, NULL, 'text')
+    ('student_task_i18n', 'note', false, NULL, 'text'),
+    ('student_task_i18n', 'external_url', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig) AS (VALUES
     ('ad_banners_created_by_fkey', ''),
@@ -773,6 +776,7 @@ expected_constraint (cname, litsig) AS (VALUES
     ('schema_migrations_applied_pkey', ''),
     ('student_task_i18n_documents_check', ''),
     ('student_task_i18n_lang_check', 'Arabic|English|French|German|Greek|Persian|Russian|Spanish|Turkish'),
+    ('student_task_i18n_link_scheme_check', '^https://'),
     ('student_task_i18n_pkey', ''),
     ('student_task_i18n_steps_check', ''),
     ('student_task_i18n_task_id_fkey', ''),

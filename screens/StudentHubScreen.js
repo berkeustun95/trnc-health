@@ -16,7 +16,7 @@ import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { normalize } from '../constants/oliIntents'
 import { readCachedTasks, fetchTasks, loadProgress, saveProgress } from '../utils/studentTasks'
 import {
-  pickContent, stepsOf, documentsOf, countDone, isTicked, toggleStep, resetTask,
+  pickContent, linkOf, stepsOf, documentsOf, countDone, isTicked, toggleStep, resetTask,
 } from '../utils/studentTaskRules'
 
 // The profile wizard's escape hatch for students at an unlisted institution
@@ -219,6 +219,7 @@ function TaskDetail({ task, lang, progress, offline, onToggle, onReset, onBack }
   const content = pickContent(task, lang)
   const steps = stepsOf(content)
   const documents = documentsOf(content)
+  const link = linkOf(task, content)
   const done = countDone(progress, task.slug, steps)
 
   const confirmReset = () => Alert.alert(t('studentTaskReset', lang), undefined, [
@@ -306,10 +307,10 @@ function TaskDetail({ task, lang, progress, offline, onToggle, onReset, onBack }
               </ContentCard>
             ) : null}
 
-            {task.external_url ? (
+            {link ? (
               <TouchableOpacity
                 style={[s.linkBtn, s.secondCard]}
-                onPress={() => Linking.openURL(task.external_url).catch(() => {})}
+                onPress={() => Linking.openURL(link).catch(() => {})}
                 activeOpacity={0.8}
                 accessibilityRole="link"
               >

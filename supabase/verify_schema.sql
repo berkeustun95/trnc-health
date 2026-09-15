@@ -218,7 +218,15 @@ WITH report AS (
     -- Partner-only visibility. If this reads MISSING, hs_select_public references a
     -- column that is not there and EVERY read of home_services errors — the module and
     -- the home-services arm of global search both fail, not degrade.
-    ('1012_hs_partner_only','home_services','is_partner')
+    ('1012_hs_partner_only','home_services','is_partner'),
+    -- Student tasks (1017). Listed although the tables are new in the same file, because
+    -- an EARLIER DRAFT of 20261017 created both tables without these: section A would read
+    -- OK against that draft. external_url is in fetchTasks' select, so MISSING there is a
+    -- 42703 that empties the whole Tasks tab. The two source columns are read only by the
+    -- file's footer staleness query.
+    ('1017_student_tasks','student_task_i18n','external_url'),
+    ('1017_student_tasks','student_tasks','source_name'),
+    ('1017_student_tasks','student_tasks','source_checked_at')
 
   ) e(m,t,c)
 
@@ -524,7 +532,8 @@ WITH report AS (
     ('1017_student_tasks','student_task_i18n_lang_check'),
     ('1017_student_tasks','student_task_i18n_title_check'),
     ('1017_student_tasks','student_task_i18n_steps_check'),
-    ('1017_student_tasks','student_task_i18n_documents_check')
+    ('1017_student_tasks','student_task_i18n_documents_check'),
+    ('1017_student_tasks','student_task_i18n_link_scheme_check')
 
   ) e(m,o)
 

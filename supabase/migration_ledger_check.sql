@@ -135,7 +135,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261014_contact_events_website_action.sql', 'ea5070260f6e220259b51543113813d90cbf6365cee4a8bc01b904c17c219035'),
   ('20261015_home_services_rename.sql', 'e08cbfa7da07b1de45193502037c5b5193a20377dc47682142cef85fef2cc1fd'),
   ('20261016_profile_consent_columns.sql', '54cfa03874246ec1ea10af9c56db1a731cd4fadcc0c4f51d94bc7717b737f59f'),
-  ('20261017_student_tasks.sql', '503cdc7d776acdbc7f72ce080b7882a525df456d0cd77ef11635371c41ba5571'),
+  ('20261017_student_tasks.sql', 'c13869e0a1a50de8bdca452625aa1ec17affb7597a5e8340e6e40f245159d598'),
   ('20261018_institutions_yodak_reconcile.sql', '7a891400ccd011cd44a40cfaaec1fbfebc683271b8d94d15dcb63b12fe9f05ac'),
   ('20261019_institutions_shortname_sort_fix.sql', '28f2257649885e11d951f801800f2111e5d46e270b87bb08cf7443eaf33fccd7'),
   ('20261020_institutions_sort_prominence.sql', '7ec72341e1110c6a27f25dfee63a9a9ff94b77b35f172b762a059c9401f98004')

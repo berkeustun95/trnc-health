@@ -3,9 +3,10 @@
 -- PROPOSED, NOT APPLIED. Apply with Role = postgres after review.
 --
 -- Two tables. student_tasks carries what is the same in every language (slug, icon, order,
--- the official link). student_task_i18n carries what is not (title, summary, steps,
--- documents, hours, note) — one row per task per language. The i18n table is left EMPTY:
--- content arrives in a separate seed, and the app renders a task with no row as pending.
+-- the default official link, where the content came from). student_task_i18n carries what
+-- is not (title, summary, steps, documents, hours, note, and an optional per-language
+-- link) — one row per task per language. The i18n table is left EMPTY: content arrives in
+-- a separate seed, and the app renders a task with no row as pending.
 --
 -- ─── lang IS THE FULL ENGLISH NAME, NOT AN ISO CODE ─────────────────────────
 --
@@ -40,6 +41,9 @@
 -- • NO external_url values. None could be verified from the repo, and a wrong link on a
 --   residence-permit task is worse than no button. The app hides the button when NULL.
 --   Fill with the UPDATE template in the footer once each URL is checked.
+-- • NO source values, and the two source columns are NEVER RENDERED. source_name and
+--   source_checked_at exist for footer query 4 (which tasks have gone stale), not for
+--   the student. No i18n key, no card line, no "source:" row in the detail view.
 -- • NO RLS on is_active. Mirrors institutions: read for signed-in sessions, the client
 --   filters is_active. Guests are anonymous sessions (WelcomeScreen signInAnonymously),
 --   which Postgres sees as role `authenticated`, so they read too.
@@ -83,7 +87,9 @@ CREATE TABLE IF NOT EXISTS public.student_tasks (
   sort_order   integer NOT NULL,
   external_url text,
   is_active    boolean NOT NULL DEFAULT false,
-  created_at   timestamptz NOT NULL DEFAULT now()
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  source_name       text,
+  source_checked_at date
 );
 
 ALTER TABLE public.student_tasks DROP CONSTRAINT IF EXISTS student_tasks_slug_unique;
@@ -105,6 +111,13 @@ ALTER TABLE public.student_tasks DROP CONSTRAINT IF EXISTS student_tasks_link_sc
 ALTER TABLE public.student_tasks ADD  CONSTRAINT student_tasks_link_scheme_check
   CHECK (external_url IS NULL OR external_url ~ '^https://');
 
+COMMENT ON COLUMN public.student_tasks.external_url IS
+  'Default official link, used for any language whose student_task_i18n row has no external_url.';
+COMMENT ON COLUMN public.student_tasks.source_name IS
+  'Who publishes the procedure this task describes (e.g. ''BTHK''). Staleness tracking only — never rendered.';
+COMMENT ON COLUMN public.student_tasks.source_checked_at IS
+  'When a human last verified this task''s content against its source. NULL = never. Never rendered.';
+
 -- ─── 3. student_task_i18n ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.student_task_i18n (
   task_id   uuid NOT NULL REFERENCES public.student_tasks(id) ON DELETE CASCADE,
@@ -115,6 +128,9 @@ CREATE TABLE IF NOT EXISTS public.student_task_i18n (
   documents text[] NOT NULL DEFAULT '{}'::text[],
   hours     text,
   note      text,
+  -- Per-language OVERRIDE of student_tasks.external_url. BTHK publishes separate TR and
+  -- EN pages, so a Turkish speaker should land on the Turkish one. NULL = use the default.
+  external_url text,
   PRIMARY KEY (task_id, lang)
 );
 
@@ -135,6 +151,11 @@ ALTER TABLE public.student_task_i18n DROP CONSTRAINT IF EXISTS student_task_i18n
 ALTER TABLE public.student_task_i18n ADD  CONSTRAINT student_task_i18n_documents_check
   CHECK (array_position(documents, NULL) IS NULL AND array_position(documents, '') IS NULL);
 
+-- Same rule as the task-level link. Single-column, so NULL cannot slip through as UNKNOWN.
+ALTER TABLE public.student_task_i18n DROP CONSTRAINT IF EXISTS student_task_i18n_link_scheme_check;
+ALTER TABLE public.student_task_i18n ADD  CONSTRAINT student_task_i18n_link_scheme_check
+  CHECK (external_url IS NULL OR external_url ~ '^https://');
+
 COMMENT ON COLUMN public.student_task_i18n.lang IS
   'Full English language name as the app stores it (''Turkish''), never an ISO code.';
 COMMENT ON COLUMN public.student_task_i18n.steps IS
@@ -143,6 +164,8 @@ COMMENT ON COLUMN public.student_task_i18n.steps IS
   'should no longer count.';
 COMMENT ON COLUMN public.student_task_i18n.hours IS
   'Opening hours as display text in this language. NULL hides the section.';
+COMMENT ON COLUMN public.student_task_i18n.external_url IS
+  'This language''s official link, overriding student_tasks.external_url. NULL = use the task default.';
 
 -- ─── 4. RLS — one read policy each, no write policy ─────────────────────────
 -- Plain English: any signed-in session, guests included (they are anonymous sessions),
@@ -165,14 +188,14 @@ CREATE POLICY "student_task_i18n_read_authenticated" ON public.student_task_i18n
 -- Two orderings are dependencies, not preferences, and section 6 asserts both:
 --   • sim_line BEFORE mcks — the MCKS student exemption needs a phone line already
 --     registered in the student's own name.
---   • health_check BEFORE residence_permit — the permit application requires the health
---     screening result.
+--   • residence_permit BEFORE health_check — per Muhaceret's official process page, the
+--     health report is submitted AFTER the permit application, within 30 days of it.
 -- The ids are fixed identities, not positions: ...0003 is residence_permit wherever it sorts.
 INSERT INTO public.student_tasks (id, slug, icon, sort_order, external_url, is_active) VALUES
   ('00000000-0000-4000-c000-000000000001','sim_line',         'cellular-outline',       10, NULL, true),
   ('00000000-0000-4000-c000-000000000002','mcks',             'phone-portrait-outline', 20, NULL, true),
-  ('00000000-0000-4000-c000-000000000004','health_check',     'medkit-outline',         30, NULL, true),
-  ('00000000-0000-4000-c000-000000000003','residence_permit', 'id-card-outline',        40, NULL, true),
+  ('00000000-0000-4000-c000-000000000003','residence_permit', 'id-card-outline',        30, NULL, true),
+  ('00000000-0000-4000-c000-000000000004','health_check',     'medkit-outline',         40, NULL, true),
   ('00000000-0000-4000-c000-000000000005','bank_account',     'card-outline',           50, NULL, true)
 ON CONFLICT (id) DO NOTHING;
 
@@ -264,6 +287,18 @@ BEGIN
     EXCEPTION WHEN check_violation THEN NULL;
     END;
 
+    -- The per-language override. Control first: an https:// override on the Turkish row
+    -- above is accepted, so the negative below is not passing on a column that rejects all.
+    UPDATE public.student_task_i18n SET external_url = 'https://example.com/tr'
+     WHERE task_id = v_probe AND lang = 'Turkish';
+
+    BEGIN
+      INSERT INTO public.student_task_i18n (task_id, lang, title, external_url)
+        VALUES (v_probe, 'English', 'zz probe', 'http://example.com/en');
+      RAISE EXCEPTION 'ASSERT: an http:// student_task_i18n.external_url was ACCEPTED';
+    EXCEPTION WHEN check_violation THEN NULL;
+    END;
+
     RAISE EXCEPTION 'zz_probe_rollback';
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM IS DISTINCT FROM 'zz_probe_rollback' THEN RAISE; END IF;
@@ -283,9 +318,9 @@ BEGIN
      >= (SELECT sort_order FROM public.student_tasks WHERE slug = 'mcks') THEN
     RAISE EXCEPTION 'seed: sim_line must sort before mcks (the MCKS exemption needs a line in the student''s name)';
   END IF;
-  IF (SELECT sort_order FROM public.student_tasks WHERE slug = 'health_check')
-     >= (SELECT sort_order FROM public.student_tasks WHERE slug = 'residence_permit') THEN
-    RAISE EXCEPTION 'seed: health_check must sort before residence_permit (the permit needs the screening result)';
+  IF (SELECT sort_order FROM public.student_tasks WHERE slug = 'residence_permit')
+     >= (SELECT sort_order FROM public.student_tasks WHERE slug = 'health_check') THEN
+    RAISE EXCEPTION 'seed: residence_permit must sort before health_check (the health report is submitted within 30 days after the permit application)';
   END IF;
 
   -- (d) RLS on, and DERIVED policy counts — printed, not remembered.
@@ -320,7 +355,7 @@ $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261017_student_tasks.sql', '503cdc7d776acdbc7f72ce080b7882a525df456d0cd77ef11635371c41ba5571')
+VALUES ('20261017_student_tasks.sql', 'c13869e0a1a50de8bdca452625aa1ec17affb7597a5e8340e6e40f245159d598')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -351,8 +386,28 @@ NOTIFY pgrst, 'reload schema';
 --         (SELECT string_agg(e->>'id', ',' ORDER BY o) FROM jsonb_array_elements(en.steps) WITH ORDINALITY x(e, o));
 --                                                                    -- expect 0 rows
 --
---   -- 3. no active task without a link
---   SELECT slug FROM student_tasks WHERE is_active AND external_url IS NULL;   -- expect 0 rows
+--   -- 3. no active task without a link, in ANY language. Resolved exactly as the app does
+--   --    (linkOf in utils/studentTaskRules.js): the language's own row if it exists — its
+--   --    override, else the task default; with no row of its own the app shows the English
+--   --    row, so the English override applies. A NULL override never borrows another
+--   --    language's link.
+--   SELECT t.slug, l.lang
+--   FROM student_tasks t
+--   CROSS JOIN unnest(ARRAY['English','Turkish','Arabic','Russian','Greek','French',
+--                           'Spanish','German','Persian']) AS l(lang)
+--   LEFT JOIN student_task_i18n own ON own.task_id = t.id AND own.lang = l.lang
+--   LEFT JOIN student_task_i18n en  ON en.task_id  = t.id AND en.lang  = 'English'
+--   WHERE t.is_active
+--     AND coalesce(CASE WHEN own.task_id IS NOT NULL THEN own.external_url ELSE en.external_url END,
+--                  t.external_url) IS NULL
+--   ORDER BY t.sort_order, l.lang;                                   -- expect 0 rows
+--
+--   -- 4. content gone stale: never verified, or verified more than 6 months ago
+--   SELECT slug, source_name, source_checked_at
+--   FROM student_tasks
+--   WHERE is_active
+--     AND (source_checked_at IS NULL OR source_checked_at < current_date - interval '6 months')
+--   ORDER BY source_checked_at NULLS FIRST, sort_order;              -- expect 0 rows
 --
 -- ─── URL template (fill once each link is verified) ─────────────────────────
 --   UPDATE public.student_tasks SET external_url = 'https://…' WHERE slug = 'sim_line';
@@ -360,6 +415,11 @@ NOTIFY pgrst, 'reload schema';
 --   UPDATE public.student_tasks SET external_url = 'https://…' WHERE slug = 'residence_permit';
 --   UPDATE public.student_tasks SET external_url = 'https://…' WHERE slug = 'health_check';
 --   UPDATE public.student_tasks SET external_url = 'https://…' WHERE slug = 'bank_account';
+--   -- a language's own page, after its content row exists:
+--   UPDATE public.student_task_i18n SET external_url = 'https://…'
+--    WHERE lang = 'Turkish' AND task_id = (SELECT id FROM public.student_tasks WHERE slug = '…');
+--   -- each time the content is checked against its source:
+--   UPDATE public.student_tasks SET source_name = '…', source_checked_at = current_date WHERE slug = '…';
 --
 -- ─── Which language values do profiles actually hold? (unverifiable as anon) ─
 --   SELECT preferred_language, count(*) FROM profiles GROUP BY 1 ORDER BY 2 DESC;
