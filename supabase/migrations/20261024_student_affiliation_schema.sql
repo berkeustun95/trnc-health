@@ -7,6 +7,8 @@
 -- and MODULE_FLAGS.studentHub stays false. What this file adds:
 --   • subjects + subject_i18n — a lookup list, built on the student_tasks pattern.
 --   • profiles.study_start_year / study_end_year / subject_id / student_listing_opt_in.
+--   • check_profile_study_years() — a trigger: an end year may not be in the future.
+--   • profiles_institution_coupling_check REWRITTEN so a graduate keeps their institution.
 --   • institutions.website_url.
 --
 -- ─── WHAT IS DELIBERATELY NOT HERE ──────────────────────────────────────────
@@ -15,26 +17,41 @@
 --   Section 7(f) asserts the profiles policy count did not move.
 -- • NO subject names. subject_i18n is left EMPTY; the content seed is hand-written.
 -- • NO website_url values. Every institution stays NULL until the 23 links are verified.
--- • NO relative year rule ("start year not in the future"). CURRENT_DATE is STABLE and a
---   CHECK requires IMMUTABLE — the same reason MIN_SIGNUP_AGE lives in a trigger. The
---   bounds below are sanity literals; the "not in the future" rule belongs to the slice-2
---   picker, whose year list simply stops at next year.
+-- • NO "start year not in the future" rule in the database. The start-year picker (slice 2)
+--   owns that, and may offer next year to someone already admitted.
 --
--- ─── ORDER: 20261022 FIRST ──────────────────────────────────────────────────
--- Section 0 refuses unless 20261022's null-safe coupling CHECKs are live. The new CHECKs
--- here do not reference those constraints, but the guarantee this slice relies on is a
--- CHAIN: study fields and listing opt-in → institution_id → a university-level
--- student_level → a student resident_status. Before 20261022 two links of that chain
--- passed on UNKNOWN.
+-- ─── ORDER: 20261022 FIRST, and THIS IS THE EDIT 20261022's GUARD WAS WRITTEN FOR ─
+-- Section 0 refuses unless 20261022's null-safe coupling CHECKs are live. Section 5 then
+-- rewrites one of them, profiles_institution_coupling_check, adding a third arm. From then
+-- on 20261022 REFUSES to re-run — its recorded SQL would restore the two-arm form and take
+-- every graduate's institution with it. That refusal is correct; do not "fix" it. The
+-- other coupling (student_level requires resident_status = 'student') is left exactly as
+-- 20261022 wrote it. verify_schema.sql's 1024 token owns the new definition.
 --
--- ⚠ OPEN — A GRADUATE CANNOT HOLD ANY OF THIS YET. The study fields hang off institution_id,
---   not student_level, so that finishing a degree does not erase it. But 20261022 admits
---   institution_id only under a university-level student_level, and student_level only
---   under resident_status = 'student'. A graduate who is now 'working' can hold no
---   institution — so no study years, no subject and no listing opt-in. Today an end year
---   is reachable only by a user still marked as a student. Closing that means changing
---   profiles_institution_coupling_check or modelling graduates separately. Undecided, and
---   deliberately not done in this file.
+-- ─── study_end_year MEANS GRADUATED ─────────────────────────────────────────
+-- NULL = currently studying. A set end year = has finished; it is NOT an expected finish.
+-- So:
+--   • profiles_institution_coupling_check: an institution needs a university-level
+--     student_level OR an end year. That third arm reads "has an end year" as "is a
+--     graduate", which is how a graduate who is now 'working' keeps their institution,
+--     their study fields and their listing opt-in.
+--   • check_profile_study_years() rejects an end year after the current year. It is a
+--     TRIGGER, not a CHECK, for MIN_SIGNUP_AGE's reason: current_date is STABLE and a
+--     CHECK requires IMMUTABLE. The static 1950–2100 CHECK stays as a sanity bound.
+--   The trigger is what makes the arm honest. Without it an expected finish year could be
+--   stored, and a current student would read as a graduate. The slice-2 picker should
+--   stop at the current year too, but only for UX; the trigger is the boundary.
+--   The year is taken in the database's time zone (UTC on Supabase). In the first hours of
+--   1 January in the TRNC, the new year is refused until UTC catches up.
+--
+-- ─── KNOWN LIMITS (accepted for v1; documented, not solved) ─────────────────
+-- 1. ONE institution_id. "Graduated from X, now studying at Y" cannot be expressed.
+-- 2. resident_status is single-select. A student who also works must pick one; picking
+--    'working' with a NULL end year means they cannot hold an institution. That is a
+--    limit of the status field, not of this constraint.
+-- 3. The third arm does not look at student_level. Once an end year is set, any row may
+--    hold an institution: a language-course student with a finished degree is ACCEPTED.
+--    That is the "graduated from X" case above, and section 7(a) pins it as accepted.
 --
 -- ─── subjects: seeded ACTIVE, column DEFAULT false ──────────────────────────
 -- The DEFAULT is false (the 20260907 rule: an INSERT that omits it lands unpublished).
@@ -64,13 +81,17 @@
 -- asserted non-NULL, and the one boolean is NOT NULL. Section 7(a) proves each on the
 -- INSTALLED definitions, with the NULL case that would have slipped through.
 --
--- ⚠ CONSEQUENCE FOR SLICE 2, and it is a standing one. Today's two writers set
---   institution_id to NULL whenever the level is not university or postgraduate
---   (ProfileSetupScreen.js:432-433, ProfileScreen.js:337-338). Once a user holds study
---   years, a subject or listing opt-in, that write FAILS with 23514 unless it clears the
---   new fields in the same UPDATE — and if graduates are to keep their institution (OPEN
---   above), those writers must stop clearing it too. Nobody can hold them yet — no UI writes them — so
---   nothing breaks today. It breaks the day slice 2 ships without updating both writers.
+-- ⚠ SLICE 2 WRITERS — both must change, and it is a standing obligation.
+--   Today ProfileSetupScreen.js:433 and ProfileScreen.js:338 set institution_id to NULL
+--   whenever the level is not university or postgraduate. From this file on:
+--   (1) STOP clearing institution_id just because the level changed. The database keeps it
+--       for anyone with an end year (the third arm above).
+--   (2) Whenever they DO clear institution_id, clear study_start_year, study_end_year,
+--       subject_id and student_listing_opt_in (false) in the SAME patch. Otherwise the
+--       write fails with 23514, and two sequential writes fail on the first.
+--   Still cleared: an institution with no university-level student_level and no end year,
+--   because the CHECK rejects it. Nobody can hold the new fields yet (no UI writes them), so
+--   nothing breaks today. It breaks the day slice 2 ships without both changes.
 
 SET ROLE postgres;
 BEGIN;
@@ -263,8 +284,7 @@ ALTER TABLE public.profiles ADD  CONSTRAINT profiles_study_years_order_check
 
 -- Study years and subject only alongside an institution — not a student_level, so a record
 -- of where someone studied does not depend on their still being a student. Only IS [NOT]
--- NULL tests, so no arm can be UNKNOWN. ⚠ See OPEN in the header: 20261022 still ties
--- institution_id itself to a current student.
+-- NULL tests, so no arm can be UNKNOWN.
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_study_fields_require_institution_check;
 ALTER TABLE public.profiles ADD  CONSTRAINT profiles_study_fields_require_institution_check
   CHECK ((study_start_year IS NULL AND study_end_year IS NULL AND subject_id IS NULL)
@@ -275,7 +295,41 @@ ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_listing_opt_in_re
 ALTER TABLE public.profiles ADD  CONSTRAINT profiles_listing_opt_in_requires_institution_check
   CHECK (NOT student_listing_opt_in OR institution_id IS NOT NULL);
 
+-- 20261022's definition plus a third arm: a graduate (end year set) keeps an institution.
+-- Here and not in a later file, because the arm needs study_end_year, added above. The new
+-- arm is an IS NOT NULL test, so no arm can be UNKNOWN. See the header on 20261022's guard.
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_institution_coupling_check;
+ALTER TABLE public.profiles ADD  CONSTRAINT profiles_institution_coupling_check
+  CHECK (institution_id IS NULL
+         OR (student_level IS NOT NULL AND student_level IN ('university','postgraduate'))
+         OR study_end_year IS NOT NULL);
+
 CREATE INDEX IF NOT EXISTS idx_profiles_subject_id ON public.profiles (subject_id);
+
+-- An end year means GRADUATED, so it cannot be in the future. A trigger because
+-- current_date is STABLE (see the header). It is not a CREATE OR REPLACE of
+-- check_profile_name_content(): that function carries the display-name key, and a re-run of
+-- this file would revert any later change to it. It fires on every insert and update; a
+-- stored end year can never become future, because years only go up. It reads no table,
+-- so it runs as the caller with an empty search_path.
+CREATE OR REPLACE FUNCTION public.check_profile_study_years()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $function$
+BEGIN
+  IF NEW.study_end_year IS NOT NULL
+     AND NEW.study_end_year > extract(year FROM current_date) THEN
+    RAISE EXCEPTION 'STUDY_END_YEAR_IN_FUTURE';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS check_profile_study_years ON public.profiles;
+CREATE TRIGGER check_profile_study_years
+  BEFORE INSERT OR UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.check_profile_study_years();
 
 -- ─── 6. institutions.website_url ────────────────────────────────────────────
 ALTER TABLE public.institutions ADD COLUMN IF NOT EXISTS website_url text;
@@ -292,8 +346,15 @@ ALTER TABLE public.institutions ADD  CONSTRAINT institutions_website_url_scheme_
 -- pg_get_constraintdef and attached to a TEMP table shaped like profiles. No real profile
 -- row is written, read for a probe, or restored — the 20261001 lesson about probes that
 -- borrow real rows does not arise. The temp tables die with the transaction.
-CREATE TEMP TABLE tmp_study_probe AS SELECT * FROM public.profiles WITH NO DATA;
-CREATE TEMP TABLE tmp_inst_probe  AS SELECT * FROM public.institutions WITH NO DATA;
+CREATE TEMP TABLE tmp_study_probe    AS SELECT * FROM public.profiles WITH NO DATA;
+CREATE TEMP TABLE tmp_end_year_probe AS SELECT * FROM public.profiles WITH NO DATA;
+CREATE TEMP TABLE tmp_inst_probe     AS SELECT * FROM public.institutions WITH NO DATA;
+
+-- The trigger gets its OWN probe table. On tmp_study_probe it would reject "end 2199"
+-- before the range CHECK could, and that CHECK would then go untested.
+CREATE TRIGGER check_profile_study_years
+  BEFORE INSERT OR UPDATE ON pg_temp.tmp_end_year_probe
+  FOR EACH ROW EXECUTE FUNCTION public.check_profile_study_years();
 
 DO $$
 DECLARE
@@ -304,6 +365,7 @@ DECLARE
   v_rows   text;
   v_count  int;
   v_probe  uuid;
+  v_year   int;
 BEGIN
   -- Attach each new CHECK to the probe table exactly as the database holds it, after
   -- proving it is on profiles and VALIDATED (a NOT VALID CHECK would skip existing rows).
@@ -313,6 +375,7 @@ BEGIN
     ('profiles', 'tmp_study_probe', 'profiles_study_years_order_check'),
     ('profiles', 'tmp_study_probe', 'profiles_study_fields_require_institution_check'),
     ('profiles', 'tmp_study_probe', 'profiles_listing_opt_in_requires_institution_check'),
+    ('profiles', 'tmp_study_probe', 'profiles_institution_coupling_check'),
     ('institutions', 'tmp_inst_probe', 'institutions_website_url_scheme_check')
   ) AS t(tbl, probe, conname) LOOP
     SELECT pg_get_constraintdef(oid), convalidated INTO v_def, v_valid FROM pg_constraint
@@ -325,27 +388,33 @@ BEGIN
 
   -- (a) The case table. Each "false" row is a NULL case some naive form would admit on
   --     UNKNOWN; each "true" row is a control, so a CHECK that rejects everything fails.
-  --     Only this file's CHECKs are attached, so the rows carry no student_level or
-  --     resident_status: 20261022's couplings are not what is under test here.
+  --     This file's CHECKs are attached, including the rewritten institution coupling.
+  --     20261022's student_level coupling is not, but every row satisfies it anyway.
+  --     The trigger is tested separately, in (a2).
   FOR c IN SELECT * FROM (VALUES
-    (NULL::smallint, NULL::smallint, NULL::uuid,        false, NULL::uuid,        true,  'all empty (every existing row)'),
-    (2024,           NULL,           NULL,              false, gen_random_uuid(), true,  'institution and a start year'),
-    (2020,           2024,           gen_random_uuid(), false, gen_random_uuid(), true,  'institution, both years, a subject'),
-    (2024,           2024,           NULL,              false, gen_random_uuid(), true,  'end year = start year'),
-    (NULL,           NULL,           NULL,              true,  gen_random_uuid(), true,  'opted in with an institution'),
-    (2024,           NULL,           NULL,              false, NULL,              false, 'start year, institution_id NULL'),
-    (NULL,           NULL,           gen_random_uuid(), false, NULL,              false, 'subject, institution_id NULL'),
-    (2020,           2024,           NULL,              false, NULL,              false, 'both years, institution_id NULL'),
-    (NULL,           2025,           NULL,              false, gen_random_uuid(), false, 'end year, start year NULL'),
-    (2024,           2023,           NULL,              false, gen_random_uuid(), false, 'end before start'),
-    (1823,           NULL,           NULL,              false, gen_random_uuid(), false, 'start 1823'),
-    (2024,           2199,           NULL,              false, gen_random_uuid(), false, 'end 2199'),
-    (NULL,           NULL,           NULL,              true,  NULL,              false, 'opted in, institution_id NULL')
-  ) AS t(start_y, end_y, subject, opt_in, inst, expected, label) LOOP
+    (NULL::text, NULL::text,        NULL::smallint, NULL::smallint, NULL::uuid,        false, NULL::uuid,        true,  'all empty (every existing row)'),
+    ('student',  'university',      2024,           NULL,           NULL,              false, gen_random_uuid(), true,  'current student, institution, start year'),
+    ('student',  'university',      2020,           2024,           gen_random_uuid(), false, gen_random_uuid(), true,  'university, both years, a subject'),
+    ('student',  'university',      2024,           2024,           NULL,              false, gen_random_uuid(), true,  'end year = start year'),
+    ('student',  'university',      NULL,           NULL,           NULL,              true,  gen_random_uuid(), true,  'opted in with an institution'),
+    ('working',  NULL,              2018,           2022,           gen_random_uuid(), true,  gen_random_uuid(), true,  'GRADUATE: working, end year, institution, opted in'),
+    ('student',  'language_course', 2018,           2022,           NULL,              false, gen_random_uuid(), true,  'LIMIT 3: language course with an end year holds an institution'),
+    ('working',  NULL,              2018,           NULL,           NULL,              false, gen_random_uuid(), false, 'LIMIT 2: working, institution, no end year'),
+    ('student',  'language_course', NULL,           NULL,           NULL,              false, gen_random_uuid(), false, 'institution under language_course, no end year'),
+    (NULL,       NULL,              NULL,           NULL,           NULL,              false, gen_random_uuid(), false, 'UNKNOWN: institution, student_level and end year NULL'),
+    ('student',  'university',      2024,           NULL,           NULL,              false, NULL,              false, 'start year, institution_id NULL'),
+    (NULL,       NULL,              NULL,           NULL,           gen_random_uuid(), false, NULL,              false, 'subject, institution_id NULL'),
+    ('student',  'university',      2020,           2024,           NULL,              false, NULL,              false, 'both years, institution_id NULL'),
+    ('student',  'university',      NULL,           2025,           NULL,              false, gen_random_uuid(), false, 'end year, start year NULL'),
+    ('student',  'university',      2024,           2023,           NULL,              false, gen_random_uuid(), false, 'end before start'),
+    ('student',  'university',      1823,           NULL,           NULL,              false, gen_random_uuid(), false, 'start 1823'),
+    ('student',  'university',      2024,           2199,           NULL,              false, gen_random_uuid(), false, 'end 2199'),
+    (NULL,       NULL,              NULL,           NULL,           NULL,              true,  NULL,              false, 'opted in, institution_id NULL')
+  ) AS t(resident, level, start_y, end_y, subject, opt_in, inst, expected, label) LOOP
     BEGIN
       INSERT INTO pg_temp.tmp_study_probe
-        (id, study_start_year, study_end_year, subject_id, student_listing_opt_in, institution_id)
-      VALUES (gen_random_uuid(), c.start_y, c.end_y, c.subject, c.opt_in, c.inst);
+        (id, resident_status, student_level, study_start_year, study_end_year, subject_id, student_listing_opt_in, institution_id)
+      VALUES (gen_random_uuid(), c.resident, c.level, c.start_y, c.end_y, c.subject, c.opt_in, c.inst);
       v_got := true;
     EXCEPTION WHEN check_violation THEN
       v_got := false;
@@ -356,6 +425,34 @@ BEGIN
         CASE WHEN c.expected THEN 'accepted' ELSE 'rejected' END;
     END IF;
   END LOOP;
+
+  -- (a2) The end-year trigger: attached to public.profiles, enabled, calling this function,
+  --      and behaving that way on its own probe table. The current year is derived here and
+  --      printed, never written as a literal that would go stale on 1 January.
+  SELECT pg_get_triggerdef(t.oid), t.tgenabled::text INTO v_def, v_rows FROM pg_trigger t
+   WHERE t.tgrelid = 'public.profiles'::regclass AND t.tgname = 'check_profile_study_years'
+     AND t.tgfoid = 'public.check_profile_study_years()'::regprocedure AND NOT t.tgisinternal;
+  IF v_def IS NULL OR v_def NOT LIKE '%BEFORE INSERT OR UPDATE ON public.profiles FOR EACH ROW%'
+     OR v_rows IS DISTINCT FROM 'O' THEN
+    RAISE EXCEPTION 'check_profile_study_years trigger on profiles is % (tgenabled=%)', coalesce(v_def, '<missing>'), v_rows;
+  END IF;
+
+  v_year := extract(year FROM current_date)::int;
+  INSERT INTO pg_temp.tmp_end_year_probe (id, study_end_year) VALUES (gen_random_uuid(), v_year);   -- control
+  INSERT INTO pg_temp.tmp_end_year_probe (id, study_end_year) VALUES (gen_random_uuid(), NULL);     -- control
+  BEGIN
+    INSERT INTO pg_temp.tmp_end_year_probe (id, study_end_year) VALUES (gen_random_uuid(), v_year + 1);
+    RAISE EXCEPTION 'ASSERT: study_end_year % (next year) was ACCEPTED on INSERT', v_year + 1;
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM IS DISTINCT FROM 'STUDY_END_YEAR_IN_FUTURE' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE pg_temp.tmp_end_year_probe SET study_end_year = v_year + 1 WHERE study_end_year IS NULL;
+    RAISE EXCEPTION 'ASSERT: study_end_year % (next year) was ACCEPTED on UPDATE', v_year + 1;
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM IS DISTINCT FROM 'STUDY_END_YEAR_IN_FUTURE' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'end-year trigger: % accepted, % rejected on insert and update', v_year, v_year + 1;
 
   -- website_url, same shape: control first.
   INSERT INTO pg_temp.tmp_inst_probe (id, name, website_url) VALUES (gen_random_uuid(), 'zz https', 'https://example.com');
@@ -447,6 +544,7 @@ BEGIN
 END $$;
 
 DROP TABLE pg_temp.tmp_study_probe;
+DROP TABLE pg_temp.tmp_end_year_probe;
 DROP TABLE pg_temp.tmp_inst_probe;
 
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
@@ -460,7 +558,7 @@ DROP TABLE pg_temp.tmp_inst_probe;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261024_student_affiliation_schema.sql', 'aef10f51905a8d0db0718b3fb738c7a72ba9cd7f01f7c009fcfe51164b640aa0')
+VALUES ('20261024_student_affiliation_schema.sql', '5e5238418a71821f25664f79c2a7eea0d8568030e0b051d2e458d0f09b06d175')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -492,6 +590,16 @@ NOTIFY pgrst, 'reload schema';
 -- ─── REVERT ─────────────────────────────────────────────────────────────────
 --   BEGIN;
 --     SET ROLE postgres;
+--     -- ⚠ Restoring 20261022's institution coupling FAILS while any graduate holds an
+--     --   institution without a university-level student_level. Decide those rows first:
+--     --   SELECT id FROM profiles WHERE institution_id IS NOT NULL
+--     --     AND (student_level IS NULL OR student_level NOT IN ('university','postgraduate'));
+--     ALTER TABLE public.profiles DROP CONSTRAINT profiles_institution_coupling_check;
+--     ALTER TABLE public.profiles ADD  CONSTRAINT profiles_institution_coupling_check
+--       CHECK (institution_id IS NULL
+--              OR (student_level IS NOT NULL AND student_level IN ('university','postgraduate')));
+--     DROP TRIGGER IF EXISTS check_profile_study_years ON public.profiles;
+--     DROP FUNCTION IF EXISTS public.check_profile_study_years();
 --     ALTER TABLE public.profiles
 --       DROP CONSTRAINT IF EXISTS profiles_listing_opt_in_requires_institution_check,
 --       DROP CONSTRAINT IF EXISTS profiles_study_fields_require_institution_check,

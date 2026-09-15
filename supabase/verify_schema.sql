@@ -333,7 +333,9 @@ WITH report AS (
     -- would act on.
     ('1008_ad_banners','bump_ad_counter'),
     -- The CHECK behind student_task_i18n.steps. Missing = the CHECK cannot exist either.
-    ('1017_student_tasks','student_task_steps_valid')
+    ('1017_student_tasks','student_task_steps_valid'),
+    -- "An end year is not in the future." A trigger, not a CHECK (current_date is STABLE).
+    ('1024_student_affiliation','check_profile_study_years')
   ) e(m,o)
 
   UNION ALL
@@ -377,7 +379,8 @@ WITH report AS (
     ('0826_place_claims','place_claims_guard_insert'),
     ('0904_accommodation_partner_feed','properties_touch_updated_at'),
     ('0905_towing_companies','towing_touch_updated_at'),
-    ('1001_profile_completion','check_profile_name_content')
+    ('1001_profile_completion','check_profile_name_content'),
+    ('1024_student_affiliation','check_profile_study_years')
 
   ) e(m,o)
 
@@ -1396,14 +1399,16 @@ WITH report AS (
     -- ── 1022 profiles coupling CHECKs, hand-applied 2026-09-15. Section E lists both NAMES
     --    under 1001, and a name survives every rewrite — including a re-run of 20261001, whose
     --    DROP IF EXISTS / ADD restores the forms that pass on UNKNOWN and succeeds silently.
-    --    So this compares the catalog text to production's, character for character.
-    --    pg_get_constraintdef appends " NOT VALID" to an unvalidated CHECK, so equality also
-    --    proves both are validated. A deliberate later rewrite changes this string in the
-    --    same commit.
-    UNION ALL SELECT '1022_profiles_coupling_checks_null_safe','profiles coupling CHECKs = production definitions (null-guarded, validated)',
+    --    So the student_level coupling is compared to production's catalog text character for
+    --    character. pg_get_constraintdef appends " NOT VALID" to an unvalidated CHECK, so
+    --    equality also proves it is validated.
+    --    The INSTITUTION coupling's exact text belongs to 1024, which rewrites it (third arm,
+    --    graduates). One owner: this token keeps only the half that is 22's under both —
+    --    the student_level null guard, which a 20261001 re-run removes.
+    UNION ALL SELECT '1022_profiles_coupling_checks_null_safe','profiles coupling CHECKs keep 22''s null guards (student_level check exact)',
       EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
         AND conname='profiles_institution_coupling_check'
-        AND pg_get_constraintdef(oid) = 'CHECK (((institution_id IS NULL) OR ((student_level IS NOT NULL) AND (student_level = ANY (ARRAY[''university''::text, ''postgraduate''::text])))))')
+        AND pg_get_constraintdef(oid) LIKE '%(student_level IS NOT NULL) AND%')
       AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
         AND conname='profiles_student_level_coupling_check'
         AND pg_get_constraintdef(oid) = 'CHECK (((student_level IS NULL) OR ((resident_status IS NOT NULL) AND (resident_status = ''student''::text))))')
@@ -1448,6 +1453,27 @@ WITH report AS (
       AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
         AND tablename IN ('subjects','subject_i18n')
         AND (cmd <> 'SELECT' OR roles <> '{authenticated}'::name[]))
+    -- (6) The institution coupling as 1024 rewrote it: 22's two arms plus
+    --     "OR study_end_year IS NOT NULL", so a graduate keeps their institution. Exact text,
+    --     so both a 22 re-run (arm gone) and a 20261001 re-run (guard gone) read MISSING.
+    UNION ALL SELECT '1024_student_affiliation','profiles_institution_coupling_check = 1024 form (graduate arm)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
+        AND conname='profiles_institution_coupling_check'
+        AND pg_get_constraintdef(oid) = 'CHECK (((institution_id IS NULL) OR ((student_level IS NOT NULL) AND (student_level = ANY (ARRAY[''university''::text, ''postgraduate''::text]))) OR (study_end_year IS NOT NULL)))')
+    -- (7) The end-year rule lives in a trigger body, and sections C and D only see NAMES. The
+    --     body pattern is a code shape no comment contains; the trigger must be enabled and
+    --     call this function. (Not pg_get_triggerdef equality: it prints the function name
+    --     with or without "public." depending on search_path.)
+    UNION ALL SELECT '1024_student_affiliation','check_profile_study_years rejects a future end year, trigger enabled on profiles',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_study_years'
+          AND p.prosrc LIKE '%NEW.study_end_year > extract(year FROM current_date)%'
+          AND p.prosrc LIKE '%RAISE EXCEPTION%')
+      AND EXISTS(SELECT 1 FROM pg_trigger t
+        WHERE t.tgrelid='public.profiles'::regclass AND t.tgname='check_profile_study_years'
+          AND NOT t.tgisinternal AND t.tgenabled='O'
+          AND t.tgfoid=(SELECT p.oid FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                         WHERE n.nspname='public' AND p.proname='check_profile_study_years' LIMIT 1))
     -- ── 1018 / 1020 institutions, reconciled to YÖDAK's list by hand on 2026-09-15. CONTENT
     --    tokens, reading public.institutions directly — safe, 1001 is applied (the 1010
     --    home_services tokens do the same). Everything is keyed on id or a count, never on a
