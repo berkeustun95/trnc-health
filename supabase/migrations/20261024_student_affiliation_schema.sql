@@ -23,8 +23,18 @@
 -- ─── ORDER: 20261022 FIRST ──────────────────────────────────────────────────
 -- Section 0 refuses unless 20261022's null-safe coupling CHECKs are live. The new CHECKs
 -- here do not reference those constraints, but the guarantee this slice relies on is a
--- CHAIN: listing opt-in → institution_id → a university-level student_level → a student
--- resident_status. Before 20261022 two links of that chain passed on UNKNOWN.
+-- CHAIN: study fields and listing opt-in → institution_id → a university-level
+-- student_level → a student resident_status. Before 20261022 two links of that chain
+-- passed on UNKNOWN.
+--
+-- ⚠ OPEN — A GRADUATE CANNOT HOLD ANY OF THIS YET. The study fields hang off institution_id,
+--   not student_level, so that finishing a degree does not erase it. But 20261022 admits
+--   institution_id only under a university-level student_level, and student_level only
+--   under resident_status = 'student'. A graduate who is now 'working' can hold no
+--   institution — so no study years, no subject and no listing opt-in. Today an end year
+--   is reachable only by a user still marked as a student. Closing that means changing
+--   profiles_institution_coupling_check or modelling graduates separately. Undecided, and
+--   deliberately not done in this file.
 --
 -- ─── subjects: seeded ACTIVE, column DEFAULT false ──────────────────────────
 -- The DEFAULT is false (the 20260907 rule: an INSERT that omits it lands unpublished).
@@ -44,9 +54,9 @@
 -- ─── ON DELETE SET NULL, and what it costs ──────────────────────────────────
 -- Deleting a subject silently clears every profile's subject_id that pointed at it — the
 -- Netkent hazard again. Retire a subject with is_active = false; only DELETE one nobody
--- references. Separately: once a profile has student_listing_opt_in = true, deleting its
--- institution FAILS, because institution_id's ON DELETE SET NULL would break the opt-in
--- CHECK. That is the safe direction, and it is new.
+-- references. Separately: once a profile holds study years, a subject or
+-- student_listing_opt_in = true, deleting its institution FAILS, because institution_id's
+-- ON DELETE SET NULL would break those CHECKs. That is the safe direction, and it is new.
 --
 -- ─── COUPLING CHECKS: every one of them is null-safe by construction ─────────
 -- Each is written so no arm can evaluate to UNKNOWN: the only predicates on nullable
@@ -54,11 +64,12 @@
 -- asserted non-NULL, and the one boolean is NOT NULL. Section 7(a) proves each on the
 -- INSTALLED definitions, with the NULL case that would have slipped through.
 --
--- ⚠ CONSEQUENCE FOR SLICE 2, and it is a standing one. Today's two writers clear
---   student_level and institution_id when a user stops being a student
+-- ⚠ CONSEQUENCE FOR SLICE 2, and it is a standing one. Today's two writers set
+--   institution_id to NULL whenever the level is not university or postgraduate
 --   (ProfileSetupScreen.js:432-433, ProfileScreen.js:337-338). Once a user holds study
---   years, a subject or listing opt-in, those writes FAIL with 23514 unless they clear
---   the new fields in the same UPDATE. Nobody can hold them yet — no UI writes them — so
+--   years, a subject or listing opt-in, that write FAILS with 23514 unless it clears the
+--   new fields in the same UPDATE — and if graduates are to keep their institution (OPEN
+--   above), those writers must stop clearing it too. Nobody can hold them yet — no UI writes them — so
 --   nothing breaks today. It breaks the day slice 2 ships without updating both writers.
 
 SET ROLE postgres;
@@ -70,12 +81,13 @@ DECLARE
   v_def  text;
   c      record;
 BEGIN
+  -- Each CHECK must carry ITS OWN operand's null guard, as pg_get_constraintdef renders it.
   FOR c IN SELECT * FROM (VALUES
-    ('profiles_institution_coupling_check'),
-    ('profiles_student_level_coupling_check')) AS t(conname) LOOP
+    ('profiles_institution_coupling_check',   'student_level'),
+    ('profiles_student_level_coupling_check', 'resident_status')) AS t(conname, guarded) LOOP
     SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
      WHERE conrelid = 'public.profiles'::regclass AND conname = c.conname;
-    IF v_def IS NULL OR v_def NOT LIKE '%IS NOT NULL%' THEN
+    IF v_def IS NULL OR v_def NOT LIKE '%(' || c.guarded || ' IS NOT NULL)%' THEN
       RAISE EXCEPTION 'REFUSING: 20261022 is not applied — % is %. Apply the coupling fix first. Nothing changed.',
         c.conname, coalesce(v_def, '<missing>');
     END IF;
@@ -155,64 +167,62 @@ INSERT INTO public.subjects (id, slug, sort_order, is_active) VALUES
   ('00000000-0000-4000-d000-000000000007', 'nutrition_dietetics',                 130, true),
   ('00000000-0000-4000-d000-000000000008', 'veterinary_medicine',                 135, true),
   ('00000000-0000-4000-d000-000000000009', 'health_management',                   140, true),
-  ('00000000-0000-4000-d000-00000000000a', 'health_vocational',                   145, true),
   -- Engineering and computing
-  ('00000000-0000-4000-d000-00000000000b', 'computer_engineering',                200, true),
-  ('00000000-0000-4000-d000-00000000000c', 'software_engineering',                205, true),
-  ('00000000-0000-4000-d000-00000000000d', 'artificial_intelligence_engineering', 210, true),
-  ('00000000-0000-4000-d000-00000000000e', 'information_systems',                 215, true),
-  ('00000000-0000-4000-d000-00000000000f', 'civil_engineering',                   220, true),
-  ('00000000-0000-4000-d000-000000000010', 'electrical_electronic_engineering',   225, true),
-  ('00000000-0000-4000-d000-000000000011', 'mechanical_engineering',              230, true),
-  ('00000000-0000-4000-d000-000000000012', 'mechatronics_engineering',            235, true),
-  ('00000000-0000-4000-d000-000000000013', 'industrial_engineering',              240, true),
-  ('00000000-0000-4000-d000-000000000014', 'biomedical_engineering',              245, true),
-  ('00000000-0000-4000-d000-000000000015', 'energy_systems_engineering',          250, true),
-  ('00000000-0000-4000-d000-000000000016', 'petroleum_natural_gas_engineering',   255, true),
+  ('00000000-0000-4000-d000-00000000000a', 'computer_engineering',                200, true),
+  ('00000000-0000-4000-d000-00000000000b', 'software_engineering',                205, true),
+  ('00000000-0000-4000-d000-00000000000c', 'artificial_intelligence_engineering', 210, true),
+  ('00000000-0000-4000-d000-00000000000d', 'information_systems',                 215, true),
+  ('00000000-0000-4000-d000-00000000000e', 'civil_engineering',                   220, true),
+  ('00000000-0000-4000-d000-00000000000f', 'electrical_electronic_engineering',   225, true),
+  ('00000000-0000-4000-d000-000000000010', 'mechanical_engineering',              230, true),
+  ('00000000-0000-4000-d000-000000000011', 'mechatronics_engineering',            235, true),
+  ('00000000-0000-4000-d000-000000000012', 'industrial_engineering',              240, true),
+  ('00000000-0000-4000-d000-000000000013', 'biomedical_engineering',              245, true),
+  ('00000000-0000-4000-d000-000000000014', 'energy_systems_engineering',          250, true),
+  ('00000000-0000-4000-d000-000000000015', 'petroleum_natural_gas_engineering',   255, true),
   -- Architecture, design and arts
-  ('00000000-0000-4000-d000-000000000017', 'architecture',                        300, true),
-  ('00000000-0000-4000-d000-000000000018', 'interior_architecture',               305, true),
-  ('00000000-0000-4000-d000-000000000019', 'graphic_design',                      310, true),
-  ('00000000-0000-4000-d000-00000000001a', 'fashion_textile_design',              315, true),
-  ('00000000-0000-4000-d000-00000000001b', 'fine_arts',                           320, true),
-  ('00000000-0000-4000-d000-00000000001c', 'music',                               325, true),
+  ('00000000-0000-4000-d000-000000000016', 'architecture',                        300, true),
+  ('00000000-0000-4000-d000-000000000017', 'interior_architecture',               305, true),
+  ('00000000-0000-4000-d000-000000000018', 'graphic_design',                      310, true),
+  ('00000000-0000-4000-d000-000000000019', 'fashion_textile_design',              315, true),
+  ('00000000-0000-4000-d000-00000000001a', 'fine_arts',                           320, true),
+  ('00000000-0000-4000-d000-00000000001b', 'music',                               325, true),
   -- Business and economics
-  ('00000000-0000-4000-d000-00000000001d', 'business_administration',             400, true),
-  ('00000000-0000-4000-d000-00000000001e', 'economics',                           405, true),
-  ('00000000-0000-4000-d000-00000000001f', 'accounting_finance',                  410, true),
-  ('00000000-0000-4000-d000-000000000020', 'marketing',                           415, true),
-  ('00000000-0000-4000-d000-000000000021', 'international_trade_logistics',       420, true),
+  ('00000000-0000-4000-d000-00000000001c', 'business_administration',             400, true),
+  ('00000000-0000-4000-d000-00000000001d', 'economics',                           405, true),
+  ('00000000-0000-4000-d000-00000000001e', 'accounting_finance',                  410, true),
+  ('00000000-0000-4000-d000-00000000001f', 'marketing',                           415, true),
+  ('00000000-0000-4000-d000-000000000020', 'international_trade_logistics',       420, true),
   -- Law and social sciences
-  ('00000000-0000-4000-d000-000000000022', 'law',                                 500, true),
-  ('00000000-0000-4000-d000-000000000023', 'international_relations',             505, true),
-  ('00000000-0000-4000-d000-000000000024', 'political_science_public_admin',      510, true),
-  ('00000000-0000-4000-d000-000000000025', 'psychology',                          515, true),
-  ('00000000-0000-4000-d000-000000000026', 'sociology',                           520, true),
+  ('00000000-0000-4000-d000-000000000021', 'law',                                 500, true),
+  ('00000000-0000-4000-d000-000000000022', 'international_relations',             505, true),
+  ('00000000-0000-4000-d000-000000000023', 'political_science_public_admin',      510, true),
+  ('00000000-0000-4000-d000-000000000024', 'psychology',                          515, true),
+  ('00000000-0000-4000-d000-000000000025', 'sociology',                           520, true),
   -- Communication
-  ('00000000-0000-4000-d000-000000000027', 'journalism',                          600, true),
-  ('00000000-0000-4000-d000-000000000028', 'public_relations_advertising',        605, true),
-  ('00000000-0000-4000-d000-000000000029', 'radio_tv_cinema',                     610, true),
+  ('00000000-0000-4000-d000-000000000026', 'journalism',                          600, true),
+  ('00000000-0000-4000-d000-000000000027', 'public_relations_advertising',        605, true),
+  ('00000000-0000-4000-d000-000000000028', 'radio_tv_cinema',                     610, true),
   -- Education and languages
-  ('00000000-0000-4000-d000-00000000002a', 'english_language_teaching',           700, true),
-  ('00000000-0000-4000-d000-00000000002b', 'preschool_teaching',                  705, true),
-  ('00000000-0000-4000-d000-00000000002c', 'primary_teaching',                    710, true),
-  ('00000000-0000-4000-d000-00000000002d', 'special_education',                   715, true),
-  ('00000000-0000-4000-d000-00000000002e', 'guidance_counselling',                720, true),
-  ('00000000-0000-4000-d000-00000000002f', 'english_language_literature',         725, true),
-  ('00000000-0000-4000-d000-000000000030', 'turkish_language_literature',         730, true),
-  ('00000000-0000-4000-d000-000000000031', 'translation_interpreting',            735, true),
-  ('00000000-0000-4000-d000-000000000032', 'english_preparatory',                 740, true),
+  ('00000000-0000-4000-d000-000000000029', 'english_language_teaching',           700, true),
+  ('00000000-0000-4000-d000-00000000002a', 'preschool_teaching',                  705, true),
+  ('00000000-0000-4000-d000-00000000002b', 'primary_teaching',                    710, true),
+  ('00000000-0000-4000-d000-00000000002c', 'special_education',                   715, true),
+  ('00000000-0000-4000-d000-00000000002d', 'guidance_counselling',                720, true),
+  ('00000000-0000-4000-d000-00000000002e', 'english_language_literature',         725, true),
+  ('00000000-0000-4000-d000-00000000002f', 'turkish_language_literature',         730, true),
+  ('00000000-0000-4000-d000-000000000030', 'translation_interpreting',            735, true),
   -- Tourism, sport and transport
-  ('00000000-0000-4000-d000-000000000033', 'tourism_hospitality',                 800, true),
-  ('00000000-0000-4000-d000-000000000034', 'gastronomy_culinary_arts',            805, true),
-  ('00000000-0000-4000-d000-000000000035', 'sports_sciences',                     810, true),
-  ('00000000-0000-4000-d000-000000000036', 'aviation',                            815, true),
-  ('00000000-0000-4000-d000-000000000037', 'maritime',                            820, true),
+  ('00000000-0000-4000-d000-000000000031', 'tourism_hospitality',                 800, true),
+  ('00000000-0000-4000-d000-000000000032', 'gastronomy_culinary_arts',            805, true),
+  ('00000000-0000-4000-d000-000000000033', 'sports_sciences',                     810, true),
+  ('00000000-0000-4000-d000-000000000034', 'aviation',                            815, true),
+  ('00000000-0000-4000-d000-000000000035', 'maritime',                            820, true),
   -- Sciences
-  ('00000000-0000-4000-d000-000000000038', 'mathematics',                         900, true),
-  ('00000000-0000-4000-d000-000000000039', 'physics',                             905, true),
-  ('00000000-0000-4000-d000-00000000003a', 'chemistry',                           910, true),
-  ('00000000-0000-4000-d000-00000000003b', 'molecular_biology_genetics',          915, true),
+  ('00000000-0000-4000-d000-000000000036', 'mathematics',                         900, true),
+  ('00000000-0000-4000-d000-000000000037', 'physics',                             905, true),
+  ('00000000-0000-4000-d000-000000000038', 'chemistry',                           910, true),
+  ('00000000-0000-4000-d000-000000000039', 'molecular_biology_genetics',          915, true),
   -- Last, always. A student whose programme is not listed must have somewhere to land.
   ('00000000-0000-4000-d000-0000000000ff', 'other',                               999, true)
 ON CONFLICT (id) DO NOTHING;
@@ -251,13 +261,14 @@ ALTER TABLE public.profiles ADD  CONSTRAINT profiles_study_years_order_check
   CHECK (study_end_year IS NULL
          OR (study_start_year IS NOT NULL AND study_end_year >= study_start_year));
 
--- Study years and subject only for a student with a level. Only IS [NOT] NULL tests, so no
--- arm can be UNKNOWN. The chain continues through 20261022: student_level requires
--- resident_status = 'student'.
-ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_study_fields_require_level_check;
-ALTER TABLE public.profiles ADD  CONSTRAINT profiles_study_fields_require_level_check
+-- Study years and subject only alongside an institution — not a student_level, so a record
+-- of where someone studied does not depend on their still being a student. Only IS [NOT]
+-- NULL tests, so no arm can be UNKNOWN. ⚠ See OPEN in the header: 20261022 still ties
+-- institution_id itself to a current student.
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_study_fields_require_institution_check;
+ALTER TABLE public.profiles ADD  CONSTRAINT profiles_study_fields_require_institution_check
   CHECK ((study_start_year IS NULL AND study_end_year IS NULL AND subject_id IS NULL)
-         OR student_level IS NOT NULL);
+         OR institution_id IS NOT NULL);
 
 -- student_listing_opt_in is NOT NULL, so `NOT student_listing_opt_in` is never UNKNOWN.
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_listing_opt_in_requires_institution_check;
@@ -300,7 +311,7 @@ BEGIN
     ('profiles', 'tmp_study_probe', 'profiles_study_start_year_range_check'),
     ('profiles', 'tmp_study_probe', 'profiles_study_end_year_range_check'),
     ('profiles', 'tmp_study_probe', 'profiles_study_years_order_check'),
-    ('profiles', 'tmp_study_probe', 'profiles_study_fields_require_level_check'),
+    ('profiles', 'tmp_study_probe', 'profiles_study_fields_require_institution_check'),
     ('profiles', 'tmp_study_probe', 'profiles_listing_opt_in_requires_institution_check'),
     ('institutions', 'tmp_inst_probe', 'institutions_website_url_scheme_check')
   ) AS t(tbl, probe, conname) LOOP
@@ -314,24 +325,27 @@ BEGIN
 
   -- (a) The case table. Each "false" row is a NULL case some naive form would admit on
   --     UNKNOWN; each "true" row is a control, so a CHECK that rejects everything fails.
+  --     Only this file's CHECKs are attached, so the rows carry no student_level or
+  --     resident_status: 20261022's couplings are not what is under test here.
   FOR c IN SELECT * FROM (VALUES
-    (NULL::text,   NULL::smallint, NULL::smallint, NULL::uuid,           false, NULL::uuid,           true,  'all empty (every existing row)'),
-    ('university', 2024,           NULL,           NULL,                 false, NULL,                 true,  'current student with a start year'),
-    ('university', 2020,           2024,           gen_random_uuid(),    false, NULL,                 true,  'graduated, with a subject'),
-    ('university', 2024,           2024,           NULL,                 false, NULL,                 true,  'end year = start year'),
-    ('university', NULL,           NULL,           NULL,                 true,  gen_random_uuid(),    true,  'opted in with an institution'),
-    (NULL,         2024,           NULL,           NULL,                 false, NULL,                 false, 'start year, student_level NULL'),
-    (NULL,         NULL,           NULL,           gen_random_uuid(),    false, NULL,                 false, 'subject, student_level NULL'),
-    ('university', NULL,           2025,           NULL,                 false, NULL,                 false, 'end year, start year NULL'),
-    ('university', 2024,           2023,           NULL,                 false, NULL,                 false, 'end before start'),
-    ('university', 1823,           NULL,           NULL,                 false, NULL,                 false, 'start 1823'),
-    ('university', 2024,           2199,           NULL,                 false, NULL,                 false, 'end 2199'),
-    (NULL,         NULL,           NULL,           NULL,                 true,  NULL,                 false, 'opted in, institution_id NULL')
-  ) AS t(level, start_y, end_y, subject, opt_in, inst, expected, label) LOOP
+    (NULL::smallint, NULL::smallint, NULL::uuid,        false, NULL::uuid,        true,  'all empty (every existing row)'),
+    (2024,           NULL,           NULL,              false, gen_random_uuid(), true,  'institution and a start year'),
+    (2020,           2024,           gen_random_uuid(), false, gen_random_uuid(), true,  'institution, both years, a subject'),
+    (2024,           2024,           NULL,              false, gen_random_uuid(), true,  'end year = start year'),
+    (NULL,           NULL,           NULL,              true,  gen_random_uuid(), true,  'opted in with an institution'),
+    (2024,           NULL,           NULL,              false, NULL,              false, 'start year, institution_id NULL'),
+    (NULL,           NULL,           gen_random_uuid(), false, NULL,              false, 'subject, institution_id NULL'),
+    (2020,           2024,           NULL,              false, NULL,              false, 'both years, institution_id NULL'),
+    (NULL,           2025,           NULL,              false, gen_random_uuid(), false, 'end year, start year NULL'),
+    (2024,           2023,           NULL,              false, gen_random_uuid(), false, 'end before start'),
+    (1823,           NULL,           NULL,              false, gen_random_uuid(), false, 'start 1823'),
+    (2024,           2199,           NULL,              false, gen_random_uuid(), false, 'end 2199'),
+    (NULL,           NULL,           NULL,              true,  NULL,              false, 'opted in, institution_id NULL')
+  ) AS t(start_y, end_y, subject, opt_in, inst, expected, label) LOOP
     BEGIN
       INSERT INTO pg_temp.tmp_study_probe
-        (id, student_level, study_start_year, study_end_year, subject_id, student_listing_opt_in, institution_id)
-      VALUES (gen_random_uuid(), c.level, c.start_y, c.end_y, c.subject, c.opt_in, c.inst);
+        (id, study_start_year, study_end_year, subject_id, student_listing_opt_in, institution_id)
+      VALUES (gen_random_uuid(), c.start_y, c.end_y, c.subject, c.opt_in, c.inst);
       v_got := true;
     EXCEPTION WHEN check_violation THEN
       v_got := false;
@@ -446,7 +460,7 @@ DROP TABLE pg_temp.tmp_inst_probe;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261024_student_affiliation_schema.sql', 'd7e70a76878ccdd05cbc964c4eccf24aaf3529d35750b54986b9126f775844a5')
+VALUES ('20261024_student_affiliation_schema.sql', 'aef10f51905a8d0db0718b3fb738c7a72ba9cd7f01f7c009fcfe51164b640aa0')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -480,7 +494,7 @@ NOTIFY pgrst, 'reload schema';
 --     SET ROLE postgres;
 --     ALTER TABLE public.profiles
 --       DROP CONSTRAINT IF EXISTS profiles_listing_opt_in_requires_institution_check,
---       DROP CONSTRAINT IF EXISTS profiles_study_fields_require_level_check,
+--       DROP CONSTRAINT IF EXISTS profiles_study_fields_require_institution_check,
 --       DROP CONSTRAINT IF EXISTS profiles_study_years_order_check,
 --       DROP CONSTRAINT IF EXISTS profiles_study_end_year_range_check,
 --       DROP CONSTRAINT IF EXISTS profiles_study_start_year_range_check,

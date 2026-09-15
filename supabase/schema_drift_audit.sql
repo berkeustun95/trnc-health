@@ -748,7 +748,7 @@ expected_constraint (cname, litsig) AS (VALUES
     ('profiles_student_level_check', 'high_school|language_course|postgraduate|university|vocational'),
     ('profiles_student_level_coupling_check', 'student'),
     ('profiles_study_end_year_range_check', '1950|2100'),
-    ('profiles_study_fields_require_level_check', ''),
+    ('profiles_study_fields_require_institution_check', ''),
     ('profiles_study_start_year_range_check', '1950|2100'),
     ('profiles_study_years_order_check', ''),
     ('profiles_subject_id_fkey', ''),

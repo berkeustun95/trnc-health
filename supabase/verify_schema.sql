@@ -553,7 +553,7 @@ WITH report AS (
     ('1024_student_affiliation','profiles_study_start_year_range_check'),
     ('1024_student_affiliation','profiles_study_end_year_range_check'),
     ('1024_student_affiliation','profiles_study_years_order_check'),
-    ('1024_student_affiliation','profiles_study_fields_require_level_check'),
+    ('1024_student_affiliation','profiles_study_fields_require_institution_check'),
     ('1024_student_affiliation','profiles_listing_opt_in_requires_institution_check'),
     ('1024_student_affiliation','institutions_website_url_scheme_check')
 
@@ -1429,8 +1429,8 @@ WITH report AS (
         AND conname='profiles_study_years_order_check'
         AND pg_get_constraintdef(oid) LIKE '%study_start_year IS NOT NULL%')
       AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
-        AND conname='profiles_study_fields_require_level_check'
-        AND pg_get_constraintdef(oid) LIKE '%student_level IS NOT NULL%')
+        AND conname='profiles_study_fields_require_institution_check'
+        AND pg_get_constraintdef(oid) LIKE '%institution_id IS NOT NULL%')
       AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
         AND conname='profiles_listing_opt_in_requires_institution_check'
         AND pg_get_constraintdef(oid) LIKE '%institution_id IS NOT NULL%')
