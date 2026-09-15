@@ -1397,12 +1397,16 @@ WITH report AS (
     UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: the 8 added ids …000f–…0016 all present',
       (SELECT count(*) FROM public.institutions
         WHERE id BETWEEN '00000000-0000-4000-b000-00000000000f' AND '00000000-0000-4000-b000-000000000016') = 8
-    -- The three held universities (1021), by id. Nothing asserted about city: ASBÜ's NULL
-    --     is deliberate (district unconfirmed) and a token pinning it would go red the day
-    --     the district is confirmed and filled in correctly.
+    -- The three held universities (1021), by id.
     UNION ALL SELECT '1021_institutions_held_three','institutions: the 3 added ids …0017–…0019 all present',
       (SELECT count(*) FROM public.institutions
         WHERE id BETWEEN '00000000-0000-4000-b000-000000000017' AND '00000000-0000-4000-b000-000000000019') = 3
+    -- ASBÜ's confirmed city (1023). 1021's recorded INSERT is ON CONFLICT DO UPDATE with
+    --     city NULL: the file's guard refuses a re-run, but the bare statement pasted alone
+    --     puts NULL back, and a city-less row vanishes under every Student Hub region chip.
+    UNION ALL SELECT '1023_institutions_asbu_city','institutions: ASBÜ (…0017) city is nicosia',
+      EXISTS(SELECT 1 FROM public.institutions
+        WHERE id = '00000000-0000-4000-b000-000000000017' AND city = 'nicosia')
     -- (4) No short_name is a lowercase slug. 18's recorded INSERT is ON CONFLICT DO UPDATE,
     --     so pasting it again resets all eight to 'metuncc', 'itukktc', … — the file's guard
     --     refuses, the bare statement does not. Derived over the whole table: every real

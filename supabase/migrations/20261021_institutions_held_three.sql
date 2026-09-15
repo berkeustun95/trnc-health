@@ -8,8 +8,13 @@
 -- 20261018 held these three back pending verification. All three were verified against
 -- YÖDAK's current list on 2026-09-15 (owner's check):
 --   …0017  Ankara Sosyal Bilimler Üniversitesi   a Turkish state university's campus.
+--          NOT A NEW UNIVERSITY: this is the institution the feat/student-hub branch
+--          array listed as 'Kıbrıs Sosyal Bilimler Üniversitesi' (kisbu) — founded 2015
+--          under that name, since renamed to Ankara Sosyal Bilimler Üniversitesi Kuzey
+--          Kıbrıs Kampüsü. kisbu.edu.tr is the legacy domain; kktc.asbu.edu.tr is current.
 --          city NULL DELIBERATELY: the district is unconfirmed, and a guessed region is
 --          worse than none. Not an oversight — do not "fill it in" without a source.
+--          (Confirmed later: 20261023 sets 'nicosia' — Haspolat Kavşağı, Gönyeli.)
 --   …0018  Altınbaş Kıbrıs Üniversitesi   formerly World Peace University (hence
 --          wpu.edu.tr); Şht. Kemal Ali Ömer Sk, Yenişehir, Nicosia.
 --   …0019  Uluslararası Alasia Üniversitesi   founded 2019 by the Özok family; campus
@@ -67,7 +72,7 @@ BEGIN
       OR i.city       IS DISTINCT FROM e.city
       OR i.sort_order IS DISTINCT FROM e.sort_order;
   IF v_changed IS NOT NULL THEN
-    RAISE EXCEPTION 'REFUSING: edited since 2026-09-15 — re-running would revert: %. Nothing applied.', v_changed;
+    RAISE EXCEPTION 'REFUSING: edited after this file ran (e.g. by a later migration) — re-running would revert: %. Nothing applied.', v_changed;
   END IF;
 END $$;
 
@@ -160,7 +165,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261021_institutions_held_three.sql', 'b0cbfebd7f7a1fc8030d98a634cc56d278136b6f9663306082f732dd8c82699a')
+VALUES ('20261021_institutions_held_three.sql', 'b5822e9ccd93cc1d8f47e6a036a103a8b9aa0963c8c50fc6440abd4c0edbcc54')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
