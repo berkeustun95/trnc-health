@@ -1514,6 +1514,18 @@ WITH report AS (
     UNION ALL SELECT '1023_institutions_asbu_city','institutions: ASBÜ (…0017) city is nicosia',
       EXISTS(SELECT 1 FROM public.institutions
         WHERE id = '00000000-0000-4000-b000-000000000017' AND city = 'nicosia')
+    -- University links (1025). Counted, not listed: every ACTIVE university except Other
+    --     carries an https link and nothing else does. A university added or reactivated
+    --     without one, or a link pasted onto Kıbrıs İlim or Other, reads MISSING — add the
+    --     link or change this count in the same commit, and say why.
+    UNION ALL SELECT '1025_institutions_website_urls','institutions: the 23 active universities carry an https link; …0006 and …00ff NULL',
+      (SELECT count(*) FROM public.institutions WHERE website_url IS NOT NULL) = 23
+      AND NOT EXISTS(SELECT 1 FROM public.institutions
+        WHERE is_active AND website_url IS NULL AND id <> '00000000-0000-4000-b000-0000000000ff')
+      AND NOT EXISTS(SELECT 1 FROM public.institutions WHERE website_url !~ '^https://')
+      AND NOT EXISTS(SELECT 1 FROM public.institutions
+        WHERE id IN ('00000000-0000-4000-b000-000000000006', '00000000-0000-4000-b000-0000000000ff')
+          AND website_url IS NOT NULL)
     -- (4) No short_name is a lowercase slug. 18's recorded INSERT is ON CONFLICT DO UPDATE,
     --     so pasting it again resets all eight to 'metuncc', 'itukktc', … — the file's guard
     --     refuses, the bare statement does not. Derived over the whole table: every real
