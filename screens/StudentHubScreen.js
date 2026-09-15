@@ -27,13 +27,52 @@ function SectionTitle({ text }) {
   return <Text style={s.sectionTitle}>{text}</Text>
 }
 
-function UniversityRow({ uni, lang }) {
-  const meta = [uni.short_name, uni.city && t(REGION_LABEL_KEY[uni.city], lang)].filter(Boolean).join(' · ')
+const uniMeta = (uni, lang) =>
+  [uni.short_name, uni.city && t(REGION_LABEL_KEY[uni.city], lang)].filter(Boolean).join(' · ')
+
+function UniversityRow({ uni, lang, onOpen }) {
+  const meta = uniMeta(uni, lang)
   return (
-    <View style={s.uniCard}>
-      <Text style={s.uniName}>{uni.name}</Text>
-      {meta ? <Text style={s.uniMeta}>{meta}</Text> : null}
-    </View>
+    <TouchableOpacity style={[s.uniCard, s.uniRow]} onPress={onOpen} activeOpacity={0.75} accessibilityRole="button">
+      <View style={s.uniRowBody}>
+        <Text style={s.uniName}>{uni.name}</Text>
+        {meta ? <Text style={s.uniMeta}>{meta}</Text> : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+    </TouchableOpacity>
+  )
+}
+
+// ─── The university page (Student Hub affiliation, slice 3) ─────────────────
+// Carries ONLY what institutions holds: name, short name, city, and the link when one is
+// set (20261025). No address, logo or accreditation line — each would need a column and
+// content nobody has supplied. This is the frame slice 4's student list is added to.
+function UniversityDetail({ uni, lang, onBack }) {
+  const meta = uniMeta(uni, lang)
+  return (
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <PageBackground topic="newcomer_essentials" />
+      <ScreenHeader onBack={onBack} lang={lang} title={t('studentTabUniversities', lang)} />
+
+      <ScrollView style={s.tabScroll} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
+        <ContentCard>
+          <Text style={s.uniDetailName}>{uni.name}</Text>
+          {meta ? <Text style={s.uniMeta}>{meta}</Text> : null}
+        </ContentCard>
+
+        {uni.website_url ? (
+          <TouchableOpacity
+            style={[s.linkBtn, s.secondCard]}
+            onPress={() => Linking.openURL(uni.website_url).catch(() => {})}
+            activeOpacity={0.8}
+            accessibilityRole="link"
+          >
+            <Ionicons name="open-outline" size={18} color={colors.surface} />
+            <Text style={s.linkBtnText}>{t('studentUniWebsite', lang)}</Text>
+          </TouchableOpacity>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
   )
 }
 
@@ -52,9 +91,10 @@ function LoadError({ lang, onRetry }) {
   )
 }
 
-function UniversitiesTab({ lang, universities, failed, onRetry }) {
-  const [query, setQuery]   = useState('')
-  const [region, setRegion] = useState('all')
+// The search text and region chip are the SCREEN's state, not this tab's: opening a
+// university replaces the whole screen, which unmounts this tab, and a filter that resets
+// on every back is a filter nobody can use to compare two universities.
+function UniversitiesTab({ lang, universities, failed, onRetry, onOpen, query, setQuery, region, setRegion }) {
 
   const regions = useMemo(
     () => ['all', ...REGIONS.filter(r => universities?.some(u => u.city === r))],
@@ -127,7 +167,7 @@ function UniversitiesTab({ lang, universities, failed, onRetry }) {
           <Text style={s.emptyText}>{t('studentNoResults', lang)}</Text>
         </View>
       ) : (
-        results.map(u => <UniversityRow key={u.id} uni={u} lang={lang} />)
+        results.map(u => <UniversityRow key={u.id} uni={u} lang={lang} onOpen={() => onOpen(u.id)} />)
       )}
     </ScrollView>
   )
@@ -336,6 +376,9 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
   // save would overwrite the stored ticks with an empty object.
   const [progress, setProgress] = useState(null)
   const [openSlug, setOpenSlug] = useState(null)
+  const [openUniId, setOpenUniId] = useState(null)
+  const [uniQuery, setUniQuery] = useState('')
+  const [uniRegion, setUniRegion] = useState('all')
 
   // Cache first, then the network. A student with no data yet sees the last copy
   // immediately; a failed refresh keeps it on screen and says it is offline.
@@ -355,17 +398,17 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
   useEffect(() => { if (progress) saveProgress(progress) }, [progress])
 
   useEffect(() => {
-    if (!openSlug) return
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setOpenSlug(null); return true })
+    if (!openSlug && !openUniId) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setOpenSlug(null); setOpenUniId(null); return true })
     return () => sub.remove()
-  }, [openSlug])
+  }, [openSlug, openUniId])
 
   // Loaded here rather than in the tab so switching tabs does not refetch.
   const load = useCallback(() => {
     setFailed(false)
     setUniversities(null)
     supabase.from('institutions')
-      .select('id, name, short_name, city')
+      .select('id, name, short_name, city, website_url')
       .eq('is_active', true)
       .neq('id', OTHER_INSTITUTION_ID)
       .order('name')
@@ -378,6 +421,11 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const openUni = openUniId ? universities?.find(u => u.id === openUniId) : null
+  if (openUni) {
+    return <UniversityDetail uni={openUni} lang={lang} onBack={() => setOpenUniId(null)} />
+  }
 
   const openTask = openSlug ? tasks?.find(task => task.slug === openSlug) : null
   if (openTask) {
@@ -425,7 +473,19 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
       </View>
 
       {tab === 'universities'
-        ? <UniversitiesTab lang={lang} universities={universities} failed={failed} onRetry={load} />
+        ? (
+          <UniversitiesTab
+            lang={lang}
+            universities={universities}
+            failed={failed}
+            onRetry={load}
+            onOpen={setOpenUniId}
+            query={uniQuery}
+            setQuery={setUniQuery}
+            region={uniRegion}
+            setRegion={setUniRegion}
+          />
+        )
         : (
           <BasicsTab
             lang={lang}
@@ -503,7 +563,10 @@ const s = StyleSheet.create({
     marginTop: 12,
     ...shadow,
   },
+  uniRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  uniRowBody: { flex: 1 },
   uniName: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, lineHeight: 21 },
+  uniDetailName: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, lineHeight: 26 },
   uniMeta: { fontSize: 13, color: colors.textSecondary, marginTop: 3 },
 
   emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },
