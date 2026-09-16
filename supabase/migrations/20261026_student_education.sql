@@ -101,8 +101,31 @@ CREATE TABLE IF NOT EXISTS public.student_education (
   -- university they attend now and not at the one they left; one boolean per person
   -- cannot express that. DEFAULT false is the privacy guarantee, same as 20261024's.
   listing_opt_in  boolean NOT NULL DEFAULT false,
+  -- PROVENANCE, and it is load-bearing. The transition trigger below may only touch rows
+  -- IT created (this flag true: the backfill, and its own inserts). A row the app created
+  -- is permanently off-limits to it — never updated, never deleted.
+  --
+  -- The trigger is SCAFFOLDING THAT DIES IN 20261027. Letting temporary scaffolding
+  -- destroy permanent user data is the wrong trade, and the echo bug proved the trigger
+  -- cannot reliably tell a deliberate change from a stale one: `AFTER UPDATE OF` fires on
+  -- SET-list membership, not on value change. So the rule is structural, not inferred.
+  --
+  -- DEFAULT false is the protection, the same inversion as towing_companies.is_active
+  -- (20260907): a banner in one file protects the one path somebody wrote; the default
+  -- protects every path nobody has written yet. The app never names this column, so every
+  -- row it inserts is app-owned automatically. The default is registered as an H token in
+  -- verify_schema.sql, because a reverted DEFAULT creates no named object.
+  --
+  -- NOT in EDUCATION_COLUMNS, alongside id and created_at: it is provenance, not something
+  -- the user told us. Do not "fix" that. 20261027 drops it with the trigger.
+  mirror_owned    boolean NOT NULL DEFAULT false,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
+
+-- Re-runnable: the table above is CREATE TABLE IF NOT EXISTS, so a re-apply after an
+-- earlier draft needs the column added explicitly.
+ALTER TABLE public.student_education
+  ADD COLUMN IF NOT EXISTS mirror_owned boolean NOT NULL DEFAULT false;
 
 ALTER TABLE public.student_education DROP CONSTRAINT IF EXISTS student_education_level_check;
 ALTER TABLE public.student_education ADD  CONSTRAINT student_education_level_check
@@ -238,12 +261,16 @@ BEGIN
    WHERE institution_id IS NOT NULL
      AND (student_level IS NULL OR student_level NOT IN ('university', 'postgraduate'));
 
+  -- mirror_owned = true: these rows ARE profiles.institution_id in the new shape, so the
+  -- transition trigger has to be allowed to keep them in step for the rest of the window.
+  -- Everything the app creates from here on defaults to false and is off-limits to it.
   INSERT INTO public.student_education
-    (user_id, institution_id, level, subject_id, study_start_year, study_end_year, listing_opt_in)
+    (user_id, institution_id, level, subject_id, study_start_year, study_end_year,
+     listing_opt_in, mirror_owned)
   SELECT p.id, p.institution_id,
          CASE WHEN p.student_level IN ('university', 'postgraduate') THEN p.student_level
               ELSE 'university' END,
-         p.subject_id, p.study_start_year, p.study_end_year, p.student_listing_opt_in
+         p.subject_id, p.study_start_year, p.study_end_year, p.student_listing_opt_in, true
     FROM public.profiles p
    WHERE p.institution_id IS NOT NULL
   ON CONFLICT (user_id, institution_id, level) DO NOTHING;
@@ -276,23 +303,33 @@ END $$;
 -- meant to end. Same shape as display_name_normalized: the server maintains the derived
 -- store so no client has to know it exists.
 --
--- ⚠ IT NEVER TOUCHES A CLOSED ROW. An old client clearing institution_id means "stop
---   showing me", which is honoured by clearing listing_opt_in on every row — NOT by
---   deleting the history. Losing a user's education record to a stale bundle is
---   unrecoverable; leaving an unlisted row is not, and the visibility intent is what
---   actually matters to them.
+-- ⚠ ONE RULE ABOVE ALL OTHERS: IT NEVER DELETES, AND NEVER TOUCHES A ROW THE APP MADE.
+--   It may CREATE a row, and UPDATE a row it created itself (mirror_owned). Nothing else.
+--   There is no DELETE anywhere in the body, and section 10 asserts that against pg_proc
+--   rather than trusting this comment.
 --
--- ⚠ AND IT MUST NEVER RAISE. The first draft of this trigger did: it INSERTed the new
---   enrolment, so an old client CHANGING university produced a SECOND row with no end
---   year and hit student_education_one_open_per_user with a 23505 — failing the user's
---   profile save outright. That is precisely the outage this whole file is sequenced to
---   avoid, arriving through the safety net rather than through the drop. Caught by
---   scratchpad/pg/s26e.cjs before this was ever proposed.
+--   Why the rule is absolute rather than best-effort: this trigger is SCAFFOLDING THAT
+--   DIES IN 20261027. Temporary scaffolding must not be able to destroy permanent user
+--   data, whatever it thinks it knows. And it cannot reliably know — `AFTER UPDATE OF`
+--   fires on SET-list membership, not on value change, so a stale bundle's echo and a
+--   deliberate edit arrive looking identical. Two drafts of this trigger were wrong in
+--   exactly that gap (below). A structural rule holds where inference did not.
 --
---   The fix is to reconcile rather than accumulate. An old client can express exactly
---   ONE affiliation, so its write means "this is my current enrolment": any OTHER open
---   row belongs to the affiliation it is replacing, and the partial index guarantees
---   there is at most one. Closed rows — the actual history — are never in scope.
+--   THE SAFE FAILURE IS "IGNORED". A stale device's move either lands as an extra row or
+--   is dropped on the floor with a RAISE LOG breadcrumb. A lost row is permanent; a
+--   duplicate is visible to its owner and fixable on their own profile page.
+--
+-- ⚠ AND IT MUST NEVER RAISE. Draft 1 INSERTed unconditionally, so an old client CHANGING
+--   university produced a SECOND open row and hit student_education_one_open_per_user
+--   with a 23505 — failing the user's profile save outright. That is precisely the outage
+--   this file is sequenced to avoid, arriving through the safety net rather than through
+--   the drop. Draft 2 fixed it by DELETING the row it thought it was replacing, which is
+--   how it came to destroy a master's degree somebody had just added on another device.
+--   Both caught by scratchpad/pg/s26e.cjs before either was applied.
+--
+--   The resolution is to do neither: check first, and decline the write when it cannot be
+--   made without breaking something. An old client can express exactly ONE affiliation,
+--   so it simply has nothing to say about a second enrolment.
 --
 -- REMOVE IT IN 20261027, in the same transaction that drops the columns it reads. It has
 -- no purpose once the columns are gone, and it cannot outlive them: its body references
@@ -305,9 +342,11 @@ SET search_path TO 'public'
 AS $function$
 DECLARE
   v_level     text;
-  v_old_level text;
-  v_moved     boolean;   -- this write names a DIFFERENT enrolment than the row held before
-  v_opens     boolean;   -- this write actually makes that enrolment the open one
+  v_id        uuid;      -- the row for THIS exact enrolment, if there is one
+  v_mine      boolean;   -- …and whether this trigger is the one that made it
+  v_end       smallint;
+  v_open_id   uuid;      -- the person's OTHER open enrolment, if any
+  v_open_mine boolean;   -- …and whether this trigger made that one
 BEGIN
   -- ─── ECHOES ARE NO-OPS. This arm is the important one. ────────────────────
   -- `AFTER UPDATE OF <cols>` fires when a column is in the SET LIST, not when its value
@@ -328,8 +367,16 @@ BEGIN
 
   IF NEW.institution_id IS NULL THEN
     IF TG_OP = 'UPDATE' AND OLD.institution_id IS NOT NULL THEN
-      -- Cleared by an old client: honour the visibility intent, keep the history.
-      UPDATE student_education SET listing_opt_in = false WHERE user_id = NEW.id;
+      -- Cleared by an old client: honour the visibility intent on the enrolment that
+      -- client could actually SEE — its own mirrored row — and keep the history.
+      --
+      -- SCOPED TO mirror_owned, and that scoping is not pedantry. affiliationPatch()
+      -- clears institution_id as a SIDE EFFECT of changing resident_status to 'working',
+      -- so an unscoped unlist would rip a CURRENT master's off every list because the user
+      -- said on an old device that they got a job. The old client is not talking about an
+      -- enrolment it has never heard of.
+      UPDATE student_education SET listing_opt_in = false
+       WHERE user_id = NEW.id AND mirror_owned;
     END IF;
     RETURN NULL;
   END IF;
@@ -337,66 +384,108 @@ BEGIN
   v_level := CASE WHEN NEW.student_level IN ('university', 'postgraduate')
                   THEN NEW.student_level ELSE 'university' END;
 
-  -- TG_OP is branched on EXPLICITLY rather than folded into the boolean below: OLD is
-  -- unassigned in an INSERT trigger and reading a field of it raises, and SQL boolean
-  -- evaluation is not guaranteed to short-circuit, so `TG_OP = 'INSERT' OR OLD.x …` is
-  -- a trap rather than a guard.
-  IF TG_OP = 'INSERT' THEN
-    v_moved := true;
-    v_opens := NEW.study_end_year IS NULL;
+  SELECT e.id, e.mirror_owned, e.study_end_year INTO v_id, v_mine, v_end
+    FROM student_education e
+   WHERE e.user_id = NEW.id AND e.institution_id = NEW.institution_id AND e.level = v_level;
+
+  -- ─── The row exists and the APP made it: hands off. ───────────────────────
+  IF v_id IS NOT NULL AND NOT v_mine THEN
+    RAISE LOG 'mirror_profile_affiliation: ignoring write for % — % is app-owned',
+      NEW.id, v_id;
+    RETURN NULL;
+  END IF;
+
+  -- The person's OTHER open enrolment, if they have one. At most one row can match: the
+  -- partial unique index says so. Everything below turns on whether it exists and, if it
+  -- does, WHO MADE IT — never on deleting it.
+  SELECT e.id, e.mirror_owned INTO v_open_id, v_open_mine
+    FROM student_education e
+   WHERE e.user_id = NEW.id AND e.study_end_year IS NULL
+     AND (v_id IS NULL OR e.id <> v_id);
+
+  IF v_id IS NOT NULL THEN
+    -- ─── The row exists and this trigger made it: update, changed fields only. ───
+    -- The other values are stale copies of what profiles held; writing them back is how
+    -- draft 2 reopened closed rows. Nothing here can delete or move a row.
+    IF NEW.study_end_year IS NULL AND v_end IS NOT NULL AND v_open_id IS NOT NULL THEN
+      -- Reopening this one would collide with another open enrolment. Decline the whole
+      -- write rather than apply half of it: a partial update is harder to reason about
+      -- later than a write that plainly did not happen.
+      RAISE LOG 'mirror_profile_affiliation: ignoring reopen for % — another open enrolment exists',
+        NEW.id;
+      RETURN NULL;
+    END IF;
+    UPDATE student_education e
+       SET subject_id       = CASE WHEN TG_OP = 'UPDATE' AND NEW.subject_id IS DISTINCT FROM OLD.subject_id
+                                   THEN NEW.subject_id ELSE e.subject_id END,
+           study_start_year = CASE WHEN TG_OP = 'UPDATE' AND NEW.study_start_year IS DISTINCT FROM OLD.study_start_year
+                                   THEN NEW.study_start_year ELSE e.study_start_year END,
+           study_end_year   = CASE WHEN TG_OP = 'UPDATE' AND NEW.study_end_year IS DISTINCT FROM OLD.study_end_year
+                                   THEN NEW.study_end_year ELSE e.study_end_year END,
+           listing_opt_in   = CASE WHEN TG_OP = 'UPDATE' AND NEW.student_listing_opt_in IS DISTINCT FROM OLD.student_listing_opt_in
+                                   THEN NEW.student_listing_opt_in ELSE e.listing_opt_in END
+     WHERE e.id = v_id;
+    RETURN NULL;
+  END IF;
+
+  -- ─── No row for this enrolment. Three cases, and only the first two act. ──
+  --
+  -- A CLOSED result cannot collide with the one-open-per-person index, so it just lands —
+  -- an old client recording a graduation at a university it has not mentioned before.
+  IF NEW.study_end_year IS NOT NULL OR v_open_id IS NULL THEN
+    NULL;   -- fall through to the INSERT
+
+  ELSIF v_open_mine THEN
+    -- A MOVE, as an old client expresses one: profiles.institution_id changed, and the
+    -- only open enrolment on record is the one THIS TRIGGER wrote to mirror the old value.
+    -- Repurpose that row in place. This is an UPDATE of a row the trigger created — no
+    -- delete, and nothing the app authored is touched, because the app has never written
+    -- to a mirror_owned row (it clears the flag when it does).
+    --
+    -- Losing the previous institution here is correct, not a compromise: profiles no
+    -- longer records it either. An old bundle can hold exactly ONE affiliation, so this
+    -- row has never been anything but a picture of that single value.
+    UPDATE student_education
+       SET institution_id   = NEW.institution_id,
+           level            = v_level,
+           subject_id       = NEW.subject_id,
+           study_start_year = NEW.study_start_year,
+           study_end_year   = NEW.study_end_year,
+           listing_opt_in   = NEW.student_listing_opt_in
+     WHERE id = v_open_id;
+    RETURN NULL;
+
   ELSE
-    v_old_level := CASE WHEN OLD.student_level IN ('university', 'postgraduate')
-                        THEN OLD.student_level ELSE 'university' END;
-    -- A MOVE is the only thing that may retire a row. Changing years, subject or the
-    -- opt-in is an edit of the enrolment the user already has.
-    v_moved := NEW.institution_id IS DISTINCT FROM OLD.institution_id
-               OR (OLD.institution_id IS NOT NULL AND v_level IS DISTINCT FROM v_old_level);
-    -- …and an enrolment only becomes THE open one on a move, or when the graduation year
-    -- is genuinely cleared. A STALE NULL end year re-sent by an old client is neither.
-    v_opens := NEW.study_end_year IS NULL
-               AND (v_moved OR NEW.study_end_year IS DISTINCT FROM OLD.study_end_year);
+    -- The person is already current somewhere else according to a row THE APP made, which
+    -- this trigger may not touch. Ignored — the safe failure. Nothing is lost: their real
+    -- enrolment stands, and their own profile page will show both universities once they
+    -- are on new JS, where they can correct it.
+    RAISE LOG 'mirror_profile_affiliation: ignoring new open enrolment for % — an app-owned open enrolment exists (%)',
+      NEW.id, v_open_id;
+    RETURN NULL;
   END IF;
 
-  -- Retire the open row this write REPLACES, before writing the new one. At most one row
-  -- can match (the partial index says so), it is never a closed history row, and doing it
-  -- first is what keeps the write below from ever hitting 23505 — which would fail the
-  -- straggler's whole profile save, the exact outage this trigger exists to prevent.
-  IF v_opens THEN
-    DELETE FROM student_education
-     WHERE user_id = NEW.id
-       AND study_end_year IS NULL
-       AND NOT (institution_id = NEW.institution_id AND level = v_level);
-  END IF;
-
-  IF v_moved THEN
+  -- DO NOTHING, not DO UPDATE: between the SELECT above and this INSERT another session
+  -- could have created the row, and the losing side must not overwrite the winner.
+  --
+  -- The EXCEPTION block is the belt. ON CONFLICT can name ONE arbiter, and this INSERT has
+  -- two ways to collide: the (user, institution, level) constraint named below, and
+  -- student_education_one_open_per_user, which the v_others check above only closes up to
+  -- the instant it ran. Same account on two devices in the same second is rare and it is
+  -- the exact population this trigger exists for, so the loser must be IGNORED rather than
+  -- allowed to raise — an unhandled 23505 here fails the straggler's whole profile save.
+  BEGIN
     INSERT INTO student_education
-      (user_id, institution_id, level, subject_id, study_start_year, study_end_year, listing_opt_in)
+      (user_id, institution_id, level, subject_id, study_start_year, study_end_year,
+       listing_opt_in, mirror_owned)
     VALUES
       (NEW.id, NEW.institution_id, v_level, NEW.subject_id,
-       NEW.study_start_year, NEW.study_end_year, NEW.student_listing_opt_in)
-    ON CONFLICT (user_id, institution_id, level) DO UPDATE
-      SET subject_id       = excluded.subject_id,
-          study_start_year = excluded.study_start_year,
-          study_end_year   = excluded.study_end_year,
-          listing_opt_in   = excluded.listing_opt_in;
-  ELSE
-    -- Same enrolment, edited. Propagate ONLY the fields that actually changed: the other
-    -- three are stale copies of what profiles held, and writing a stale NULL end year back
-    -- would REOPEN a closed row — two open rows, 23505, failed save. And never insert: if
-    -- no row matches, the new app deleted it, and resurrecting it would undo that.
-    UPDATE student_education e
-       SET subject_id       = CASE WHEN NEW.subject_id IS DISTINCT FROM OLD.subject_id
-                                   THEN NEW.subject_id ELSE e.subject_id END,
-           study_start_year = CASE WHEN NEW.study_start_year IS DISTINCT FROM OLD.study_start_year
-                                   THEN NEW.study_start_year ELSE e.study_start_year END,
-           study_end_year   = CASE WHEN NEW.study_end_year IS DISTINCT FROM OLD.study_end_year
-                                   THEN NEW.study_end_year ELSE e.study_end_year END,
-           listing_opt_in   = CASE WHEN NEW.student_listing_opt_in IS DISTINCT FROM OLD.student_listing_opt_in
-                                   THEN NEW.student_listing_opt_in ELSE e.listing_opt_in END
-     WHERE e.user_id = NEW.id
-       AND e.institution_id = NEW.institution_id
-       AND e.level = v_level;
-  END IF;
+       NEW.study_start_year, NEW.study_end_year, NEW.student_listing_opt_in, true)
+    ON CONFLICT (user_id, institution_id, level) DO NOTHING;
+  EXCEPTION WHEN unique_violation THEN
+    RAISE LOG 'mirror_profile_affiliation: ignoring new enrolment for % — lost a race (%)',
+      NEW.id, SQLERRM;
+  END;
 
   RETURN NULL;   -- AFTER trigger
 END;
@@ -695,6 +784,15 @@ BEGIN
      OR v_def NOT ILIKE '%IS NOT DISTINCT FROM OLD.student\_listing\_opt\_in%' THEN
     RAISE EXCEPTION 'mirror_profile_affiliation has no echo guard — an unchanged write would be treated as a move. Body: %', left(v_def, 600);
   END IF;
+  -- THE RULE, asserted against the deployed body rather than trusted from the comment.
+  -- Scaffolding does not get to delete permanent data. Anchored on the code shape
+  -- 'DELETE FROM student_education', which no comment in that body contains, and paired
+  -- with positives so an empty or renamed body cannot satisfy the negative by vanishing.
+  IF v_def ILIKE '%DELETE FROM student\_education%'
+     OR v_def NOT ILIKE '%mirror\_owned%'
+     OR v_def NOT ILIKE '%INSERT INTO student\_education%' THEN
+    RAISE EXCEPTION 'mirror_profile_affiliation must never DELETE and must respect mirror_owned. Body: %', left(v_def, 900);
+  END IF;
 
   -- (h) content_reports, read back.
   SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
@@ -748,7 +846,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261026_student_education.sql', '0f7570faaf6b612bed0e1f984a70caf20036d1cc6c7b78ebc2eb251e0d81cc5a')
+VALUES ('20261026_student_education.sql', 'dc31bd5023ed5fee5651209cd3e17d27dcb94738f717d163bb76c72241ba3d20')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

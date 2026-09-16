@@ -2342,6 +2342,30 @@ WITH report AS (
         WHERE n.nspname='public' AND p.proname='mirror_profile_affiliation'
           AND pg_get_functiondef(p.oid) ILIKE '%IS NOT DISTINCT FROM OLD.institution\_id%'
           AND pg_get_functiondef(p.oid) ILIKE '%IS NOT DISTINCT FROM OLD.student\_listing\_opt\_in%')
+    -- (10) THE RULE THE WHOLE TRIGGER IS BUILT AROUND: it may create a row and update one
+    -- it created itself (mirror_owned), and NOTHING else. It never deletes. This trigger is
+    -- scaffolding that 20261027 removes, and temporary scaffolding must not be able to
+    -- destroy permanent user data — two drafts of it were wrong in exactly that way, the
+    -- second one deleting a master's degree somebody had just added on another device.
+    -- Negative anchored on the code shape, which no comment in that body contains, plus
+    -- positives so an emptied or renamed body cannot satisfy the negative by vanishing.
+    UNION ALL SELECT '1026_student_education','mirror_profile_affiliation NEVER deletes, and respects mirror_owned',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='mirror_profile_affiliation'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%DELETE FROM student\_education%'
+          AND pg_get_functiondef(p.oid) ILIKE '%mirror\_owned%'
+          AND pg_get_functiondef(p.oid) ILIKE '%INSERT INTO student\_education%')
+    -- (11) …and the DEFAULT that makes the rule hold for code nobody has written yet.
+    -- The app never names mirror_owned, so every row it inserts is app-owned and therefore
+    -- untouchable, automatically. Same inversion as towing_companies.is_active (20260907),
+    -- and registered here for the same reason: a reverted DEFAULT creates no named object
+    -- and is otherwise undetectable. Flip it to true and the trigger reclaims the right to
+    -- overwrite every row the app has ever created, silently.
+    UNION ALL SELECT '1026_student_education','student_education.mirror_owned DEFAULTs to false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+              WHERE table_schema='public' AND table_name='student_education'
+                AND column_name='mirror_owned' AND column_default = 'false'
+                AND is_nullable = 'NO')
     -- ══ resident_status narrowed to four (20261006) ═════════════════════════
     -- THE CONSTRAINT NAME DID NOT CHANGE, which is exactly why this token has to
     -- exist. Section E asserts profiles_resident_status_check is PRESENT, and it stays

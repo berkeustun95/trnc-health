@@ -597,6 +597,7 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('student_education', 'study_start_year', false, NULL, 'smallint'),
     ('student_education', 'study_end_year', false, NULL, 'smallint'),
     ('student_education', 'listing_opt_in', true, 'false', 'boolean'),
+    ('student_education', 'mirror_owned', true, 'false', 'boolean'),
     ('student_education', 'created_at', true, 'now()', 'timestamp with time zone')
 ),
 expected_constraint (cname, litsig) AS (VALUES
