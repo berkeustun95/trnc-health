@@ -155,6 +155,9 @@ const DISCLOSURE = {
   study_start_year:       /year you started/i,
   study_end_year:         /year you graduated/i,
   student_listing_opt_in: /student list/i,
+  // student_education's name for the same fact (20261026). Both spellings carry a rule so
+  // the check survives 20261027 moving the column between tables.
+  listing_opt_in:         /student list/i,
 }
 
 // Columns that are not user-supplied personal data to itemise. Each needs a REASON.
@@ -258,11 +261,27 @@ function checkGoLive(problems, log, flagOn, texts) {
   if (!flagOn) log('    · silent until the flag flips; fires on the publish that makes these untrue')
 }
 
+// TWO derived sources, not one. PROFILE_COLUMNS is what profiles holds; EDUCATION_COLUMNS
+// is what student_education holds (20261026). The second exists because the first is about
+// to shrink: 20261027 moves the five affiliation columns out of profiles, and a guard
+// reading only PROFILE_COLUMNS would quietly stop checking that they are disclosed — going
+// GREEN because the data moved, while the app still collects every one of those facts.
+//
+// Both are READ, never retyped here. `listing_opt_in` is the same fact PROFILE_COLUMNS
+// calls `student_listing_opt_in`, so the union is de-duplicated by DISCLOSURE key below.
 function readColumns() {
   const app = readFileSync(join(ROOT, 'App.js'), 'utf8')
   const m = app.match(/const PROFILE_COLUMNS\s*=\s*'([^']+)'/)
   if (!m) throw new Error('could not locate PROFILE_COLUMNS in App.js')
-  return m[1].split(',').map(c => c.trim()).filter(Boolean)
+  const profile = m[1].split(',').map(c => c.trim()).filter(Boolean)
+
+  const gate = readFileSync(join(ROOT, 'constants/profileGate.js'), 'utf8')
+  const e = gate.match(/export const EDUCATION_COLUMNS\s*=\s*\[([\s\S]*?)\]/)
+  if (!e) throw new Error('could not locate EDUCATION_COLUMNS in constants/profileGate.js')
+  const education = [...e[1].matchAll(/'([a-z_]+)'/g)].map(x => x[1])
+  if (!education.length) throw new Error('EDUCATION_COLUMNS parsed to zero columns — the guard would check nothing')
+
+  return [...new Set([...profile, ...education])]
 }
 
 function loadCopies() {
@@ -338,7 +357,13 @@ function check(copies, columns, log = console.log, world = null) {
 // ── --self: every failure path, mutation asserted to have landed first ──
 function self() {
   const copies = loadCopies(), columns = readColumns(), quiet = () => {}
-  const realWorld = { flagOn: readStudentHubFlag(), texts: loadGoLiveTexts() }
+  // BASELINE FORCES THE FLAG OFF, and that is not cheating. --self asks "can every
+  // failure path go red", and it needs a green starting point to attribute the red to the
+  // mutation. Reading the live flag here makes the self-test unusable exactly when someone
+  // has flipped the module on locally to preview it — which is step 4 of the go-live SOP,
+  // i.e. a normal and correct working state. The tripwire's own paths are driven by
+  // flipping flagOn to true as a MUTATION in the two cases below, so nothing goes unchecked.
+  const realWorld = { flagOn: false, texts: loadGoLiveTexts() }
   if (check(copies, columns, quiet, realWorld).length) {
     console.error('  --self cannot run: the real files are already failing.')
     return 1
@@ -355,6 +380,13 @@ function self() {
       ([cs]) => !/date of birth/i.test(cs[0].text)],
     ['a NEW profile column appears', () => [copies, [...columns, 'passport_number']],
       ([,cols]) => cols.includes('passport_number')],
+    // ── The SECOND derived source is load-bearing. If the guard ever stops reading
+    //    EDUCATION_COLUMNS, 20261027 moving the affiliation columns out of profiles
+    //    would silently retire four disclosure rules and this guard would go GREEN on
+    //    unchanged obligations. A new education column with no rule must go red exactly
+    //    the way a new profiles column does.
+    ['a NEW student_education column appears', () => [copies, [...columns, 'transcript_url']],
+      ([,cols]) => cols.includes('transcript_url')],
     // ── The go-live tripwire. Flipping ONLY the flag must turn it red against the
     //    real, unmodified privacy files — that is the whole point of it.
     ['Student Hub goes live on stale privacy copy',

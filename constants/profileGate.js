@@ -89,6 +89,27 @@ export const INSTITUTION_REQUIRED_LEVELS = ['university', 'postgraduate']
 
 export const DISPLAY_PREFERENCES = ['display_name', 'full_name']
 
+// ─── student_education's disclosable columns (20261026) ─────────────────────
+//
+// THIS EXISTS TO STOP A GUARD GOING GREEN BECAUSE THE DATA MOVED.
+// check-privacy-parity derives what must be disclosed from App.js PROFILE_COLUMNS. When
+// 20261027 drops institution_id / study_start_year / study_end_year / subject_id /
+// student_listing_opt_in from profiles, they leave that list — and the disclosure rules
+// for them stop being exercised, while the obligation is completely unchanged, because
+// the app still collects every one of these facts. The guard would certify its own blind
+// spot, which is worse than having no guard.
+//
+// So the guard reads BOTH lists. Keep this in step with the table: a column added here
+// fails the guard until it is disclosed in all four privacy copies or exempted with a
+// reason, which is the review moment a hardcoded list never creates.
+//
+// `level` is deliberately absent — it is disclosed inside the "university details"
+// sentence rather than as a field of its own, the same way the four consent columns are
+// covered by one prose bullet. If that bullet stops describing it, exempt it explicitly.
+export const EDUCATION_COLUMNS = [
+  'institution_id', 'subject_id', 'study_start_year', 'study_end_year', 'listing_opt_in',
+]
+
 // ─── AFFILIATION PATCH (20261024) — the ONE writer both screens use ─────────
 //
 // Four CHECKs and a trigger couple these columns, and a patch that honours three of
