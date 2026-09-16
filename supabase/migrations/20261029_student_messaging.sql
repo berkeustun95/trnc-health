@@ -114,12 +114,28 @@ CREATE TABLE IF NOT EXISTS public.conversations (
   pair_hi uuid GENERATED ALWAYS AS
     (CASE WHEN initiator_id < recipient_id THEN recipient_id ELSE initiator_id END) STORED,
 
-  CONSTRAINT conversations_not_self CHECK (initiator_id IS DISTINCT FROM recipient_id),
+  -- ► `<>`, NOT `IS DISTINCT FROM`, AND THE DIFFERENCE IS A BUG EITHER WAY ROUND.
+  --   CLAUDE.md's rule — always IS DISTINCT FROM — is about ASSERTIONS, where a NULL
+  --   comparison must FIRE. A CHECK is the opposite: an unknown result counts as
+  --   SATISFIED, which is exactly what nullable columns need. Both participants are
+  --   ON DELETE SET NULL, so once two people have deleted their accounts this row holds
+  --   (NULL, NULL) — and `NULL IS DISTINCT FROM NULL` is FALSE, so the strict form would
+  --   refuse the SECOND deletion. `NULL <> NULL` is NULL, which passes.
+  --   Do not "correct" this to IS DISTINCT FROM.
+  CONSTRAINT conversations_not_self CHECK (initiator_id <> recipient_id),
   -- You cannot both accept and decline. A decline is final, so this is a real invariant
   -- rather than a tidiness rule: if both were ever set, `awaiting acceptance` and
   -- `permanently refused` would be true at once and every gate below would disagree.
   CONSTRAINT conversations_not_both CHECK (accepted_at IS NULL OR declined_at IS NULL),
-  CONSTRAINT conversations_closed_pair CHECK ((closed_at IS NULL) = (closed_by IS NULL))
+  -- ► ONE-WAY, NOT AN EQUIVALENCE, FOR THE SAME REASON. `closed_by` is ON DELETE SET
+  --   NULL, so when the person who LEFT deletes their account Postgres nulls it while
+  --   `closed_at` stays set. The symmetric form `(closed_at IS NULL) = (closed_by IS
+  --   NULL)` then refuses the DELETE, and anybody who has ever tapped Leave or Block
+  --   cannot delete their account. Same failure as the one guard_message_immutable had:
+  --   a foreign key's own SET NULL is an ordinary write, and constraints see it.
+  --   So: a recorded closer implies the thread is closed; a closed thread may have lost
+  --   its closer. The other direction is not an invariant.
+  CONSTRAINT conversations_closed_pair CHECK (closed_by IS NULL OR closed_at IS NOT NULL)
 );
 
 -- At most ONE live thread per pair. Settled threads (declined, closed) drop out of the
@@ -737,8 +753,16 @@ BEGIN
     RETURN 'refused';
   END IF;
 
-  INSERT INTO conversations (initiator_id, recipient_id) VALUES (v_me, p_recipient_id)
-  RETURNING id INTO v_conv;
+  -- The EXISTS check above and this INSERT are not atomic with respect to another
+  -- session doing the same thing, so two simultaneous openers both pass it and the
+  -- second meets the partial unique index as a raw 23505 the client cannot read.
+  -- 20261026's own belt, worn for the same reason.
+  BEGIN
+    INSERT INTO conversations (initiator_id, recipient_id) VALUES (v_me, p_recipient_id)
+    RETURNING id INTO v_conv;
+  EXCEPTION WHEN unique_violation THEN
+    RAISE EXCEPTION 'CONVERSATION_EXISTS';
+  END;
 
   -- sender_display_name is stamped by msg_10; the placeholder is never stored.
   INSERT INTO messages (conversation_id, sender_id, sender_display_name, body)
@@ -1333,6 +1357,35 @@ BEGIN
     RAISE EXCEPTION 'interval ''18 years'' appears in more than one function — ADULT_AGE must have one home';
   END IF;
 
+  -- ► THE TWO CHECKS THAT MUST TOLERATE A DELETED ACCOUNT.
+  -- Both `initiator_id`/`recipient_id` and `closed_by` are ON DELETE SET NULL, and a
+  -- foreign key performs that as an ordinary UPDATE which constraints see. The strict
+  -- forms — `initiator_id IS DISTINCT FROM recipient_id` and
+  -- `(closed_at IS NULL) = (closed_by IS NULL)` — each make `DELETE FROM profiles` fail,
+  -- so account deletion breaks for anyone who has left a thread or blocked somebody.
+  -- Asserted by READING THE DEFINITION rather than by deleting a profile: an in-migration
+  -- probe that removes a real account is not a probe, it is an outage.
+  -- pg_get_constraintdef carries no comments, so a LIKE over it matches code and only code.
+  IF EXISTS (SELECT 1 FROM pg_constraint c
+              WHERE c.conrelid = to_regclass('public.conversations')
+                AND c.conname = 'conversations_not_self'
+                AND pg_get_constraintdef(c.oid) ILIKE '%IS DISTINCT FROM%') THEN
+    RAISE EXCEPTION 'conversations_not_self uses IS DISTINCT FROM: once BOTH participants delete their accounts the row is (NULL, NULL) and the second DELETE is refused. Use <>.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_constraint c
+              WHERE c.conrelid = to_regclass('public.conversations')
+                AND c.conname = 'conversations_closed_pair'
+                -- Parens stripped before matching: pg_get_constraintdef returns the
+                -- CANONICAL rendering, `((closed_by IS NULL) OR (closed_at IS NOT
+                -- NULL))`, not the spelling above it. Matching the source spelling is
+                -- the frame-of-reference mistake this file warns about twice.
+                AND replace(replace(pg_get_constraintdef(c.oid), '(', ''), ')', '')
+                    NOT ILIKE '%closed_by IS NULL OR closed_at IS NOT NULL%') THEN
+    RAISE EXCEPTION 'conversations_closed_pair is not the one-way form: %',
+      (SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c
+        WHERE c.conrelid = to_regclass('public.conversations') AND c.conname = 'conversations_closed_pair');
+  END IF;
+
   RAISE NOTICE '20261029 verified.';
 END $$;
 
@@ -1347,7 +1400,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261029_student_messaging.sql', 'fa946b00f1f46ff483b987f2b5fd800c1f0fe6f8ade4c0bf9b84a81051035a72')
+VALUES ('20261029_student_messaging.sql', '361271e17aab88da0f8fdeb48ac186685496765063a8ba413b5ed3137a2a2683')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
