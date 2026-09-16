@@ -42,6 +42,14 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
   // private thread with the business — the RPC rejects them server-side too.
   const canBlock   = contentType === 'review'
   const isFacility = contentType === 'facility'
+  // A student-list entry is a PERSON, not a piece of content, and "Report this content /
+  // we remove violating content" reads as a category error over somebody's name. Same
+  // shape as the facility branch above — copy only; the insert is identical.
+  // No block action here: blocks exist (20260712) and get_student_list honours them in
+  // both directions, but the only way to create one today is the review flow. A block
+  // button on a person belongs with profile pages and messaging (slices 5-6), where
+  // there is something to block them FROM.
+  const isProfile  = contentType === 'profile'
 
   function close() {
     setOpen(false)
@@ -162,8 +170,8 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
 
             {step === 'form' && (
               <>
-                <Text style={s.title}>{t(isFacility ? 'reportBusinessTitle' : 'reportTitle', lang)}</Text>
-                <Text style={s.sub}>{t(isFacility ? 'reportBusinessSub' : 'reportSubtitle', lang)}</Text>
+                <Text style={s.title}>{t(isProfile ? 'reportProfileTitle' : isFacility ? 'reportBusinessTitle' : 'reportTitle', lang)}</Text>
+                <Text style={s.sub}>{t(isProfile ? 'reportProfileSub' : isFacility ? 'reportBusinessSub' : 'reportSubtitle', lang)}</Text>
 
                 {REASONS.map(r => (
                   <TouchableOpacity

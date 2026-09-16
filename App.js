@@ -1862,13 +1862,24 @@ export default function App() {
     // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
     // earlier in this chain, so Back returns here.
     content = (MODULE_FLAGS.studentHub || isAdmin)
-      ? <StudentHubScreen lang={lang} onBack={() => setShowStudentHub(false)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)} />
+      ? <StudentHubScreen lang={lang} onBack={() => setShowStudentHub(false)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
+          isGuest={isGuest(session)}
+          // CLOSES the hub on the way to the profile, deliberately. The student list's
+          // one action is "turn on the listing setting", and the hub would otherwise stay
+          // mounted holding the opt-in value it read before the user changed it — showing
+          // the reciprocity copy again at the exact moment the setting started working.
+          // Re-entering the hub re-mounts it and re-reads the row.
+          onGoToProfile={() => { setShowStudentHub(false); setActiveTab('profile') }} />
       : <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
   } else if (adminPreview === 'studentHub') {
     // After showEsim and showNewcomerEssentials, not beside the Explore preview — the
     // cross-links only stack if their targets render first. Never clear adminPreview to
     // open them: an admin with no preview set short-circuits to AdminScreen.
-    content = <StudentHubScreen lang={lang} onBack={() => setAdminPreview(null)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)} />
+    // An admin previewing has no customer profile tab to send anyone to — the content
+    // selector is role-first and short-circuits to AdminScreen — so the reciprocity CTA
+    // just closes the preview rather than routing into a tab that does not exist here.
+    content = <StudentHubScreen lang={lang} onBack={() => setAdminPreview(null)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
+      isGuest={false} onGoToProfile={() => setAdminPreview(null)} />
   } else {
     inTabShell = true
     // Utility-only drawer. Home's module grid is the app's navigation now, so the

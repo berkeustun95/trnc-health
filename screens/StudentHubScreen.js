@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, ActivityIndicator,
-  Alert, BackHandler, Linking,
+  Alert, BackHandler, Linking, Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -10,6 +10,9 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import ContentCard from '../components/ContentCard'
 import MascotIntroCard from '../components/MascotIntroCard'
+import ContentReportMenu from '../components/ContentReportMenu'
+import { MODULE_FLAGS } from '../constants/flags'
+import { getPreset } from '../constants/avatars'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
@@ -43,11 +46,134 @@ function UniversityRow({ uni, lang, onOpen }) {
   )
 }
 
+// ─── One entry in the student list (slice 4) ────────────────────────────────
+// Renders ONLY what get_student_list returns. There is no more to render: the RPC hands
+// back six columns and the row has no other source.
+//
+// "Current" vs "graduate" is DERIVED from study_end_year rather than stored — an end year
+// means graduated (20261024's third arm, and the trigger that rejects future end years is
+// what keeps that true).
+function StudentRow({ row, lang, isMe }) {
+  const preset  = getPreset(row.avatar_url)
+  const alumni  = row.study_end_year != null
+  const years   = row.study_start_year
+    ? `${row.study_start_year} – ${row.study_end_year ?? t('studentListPresent', lang)}`
+    : null
+  const meta    = [row.subject_name, years].filter(Boolean).join(' · ')
+
+  return (
+    <View style={[s.studentRow, isMe && s.studentRowMe]}>
+      {preset ? (
+        <View style={[s.studentAvatar, { backgroundColor: preset.bg }]}>
+          <Text style={s.studentAvatarEmoji}>{preset.emoji}</Text>
+        </View>
+      ) : row.avatar_url?.startsWith('http') ? (
+        <Image source={{ uri: row.avatar_url }} style={s.studentAvatar} />
+      ) : (
+        <View style={[s.studentAvatar, s.studentAvatarBlank]}>
+          <Text style={s.studentAvatarInitial}>{row.display_name?.[0]?.toUpperCase() ?? '?'}</Text>
+        </View>
+      )}
+
+      <View style={s.studentBody}>
+        <View style={s.studentNameRow}>
+          <Text style={s.studentName} numberOfLines={1}>{row.display_name}</Text>
+          {isMe ? <View style={s.studentYouPill}><Text style={s.studentYouText}>{t('studentListYou', lang)}</Text></View> : null}
+        </View>
+        {meta ? <Text style={s.studentMeta} numberOfLines={1}>{meta}</Text> : null}
+        <Text style={[s.studentStatus, alumni && s.studentStatusAlumni]}>
+          {t(alumni ? 'studentListAlumni' : 'studentListCurrent', lang)}
+        </Text>
+      </View>
+
+      {/* Reporting your own entry is meaningless, so the menu is hidden on it. */}
+      {isMe ? null : (
+        <ContentReportMenu contentType="profile" contentId={row.user_id} lang={lang} />
+      )}
+    </View>
+  )
+}
+
+// ─── The student list ───────────────────────────────────────────────────────
+// THREE STATES, NEVER COLLAPSED INTO ONE. Every university is empty at launch, so empty
+// is this feature's DEFAULT state and must not read as broken:
+//
+//   guest            → nothing at all. Not a heading, not a hint that a list exists.
+//   not opted in     → the reciprocity explanation and a route to the toggle. NOTHING
+//                      NUMERIC: telling a non-member "3 students here" would disclose the
+//                      count to somebody who has given nothing, which is the exact trade
+//                      the opt-in exists to prevent.
+//   opted in, empty  → an invitation, and confirmation that their own opt-in worked.
+//
+// The RPC enforces all of this server-side too; this is the copy, not the boundary.
+function StudentList({ uni, lang, isGuest, listingOptIn, myId, onGoToProfile }) {
+  const [rows, setRows]     = useState(null)
+  const [failed, setFailed] = useState(false)
+
+  const eligible = !isGuest && listingOptIn
+
+  useEffect(() => {
+    if (!eligible) return
+    let cancelled = false
+    setFailed(false)
+    setRows(null)
+    supabase
+      .rpc('get_student_list', { p_institution_id: uni.id, p_lang: lang })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        // AUTH_REQUIRED / NOT_LISTED are the server saying what the client already
+        // decided; anything else is a real failure. Either way the raw message never
+        // reaches the user.
+        if (error) { setFailed(true); return }
+        setRows(data ?? [])
+      })
+    return () => { cancelled = true }
+  }, [uni.id, lang, eligible])
+
+  if (isGuest) return null
+
+  if (!listingOptIn) {
+    return (
+      <ContentCard style={s.secondCard}>
+        <Text style={s.studentLockedTitle}>{t('studentListLockedTitle', lang)}</Text>
+        <Text style={s.studentLockedBody}>{t('studentListLockedBody', lang)}</Text>
+        <TouchableOpacity style={s.studentLockedBtn} onPress={onGoToProfile} activeOpacity={0.85} accessibilityRole="button">
+          <Ionicons name="person-circle-outline" size={18} color={colors.primary} />
+          <Text style={s.studentLockedBtnText}>{t('studentListLockedCta', lang)}</Text>
+        </TouchableOpacity>
+      </ContentCard>
+    )
+  }
+
+  return (
+    <View style={s.secondCard}>
+      <SectionTitle text={t('studentListTitle', lang)} />
+      {failed ? (
+        <ContentCard><Text style={s.studentEmpty}>{t('studentLoadError', lang)}</Text></ContentCard>
+      ) : rows === null ? (
+        <ContentCard><ActivityIndicator color={colors.primary} /></ContentCard>
+      ) : rows.length === 0 ? (
+        <ContentCard>
+          <Text style={s.studentEmpty}>{t('studentListEmpty', lang).replace('{name}', uni.name)}</Text>
+        </ContentCard>
+      ) : (
+        <ContentCard>
+          {rows.map((row, i) => (
+            <View key={row.user_id} style={i ? s.studentDivider : null}>
+              <StudentRow row={row} lang={lang} isMe={row.user_id === myId} />
+            </View>
+          ))}
+        </ContentCard>
+      )}
+    </View>
+  )
+}
+
 // ─── The university page (Student Hub affiliation, slice 3) ─────────────────
 // Carries ONLY what institutions holds: name, short name, city, and the link when one is
 // set (20261025). No address, logo or accreditation line — each would need a column and
-// content nobody has supplied. This is the frame slice 4's student list is added to.
-function UniversityDetail({ uni, lang, onBack }) {
+// content nobody has supplied. Slice 4 adds the student list below the website button.
+function UniversityDetail({ uni, lang, isGuest, listingOptIn, myId, onGoToProfile, onBack }) {
   const meta = uniMeta(uni, lang)
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -70,6 +196,17 @@ function UniversityDetail({ uni, lang, onBack }) {
             <Ionicons name="open-outline" size={18} color={colors.surface} />
             <Text style={s.linkBtnText}>{t('studentUniWebsite', lang)}</Text>
           </TouchableOpacity>
+        ) : null}
+
+        {MODULE_FLAGS.studentHub ? (
+          <StudentList
+            uni={uni}
+            lang={lang}
+            isGuest={isGuest}
+            listingOptIn={listingOptIn}
+            myId={myId}
+            onGoToProfile={onGoToProfile}
+          />
         ) : null}
       </ScrollView>
     </SafeAreaView>
@@ -365,10 +502,16 @@ function TaskDetail({ task, lang, progress, offline, onToggle, onReset, onBack }
   )
 }
 
-export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewcomerEssentials }) {
+export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewcomerEssentials, isGuest = false, onGoToProfile }) {
   const [tab, setTab] = useState('universities')
   const [universities, setUniversities] = useState(null)
   const [failed, setFailed] = useState(false)
+  // The viewer's OWN row, read here rather than passed down from App.js. App.js caches the
+  // profile and has no callback for the listing toggle, so a prop would be stale exactly
+  // once — right after the user turns the setting on and comes back, which is the moment
+  // the feature has to be right. Opening the profile closes this screen, so re-entering
+  // re-mounts and re-reads.
+  const [me, setMe] = useState(null)
 
   const [tasks, setTasks] = useState(null)
   const [tasksFailed, setTasksFailed] = useState(false)
@@ -422,9 +565,34 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
 
   useEffect(() => { load() }, [load])
 
+  // Own row only — RLS returns exactly one, and that is all this needs.
+  useEffect(() => {
+    if (!MODULE_FLAGS.studentHub || isGuest) return
+    let cancelled = false
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled || !session?.user) return
+      supabase.from('profiles')
+        .select('id, student_listing_opt_in')
+        .eq('id', session.user.id)
+        .maybeSingle()
+        .then(({ data }) => { if (!cancelled) setMe(data ?? null) })
+    })
+    return () => { cancelled = true }
+  }, [isGuest])
+
   const openUni = openUniId ? universities?.find(u => u.id === openUniId) : null
   if (openUni) {
-    return <UniversityDetail uni={openUni} lang={lang} onBack={() => setOpenUniId(null)} />
+    return (
+      <UniversityDetail
+        uni={openUni}
+        lang={lang}
+        isGuest={isGuest}
+        listingOptIn={me?.student_listing_opt_in === true}
+        myId={me?.id ?? null}
+        onGoToProfile={onGoToProfile}
+        onBack={() => setOpenUniId(null)}
+      />
+    )
   }
 
   const openTask = openSlug ? tasks?.find(task => task.slug === openSlug) : null
@@ -604,6 +772,29 @@ const s = StyleSheet.create({
   retryText: { fontSize: 15, fontWeight: '600', color: colors.surface },
 
   secondCard: { marginTop: 16 },
+
+  // ─── Student list (slice 4) ───────────────────────────────────────────────
+  studentRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  studentRowMe:        { opacity: 1 },
+  studentDivider:      { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  studentAvatar:       { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  studentAvatarEmoji:  { fontSize: 22 },
+  studentAvatarBlank:  { backgroundColor: colors.cardBg },
+  studentAvatarInitial:{ fontSize: 18, fontWeight: '700', color: colors.textSecondary },
+  studentBody:         { flex: 1, minWidth: 0 },
+  studentNameRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  studentName:         { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
+  studentYouPill:      { paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.sm, backgroundColor: colors.primaryLight },
+  studentYouText:      { fontSize: 11, fontWeight: '700', color: colors.primary },
+  studentMeta:         { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  studentStatus:       { fontSize: 12, color: colors.primary, marginTop: 3, fontWeight: '600' },
+  studentStatusAlumni: { color: colors.textSecondary },
+  studentEmpty:        { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+
+  studentLockedTitle:  { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  studentLockedBody:   { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+  studentLockedBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.primary, backgroundColor: 'transparent' },
+  studentLockedBtnText:{ fontSize: 15, fontWeight: '700', color: colors.primary },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '700',

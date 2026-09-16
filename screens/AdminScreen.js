@@ -488,9 +488,17 @@ function DashboardTab({ onNavigate }) {
 // publish a 24h removal commitment in the Terms).
 
 const REASON_LABELS  = { offensive: 'Offensive', harassment: 'Harassment', spam: 'Spam', false_info: 'False info', other: 'Other' }
-const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places' }
-const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by' }
-const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name' }
+// 'profile' (20261026) is READ here but never WRITTEN: profiles has no hidden_at, and
+// what "hidden" should mean for a person is a decision that has not been made. Its row
+// is fetched so the report renders as itself; every write action is suppressed below.
+// Without the fetch branch a profile report falls to `missing` and renders "Content no
+// longer exists — the author likely deleted their account", which is a lie that an admin
+// would act on by dismissing a real report.
+const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places', profile: 'profiles' }
+const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by', profile: 'id' }
+const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name', profile: 'display_name' }
+// Types whose remedy is not built. Read-only in triage: Dismiss is the only action.
+const READ_ONLY_REPORT_TYPES = ['profile']
 
 // PlacesTab reviews THREE sources (beaches/landmarks frozen + the new places table). The
 // WRITE path (approve/reject/delete) MUST switch on _type to the right table — a `place`
@@ -537,12 +545,17 @@ function ReportsTab({ session }) {
     // type. It may be missing entirely — delete_own_account hard-deletes a user's
     // reviews, which leaves their reports dangling.
     const contentByKey = new Map()
-    for (const type of ['review', 'question', 'answer', 'facility', 'place']) {
+    for (const type of ['review', 'question', 'answer', 'facility', 'place', 'profile']) {
       const ids = [...new Set(reports.filter(r => r.content_type === type).map(r => r.content_id))]
       if (!ids.length) continue
+      // profiles has no hidden_at/hidden_reason — selecting them would 42703 the whole
+      // read and empty the queue of every type, not just this one.
+      const cols = READ_ONLY_REPORT_TYPES.includes(type)
+        ? `id, ${TEXT_COL[type]}, ${AUTHOR_COL[type]}`
+        : `id, ${TEXT_COL[type]}, ${AUTHOR_COL[type]}, hidden_at, hidden_reason`
       const { data } = await supabase
         .from(CONTENT_TABLE[type])
-        .select(`id, ${TEXT_COL[type]}, ${AUTHOR_COL[type]}, hidden_at, hidden_reason`)
+        .select(cols)
         .in('id', ids)
       for (const row of data ?? []) contentByKey.set(`${type}:${row.id}`, row)
     }
@@ -684,6 +697,7 @@ function ReportsTab({ session }) {
         const hidden      = !!g.content?.hidden_at
         const autoHidden  = g.content?.hidden_reason === 'auto_reports'
         const text        = g.content?.[TEXT_COL[g.contentType]]
+        const readOnly    = READ_ONLY_REPORT_TYPES.includes(g.contentType)
         const reasonCount = g.reports.reduce((acc, r) => ({ ...acc, [r.reason]: (acc[r.reason] ?? 0) + 1 }), {})
         const isBusy      = busy === g.key
 
@@ -708,6 +722,15 @@ function ReportsTab({ session }) {
               ? <Text style={s.reportMissing}>Content no longer exists — the author likely deleted their account. Dismiss to clear.</Text>
               : <Text style={s.reportBody}>{text || <Text style={s.reportMissing}>(rating only, no text)</Text>}</Text>}
 
+            {readOnly && !missing && (
+              <Text style={s.reportMissing}>
+                Reported display name. No action is available here yet — profiles have no
+                hidden state. Act on the user directly (clear the display name to force a
+                new one, or set a UGC ban, which also removes them from every student
+                list), then Dismiss.
+              </Text>
+            )}
+
             <Text style={s.reportMeta}>
               {g.reports.length} report{g.reports.length !== 1 ? 's' : ''} ·{' '}
               {Object.entries(reasonCount).map(([k, n]) => `${REASON_LABELS[k] ?? k}${n > 1 ? ` ×${n}` : ''}`).join(', ')}
@@ -722,7 +745,7 @@ function ReportsTab({ session }) {
                 <ActivityIndicator color={colors.primary} style={{ paddingVertical: 7 }} />
               ) : (
                 <>
-                  {!missing && (hidden
+                  {!missing && !readOnly && (hidden
                     ? <TouchableOpacity style={s.ghostBtn} onPress={() => restoreContent(g)}>
                         <Text style={s.ghostBtnText}>Restore</Text>
                       </TouchableOpacity>
@@ -730,7 +753,7 @@ function ReportsTab({ session }) {
                         <Text style={s.dangerGhostText}>Remove</Text>
                       </TouchableOpacity>
                   )}
-                  {!missing && g.contentType !== 'facility' && g.contentType !== 'place' && (
+                  {!missing && !readOnly && g.contentType !== 'facility' && g.contentType !== 'place' && (
                     <TouchableOpacity style={s.dangerGhostBtn} onPress={() => confirmBan(g)}>
                       <Text style={s.dangerGhostText}>Ban author</Text>
                     </TouchableOpacity>
