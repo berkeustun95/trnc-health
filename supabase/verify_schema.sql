@@ -334,6 +334,10 @@ WITH report AS (
     -- direction — but it fails closed SILENTLY, so their existence is asserted here.
     ('1026_student_education','can_see_student_lists'),
     ('1026_student_education','get_student_list'),
+    -- Slice 5's profile page. The SECOND surface on which one customer's data reaches
+    -- another; if it goes missing the page fails closed (no rows), which is the safe
+    -- direction — but silently, so its existence is asserted here.
+    ('1028_student_profile','get_student_profile'),
     -- The transition mirror. 20261027 drops it in the same transaction as the columns
     -- it reads; while profiles still HAS them, its absence means an old client's write
     -- never reaches student_education and the student list silently misses that user.
@@ -696,6 +700,9 @@ WITH report AS (
     -- opted-in user, which the client cannot tell apart from an empty list.
     ('1026_student_education','can_see_student_lists'),
     ('1026_student_education','get_student_list'),
+    -- Without the grant the profile page returns a permission error to every opted-in
+    -- user, which the client cannot tell apart from a profile that is simply gone.
+    ('1028_student_profile','get_student_profile'),
     -- bump_ad_counter is ALSO granted to anon, which this section does not check — the app
     -- signs in anonymously on launch, so a render landing before that completes runs as
     -- true `anon`. The migration's own DO block asserts BOTH grants via
@@ -2366,6 +2373,45 @@ WITH report AS (
               WHERE table_schema='public' AND table_name='student_education'
                 AND column_name='mirror_owned' AND column_default = 'false'
                 AND is_nullable = 'NO')
+    -- ══ Slice 5 — the profile page (20261028). TWO tokens. ══════════════════
+    --
+    -- A SIBLING of the 1026 DEFINER token, NOT an extension of it — deliberately. The
+    -- tempting move was to bump that token's count from 2 to 3 and have one row own "the
+    -- student-hub RPCs are safe". It would misattribute: a database with 26 applied and
+    -- 28 not yet would go red on a 1026 row while 20261026 is perfectly correct, which is
+    -- the known-stale row this file warns about twice. One owner per FACT, and these are
+    -- two facts about two migrations.
+    --
+    -- (1) THE COLUMN LIST. Same reasoning as get_student_list's, and the same blindness
+    -- it exists to cover: a SECURITY DEFINER function bypasses RLS by definition, so
+    -- every policy-shaped check in this file — including the profiles policy count — is
+    -- structurally unable to see it. If somebody adds `phone text` to the RETURNS TABLE,
+    -- this row is the only one in the whole report that moves.
+    --   Eight columns, not six: the profile page shows one row per ENROLMENT, so it adds
+    --   institution_name and level. It adds no new FACT about a person — level is
+    --   profiles.student_level per enrolment, already disclosed as "study level".
+    UNION ALL SELECT '1028_student_profile','get_student_profile returns EXACTLY the eight agreed columns',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='get_student_profile'
+          AND pg_get_function_result(p.oid) =
+              'TABLE(user_id uuid, display_name text, avatar_url text, institution_name text, level text, subject_name text, study_start_year smallint, study_end_year smallint)')
+    -- (2) DEFINER, search_path pinned, guest-guarded, reciprocity-gated, and no anon
+    -- EXECUTE. `authenticated` INCLUDES anonymous sessions in Supabase, so the grant is
+    -- not the guard — the body is. can_see_student_lists() is asserted BY NAME here
+    -- because reusing it is the design: a second copy of the reciprocity rule is a second
+    -- thing to drift, and the copy that drifts is the one that lets somebody lurk.
+    UNION ALL SELECT '1028_student_profile','get_student_profile: DEFINER, search_path pinned, guest-guarded, reciprocity-gated, no anon EXECUTE',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='get_student_profile'
+          AND p.prosecdef
+          AND p.proconfig::text ILIKE '%search_path=public%'
+          AND pg_get_functiondef(p.oid) ILIKE '%is_anonymous_session%'
+          AND pg_get_functiondef(p.oid) ILIKE '%can_see_student_lists%')
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public' AND p.proname='get_student_profile'
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
     -- ══ resident_status narrowed to four (20261006) ═════════════════════════
     -- THE CONSTRAINT NAME DID NOT CHANGE, which is exactly why this token has to
     -- exist. Section E asserts profiles_resident_status_check is PRESENT, and it stays
@@ -2455,64 +2501,52 @@ WITH report AS (
   ) z
 
   UNION ALL
-  -- ── I. RLS ENABLED on user-data tables (health app — must be ON) ───────────
+  -- ── I. RLS ENABLED — DERIVED over every table in `public`, not a name list ─
+  --
+  -- ⚠ REWRITTEN 2026-09-16. This section used to carry a hand-maintained
+  --   `c.relname IN (...)` of 44 names, and a new table did not join it by being
+  --   created — somebody had to remember. student_education (20261026) was missing for
+  --   exactly that reason, and the ledger table has never been in it at all.
+  --
+  --   That is the failure this whole file argues against in the 0821 note: a check
+  --   phrased as a remembered list has no red to go to. It goes green over the table
+  --   nobody thought of, which is the only table the check was ever needed for. The
+  --   privacy guard had the same shape and the same hole. So: enumerate what IS, and
+  --   let the exceptions be the thing that has to be justified.
+  --
+  -- WHAT THE ROWS MEAN. RLS is the security boundary for this app, so in `public` the
+  -- correct state is ON for every table we own, in three distinct cases:
+  --   • USER DATA — profiles, reviews, questions, notifications, claim requests. OFF
+  --     here is a customer reading another customer's row.
+  --   • ADMIN-SEEDED DIRECTORIES — towing_companies, home_strip_pin, ad_banners,
+  --     ad_modules, student_tasks, institutions, reserved_names, subjects. No user data,
+  --     but public-read + admin-write-only is TRUE SOLELY BECAUSE RLS IS ON. OFF means
+  --     world-writable. ad_banners and home_strip_pin are the sharpest: both render an
+  --     outbound link and artwork on the FIRST SCREEN of the app, so an unauthenticated
+  --     writer could put an arbitrary destination in front of every user, and it would
+  --     look exactly like a campaign we sold.
+  --   • WRITE-ONLY / LOG TABLES — contact_events is world-INSERTABLE by design and RLS
+  --     is the only thing making it not also world-READABLE; push_log holds delivery
+  --     history that RLS keeps off every signed-in customer.
+  --
+  -- EXTENSION-OWNED TABLES ARE EXCLUDED, derived from pg_depend rather than named:
+  -- PostGIS's spatial_ref_sys and anything else an extension installs into public is not
+  -- ours to police, and naming them would rebuild the list this rewrite removes.
+  --
+  -- THERE IS NO EXEMPTION LIST, deliberately. If a table legitimately needs RLS off,
+  -- that is a decision worth seeing in the report every time rather than one worth
+  -- hiding behind a name — and an exemption list is just the old list wearing a
+  -- different hat, with the same blind spot for whatever nobody classified.
   SELECT 'I-rls-enabled', '-', c.relname,
          CASE WHEN c.relrowsecurity THEN 'ON' ELSE 'OFF ← FIX' END
-  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-  WHERE n.nspname='public' AND c.relkind='r' AND c.relname IN (
-    'profiles','facilities','reviews','questions','answers',
-    'notifications','claim_requests','facility_change_requests','job_postings',
-    'content_reports','blocks','insurance_companies','esim_waitlist','module_waitlist',
-    'moderation_rejections',
-    'provider_documents','provider_credentials','quiz_submissions','pharmacist_scores',
-    -- directory / UGC tables (Slice 5 — user-writable rows, so RLS must be ON here too)
-    'beaches','landmarks','places','place_claims','events','home_services','transport_providers',
-    'estate_agencies','estate_agents','properties','property_images',
-    'duty_list','duty_schedule','blocked_terms','bus_routes',
-    -- admin-seeded directory: no user data, but public-read + admin-write only
-    -- works solely because RLS is ON. OFF here = world-writable firm listings.
-    'towing_companies',
-    -- home_strip_pin is the same shape: admin-seeded, public-read, no user data. RLS OFF
-    -- here means world-writable cards on the first screen of the app — an unauthenticated
-    -- writer could put an arbitrary title and an arbitrary outbound link in front of every
-    -- user, which is worse than a defaced directory row.
-    'home_strip_pin',
-    -- ad_banners is the same shape again: admin-seeded, public-read, no user data. RLS
-    -- OFF here is worse than for home_strip_pin, because this table's whole purpose is
-    -- to carry an OUTBOUND LINK and an IMAGE URL that render on the first screen of the
-    -- app — an unauthenticated writer could put arbitrary artwork and an arbitrary
-    -- destination in front of every user, and it would look exactly like a campaign we
-    -- sold.
-    'ad_banners',
-    -- ad_modules is the FK target that decides which modules may carry an ad. RLS OFF
-    -- here means any signed-in user can INSERT a module — which on its own renders
-    -- nothing, but it is the row that makes an ad_banners row insertable, so it is the
-    -- first half of a two-step to publish artwork nobody reviewed.
-    'ad_modules',
-    -- push_log records who we tried to push to. RLS is the only thing keeping that
-    -- delivery history off every signed-in customer. OFF here = a readable log of
-    -- which providers got which alerts and when.
-    'push_log',
-    -- contact_events is world-INSERTABLE by design (the inverse of towing_companies).
-    -- RLS is the ONLY thing making it not also world-READABLE, and `authenticated`
-    -- holds a table-level SELECT grant so the future admin screen needs no migration.
-    -- OFF here = every customer can read the whole contact log.
-    'contact_events',
-    -- Profile gate lookups. institutions is service-role-write-only and reserved_names
-    -- is admin-write-only; BOTH of those are true solely because RLS is ON. OFF here
-    -- means any signed-in user can add a university, or delete every reserved name and
-    -- then register "ADA Destek".
-    'institutions',
-    'reserved_names',
-    -- Student Hub tasks: postgres-authored content, read by every signed-in session.
-    -- OFF here = any signed-in user can rewrite the steps a student follows to get a
-    -- residence permit.
-    'student_tasks',
-    'student_task_i18n',
-    -- Subjects (1024): same reasoning — OFF = any signed-in user can rename a subject.
-    'subjects',
-    'subject_i18n'
-  )
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public'
+    AND c.relkind IN ('r', 'p')
+    AND NOT EXISTS (SELECT 1 FROM pg_depend d
+                     WHERE d.classid = 'pg_class'::regclass
+                       AND d.objid = c.oid
+                       AND d.deptype = 'e')
 )
 -- ─── THE VERDICT ROW ────────────────────────────────────────────────────────
 -- Added 2026-08-30. Scanning ~700 rows by eye for `status <> 'OK'` is not an assertion,
