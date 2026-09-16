@@ -182,6 +182,82 @@ const EXEMPT = {
   marketing_opt_in_at:     'part of the consent record; the marketing sentence in that bullet',
 }
 
+// ─── GO-LIVE TRIPWIRE: three sentences that become FALSE the day the Student Hub ships ──
+//
+// This is the OPPOSITE of the flag exemption removed on 2026-09-15, and the difference is
+// the direction it fires in. That exemption SUPPRESSED a failure while the flag was off,
+// so it went quiet on go-live day, months later, with nobody left who remembered why the
+// OTA was blocked. This SUPPRESSES NOTHING: it is silent while the flag is off and fires
+// exactly once, on the publish that first makes the sentences untrue.
+//
+// All three are statements about the world that slice 4 changes:
+//   1. "Your data is never visible to other customers" — the student list is one customer's
+//      data shown to another. Present in all FOUR copies, Turkish included.
+//   2. "there is no student list in the app yet, so turning it on shows you to no one" —
+//      added with slice 2, honest then, false the moment the list renders.
+//   3. "Not used yet — nothing in the app reads them" — same bullet, same problem.
+//
+// FOUR copies: privacy.tr.js is NOT in COPIES above (the parity comparison is between the
+// three English ones) and would otherwise ship a Turkish promise the English copy had
+// retracted — the worse half of the failure, because the Turkish reader is the one most
+// likely to be a student here.
+//
+// It does NOT check what the replacement text SAYS. Berke writes that copy; a guard that
+// demanded particular wording would be a guard with opinions about prose. It checks only
+// that the retracted claims are gone, and the DERIVED disclosure rules above independently
+// keep student_listing_opt_in itemised in all three English copies.
+const GOLIVE_FLAG = 'studentHub'
+const GOLIVE_STALE = [
+  { key: 'never visible to other customers',
+    en: /never visible to other customers/i,
+    tr: /diğer müşterilere hiçbir zaman görünmez/i,
+    why: 'the student list shows one customer to another' },
+  { key: 'no student list yet',
+    en: /there is no student list in the app yet/i,
+    tr: /henüz bir öğrenci listesi yoktur/i,
+    why: 'there is one now, and opting in shows you to people' },
+  { key: 'nothing reads the study fields',
+    en: /nothing in the app reads them/i,
+    tr: /uygulamada bu veriler hiçbir yerde kullanılmıyor/i,
+    why: 'get_student_list reads four of them (20261026)' },
+]
+const GOLIVE_COPIES = [
+  { label: 'docs/privacy.html',              path: 'docs/privacy.html',              lang: 'en' },
+  { label: 'web/privacy.html',               path: 'web/privacy.html',               lang: 'en' },
+  { label: 'constants/legal/privacy.en.js',  path: 'constants/legal/privacy.en.js',  lang: 'en' },
+  { label: 'constants/legal/privacy.tr.js',  path: 'constants/legal/privacy.tr.js',  lang: 'tr' },
+]
+
+// Reads the RUNTIME flag file, not this script's own copy. check-module-flags.mjs already
+// fails when the two disagree, so the pair is covered; what matters here is the value that
+// would actually be bundled.
+function readStudentHubFlag(raw) {
+  const src = raw ?? readFileSync(join(ROOT, 'constants/flags.js'), 'utf8')
+  const m = src.match(new RegExp(`${GOLIVE_FLAG}\\s*:\\s*(true|false)`))
+  if (!m) throw new Error(`could not read MODULE_FLAGS.${GOLIVE_FLAG} from constants/flags.js`)
+  return m[1] === 'true'
+}
+
+function checkGoLive(problems, log, flagOn, texts) {
+  log(`\n  go-live tripwire (MODULE_FLAGS.${GOLIVE_FLAG} = ${flagOn})`)
+  for (const st of GOLIVE_STALE) {
+    const present = GOLIVE_COPIES
+      .filter(c => st[c.lang].test(texts[c.path]))
+      .map(c => c.label)
+    if (!flagOn) {
+      log(`    · ${st.key.padEnd(34)} ${present.length ? `in ${present.length} copy/copies — armed` : 'already removed'}`)
+      continue
+    }
+    if (present.length) {
+      problems.push(`the Student Hub is LIVE but "${st.key}" is still in: ${present.join(', ')} — ${st.why}. Rewrite all four privacy copies before publishing.`)
+      log(`    ✗ ${st.key.padEnd(34)} STILL PRESENT in ${present.join(', ')}`)
+    } else {
+      log(`    ✓ ${st.key.padEnd(34)} removed from all four copies`)
+    }
+  }
+  if (!flagOn) log('    · silent until the flag flips; fires on the publish that makes these untrue')
+}
+
 function readColumns() {
   const app = readFileSync(join(ROOT, 'App.js'), 'utf8')
   const m = app.match(/const PROFILE_COLUMNS\s*=\s*'([^']+)'/)
@@ -197,9 +273,23 @@ function loadCopies() {
   })
 }
 
-function check(copies, columns, log = console.log) {
+function loadGoLiveTexts() {
+  const out = {}
+  for (const c of GOLIVE_COPIES) {
+    const p = join(ROOT, c.path)
+    if (!existsSync(p)) throw new Error(`missing privacy copy: ${c.path}`)
+    out[c.path] = flatten(readFileSync(p, 'utf8'))
+  }
+  return out
+}
+
+// `world` lets --self substitute a mutated flag/texts without touching the real files.
+function check(copies, columns, log = console.log, world = null) {
   const problems = []
+  const flagOn = world ? world.flagOn : readStudentHubFlag()
+  const texts  = world ? world.texts  : loadGoLiveTexts()
   checkEncoding(problems, log)
+  checkGoLive(problems, log, flagOn, texts)
 
   // ── 1. same "Last updated" ──
   log('  dates')
@@ -248,7 +338,8 @@ function check(copies, columns, log = console.log) {
 // ── --self: every failure path, mutation asserted to have landed first ──
 function self() {
   const copies = loadCopies(), columns = readColumns(), quiet = () => {}
-  if (check(copies, columns, quiet).length) {
+  const realWorld = { flagOn: readStudentHubFlag(), texts: loadGoLiveTexts() }
+  if (check(copies, columns, quiet, realWorld).length) {
     console.error('  --self cannot run: the real files are already failing.')
     return 1
   }
@@ -264,12 +355,30 @@ function self() {
       ([cs]) => !/date of birth/i.test(cs[0].text)],
     ['a NEW profile column appears', () => [copies, [...columns, 'passport_number']],
       ([,cols]) => cols.includes('passport_number')],
+    // ── The go-live tripwire. Flipping ONLY the flag must turn it red against the
+    //    real, unmodified privacy files — that is the whole point of it.
+    ['Student Hub goes live on stale privacy copy',
+      () => [copies, columns, { flagOn: true, texts: realWorld.texts }],
+      ([,,w]) => w.flagOn === true && /never visible to other customers/i.test(w.texts['constants/legal/privacy.en.js'])],
+    // ── …and the Turkish copy is checked INDEPENDENTLY. With all three English copies
+    //    rewritten and privacy.tr.js left alone, this must still fire — otherwise a
+    //    Turkish reader keeps a promise the English reader has had retracted.
+    ['live, English rewritten, Turkish left stale',
+      () => {
+        const texts = { ...realWorld.texts }
+        for (const c of GOLIVE_COPIES.filter(x => x.lang === 'en')) {
+          texts[c.path] = GOLIVE_STALE.reduce((s, st) => s.replace(st.en, 'REWRITTEN'), texts[c.path])
+        }
+        return [copies, columns, { flagOn: true, texts }]
+      },
+      ([,,w]) => !/never visible to other customers/i.test(w.texts['web/privacy.html'])
+             && /diğer müşterilere hiçbir zaman görünmez/i.test(w.texts['constants/legal/privacy.tr.js'])],
   ]
   let bad = 0
   for (const [name, build, landed] of cases) {
     const world = build()
     if (!landed(world)) { console.error(`    ✗ ${name.padEnd(46)} MUTATION DID NOT LAND — the test is broken, not the guard`); bad++; continue }
-    const found = check(world[0], world[1], quiet)
+    const found = check(world[0], world[1], quiet, world[2] ?? realWorld)
     if (!found.length) { console.error(`    ✗ ${name.padEnd(46)} mutation landed but the guard stayed GREEN`); bad++; continue }
     console.log(`    ✓ ${name.padEnd(46)} red: ${found[0].slice(0, 90)}`)
   }
