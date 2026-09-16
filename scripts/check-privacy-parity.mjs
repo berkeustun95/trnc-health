@@ -165,6 +165,10 @@ const DISCLOSURE = {
 
 // Columns that are not user-supplied personal data to itemise. Each needs a REASON.
 const EXEMPT = {
+  // student_education's own columns. id/created_at are never in EDUCATION_COLUMNS and need
+  // no entry; mirror_owned does, because leaving it out silently is exactly the "reasoned
+  // off the list" move that put `level` in the wrong place once already.
+  mirror_owned:            'provenance, not something the user told us: which rows the 20261026 transition trigger may touch',
   role:                    'assigned by us, always customer at signup (20260827)',
   blocked_until:           'a moderation outcome, covered by the Terms not the data list',
   profile_completed_at:    'internal flag, derived from fields already disclosed',

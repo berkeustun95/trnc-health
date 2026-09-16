@@ -211,6 +211,13 @@ const SURFACES = [
   // before the flip, not after. Its region chips are t(REGION_LABEL_KEY[city]), already read
   // from the key map above.
   'screens/StudentHubScreen.js',
+  // Slice 5's profile page. Added WITH the screen rather than after it: SURFACES is a
+  // hand-kept list, so a new screen does not join this guard by existing — somebody has
+  // to remember, and the screen nobody remembers is the one whose copy ships in English
+  // to eight locales. Its study-level labels are t(STUDENT_LEVEL_LABEL_KEY[level]),
+  // reached through a variable and therefore invisible to the literal scan; the map is
+  // read out of constants/profileGate.js below for exactly that reason.
+  'screens/StudentProfileScreen.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —

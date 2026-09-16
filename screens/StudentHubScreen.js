@@ -11,6 +11,7 @@ import ScreenHeader from '../components/ScreenHeader'
 import ContentCard from '../components/ContentCard'
 import MascotIntroCard from '../components/MascotIntroCard'
 import ContentReportMenu from '../components/ContentReportMenu'
+import StudentProfileScreen from './StudentProfileScreen'
 import { MODULE_FLAGS } from '../constants/flags'
 import { getPreset } from '../constants/avatars'
 import { colors, shadow, radius } from '../constants/theme'
@@ -53,7 +54,7 @@ function UniversityRow({ uni, lang, onOpen }) {
 // "Current" vs "graduate" is DERIVED from study_end_year rather than stored — an end year
 // means graduated (20261024's third arm, and the trigger that rejects future end years is
 // what keeps that true).
-function StudentRow({ row, lang, isMe }) {
+function StudentRow({ row, lang, isMe, onOpen }) {
   const preset  = getPreset(row.avatar_url)
   const alumni  = row.study_end_year != null
   const years   = row.study_start_year
@@ -61,8 +62,19 @@ function StudentRow({ row, lang, isMe }) {
     : null
   const meta    = [row.subject_name, years].filter(Boolean).join(' · ')
 
+  // The AVATAR AND BODY are the tap target, not the whole row: the report menu is a
+  // TouchableOpacity of its own sitting inside it, and nesting one touchable in another
+  // leaves which gesture wins to the responder system. Keeping the menu outside the
+  // touchable makes the answer structural rather than something to reason about.
   return (
     <View style={s.studentRow}>
+      <TouchableOpacity
+        style={s.studentTap}
+        onPress={() => onOpen?.(row.user_id)}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={row.display_name}
+      >
       {preset ? (
         <View style={[s.studentAvatar, { backgroundColor: preset.bg }]}>
           <Text style={s.studentAvatarEmoji}>{preset.emoji}</Text>
@@ -85,6 +97,7 @@ function StudentRow({ row, lang, isMe }) {
           {t(alumni ? 'studentListAlumni' : 'studentListCurrent', lang)}
         </Text>
       </View>
+      </TouchableOpacity>
 
       {/* Reporting your own entry is meaningless, so the menu is hidden on it. */}
       {isMe ? null : (
@@ -111,7 +124,7 @@ function StudentRow({ row, lang, isMe }) {
 // round trip to every user who IS opted in: "turn this on" flashing at the person who
 // already did, which is the same "broken at the moment it worked" failure the profile
 // round-trip was designed to avoid, just moved earlier.
-function StudentList({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToProfile }) {
+function StudentList({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToProfile, onOpenStudent }) {
   const [rows, setRows]     = useState(null)
   const [failed, setFailed] = useState(false)
 
@@ -185,7 +198,7 @@ function StudentList({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToP
         <ContentCard>
           {rows.map((row, i) => (
             <View key={row.user_id} style={i ? s.studentDivider : null}>
-              <StudentRow row={row} lang={lang} isMe={row.user_id === myId} />
+              <StudentRow row={row} lang={lang} isMe={row.user_id === myId} onOpen={onOpenStudent} />
             </View>
           ))}
         </ContentCard>
@@ -198,7 +211,7 @@ function StudentList({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToP
 // Carries ONLY what institutions holds: name, short name, city, and the link when one is
 // set (20261025). No address, logo or accreditation line — each would need a column and
 // content nobody has supplied. Slice 4 adds the student list below the website button.
-function UniversityDetail({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToProfile, onBack }) {
+function UniversityDetail({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToProfile, onOpenStudent, onBack }) {
   const meta = uniMeta(uni, lang)
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -232,6 +245,7 @@ function UniversityDetail({ uni, lang, isGuest, listingOptIn, meFailed, myId, on
             meFailed={meFailed}
             myId={myId}
             onGoToProfile={onGoToProfile}
+            onOpenStudent={onOpenStudent}
           />
         ) : null}
       </ScrollView>
@@ -547,6 +561,7 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
   const [progress, setProgress] = useState(null)
   const [openSlug, setOpenSlug] = useState(null)
   const [openUniId, setOpenUniId] = useState(null)
+  const [openStudentId, setOpenStudentId] = useState(null)
   const [uniQuery, setUniQuery] = useState('')
   const [uniRegion, setUniRegion] = useState('all')
 
@@ -567,11 +582,18 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
   useEffect(() => { loadProgress().then(setProgress) }, [])
   useEffect(() => { if (progress) saveProgress(progress) }, [progress])
 
+  // ONE LEVEL AT A TIME. The profile page opens ON TOP of a university page, so a back
+  // press there must close the profile and leave the university page standing — clearing
+  // both would drop the user two levels for one gesture, which reads as the app losing
+  // its place. Ordered innermost-first for the same reason.
   useEffect(() => {
-    if (!openSlug && !openUniId) return
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setOpenSlug(null); setOpenUniId(null); return true })
+    if (!openSlug && !openUniId && !openStudentId) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (openStudentId) { setOpenStudentId(null); return true }
+      setOpenSlug(null); setOpenUniId(null); return true
+    })
     return () => sub.remove()
-  }, [openSlug, openUniId])
+  }, [openSlug, openUniId, openStudentId])
 
   // Loaded here rather than in the tab so switching tabs does not refetch.
   const load = useCallback(() => {
@@ -615,6 +637,18 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
     return () => { cancelled = true }
   }, [isGuest])
 
+  // BEFORE the university page: this is the page on top of the stack.
+  if (openStudentId) {
+    return (
+      <StudentProfileScreen
+        userId={openStudentId}
+        lang={lang}
+        isMe={openStudentId === me?.id}
+        onBack={() => setOpenStudentId(null)}
+      />
+    )
+  }
+
   const openUni = openUniId ? universities?.find(u => u.id === openUniId) : null
   if (openUni) {
     return (
@@ -626,6 +660,7 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
         meFailed={meFailed}
         myId={me?.id ?? null}
         onGoToProfile={onGoToProfile}
+        onOpenStudent={setOpenStudentId}
         onBack={() => setOpenUniId(null)}
       />
     )
@@ -811,6 +846,9 @@ const s = StyleSheet.create({
 
   // ─── Student list (slice 4) ───────────────────────────────────────────────
   studentRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  // The tap target inside the row. flex:1 so it takes everything the report menu does
+  // not, and the same row layout it replaced — the menu is a sibling, not a child.
+  studentTap:          { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   studentDivider:      { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   studentAvatar:       { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   studentAvatarEmoji:  { fontSize: 22 },
