@@ -327,6 +327,12 @@ WITH report AS (
     ('1001_profile_completion','is_reserved_display_name'),
     ('1001_profile_completion','check_profile_name_content'),
     ('1002_display_name_rpc','display_name_available'),
+    -- Slice 4. get_student_list is the ONLY path by which one customer reads another
+    -- customer's row; can_see_student_lists is the reciprocity rule slices 4-6 share.
+    -- If either goes missing the student list fails closed (no rows), which is the safe
+    -- direction — but it fails closed SILENTLY, so their existence is asserted here.
+    ('1026_student_list','can_see_student_lists'),
+    ('1026_student_list','get_student_list'),
     -- The ONLY write path the app has on ad_banners: the client is never granted UPDATE on
     -- that table, so if this function is missing every view and tap counts ZERO — silently,
     -- and a silent zero reads as "nobody looks at the ads", which is a conclusion somebody
@@ -674,6 +680,10 @@ WITH report AS (
     -- display-name field returns a permission error the user cannot act on — inside a
     -- hard block, on the step people abandon on.
     ('1002_display_name_rpc','display_name_available'),
+    -- Slice 4. Without the grant the student list returns a permission error to every
+    -- opted-in user, which the client cannot tell apart from an empty list.
+    ('1026_student_list','can_see_student_lists'),
+    ('1026_student_list','get_student_list'),
     -- bump_ad_counter is ALSO granted to anon, which this section does not check — the app
     -- signs in anonymously on launch, so a render landing before that completes runs as
     -- true `anon`. The migration's own DO block asserts BOTH grants via
@@ -1044,12 +1054,23 @@ WITH report AS (
     -- returning SELECT policy on profiles fails the check and has to be looked at.
     -- Expected set: owner read, admin read all, admin read profiles.
     -- If you add a legitimate fourth, bump this number IN THE SAME COMMIT and say why.
-    -- ⚠ OPEN GAP, filed 2026-09-15, not yet closed: this counts cmd='SELECT' only. A policy
-    --   written FOR ALL is stored with cmd='ALL', grants SELECT all the same, and does not
-    --   move this count — so a FOR ALL policy on profiles reads OK here.
-    UNION ALL SELECT '0922_drop_grooming_profile_overshare','profiles has exactly 3 SELECT policies (derived count, not a name list)',
+    -- GAP CLOSED 2026-09-16 (slice 4), filed 2026-09-15. This counted cmd='SELECT' only.
+    -- A policy written FOR ALL is stored with cmd='ALL' and grants SELECT just the same,
+    -- so it moved this count by ZERO and read OK — a policy-count token blind to half the
+    -- ways a policy can grant a read. Now counts SELECT *and* ALL.
+    --
+    -- permissive='PERMISSIVE' matters and is not noise: a RESTRICTIVE policy NARROWS
+    -- access (profiles carries three of them, the 20260714 anon blocks), and failing this
+    -- token because someone added a restriction would be backwards — it exists to catch
+    -- over-sharing. Restrictive FOR ALL is therefore deliberately not counted.
+    --
+    -- Watched RED before being trusted, on real PostgreSQL 15.18 and 17.10: a 4th
+    -- permissive SELECT policy takes it to 4, and so does a FOR ALL policy — which the
+    -- old form of this token could not see at all.
+    UNION ALL SELECT '0922_drop_grooming_profile_overshare','profiles has exactly 3 permissive SELECT/ALL policies (derived count, not a name list)',
       (SELECT count(*) FROM pg_policies
-        WHERE schemaname='public' AND tablename='profiles' AND cmd='SELECT') = 3
+        WHERE schemaname='public' AND tablename='profiles'
+          AND permissive='PERMISSIVE' AND cmd IN ('SELECT','ALL')) = 3
     -- ── 0923 server-side notifications. FOUR tokens. The functions' EXISTENCE is section
     -- C's job; none of what makes them SAFE is visible there.
     --
@@ -2180,6 +2201,73 @@ WITH report AS (
         LEFT JOIN pg_roles r ON r.oid = a.grantee
         WHERE n.nspname='public' AND p.proname='display_name_available'
           AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+
+    -- ══ Slice 4 — the student list (20261026). FOUR tokens. ═════════════════
+    --
+    -- (1) THE COLUMN LIST, pinned to the exact rendering. This is the whole privacy claim
+    -- of the slice: six columns leave get_student_list and no client can ask for a
+    -- seventh. Section C only asserts the function EXISTS, and a function that has grown
+    -- `phone text` exists just as well.
+    --
+    -- THIS TOKEN IS THE ONLY THING WATCHING THIS SURFACE. The profiles policy count above
+    -- cannot see a SECURITY DEFINER function — a DEFINER function bypasses RLS by
+    -- definition, so every policy-shaped check in this file is blind to it. If someone
+    -- adds a column to the RETURNS TABLE, every other row in this report stays green.
+    --
+    -- Pinned as a STRING rather than parsed: pg_get_function_result renders canonically,
+    -- and comparing the rendered form to the expected form is the reading that needs no
+    -- decoding — the lesson from the tgargs token that tried to decode BYTEA by hand.
+    UNION ALL SELECT '1026_student_list','get_student_list returns EXACTLY the six agreed columns',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='get_student_list'
+          AND pg_get_function_result(p.oid) =
+              'TABLE(user_id uuid, display_name text, avatar_url text, subject_name text, study_start_year smallint, study_end_year smallint)')
+    -- (2) Both functions authenticated-only, SECURITY DEFINER, search_path pinned, and
+    -- guarding anonymous sessions. `authenticated` INCLUDES guests in Supabase, so the
+    -- grant is not the guard — the body is. A DEFINER function with a mutable search_path
+    -- is a privilege-escalation surface on top of a privacy one.
+    UNION ALL SELECT '1026_student_list','student-list RPCs: DEFINER, search_path pinned, guest-guarded, no anon EXECUTE',
+      (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname IN ('get_student_list','can_see_student_lists')
+          AND p.prosecdef
+          AND p.proconfig::text ILIKE '%search_path=public%'
+          AND pg_get_functiondef(p.oid) ILIKE '%is_anonymous_session%') = 2
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public' AND p.proname IN ('get_student_list','can_see_student_lists')
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+    -- (3) content_reports admits 'profile' — the report path behind the first surface in
+    -- the app that shows a stranger's name. Derived from the constraint text rather than
+    -- compared to a remembered spelling: `IN (...)` and `= ANY (ARRAY[...])` are the same
+    -- constraint printed two ways, and pinning either would fail on a correct database.
+    UNION ALL SELECT '1026_student_list','content_reports admits the 5 old types plus profile',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.content_reports')
+          AND c.conname = 'content_reports_content_type_check')
+      = ARRAY['answer','facility','place','profile','question','review']
+    -- (4) A PERSON IS NEVER AUTO-HIDDEN. auto_hide_reported_content fires at 3 distinct
+    -- reporters; three coordinated accounts erasing anyone from every list in the app is a
+    -- brigading weapon, not a safeguard. Profile reports go to admin triage only.
+    --
+    -- Anchored on `UPDATE profiles` — a CODE SHAPE, never the word "profile". pg_get_
+    -- functiondef returns the COMMENTS too, and a token forbidding the word would forbid
+    -- its own explanation: the only way to make it green would be to delete the comment
+    -- telling the next reader not to add the branch. That mistake is documented twice in
+    -- this file already and was made anyway.
+    -- Paired with a POSITIVE on all five branches it SHOULD have, so a body that lost its
+    -- work entirely cannot satisfy the negative half by being empty.
+    UNION ALL SELECT '1026_student_list','auto_hide_reported_content has NO profile branch (and still has its five)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='auto_hide_reported_content'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%UPDATE profiles%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE reviews%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE questions%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE answers%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE facilities%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE places%')
     -- ══ resident_status narrowed to four (20261006) ═════════════════════════
     -- THE CONSTRAINT NAME DID NOT CHANGE, which is exactly why this token has to
     -- exist. Section E asserts profiles_resident_status_check is PRESENT, and it stays
