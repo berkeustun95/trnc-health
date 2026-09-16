@@ -62,7 +62,7 @@ function StudentRow({ row, lang, isMe }) {
   const meta    = [row.subject_name, years].filter(Boolean).join(' · ')
 
   return (
-    <View style={[s.studentRow, isMe && s.studentRowMe]}>
+    <View style={s.studentRow}>
       {preset ? (
         <View style={[s.studentAvatar, { backgroundColor: preset.bg }]}>
           <Text style={s.studentAvatarEmoji}>{preset.emoji}</Text>
@@ -811,7 +811,6 @@ const s = StyleSheet.create({
 
   // ─── Student list (slice 4) ───────────────────────────────────────────────
   studentRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  studentRowMe:        { opacity: 1 },
   studentDivider:      { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   studentAvatar:       { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   studentAvatarEmoji:  { fontSize: 22 },
