@@ -144,7 +144,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261023_institutions_asbu_city.sql', 'c23543884716562bb82c6306c777603123e67b6b8856bfc426176d3690d70407'),
   ('20261024_student_affiliation_schema.sql', '5e53e4be84e9498473cac377f2d84412afc5cd816df0a09549bc73f65e408859'),
   ('20261025_institutions_website_urls.sql', '6f11ea7e8e679646257e5d540fb8c6d68e0bdbb1d09f911fbacaf9654e0271c8'),
-  ('20261026_student_education.sql', '6f315f638a132ddfa6ff060a26d6f4388b9378ead60a38b0ec184842e3c85ddb')
+  ('20261026_student_education.sql', '0f7570faaf6b612bed0e1f984a70caf20036d1cc6c7b78ebc2eb251e0d81cc5a')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

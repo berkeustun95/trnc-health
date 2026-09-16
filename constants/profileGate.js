@@ -103,11 +103,13 @@ export const DISPLAY_PREFERENCES = ['display_name', 'full_name']
 // fails the guard until it is disclosed in all four privacy copies or exempted with a
 // reason, which is the review moment a hardcoded list never creates.
 //
-// `level` is deliberately absent — it is disclosed inside the "university details"
-// sentence rather than as a field of its own, the same way the four consent columns are
-// covered by one prose bullet. If that bullet stops describing it, exempt it explicitly.
+// `level` is here because it is the SAME FACT as profiles.student_level — recorded once
+// per enrolment rather than once per person — and that fact is already disclosed as
+// "study level" in all four copies. An earlier draft left it out on the reasoning that a
+// "university details" sentence covered it; no copy says that, and reasoning a column off
+// the list is how a derived guard turns back into a remembered one.
 export const EDUCATION_COLUMNS = [
-  'institution_id', 'subject_id', 'study_start_year', 'study_end_year', 'listing_opt_in',
+  'institution_id', 'level', 'subject_id', 'study_start_year', 'study_end_year', 'listing_opt_in',
 ]
 
 // ─── AFFILIATION PATCH (20261024) — the ONE writer both screens use ─────────

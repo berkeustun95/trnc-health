@@ -304,22 +304,71 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_level text;
+  v_level     text;
+  v_old_level text;
+  v_moved     boolean;   -- this write names a DIFFERENT enrolment than the row held before
+  v_opens     boolean;   -- this write actually makes that enrolment the open one
 BEGIN
-  IF NEW.institution_id IS NOT NULL THEN
-    v_level := CASE WHEN NEW.student_level IN ('university', 'postgraduate')
-                    THEN NEW.student_level ELSE 'university' END;
+  -- ─── ECHOES ARE NO-OPS. This arm is the important one. ────────────────────
+  -- `AFTER UPDATE OF <cols>` fires when a column is in the SET LIST, not when its value
+  -- changes — and the live app spreads ...aff into EVERY save, echoing whatever profiles
+  -- already holds. After the OTA those columns go stale, so a straggler on old JS
+  -- changing their PHONE NUMBER would re-send a stale institution_id and, without this,
+  -- retire the enrolment they had just added in the new app. The safety net would destroy
+  -- the very thing it exists to protect, in exactly the window it exists for.
+  IF TG_OP = 'UPDATE'
+     AND NEW.institution_id         IS NOT DISTINCT FROM OLD.institution_id
+     AND NEW.student_level          IS NOT DISTINCT FROM OLD.student_level
+     AND NEW.subject_id             IS NOT DISTINCT FROM OLD.subject_id
+     AND NEW.study_start_year       IS NOT DISTINCT FROM OLD.study_start_year
+     AND NEW.study_end_year         IS NOT DISTINCT FROM OLD.study_end_year
+     AND NEW.student_listing_opt_in IS NOT DISTINCT FROM OLD.student_listing_opt_in THEN
+    RETURN NULL;
+  END IF;
 
-    -- Retire the open row this write REPLACES, before writing the new one. At most one
-    -- row can match (the partial index says so), it is never a closed history row, and
-    -- doing it first is what keeps the upsert below from ever hitting 23505.
-    IF NEW.study_end_year IS NULL THEN
-      DELETE FROM student_education
-       WHERE user_id = NEW.id
-         AND study_end_year IS NULL
-         AND NOT (institution_id = NEW.institution_id AND level = v_level);
+  IF NEW.institution_id IS NULL THEN
+    IF TG_OP = 'UPDATE' AND OLD.institution_id IS NOT NULL THEN
+      -- Cleared by an old client: honour the visibility intent, keep the history.
+      UPDATE student_education SET listing_opt_in = false WHERE user_id = NEW.id;
     END IF;
+    RETURN NULL;
+  END IF;
 
+  v_level := CASE WHEN NEW.student_level IN ('university', 'postgraduate')
+                  THEN NEW.student_level ELSE 'university' END;
+
+  -- TG_OP is branched on EXPLICITLY rather than folded into the boolean below: OLD is
+  -- unassigned in an INSERT trigger and reading a field of it raises, and SQL boolean
+  -- evaluation is not guaranteed to short-circuit, so `TG_OP = 'INSERT' OR OLD.x …` is
+  -- a trap rather than a guard.
+  IF TG_OP = 'INSERT' THEN
+    v_moved := true;
+    v_opens := NEW.study_end_year IS NULL;
+  ELSE
+    v_old_level := CASE WHEN OLD.student_level IN ('university', 'postgraduate')
+                        THEN OLD.student_level ELSE 'university' END;
+    -- A MOVE is the only thing that may retire a row. Changing years, subject or the
+    -- opt-in is an edit of the enrolment the user already has.
+    v_moved := NEW.institution_id IS DISTINCT FROM OLD.institution_id
+               OR (OLD.institution_id IS NOT NULL AND v_level IS DISTINCT FROM v_old_level);
+    -- …and an enrolment only becomes THE open one on a move, or when the graduation year
+    -- is genuinely cleared. A STALE NULL end year re-sent by an old client is neither.
+    v_opens := NEW.study_end_year IS NULL
+               AND (v_moved OR NEW.study_end_year IS DISTINCT FROM OLD.study_end_year);
+  END IF;
+
+  -- Retire the open row this write REPLACES, before writing the new one. At most one row
+  -- can match (the partial index says so), it is never a closed history row, and doing it
+  -- first is what keeps the write below from ever hitting 23505 — which would fail the
+  -- straggler's whole profile save, the exact outage this trigger exists to prevent.
+  IF v_opens THEN
+    DELETE FROM student_education
+     WHERE user_id = NEW.id
+       AND study_end_year IS NULL
+       AND NOT (institution_id = NEW.institution_id AND level = v_level);
+  END IF;
+
+  IF v_moved THEN
     INSERT INTO student_education
       (user_id, institution_id, level, subject_id, study_start_year, study_end_year, listing_opt_in)
     VALUES
@@ -330,10 +379,23 @@ BEGIN
           study_start_year = excluded.study_start_year,
           study_end_year   = excluded.study_end_year,
           listing_opt_in   = excluded.listing_opt_in;
-
-  ELSIF TG_OP = 'UPDATE' AND OLD.institution_id IS NOT NULL THEN
-    -- Cleared by an old client: honour the visibility intent, keep the history.
-    UPDATE student_education SET listing_opt_in = false WHERE user_id = NEW.id;
+  ELSE
+    -- Same enrolment, edited. Propagate ONLY the fields that actually changed: the other
+    -- three are stale copies of what profiles held, and writing a stale NULL end year back
+    -- would REOPEN a closed row — two open rows, 23505, failed save. And never insert: if
+    -- no row matches, the new app deleted it, and resurrecting it would undo that.
+    UPDATE student_education e
+       SET subject_id       = CASE WHEN NEW.subject_id IS DISTINCT FROM OLD.subject_id
+                                   THEN NEW.subject_id ELSE e.subject_id END,
+           study_start_year = CASE WHEN NEW.study_start_year IS DISTINCT FROM OLD.study_start_year
+                                   THEN NEW.study_start_year ELSE e.study_start_year END,
+           study_end_year   = CASE WHEN NEW.study_end_year IS DISTINCT FROM OLD.study_end_year
+                                   THEN NEW.study_end_year ELSE e.study_end_year END,
+           listing_opt_in   = CASE WHEN NEW.student_listing_opt_in IS DISTINCT FROM OLD.student_listing_opt_in
+                                   THEN NEW.student_listing_opt_in ELSE e.listing_opt_in END
+     WHERE e.user_id = NEW.id
+       AND e.institution_id = NEW.institution_id
+       AND e.level = v_level;
   END IF;
 
   RETURN NULL;   -- AFTER trigger
@@ -622,6 +684,17 @@ BEGIN
                   AND tgname = 'mirror_profile_affiliation' AND NOT tgisinternal) THEN
     RAISE EXCEPTION 'mirror_profile_affiliation is not bound to profiles — old-client writes would not reach the table';
   END IF;
+  -- The echo guard, read back from pg_proc rather than trusted from this file. `AFTER
+  -- UPDATE OF <cols>` fires on ASSIGNMENT, not on change, and the live app spreads the
+  -- whole affiliation patch into every save — so without this arm a straggler editing an
+  -- unrelated field re-sends a stale institution_id and retires an enrolment the new app
+  -- had just written. Behaviour is proved in the scratchpad suite; this only proves the
+  -- deployed body still contains the comparison.
+  v_def := pg_get_functiondef('public.mirror_profile_affiliation()'::regprocedure);
+  IF v_def NOT ILIKE '%IS NOT DISTINCT FROM OLD.institution\_id%'
+     OR v_def NOT ILIKE '%IS NOT DISTINCT FROM OLD.student\_listing\_opt\_in%' THEN
+    RAISE EXCEPTION 'mirror_profile_affiliation has no echo guard — an unchanged write would be treated as a move. Body: %', left(v_def, 600);
+  END IF;
 
   -- (h) content_reports, read back.
   SELECT pg_get_constraintdef(oid) INTO v_def FROM pg_constraint
@@ -675,7 +748,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261026_student_education.sql', '6f315f638a132ddfa6ff060a26d6f4388b9378ead60a38b0ec184842e3c85ddb')
+VALUES ('20261026_student_education.sql', '0f7570faaf6b612bed0e1f984a70caf20036d1cc6c7b78ebc2eb251e0d81cc5a')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

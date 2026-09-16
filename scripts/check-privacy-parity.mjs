@@ -155,9 +155,12 @@ const DISCLOSURE = {
   study_start_year:       /year you started/i,
   study_end_year:         /year you graduated/i,
   student_listing_opt_in: /student list/i,
-  // student_education's name for the same fact (20261026). Both spellings carry a rule so
-  // the check survives 20261027 moving the column between tables.
+  // student_education's names for facts profiles already discloses (20261026). Both
+  // spellings carry a rule so the check survives 20261027 moving the column between
+  // tables — `listing_opt_in` is `student_listing_opt_in`, and `level` is `student_level`
+  // recorded once per enrolment instead of once per person.
   listing_opt_in:         /student list/i,
+  level:                  /study level/i,
 }
 
 // Columns that are not user-supplied personal data to itemise. Each needs a REASON.
@@ -278,10 +281,24 @@ function readColumns() {
   const gate = readFileSync(join(ROOT, 'constants/profileGate.js'), 'utf8')
   const e = gate.match(/export const EDUCATION_COLUMNS\s*=\s*\[([\s\S]*?)\]/)
   if (!e) throw new Error('could not locate EDUCATION_COLUMNS in constants/profileGate.js')
-  const education = [...e[1].matchAll(/'([a-z_]+)'/g)].map(x => x[1])
+  // Match ANY quoted entry, then validate the shape — do NOT filter by shape while
+  // matching. A narrow `'([a-z_]+)'` silently SKIPS anything it cannot read (a digit, a
+  // stray capital) and the column simply leaves the guard's world with no error: the
+  // count drops by one and everything still reports green. That is precisely the
+  // going-green-because-the-data-moved failure this list was added to prevent, rebuilt
+  // inside its own parser. Caught by a red-first probe that mutated 'level' to 'levelXX'
+  // and watched the check NOT go red.
+  const education = [...e[1].matchAll(/'([^']*)'/g)].map(x => x[1])
+  const bad = education.filter(c => !/^[a-z0-9_]+$/.test(c))
+  if (bad.length) throw new Error(`EDUCATION_COLUMNS contains entries that are not column names: ${bad.join(', ')}`)
   if (!education.length) throw new Error('EDUCATION_COLUMNS parsed to zero columns — the guard would check nothing')
 
-  return [...new Set([...profile, ...education])]
+  // The union carries its ORIGIN, so a failure message can name the file to edit.
+  // `listing_opt_in` and `student_listing_opt_in` are the same fact under two names; the
+  // Set de-duplicates the rest.
+  const columns = [...new Set([...profile, ...education])]
+  columns.sourceOf = c => (profile.includes(c) ? 'App.js PROFILE_COLUMNS' : 'EDUCATION_COLUMNS in constants/profileGate.js')
+  return columns
 }
 
 function loadCopies() {
@@ -346,7 +363,7 @@ function check(copies, columns, log = console.log, world = null) {
   if (!gaps.length && !unknown.length) log(`    ✓ all ${covered} disclosable column(s) appear in all three copies`)
   for (const g of gaps) problems.push(`profiles.${g.col} is collected but not disclosed in: ${g.missing.join(', ')}`)
   for (const u of unknown) {
-    problems.push(`profiles.${u} is in PROFILE_COLUMNS but this guard has no rule for it — disclose it in all three copies, or add it to EXEMPT with a reason`)
+    problems.push(`${u} is in ${columns.sourceOf?.(u) ?? 'the column union'} but this guard has no rule for it — disclose it in all three copies, or add it to EXEMPT with a reason`)
     log(`    ✗ ${u.padEnd(20)} NEW COLUMN — no disclosure rule and not exempt`)
   }
   log(`    · ${Object.keys(EXEMPT).length} column(s) exempt: ${Object.keys(EXEMPT).join(', ')}`)

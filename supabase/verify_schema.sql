@@ -2314,6 +2314,34 @@ WITH report AS (
           AND pg_get_functiondef(p.oid) ILIKE '%UPDATE answers%'
           AND pg_get_functiondef(p.oid) ILIKE '%UPDATE facilities%'
           AND pg_get_functiondef(p.oid) ILIKE '%UPDATE places%')
+    -- (8) search_content must NEVER grow a student_education arm. MODULE_FLAGS does not
+    -- gate search (CLAUDE.md), search_content is SECURITY INVOKER but its facilities/places
+    -- arms are readable by anon — so an arm over this table would publish the student list
+    -- to signed-out visitors, defeating the guest guard, the reciprocity rule and the six-
+    -- column limit in one step. The rule was written as a comment in 20261026; a comment is
+    -- not a check.
+    --   Anchored to the CODE SHAPE 'from student_education', not the bare table name:
+    --   pg_get_functiondef() returns the comments too (the 0827 token), and a future
+    --   comment saying "deliberately no student_education arm" must not fail this.
+    --   Paired with a positive so it cannot go green by the function ceasing to exist.
+    UNION ALL SELECT '1026_student_education','search_content has NO student_education arm',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='search_content'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%from student\_education%'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%join student\_education%'
+          AND pg_get_functiondef(p.oid) ILIKE '%from facilities%')
+    -- (9) The transition trigger IGNORES ECHOES. `AFTER UPDATE OF <cols>` fires when a
+    -- column is in the SET LIST, not when its value changes, and the live app spreads the
+    -- whole affiliation patch into every save. After the OTA those profiles columns go
+    -- stale, so without this guard a straggler on old JS editing their PHONE NUMBER would
+    -- re-send a stale institution_id and retire the enrolment they had just added in the
+    -- new app — the safety net destroying the thing it exists to protect, in exactly the
+    -- window it exists for. Anchored on the comparison itself, which no comment contains.
+    UNION ALL SELECT '1026_student_education','mirror_profile_affiliation is a no-op on an unchanged write',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='mirror_profile_affiliation'
+          AND pg_get_functiondef(p.oid) ILIKE '%IS NOT DISTINCT FROM OLD.institution\_id%'
+          AND pg_get_functiondef(p.oid) ILIKE '%IS NOT DISTINCT FROM OLD.student\_listing\_opt\_in%')
     -- ══ resident_status narrowed to four (20261006) ═════════════════════════
     -- THE CONSTRAINT NAME DID NOT CHANGE, which is exactly why this token has to
     -- exist. Section E asserts profiles_resident_status_check is PRESENT, and it stays
