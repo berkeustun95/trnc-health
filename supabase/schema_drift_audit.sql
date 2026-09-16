@@ -588,7 +588,16 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('subjects', 'created_at', true, 'now()', 'timestamp with time zone'),
     ('subject_i18n', 'subject_id', true, NULL, 'uuid'),
     ('subject_i18n', 'lang', true, NULL, 'text'),
-    ('subject_i18n', 'name', true, NULL, 'text')
+    ('subject_i18n', 'name', true, NULL, 'text'),
+    ('student_education', 'id', true, 'gen_random_uuid()', 'uuid'),
+    ('student_education', 'user_id', true, NULL, 'uuid'),
+    ('student_education', 'institution_id', true, NULL, 'uuid'),
+    ('student_education', 'level', true, NULL, 'text'),
+    ('student_education', 'subject_id', false, NULL, 'uuid'),
+    ('student_education', 'study_start_year', false, NULL, 'smallint'),
+    ('student_education', 'study_end_year', false, NULL, 'smallint'),
+    ('student_education', 'listing_opt_in', true, 'false', 'boolean'),
+    ('student_education', 'created_at', true, 'now()', 'timestamp with time zone')
 ),
 expected_constraint (cname, litsig) AS (VALUES
     ('ad_banners_created_by_fkey', ''),
@@ -794,6 +803,15 @@ expected_constraint (cname, litsig) AS (VALUES
     ('reviews_pkey', ''),
     ('reviews_rating_check', '1|5'),
     ('schema_migrations_applied_pkey', ''),
+    ('student_education_end_year_range_check', '1950|2100'),
+    ('student_education_institution_id_fkey', ''),
+    ('student_education_level_check', 'postgraduate|university'),
+    ('student_education_pkey', ''),
+    ('student_education_start_year_range_check', '1950|2100'),
+    ('student_education_subject_id_fkey', ''),
+    ('student_education_user_id_fkey', ''),
+    ('student_education_user_inst_level_key', ''),
+    ('student_education_years_order_check', ''),
     ('student_task_i18n_documents_check', ''),
     ('student_task_i18n_lang_check', 'Arabic|English|French|German|Greek|Persian|Russian|Spanish|Turkish'),
     ('student_task_i18n_link_scheme_check', '^https://'),
@@ -868,6 +886,7 @@ expected_index (iname) AS (VALUES
     ('idx_quiz_submissions_assigned_facility_id'),
     ('idx_quiz_submissions_customer_id'),
     ('idx_reviews_facility_id'),
+    ('idx_student_education_listed'),
     ('idx_towing_companies_coverage'),
     ('job_postings_board_idx'),
     ('job_postings_owner_idx'),
@@ -878,7 +897,8 @@ expected_index (iname) AS (VALUES
     ('property_images_primary_unique'),
     ('property_images_property_id_idx'),
     ('reviews_customer_facility_live_uniq'),
-    ('reviews_customer_id_idx')
+    ('reviews_customer_id_idx'),
+    ('student_education_one_open_per_user')
 ),
 expected_table (tbl) AS (
   SELECT DISTINCT tbl FROM expected

@@ -67,6 +67,7 @@ WITH report AS (
     ('1017_student_tasks','student_tasks'),
     ('1017_student_tasks','student_task_i18n'),
     ('1024_student_affiliation','subjects'),
+    ('1026_student_education','student_education'),
     ('1024_student_affiliation','subject_i18n'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
@@ -331,8 +332,12 @@ WITH report AS (
     -- customer's row; can_see_student_lists is the reciprocity rule slices 4-6 share.
     -- If either goes missing the student list fails closed (no rows), which is the safe
     -- direction — but it fails closed SILENTLY, so their existence is asserted here.
-    ('1026_student_list','can_see_student_lists'),
-    ('1026_student_list','get_student_list'),
+    ('1026_student_education','can_see_student_lists'),
+    ('1026_student_education','get_student_list'),
+    -- The transition mirror. 20261027 drops it in the same transaction as the columns
+    -- it reads; while profiles still HAS them, its absence means an old client's write
+    -- never reaches student_education and the student list silently misses that user.
+    ('1026_student_education','mirror_profile_affiliation'),
     -- The ONLY write path the app has on ad_banners: the client is never granted UPDATE on
     -- that table, so if this function is missing every view and tap counts ZERO — silently,
     -- and a silent zero reads as "nobody looks at the ads", which is a conclusion somebody
@@ -564,7 +569,12 @@ WITH report AS (
     ('1024_student_affiliation','profiles_study_years_order_check'),
     ('1024_student_affiliation','profiles_study_fields_require_institution_check'),
     ('1024_student_affiliation','profiles_listing_opt_in_requires_institution_check'),
-    ('1024_student_affiliation','institutions_website_url_scheme_check')
+    ('1024_student_affiliation','institutions_website_url_scheme_check'),
+    ('1026_student_education','student_education_level_check'),
+    ('1026_student_education','student_education_user_inst_level_key'),
+    ('1026_student_education','student_education_start_year_range_check'),
+    ('1026_student_education','student_education_end_year_range_check'),
+    ('1026_student_education','student_education_years_order_check')
 
   ) e(m,o)
 
@@ -626,6 +636,8 @@ WITH report AS (
     ('1001_profile_completion','profiles_display_name_norm_uniq'),
     ('1001_profile_completion','idx_profiles_institution_id'),
     ('1024_student_affiliation','idx_profiles_subject_id'),
+    ('1026_student_education','student_education_one_open_per_user'),
+    ('1026_student_education','idx_student_education_listed'),
     -- home_strip_pin (1007). The PARTIAL UNIQUE is the load-bearing one: rank 1 of
     -- the Home strip asks for "the pin for today", singular, and without this two
     -- active rows on one date make that answer depend on row order — a bug that
@@ -682,8 +694,8 @@ WITH report AS (
     ('1002_display_name_rpc','display_name_available'),
     -- Slice 4. Without the grant the student list returns a permission error to every
     -- opted-in user, which the client cannot tell apart from an empty list.
-    ('1026_student_list','can_see_student_lists'),
-    ('1026_student_list','get_student_list'),
+    ('1026_student_education','can_see_student_lists'),
+    ('1026_student_education','get_student_list'),
     -- bump_ad_counter is ALSO granted to anon, which this section does not check — the app
     -- signs in anonymously on launch, so a render landing before that completes runs as
     -- true `anon`. The migration's own DO block asserts BOTH grants via
@@ -2217,7 +2229,7 @@ WITH report AS (
     -- Pinned as a STRING rather than parsed: pg_get_function_result renders canonically,
     -- and comparing the rendered form to the expected form is the reading that needs no
     -- decoding — the lesson from the tgargs token that tried to decode BYTEA by hand.
-    UNION ALL SELECT '1026_student_list','get_student_list returns EXACTLY the six agreed columns',
+    UNION ALL SELECT '1026_student_education','get_student_list returns EXACTLY the six agreed columns',
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='get_student_list'
           AND pg_get_function_result(p.oid) =
@@ -2226,7 +2238,7 @@ WITH report AS (
     -- guarding anonymous sessions. `authenticated` INCLUDES guests in Supabase, so the
     -- grant is not the guard — the body is. A DEFINER function with a mutable search_path
     -- is a privilege-escalation surface on top of a privacy one.
-    UNION ALL SELECT '1026_student_list','student-list RPCs: DEFINER, search_path pinned, guest-guarded, no anon EXECUTE',
+    UNION ALL SELECT '1026_student_education','student-list RPCs: DEFINER, search_path pinned, guest-guarded, no anon EXECUTE',
       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname IN ('get_student_list','can_see_student_lists')
           AND p.prosecdef
@@ -2241,7 +2253,7 @@ WITH report AS (
     -- the app that shows a stranger's name. Derived from the constraint text rather than
     -- compared to a remembered spelling: `IN (...)` and `= ANY (ARRAY[...])` are the same
     -- constraint printed two ways, and pinning either would fail on a correct database.
-    UNION ALL SELECT '1026_student_list','content_reports admits the 5 old types plus profile',
+    UNION ALL SELECT '1026_student_education','content_reports admits the 5 old types plus profile',
       (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
          FROM pg_constraint c,
               LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
@@ -2259,7 +2271,41 @@ WITH report AS (
     -- this file already and was made anyway.
     -- Paired with a POSITIVE on all five branches it SHOULD have, so a body that lost its
     -- work entirely cannot satisfy the negative half by being empty.
-    UNION ALL SELECT '1026_student_list','auto_hide_reported_content has NO profile branch (and still has its five)',
+    -- (5) THE TABLE THAT HOLDS ONE USER'S DATA FOR ANOTHER TO SEE. Two permissive
+    -- SELECT policies and no more, each owner- or admin-scoped, plus the three anon
+    -- blocks. The leak this forbids is concrete: reviews.customer_id is publicly
+    -- readable, so `reviews?select=profiles(*,student_education(*))` walks any wider
+    -- policy and hands a stranger's study history to anyone who can read a review.
+    -- DERIVED counts, not a name list — a policy nobody thought of is the whole risk.
+    UNION ALL SELECT '1026_student_education','student_education: RLS on, 2 owner/admin SELECT policies, 3 anon blocks',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c
+                 WHERE c.oid = to_regclass('public.student_education')), false)
+      AND (SELECT count(*) FROM pg_policies
+            WHERE schemaname='public' AND tablename='student_education'
+              AND permissive='PERMISSIVE' AND cmd IN ('SELECT','ALL')) = 2
+      AND NOT EXISTS (SELECT 1 FROM pg_policies
+            WHERE schemaname='public' AND tablename='student_education'
+              AND permissive='PERMISSIVE' AND cmd IN ('SELECT','ALL')
+              AND qual NOT ILIKE '%auth.uid()%' AND qual NOT ILIKE '%is_admin%')
+      AND (SELECT count(*) FROM pg_policies
+            WHERE schemaname='public' AND tablename='student_education'
+              AND permissive='RESTRICTIVE') = 3
+    -- (6) "Current" is derived from study_end_year IS NULL, and that is only a definition
+    -- while at most one row per person can be open. Lose this index and every consumer of
+    -- "are they still there" silently starts guessing — including get_student_list's
+    -- collapse, which would then pick between two open rows arbitrarily.
+    UNION ALL SELECT '1026_student_education','one open enrolment per person (partial unique index)',
+      EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+              AND indexname='student_education_one_open_per_user'
+              AND indexdef ILIKE '%UNIQUE%' AND indexdef ILIKE '%study_end_year IS NULL%')
+    -- (7) The future-end-year trigger MOVED to the new table. 20261024's token asserts it
+    -- on profiles and stays correct until 20261027 drops that one; this asserts the new
+    -- binding. Both are true between 26 and 27, which is exactly the window.
+    UNION ALL SELECT '1026_student_education','check_profile_study_years is bound to student_education',
+      EXISTS(SELECT 1 FROM pg_trigger
+              WHERE tgrelid = to_regclass('public.student_education')
+                AND tgname = 'check_student_education_years' AND NOT tgisinternal)
+    UNION ALL SELECT '1026_student_education','auto_hide_reported_content has NO profile branch (and still has its five)',
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='auto_hide_reported_content'
           AND pg_get_functiondef(p.oid) NOT ILIKE '%UPDATE profiles%'
