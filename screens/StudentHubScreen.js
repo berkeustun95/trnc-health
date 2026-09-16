@@ -106,11 +106,16 @@ function StudentRow({ row, lang, isMe }) {
 //   opted in, empty  → an invitation, and confirmation that their own opt-in worked.
 //
 // The RPC enforces all of this server-side too; this is the copy, not the boundary.
-function StudentList({ uni, lang, isGuest, listingOptIn, myId, onGoToProfile }) {
+// listingOptIn is a TRI-STATE — true / false / null for "not read yet" — and the null
+// matters. Collapsing it into false shows the reciprocity card for the length of one
+// round trip to every user who IS opted in: "turn this on" flashing at the person who
+// already did, which is the same "broken at the moment it worked" failure the profile
+// round-trip was designed to avoid, just moved earlier.
+function StudentList({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToProfile }) {
   const [rows, setRows]     = useState(null)
   const [failed, setFailed] = useState(false)
 
-  const eligible = !isGuest && listingOptIn
+  const eligible = !isGuest && listingOptIn === true
 
   useEffect(() => {
     if (!eligible) return
@@ -132,7 +137,27 @@ function StudentList({ uni, lang, isGuest, listingOptIn, myId, onGoToProfile }) 
 
   if (isGuest) return null
 
-  if (!listingOptIn) {
+  // The own-row read failed: say so rather than showing the reciprocity card, which would
+  // tell an opted-in user they are not opted in.
+  if (meFailed) {
+    return (
+      <View style={s.secondCard}>
+        <SectionTitle text={t('studentListTitle', lang)} />
+        <ContentCard><Text style={s.studentEmpty}>{t('studentLoadError', lang)}</Text></ContentCard>
+      </View>
+    )
+  }
+
+  if (listingOptIn === null) {
+    return (
+      <View style={s.secondCard}>
+        <SectionTitle text={t('studentListTitle', lang)} />
+        <ContentCard><ActivityIndicator color={colors.primary} /></ContentCard>
+      </View>
+    )
+  }
+
+  if (listingOptIn === false) {
     return (
       <ContentCard style={s.secondCard}>
         <Text style={s.studentLockedTitle}>{t('studentListLockedTitle', lang)}</Text>
@@ -173,7 +198,7 @@ function StudentList({ uni, lang, isGuest, listingOptIn, myId, onGoToProfile }) 
 // Carries ONLY what institutions holds: name, short name, city, and the link when one is
 // set (20261025). No address, logo or accreditation line — each would need a column and
 // content nobody has supplied. Slice 4 adds the student list below the website button.
-function UniversityDetail({ uni, lang, isGuest, listingOptIn, myId, onGoToProfile, onBack }) {
+function UniversityDetail({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToProfile, onBack }) {
   const meta = uniMeta(uni, lang)
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -204,6 +229,7 @@ function UniversityDetail({ uni, lang, isGuest, listingOptIn, myId, onGoToProfil
             lang={lang}
             isGuest={isGuest}
             listingOptIn={listingOptIn}
+            meFailed={meFailed}
             myId={myId}
             onGoToProfile={onGoToProfile}
           />
@@ -512,6 +538,7 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
   // the feature has to be right. Opening the profile closes this screen, so re-entering
   // re-mounts and re-reads.
   const [me, setMe] = useState(null)
+  const [meFailed, setMeFailed] = useState(false)
 
   const [tasks, setTasks] = useState(null)
   const [tasksFailed, setTasksFailed] = useState(false)
@@ -570,12 +597,20 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
     if (!MODULE_FLAGS.studentHub || isGuest) return
     let cancelled = false
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (cancelled || !session?.user) return
+      if (cancelled) return
+      if (!session?.user) { setMeFailed(true); return }
       supabase.from('profiles')
         .select('id, student_listing_opt_in')
         .eq('id', session.user.id)
         .maybeSingle()
-        .then(({ data }) => { if (!cancelled) setMe(data ?? null) })
+        .then(({ data, error }) => {
+          if (cancelled) return
+          // maybeSingle() returns {data: null, error: null} on zero rows — it does NOT
+          // throw — so a missing row has to be treated as a failure explicitly, or `me`
+          // stays null forever and the list spins.
+          if (error || !data) { setMeFailed(true); return }
+          setMe(data)
+        })
     })
     return () => { cancelled = true }
   }, [isGuest])
@@ -587,7 +622,8 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
         uni={openUni}
         lang={lang}
         isGuest={isGuest}
-        listingOptIn={me?.student_listing_opt_in === true}
+        listingOptIn={me ? me.student_listing_opt_in === true : null}
+        meFailed={meFailed}
         myId={me?.id ?? null}
         onGoToProfile={onGoToProfile}
         onBack={() => setOpenUniId(null)}

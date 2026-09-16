@@ -550,9 +550,11 @@ function ReportsTab({ session }) {
       if (!ids.length) continue
       // profiles has no hidden_at/hidden_reason — selecting them would 42703 the whole
       // read and empty the queue of every type, not just this one.
-      const cols = READ_ONLY_REPORT_TYPES.includes(type)
-        ? `id, ${TEXT_COL[type]}, ${AUTHOR_COL[type]}`
-        : `id, ${TEXT_COL[type]}, ${AUTHOR_COL[type]}, hidden_at, hidden_reason`
+      // Deduped: for 'profile' both TEXT_COL and AUTHOR_COL resolve to columns that
+      // overlap with `id`, and PostgREST is given the same name twice.
+      const cols = [...new Set(READ_ONLY_REPORT_TYPES.includes(type)
+        ? ['id', TEXT_COL[type], AUTHOR_COL[type]]
+        : ['id', TEXT_COL[type], AUTHOR_COL[type], 'hidden_at', 'hidden_reason'])].join(', ')
       const { data } = await supabase
         .from(CONTENT_TABLE[type])
         .select(cols)
