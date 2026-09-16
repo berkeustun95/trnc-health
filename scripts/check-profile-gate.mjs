@@ -45,7 +45,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { MIN_SIGNUP_AGE, CURRENT_PROFILE_SCHEMA_VERSION, RESIDENT_STATUSES,
+import { MIN_SIGNUP_AGE, ADULT_AGE, CURRENT_PROFILE_SCHEMA_VERSION, RESIDENT_STATUSES,
          STUDENT_LEVELS, DISPLAY_PREFERENCES, GATE_EXEMPT_MODULES, GATE_EXEMPT_SCREENS,
          GATE_READONLY_PROP, GATE_READONLY_HANDLER, GATE_FORBIDDEN_PROP,
        } from '../constants/profileGate.js'
@@ -57,6 +57,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const MIGRATIONS = resolve(ROOT, 'supabase/migrations')
 const SCHEMA_FILE = '20261001_profile_completion_schema.sql'
 const RPC_FILE = '20261002_display_name_availability_rpc.sql'
+const MESSAGING_FILE = '20261029_student_messaging.sql'
 
 const fails = []
 const notes = []
@@ -65,6 +66,7 @@ const ok = m => notes.push(`  ok   ${m}`)
 
 const sql = readFileSync(resolve(MIGRATIONS, SCHEMA_FILE), 'utf8')
 const rpcSql = readFileSync(resolve(MIGRATIONS, RPC_FILE), 'utf8')
+const MESSAGING_SQL = readFileSync(resolve(MIGRATIONS, MESSAGING_FILE), 'utf8')
 
 // Slice a dollar-quoted function body out of a migration. Anchored on the CREATE line
 // and terminated by the matching $function$ — NOT by the first ';', which appears inside
@@ -98,6 +100,42 @@ function fnBody(text, name) {
       ok(`MIN_SIGNUP_AGE = ${MIN_SIGNUP_AGE} in both halves`)
     }
     if (!/UNDERAGE/.test(body)) fail('the trigger does not raise UNDERAGE')
+  }
+}
+
+// ─── 1b. ADULT_AGE — the same contract, for the messaging age rule ───────────
+// Slice 6's rule (adults cannot initiate with under-18s) lives in may_initiate_by_age().
+// Same shape as MIN_SIGNUP_AGE above and same reason it cannot be a CHECK constraint.
+{
+  const body = fnBody(MESSAGING_SQL, 'may_initiate_by_age')
+  if (!body) {
+    fail(`could not find may_initiate_by_age() in ${MESSAGING_FILE}`)
+  } else {
+    const m = body.match(/current_date\s*-\s*interval\s*'(\d+)\s+years'/)
+    if (!m) {
+      fail(`the age rule is missing from may_initiate_by_age(). Adults could then ` +
+           `initiate contact with under-18s, which is the one non-negotiable rule in ` +
+           `slice 6.`)
+    } else if (Number(m[1]) !== ADULT_AGE) {
+      fail(`ADULT_AGE disagrees: constants/profileGate.js says ${ADULT_AGE}, ` +
+           `${MESSAGING_FILE} enforces ${m[1]}.`)
+    } else {
+      ok(`ADULT_AGE = ${ADULT_AGE} in both halves`)
+    }
+
+    // THE RULE MUST FAIL CLOSED ON A NULL date_of_birth. The naive form —
+    // NOT (sender_is_adult AND recipient_is_minor) — allows every unknown age, because
+    // an unknown sender is not `sender_is_adult` and the rule never fires. The function
+    // is therefore written as a positive ALLOW with two named escapes and a bare
+    // `RETURN false` at the end. If that final default ever becomes `RETURN true`, the
+    // whole rule inverts silently and nothing else in the repo would notice.
+    if (!/RETURN\s+false\s*;\s*END\s*;\s*$/.test(body.trim() + '')) {
+      fail(`may_initiate_by_age() does not END with RETURN false. It must fail CLOSED: ` +
+           `every path that has not positively established "sender is a known minor" or ` +
+           `"recipient is a known adult" has to refuse.`)
+    } else {
+      ok('may_initiate_by_age() falls through to RETURN false (unknown age fails closed)')
+    }
   }
 }
 

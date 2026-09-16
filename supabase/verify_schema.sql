@@ -68,6 +68,12 @@ WITH report AS (
     ('1017_student_tasks','student_task_i18n'),
     ('1024_student_affiliation','subjects'),
     ('1026_student_education','student_education'),
+    -- Slice 6. The first tables two customers JOINTLY own. Nobody is granted INSERT,
+    -- UPDATE or DELETE on any of the three — see the 1029 H-token, which is the only
+    -- thing that can see that, since a missing GRANT creates no named object.
+    ('1029_student_messaging','conversations'),
+    ('1029_student_messaging','messages'),
+    ('1029_student_messaging','conversation_attempts'),
     ('1024_student_affiliation','subject_i18n'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
@@ -338,6 +344,24 @@ WITH report AS (
     -- another; if it goes missing the page fails closed (no rows), which is the safe
     -- direction — but silently, so its existence is asserted here.
     ('1028_student_profile','get_student_profile'),
+    -- Slice 6. is_listed_student is the general form of the reciprocity rule and
+    -- can_see_student_lists now DELEGATES to it, so its absence breaks slices 4, 5 AND 6
+    -- at once. may_initiate_by_age is the age rule.
+    ('1029_student_messaging','is_listed_student'),
+    ('1029_student_messaging','may_initiate_by_age'),
+    ('1029_student_messaging','start_conversation'),
+    ('1029_student_messaging','send_message'),
+    ('1029_student_messaging','accept_conversation'),
+    ('1029_student_messaging','decline_conversation'),
+    ('1029_student_messaging','leave_conversation'),
+    ('1029_student_messaging','delete_message'),
+    ('1029_student_messaging','block_user'),
+    ('1029_student_messaging','list_conversations'),
+    ('1029_student_messaging','notify_new_message'),
+    ('1029_student_messaging','stamp_message_sender'),
+    ('1029_student_messaging','enforce_message_age_rule'),
+    ('1029_student_messaging','guard_message_immutable'),
+    ('1029_student_messaging','touch_conversation'),
     -- The transition mirror. 20261027 drops it in the same transaction as the columns
     -- it reads; while profiles still HAS them, its absence means an old client's write
     -- never reaches student_education and the student list silently misses that user.
@@ -396,6 +420,14 @@ WITH report AS (
     ('0905_towing_companies','towing_touch_updated_at'),
     ('1001_profile_completion','check_profile_name_content'),
     ('1024_student_affiliation','check_profile_study_years')
+    -- Slice 6. The numeric prefixes ARE the firing order (triggers of a kind fire
+    -- alphabetically); the 1029 H-token pins the whole sequence as one string, which is
+    -- the only check that can see a rename that reorders them.
+    ,('1029_student_messaging','msg_10_stamp_sender'),
+    ('1029_student_messaging','msg_20_age_rule'),
+    ('1029_student_messaging','msg_30_ugc_screen'),
+    ('1029_student_messaging','msg_40_immutable'),
+    ('1029_student_messaging','msg_50_touch_conversation')
 
   ) e(m,o)
 
@@ -579,6 +611,11 @@ WITH report AS (
     ('1026_student_education','student_education_start_year_range_check'),
     ('1026_student_education','student_education_end_year_range_check'),
     ('1026_student_education','student_education_years_order_check')
+    ,('1029_student_messaging','conversations_not_self'),
+    ('1029_student_messaging','conversations_not_both'),
+    ('1029_student_messaging','conversations_closed_pair'),
+    ('1029_student_messaging','conversation_attempts_outcome_check'),
+    ('1029_student_messaging','messages_body_check')
 
   ) e(m,o)
 
@@ -642,6 +679,14 @@ WITH report AS (
     ('1024_student_affiliation','idx_profiles_subject_id'),
     ('1026_student_education','student_education_one_open_per_user'),
     ('1026_student_education','idx_student_education_listed'),
+    -- ► conversations_one_live_per_pair is PARTIAL, and the partial-ness is the design.
+    --   A plain UNIQUE(pair_lo,pair_hi) would make LEAVING a conversation into a
+    --   permanent, invisible, mutual block: the settled row would occupy the pair's only
+    --   slot forever. Same shape and reasoning as student_education_one_open_per_user.
+    ('1029_student_messaging','conversations_one_live_per_pair'),
+    ('1029_student_messaging','conversations_pair_idx'),
+    ('1029_student_messaging','messages_conversation_idx'),
+    ('1029_student_messaging','conversation_attempts_rate_idx'),
     -- home_strip_pin (1007). The PARTIAL UNIQUE is the load-bearing one: rank 1 of
     -- the Home strip asks for "the pin for today", singular, and without this two
     -- active rows on one date make that answer depend on row order — a bug that
@@ -703,6 +748,18 @@ WITH report AS (
     -- Without the grant the profile page returns a permission error to every opted-in
     -- user, which the client cannot tell apart from a profile that is simply gone.
     ('1028_student_profile','get_student_profile'),
+    -- Slice 6. Without these the messaging screens return a permission error the client
+    -- cannot distinguish from an empty inbox. notify_new_message is DELIBERATELY ABSENT:
+    -- it is revoked from every client role, and a push sender anyone can call is a push
+    -- sender anyone can aim. The 1029 H-token asserts that revocation positively.
+    ('1029_student_messaging','start_conversation'),
+    ('1029_student_messaging','send_message'),
+    ('1029_student_messaging','accept_conversation'),
+    ('1029_student_messaging','decline_conversation'),
+    ('1029_student_messaging','leave_conversation'),
+    ('1029_student_messaging','delete_message'),
+    ('1029_student_messaging','block_user'),
+    ('1029_student_messaging','list_conversations'),
     -- bump_ad_counter is ALSO granted to anon, which this section does not check — the app
     -- signs in anonymously on launch, so a render landing before that completes runs as
     -- true `anon`. The migration's own DO block asserts BOTH grants via
@@ -2260,13 +2317,17 @@ WITH report AS (
     -- the app that shows a stranger's name. Derived from the constraint text rather than
     -- compared to a remembered spelling: `IN (...)` and `= ANY (ARRAY[...])` are the same
     -- constraint printed two ways, and pinning either would fail on a correct database.
-    UNION ALL SELECT '1026_student_education','content_reports admits the 5 old types plus profile',
+    UNION ALL SELECT '1026_student_education','content_reports admits the 5 old types plus profile and message',
       (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
          FROM pg_constraint c,
               LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
         WHERE c.conrelid = to_regclass('public.content_reports')
           AND c.conname = 'content_reports_content_type_check')
-      = ARRAY['answer','facility','place','profile','question','review']
+      = ARRAY['answer','facility','message','place','profile','question','review']
+    -- ► BUMPED FROM 6 TO 7 BY 20261029, in the same commit that widened the CHECK. The
+    --   edit is the review moment, and it is the whole argument for pinning the derived
+    --   array instead of a remembered name: this row went red the moment 'message' was
+    --   admitted, which is what made somebody look.
     -- (4) A PERSON IS NEVER AUTO-HIDDEN. auto_hide_reported_content fires at 3 distinct
     -- reporters; three coordinated accounts erasing anyone from every list in the app is a
     -- brigading weapon, not a safeguard. Profile reports go to admin triage only.
@@ -2412,6 +2473,169 @@ WITH report AS (
         LEFT JOIN pg_roles r ON r.oid = a.grantee
         WHERE n.nspname='public' AND p.proname='get_student_profile'
           AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+
+    -- ══ Slice 6: messaging (20261029) ═══════════════════════════════════════
+    -- Written as SIBLINGS of the 1026/1028 tokens, never as extensions of them, so a
+    -- database carrying 26 and 28 but not 29 shows red on 1029 rows only and does not
+    -- misattribute the failure to a migration that is perfectly applied.
+    --
+    -- (1) ► THE LOAD-BEARING ONE. Every rule in slice 6 — accept-first, the 1000-char
+    -- cap, the age rule, the snapshotted sender, a permanent decline — is a statement
+    -- about WHICH COLUMNS MAY CHANGE AND WHEN, and RLS has no column dimension, so none
+    -- of them can be expressed as a write policy. They hold only because the DEFINER
+    -- functions own the only write path. One GRANT undoes all of it silently, and a
+    -- missing grant creates NO NAMED OBJECT, so section G cannot see this: it is the only
+    -- row in the report that can.
+    -- DERIVED from role_table_grants, not a remembered list of who was granted what.
+    UNION ALL SELECT '1029_student_messaging','NOBODY holds INSERT or DELETE on conversations/messages/conversation_attempts',
+      (SELECT count(*) FROM information_schema.role_table_grants
+        WHERE table_schema='public'
+          AND table_name IN ('conversations','messages','conversation_attempts')
+          AND privilege_type IN ('INSERT','DELETE')
+          AND grantee IN ('anon','authenticated','PUBLIC')) = 0
+    -- (2) The ONE update anybody holds, and the trigger that keeps it to the moderation
+    -- columns. Granting UPDATE is column-blind; guard_message_immutable is what stops an
+    -- admin (or a future policy widening) rewriting what somebody said.
+    -- Anchored on `MESSAGE_IMMUTABLE`, a code shape, never on the word "immutable" —
+    -- pg_get_functiondef returns the COMMENTS, and this file has already shipped a token
+    -- that forbade its own explanation once.
+    UNION ALL SELECT '1029_student_messaging','messages: UPDATE granted to authenticated ONLY, and bodies are immutable',
+      (SELECT count(*) FROM information_schema.role_table_grants
+        WHERE table_schema='public' AND table_name='messages'
+          AND privilege_type='UPDATE' AND grantee IN ('anon','PUBLIC')) = 0
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='guard_message_immutable'
+          AND pg_get_functiondef(p.oid) LIKE '%MESSAGE_IMMUTABLE%')
+      AND EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.messages')
+                  AND tgname='msg_40_immutable' AND NOT tgisinternal)
+    -- (3) ► THE AGE RULE MUST FAIL CLOSED. The naive form — NOT (sender is adult AND
+    -- recipient is minor) — ALLOWS every null date_of_birth, because an unknown sender is
+    -- not "adult" and the rule simply never fires. may_initiate_by_age is therefore
+    -- written as a positive ALLOW with two named escapes and a bare RETURN false at the
+    -- end; if that default ever inverts, adults reach children and nothing else here
+    -- would notice. `npm run profile:check` asserts the same shape against the FILE; this
+    -- asserts it against the DATABASE, which is the half that is actually running.
+    UNION ALL SELECT '1029_student_messaging','may_initiate_by_age: DEFINER, 18 years, and falls through to RETURN false',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='may_initiate_by_age'
+          AND p.prosecdef
+          AND p.proconfig::text ILIKE '%search_path=public%'
+          AND p.prosrc LIKE '%interval ''18 years''%'
+          AND p.prosrc ~ 'RETURN false;\s*END;\s*$')
+    -- (4) Enforced TWICE, and the second one is the point: a rule living only inside one
+    -- function lasts exactly until somebody writes a second way to insert a message.
+    UNION ALL SELECT '1029_student_messaging','the age rule is enforced in the RPC AND on the table',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='start_conversation'
+          AND pg_get_functiondef(p.oid) LIKE '%may_initiate_by_age(%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='enforce_message_age_rule'
+          AND pg_get_functiondef(p.oid) LIKE '%may_initiate_by_age(%')
+      AND EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.messages')
+                  AND tgname='msg_20_age_rule' AND NOT tgisinternal)
+    -- (5) FIRING ORDER, pinned as one string. Triggers of a kind fire ALPHABETICALLY, so
+    -- the numeric prefixes are a decision and not decoration — and a rename that reorders
+    -- them creates no missing object for section D to find.
+    UNION ALL SELECT '1029_student_messaging','the five messages triggers, in the firing order the prefixes declare',
+      (SELECT string_agg(tgname, ',' ORDER BY tgname) FROM pg_trigger
+        WHERE tgrelid = to_regclass('public.messages') AND NOT tgisinternal)
+      = 'msg_10_stamp_sender,msg_20_age_rule,msg_30_ugc_screen,msg_40_immutable,msg_50_touch_conversation'
+    -- (6) Screening REUSES check_ugc_on_insert with the 'body' argument. No new matcher:
+    -- the function reads to_jsonb(NEW) ->> TG_ARGV[0], which is why a table it has never
+    -- seen needs no change to it. Read through pg_get_triggerdef, which renders canonical
+    -- SQL — tgargs is BYTEA with NULL-terminated arguments and decoding it by hand is how
+    -- a check ends up searching a hex string for a word that cannot be in one.
+    UNION ALL SELECT '1029_student_messaging','messages are screened by the EXISTING matcher, bound to body',
+      EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.messages')
+              AND tgname='msg_30_ugc_screen' AND NOT tgisinternal
+              AND pg_get_triggerdef(oid) LIKE '%check_ugc_on_insert(%body%)%')
+    -- (7) ► ONE LIVE THREAD PER PAIR, AND THE INDEX MUST BE PARTIAL. Made non-partial,
+    -- every leave and every decline becomes a permanent invisible mutual block: the
+    -- settled row holds the pair's only slot forever, and the pair can never speak again.
+    -- Nothing would error; two people would simply find they cannot start a conversation.
+    UNION ALL SELECT '1029_student_messaging','conversations_one_live_per_pair is UNIQUE and PARTIAL on the settled columns',
+      EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+              AND indexname='conversations_one_live_per_pair'
+              AND indexdef ILIKE '%UNIQUE%'
+              AND indexdef ILIKE '%declined_at IS NULL%'
+              AND indexdef ILIKE '%closed_at IS NULL%')
+    -- (8) ► ADMIN SEES A REPORTED MESSAGE, NOT A THREAD AND NOT THE TABLE. A report is
+    -- what opens the door. Both halves, because either alone certifies a blind spot: no
+    -- policy on `conversations` mentions is_admin at all (thread metadata is never
+    -- readable in bulk), and every admin policy on `messages` is scoped by a
+    -- content_reports EXISTS. A blanket is_admin() here is a wiretap, not a moderation
+    -- tool, and it is one word away at all times.
+    UNION ALL SELECT '1029_student_messaging','admin reads ONLY reported messages, and no conversation metadata at all',
+      NOT EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='conversations' AND qual ILIKE '%is_admin%')
+      AND NOT EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='messages'
+          AND qual ILIKE '%is_admin%' AND qual NOT ILIKE '%content_reports%')
+      AND EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='messages'
+          AND qual ILIKE '%is_admin%' AND qual ILIKE '%content_reports%')
+    -- (9) DERIVED policy counts. 4 / 6 / 4, printed by the migration's own DO block. If a
+    -- legitimate new policy takes one of these up, bump it HERE and say why — that edit is
+    -- the review moment a name list never creates.
+    UNION ALL SELECT '1029_student_messaging','messaging RLS: on, and policy counts are 4 / 6 / 4',
+      COALESCE((SELECT bool_and(c.relrowsecurity) FROM pg_class c
+                 WHERE c.oid IN (to_regclass('public.conversations'),
+                                 to_regclass('public.messages'),
+                                 to_regclass('public.conversation_attempts'))), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='conversations') = 4
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='messages') = 6
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='conversation_attempts') = 4
+    -- (10) The initiator must NOT be able to see that they were declined — "reads as no
+    -- reply" is the whole design, and it is one clause in one policy.
+    UNION ALL SELECT '1029_student_messaging','a declined thread is hidden from its initiator, and a left one from the leaver',
+      EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='conversations' AND cmd='SELECT'
+          AND qual ILIKE '%declined_at IS NULL%' AND qual ILIKE '%closed_by%')
+    -- (11) conversation_attempts is ADMIN-READ ONLY. An initiator who could list their own
+    -- refusals has an oracle for who blocked them, which is the thing the generic refusal
+    -- exists to prevent — undone by a SELECT policy nobody thought about.
+    UNION ALL SELECT '1029_student_messaging','conversation_attempts is admin-read only (no author SELECT)',
+      NOT EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='conversation_attempts'
+          AND permissive='PERMISSIVE' AND cmd IN ('SELECT','ALL')
+          AND qual NOT ILIKE '%is_admin%')
+    -- (12) notify_new_message is callable by NOBODY. A push sender anyone can call is a
+    -- push sender anyone can aim at a stranger's lock screen, with text of their choosing.
+    UNION ALL SELECT '1029_student_messaging','notify_new_message is EXECUTE-able by no client role',
+      NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public' AND p.proname='notify_new_message'
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated')))
+    -- (13) ONE reciprocity rule, not two. can_see_student_lists DELEGATES to
+    -- is_listed_student; if somebody re-inlines the predicate, the two copies drift and
+    -- the copy that drifts is the one that lets somebody lurk.
+    UNION ALL SELECT '1029_student_messaging','can_see_student_lists delegates to is_listed_student (one copy of the rule)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='can_see_student_lists'
+          AND pg_get_functiondef(p.oid) LIKE '%is_listed_student(%'
+          AND pg_get_functiondef(p.oid) ILIKE '%is_anonymous_session%')
+    -- (14) NEGATIVE: search_content must never grow a messages arm. MODULE_FLAGS does not
+    -- gate search, and a private message surfacing in global search is the single worst
+    -- failure this slice could have. Anchored on the code shapes `FROM messages` and
+    -- `JOIN messages`, never the bare word — pg_get_functiondef returns the comments, and
+    -- a token forbidding the word would forbid this explanation.
+    UNION ALL SELECT '1029_student_messaging','search_content has NO messages arm (and still has its own)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='search_content'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%FROM messages%'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%JOIN messages%'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%FROM conversations%'
+          AND pg_get_functiondef(p.oid) ILIKE '%FROM facilities%')
+    -- (15) NEGATIVE: no auto-hide branch for messages. A message has exactly two people
+    -- who can see it and auto_hide_reported_content fires at THREE distinct reporters, so
+    -- a branch would be dead code that reads as a safeguard. `UPDATE messages` is the code
+    -- shape; the word "message" appears in that function's prose already.
+    UNION ALL SELECT '1029_student_messaging','auto_hide_reported_content has NO messages branch (3 reporters is unreachable for 2 people)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='auto_hide_reported_content'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%UPDATE messages%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE reviews%')
     -- ══ resident_status narrowed to four (20261006) ═════════════════════════
     -- THE CONSTRAINT NAME DID NOT CHANGE, which is exactly why this token has to
     -- exist. Section E asserts profiles_resident_status_check is PRESENT, and it stays

@@ -19,6 +19,18 @@ export const MIN_SIGNUP_AGE = 13
 // Oldest plausible account holder. Only used to bound the year dropdown.
 export const MAX_SIGNUP_AGE = 100
 
+// Majority, for the messaging age rule: an adult may not INITIATE a conversation with an
+// under-18. Minor→minor, minor→adult and adult→adult are all fine; only adult→minor is
+// refused, and it is refused server-side in may_initiate_by_age() because a client-side
+// age check is a client-side age check.
+//
+// NEVER INLINE THIS EITHER. Exactly twice, same contract as MIN_SIGNUP_AGE: here, and as
+// `interval '18 years'` in may_initiate_by_age() (20261029). It cannot be a CHECK
+// constraint — CURRENT_DATE is STABLE and a CHECK needs IMMUTABLE — so a function is the
+// only home it has. `npm run profile:check` fails if the two halves disagree, and the
+// migration's own DO block fails if a SECOND function in the schema grows a copy.
+export const ADULT_AGE = 18
+
 // ─── SCHEMA VERSION ──────────────────────────────────────────────────────────
 // The gate fires when profiles.profile_schema_version < this. The column DEFAULTs to 0
 // in the database, so every existing row and every new signup is gated until the wizard
