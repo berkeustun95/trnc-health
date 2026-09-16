@@ -635,9 +635,33 @@ BEGIN
   ELSE
     -- No name, no content, and no count either — "3 people want to message you" is
     -- itself information about how exposed somebody is.
-    v_title := CASE WHEN v_lang = 'Turkish' THEN 'Yeni mesaj isteği' ELSE 'New message request' END;
-    v_text  := CASE WHEN v_lang = 'Turkish' THEN 'Biri sana mesaj göndermek istiyor.'
-                    ELSE 'Someone wants to message you.' END;
+    --
+    -- ALL NINE LANGUAGES, with an English fallback, in the shape module_notif_text()
+    -- already uses. An English/Turkish CASE would have been two lines and would have put
+    -- English on the lock screen of every Greek, Persian, Arabic, Russian, French,
+    -- Spanish and German user — and this is the ONE notification that reaches somebody
+    -- who has not agreed to be reached, so it is the worst one to leave untranslated.
+    -- preferred_language holds FULL ENGLISH NAMES ('Turkish'), never ISO codes: an ISO
+    -- comparison never errors, it just matches nothing and silently falls back.
+    SELECT coalesce(t.title, 'New message request'), coalesce(t.body, 'Someone wants to message you.')
+      INTO v_title, v_text
+      FROM (VALUES
+        ('English', 'New message request',  'Someone wants to message you.'),
+        ('Turkish', 'Yeni mesaj isteği',    'Biri sana mesaj göndermek istiyor.'),
+        ('Arabic',  'طلب رسالة جديد',        'شخص ما يريد مراسلتك.'),
+        ('Russian', 'Новый запрос на переписку', 'Кто-то хочет написать вам.'),
+        ('Greek',   'Νέο αίτημα μηνύματος', 'Κάποιος θέλει να σας στείλει μήνυμα.'),
+        ('French',  'Nouvelle demande de message', 'Quelqu''un souhaite vous écrire.'),
+        ('Spanish', 'Nueva solicitud de mensaje',  'Alguien quiere enviarte un mensaje.'),
+        ('German',  'Neue Nachrichtenanfrage',     'Jemand möchte dir schreiben.'),
+        ('Persian', 'درخواست پیام جدید',    'کسی می‌خواهد به شما پیام بدهد.')
+      ) AS t(lang, title, body)
+     WHERE t.lang = v_lang;
+
+    IF v_title IS NULL THEN
+      v_title := 'New message request';
+      v_text  := 'Someone wants to message you.';
+    END IF;
   END IF;
 
   INSERT INTO notifications (user_id, title, body) VALUES (v_to, v_title, v_text);
@@ -1069,7 +1093,19 @@ BEGIN
          -- Only the recipient is ever "awaiting me". The initiator is never told a
          -- decline happened, so for them an unaccepted thread simply has no reply.
          (c.recipient_id = v_me AND c.accepted_at IS NULL AND c.declined_at IS NULL),
-         c.closed_at IS NOT NULL,
+         -- ► A BLOCK MUST READ AS "CLOSED", NEVER AS "GONE". block_user() closes the
+         --   thread, so a block and a leave normally look identical here — which is the
+         --   rule: the blocked party is told the conversation is closed, never that they
+         --   were blocked. The older block_content_author() path does NOT close anything
+         --   though, so without this clause a thread blocked from the review flow would
+         --   sit in the list looking live while every send returned CONVERSATION_CLOSED.
+         --   Note what this deliberately does NOT do: it does not FILTER the row out. A
+         --   thread that vanishes when a leave would have left it visible is exactly the
+         --   signal that tells somebody they were blocked.
+         (c.closed_at IS NOT NULL
+          OR EXISTS (SELECT 1 FROM blocks b
+                      WHERE (b.blocker_id = v_me AND b.blocked_id = o.id)
+                         OR (b.blocker_id = o.id AND b.blocked_id = v_me))),
          c.last_message_at,
          -- The opener IS shown in full in-app even before acceptance: the recipient has
          -- to read it to decide. Push is the surface that stays blank, not this one.
@@ -1086,9 +1122,6 @@ BEGIN
      -- the initiator: it drops out of their list too, reading as a conversation that was
      -- never answered rather than one that was refused.
      AND NOT (c.declined_at IS NOT NULL)
-     AND NOT EXISTS (SELECT 1 FROM blocks b
-                      WHERE (b.blocker_id = v_me AND b.blocked_id = o.id)
-                         OR (b.blocker_id = o.id AND b.blocked_id = v_me))
    ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC;
 END;
 $function$;
@@ -1400,7 +1433,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261029_student_messaging.sql', '361271e17aab88da0f8fdeb48ac186685496765063a8ba413b5ed3137a2a2683')
+VALUES ('20261029_student_messaging.sql', '98b00ee19adbbdd74e3700f85a70f17b65ca6ba8508ed463e9e9186a255ec552')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
