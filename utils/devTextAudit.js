@@ -86,7 +86,24 @@ import { colors, contrastRatio } from '../constants/theme'
 const CONTROL_TIMEOUT_MS = 6000
 
 // Sentinels, not i18n strings, so they can never collide with real copy.
-const POSITIVE_PROBE = 'ADA_AUDIT_POSITIVE_CONTROL_this_string_is_far_too_long_to_fit_on_one_short_line'
+//
+// ► ORDINARY SPACED WORDS, AND IT MUST OVERFLOW PAST ITS LINE LIMIT, NOT WITHIN IT.
+//   Both details are load-bearing and both were nearly got wrong.
+//
+//   The detection this control is proving works by whole lines going MISSING: at
+//   numberOfLines={1} in a 40px box (~6 characters per line at 12px), this string needs
+//   ~15 lines and 14 of them are never laid out, so the join comes back far shorter than
+//   the source. It does NOT work by the ellipsis — Android's getLineEnd can report the
+//   full character range of the last line with the ellipsis applied only at draw time,
+//   which is listed above as a known miss. A probe that overflowed only WITHIN its last
+//   allowed line would therefore fail on a perfectly healthy platform and switch the whole
+//   audit off.
+//
+//   And the words are separated by real spaces rather than underscores, because an
+//   unbreakable 79-character token has no break opportunity and relies on the engine
+//   breaking mid-word to wrap at all. The control must not depend on the one behaviour
+//   nobody can predict; it should be the most ordinary text in the app.
+const POSITIVE_PROBE = 'ADA audit positive control this string is far too long to fit on one short line and has to clip'
 // Long enough that it cannot fail to wrap in a 200px box, because a negative control that
 // happens to fit on one line proves only that one line works — and the failure it exists
 // to catch (an empty per-line `text`, which would make every string look clipped) is a
@@ -243,8 +260,24 @@ export function install() {
   if (state.installed) return
   state.installed = true
 
-  const TextModule = require('react-native/Libraries/Text/Text')
-  const OriginalText = TextModule.default
+  // Reaching into react-native by internal path is what makes this work without touching
+  // 72 files, and it is also the one thing here that a version bump can move. A missing
+  // path must degrade to a dev-mode warning, never to a crash on startup — an audit that
+  // stops the app from booting is infinitely worse than the bugs it was written to find.
+  let TextModule
+  try {
+    TextModule = require('react-native/Libraries/Text/Text')
+  } catch (e) {
+    console.warn('[ada-audit] INSTALL FAILED — react-native/Libraries/Text/Text did not resolve.\n' +
+                 '            The internal path has probably moved in this version of React Native.\n' +
+                 `            Nothing is being audited. (${e?.message})`)
+    return
+  }
+  const OriginalText = TextModule && TextModule.default
+  if (!OriginalText) {
+    console.warn('[ada-audit] INSTALL FAILED — the Text module has no default export. Nothing is being audited.')
+    return
+  }
 
   function AuditedText(props) {
     const onSafeSurface = useContext(OnSafeSurface)
