@@ -12898,6 +12898,49 @@ export function t(key, lang) {
   return translations[code]?.[key] ?? translations.en[key] ?? key
 }
 
+// ─── Reverse lookup: a rendered string → the key(s) that produce it ─────────
+//
+// Used by utils/devTextAudit.js (__DEV__ only) so a suppression in
+// constants/textAuditAllowlist.js can be written ONCE, against the key, instead of nine
+// times against nine translations. The audit sees pixels and text; it has no idea which
+// t() call produced them, and this is the only way back.
+//
+// Deliberately NOT exporting `translations` itself. The dict is already in every bundle,
+// so this costs nothing at runtime, but a live handle to it invites somebody to mutate it
+// from a screen. A lookup function cannot be written through.
+//
+// Returns ALL matching keys, not the first: two keys may legitimately share a value
+// ("Tamam" is both `ok` and `favDone`), and picking one arbitrarily would make a
+// suppression work or not work depending on object key order, which is exactly the kind
+// of instrument that fails a different way on Tuesday.
+//
+// ► Strings built by INTERPOLATION never match. `tCity()` output and any template
+//   carrying {n}/{name} is assembled after the dict is read, so the rendered text is not
+//   a dict value and gets no key. Those labels are therefore UNAUDITED rather than
+//   suppressed — a miss, not a false alarm, which is the safe direction. Noted in the
+//   audit's header too, because it is the kind of gap that is invisible until you look
+//   for a warning that never came.
+let reverseIndex = null
+
+export function devKeysForString(value) {
+  if (typeof value !== 'string' || value === '') return []
+  if (reverseIndex === null) {
+    reverseIndex = new Map()
+    for (const code of Object.keys(translations)) {
+      const dict = translations[code]
+      if (!dict) continue
+      for (const key of Object.keys(dict)) {
+        const v = dict[key]
+        if (typeof v !== 'string') continue   // skips cityForms, which is an object
+        const existing = reverseIndex.get(v)
+        if (existing) { if (!existing.includes(key)) existing.push(key) }
+        else reverseIndex.set(v, [key])
+      }
+    }
+  }
+  return reverseIndex.get(value) || []
+}
+
 // t() for a string that names a region.
 //
 // Most languages take an uninflected prepositional phrase ("Willkommen in

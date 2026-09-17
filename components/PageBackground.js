@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { View, Image, StyleSheet } from 'react-native'
+import { photoBackdrop } from './SurfaceContext'
 
 const SCRIM_OPACITY = 0.30
 
@@ -20,6 +22,20 @@ const TOPIC_CONFIG = {
 
 export default function PageBackground({ topic, scrimOpacity = SCRIM_OPACITY }) {
   const config = TOPIC_CONFIG[topic]
+
+  // Counts, rather than provides, because this component is a SIBLING of the content it
+  // sits behind, not its parent — a context here would reach nothing. The dev contrast
+  // audit reads the count to know a photo is on screen. See components/SurfaceContext.js.
+  //
+  // The effect is unconditional and the early return is below it: a hook cannot be called
+  // after a conditional return, and an unknown `topic` renders nothing anyway, so the
+  // guard lives inside the effect instead.
+  useEffect(() => {
+    if (!config) return undefined
+    photoBackdrop.count += 1
+    return () => { photoBackdrop.count -= 1 }
+  }, [config])
+
   if (!config) return null
 
   return (
