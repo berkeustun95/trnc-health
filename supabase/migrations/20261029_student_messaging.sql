@@ -631,7 +631,22 @@ BEGIN
 
   IF v_accepted THEN
     v_title := v_name;
-    v_text  := left(v_body, 140);
+    -- ► THE ELLIPSIS IS CONDITIONAL, AND THAT IS THE WHOLE POINT. A bare
+    --   left(v_body, 140) makes a truncated message read as a COMPLETE short one:
+    --   "I need to tell you something about" looks like the entire thing somebody sent,
+    --   and the recipient acts on a sentence that was never finished. Appending it
+    --   unconditionally is the mirror error — every short message would look cut off.
+    --   rtrim first, or a truncation landing after a space reads as "word …".
+    --
+    --   WRITTEN AS U&'\2026', NOT AS THE CHARACTER. This file is APPLIED BY PASTING IT
+    --   INTO THE SUPABASE SQL EDITOR, and 20261001 escapes its whitespace class for
+    --   exactly that reason. The escape is pure ASCII, so it cannot be mangled at all —
+    --   which beats detecting the mangling afterwards. A single '.' repeated three times
+    --   would also be paste-proof, but renders as three glyphs where every notification
+    --   UI on both platforms elides with one.
+    v_text  := CASE WHEN char_length(v_body) > 140
+                    THEN rtrim(left(v_body, 140)) || U&'\2026'
+                    ELSE v_body END;
   ELSE
     -- No name, no content, and no count either — "3 people want to message you" is
     -- itself information about how exposed somebody is.
@@ -654,7 +669,16 @@ BEGIN
         ('French',  'Nouvelle demande de message', 'Quelqu''un souhaite vous écrire.'),
         ('Spanish', 'Nueva solicitud de mensaje',  'Alguien quiere enviarte un mensaje.'),
         ('German',  'Neue Nachrichtenanfrage',     'Jemand möchte dir schreiben.'),
-        ('Persian', 'درخواست پیام جدید',    'کسی می‌خواهد به شما پیام بدهد.')
+        ('Persian', 'درخواست پیام جدید',
+         -- ► THE ONLY INVISIBLE CHARACTER THIS FILE EVER CONTAINED, now escaped.
+         --   Persian for "wants" carries a ZERO-WIDTH NON-JOINER between its two halves.
+         --   It is correct orthography, it is INVISIBLE IN A DIFF, and if the SQL
+         --   editor's clipboard drops it the string silently becomes 'میخواهد' —
+         --   wrong, unnoticeable in review, and findable only by a Persian reader
+         --   looking at a real notification. This is precisely the failure
+         --   20261001 escapes its whitespace class to avoid. The visible Persian
+         --   stays readable; only the invisible character becomes an escape.
+                    'کسی می' || U&'\200C' || 'خواهد به شما پیام بدهد.')
       ) AS t(lang, title, body)
      WHERE t.lang = v_lang;
 
@@ -1419,6 +1443,43 @@ BEGIN
         WHERE c.conrelid = to_regclass('public.conversations') AND c.conname = 'conversations_closed_pair');
   END IF;
 
+  -- ► DID THE NINE-LANGUAGE PUSH COPY SURVIVE THE PASTE?
+  -- The two FRAGILE characters are escapes and cannot be mangled: the ellipsis
+  -- (U&'\2026') and the Persian zero-width non-joiner (U&'\200C'). The rest of the copy
+  -- is raw Greek, Cyrillic, Arabic, Persian and Turkish, and if the SQL editor's
+  -- clipboard mishandles UTF-8 those become mojibake — visible, but only on the lock
+  -- screen of a user who reads that language, months from now, with nothing in the drift
+  -- report to point at it.
+  -- One character per script, each written as an ASCII U&'' escape so the LEFT side of
+  -- the comparison cannot itself be corrupted by the same paste. If the paste were
+  -- lossless this prints nothing; if it mangled anything, all five vanish at once.
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace,
+    LATERAL (VALUES (U&'\011F', 'Turkish'),    -- ğ  isteği
+                    (U&'\039D', 'Greek'),      -- Ν  Νέο
+                    (U&'\041D', 'Russian'),    -- Н  Новый
+                    (U&'\0637', 'Arabic'),     -- ط  طلب
+                    (U&'\067E', 'Persian')     -- پ  پیام
+            ) AS c(ch, lang)
+     WHERE n.nspname = 'public' AND p.proname = 'notify_new_message'
+       AND position(c.ch in p.prosrc) = 0
+  ) THEN
+    RAISE EXCEPTION 'the push copy did not survive the paste — % lost its script. Re-paste 20261029 as UTF-8.',
+      (SELECT string_agg(c.lang, ', ') FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace,
+       LATERAL (VALUES (U&'\011F','Turkish'),(U&'\039D','Greek'),(U&'\041D','Russian'),
+                       (U&'\0637','Arabic'),(U&'\067E','Persian')) AS c(ch, lang)
+        WHERE n.nspname='public' AND p.proname='notify_new_message' AND position(c.ch in p.prosrc) = 0);
+  END IF;
+
+  -- The truncation marker, and the ZWNJ, asserted on the RUNTIME VALUE rather than on
+  -- prosrc: both are `U&''` escapes in the source, so prosrc holds the escape TEXT and a
+  -- search of it for the CHARACTER would be false on a perfectly correct database. That
+  -- is the frame-of-reference mistake this file has already made once today.
+  IF (SELECT CASE WHEN char_length(repeat('x', 200)) > 140
+                  THEN rtrim(left(repeat('x', 200), 140)) || U&'\2026' END) NOT LIKE '%' || U&'\2026' THEN
+    RAISE EXCEPTION 'the ellipsis escape did not evaluate to U+2026';
+  END IF;
+
   RAISE NOTICE '20261029 verified.';
 END $$;
 
@@ -1433,7 +1494,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261029_student_messaging.sql', '98b00ee19adbbdd74e3700f85a70f17b65ca6ba8508ed463e9e9186a255ec552')
+VALUES ('20261029_student_messaging.sql', '95b95467d2324ed0d862270ee43230594e3c1a649475fa8d43260564481566c9')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
