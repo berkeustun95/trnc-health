@@ -23,9 +23,15 @@ import { t } from '../constants/i18n'
 // from strangers is a moderation surface, and every field on this page is structured and
 // comes from a vocabulary the database constrains.
 //
-// NO BLOCK ACTION. Blocks exist (20260712) and the RPC honours them in both directions,
-// but the only way to create one today is the review flow. A block button belongs with
-// messaging, where there is something concrete to block somebody FROM.
+// BLOCK LIVES HERE NOW (slice 6). Blocks have existed since 20260712 and both student
+// RPCs have always honoured them in both directions, but until 20261029 the only way to
+// CREATE one was the review flow — you had to find something somebody wrote. block_user()
+// takes a person, and this page is where a person is.
+//
+// ► AND THERE IS NO "LEAVE" ANYWHERE ON THIS PAGE, because leave is a property of a
+//   CONVERSATION, not of a person. The only way to stop somebody from here is to block
+//   them, which is the correct and stronger verb. See ConversationScreen for the place
+//   where both exist and how they are kept apart.
 //
 // ⚠ TWO RULES FOR WHOEVER ADDS THE FIRST WRITE PATH HERE. This screen READS ONLY, so it
 //   breaks neither — but the next person to touch student_education from the app needs
@@ -71,7 +77,7 @@ function Enrolment({ row, lang }) {
   )
 }
 
-export default function StudentProfileScreen({ userId, lang, isMe = false, onBack }) {
+export default function StudentProfileScreen({ userId, lang, isMe = false, onBack, onMessage }) {
   // rows: null = not read yet · [] = nothing visible · [...] = the history
   const [rows, setRows]   = useState(null)
   const [error, setError] = useState(null)   // null | 'gone' | 'load'
@@ -148,9 +154,31 @@ export default function StudentProfileScreen({ userId, lang, isMe = false, onBac
                 {/* Reporting yourself is meaningless, so the menu is hidden on your own
                     page — the same rule the student list row already applies. */}
                 {isMe ? null : (
-                  <ContentReportMenu contentType="profile" contentId={userId} lang={lang} />
+                  <ContentReportMenu
+                    contentType="profile"
+                    contentId={userId}
+                    lang={lang}
+                    blockUserId={userId}
+                    onBlocked={onBack}
+                  />
                 )}
               </View>
+              {/* ► THE REFUSAL IS THE SERVER'S, NOT THIS BUTTON'S. The button is shown to
+                  everyone the page is shown to, and start_conversation answers. Hiding it
+                  for people who cannot be messaged would BE the oracle the generic refusal
+                  exists to prevent: an adult would learn a stranger is under 18 by noticing
+                  the button was missing. It is better to offer it and be refused. */}
+              {isMe || !onMessage ? null : (
+                <TouchableOpacity
+                  style={s.messageBtn}
+                  onPress={() => onMessage({ userId, displayName: header.display_name })}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="chatbubble-outline" size={17} color={colors.surface} />
+                  <Text style={s.messageBtnText}>{t('msgSendMessage', lang)}</Text>
+                </TouchableOpacity>
+              )}
             </ContentCard>
 
             <View style={s.historyWrap}>
@@ -193,6 +221,10 @@ const s = StyleSheet.create({
   // and this pill sits over a PageBackground photo where it reads washed out. The
   // theme carries primaryDark (6.71:1) for exactly this pairing.
   youText:   { fontSize: 11, fontWeight: '700', color: colors.primaryDark },
+
+  messageBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    marginTop: 16, backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 12 },
+  messageBtnText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
 
   historyWrap:  { marginTop: 18 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.textSecondary,

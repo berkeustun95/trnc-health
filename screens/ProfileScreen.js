@@ -223,8 +223,14 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     }
   }, [])
 
-  // Deliberately NO names here. Reviews are anonymous, so showing "you blocked
-  // Ahmet K." would reveal who wrote the review the user blocked from.
+  // ► DELIBERATELY NO NAMES, AND SLICE 6 MADE THAT A REQUIREMENT RATHER THAN A CHOICE.
+  //   It was already right for reviews: those are anonymous, so "you blocked Ahmet K."
+  //   would reveal who wrote the review somebody blocked from. Now block_user() puts
+  //   PERSON-blocks in this same list, and those names are no secret — the blocker was
+  //   looking at the profile when they tapped it.
+  //   Naming those and not the others is exactly what must not happen: the rows that
+  //   stayed nameless would then be identifiable as the review ones, which is the
+  //   anonymity leak the original rule exists to prevent. All rows or none, so none.
   async function loadBlocks() {
     const { data } = await supabase.from('blocks')
       .select('blocked_id, created_at')
@@ -894,7 +900,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
           {blocks.length > 0 && (
             <View style={s.blockedSection}>
-              <Text style={s.sectionTitle}>{t('blockedReviewers', lang)}</Text>
+              {/* "Blocked reviewers" until 20261029 — this list now also holds people
+                  blocked from a profile page or a conversation, so the heading had to
+                  stop naming one of the two ways in. */}
+              <Text style={s.sectionTitle}>{t('blockedPeople', lang)}</Text>
               {blocks.map(b => (
                 <View key={b.blocked_id} style={s.blockedRow}>
                   <Text style={s.blockedLabel}>

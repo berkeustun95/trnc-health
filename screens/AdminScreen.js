@@ -494,9 +494,25 @@ const REASON_LABELS  = { offensive: 'Offensive', harassment: 'Harassment', spam:
 // Without the fetch branch a profile report falls to `missing` and renders "Content no
 // longer exists — the author likely deleted their account", which is a lie that an admin
 // would act on by dismissing a real report.
-const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places', profile: 'profiles' }
-const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by', profile: 'id' }
-const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name', profile: 'display_name' }
+// 'message' (20261029) is a NORMAL type here: messages has hidden_at and hidden_reason,
+// so Remove/Restore/Ban all work and it must NOT join READ_ONLY_REPORT_TYPES.
+//
+// ► ADMIN ACCESS TO A MESSAGE IS SCOPED TO THE REPORT, not granted by is_admin(). The RLS
+//   policy requires a content_reports row of type 'message' pointing at that exact id — an
+//   admin can read the reported message and NOTHING ELSE in anybody's inbox, not the
+//   thread around it and not the conversation metadata. Every action below runs off a
+//   pending report, so the policy is satisfied; if a report row were deleted mid-action,
+//   updateOrAlert's "0 rows changed — most likely an RLS policy" branch is what fires.
+const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places', profile: 'profiles', message: 'messages' }
+// messages.sender_id is ON DELETE SET NULL, so a reported message whose author deleted
+// their account has NO author to ban. confirmBan already refuses on a null authorId.
+const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by', profile: 'id', message: 'sender_id' }
+const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name', profile: 'display_name', message: 'body' }
+// Columns only SOME tables have. messages carries deleted_at — the sender withdrew it —
+// and an admin who could not see that would judge a message the participants can no longer
+// see, without knowing it. Selecting it unconditionally would 42703 every other type and
+// empty the whole queue, which is the trap the profile branch below already documents.
+const EXTRA_COLS     = { message: ['deleted_at'] }
 // Types whose remedy is not built. Read-only in triage: Dismiss is the only action.
 const READ_ONLY_REPORT_TYPES = ['profile']
 
@@ -545,7 +561,11 @@ function ReportsTab({ session }) {
     // type. It may be missing entirely — delete_own_account hard-deletes a user's
     // reviews, which leaves their reports dangling.
     const contentByKey = new Map()
-    for (const type of ['review', 'question', 'answer', 'facility', 'place', 'profile']) {
+    // ► THIS LIST IS SEPARATE FROM CONTENT_TABLE AND BOTH MUST BE EDITED. A type added to
+    //   the maps but not here is silently never fetched: `g.content` stays null and the
+    //   card renders "Content no longer exists — the author likely deleted their account",
+    //   which is a lie an admin would act on by dismissing a real report.
+    for (const type of ['review', 'question', 'answer', 'facility', 'place', 'profile', 'message']) {
       const ids = [...new Set(reports.filter(r => r.content_type === type).map(r => r.content_id))]
       if (!ids.length) continue
       // profiles has no hidden_at/hidden_reason — selecting them would 42703 the whole
@@ -554,7 +574,7 @@ function ReportsTab({ session }) {
       // overlap with `id`, and PostgREST is given the same name twice.
       const cols = [...new Set(READ_ONLY_REPORT_TYPES.includes(type)
         ? ['id', TEXT_COL[type], AUTHOR_COL[type]]
-        : ['id', TEXT_COL[type], AUTHOR_COL[type], 'hidden_at', 'hidden_reason'])].join(', ')
+        : ['id', TEXT_COL[type], AUTHOR_COL[type], 'hidden_at', 'hidden_reason', ...(EXTRA_COLS[type] ?? [])])].join(', ')
       const { data } = await supabase
         .from(CONTENT_TABLE[type])
         .select(cols)
@@ -664,9 +684,13 @@ function ReportsTab({ session }) {
     await notifyAuthor(
       g,
       'Posting suspended',
+      // "post reviews or questions" was the whole story until messaging shipped. A UGC ban
+      // writes profiles.ugc_banned_until, and is_listed_student() — which start_conversation
+      // and send_message both gate on — excludes a banned account. So a ban silently stops
+      // their messaging too, and this notice has to say so or it understates what was done.
       days
-        ? `Your ${g.contentType} was removed and you cannot post reviews or questions for ${days} days.`
-        : `Your ${g.contentType} was removed and you can no longer post reviews or questions.`,
+        ? `Your ${g.contentType} was removed and you cannot post or send messages for ${days} days.`
+        : `Your ${g.contentType} was removed and you can no longer post or send messages.`,
     )
     setBusy(null); load()
   }
@@ -698,6 +722,12 @@ function ReportsTab({ session }) {
         const missing     = !g.content
         const hidden      = !!g.content?.hidden_at
         const autoHidden  = g.content?.hidden_reason === 'auto_reports'
+        // Only messages can be withdrawn by their author (sender-only soft delete). The
+        // row and the text survive precisely so a report still has something to point at,
+        // but neither participant can see it any more — and an admin judging it needs to
+        // know that, both to read the exchange correctly and because Remove on something
+        // already invisible to both people achieves nothing.
+        const withdrawn   = !!g.content?.deleted_at
         const text        = g.content?.[TEXT_COL[g.contentType]]
         const readOnly    = READ_ONLY_REPORT_TYPES.includes(g.contentType)
         const reasonCount = g.reports.reduce((acc, r) => ({ ...acc, [r.reason]: (acc[r.reason] ?? 0) + 1 }), {})
@@ -714,6 +744,11 @@ function ReportsTab({ session }) {
                   <Text style={[s.reportBadgeText, { color: colors.danger }]}>
                     {autoHidden ? 'AUTO-HIDDEN' : 'HIDDEN'}
                   </Text>
+                </View>
+              )}
+              {withdrawn && (
+                <View style={s.reportBadge}>
+                  <Text style={s.reportBadgeText}>WITHDRAWN BY SENDER</Text>
                 </View>
               )}
               <View style={{ flex: 1 }} />

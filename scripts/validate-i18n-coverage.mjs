@@ -52,6 +52,11 @@ import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories.js'
 import { REGION_LABEL_KEY } from '../constants/regions.js'
 import { RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY } from '../constants/profileGate.js'
+// Slice 6's send failures are reached as t(SEND_ERROR_KEY[token]) — a key looked up
+// through a variable, which the literal `t('key')` scan cannot see. Imported by name for
+// the same reason STUDENT_LEVEL_LABEL_KEY is: a new outcome added to that map must fail
+// this check until it is translated, not slip through untranslated in eight locales.
+import { SEND_ERROR_KEY } from '../constants/messaging.js'
 import { STRIP_CARD_KEYS } from '../constants/homeStrip.js'
 import { AD_SPONSORED_KEY } from '../constants/ads.js'
 import { PET_PARTNERS, PENDING_KEYS as PET_PENDING_KEYS, petPartnerSections } from '../constants/petPartners.js'
@@ -218,6 +223,11 @@ const SURFACES = [
   // reached through a variable and therefore invisible to the literal scan; the map is
   // read out of constants/profileGate.js below for exactly that reason.
   'screens/StudentProfileScreen.js',
+  // Slice 6. New component files leave this guard's scope by default and nothing goes
+  // red — the note further down records that happening four separate times. Added in the
+  // same commit as the screens themselves, which is the only moment anyone remembers.
+  'screens/ConversationsScreen.js',
+  'screens/ConversationScreen.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
@@ -512,6 +522,7 @@ const viaVariable = [
   // literal scan — the exact blind spot this file's header describes.
   ...Object.values(RESIDENT_STATUS_LABEL_KEY),
   ...Object.values(STUDENT_LEVEL_LABEL_KEY),
+  ...Object.values(SEND_ERROR_KEY),
   ...Object.values(STEP_TITLE_KEY),
   ...Object.values(HELP_ROW_LABEL_KEY),
   ...Object.values(CATEGORY_LABEL_KEY),

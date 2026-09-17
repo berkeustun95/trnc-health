@@ -12,6 +12,8 @@ import ContentCard from '../components/ContentCard'
 import MascotIntroCard from '../components/MascotIntroCard'
 import ContentReportMenu from '../components/ContentReportMenu'
 import StudentProfileScreen from './StudentProfileScreen'
+import ConversationsScreen from './ConversationsScreen'
+import ConversationScreen from './ConversationScreen'
 import { MODULE_FLAGS } from '../constants/flags'
 import { getPreset } from '../constants/avatars'
 import { colors, shadow, radius } from '../constants/theme'
@@ -562,6 +564,12 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
   const [openSlug, setOpenSlug] = useState(null)
   const [openUniId, setOpenUniId] = useState(null)
   const [openStudentId, setOpenStudentId] = useState(null)
+  // Slice 6. `openConv` is a row from list_conversations(); `composeWith` is a person with
+  // no thread yet. They are mutually exclusive and both sit ABOVE the profile page in the
+  // stack, because you reach a conversation THROUGH a profile.
+  const [openConv, setOpenConv] = useState(null)
+  const [composeWith, setComposeWith] = useState(null)
+  const [convKey, setConvKey] = useState(0)
   const [uniQuery, setUniQuery] = useState('')
   const [uniRegion, setUniRegion] = useState('all')
 
@@ -587,13 +595,16 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
   // both would drop the user two levels for one gesture, which reads as the app losing
   // its place. Ordered innermost-first for the same reason.
   useEffect(() => {
-    if (!openSlug && !openUniId && !openStudentId) return
+    if (!openSlug && !openUniId && !openStudentId && !openConv && !composeWith) return
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      // INNERMOST FIRST. A conversation sits on top of the profile that opened it, so it
+      // has to be closed before the page underneath it.
+      if (openConv || composeWith) { setOpenConv(null); setComposeWith(null); return true }
       if (openStudentId) { setOpenStudentId(null); return true }
       setOpenSlug(null); setOpenUniId(null); return true
     })
     return () => sub.remove()
-  }, [openSlug, openUniId, openStudentId])
+  }, [openSlug, openUniId, openStudentId, openConv, composeWith])
 
   // Loaded here rather than in the tab so switching tabs does not refetch.
   const load = useCallback(() => {
@@ -614,28 +625,66 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
 
   useEffect(() => { load() }, [load])
 
-  // Own row only — RLS returns exactly one, and that is all this needs.
+  // ─── THE RECIPROCITY GATE IS THE DATABASE'S, NOT THIS SCREEN'S ─────────────
+  //
+  // This used to read `profiles.student_listing_opt_in` and compare it to true. That was
+  // correct while a person had ONE affiliation and one switch. It stops being correct the
+  // moment 20261026's student_education exists, because the opt-in became PER ENROLMENT:
+  // somebody listed at one university and not another is `true` here and `false` there,
+  // and a single boolean on `profiles` cannot say which.
+  //
+  // `can_see_student_lists()` is the one rule, it lives in the database, and it is what
+  // get_student_list, get_student_profile, start_conversation and send_message all gate
+  // on. Asking it directly means this screen and the server can never disagree — and the
+  // copy that drifts is always the one that lets somebody lurk.
+  //
+  // It also removes a `profiles` read entirely: the only other thing this needed was the
+  // caller's own id, and the session already has that.
   useEffect(() => {
     if (!MODULE_FLAGS.studentHub || isGuest) return
     let cancelled = false
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (cancelled) return
       if (!session?.user) { setMeFailed(true); return }
-      supabase.from('profiles')
-        .select('id, student_listing_opt_in')
-        .eq('id', session.user.id)
-        .maybeSingle()
-        .then(({ data, error }) => {
-          if (cancelled) return
-          // maybeSingle() returns {data: null, error: null} on zero rows — it does NOT
-          // throw — so a missing row has to be treated as a failure explicitly, or `me`
-          // stays null forever and the list spins.
-          if (error || !data) { setMeFailed(true); return }
-          setMe(data)
-        })
+      supabase.rpc('can_see_student_lists').then(({ data, error }) => {
+        if (cancelled) return
+        // A boolean RPC returns `false` legitimately, so `!data` is not a failure test —
+        // only `error` is, and a null body from a function that always returns a boolean
+        // means something went wrong rather than "no".
+        if (error || data == null) { setMeFailed(true); return }
+        setMe({ id: session.user.id, canSee: data === true })
+      })
     })
     return () => { cancelled = true }
   }, [isGuest])
+
+  // A conversation opened from a profile has to be resolved to a real row before it can
+  // be rendered, because start_conversation returns only a status. One extra RPC on a rare
+  // path, rather than threading the inbox's rows back up through two components.
+  async function openThreadWith(userId) {
+    const { data } = await supabase.rpc('list_conversations')
+    const row = (data ?? []).find(r => r.other_user_id === userId)
+    setComposeWith(null)
+    setOpenConv(row ?? null)
+    setConvKey(k => k + 1)
+  }
+
+  // TOP OF THE STACK: a conversation sits above the profile page that opened it.
+  if (openConv || composeWith) {
+    return (
+      <ConversationScreen
+        conversation={openConv}
+        composeWith={composeWith}
+        myId={me?.id ?? null}
+        lang={lang}
+        onBack={() => { setOpenConv(null); setComposeWith(null); setConvKey(k => k + 1) }}
+        onChanged={result => {
+          if (result?.openWith) { openThreadWith(result.openWith); return }
+          setConvKey(k => k + 1)
+        }}
+      />
+    )
+  }
 
   // BEFORE the university page: this is the page on top of the stack.
   if (openStudentId) {
@@ -645,6 +694,7 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
         lang={lang}
         isMe={openStudentId === me?.id}
         onBack={() => setOpenStudentId(null)}
+        onMessage={person => setComposeWith(person)}
       />
     )
   }
@@ -656,7 +706,7 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
         uni={openUni}
         lang={lang}
         isGuest={isGuest}
-        listingOptIn={me ? me.student_listing_opt_in === true : null}
+        listingOptIn={me ? me.canSee : null}
         meFailed={meFailed}
         myId={me?.id ?? null}
         onGoToProfile={onGoToProfile}
@@ -709,6 +759,18 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
         >
           <Text style={[s.segmentText, tab === 'basics' && s.segmentTextActive]}>{t('studentTabBasics', lang)}</Text>
         </TouchableOpacity>
+        {/* Messaging is a member-only surface, so a GUEST is not shown the tab at all —
+            the same rule the student list applies. Showing it and then explaining would
+            advertise a feature to somebody who cannot have an account yet. */}
+        {isGuest ? null : (
+          <TouchableOpacity
+            style={[s.segmentBtn, tab === 'messages' && s.segmentBtnActive]}
+            onPress={() => setTab('messages')}
+            activeOpacity={0.9}
+          >
+            <Text style={[s.segmentText, tab === 'messages' && s.segmentTextActive]}>{t('studentTabMessages', lang)}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {tab === 'universities'
@@ -723,6 +785,16 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
             setQuery={setUniQuery}
             region={uniRegion}
             setRegion={setUniRegion}
+          />
+        )
+        : tab === 'messages'
+        ? (
+          <ConversationsScreen
+            lang={lang}
+            canSee={me ? me.canSee : (meFailed ? false : null)}
+            refreshKey={convKey}
+            onOpen={setOpenConv}
+            onGoToProfile={onGoToProfile}
           />
         )
         : (
