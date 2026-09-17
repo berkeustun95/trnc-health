@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity,
-  TextInput, Modal, Alert,
+  TextInput, Modal, Alert, Keyboard, Platform,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
@@ -38,6 +38,22 @@ import { monthNames } from '../constants/months'
 //     • LEAVE'S OWN CONFIRMATION SAYS IT IS NOT A DEFENCE, and offers Block from inside
 //       it. Someone reaching for the softer word at the wrong moment is handed the
 //       stronger one in the same breath, rather than discovering the difference later.
+//
+// ─── THE COMPOSER SITS ON THE ANDROID NAVIGATION BAR ────────────────────────
+//
+// A bottom-anchored bar inside `edges={['top']}` gets NO bottom inset, so on a
+// three-button Android device it renders UNDER the navigation bar: the field is
+// overlapped by the nav buttons and cannot be tapped at all. Every other bottom-anchored
+// bar in ADA pays `Math.max(insets.bottom, 12)` — PropertyDetailScreen, TowingDetailScreen
+// and DormPartnerScreen all do exactly that — so this does too rather than inventing a
+// second rule.
+//
+// ► AND IT COLLAPSES WHEN THE KEYBOARD IS OPEN. app.config.js leaves
+//   softwareKeyboardLayoutMode unset, so Android uses adjustResize and the WINDOW shrinks
+//   to sit above the keyboard. At that moment the navigation bar is no longer adjacent to
+//   the bottom of the window, and still paying its inset would open a visible dead strip
+//   between the composer and the keyboard. Keyboard state is read with the same
+//   Keyboard.addListener idiom OliGuide and SearchModal already use.
 //
 // ─── LINKS ARE TEXT, NEVER TAPS ─────────────────────────────────────────────
 // Message bodies render in a plain <Text> with data detectors OFF. Phishing arrives as a
@@ -119,7 +135,23 @@ export default function ConversationScreen({
   const [errKey, setErrKey]   = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [busy, setBusy]       = useState(false)
+  const [kbOpen, setKbOpen]   = useState(false)
   const scrollRef = useRef(null)
+  const insets = useSafeAreaInsets()
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+    const subs = [
+      Keyboard.addListener(showEvt, () => setKbOpen(true)),
+      Keyboard.addListener(hideEvt, () => setKbOpen(false)),
+    ]
+    return () => subs.forEach(x => x.remove())
+  }, [])
+
+  // One number, three bars — composer, request and closed all sit in the same place and
+  // must clear the same nav bar.
+  const barPad = { paddingBottom: kbOpen ? 10 : Math.max(insets.bottom, 12) }
 
   const accepted = conversation?.is_accepted === true
   const closed   = conversation?.is_closed === true
@@ -324,7 +356,9 @@ export default function ConversationScreen({
               const newDay = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString()
               return (
                 <View key={m.id}>
-                  {newDay ? <Text style={s.dayLabel}>{dayLabel(m.created_at, lang)}</Text> : null}
+                  {newDay ? (
+                    <View style={s.dayPill}><Text style={s.dayLabel}>{dayLabel(m.created_at, lang)}</Text></View>
+                  ) : null}
                   <Bubble msg={m} mine={m.sender_id === myId} lang={lang} onDelete={confirmDelete} />
                 </View>
               )
@@ -342,7 +376,7 @@ export default function ConversationScreen({
 
         {/* ── An incoming request: Accept or Decline, and nothing else ──────── */}
         {awaiting && !closed ? (
-          <View style={s.requestBar}>
+          <View style={[s.requestBar, barPad]}>
             <Text style={s.requestText}>
               {t('msgRequestPrompt', lang).replace('{name}', other?.displayName ?? '')}
             </Text>
@@ -368,9 +402,9 @@ export default function ConversationScreen({
         ) : closed ? (
           // ► A BLOCK AND A LEAVE PRODUCE THE SAME LINE. That is the point: anything that
           //   separated them would tell the blocked person they were blocked.
-          <View style={s.closedBar}><Text style={s.closedText}>{t('msgConversationClosed', lang)}</Text></View>
+          <View style={[s.closedBar, barPad]}><Text style={s.closedText}>{t('msgConversationClosed', lang)}</Text></View>
         ) : composerOpen ? (
-          <View style={s.composer}>
+          <View style={[s.composer, barPad]}>
             {errKey ? <Text style={s.error}>{t(errKey, lang)}</Text> : null}
             <View style={s.composerRow}>
               <TextInput
@@ -405,7 +439,7 @@ export default function ConversationScreen({
           // The initiator, waiting. A DECLINE LOOKS EXACTLY LIKE THIS — the thread is
           // hidden from their list the moment it is declined, so they never reach a state
           // that says "declined", and this line is the only thing they ever see.
-          <View style={s.closedBar}><Text style={s.closedText}>{t('msgAwaitingAcceptance', lang)}</Text></View>
+          <View style={[s.closedBar, barPad]}><Text style={s.closedText}>{t('msgAwaitingAcceptance', lang)}</Text></View>
         )}
       </KeyboardAwareForm>
 
@@ -450,8 +484,15 @@ const s = StyleSheet.create({
                marginTop: 14, backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 11 },
   retryText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
 
-  dayLabel:  { alignSelf: 'center', fontSize: 11, fontWeight: '700', color: colors.textSecondary,
-               textTransform: 'uppercase', letterSpacing: 0.6, marginVertical: 10 },
+  // ► ON A SURFACE, NOT ON THE PHOTO. PageBackground paints a photo under a 0.30 black
+  //   scrim, and textSecondary grey on that is barely legible. Everywhere else in ADA a
+  //   section label of this kind sits inside a ContentCard (see NewcomerEssentialsScreen)
+  //   — a chat has no card to put it in, so it gets the same white surface as a pill,
+  //   which is the treatment every other badge in this screen already uses.
+  dayPill:   { alignSelf: 'center', backgroundColor: colors.surface, borderRadius: radius.sm,
+               paddingHorizontal: 10, paddingVertical: 3, marginVertical: 10 },
+  dayLabel:  { fontSize: 11, fontWeight: '700', color: colors.textSecondary,
+               textTransform: 'uppercase', letterSpacing: 0.6 },
 
   bubbleRow:       { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginBottom: 8 },
   bubbleRowMine:   { justifyContent: 'flex-end' },
@@ -466,7 +507,8 @@ const s = StyleSheet.create({
   bubbleTimeMine:  { color: 'rgba(255,255,255,0.75)' },
   bubbleReport:    { paddingBottom: 6 },
 
-  requestBar:  { padding: 14, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, gap: 10 },
+  requestBar:  { paddingHorizontal: 14, paddingTop: 14, backgroundColor: colors.surface,
+                 borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, gap: 10 },
   requestText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   requestBtns: { flexDirection: 'row', gap: 10 },
   declineBtn:  { flex: 1, paddingVertical: 13, borderRadius: radius.md, backgroundColor: colors.cardBg, alignItems: 'center' },
@@ -474,10 +516,12 @@ const s = StyleSheet.create({
   acceptBtn:   { flex: 1, paddingVertical: 13, borderRadius: radius.md, backgroundColor: colors.primary, alignItems: 'center' },
   acceptText:  { fontSize: 15, fontWeight: '700', color: colors.surface },
 
-  closedBar:  { padding: 16, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  closedBar:  { paddingHorizontal: 16, paddingTop: 16, backgroundColor: colors.surface,
+                borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   closedText: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },
 
-  composer:    { padding: 10, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  composer:    { paddingHorizontal: 10, paddingTop: 10, backgroundColor: colors.surface,
+                 borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   input:       { flex: 1, maxHeight: 120, minHeight: 42, borderRadius: radius.md, borderWidth: 1,
                  borderColor: colors.border, backgroundColor: colors.bg, paddingHorizontal: 12,

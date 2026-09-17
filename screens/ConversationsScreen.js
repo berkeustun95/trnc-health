@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, Image,
   RefreshControl,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import ContentCard from '../components/ContentCard'
@@ -94,6 +95,11 @@ export default function ConversationsScreen({ lang, canSee, onOpen, onGoToProfil
   const [rows, setRows]         = useState(null)
   const [failed, setFailed]     = useState(false)
   const [refreshing, setRefresh] = useState(false)
+  // This list renders inside StudentHubScreen's SafeAreaView, which claims only the TOP
+  // edge — so nothing here pays the Android navigation bar and the last conversation row
+  // ends up underneath it. Same fix and same Math.max as every other bottom-reaching
+  // surface in ADA.
+  const insets = useSafeAreaInsets()
 
   const load = useCallback(() => {
     if (canSee !== true) return undefined
@@ -142,7 +148,7 @@ export default function ConversationsScreen({ lang, canSee, onOpen, onGoToProfil
   return (
     <ScrollView
       style={s.scroll}
-      contentContainerStyle={s.content}
+      contentContainerStyle={[s.content, { paddingBottom: 32 + insets.bottom }]}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
@@ -177,7 +183,7 @@ export default function ConversationsScreen({ lang, canSee, onOpen, onGoToProfil
 
 const s = StyleSheet.create({
   scroll:  { flex: 1 },
-  content: { padding: 16, paddingBottom: 32 },
+  content: { padding: 16 },
   card:    { margin: 16 },
 
   row:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },

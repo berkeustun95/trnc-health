@@ -157,8 +157,10 @@ function StudentList({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToP
   if (meFailed) {
     return (
       <View style={s.secondCard}>
-        <SectionTitle text={t('studentListTitle', lang)} />
-        <ContentCard><Text style={s.studentEmpty}>{t('studentLoadError', lang)}</Text></ContentCard>
+        <ContentCard>
+          <SectionTitle text={t('studentListTitle', lang)} />
+          <Text style={s.studentEmpty}>{t('studentLoadError', lang)}</Text>
+        </ContentCard>
       </View>
     )
   }
@@ -166,8 +168,10 @@ function StudentList({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToP
   if (listingOptIn === null) {
     return (
       <View style={s.secondCard}>
-        <SectionTitle text={t('studentListTitle', lang)} />
-        <ContentCard><ActivityIndicator color={colors.primary} /></ContentCard>
+        <ContentCard>
+          <SectionTitle text={t('studentListTitle', lang)} />
+          <ActivityIndicator color={colors.primary} />
+        </ContentCard>
       </View>
     )
   }
@@ -186,25 +190,28 @@ function StudentList({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToP
   }
 
   return (
+    // ► THE HEADING IS INSIDE THE CARD, NOT ABOVE IT. PageBackground paints a photo under
+    //   a 0.30 black scrim; textSecondary grey sitting straight on that is barely legible,
+    //   which is what "EĞİTİM" on the profile page showed. Every section label in ADA that
+    //   reads correctly is inside a ContentCard — NewcomerEssentialsScreen is the pattern —
+    //   so all four states below share ONE card with the title as its first child.
     <View style={s.secondCard}>
-      <SectionTitle text={t('studentListTitle', lang)} />
-      {failed ? (
-        <ContentCard><Text style={s.studentEmpty}>{t('studentLoadError', lang)}</Text></ContentCard>
-      ) : rows === null ? (
-        <ContentCard><ActivityIndicator color={colors.primary} /></ContentCard>
-      ) : rows.length === 0 ? (
-        <ContentCard>
+      <ContentCard>
+        <SectionTitle text={t('studentListTitle', lang)} />
+        {failed ? (
+          <Text style={s.studentEmpty}>{t('studentLoadError', lang)}</Text>
+        ) : rows === null ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : rows.length === 0 ? (
           <Text style={s.studentEmpty}>{t('studentListEmpty', lang).replace('{name}', uni.name)}</Text>
-        </ContentCard>
-      ) : (
-        <ContentCard>
-          {rows.map((row, i) => (
+        ) : (
+          rows.map((row, i) => (
             <View key={row.user_id} style={i ? s.studentDivider : null}>
               <StudentRow row={row} lang={lang} isMe={row.user_id === myId} onOpen={onOpenStudent} />
             </View>
-          ))}
-        </ContentCard>
-      )}
+          ))
+        )}
+      </ContentCard>
     </View>
   )
 }
@@ -750,14 +757,14 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
           onPress={() => setTab('universities')}
           activeOpacity={0.9}
         >
-          <Text style={[s.segmentText, tab === 'universities' && s.segmentTextActive]}>{t('studentTabUniversities', lang)}</Text>
+          <Text numberOfLines={2} style={[s.segmentText, tab === 'universities' && s.segmentTextActive]}>{t('studentTabUniversities', lang)}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[s.segmentBtn, tab === 'basics' && s.segmentBtnActive]}
           onPress={() => setTab('basics')}
           activeOpacity={0.9}
         >
-          <Text style={[s.segmentText, tab === 'basics' && s.segmentTextActive]}>{t('studentTabBasics', lang)}</Text>
+          <Text numberOfLines={2} style={[s.segmentText, tab === 'basics' && s.segmentTextActive]}>{t('studentTabBasics', lang)}</Text>
         </TouchableOpacity>
         {/* Messaging is a member-only surface, so a GUEST is not shown the tab at all —
             the same rule the student list applies. Showing it and then explaining would
@@ -768,7 +775,7 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
             onPress={() => setTab('messages')}
             activeOpacity={0.9}
           >
-            <Text style={[s.segmentText, tab === 'messages' && s.segmentTextActive]}>{t('studentTabMessages', lang)}</Text>
+            <Text numberOfLines={2} style={[s.segmentText, tab === 'messages' && s.segmentTextActive]}>{t('studentTabMessages', lang)}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -834,7 +841,17 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   segmentBtnActive: { backgroundColor: colors.surface, ...shadow },
-  segmentText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  // ► TWO TABS BECAME THREE, WHICH CUT EACH ONE FROM ~156dp TO ~104dp ON A 360dp PHONE.
+  //   The middle label is 17-25 characters in every language except English ("Öğrenci
+  //   temelleri", "Βασικά για νέους φοιτητές", "أساسيات الطالب الجديد"), so at 14pt on one
+  //   line it no longer fits and the third tab is what made that true.
+  //
+  //   Wrapping to a second line, capped at two by numberOfLines on the call sites. NOT
+  //   adjustsFontSizeToFit — ExchangeRatesScreen already rejected that as unreliable — and
+  //   NOT AdminScreen's horizontally scrolling pills, which are right for its dozen tabs
+  //   and wrong here: a brand-new feature must not be hidden behind a swipe.
+  //   textAlign matters once there are two lines; alignItems centres the block, not the text.
+  segmentText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
   segmentTextActive: { color: colors.primary },
 
   tabScroll: { flex: 1 },

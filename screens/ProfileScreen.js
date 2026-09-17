@@ -9,7 +9,7 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
-import { colors, shadow } from '../constants/theme'
+import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { getNatLabel, NATIONALITIES, NATIONALITY_CODES } from '../constants/nationalityTranslations'
 import { COUNTRY_CODES } from '../constants/countryCodes'
@@ -542,7 +542,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   }
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
+    // ► edges INCLUDES 'bottom' FOR THE FOOTER. Without it the save button renders under
+    //   the Android three-button navigation bar and cannot be tapped — the same failure
+    //   the message composer had. ProfileSetupScreen's footer is the pattern this copies.
+    <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <KeyboardAwareForm>
         <ScrollView
           contentContainerStyle={s.container}
@@ -552,15 +555,9 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           <View style={s.header}>
             <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
             <Text style={s.title}>{t('profile', lang)}</Text>
-            <TouchableOpacity
-              onPress={save}
-              disabled={saving || !hasChanges}
-              style={(!hasChanges && !saving) && { opacity: 0.35 }}
-            >
-              <Text style={[s.saveText, saving && { opacity: 0.4 }]}>
-                {saved ? t('saved', lang) : saving ? t('saving', lang) : t('save', lang)}
-              </Text>
-            </TouchableOpacity>
+            {/* Counterweight for the back button so the title stays centred. Save used to
+                live here as a text link; it is a full-width footer button now. */}
+            <View style={s.headerSpacer} />
           </View>
 
           <View style={s.avatarSection}>
@@ -1043,6 +1040,28 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           <SearchModal visible={picker === 'endYear'} title={t('pgStudyEnd', lang)} options={endYearOptions}
             value={form.study_end_year} onSelect={v => { set('study_end_year')(v); setPicker(null) }} onClose={() => setPicker(null)} />
         </ScrollView>
+
+        {/* ► THE PRIMARY ACTION IS A FULL-WIDTH BUTTON AT THE BOTTOM, as it is everywhere
+            else in ADA. A text link in the top corner is easy to miss and hard to reach
+            one-handed on a tall phone, and it was the only primary action in the app
+            shaped that way. Style and structure copied from ProfileSetupScreen's footer —
+            a flex sibling of the ScrollView inside KeyboardAwareForm, so the keyboard
+            lifts it instead of covering it. */}
+        <View style={s.footer}>
+          <TouchableOpacity
+            style={[s.footerBtn, (!hasChanges || saving) && s.footerBtnOff]}
+            onPress={save}
+            disabled={saving || !hasChanges}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+          >
+            {saving
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={s.footerBtnText}>
+                  {saved ? t('saved', lang) : t('save', lang)}
+                </Text>}
+          </TouchableOpacity>
+        </View>
       </KeyboardAwareForm>
     </SafeAreaView>
   )
@@ -1059,7 +1078,17 @@ const s = StyleSheet.create({
   header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, paddingBottom: 20 },
   title:            { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   backBtn:          { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  saveText:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.primary },
+  headerSpacer:     { width: 52 },
+  footer: {
+    flexShrink: 0, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
+    borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg,
+  },
+  footerBtn: {
+    backgroundColor: colors.primary, borderRadius: radius.md,
+    paddingVertical: 15, alignItems: 'center', justifyContent: 'center', ...shadow,
+  },
+  footerBtnOff:     { backgroundColor: colors.border, shadowOpacity: 0, elevation: 0 },
+  footerBtnText:    { color: '#fff', fontSize: 15.5, fontFamily: 'Inter_700Bold' },
 
   avatarSection:    { alignItems: 'center', marginBottom: 24 },
   avatarWrap:       { marginBottom: 12, position: 'relative' },

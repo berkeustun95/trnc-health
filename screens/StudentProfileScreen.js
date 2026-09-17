@@ -181,9 +181,14 @@ export default function StudentProfileScreen({ userId, lang, isMe = false, onBac
               )}
             </ContentCard>
 
+            {/* ► THE HEADING IS INSIDE THE CARD. It used to sit above it, directly on
+                PageBackground's photo, where textSecondary grey under a 0.30 scrim is
+                barely readable — this is the "EĞİTİM" bug. Every section label in ADA
+                that reads correctly is inside a ContentCard; NewcomerEssentialsScreen
+                is the pattern this follows. */}
             <View style={s.historyWrap}>
-              <Text style={s.sectionTitle}>{t('studentProfileHistory', lang)}</Text>
               <ContentCard>
+                <Text style={s.sectionTitle}>{t('studentProfileHistory', lang)}</Text>
                 {rows.map((row, i) => (
                   <View key={`${row.institution_name}-${row.level}`} style={i ? s.divider : null}>
                     <Enrolment row={row} lang={lang} />
@@ -228,7 +233,7 @@ const s = StyleSheet.create({
 
   historyWrap:  { marginTop: 18 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.textSecondary,
-                  textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8, marginLeft: 4 },
+                  textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 },
 
   divider:   { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: 12, paddingTop: 12 },
   enrolRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
