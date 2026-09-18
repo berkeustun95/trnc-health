@@ -245,10 +245,23 @@ function handleTruncation(source, lines, owner, boxWidth) {
   //
   // fontScale is the user's accessibility text-size setting. At 1.3 or 1.5 every label in
   // the app is a third wider than any figure derived on a desk, and it is invisible in code.
-  const lineW = lines[0] && typeof lines[0].width === 'number' ? Math.round(lines[0].width) : null
+  //
+  // ► ONE DECIMAL, NOT WHOLE dp, AND THE PRECISION IS THE POINT.
+  //   The first real finding printed `room 55dp · drew 52dp`, and the explanation for it
+  //   turns on a deficit of well under a point: Yoga force-CEILS a text node's own frame
+  //   (PixelGrid.cpp:85 — "we never want to round down its size as this could lead to
+  //   unwanted text truncation") but a content-hugging ANCESTOR is NodeType::Default and
+  //   gets plain round-to-nearest, so it can discard the fraction that the text needed.
+  //
+  //   Whole-dp output rounds away exactly that quantity. It made the instrument report the
+  //   symptom while hiding the evidence, and left the deficit to be inferred from 55 vs 52
+  //   rather than read off. Layout lands on the physical pixel grid, so a real width is a
+  //   multiple of 1/density dp — 54.9 and 55.3 are both "55" and mean different things.
+  const fmt = v => v.toFixed(1)
+  const lineW = lines[0] && typeof lines[0].width === 'number' ? lines[0].width : null
   const geom = [
-    boxWidth != null ? `room ${Math.round(boxWidth)}dp` : null,
-    lineW != null ? `drew ${lineW}dp` : null,
+    boxWidth != null ? `room ${fmt(boxWidth)}dp` : null,
+    lineW != null ? `drew ${fmt(lineW)}dp` : null,
     `fontScale ${PixelRatio.getFontScale()}`,
     `${lines.length} line(s)`,
   ].filter(Boolean).join(' · ')
