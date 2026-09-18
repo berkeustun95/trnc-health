@@ -1,6 +1,7 @@
 import { useContext } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { OnSafeSurface, photoBackdrop } from '../components/SurfaceContext'
+import { sourceTextOf, renderedTextOf, display, dense } from './textAuditVerdict'
 import { devKeysForString } from '../constants/i18n'
 import { TRUNCATION_ALLOWED, ON_PHOTO_ALLOWED } from '../constants/textAuditAllowlist'
 import { colors, contrastRatio } from '../constants/theme'
@@ -135,32 +136,6 @@ const state = {
 const PHOTO_BACKDROP = '#5a5a5a'
 const MIN_RATIO = 4.5
 
-// React's own flattening rules, because the source length has to be what React would
-// render. null/undefined/booleans contribute nothing, numbers stringify, arrays recurse,
-// and a nested <Text> contributes its children (an inline <Image> or icon contributes
-// nothing, which is correct — it occupies space but no characters).
-function flattenChildren(node, out) {
-  if (node === null || node === undefined || typeof node === 'boolean') return
-  if (typeof node === 'string') { out.push(node); return }
-  if (typeof node === 'number')  { out.push(String(node)); return }
-  if (Array.isArray(node)) { for (const child of node) flattenChildren(child, out); return }
-  if (node.props && node.props.children !== undefined) flattenChildren(node.props.children, out)
-}
-
-// Two normalisations, and the split matters.
-//
-// `display` is for the message a human reads.
-//
-// `dense` — ALL whitespace removed — is what the lengths are compared on, and it is the
-// one doing real work. A line break eats the space it broke on, and whether the engine
-// reports that space at the end of line N, the start of line N+1, or not at all is a
-// platform detail nobody should have to be right about. Comparing raw lengths would flag
-// every wrapped label in the app; comparing collapsed whitespace still depends on which
-// side the space landed. Counting only non-whitespace characters is immune to all of it,
-// and truncation removes real characters, so nothing that matters is lost.
-const display = s => s.replace(/\s+/g, ' ').trim()
-const dense   = s => s.replace(/\s+/g, '')
-
 function report(kind, key, message) {
   const id = `${kind}:${key}`
   if (state.seen.has(id)) return
@@ -169,7 +144,7 @@ function report(kind, key, message) {
 }
 
 function handleTruncation(source, lines) {
-  const rendered = lines.map(l => (typeof l.text === 'string' ? l.text : '')).join('')
+  const rendered = renderedTextOf(lines)
 
   // ─── Control routing ─────────────────────────────────────────────────────
   if (source === POSITIVE_PROBE) {
@@ -245,37 +220,46 @@ function checkContrast(source, style) {
     `            ALLOW_ON_PHOTO in constants/textAuditAllowlist.js with a reason.`)
 }
 
-// ─── The patch ─────────────────────────────────────────────────────────────
+// ─── The patch, on the FOURTH attempt ───────────────────────────────────────
 //
-// react-native exports Text through a lazy getter (node_modules/react-native/index.js:112
-// — `get Text() { return require('./Libraries/Text/Text').default }`), which re-reads
-// `.default` on EVERY access. So replacing that one property reaches all 72 files that
-// render text, with no edit to any of them — including the three Student Hub files this
-// task must not touch.
+// Compiled screens reference `_reactNative.Text` at each JSX site (verified by running
+// babel-preset-expo over a probe file), not a value hoisted at import time. So replacing
+// ONE property on the `react-native` module object reaches all 72 files that render text,
+// with no edit to any of them — including the three Student Hub files this task must not
+// touch. That part was right from the start. Getting AT the property took four goes, and
+// the three failures are recorded because each one looks reasonable until you try it:
 //
-// Note what is NOT possible here: Text is a Flow `component()` in 0.81.5, so it is a plain
-// function with no `.render` to wrap, and React 19 removed defaultProps for function
-// components. Those are the two obvious approaches and both are dead ends.
+//   1. `Text.render = ...` — the forwardRef trick. Dead: Text is a Flow `component()` in
+//      0.81.5, a plain function with no `.render`.
+//   2. `Text.defaultProps` — dead: React 19 removed defaultProps for function components.
+//   3. `require('react-native/Libraries/Text/Text').default = ...` — dead, and this is the
+//      one that shipped and crashed the app on launch:
+//          TypeError: Cannot assign to property 'default' which has only a getter
+//      Babel compiles `export default` to an accessor with NO setter, and measuring the
+//      descriptor shows it is also `configurable: false` — so `Object.defineProperty`
+//      cannot rescue it either. That module is genuinely sealed.
+//
+//   4. `Object.defineProperty(require('react-native'), 'Text', ...)` — works, and the
+//      reason is a real difference rather than a lucky guess. react-native/index.js:32 is a
+//      plain OBJECT LITERAL (`module.exports = { get Text() {...} }`), and accessors
+//      declared in an object literal are `configurable: true`. Assignment still throws
+//      (same error as #3 — there is no setter), but a configurable property can be
+//      REDEFINED. Measured both descriptors side by side before writing this; index.js
+//      contains no freeze, seal or preventExtensions.
+//
+// The lesson worth keeping: "it has only a getter" and "it cannot be replaced" are
+// different statements, and the difference is `configurable`.
 export function install() {
   if (state.installed) return
   state.installed = true
 
-  // Reaching into react-native by internal path is what makes this work without touching
-  // 72 files, and it is also the one thing here that a version bump can move. A missing
-  // path must degrade to a dev-mode warning, never to a crash on startup — an audit that
-  // stops the app from booting is infinitely worse than the bugs it was written to find.
-  let TextModule
-  try {
-    TextModule = require('react-native/Libraries/Text/Text')
-  } catch (e) {
-    console.warn('[ada-audit] INSTALL FAILED — react-native/Libraries/Text/Text did not resolve.\n' +
-                 '            The internal path has probably moved in this version of React Native.\n' +
-                 `            Nothing is being audited. (${e?.message})`)
-    return
-  }
-  const OriginalText = TextModule && TextModule.default
-  if (!OriginalText) {
-    console.warn('[ada-audit] INSTALL FAILED — the Text module has no default export. Nothing is being audited.')
+  // No deep import. `require('react-native')` is the public entry, which also means this
+  // file emits none of the "Deep imports from the 'react-native' package are deprecated"
+  // warnings that the earlier version did.
+  const RN = require('react-native')
+  const OriginalText = RN.Text        // reading the getter once resolves the real component
+  if (typeof OriginalText !== 'function' && typeof OriginalText !== 'object') {
+    console.warn('[ada-audit] INSTALL FAILED — react-native.Text did not resolve to a component. Nothing is audited.')
     return
   }
 
@@ -285,9 +269,7 @@ export function install() {
     let source = null
     const needsSource = props.numberOfLines > 0 || (!onSafeSurface && photoBackdrop.count > 0)
     if (needsSource) {
-      const parts = []
-      flattenChildren(props.children, parts)
-      source = parts.join('')
+      source = sourceTextOf(props.children)
     }
 
     if (source && !onSafeSurface) checkContrast(source, props.style)
@@ -311,12 +293,28 @@ export function install() {
   }
   AuditedText.displayName = 'AuditedText'
 
-  TextModule.default = AuditedText
+  // defineProperty, never assignment. See attempt #3 in the header — assignment throws on
+  // an accessor with no setter, and it throws at import time, which takes the whole app
+  // down before anything renders. Wrapped so that a future React Native which DOES seal
+  // this object degrades to a warning instead of the same crash.
+  try {
+    Object.defineProperty(RN, 'Text', {
+      value: AuditedText,
+      configurable: true,
+      enumerable: true,
+      writable: true,
+    })
+  } catch (e) {
+    console.warn('[ada-audit] INSTALL FAILED — react-native.Text could not be redefined.\n' +
+                 '            The export is sealed in this version. Nothing is being audited.\n' +
+                 `            (${e && e.message})`)
+    return
+  }
 
   // Did the patch actually land? A monkey-patch that silently did nothing looks exactly
   // like an app with no problems, and this file exists because that failure mode is the
   // one that costs you two months.
-  const applied = require('react-native').Text
+  const applied = RN.Text
   if (applied !== AuditedText) {
     console.warn('[ada-audit] INSTALL FAILED — react-native.Text is not the audited component.\n' +
                  '            Nothing will be reported. The export is probably read-only in this\n' +

@@ -85,25 +85,20 @@ function considerNode(node, kind) {
 }
 
 // Same patch mechanism as utils/devTextAudit.js: react-native exports these through lazy
-// getters that re-read `.default` on every access, so replacing that one property reaches
-// every call site with no edit to any screen.
-// ► EACH PATH IS A LITERAL INSIDE A THUNK, NOT A STRING IN A TABLE.
-//   Metro resolves the dependency graph statically, by walking the AST for `require()`
-//   calls whose argument is a string literal. A table of paths iterated with
-//   `require(path)` is a dynamic require, and it does not fail at runtime — it fails the
-//   BUNDLE, for the whole app:
-//       Error: utils/devSafeAreaAudit.js: Invalid call at line 119: require(path)
-//   Which is the worst possible blast radius for a dev-only audit: a check nobody had
-//   validated yet stopped the entire app from starting.
+// ► NO DEEP IMPORTS, AND NO ASSIGNMENT. Both were learned the hard way, one launch apart.
+//   The first version iterated a table of `react-native/Libraries/...` paths and called
+//   `require(path)`. Metro resolves dependencies statically from string literals, so that
+//   failed the BUNDLE for the whole app. Thunks with literals fixed the bundle but kept the
+//   deep imports, which react-native then warns about on every launch — and worse, the
+//   module body ran those requires whether or not this audit was wanted.
 //
-//   Wrapping each one in an arrow function keeps the literal exactly where Metro's scan
-//   needs it while still allowing the loop below, so the table stays readable.
-const TARGETS = [
-  ['Pressable',          () => require('react-native/Libraries/Components/Pressable/Pressable')],
-  ['TouchableOpacity',   () => require('react-native/Libraries/Components/Touchable/TouchableOpacity')],
-  ['TouchableHighlight', () => require('react-native/Libraries/Components/Touchable/TouchableHighlight')],
-  ['TextInput',          () => require('react-native/Libraries/Components/TextInput/TextInput')],
-]
+//   Patching the four PUBLIC exports instead solves all of it: no deep paths, no
+//   deprecation warnings, and the same reach, because compiled screens reference
+//   `_reactNative.TouchableOpacity` at each call site. The property must be REDEFINED
+//   rather than assigned — react-native/index.js declares these as object-literal getters,
+//   which have no setter but are `configurable: true`. See utils/devTextAudit.js for the
+//   full account of why assignment throws.
+const TARGET_NAMES = ['Pressable', 'TouchableOpacity', 'TouchableHighlight', 'TextInput']
 
 export function installSafeAreaAudit() {
   if (state.installed) return
@@ -125,10 +120,10 @@ export function installSafeAreaAudit() {
   }
   console.log(`[ada-audit] safe-area audit armed — frame ${Math.round(state.frame.height)}px, bottom inset ${Math.round(state.inset)}px.`)
 
-  for (const [kind, load] of TARGETS) {
-    let mod
-    try { mod = load() } catch { continue }
-    const Original = mod && mod.default
+  const RN = require('react-native')
+
+  for (const kind of TARGET_NAMES) {
+    const Original = RN[kind]
     if (!Original) continue
 
     function Audited(props) {
@@ -143,6 +138,10 @@ export function installSafeAreaAudit() {
       return <Original {...props} ref={setRef} />
     }
     Audited.displayName = `Audited(${kind})`
-    mod.default = Audited
+    try {
+      Object.defineProperty(RN, kind, { value: Audited, configurable: true, enumerable: true, writable: true })
+    } catch (e) {
+      console.warn(`[ada-audit] could not wrap ${kind}: ${e && e.message}`)
+    }
   }
 }
