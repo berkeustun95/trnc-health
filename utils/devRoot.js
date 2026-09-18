@@ -72,8 +72,20 @@ export default function DevRoot() {
 
   useEffect(() => {
     let cancelled = false
+    // The text audit always runs — it is the one worth having.
     installTextAudit()
-    installSafeAreaAudit()
+
+    // ► THE SAFE-AREA AUDIT IS OPT-IN, AND IT EARNED THAT.
+    //   It is the weakest of the three by its own header, its noise level has never been
+    //   measured because it has never been run, and on its first contact with a real
+    //   bundler it took the whole app down with a dynamic require — a check nobody had
+    //   validated yet stopped the app from starting. That is a bad trade to make by
+    //   default for the check you are least sure about.
+    //
+    //   So it stays out of the way until asked for:
+    //       EXPO_PUBLIC_DEV_SAFEAREA=1 npx expo start -c
+    //   The overflow detector, which is the point of all this, no longer depends on it.
+    if (process.env.EXPO_PUBLIC_DEV_SAFEAREA === '1') installSafeAreaAudit()
     // Always resolves. A dev convenience that could stop the app from starting would be a
     // worse bug than the one it exists to help find.
     seedLaunchArgs()

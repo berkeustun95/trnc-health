@@ -87,11 +87,22 @@ function considerNode(node, kind) {
 // Same patch mechanism as utils/devTextAudit.js: react-native exports these through lazy
 // getters that re-read `.default` on every access, so replacing that one property reaches
 // every call site with no edit to any screen.
+// ► EACH PATH IS A LITERAL INSIDE A THUNK, NOT A STRING IN A TABLE.
+//   Metro resolves the dependency graph statically, by walking the AST for `require()`
+//   calls whose argument is a string literal. A table of paths iterated with
+//   `require(path)` is a dynamic require, and it does not fail at runtime — it fails the
+//   BUNDLE, for the whole app:
+//       Error: utils/devSafeAreaAudit.js: Invalid call at line 119: require(path)
+//   Which is the worst possible blast radius for a dev-only audit: a check nobody had
+//   validated yet stopped the entire app from starting.
+//
+//   Wrapping each one in an arrow function keeps the literal exactly where Metro's scan
+//   needs it while still allowing the loop below, so the table stays readable.
 const TARGETS = [
-  ['react-native/Libraries/Components/Pressable/Pressable',            'Pressable'],
-  ['react-native/Libraries/Components/Touchable/TouchableOpacity',     'TouchableOpacity'],
-  ['react-native/Libraries/Components/Touchable/TouchableHighlight',   'TouchableHighlight'],
-  ['react-native/Libraries/Components/TextInput/TextInput',            'TextInput'],
+  ['Pressable',          () => require('react-native/Libraries/Components/Pressable/Pressable')],
+  ['TouchableOpacity',   () => require('react-native/Libraries/Components/Touchable/TouchableOpacity')],
+  ['TouchableHighlight', () => require('react-native/Libraries/Components/Touchable/TouchableHighlight')],
+  ['TextInput',          () => require('react-native/Libraries/Components/TextInput/TextInput')],
 ]
 
 export function installSafeAreaAudit() {
@@ -114,10 +125,10 @@ export function installSafeAreaAudit() {
   }
   console.log(`[ada-audit] safe-area audit armed — frame ${Math.round(state.frame.height)}px, bottom inset ${Math.round(state.inset)}px.`)
 
-  for (const [path, kind] of TARGETS) {
+  for (const [kind, load] of TARGETS) {
     let mod
-    try { mod = require(path) } catch { continue }
-    const Original = mod.default
+    try { mod = load() } catch { continue }
+    const Original = mod && mod.default
     if (!Original) continue
 
     function Audited(props) {

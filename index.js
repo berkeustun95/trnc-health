@@ -5,22 +5,28 @@ import App from './App';
 // EXPO_PUBLIC_DEV_LANG / EXPO_PUBLIC_DEV_ONBOARDED launch arguments can be seeded before
 // App reads them. See utils/devRoot.js.
 //
-// The `if (__DEV__) require(...)` form is deliberate, and what it does and does not promise
-// was checked rather than assumed — transforming this file through babel-preset-expo with
-// `caller.isDev = false` emits `if (false) { Root = require("./utils/devRoot").default }`.
+// The `if (__DEV__) require(...)` form is deliberate, and it was MEASURED rather than
+// assumed — twice, because the first measurement was only half the pipeline.
 //
-// So: in production the branch is dead and **none of utils/devRoot.js, utils/devTextAudit.js
-// or utils/devSafeAreaAudit.js ever runs** — no patched components, no probes, no listeners.
-// That is the guarantee that matters and it is absolute.
+// Babel alone (babel-preset-expo with `caller.isDev = false`) emits
+// `if (false) { Root = require("./utils/devRoot").default }` — the branch is dead, but the
+// require is still textually in the AST, which is where Metro collects dependencies. On
+// that evidence alone the honest claim was "it never runs, but it may still ship as dead
+// weight".
 //
-// What it does NOT promise is absence. The `require(...)` call is still in the AST when
-// Metro collects dependencies, so those modules can still be pulled into the bundle graph
-// as dead weight even though the minifier drops the `if (false)` statement itself. The
-// marginal cost is small (they import App, AsyncStorage, i18n and theme, all of which ship
-// anyway). Said plainly here because "stripped from the bundle" is the claim everyone
-// assumes this idiom makes, and it is a stronger claim than the one it actually supports.
+// The full pipeline does better. Metro's own production bundle
+// (`/index.bundle?platform=android&dev=false&minify=true`, 2026-09-18) contains **zero**
+// occurrences of `ada-audit`, `POSITIVE control PASSED`, `safe-area audit armed` or
+// `EXPO_PUBLIC_DEV_SAFEAREA` — 5.2 MB against 13.5 MB for the dev bundle. The minifier
+// eliminates the `if (false)` branch and the modules go with it.
 //
-// A static `import` would be worse on both counts: it would run at startup in production.
+// So both claims hold in production: none of utils/devRoot.js, utils/devTextAudit.js or
+// utils/devSafeAreaAudit.js runs, and none of it is present. Recorded with the method
+// because "stripped from the bundle" is what everyone ASSUMES this idiom does, and the
+// assumption happens to be right here only because of the minifier — not because of
+// `__DEV__`.
+//
+// A static `import` would break both: it would ship, and it would run at startup.
 let Root = App;
 if (__DEV__) {
   Root = require('./utils/devRoot').default;
