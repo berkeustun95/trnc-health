@@ -71,6 +71,7 @@
     "moderation:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-moderation-normalization.mjs",
     "moderation:log": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-moderation-log.mjs",
     "profile:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-profile-gate.mjs",
+    "audits:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-dev-audits.mjs",
     "web:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-web-assets.mjs",
     "web:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-web-assets.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs && npx wrangler deploy",
     "privacy:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs",

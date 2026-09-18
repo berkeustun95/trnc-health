@@ -1,4 +1,5 @@
-import { useContext } from 'react'
+import * as React from 'react'
+import { useContext, useRef } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { OnSafeSurface, photoBackdrop } from '../components/SurfaceContext'
 import { sourceTextOf, renderedTextOf, display, dense } from './textAuditVerdict'
@@ -86,6 +87,21 @@ import { colors, contrastRatio } from '../constants/theme'
 
 const CONTROL_TIMEOUT_MS = 6000
 
+// ─── WHY A SETTLE WINDOW, AND NOT JUST "REPORT WHAT THE EVENT SAID" ─────────
+//
+// onTextLayout fires on EVERY measurement that differs from the last one —
+// ParagraphEventEmitter.cpp:42 suppresses only an identical repeat, not an intermediate
+// pass. So a Text can be measured narrow while its row is still resolving, measured again
+// correctly a frame later, and the first of those is a truncation that never reached a
+// human eye.
+//
+// Reporting the first event therefore produces a bug report for a layout that is fine —
+// which is the most expensive kind of false positive, because somebody goes and "fixes" a
+// screen that was never broken. Only the LAST measurement for a given node describes what
+// is actually on screen, so each node's verdict is deferred and superseded until it stops
+// changing.
+const SETTLE_MS = 400
+
 // Sentinels, not i18n strings, so they can never collide with real copy.
 //
 // ► ORDINARY SPACED WORDS, AND IT MUST OVERFLOW PAST ITS LINE LIMIT, NOT WITHIN IT.
@@ -136,6 +152,32 @@ const state = {
 const PHOTO_BACKDROP = '#5a5a5a'
 const MIN_RATIO = 4.5
 
+// ─── WHERE did this render? ─────────────────────────────────────────────────
+//
+// The reverse lookup answers WHAT string broke, and it is deliberately unable to answer
+// WHERE: four modules each define their own key for "Nicosia" with the same Turkish value,
+// so "Lefkoşa" maps to four keys and the audit cannot tell which of them rendered. That is
+// not a bug in the lookup — it is a dictionary, and a dictionary genuinely does not know
+// who read it.
+//
+// React 19 can answer it, though. captureOwnerStack() returns the chain of components that
+// OWN the currently-rendering element (dev builds only), so the first app frame in it is
+// the component that wrote the <Text>. That turns "one of these four keys" into a file and
+// a line.
+//
+// Degrades to null rather than throwing: it is a dev-only API, it returns null outside
+// render, and a report with no location is still worth having.
+function ownerLocation() {
+  try {
+    const stack = React.captureOwnerStack && React.captureOwnerStack()
+    if (!stack) return null
+    const frames = stack.split('\n').map(l => l.trim()).filter(Boolean)
+    return frames.find(l => /screens\/|components\//.test(l) && !/devTextAudit/.test(l)) || frames[0] || null
+  } catch {
+    return null
+  }
+}
+
 function report(kind, key, message) {
   const id = `${kind}:${key}`
   if (state.seen.has(id)) return
@@ -143,7 +185,7 @@ function report(kind, key, message) {
   console.warn(message)
 }
 
-function handleTruncation(source, lines) {
+function handleTruncation(source, lines, owner) {
   const rendered = renderedTextOf(lines)
 
   // ─── Control routing ─────────────────────────────────────────────────────
@@ -186,6 +228,7 @@ function handleTruncation(source, lines) {
 
   report('truncate', keys.join('|'),
     `[ada-audit] TEXT CLIPPED  ${keys.map(k => `t('${k}')`).join(' or ')}\n` +
+    (owner ? `            at     : ${owner}\n` : '') +
     `            wanted : "${display(source)}"\n` +
     `            drew   : "${display(rendered)}"\n` +
     `            This label does not fit in its allowed lines in the current language.\n` +
@@ -193,7 +236,7 @@ function handleTruncation(source, lines) {
     `            constants/textAuditAllowlist.js with a reason.`)
 }
 
-function checkContrast(source, style) {
+function checkContrast(source, style, owner) {
   // ► NOT gated on the controls, unlike truncation, and the asymmetry is deliberate.
   //   The controls prove that onTextLayout fires and reports honestly. This check never
   //   asks the layout engine anything — it reads a colour off a style at render time — so
@@ -213,6 +256,7 @@ function checkContrast(source, style) {
 
   report('contrast', keys.join('|'),
     `[ada-audit] LOW CONTRAST ON PHOTO  ${keys.map(k => `t('${k}')`).join(' or ')}\n` +
+    (owner ? `            at   : ${owner}\n` : '') +
     `            "${display(source)}"\n` +
     `            ${color} on the scrimmed photo measures ${ratio.toFixed(2)}:1 (needs ${MIN_RATIO}:1).\n` +
     `            ADA's answer to this is a ContentCard — that is what every readable label\n` +
@@ -265,6 +309,7 @@ export function install() {
 
   function AuditedText(props) {
     const onSafeSurface = useContext(OnSafeSurface)
+    const pending = useRef(null)
 
     let source = null
     const needsSource = props.numberOfLines > 0 || (!onSafeSurface && photoBackdrop.count > 0)
@@ -272,7 +317,11 @@ export function install() {
       source = sourceTextOf(props.children)
     }
 
-    if (source && !onSafeSurface) checkContrast(source, props.style)
+    // captureOwnerStack() is only meaningful DURING render, so it is read here and carried
+    // into the layout callback rather than being read from inside it.
+    const owner = source ? ownerLocation() : null
+
+    if (source && !onSafeSurface) checkContrast(source, props.style, owner)
 
     // onTextLayout is attached ONLY where numberOfLines is set. It makes Fabric measure
     // every line of that node, so putting it on all text would be a real dev-mode cost for
@@ -286,7 +335,15 @@ export function install() {
         onTextLayout={event => {
           if (existing) existing(event)          // chain, never replace (0 callers today)
           const lines = event && event.nativeEvent && event.nativeEvent.lines
-          if (Array.isArray(lines) && lines.length > 0) handleTruncation(source, lines)
+          if (!Array.isArray(lines) || lines.length === 0) return
+
+          // Supersede any verdict still waiting on this node. An intermediate measurement
+          // is not what the user sees; only the one nothing follows is.
+          if (pending.current) clearTimeout(pending.current)
+          pending.current = setTimeout(() => {
+            pending.current = null
+            handleTruncation(source, lines, owner)
+          }, SETTLE_MS)
         }}
       />
     )
