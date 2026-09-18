@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useContext, useRef } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, View, PixelRatio } from 'react-native'
 import { OnSafeSurface, photoBackdrop } from '../components/SurfaceContext'
 import { sourceTextOf, renderedTextOf, display, dense } from './textAuditVerdict'
 import { devKeysForString } from '../constants/i18n'
@@ -185,7 +185,7 @@ function report(kind, key, message) {
   console.warn(message)
 }
 
-function handleTruncation(source, lines, owner) {
+function handleTruncation(source, lines, owner, boxWidth) {
   const rendered = renderedTextOf(lines)
 
   // ─── Control routing ─────────────────────────────────────────────────────
@@ -226,11 +226,39 @@ function handleTruncation(source, lines, owner) {
   if (keys.length === 0) return                                  // not UI chrome — see SCOPE
   if (keys.some(k => TRUNCATION_ALLOWED.has(k))) return
 
+  // ─── THE GEOMETRY, BECAUSE "IT CLIPPED" IS NOT A DIAGNOSIS ────────────────
+  //
+  // A report that says only WHAT was cut sends you to the stylesheet to derive what the
+  // width must have been — which is exactly what went wrong with the first real finding:
+  // the arithmetic said ~190dp available for a ~55dp word, and the arithmetic was wrong.
+  // Deriving a runtime width from a stylesheet means modelling flex, gaps, siblings, the
+  // parent chain and the font, and being right about all of them at once.
+  //
+  // So the audit now prints the numbers it already has. `room` is the Text's own laid-out
+  // width; `drew` is what the engine actually painted on the first line. Between them the
+  // diagnosis forks immediately:
+  //
+  //   room is SMALL  -> something upstream is squeezing this Text; go and measure the
+  //                     parent, the problem is not the string.
+  //   room is LARGE  -> the Text had space and the glyphs still did not fit; suspect the
+  //                     font scale, which is why it is printed too.
+  //
+  // fontScale is the user's accessibility text-size setting. At 1.3 or 1.5 every label in
+  // the app is a third wider than any figure derived on a desk, and it is invisible in code.
+  const lineW = lines[0] && typeof lines[0].width === 'number' ? Math.round(lines[0].width) : null
+  const geom = [
+    boxWidth != null ? `room ${Math.round(boxWidth)}dp` : null,
+    lineW != null ? `drew ${lineW}dp` : null,
+    `fontScale ${PixelRatio.getFontScale()}`,
+    `${lines.length} line(s)`,
+  ].filter(Boolean).join(' · ')
+
   report('truncate', keys.join('|'),
     `[ada-audit] TEXT CLIPPED  ${keys.map(k => `t('${k}')`).join(' or ')}\n` +
     (owner ? `            at     : ${owner}\n` : '') +
     `            wanted : "${display(source)}"\n` +
     `            drew   : "${display(rendered)}"\n` +
+    `            box    : ${geom}\n` +
     `            This label does not fit in its allowed lines in the current language.\n` +
     `            If the clipping is intended, add the key to ALLOW_TRUNCATION in\n` +
     `            constants/textAuditAllowlist.js with a reason.`)
@@ -310,6 +338,7 @@ export function install() {
   function AuditedText(props) {
     const onSafeSurface = useContext(OnSafeSurface)
     const pending = useRef(null)
+    const boxWidth = useRef(null)
 
     let source = null
     const needsSource = props.numberOfLines > 0 || (!onSafeSurface && photoBackdrop.count > 0)
@@ -329,9 +358,16 @@ export function install() {
     if (!source || !(props.numberOfLines > 0)) return <OriginalText {...props} />
 
     const existing = props.onTextLayout
+    const existingLayout = props.onLayout
     return (
       <OriginalText
         {...props}
+        onLayout={event => {
+          if (existingLayout) existingLayout(event)   // chain, never replace
+          const w = event && event.nativeEvent && event.nativeEvent.layout
+            ? event.nativeEvent.layout.width : null
+          if (typeof w === 'number') boxWidth.current = w
+        }}
         onTextLayout={event => {
           if (existing) existing(event)          // chain, never replace (0 callers today)
           const lines = event && event.nativeEvent && event.nativeEvent.lines
@@ -342,7 +378,7 @@ export function install() {
           if (pending.current) clearTimeout(pending.current)
           pending.current = setTimeout(() => {
             pending.current = null
-            handleTruncation(source, lines, owner)
+            handleTruncation(source, lines, owner, boxWidth.current)
           }, SETTLE_MS)
         }}
       />

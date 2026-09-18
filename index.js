@@ -16,12 +16,11 @@ import App from './App';
 //
 // The full pipeline does better. Metro's own production bundle
 // (`/index.bundle?platform=android&dev=false&minify=true`, 2026-09-18) contains **zero**
-// occurrences of `ada-audit`, `POSITIVE control PASSED`, `safe-area audit armed` or
-// `EXPO_PUBLIC_DEV_SAFEAREA` — 5.2 MB against 13.5 MB for the dev bundle. The minifier
-// eliminates the `if (false)` branch and the modules go with it.
+// occurrences of `ada-audit` or `POSITIVE control PASSED` — 5.2 MB against 13.5 MB for the
+// dev bundle. The minifier eliminates the `if (false)` branch and the modules go with it.
 //
-// So both claims hold in production: none of utils/devRoot.js, utils/devTextAudit.js or
-// utils/devSafeAreaAudit.js runs, and none of it is present. Recorded with the method
+// So both claims hold in production: neither utils/devRoot.js nor utils/devTextAudit.js
+// runs, and none of it is present. Recorded with the method
 // because "stripped from the bundle" is what everyone ASSUMES this idiom does, and the
 // assumption happens to be right here only because of the minifier — not because of
 // `__DEV__`.

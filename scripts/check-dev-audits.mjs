@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ─── The two crashes this exists to prevent ─────────────────────────────────
 //
-// The __DEV__ UI audits (utils/devTextAudit.js, utils/devSafeAreaAudit.js, utils/devRoot.js)
+// The __DEV__ UI audits (utils/devTextAudit.js, utils/devRoot.js)
 // reach into React Native to wrap components. That is what lets them watch all 72 files
 // that render text without editing any of them — and it is also why they took the whole
 // app down twice in two days, both times in a way no bundle check could see:
@@ -36,7 +36,6 @@ import { readFileSync, existsSync } from 'node:fs'
 // two real outages rather than only on the snippets in SELF_TEST.
 const FILES = process.argv.slice(2).length ? process.argv.slice(2) : [
   'utils/devTextAudit.js',
-  'utils/devSafeAreaAudit.js',
   'utils/devRoot.js',
   'utils/textAuditVerdict.js',
   'index.js',
