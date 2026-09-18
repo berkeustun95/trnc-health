@@ -415,9 +415,10 @@ const s = StyleSheet.create({
                borderRadius: 23, backgroundColor: '#fff', paddingHorizontal: 16 },
   searchText:{ flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   // A single pill, deliberately shallow: paddingVertical 6 against the old stack's ~71pt.
-  // alignSelf flex-start so it hugs its content instead of stretching across the hero.
-  // flex:1 so the bottom-right column stays pinned right; the chip itself hugs its
-  // content via alignSelf.
+  // flex:1 so the bottom-right column stays pinned right.
+  //
+  // The chip used to hug its content via alignSelf: 'flex-start'. That was removed on
+  // 2026-09-18 — see the note on `chip` below for why it had become actively harmful.
   chipCol:   { flex: 1 },
   // ─── NO BACKDROP. PLAIN TEXT ON THE PHOTOGRAPH ────────────────────────────
   //
@@ -444,7 +445,32 @@ const s = StyleSheet.create({
   // The textShadow is a belt-and-braces perceptual aid at glyph EDGES and is deliberately
   // not counted in any figure above: WCAG has no method for it, so it is not something the
   // numbers may lean on. The scrim is what carries the contrast.
-  chip:      { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  // ─── DO NOT ADD alignSelf: 'flex-start' BACK ────────────────────────────────
+  //
+  // It was here, and it clipped the district name in Turkish on the home screen — the
+  // first thing most users see, in the language most of them read. "Lefkoşa" drew as
+  // "Lefko…" with 55.3dp of room, found 2026-09-18 by the __DEV__ text audit.
+  //
+  // The hug was VESTIGIAL. This row used to be a rgba(0,0,0,0.74) pill, and a pill must
+  // hug — its background has to wrap the text. The pill went on 2026-09-07 (see the note
+  // below); the hug stayed, and with no background left to size it did nothing but turn
+  // ~190dp of free space into a width derived from the text's own measurement.
+  //
+  // Why that clips, which is the part worth keeping:
+  //   Yoga force-CEILS a text node's own frame, deliberately — PixelGrid.cpp:85,
+  //   "If a node has a custom measure function we never want to round down its size as
+  //   this could lead to unwanted text truncation". But NodeType::Text is set only on
+  //   nodes that HAVE a measure function (node/Node.cpp:113), so this View is
+  //   NodeType::Default and takes plain round-to-nearest. A content-hugging ancestor
+  //   therefore derives its width from the text's fractional measurement and can round
+  //   that fraction away, and `flexShrink: 1` on the district then lets the Text absorb
+  //   the loss instead of overflowing by a sub-pixel nobody would ever see.
+  //
+  // Stretching costs nothing: there is no background to hug, justifyContent defaults to
+  // flex-start so the children still start at the left, and pointerEvents="box-none"
+  // means the wider box adds no touch target. It buys the Text real slack, so flexShrink
+  // stays as a genuine safety valve for a long name rather than firing on a rounding error.
+  chip:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // 14pt, down from 17. "Smaller and lighter" is the brief; the floor does not move with
   // size here because 17pt was never large-text either (that needs 18pt, or 14pt bold).
   district:  { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#fff', flexShrink: 1,
