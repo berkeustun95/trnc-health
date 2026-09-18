@@ -2636,6 +2636,32 @@ WITH report AS (
         WHERE n.nspname='public' AND p.proname='auto_hide_reported_content'
           AND pg_get_functiondef(p.oid) NOT ILIKE '%UPDATE messages%'
           AND pg_get_functiondef(p.oid) ILIKE '%UPDATE reviews%')
+    -- ══ completion check loses institution_id (20261030) ════════════════════
+    -- THE CONSTRAINT NAME DID NOT CHANGE. Section E asserts
+    -- profiles_completion_requires_fields_check is PRESENT and stays green word for word
+    -- over the OLD definition, so this is the only row in the report that can tell a
+    -- database with 20261030 applied from one without it.
+    --
+    -- It matters more than a usual behaviour token, in both directions:
+    --   • UNAPPLIED, with the OTA shipped: ProfileScreen's education editor writes the
+    --     institution to student_education and never to profiles, so every path into
+    --     university-level student status ends in a 23514 the user cannot clear.
+    --   • UNAPPLIED, when 20261027 runs: DROP COLUMN institution_id FAILS, because a
+    --     multi-column CHECK still references it.
+    --
+    -- Both directions asserted, because either alone certifies a blind spot: the ABSENCE
+    -- of institution_id (the point of the file) AND the presence of the arms that must
+    -- have survived (without which a constraint rewritten down to nothing would pass the
+    -- absence half and silently stop guarding profile completion entirely).
+    UNION ALL SELECT '1030_completion_check','completion check no longer requires institution_id, and still guards the rest',
+      EXISTS(SELECT 1 FROM pg_constraint c
+        WHERE c.conname='profiles_completion_requires_fields_check'
+          AND pg_get_constraintdef(c.oid) NOT ILIKE '%institution_id%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%first_name%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%display_name%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%nationality_code%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%student_level%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%profile_completed_at%')
     -- ══ resident_status narrowed to four (20261006) ═════════════════════════
     -- THE CONSTRAINT NAME DID NOT CHANGE, which is exactly why this token has to
     -- exist. Section E asserts profiles_resident_status_check is PRESENT, and it stays
