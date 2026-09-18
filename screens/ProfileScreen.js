@@ -20,9 +20,15 @@ import { pad, ageOn, daysInMonth } from '../utils/profileFields'
 import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../components/DisplayNameCheck'
 import {
   MIN_SIGNUP_AGE, MAX_SIGNUP_AGE, RESIDENT_STATUSES, STUDENT_LEVELS,
-  INSTITUTION_REQUIRED_LEVELS, RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
-  DISPLAY_NAME_MAX, affiliationPatch, STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
+  RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
+  DISPLAY_NAME_MAX, STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
 } from '../constants/profileGate'
+// affiliationPatch is deliberately NOT imported any more. It writes the five profiles
+// columns 20261027 drops, and this screen is the last thing that was still calling it.
+import {
+  EDUCATION_SELECT, LEVELS, splitEnrolments, findSameEnrolment, enrolmentError,
+  enrolmentRow, isInstitutionCouplingBlock, profilesAffiliationClear,
+} from '../utils/education'
 import { subjectOptions, studyYearOptions, studyYearCeiling } from '../utils/studyFields'
 import LegalScreen from './LegalScreen'
 import { TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
@@ -97,14 +103,66 @@ function AvatarDisplay({ avatarUrl, initials, size = 72, textSize = 26 }) {
 // bites only on a row whose profile_completed_at is set, which is why it is derived from
 // that column rather than from the role or from this screen's own opinion.
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
+// ─── One enrolment ──────────────────────────────────────────────────────────
+//
+// Defined at module scope, not inside ProfileScreen: a component declared in its parent is
+// a NEW type on every render, so React unmounts and remounts the whole subtree — the
+// remount bug this repo's conventions call out by name.
+//
+// Renders the same for a current and a past enrolment; the only difference is the years
+// line, and "still studying" is what study_end_year IS NULL means to a reader.
+function EnrolmentRow({ row, lang, institutions, subjects, onEdit, onRemove, disabled }) {
+  const inst = institutions.find(i => i.id === row.institution_id)
+  const instLabel = inst ? (inst.short_name ? `${inst.name} (${inst.short_name})` : inst.name) : '—'
+  const subject = subjectOptions(subjects, lang).find(o => o.value === row.subject_id)
+  const years = row.study_start_year == null
+    ? (row.study_end_year == null ? '' : String(row.study_end_year))
+    : `${row.study_start_year} – ${row.study_end_year ?? t('pgStillStudying', lang)}`
+  return (
+    <View style={s.eduRow}>
+      <View style={s.eduRowBody}>
+        <Text style={s.eduRowTitle} numberOfLines={2}>{instLabel}</Text>
+        <Text style={s.eduRowMeta} numberOfLines={2}>
+          {[t(STUDENT_LEVEL_LABEL_KEY[row.level], lang), subject?.label, years].filter(Boolean).join(' · ')}
+        </Text>
+      </View>
+      <TouchableOpacity onPress={onEdit} disabled={disabled} style={s.eduRowAction} accessibilityRole="button">
+        <Feather name="edit-2" size={16} color={disabled ? colors.textSecondary : colors.primary} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onRemove} disabled={disabled} style={s.eduRowAction} accessibilityRole="button">
+        <Feather name="trash-2" size={16} color={disabled ? colors.textSecondary : colors.danger ?? '#C2410C'} />
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+// A stored row → the shape the draft editor edits. Kept next to the row that produces it
+// so the two cannot drift; `id` is what makes saveEnrolment update rather than insert.
+function draftFromRow(row) {
+  return {
+    id: row.id,
+    institutionId: row.institution_id,
+    level: row.level,
+    startYear: row.study_start_year,
+    endYear: row.study_end_year,
+    subjectId: row.subject_id,
+  }
+}
+
 export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange }) {
   const [profile, setProfile]               = useState(null)
   const [form, setForm]                     = useState({
     first_name: '', last_name: '', display_name: '',
     dobY: null, dobM: null, dobD: null,
     phone: '', nationality: '', region: null, resident_status: null,
-    student_level: null, institution_id: null, preferred_language: 'English',
-    study_start_year: null, study_end_year: null, subject_id: null,
+    // student_level STAYS: it is a profiles column 20261027 does not drop, it covers
+    // high_school / language_course / vocational which have no institution at all, and
+    // profiles_student_level_coupling_check still ties it to resident_status.
+    //
+    // institution_id, study_start_year, study_end_year and subject_id are GONE from the
+    // form. They live in student_education now, one row per enrolment, and this screen
+    // neither reads nor writes the profiles copies — see the note above the save.
+    student_level: null, preferred_language: 'English',
   })
   const [institutions, setInstitutions]     = useState([])
   const [picker, setPicker]                 = useState(null)  // 'day'|'month'|'year'|'nat'|'cc'|'inst'|'region'|'status'|'level'|'pastInst'|'subject'|'startYear'|'endYear'
@@ -137,9 +195,19 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   const [listingOn, setListingOn]               = useState(false)
   const [listingBusy, setListingBusy]           = useState(false)
   const [subjects, setSubjects]                 = useState([])
-  // Opens the past-university fields for someone who has none yet. Once an institution is
-  // in the form the fields stay open on their own.
-  const [addingPastUni, setAddingPastUni]       = useState(false)
+  // ─── Education (20261026) ───────────────────────────────────────────────────
+  // rows: every enrolment, newest-closed first. draft: the one being added or edited,
+  // or null when the editor is closed. The split into "currently studying" / "previously"
+  // is DERIVED from study_end_year IS NULL and never stored — see utils/education.js.
+  const [enrolments, setEnrolments]             = useState(null)   // null = still loading
+  const [draft, setDraft]                       = useState(null)
+  const [eduBusy, setEduBusy]                   = useState(false)
+  const [eduError, setEduError]                 = useState(null)
+  const [removing, setRemoving]                 = useState(null)   // the row awaiting confirmation
+  // The reciprocity gate, asked of the database rather than derived here: an enrolment
+  // with listing_opt_in is NOT sufficient on its own (a display name and no UGC ban are
+  // also required), and only can_see_student_lists() knows the whole rule.
+  const [canSee, setCanSee]                     = useState(null)
 
   function toggleSection(setter) {
     if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true)
@@ -153,14 +221,20 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         // full_name is READ (for the legacy-row fallback below) but never written back.
         const { data, error } = await supabase.from('profiles')
           .select('first_name, last_name, display_name, date_of_birth, region, resident_status, ' +
-                  'student_level, institution_id, full_name, phone, nationality, nationality_code, ' +
+                  'student_level, full_name, phone, nationality, nationality_code, ' +
                   'preferred_language, role, avatar_url, profile_completed_at, ' +
                   // Hand-written list, NOT App.js's PROFILE_COLUMNS — this screen has
                   // always had its own. Both now name marketing_opt_in_at and both
                   // therefore depend on 20261016 being applied before the OTA.
-                  'marketing_opt_in_at, ' +
-                  // 20261024. Same dependency: applied before any OTA carrying this line.
-                  'study_start_year, study_end_year, subject_id, student_listing_opt_in')
+                  'marketing_opt_in_at')
+          // ► THE FIVE AFFILIATION COLUMNS ARE NOT SELECTED, and that is what lets this
+          //   one release span 20261027. institution_id, study_start_year, study_end_year,
+          //   subject_id and student_listing_opt_in are dropped AFTER this build has
+          //   soaked, and this build is what is installed when that happens — naming a
+          //   dropped column in a select is a 42703 through PostgREST for every profile
+          //   open. The editor reads student_education instead, and the only place any of
+          //   the five is named at all is the recovery path in the save, which cannot run
+          //   once they are gone.)
           .eq('id', session.user.id)
           .single()
         if (error) { setLoadError(true); return }
@@ -168,7 +242,6 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           setProfile(data)
           setAvatarUrl(data.avatar_url ?? null)
           setMarketingOn(data.marketing_opt_in_at != null)
-          setListingOn(data.student_listing_opt_in === true)
           const stored = data.phone ?? ''
           const matched = COUNTRY_CODES.find(c => stored.startsWith(c.code))
           if (matched) setSelectedCC(matched.code)
@@ -193,11 +266,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             region: data.region ?? null,
             resident_status: data.resident_status ?? null,
             student_level: data.student_level ?? null,
-            institution_id: data.institution_id ?? null,
             preferred_language: data.preferred_language ?? 'English',
-            study_start_year: data.study_start_year ?? null,
-            study_end_year: data.study_end_year ?? null,
-            subject_id: data.subject_id ?? null,
           }
           setForm(initialForm)
           setSavedForm(initialForm)
@@ -209,6 +278,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
     loadProfile()
     loadBlocks()
+    loadEnrolments()
+    refreshCanSee()
     supabase.from('institutions')
       .select('id, name, short_name')
       .eq('is_active', true)
@@ -268,19 +339,141 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     setMarketingBusy(false)
   }
 
-  // Written against the STORED institution (the switch is disabled without one), so the
-  // listing CHECK is the database's to enforce, and the read-back is what the switch shows.
+  // ─── Education: load ────────────────────────────────────────────────────────
+  //
+  // RLS does the scoping (student_education owner read, USING user_id = auth.uid()), so
+  // the .eq() here is belt-and-braces rather than the boundary. Ordered nulls-first so the
+  // open enrolment leads; splitEnrolments() still derives which one that is.
+  async function loadEnrolments() {
+    const { data, error } = await supabase
+      .from('student_education')
+      .select(EDUCATION_SELECT)
+      .eq('user_id', session.user.id)
+      .order('study_end_year', { ascending: false, nullsFirst: true })
+    if (error) { setEnrolments([]); setEduError('eduLoadError'); return }
+    setEnrolments(data ?? [])
+    // The switch reflects the ROWS, because that is what it writes. It is not the same
+    // question as canSee — a listed enrolment with no display_name still cannot see lists.
+    setListingOn((data ?? []).some(r => r.listing_opt_in))
+  }
+
+  // Asked of the database, never derived here. can_see_student_lists() requires an
+  // opted-in enrolment AND a display name AND no UGC ban, and only it knows all three.
+  async function refreshCanSee() {
+    const { data, error } = await supabase.rpc('can_see_student_lists')
+    setCanSee(error ? null : data === true)
+  }
+
+  // ─── Education: the single opt-in switch ───────────────────────────────────
+  //
+  // ► THE SCHEMA KEEPS OPT-IN PER ROW; THE UI IS ONE SWITCH. On writes true to every
+  //   enrolment, off writes false to every enrolment. So somebody cannot yet be listed at
+  //   their current university but not their old one — the schema can express that, this
+  //   UI will not, and that direction is deliberate: a schema more capable than its UI
+  //   gains the granularity later with no migration, the reverse needs one.
+  //
+  // mirror_owned goes to false in the same write, per the rule that every row this app
+  // touches becomes app-owned — otherwise 20261026's transition trigger is still entitled
+  // to unlist it behind the user's back.
   async function toggleListing(next) {
-    if (listingBusy) return
+    if (listingBusy || !enrolments?.length) return
     setListingBusy(true)
     setListingOn(next)
-    const { data, error } = await supabase.from('profiles')
-      .update({ student_listing_opt_in: next })
-      .eq('id', session.user.id)
-      .select('student_listing_opt_in')
-      .single()
-    setListingOn(error ? !next : data?.student_listing_opt_in === true)
+    const { error } = await supabase
+      .from('student_education')
+      .update({ listing_opt_in: next, mirror_owned: false })
+      .eq('user_id', session.user.id)
+    if (error) setListingOn(!next)
+    await loadEnrolments()
+    await refreshCanSee()
     setListingBusy(false)
+  }
+
+  // A database refusal → an i18n key. Never a raw message: a constraint name on screen is
+  // not copy, and every one of these is a rule the form already checked, reaching here only
+  // because two clients raced or the form's mirror of a CHECK drifted from the CHECK.
+  function eduErrorKey(error) {
+    const msg = error?.message ?? ''
+    if (msg.includes(STUDY_END_YEAR_IN_FUTURE)) return 'eduErrEndFuture'
+    if (error?.code === '23505') return 'eduErrDuplicate'
+    if (error?.code === '23514') return 'eduErrRejected'
+    return 'eduSaveFailed'
+  }
+
+  // ─── Education: add or edit ────────────────────────────────────────────────
+  //
+  // ► THE TWO-REQUEST WRITE, AND WHY IT IS NOT ONE.
+  //   student_education_one_open_per_user is a partial unique index over (user_id) WHERE
+  //   study_end_year IS NULL, so a second OPEN enrolment cannot exist. Starting somewhere
+  //   new therefore means closing the current one with a graduation year FIRST, then
+  //   inserting — and 20261026 says so in its own header: "adding a second university
+  //   forces the user to close the first one with a graduation year… in the same write".
+  //
+  //   It is NOT the same write. There is no write RPC for this table (slice 6 added ten
+  //   functions, none of them for education), PostgREST sends these as two requests, and a
+  //   bulk upsert cannot mix an UPDATE of a known id with an INSERT of a new one without
+  //   the client minting a uuid. So the ordering is chosen for its failure mode rather
+  //   than its elegance: close, then insert. If the insert fails the user is left with
+  //   their previous university CLOSED and no current one — visible on screen, fixable by
+  //   adding again, and stated in eduErrHalfClosed rather than left to be noticed.
+  //   The reverse order cannot even be attempted: the index rejects the second open row.
+  async function saveEnrolment() {
+    if (eduBusy || !draft) return
+    const ceiling = studyYearCeiling()
+    const key = enrolmentError(draft, { yearCeiling: ceiling, minYear: STUDY_YEAR_MIN })
+    if (key) { setEduError(key); return }
+    // Routed to an edit rather than an insert: UNIQUE (user_id, institution_id, level)
+    // makes the same degree at the same place impossible, and a raw insert would 23505.
+    if (findSameEnrolment(enrolments ?? [], draft, draft.id)) { setEduError('eduErrDuplicate'); return }
+
+    const { current } = splitEnrolments(enrolments ?? [])
+    const mustClose = draft.endYear == null && current && current.id !== draft.id
+    if (mustClose && draft.closeYear == null) { setEduError('eduErrCloseCurrent'); return }
+    if (mustClose && current.study_start_year != null && draft.closeYear < current.study_start_year) {
+      setEduError('eduErrYearsOrder'); return
+    }
+    if (mustClose && draft.closeYear > ceiling) { setEduError('eduErrEndFuture'); return }
+
+    setEduBusy(true); setEduError(null)
+    if (mustClose) {
+      const { error } = await supabase.from('student_education')
+        .update({ study_end_year: draft.closeYear, mirror_owned: false })
+        .eq('id', current.id)
+      if (error) { setEduError(eduErrorKey(error)); setEduBusy(false); return }
+    }
+    const row = enrolmentRow(draft, { userId: session.user.id, listingOptIn: listingOn })
+    const { error } = draft.id
+      ? await supabase.from('student_education').update(row).eq('id', draft.id)
+      : await supabase.from('student_education').insert(row)
+    if (error) {
+      // The window above landed and this did not. Say so plainly — the user's history now
+      // reads differently from what they intended and no other screen will mention it.
+      setEduError(mustClose ? 'eduErrHalfClosed' : eduErrorKey(error))
+      await loadEnrolments()
+      setEduBusy(false)
+      return
+    }
+    setDraft(null)
+    await loadEnrolments()
+    await refreshCanSee()
+    setEduBusy(false)
+  }
+
+  // ─── Education: remove ─────────────────────────────────────────────────────
+  //
+  // Confirmation copy is chosen in the RENDER, not here, because what removal costs
+  // depends on whether this is the last LISTED enrolment: is_listed_student() is what
+  // start_conversation and send_message consult, and losing the last opted-in row makes
+  // send_message raise CONVERSATION_CLOSED for everyone already talking to this person.
+  async function removeEnrolment(row) {
+    if (eduBusy) return
+    setEduBusy(true); setEduError(null)
+    const { error } = await supabase.from('student_education').delete().eq('id', row.id)
+    if (error) setEduError('eduRemoveFailed')
+    setRemoving(null)
+    await loadEnrolments()
+    await refreshCanSee()
+    setEduBusy(false)
   }
 
   async function savePresetAvatar(id) {
@@ -357,24 +550,33 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     // display_name only when NEW IS DISTINCT FROM OLD, and 20261001's header explains at
     // length why that guard exists. This mirrors it rather than re-inventing the trap it
     // was written to close.
-    // A past university is ONE atomic fact: the third arm of
-    // profiles_institution_coupling_check needs study_end_year beside institution_id,
-    // profiles_study_fields_require_institution_check needs the reverse, and
-    // profiles_study_years_order_check needs a start year under any end year. Anything less
-    // than all three would be silently dropped by affiliationPatch, so it is stopped here.
-    if (pastUniPartial) { setError(t('pgPastUniIncomplete', lang)); return }
     const nameChanged = form.display_name.trim() !== (savedForm?.display_name ?? '').trim()
     if (nameChanged && form.display_name.trim() && nameState &&
         !['available', 'checking'].includes(nameState.status)) return
 
     setSaving(true)
-    // The listing opt-in is omitted: it has its own immediate write. It is sent (false) only
-    // when the institution goes, which is when the CHECK demands it.
-    const aff = affiliationPatch({
-      status: form.resident_status, level: form.student_level, institutionId: form.institution_id,
-      startYear: form.study_start_year, endYear: form.study_end_year, subjectId: form.subject_id,
-    })
-    const { error: err } = await supabase
+    // ─── THE FIVE AFFILIATION COLUMNS ARE NOT IN THIS PATCH ───────────────────
+    //
+    // affiliationPatch() used to spread institution_id, study_start_year, study_end_year,
+    // subject_id and student_listing_opt_in into every save. It is gone from this screen.
+    // The affiliation lives in student_education, and naming a column 20261027 drops would
+    // 42703 every profile save the moment it runs.
+    //
+    // student_level STAYS — it is not one of the five, it covers high_school /
+    // language_course / vocational which have no institution, and
+    // profiles_student_level_coupling_check still requires it to be NULL for anyone whose
+    // resident_status is not 'student'. That single rule is the whole reason the recovery
+    // path below has to exist.
+    // ► THE PAYLOAD STAYS INLINE IN .update({ … }) ON PURPOSE.
+    //   scripts/check-profile-gate.mjs parses .update() payload LITERALS and asserts
+    //   full_name is never among them — full_name is derived by check_profile_name_content()
+    //   and writing it would fight the trigger. Its control is that first_name and
+    //   display_name ARE present, so that an absence check cannot pass on a parse that
+    //   found nothing. Hoisting this into `const patch = {…}` defeated that parse and the
+    //   guard said so, correctly: the columns were still written, but nothing could verify
+    //   it any more. A thunk keeps the literal where the guard can see it AND lets the
+    //   recovery path below re-send it without a second copy to drift.
+    const writeProfile = () => supabase
       .from('profiles')
       .update({
         first_name: form.first_name.trim() || null,
@@ -386,16 +588,51 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
         nationality_code: NATIONALITY_CODES[form.nationality] ?? null,
         region: form.region,
         resident_status: form.resident_status,
-        // The coupling CHECKs reject a student_level without a student status and an
-        // institution without a university-level one OR an end year, and every study field
-        // without an institution — so the clears must ride in the SAME patch as the change
-        // that causes them. Two sequential writes fail on the first. See affiliationPatch.
-        ...aff,
+        // profiles_student_level_coupling_check: a level without student status is a 23514,
+        // so this must go NULL in the same write that moves resident_status away.
+        student_level: form.resident_status === 'student' ? form.student_level : null,
         preferred_language: form.preferred_language,
         // full_name is DERIVED by check_profile_name_content() from the two fields above.
         // resident_status_updated_at is stamped by the same trigger. Neither is sent.
       })
       .eq('id', session.user.id)
+
+    let { error: err } = await writeProfile()
+
+    // ─── CLAIM, CLEAR, THEN RETRY. The only path that names the five, and it ─────
+    // ─── cannot run once they are gone. ─────────────────────────────────────────
+    //
+    // Two CHECKs pull against each other for exactly one person: someone whose profiles row
+    // still carries a stale institution with NO end year, moving their status away from
+    // 'student'. The write above must null student_level (profiles_student_level_coupling_check),
+    // and profiles_institution_coupling_check then rejects the stale institution, because
+    // its third arm — a graduation year — is the only thing that would have saved it and a
+    // CURRENT student has none. Graduates and already-clear rows never reach here.
+    //
+    // ► THE ORDER IS THE SAFETY PROPERTY, NOT A PREFERENCE.
+    //   1. CLAIM every enrolment row. 20261026's unlist branch is
+    //      `UPDATE student_education SET listing_opt_in = false WHERE user_id = NEW.id AND
+    //      mirror_owned`, so nulling institution_id silently de-lists every row the
+    //      transition trigger still owns — the person drops off the student list and is
+    //      told nothing. Claiming first makes that branch a no-op. One statement, so it
+    //      lands for all of the user's rows or none.
+    //   2. CLEAR the five ALONE. Legal on its own: institution_id IS NULL satisfies the
+    //      coupling check outright, the study fields go with it, and student_level is
+    //      untouched at this point so its own coupling still holds.
+    //   3. RETRY the same write, which now passes because the stale institution is gone.
+    //
+    // Detected from the REFUSAL, never predicted from a read: reading those columns to
+    // decide in advance would 42703 after 20261027, and this build is what is installed
+    // then. Once they are dropped the CHECK goes with them, step 1 never runs, and the
+    // only statement that names them is unreachable.
+    if (isInstitutionCouplingBlock(err)) {
+      await supabase.from('student_education')
+        .update({ mirror_owned: false }).eq('user_id', session.user.id)
+      await supabase.from('profiles')
+        .update(profilesAffiliationClear()).eq('id', session.user.id)
+      ;({ error: err } = await writeProfile())
+      await loadEnrolments()
+    }
     if (err) {
       const nameErr = await displayNameSaveError(err, form.display_name.trim())
       if (nameErr) setNameState(nameErr)
@@ -403,15 +640,9 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
       else if (err.message?.includes(STUDY_END_YEAR_IN_FUTURE)) setError(t('pgStudyEndFuture', lang))
       else setError(err.message)
     } else {
-      // The form is brought to what was WRITTEN: an institution the patch cleared must not
-      // linger in state, or the next save would not know it had already gone.
-      const written = {
-        ...form,
-        student_level: aff.student_level,
-        institution_id: aff.institution_id,
-        ...(aff.institution_id == null ? { study_start_year: null, study_end_year: null, subject_id: null } : {}),
-      }
-      if (aff.institution_id == null) { setListingOn(false); setAddingPastUni(false) }
+      // The form is brought to what was WRITTEN. Only student_level can differ from what
+      // the user typed, and only in the one direction the coupling CHECK forces.
+      const written = { ...form, student_level: form.resident_status === 'student' ? form.student_level : null }
       setForm(written)
       setSaved(true)
       setSavedForm(written)
@@ -458,8 +689,19 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     !form.first_name.trim() || !form.last_name.trim() || !form.display_name.trim() ||
     !form.dobY || !form.dobM || !form.dobD || !form.region || !form.resident_status ||
     !form.nationality.trim() ||
-    (form.resident_status === 'student' && !form.student_level) ||
-    (INSTITUTION_REQUIRED_LEVELS.includes(studentLevel) && !form.institution_id)
+    (form.resident_status === 'student' && !form.student_level)
+  // ► THE INSTITUTION CLAUSE IS GONE, and it had to go in the same change as the editor.
+  //   It read `INSTITUTION_REQUIRED_LEVELS.includes(studentLevel) && !form.institution_id`
+  //   — the client's copy of profiles_completion_requires_fields_check's last arm.
+  //   20261030 removed that arm, because the fact it guarded now lives in
+  //   student_education and a CHECK cannot see across tables. Keeping it here would leave
+  //   Save permanently disabled for a university student, since nothing writes
+  //   profiles.institution_id any more and the form no longer holds it.
+  //
+  //   What is given up is stated plainly in 20261030: nothing in the DATABASE now stops a
+  //   completed profile claiming university-level student status with no enrolment. This
+  //   screen is the only thing that ever asks, and it asks by showing the education
+  //   section rather than by blocking Save — an incomplete profile is not a corrupt one.
 
   const initials = (form.first_name.trim() || form.last_name.trim())
     ? [form.first_name.trim()[0], form.last_name.trim()[0]].filter(Boolean).join('').toUpperCase()
@@ -494,23 +736,35 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   //     ask a non-student about university.
   // A uni student who changes status keeps their institution in the form, so it reappears
   // here as a past university to complete or remove — never silently dropped on Save.
-  const isUniStudent = INSTITUTION_REQUIRED_LEVELS.includes(studentLevel)
-  const showStudy = MODULE_FLAGS.studentHub && isUniStudent && form.institution_id != null
-  const showPastUni = MODULE_FLAGS.studentHub && !isUniStudent && (form.institution_id != null || addingPastUni)
-  const pastUniEmpty = form.institution_id == null && form.study_start_year == null &&
-    form.study_end_year == null && form.subject_id == null
-  const pastUniComplete = form.institution_id != null && form.study_start_year != null && form.study_end_year != null
-  const pastUniPartial = showPastUni && !pastUniEmpty && !pastUniComplete
+  // ─── Education, derived ────────────────────────────────────────────────────
+  //
+  // "Currently studying" holds AT MOST ONE row, and that is not a UI convention:
+  // student_education_one_open_per_user is a partial unique index over (user_id) WHERE
+  // study_end_year IS NULL. The section mirrors the constraint rather than inventing its
+  // own rule, which is why `current` is a single row and not a list.
+  //
+  // The old shape — one institution on `profiles`, shown as "current studies" for a
+  // university student and "past university" for everyone else — is gone. An enrolment is
+  // no longer a property of the person's CURRENT status: a graduate who now works keeps
+  // their degrees, and a working person can add one. So this section is shown to every
+  // completed profile, not only to students.
+  const { current: currentEnrol, past: pastEnrol } = splitEnrolments(enrolments ?? [])
+  const showEducation = MODULE_FLAGS.studentHub && isComplete
+  // Adding a new CURRENT enrolment while one is open requires closing that one in the same
+  // form — the index leaves no other order. See saveEnrolment.
+  const draftNeedsClose = draft != null && draft.endYear == null &&
+    currentEnrol != null && currentEnrol.id !== draft.id
+  const listedCount = (enrolments ?? []).filter(r => r.listing_opt_in).length
   const studyYearMax = studyYearCeiling()
   const subjectOpts = [{ value: null, label: '—' }, ...subjectOptions(subjects, lang)]
   // A student may clear either year; a past university may not, so its lists carry no blank.
   const startYearOptions = [
-    ...(isUniStudent ? [{ value: null, label: '—' }] : []),
+    ...[{ value: null, label: '—' }],
     ...studyYearOptions(studyYearMax, STUDY_YEAR_MIN),
   ]
   const endYearOptions = [
-    ...(isUniStudent ? [{ value: null, label: t('pgStillStudying', lang) }] : []),
-    ...studyYearOptions(studyYearMax, form.study_start_year ?? STUDY_YEAR_MIN),
+    ...[{ value: null, label: t('pgStillStudying', lang) }],
+    ...studyYearOptions(studyYearMax, draft?.startYear ?? STUDY_YEAR_MIN),
   ]
 
   if (loading) {
@@ -759,116 +1013,158 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 </View>
               )}
 
-              {isUniStudent && (
-                <View style={s.fieldGroup}>
-                  <Text style={s.fieldLabel}>{t('pgInstitution', lang)}</Text>
-                  <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('inst')} activeOpacity={0.7}>
-                    <Text style={[s.pickerBtnText, !form.institution_id && s.pickerBtnPlaceholder]}>
-                      {instOptions.find(o => o.value === form.institution_id)?.label || t('pgInstitutionSearch', lang)}
-                    </Text>
-                    <Feather name="chevron-down" size={16} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-              )}
+              {showEducation && (
+                <View style={s.eduSection}>
+                  {/* ─── CURRENTLY STUDYING — at most one, and the DATABASE says so ───
+                      student_education_one_open_per_user is a partial unique index over
+                      (user_id) WHERE study_end_year IS NULL. This renders one row or none
+                      because a second is impossible, not because the design prefers it. */}
+                  <Text style={s.eduGroupLabel}>{t('eduCurrentTitle', lang)}</Text>
+                  {enrolments === null ? (
+                    <ActivityIndicator color={colors.primary} style={s.eduLoading} />
+                  ) : currentEnrol ? (
+                    <EnrolmentRow
+                      row={currentEnrol} lang={lang} institutions={institutions} subjects={subjects}
+                      onEdit={() => { setEduError(null); setDraft(draftFromRow(currentEnrol)) }}
+                      onRemove={() => { setEduError(null); setRemoving(currentEnrol) }}
+                      disabled={eduBusy || draft != null}
+                    />
+                  ) : (
+                    <Text style={s.eduEmpty}>{t('eduNoCurrent', lang)}</Text>
+                  )}
 
-              {showStudy && (
-                <>
-                  <View style={s.fieldGroup}>
-                    <Text style={s.fieldLabel}>{t('pgSubject', lang)}</Text>
-                    <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('subject')} activeOpacity={0.7}>
-                      <Text style={[s.pickerBtnText, !form.subject_id && s.pickerBtnPlaceholder]} numberOfLines={1}>
-                        {subjectOpts.find(o => o.value === form.subject_id && o.value)?.label || t('pgSubjectSearch', lang)}
+                  <Text style={[s.eduGroupLabel, s.eduGroupLabelSpaced]}>{t('eduPastTitle', lang)}</Text>
+                  {enrolments !== null && pastEnrol.length === 0 && (
+                    <Text style={s.eduEmpty}>{t('eduNoPast', lang)}</Text>
+                  )}
+                  {pastEnrol.map(row => (
+                    <EnrolmentRow
+                      key={row.id} row={row} lang={lang} institutions={institutions} subjects={subjects}
+                      onEdit={() => { setEduError(null); setDraft(draftFromRow(row)) }}
+                      onRemove={() => { setEduError(null); setRemoving(row) }}
+                      disabled={eduBusy || draft != null}
+                    />
+                  ))}
+
+                  {/* ─── REMOVE, WITH THE COST STATED BEFORE THE TAP ───────────────
+                      Removing the last LISTED enrolment is not a tidy-up: is_listed_student()
+                      is what start_conversation and send_message consult, so the threads
+                      this person is already in stop accepting messages. They stay readable.
+                      That has to be on screen before the confirm, not discovered after. */}
+                  {removing && (
+                    <View style={s.eduConfirm}>
+                      <Text style={s.eduConfirmText}>
+                        {removing.listing_opt_in && listedCount === 1
+                          ? t('eduRemoveWarnLastListed', lang)
+                          : t('eduRemoveWarn', lang)}
                       </Text>
-                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={s.fieldGroup}>
-                    <Text style={s.fieldLabel}>{t('pgStudyStart', lang)}</Text>
-                    <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('startYear')} activeOpacity={0.7}>
-                      <Text style={[s.pickerBtnText, !form.study_start_year && s.pickerBtnPlaceholder]}>
-                        {form.study_start_year ? String(form.study_start_year) : '—'}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={s.fieldGroup}>
-                    <Text style={s.fieldLabel}>{t('pgStudyEnd', lang)}</Text>
+                      <View style={s.eduConfirmRow}>
+                        <TouchableOpacity style={s.eduCancelBtn} onPress={() => setRemoving(null)} disabled={eduBusy}>
+                          <Text style={s.eduCancelText}>{t('cancel', lang)}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={s.eduRemoveBtn} onPress={() => removeEnrolment(removing)} disabled={eduBusy}>
+                          <Text style={s.eduRemoveText}>{t('eduRemoveConfirm', lang)}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {!draft && !removing && (
                     <TouchableOpacity
-                      style={[s.pickerBtn, !form.study_start_year && { opacity: 0.45 }]}
-                      onPress={() => setPicker('endYear')}
-                      disabled={!form.study_start_year}
+                      style={s.eduAddBtn}
+                      onPress={() => { setEduError(null); setDraft({ level: 'university', startYear: null, endYear: null, subjectId: null, institutionId: null }) }}
                       activeOpacity={0.7}
                     >
-                      <Text style={s.pickerBtnText}>
-                        {form.study_end_year ? String(form.study_end_year) : t('pgStillStudying', lang)}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                      <Feather name="plus" size={16} color={colors.primary} />
+                      <Text style={s.eduAddText}>{t('eduAdd', lang)}</Text>
                     </TouchableOpacity>
-                  </View>
-                </>
-              )}
+                  )}
 
-              {MODULE_FLAGS.studentHub && !isUniStudent && !showPastUni && (
-                <TouchableOpacity style={s.pastUniAdd} onPress={() => setAddingPastUni(true)} activeOpacity={0.7}>
-                  <Feather name="plus" size={16} color={colors.primary} />
-                  <Text style={s.pastUniAddText}>{t('pgAddPastUniversity', lang)}</Text>
-                </TouchableOpacity>
-              )}
+                  {draft && (
+                    <View style={s.eduDraft}>
+                      <View style={s.fieldGroup}>
+                        <Text style={s.fieldLabel}>{t('pgInstitution', lang)}</Text>
+                        <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('inst')} activeOpacity={0.7}>
+                          <Text style={[s.pickerBtnText, !draft.institutionId && s.pickerBtnPlaceholder]} numberOfLines={1}>
+                            {instOptions.find(o => o.value === draft.institutionId)?.label || t('pgInstitutionSearch', lang)}
+                          </Text>
+                          <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={s.fieldGroup}>
+                        <Text style={s.fieldLabel}>{t('pgStudentLevel', lang)}</Text>
+                        <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('eduLevel')} activeOpacity={0.7}>
+                          <Text style={s.pickerBtnText}>{t(STUDENT_LEVEL_LABEL_KEY[draft.level], lang)}</Text>
+                          <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={s.fieldGroup}>
+                        <Text style={s.fieldLabel}>{t('pgStudyStart', lang)}</Text>
+                        <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('startYear')} activeOpacity={0.7}>
+                          <Text style={[s.pickerBtnText, !draft.startYear && s.pickerBtnPlaceholder]}>
+                            {draft.startYear ? String(draft.startYear) : '—'}
+                          </Text>
+                          <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                      {/* study_end_year IS NULL is the whole definition of "current", so this
+                          one field is what decides which section the row lands in. The picker
+                          is disabled without a start year because
+                          student_education_years_order_check requires one under any end. */}
+                      <View style={s.fieldGroup}>
+                        <Text style={s.fieldLabel}>{t('pgStudyEnd', lang)}</Text>
+                        <TouchableOpacity
+                          style={[s.pickerBtn, !draft.startYear && { opacity: 0.45 }]}
+                          onPress={() => setPicker('endYear')} disabled={!draft.startYear} activeOpacity={0.7}
+                        >
+                          <Text style={s.pickerBtnText}>
+                            {draft.endYear ? String(draft.endYear) : t('pgStillStudying', lang)}
+                          </Text>
+                          <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={s.fieldGroup}>
+                        <Text style={s.fieldLabel}>{t('pgPastSubject', lang)}</Text>
+                        <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('subject')} activeOpacity={0.7}>
+                          <Text style={[s.pickerBtnText, !draft.subjectId && s.pickerBtnPlaceholder]} numberOfLines={1}>
+                            {subjectOpts.find(o => o.value === draft.subjectId && o.value)?.label || t('pgSubjectSearch', lang)}
+                          </Text>
+                          <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
 
-              {showPastUni && (
-                <View style={s.pastUniSection}>
-                  <Text style={s.sectionTitle}>{t('pgPastUniversity', lang)}</Text>
-                  <View style={s.fieldGroup}>
-                    <Text style={s.fieldLabel}>{t('pgPastUniInstitution', lang)}</Text>
-                    <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('pastInst')} activeOpacity={0.7}>
-                      <Text style={[s.pickerBtnText, !form.institution_id && s.pickerBtnPlaceholder]} numberOfLines={1}>
-                        {instOptions.find(o => o.value === form.institution_id)?.label || t('pgInstitutionSearch', lang)}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={s.fieldGroup}>
-                    <Text style={s.fieldLabel}>{t('pgStudyStart', lang)}</Text>
-                    <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('startYear')} activeOpacity={0.7}>
-                      <Text style={[s.pickerBtnText, !form.study_start_year && s.pickerBtnPlaceholder]}>
-                        {form.study_start_year ? String(form.study_start_year) : '—'}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={s.fieldGroup}>
-                    <Text style={s.fieldLabel}>{t('pgStudyEnd', lang)}</Text>
-                    <TouchableOpacity
-                      style={[s.pickerBtn, !form.study_start_year && { opacity: 0.45 }]}
-                      onPress={() => setPicker('endYear')}
-                      disabled={!form.study_start_year}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[s.pickerBtnText, !form.study_end_year && s.pickerBtnPlaceholder]}>
-                        {form.study_end_year ? String(form.study_end_year) : '—'}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={s.fieldGroup}>
-                    <Text style={s.fieldLabel}>{t('pgPastSubject', lang)}</Text>
-                    <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('subject')} activeOpacity={0.7}>
-                      <Text style={[s.pickerBtnText, !form.subject_id && s.pickerBtnPlaceholder]} numberOfLines={1}>
-                        {subjectOpts.find(o => o.value === form.subject_id && o.value)?.label || t('pgSubjectSearch', lang)}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                  {pastUniPartial && error !== t('pgPastUniIncomplete', lang) && <Text style={s.fieldHint}>{t('pgPastUniIncomplete', lang)}</Text>}
-                  <TouchableOpacity
-                    style={s.pastUniRemove}
-                    onPress={() => {
-                      setForm(f => ({ ...f, institution_id: null, study_start_year: null, study_end_year: null, subject_id: null }))
-                      setAddingPastUni(false)
-                    }}
-                  >
-                    <Text style={s.pastUniRemoveText}>{t('pgRemovePastUniversity', lang)}</Text>
-                  </TouchableOpacity>
+                      {/* ► THE INDEX LEAVES NO OTHER ORDER. Starting somewhere new while an
+                          enrolment is still open means closing that one first, so the year
+                          is collected HERE rather than discovered as a failed write. */}
+                      {draftNeedsClose && (
+                        <View style={s.fieldGroup}>
+                          <Text style={s.fieldLabel}>
+                            {t('eduCloseCurrentLabel', lang).replace('{uni}',
+                              instOptions.find(o => o.value === currentEnrol.institution_id)?.label ?? '')}
+                          </Text>
+                          <TouchableOpacity style={s.pickerBtn} onPress={() => setPicker('closeYear')} activeOpacity={0.7}>
+                            <Text style={[s.pickerBtnText, !draft.closeYear && s.pickerBtnPlaceholder]}>
+                              {draft.closeYear ? String(draft.closeYear) : '—'}
+                            </Text>
+                            <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+                          </TouchableOpacity>
+                          <Text style={s.fieldHint}>{t('eduCloseCurrentHint', lang)}</Text>
+                        </View>
+                      )}
+
+                      <View style={s.eduConfirmRow}>
+                        <TouchableOpacity style={s.eduCancelBtn} onPress={() => { setDraft(null); setEduError(null) }} disabled={eduBusy}>
+                          <Text style={s.eduCancelText}>{t('cancel', lang)}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={s.eduSaveBtn} onPress={saveEnrolment} disabled={eduBusy}>
+                          {eduBusy ? <ActivityIndicator color={colors.surface} />
+                                   : <Text style={s.eduSaveText}>{t('eduSave', lang)}</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {eduError && <Text style={s.errorText}>{t(eduError, lang)}</Text>}
                 </View>
               )}
 
@@ -884,14 +1180,24 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 <Switch
                   value={listingOn}
                   onValueChange={toggleListing}
-                  disabled={listingBusy || !savedForm?.institution_id}
+                  // Nothing to write to until an enrolment exists — the opt-in is a column
+                  // on student_education, one per row, not a property of the person.
+                  disabled={listingBusy || !enrolments?.length}
                   trackColor={{ true: colors.primary }}
                   thumbColor="#fff"
                 />
               </View>
-              {!savedForm?.institution_id && (
-                <Text style={s.fieldHint}>{t('pgListingNeedsInstitution', lang)}</Text>
-              )}
+              {/* ► "NO ENROLMENTS" AND "OPT-IN OFF" ARE THE SAME STATE TO THE DATABASE.
+                  can_see_student_lists() requires at least one row with listing_opt_in, so
+                  a person with no enrolments and a person with the switch off are equally
+                  locked out — and telling them apart on screen would be inventing a
+                  distinction the gate does not make. The hint explains what to DO, which is
+                  the only part that actually differs. */}
+              {!enrolments?.length ? (
+                <Text style={s.fieldHint}>{t('eduListingNeedsEnrolment', lang)}</Text>
+              ) : !listingOn ? (
+                <Text style={s.fieldHint}>{t('eduListingOffHint', lang)}</Text>
+              ) : null}
             </View>
           )}
 
@@ -980,8 +1286,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               over the same vocabularies; a second implementation on the screen that edits
               the same columns is the drift class this repo keeps paying for. Selecting a
               resident status other than 'student' clears the level in the SAME setForm
-              call. The institution stays in state; affiliationPatch() clears it (and the
-              study fields) in the save patch when no level or end year keeps it. */}
+              call. Education has its own pickers further down, writing to the DRAFT — the
+              institution is no longer a field on this form at all. */}
           <SearchModal visible={picker === 'day'} title={t('pgDay', lang)} options={dayOptions}
             value={form.dobD} onSelect={v => { set('dobD')(v); setPicker(null) }} onClose={() => setPicker(null)} />
           <SearchModal visible={picker === 'month'} title={t('pgMonth', lang)} options={monthOptions}
@@ -1003,7 +1309,8 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 ...f,
                 resident_status: v,
                 student_level: v === 'student' ? f.student_level : null,
-                // institution_id is KEPT: affiliationPatch decides at save, because a
+                // The institution is not touched here: it lives on the enrolment rows, and
+                // changing status no longer implies anything about where somebody studied.
                 // graduate's end year keeps it through a status change.
               }))
               setPicker(null)
@@ -1016,29 +1323,46 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               setPicker(null)
             }}
             onClose={() => setPicker(null)} />
+          {/* Every education picker writes to the DRAFT, never to the profile form — the
+              five columns those fields used to feed are not written by this screen any
+              more. `pastInst` is gone with the past-university shape it belonged to. */}
           <SearchModal visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
             searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
-            value={form.institution_id} onSelect={v => { set('institution_id')(v); setPicker(null) }} onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'pastInst'} searchable title={t('pgPastUniInstitution', lang)}
-            searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
-            value={form.institution_id} onSelect={v => { set('institution_id')(v); setPicker(null) }} onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'subject'} searchable title={isUniStudent ? t('pgSubject', lang) : t('pgPastSubject', lang)}
+            value={draft?.institutionId ?? null}
+            onSelect={v => { setDraft(d => ({ ...d, institutionId: v })); setPicker(null) }}
+            onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'eduLevel'} title={t('pgStudentLevel', lang)}
+            options={levelOptions.filter(o => LEVELS.includes(o.value))}
+            value={draft?.level ?? null}
+            onSelect={v => { setDraft(d => ({ ...d, level: v })); setPicker(null) }}
+            onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'subject'} searchable title={t('pgSubject', lang)}
             searchPlaceholder={t('pgSubjectSearch', lang)} options={subjectOpts}
-            value={form.subject_id} onSelect={v => { set('subject_id')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+            value={draft?.subjectId ?? null}
+            onSelect={v => { setDraft(d => ({ ...d, subjectId: v })); setPicker(null) }}
+            onClose={() => setPicker(null)} />
           <SearchModal visible={picker === 'startYear'} title={t('pgStudyStart', lang)} options={startYearOptions}
-            value={form.study_start_year}
+            value={draft?.startYear ?? null}
             onSelect={v => {
-              // profiles_study_years_order_check: no end without a start, no end before it.
-              setForm(f => ({
-                ...f,
-                study_start_year: v,
-                study_end_year: v == null || (f.study_end_year != null && f.study_end_year < v) ? null : f.study_end_year,
+              // student_education_years_order_check: no end without a start, and no end
+              // before it. Clearing the end year here rather than letting the write fail.
+              setDraft(d => ({
+                ...d,
+                startYear: v,
+                endYear: v == null || (d.endYear != null && d.endYear < v) ? null : d.endYear,
               }))
               setPicker(null)
             }}
             onClose={() => setPicker(null)} />
           <SearchModal visible={picker === 'endYear'} title={t('pgStudyEnd', lang)} options={endYearOptions}
-            value={form.study_end_year} onSelect={v => { set('study_end_year')(v); setPicker(null) }} onClose={() => setPicker(null)} />
+            value={draft?.endYear ?? null}
+            onSelect={v => { setDraft(d => ({ ...d, endYear: v })); setPicker(null) }}
+            onClose={() => setPicker(null)} />
+          <SearchModal visible={picker === 'closeYear'} title={t('pgStudyEnd', lang)}
+            options={studyYearOptions(studyYearMax, currentEnrol?.study_start_year ?? STUDY_YEAR_MIN)}
+            value={draft?.closeYear ?? null}
+            onSelect={v => { setDraft(d => ({ ...d, closeYear: v })); setPicker(null) }}
+            onClose={() => setPicker(null)} />
         </ScrollView>
 
         {/* ► THE PRIMARY ACTION IS A FULL-WIDTH BUTTON AT THE BOTTOM, as it is everywhere
@@ -1164,10 +1488,38 @@ const s = StyleSheet.create({
   presetCheck:      { position: 'absolute', bottom: -2, right: -2, backgroundColor: colors.bg, borderRadius: 10 },
 
   // Past university
-  pastUniAdd:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, marginBottom: 8 },
-  pastUniAddText:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
-  pastUniSection:   { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, marginTop: 4, marginBottom: 8 },
-  pastUniRemove:    { alignSelf: 'flex-start', paddingVertical: 8 },
-  pastUniRemoveText:{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.danger, textDecorationLine: 'underline' },
+
+  // ─── Education ─────────────────────────────────────────────────────────────
+  eduSection:        { marginTop: 4 },
+  eduGroupLabel:     { fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+                       textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  eduGroupLabelSpaced: { marginTop: 20 },
+  eduLoading:        { alignSelf: 'flex-start', marginBottom: 8 },
+  eduEmpty:          { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: 4 },
+  eduRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10,
+                       borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  eduRowBody:        { flex: 1, gap: 2 },
+  eduRowTitle:       { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  eduRowMeta:        { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
+  eduRowAction:      { padding: 8 },
+  eduAddBtn:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
+                       borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.primary,
+                       paddingVertical: 10, justifyContent: 'center' },
+  eduAddText:        { fontSize: 14, fontWeight: '700', color: colors.primary },
+  eduDraft:          { marginTop: 12, paddingTop: 12,
+                       borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  eduConfirm:        { marginTop: 12, padding: 12, borderRadius: radius.md, backgroundColor: colors.cardBg,
+                       borderWidth: 1, borderColor: colors.border },
+  eduConfirmText:    { fontSize: 13, color: colors.textPrimary, lineHeight: 19, marginBottom: 12 },
+  eduConfirmRow:     { flexDirection: 'row', gap: 10, marginTop: 4 },
+  eduCancelBtn:      { flex: 1, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border,
+                       paddingVertical: 11, alignItems: 'center' },
+  eduCancelText:     { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
+  eduRemoveBtn:      { flex: 1, borderRadius: radius.md, backgroundColor: colors.danger ?? '#C2410C',
+                       paddingVertical: 11, alignItems: 'center' },
+  eduRemoveText:     { fontSize: 14, fontWeight: '700', color: '#fff' },
+  eduSaveBtn:        { flex: 1, borderRadius: radius.md, backgroundColor: colors.primary,
+                       paddingVertical: 11, alignItems: 'center' },
+  eduSaveText:       { fontSize: 14, fontWeight: '700', color: colors.surface },
 
 })
