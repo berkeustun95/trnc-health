@@ -2657,6 +2657,14 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_constraint c
         WHERE c.conname='profiles_completion_requires_fields_check'
           AND pg_get_constraintdef(c.oid) NOT ILIKE '%institution_id%'
+          -- phone's ABSENCE, and this half is the older debt. It was removed from the live
+          -- constraint BY HAND on or before 2026-09-12 (the DB half of 721c0d3, which says
+          -- so in its own message), and the recording migration + H token that commit and
+          -- 2026-09-12_phone-optional.md both named as the follow-up were never written.
+          -- For six days the repo said the constraint required phone and prod did not, and
+          -- nothing in this report could tell the difference — section E checks the NAME.
+          -- This is that follow-up.
+          AND pg_get_constraintdef(c.oid) NOT ILIKE '%phone%'
           AND pg_get_constraintdef(c.oid) ILIKE '%first_name%'
           AND pg_get_constraintdef(c.oid) ILIKE '%display_name%'
           AND pg_get_constraintdef(c.oid) ILIKE '%nationality_code%'

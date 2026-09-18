@@ -60,6 +60,39 @@
 -- reachable from it, it will be wrong for these rows, and there will be no error to
 -- notice. Read student_education.
 --
+-- ─── ⚠ WRITTEN AGAINST THE LIVE CONSTRAINT, NOT AGAINST 20261001 ───────────
+--
+-- The first draft of this file carried `phone IS NOT NULL` forward because 20261001:160
+-- has it. PROD DOES NOT. pg_get_constraintdef on 2026-09-18 shows no phone clause:
+--
+--   CHECK (((profile_completed_at IS NULL) OR ((first_name IS NOT NULL) AND (last_name
+--   IS NOT NULL) AND (display_name IS NOT NULL) AND (date_of_birth IS NOT NULL) AND
+--   (region IS NOT NULL) AND (resident_status IS NOT NULL) AND (nationality_code IS NOT
+--   NULL) AND ((resident_status <> 'student'::text) OR (student_level IS NOT NULL)) AND
+--   ((student_level IS NULL) OR (student_level <> ALL (ARRAY['university'::text,
+--   'postgraduate'::text])) OR (institution_id IS NOT NULL)))))
+--
+-- The clause was removed BY HAND on or before 2026-09-12 as the database half of commit
+-- 721c0d3 ("Phone becomes optional"), which says so in its own message: "No migration:
+-- the DB half of the phone change was applied by hand before this commit (see the
+-- follow-up recording it)." That follow-up was never written. 2026-09-12_phone-optional.md
+-- names the exact remedy — "A recording migration + a verify_schema.sql H-token are the
+-- follow-up" — and neither existed until this file.
+--
+-- Carrying phone forward would not have been a harmless copy. It would have ADDED a
+-- requirement, and a plain ADD CONSTRAINT validates existing rows: 3 completed profiles
+-- have no phone (227 of 257 rows have none at all), so the statement would have raised
+-- 23514 and aborted. Nothing would have applied — the BEGIN/COMMIT wrapper is why a wrong
+-- file costs nothing here — but the fix would still have been a second, silent policy
+-- change smuggled into a file about institution_id.
+--
+-- ► SO THIS FILE ALSO DISCHARGES THE 2026-09-12 DEBT, and that is not scope creep:
+--   recording an already-applied hand change is the opposite of a new decision. The end
+--   state below is identical on a prod-shaped database (where phone is already gone) and
+--   on one built from migration files (where it is not), so the two converge. The H token
+--   in verify_schema.sql now asserts phone's ABSENCE, which is the half that makes a
+--   future hand-edit visible.
+--
 -- ─── NO BEHAVIOURAL PROBE IN THIS FILE, DELIBERATELY ────────────────────────
 --
 -- The natural verification is to take a real completed university student, null their
@@ -96,14 +129,23 @@ BEGIN
   IF position('institution_id' in v_def) = 0 THEN
     RAISE NOTICE '20261030: already applied — the constraint no longer references institution_id. Nothing to do.';
   END IF;
+
+  -- PRINT the live definition before touching it. This file exists in the shape it does
+  -- because its first draft was written from 20261001 instead of from here, and the
+  -- difference (a phone clause that prod has not had since 2026-09-12) would have aborted
+  -- the apply. Printing what is actually there costs one line and is the only thing that
+  -- would have caught it without a human noticing.
+  RAISE NOTICE '20261030: live definition BEFORE = %', v_def;
 END $$;
 
 -- ─── 1. The rewrite ─────────────────────────────────────────────────────────
 --
--- Every other arm is carried over VERBATIM from 20261001:152-165. Only the three-line
--- student_level/institution_id arm is gone. phone stays: it was removed from the CLIENT
--- checks on 2026-09-12 but never from this constraint, and removing it here would be a
--- second, unrelated decision smuggled into this one.
+-- Every arm below is carried over from the LIVE definition quoted in the header. The only
+-- thing removed is the student_level/institution_id arm. There is no phone clause to carry
+-- because prod has not had one since 2026-09-12; ADDING one would raise 23514 on the 3
+-- completed profiles that have no phone.
+--
+-- This never ADDS a requirement, so it cannot fail validation on either shape of database.
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_completion_requires_fields_check;
 ALTER TABLE public.profiles ADD  CONSTRAINT profiles_completion_requires_fields_check
   CHECK (profile_completed_at IS NULL OR (
@@ -114,7 +156,6 @@ ALTER TABLE public.profiles ADD  CONSTRAINT profiles_completion_requires_fields_
     AND region           IS NOT NULL
     AND resident_status  IS NOT NULL
     AND nationality_code IS NOT NULL
-    AND phone            IS NOT NULL
     AND (resident_status <> 'student' OR student_level IS NOT NULL)
   ));
 
@@ -124,7 +165,7 @@ DECLARE
   v_def  text;
   v_col  text;
   v_kept text[] := ARRAY['first_name','last_name','display_name','date_of_birth','region',
-                         'resident_status','nationality_code','phone','student_level',
+                         'resident_status','nationality_code','student_level',
                          'profile_completed_at'];
 BEGIN
   SELECT pg_get_constraintdef(c.oid) INTO v_def
@@ -153,6 +194,13 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- phone must be ABSENT. Not decoration: it is what makes a database built from migration
+  -- files converge with prod, and what turns a future hand-edit that re-adds it into a red
+  -- row instead of a silent divergence.
+  IF position('phone' in v_def) > 0 THEN
+    RAISE EXCEPTION 'the completion check requires phone again — prod has not since 2026-09-12. Live definition: %', v_def;
+  END IF;
+
   -- The four columns 20261027 will drop must appear NOWHERE in this constraint now, or
   -- that DROP COLUMN will fail on a dependency this file was supposed to clear.
   FOREACH v_col IN ARRAY ARRAY['study_start_year','study_end_year','subject_id','student_listing_opt_in'] LOOP
@@ -175,7 +223,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261030_completion_check_drops_institution.sql', 'df0ed0d0da42acf31b5a14e41c2bbbd00eb4d1bf4dee3a2b8b838d72b61be16d')
+VALUES ('20261030_completion_check_drops_institution.sql', '38ea7211d68eeb7b0a14214b3c971dd60a2c83af97be842bfc9a7ca2145a5164')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
