@@ -233,10 +233,27 @@ function colsInExpr(expr, knownCols) {
 // events_description_i18n_check in section K when nothing was wrong with them.
 // (Caveat: JS code-unit order and COLLATE "C" byte order agree on ASCII, which is all
 // a constraint body has ever contained here. Non-ASCII literals could diverge.)
+// A NEGATIVE CONSTANT IS RENDERED AS A QUOTED STRING, and that asymmetry produced a false
+// positive the first time this section was pointed at real data. The repo writes
+//     floor BETWEEN -5 AND 200
+// and pg_get_constraintdef renders it
+//     ((floor >= '-5'::integer) AND (floor <= 200))
+// so the live side saw the STRING '-5' while the repo side's \b\d+\b skipped the minus and
+// saw the NUMBER 5. Same constraint, different signature, reported as drift —
+// properties_structure_range_check, 2026-09-18. A drift checker that cries wolf teaches
+// people to skim its output, which is the failure this whole file exists to avoid.
+//
+// Both sides now unwrap a quoted numeric (with or without its cast) to a bare number
+// first, then read the sign. The minus is only taken when it follows a space or an open
+// paren, which is where a negative CONSTANT appears and a subtraction operator does not —
+// and either way both sides apply the identical rule, so parity holds even where the
+// heuristic is arguable.
 function litSig(def) {
+  const s = String(def).replace(/'(-?\d+(?:\.\d+)?)'(?:::[a-z0-9_ ]+)?/gi, '$1')
   const out = new Set()
-  for (const m of String(def).matchAll(/'((?:[^']|'')*)'/g)) out.add(m[1].replace(/''/g, "'"))
-  for (const m of String(def).matchAll(/\b(\d+(?:\.\d+)?)\b/g)) out.add(m[1])
+  for (const m of s.matchAll(/'((?:[^']|'')*)'/g)) out.add(m[1].replace(/''/g, "'"))
+  for (const m of s.matchAll(/\b(\d+(?:\.\d+)?)\b/g)) out.add(m[1])
+  for (const m of s.matchAll(/[ (](-\d+(?:\.\d+)?)\b/g)) out.add(m[1])
   return [...out].sort().join('|')
 }
 
@@ -319,6 +336,40 @@ const idxEvents = []                  // ordered {name, op:'add'|'drop'}
 const ensure = t => (repo[t] ??= {})
 
 const parsed = files.map(f => ({ f, sql: blank(readFileSync(resolve(ROOT, f), 'utf8')) }))
+
+// ─── CONSTRAINTS CREATED INSIDE A DO BLOCK ─────────────────────────────────
+//
+// blank() erases $$ … $$ bodies before anything is parsed — correct for statement
+// splitting, because a procedural body is not DDL and its semicolons are not statement
+// terminators. The cost is that DDL written INSIDE such a body disappears with it.
+//
+// That is not hypothetical. 20261007 and 20261008 create all 13 of their constraints as
+//     DO $$ BEGIN
+//       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'x') THEN
+//         ALTER TABLE public.ad_banners ADD CONSTRAINT x CHECK (…);
+//       END IF;
+//     END $$;
+// which is a perfectly ordinary idempotency idiom. The repo modelled those constraints as
+// NOT EXISTING, so all 13 sat permanently in F-live-only-constraint — reported as "the
+// database has something no migration creates" when a migration creates every one of
+// them. Found 2026-09-18 by diffing the audit against a full export of live CHECKs.
+//
+// So the raw text is scanned a second time for ALTER TABLE … ADD CONSTRAINT inside those
+// bodies. Only that one shape: an IF NOT EXISTS guard around a CREATE or a DROP has
+// different semantics and is deliberately not inferred from here.
+function constraintsInDoBlocks(sql) {
+  const found = []
+  const re = /\$\$([\s\S]*?)\$\$/g
+  let m
+  while ((m = re.exec(sql)) !== null) {
+    const body = m[1].replace(/--.*$/gm, '')
+    const inner = /\bALTER\s+TABLE\s+(?:public\.)?([\w"]+)\s+ADD\s+CONSTRAINT\s+([\w"]+)\s+([\s\S]*?);/gi
+    let a
+    while ((a = inner.exec(body)) !== null) found.push({ tbl: a[1], name: a[2], spec: a[3].trim() })
+  }
+  return found
+}
+
 
 // ── Phase 1: every CREATE TABLE, so a table always exists before it is altered.
 for (const { f, sql } of parsed) {
@@ -468,6 +519,21 @@ for (const { f, sql } of parsed) {
     fileIdx.push({ at: mm.index, name: colName(mm[1]), op: 'drop', from: f })
   fileIdx.sort((a, b) => a.at - b.at)
   idxEvents.push(...fileIdx)
+
+  // ► DO-BLOCK CONSTRAINTS ARE EMITTED HERE, PER FILE, NOT APPENDED AT THE END.
+  //   The first version collected them across all files and pushed them after the whole
+  //   replay, reasoning that a name defined only inside a DO block has no competing event
+  //   so ordering could not matter. That reasoning was WRONG and the audit caught it on
+  //   the next run: 20261008 creates ad_banners_slot_check in a DO block, and 20261009
+  //   DROPS it at top level along with the slot column. settle() takes the last event per
+  //   name, so an end-appended add resurrected a constraint that had been deliberately
+  //   dropped, and the repo then expected a constraint prod was right not to have.
+  //
+  //   Emitting per file restores replay order across files, which is the ordering that
+  //   actually decides these cases.
+  for (const c of constraintsInDoBlocks(readFileSync(resolve(ROOT, f), 'utf8'))) {
+    conEvents.push({ name: c.name, op: 'add', body: c.spec, from: f, tbl: c.tbl })
+  }
 }
 
 // ─── DROP TABLE ─────────────────────────────────────────────────────────────
@@ -686,9 +752,13 @@ live_con AS (
          (SELECT coalesce(string_agg(x, '|' ORDER BY x COLLATE "C"), '')
             FROM (
               SELECT DISTINCT x FROM (
-                SELECT (regexp_matches(pg_get_constraintdef(k.oid), '''((?:[^'']|'''')*)''', 'g'))[1] AS x
+                -- Quoted numerics unwrapped FIRST, exactly as litSig() does it, so a negative
+              -- constant reads as a number on both sides instead of a string on one.
+              SELECT (regexp_matches(regexp_replace(pg_get_constraintdef(k.oid), '''(-?\\d+(\\.\\d+)?)''(::[a-z0-9_ ]+)?', '\\1', 'g'), '''((?:[^'']|'''')*)''', 'g'))[1] AS x
                 UNION ALL
-                SELECT (regexp_matches(pg_get_constraintdef(k.oid), '\\y(\\d+(?:\\.\\d+)?)\\y', 'g'))[1]
+                SELECT (regexp_matches(regexp_replace(pg_get_constraintdef(k.oid), '''(-?\\d+(\\.\\d+)?)''(::[a-z0-9_ ]+)?', '\\1', 'g'), '\\y(\\d+(?:\\.\\d+)?)\\y', 'g'))[1]
+                UNION ALL
+                SELECT (regexp_matches(regexp_replace(pg_get_constraintdef(k.oid), '''(-?\\d+(\\.\\d+)?)''(::[a-z0-9_ ]+)?', '\\1', 'g'), '[ (](-\\d+(\\.\\d+)?)\\y', 'g'))[1]
               ) u WHERE x IS NOT NULL
             ) s) AS litsig,
          -- Live COLUMN signature, computed the same way colSig() computes the repo side:

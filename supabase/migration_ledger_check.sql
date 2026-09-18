@@ -146,7 +146,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261025_institutions_website_urls.sql', '6f11ea7e8e679646257e5d540fb8c6d68e0bdbb1d09f911fbacaf9654e0271c8'),
   ('20261026_student_education.sql', 'dc31bd5023ed5fee5651209cd3e17d27dcb94738f717d163bb76c72241ba3d20'),
   ('20261028_student_profile_rpc.sql', 'ab53efc8aab9da4de3d4157f63eeeb9eb536b5d6d71ea32de9ae2bc12c2291b5'),
-  ('20261029_student_messaging.sql', '95b95467d2324ed0d862270ee43230594e3c1a649475fa8d43260564481566c9'),
+  ('20261029_student_messaging.sql', '6831be0da3db732569817532e6b7bd390ac1faacfc0ad96245848487d6aa3231'),
   ('20261030_completion_check_drops_institution.sql', '38ea7211d68eeb7b0a14214b3c971dd60a2c83af97be842bfc9a7ca2145a5164')
 )
 SELECT * FROM (

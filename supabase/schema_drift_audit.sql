@@ -626,8 +626,17 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('conversation_attempts', 'created_at', true, 'now()', 'timestamp with time zone')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
+    ('ad_banners_advertiser_check', '0', 'advertiser_name'),
+    ('ad_banners_counts_check', '0', 'tap_count|view_count'),
     ('ad_banners_created_by_fkey', '', ''),
+    ('ad_banners_destination_check', '1', 'link_url|route'),
+    ('ad_banners_image_scheme_check', '^https://', 'image_url'),
+    ('ad_banners_link_scheme_check', '^https://', 'link_url'),
+    ('ad_banners_module_fkey', '', 'module'),
     ('ad_banners_pkey', '', ''),
+    ('ad_banners_position_check', 'detail_bottom|list_bottom|list_inline|list_top', 'position'),
+    ('ad_banners_route_check', 'accommodation|beaches|esim|events|exchangeRates|explore|games|garages|grooming|homeServices|insurance|jobPostings|municipal|newcomerEssentials|pets|studentHub|towing|transport', 'route'),
+    ('ad_banners_window_check', '', 'ends_at|starts_at'),
     ('ad_modules_pkey', '', ''),
     ('answers_pkey', '', 'id'),
     ('answers_provider_id_fkey', '', 'id|provider_id'),
@@ -728,7 +737,12 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('home_services_pkey', '', ''),
     ('home_services_status_check', 'active|pending|rejected', 'status'),
     ('home_strip_pin_created_by_fkey', '', ''),
+    ('home_strip_pin_kind_check', 'event|place|promo', 'kind'),
+    ('home_strip_pin_link_scheme_check', '^https?://', 'link_url'),
     ('home_strip_pin_pkey', '', ''),
+    ('home_strip_pin_shape_check', 'event|place|promo', 'kind|link_url|target_id|title_i18n'),
+    ('home_strip_pin_sponsor_check', '0|promo', 'kind|sponsor_name'),
+    ('home_strip_pin_window_check', '', 'ends_at|starts_at'),
     ('institutions_city_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'city'),
     ('institutions_name_unique', '', 'name'),
     ('institutions_pkey', '', ''),
@@ -757,7 +771,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('messages_pkey', '', ''),
     ('messages_sender_id_fkey', '', ''),
     ('moderation_rejections_content_text_check', '1|2000', 'content_text'),
-    ('moderation_rejections_content_type_check', 'answer|change_request|facility|message|place|question|review', 'content_type'),
+    ('moderation_rejections_content_type_check', 'answer|change_request|display_name|facility|full_name|message|place|question|review', 'content_type'),
     ('moderation_rejections_matched_term_fkey', '', ''),
     ('moderation_rejections_pkey', '', ''),
     ('moderation_rejections_user_id_fkey', '', ''),
@@ -819,7 +833,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('properties_property_type_check', 'apartment|commercial|house|land|studio|villa', 'property_type'),
     ('properties_source_agent_xor_check', '', 'agent_id|source'),
     ('properties_status_check', 'active|archived|delisted|pending|rejected', 'status'),
-    ('properties_structure_range_check', '0|1|120|20|200|5', 'ensuite_count|floor|living_rooms|min_term_months|total_floors'),
+    ('properties_structure_range_check', '-5|0|1|120|20|200|5', 'ensuite_count|floor|living_rooms|min_term_months|total_floors'),
     ('property_images_pkey', '', ''),
     ('property_images_property_id_fkey', '', ''),
     ('provider_credentials_facility_id_fkey', '', ''),
@@ -977,9 +991,13 @@ live_con AS (
          (SELECT coalesce(string_agg(x, '|' ORDER BY x COLLATE "C"), '')
             FROM (
               SELECT DISTINCT x FROM (
-                SELECT (regexp_matches(pg_get_constraintdef(k.oid), '''((?:[^'']|'''')*)''', 'g'))[1] AS x
+                -- Quoted numerics unwrapped FIRST, exactly as litSig() does it, so a negative
+              -- constant reads as a number on both sides instead of a string on one.
+              SELECT (regexp_matches(regexp_replace(pg_get_constraintdef(k.oid), '''(-?\d+(\.\d+)?)''(::[a-z0-9_ ]+)?', '\1', 'g'), '''((?:[^'']|'''')*)''', 'g'))[1] AS x
                 UNION ALL
-                SELECT (regexp_matches(pg_get_constraintdef(k.oid), '\y(\d+(?:\.\d+)?)\y', 'g'))[1]
+                SELECT (regexp_matches(regexp_replace(pg_get_constraintdef(k.oid), '''(-?\d+(\.\d+)?)''(::[a-z0-9_ ]+)?', '\1', 'g'), '\y(\d+(?:\.\d+)?)\y', 'g'))[1]
+                UNION ALL
+                SELECT (regexp_matches(regexp_replace(pg_get_constraintdef(k.oid), '''(-?\d+(\.\d+)?)''(::[a-z0-9_ ]+)?', '\1', 'g'), '[ (](-\d+(\.\d+)?)\y', 'g'))[1]
               ) u WHERE x IS NOT NULL
             ) s) AS litsig,
          -- Live COLUMN signature, computed the same way colSig() computes the repo side:

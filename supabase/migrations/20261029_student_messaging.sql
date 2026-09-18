@@ -288,9 +288,21 @@ ALTER TABLE public.content_reports DROP CONSTRAINT IF EXISTS content_reports_con
 ALTER TABLE public.content_reports ADD CONSTRAINT content_reports_content_type_check
   CHECK (content_type IN ('answer','facility','message','place','profile','question','review'));
 
+-- ► ALL NINE VALUES, and the two at the end are why this line was wrong.
+--
+-- The first draft listed seven: it ADDED 'message' and silently DROPPED 'display_name'
+-- and 'full_name', which 20261001:562 had added deliberately for name moderation. A file
+-- whose stated job is "add message" narrowed the column instead, and nothing said so —
+-- no comment, no assertion, no note.
+--
+-- Caught on 2026-09-18 by diffing every live CHECK against the repo, before this file was
+-- applied. Nothing currently writes those two values (utils/profanity.js's callers pass
+-- answer/message/review/question), so applying the seven-value form would have broken
+-- nothing TODAY and quietly removed the record of what the column may hold.
 ALTER TABLE public.moderation_rejections DROP CONSTRAINT IF EXISTS moderation_rejections_content_type_check;
 ALTER TABLE public.moderation_rejections ADD CONSTRAINT moderation_rejections_content_type_check
-  CHECK (content_type IN ('review','question','answer','facility','change_request','place','message'));
+  CHECK (content_type IN ('review','question','answer','facility','change_request','place',
+                          'display_name','full_name','message'));
 
 -- ─── NO auto_hide_reported_content BRANCH FOR MESSAGES, ON PURPOSE ──────────
 --
@@ -314,7 +326,7 @@ ALTER TABLE public.moderation_rejections ADD CONSTRAINT moderation_rejections_co
 -- gives an admin the pattern; an admin acts on it.
 
 COMMENT ON CONSTRAINT moderation_rejections_content_type_check ON public.moderation_rejections IS
-  'Adds ''message'' (20261029). blocked_terms was curated for PUBLIC content and matches '
+  'Adds ''message'' (20261029) to the eight from 20261001 — display_name and full_name included. blocked_terms was curated for PUBLIC content and matches '
   'profanity on a word boundary; it cannot catch grooming. A floor, not a solution — '
   'which is why nothing auto-bans on a hit.';
 
@@ -1407,6 +1419,21 @@ BEGIN
     RAISE EXCEPTION 'content_reports type list is %, expected the 6 old plus message', v_types;
   END IF;
 
+  -- ► THE SIBLING ASSERTION THIS FILE SHIPPED WITHOUT, AND THE REASON IT NOW HAS ONE.
+  -- content_reports was pinned to a DERIVED array; moderation_rejections was not, and that
+  -- asymmetry is exactly where the narrowing hid. An enumerable set this file rewrites gets
+  -- asserted, or the next edit silently drops a value again.
+  SELECT array_agg(DISTINCT m[1] ORDER BY m[1]) INTO v_types
+    FROM pg_constraint c,
+         LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+   WHERE c.conrelid = to_regclass('public.moderation_rejections')
+     AND c.conname = 'moderation_rejections_content_type_check';
+  RAISE NOTICE 'moderation_rejections admits: %', v_types;
+  IF v_types IS DISTINCT FROM ARRAY['answer','change_request','display_name','facility',
+                                    'full_name','message','place','question','review'] THEN
+    RAISE EXCEPTION 'moderation_rejections type list is %, expected the 8 from 20261001 plus message', v_types;
+  END IF;
+
   -- ADULT_AGE lives in exactly one place in SQL. If a second copy appears, the mirror
   -- check in scripts/check-profile-gate.mjs is comparing against an ambiguous source.
   IF (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -1494,7 +1521,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261029_student_messaging.sql', '95b95467d2324ed0d862270ee43230594e3c1a649475fa8d43260564481566c9')
+VALUES ('20261029_student_messaging.sql', '6831be0da3db732569817532e6b7bd390ac1faacfc0ad96245848487d6aa3231')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
