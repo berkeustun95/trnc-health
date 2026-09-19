@@ -2636,6 +2636,31 @@ WITH report AS (
         WHERE n.nspname='public' AND p.proname='auto_hide_reported_content'
           AND pg_get_functiondef(p.oid) NOT ILIKE '%UPDATE messages%'
           AND pg_get_functiondef(p.oid) ILIKE '%UPDATE reviews%')
+    -- ══ blocks.origin + the named blocked list (20261032) ═══════════════════
+    -- The COLUMN and the FUNCTION are named objects and are registered in E/G as usual.
+    -- This token exists for the one thing neither of those can see: WHETHER THE NAME IS
+    -- STILL WITHHELD SERVER-SIDE.
+    --
+    -- list_my_blocks() returns display_name only inside a CASE on origin = 'person'. An
+    -- edit that "simplifies" that to a plain p.display_name keeps the same signature, the
+    -- same grants and the same name — every existing check stays green — and starts
+    -- handing the client the identity of anonymous review authors. That is the single line
+    -- worth a token here.
+    --
+    -- Both halves of the default too: a DEFAULT that stopped being 'content' would make an
+    -- unclassified row NAMED, which is the direction that leaks, and a reverted DEFAULT
+    -- creates no named object at all.
+    UNION ALL SELECT '1032_blocks_origin','blocked names are withheld server-side, and origin still defaults to content',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='list_my_blocks'
+          AND pg_get_functiondef(p.oid) ILIKE '%CASE WHEN b.origin%'
+          AND pg_get_functiondef(p.oid) ILIKE '%auth.uid()%')
+      AND EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='blocks' AND column_name='origin'
+          AND column_default LIKE '%content%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='block_user'
+          AND pg_get_functiondef(p.oid) ILIKE '%''person''%')
     -- ══ message push carries routing data (20261031) ════════════════════════
     -- CREATE OR REPLACE creates no named object, so E/F/G are blind to it and only a
     -- behaviour token can tell an applied database from an unapplied one.

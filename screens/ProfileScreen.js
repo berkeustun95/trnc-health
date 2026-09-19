@@ -302,11 +302,26 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   //   Naming those and not the others is exactly what must not happen: the rows that
   //   stayed nameless would then be identifiable as the review ones, which is the
   //   anonymity leak the original rule exists to prevent. All rows or none, so none.
+  // ─── The blocked list ──────────────────────────────────────────────────────
+  //
+  // Through list_my_blocks() (20261032), which is a DEFINER function for a reason that is
+  // not stylistic: profiles RLS does not let one customer read another's row, so a join
+  // from here returns nothing at all. It hands back a display_name ONLY for a person-block
+  // — a review-block's author stays anonymous server-side, because the blocker may know
+  // them only as an anonymous reviewer.
+  //
+  // ► THE FALLBACK IS WHAT LETS THIS SHIP BEFORE THE MIGRATION IS APPLIED. Without it the
+  //   RPC 404s, the list renders empty, and an empty blocked list is not a neutral
+  //   failure — it says "you have blocked nobody", which would stop somebody looking for
+  //   the unblock button they came here for. Degrading to the dated rows is the old
+  //   behaviour, which is merely unhelpful rather than untrue.
   async function loadBlocks() {
-    const { data } = await supabase.from('blocks')
+    const { data, error } = await supabase.rpc('list_my_blocks')
+    if (!error && data) { setBlocks(data); return }
+    const { data: rows } = await supabase.from('blocks')
       .select('blocked_id, created_at')
       .order('created_at', { ascending: false })
-    setBlocks(data ?? [])
+    setBlocks((rows ?? []).map(r => ({ ...r, origin: 'content', display_name: null, avatar_url: null })))
   }
 
   async function unblock(blockedId) {
@@ -1207,16 +1222,41 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   blocked from a profile page or a conversation, so the heading had to
                   stop naming one of the two ways in. */}
               <Text style={s.sectionTitle}>{t('blockedPeople', lang)}</Text>
-              {blocks.map(b => (
-                <View key={b.blocked_id} style={s.blockedRow}>
-                  <Text style={s.blockedLabel}>
-                    {t('blockedOn', lang).replace('{d}', new Date(b.created_at).toLocaleDateString([], { dateStyle: 'medium' }))}
-                  </Text>
-                  <TouchableOpacity style={s.unblockBtn} onPress={() => unblock(b.blocked_id)}>
-                    <Text style={s.unblockText}>{t('unblock', lang)}</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
+              {/* ► AN UNNAMED ROW SAYS WHY IT IS UNNAMED. A bare date reads as a bug —
+                      three identical rows and no way to tell them apart. The reason is
+                      real and the user will accept it once told: reviews carry no name,
+                      so we have none to show. Saying so turns a broken-looking row into
+                      an honest one, and it is the only thing that makes the remaining
+                      ambiguity tolerable rather than mysterious. */}
+              {blocks.map(b => {
+                const named = b.origin === 'person' && !!b.display_name
+                return (
+                  <View key={b.blocked_id} style={s.blockedRow}>
+                    {named ? (
+                      <View style={s.blockedWho}>
+                        <AvatarDisplay avatarUrl={b.avatar_url} initials={(b.display_name[0] ?? '?').toUpperCase()} size={32} textSize={13} />
+                        <View style={s.blockedWhoBody}>
+                          <Text style={s.blockedName} numberOfLines={1}>{b.display_name}</Text>
+                          <Text style={s.blockedLabel}>
+                            {t('blockedOn', lang).replace('{d}', new Date(b.created_at).toLocaleDateString([], { dateStyle: 'medium' }))}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={s.blockedWhoBody}>
+                        <Text style={s.blockedName} numberOfLines={2}>{t('blockedReviewerTitle', lang)}</Text>
+                        <Text style={s.blockedLabel}>
+                          {t('blockedOn', lang).replace('{d}', new Date(b.created_at).toLocaleDateString([], { dateStyle: 'medium' }))}
+                        </Text>
+                        <Text style={s.blockedHint}>{t('blockedReviewerHint', lang)}</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity style={s.unblockBtn} onPress={() => unblock(b.blocked_id)}>
+                      <Text style={s.unblockText}>{t('unblock', lang)}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              })}
             </View>
           )}
 
@@ -1440,7 +1480,11 @@ const s = StyleSheet.create({
   pickerBtnPlaceholder: { color: colors.border },
 
   blockedSection:   { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, marginTop: 8, marginBottom: 16 },
-  blockedRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
+  blockedRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 10 },
+  blockedWho:       { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
+  blockedWhoBody:   { flex: 1, minWidth: 0 },
+  blockedName:      { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  blockedHint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 17, marginTop: 3 },
   blockedLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   unblockBtn:       { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.primaryLight },
   unblockText:      { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
