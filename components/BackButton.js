@@ -39,6 +39,7 @@ export default function BackButton({
   onPress,
   style,
   accessibilityLabel,
+  onLayout,            // passthrough; TouchableOpacity supports it and callers may measure
 }) {
   const text = label ?? t('back', lang)
   const hero = variant === 'hero'
@@ -53,6 +54,7 @@ export default function BackButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? text}
       style={[s.base, style]}
+      onLayout={onLayout}
     >
       <Ionicons
         name="chevron-back"
