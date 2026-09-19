@@ -2,20 +2,6 @@ import { View, Text, StyleSheet } from 'react-native'
 import { colors } from '../constants/theme'
 import BackButton from './BackButton'
 
-// ⚠ TEMPORARY MEASUREMENT — 2026-09-19, REMOVE ONCE READ.
-//
-// t('back') clips to "G…" here in Turkish with 29.9dp of room for a word needing ~31.
-// The 1.1dp gap is larger than the pixel-grid quantum (0.36dp at density 2.75), so this is
-// probably NOT the rounding class that explains the home hero — something is genuinely
-// constraining the width. Two derivations from the stylesheet have failed to reproduce it:
-// `back` has minWidth 70 (a FLOOR, not a cap), `bar` is a plain row, and nothing visible
-// here stops the column growing to its content.
-//
-// So this stops deriving and reads the number. back width minus the 2dp gap minus the
-// 29.9dp the audit already reports for the label gives the icon's real advance width,
-// which is the quantity every attempt so far has had to assume.
-const probed = { done: false }
-
 export default function ScreenHeader({
   onBack,
   backLabel,
@@ -27,16 +13,8 @@ export default function ScreenHeader({
 }) {
   return (
     <View style={s.bar}>
-      <BackButton
-        lang={lang} label={backLabel} onPress={onBack} style={s.back}
-        onLayout={__DEV__ ? e => {
-          if (probed.done) return
-          probed.done = true
-          const w = e.nativeEvent.layout.width
-          console.log(`[probe] ScreenHeader back column = ${w.toFixed(1)}dp ` +
-                      `(minWidth is 70; label reported 29.9dp, gap 2 -> icon ~${(w - 2 - 29.9).toFixed(1)}dp)`)
-        } : undefined}
-      />
+      <BackButton lang={lang} label={backLabel} onPress={onBack} style={s.back} />
+
 
       <View style={s.center}>
         {titleIcon ? (
@@ -65,6 +43,10 @@ const s = StyleSheet.create({
                   backgroundColor: colors.cardBg,
                   borderBottomWidth: 1, borderBottomColor: colors.border,
                   marginBottom: 18 },
+  // 70 is the matched pair with `right` below: equal side columns are what make the
+  // flex:1 centre an actual centre. Measured at 70.0dp on device and NOT the cause of the
+  // Turkish back-label clip — that was the label being allocated exactly its own measured
+  // width while 14dp sat spare in this very column. See the note on BackButton's `label`.
   back:         { minWidth: 70, justifyContent: 'flex-start' },
   center:       { flex: 1, alignItems: 'center' },
   iconTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

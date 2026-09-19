@@ -84,5 +84,34 @@ const s = StyleSheet.create({
   // pill style; with those stripped, the icon and label would otherwise touch.
   base:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start',
            minHeight: MIN_TARGET, minWidth: MIN_TARGET, gap: 2 },
-  label: { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, flexShrink: 1 },
+  // ► flexGrow: 1 IS THE FIX FOR A CLIPPED BACK LABEL, and it is not a width increase.
+  //
+  //   t('back') drew as "G…" in Turkish on all 25 ScreenHeader screens. Every obvious
+  //   explanation was measured and killed:
+  //     * the chevron is NOT oversized — Ionicons.ttf gives U+F229 an advance of exactly
+  //       1.0 em, 24.00dp at size 24, read from the font's own hmtx table;
+  //     * the column is NOT too narrow — ScreenHeader's `back` measured 70.0dp on device,
+  //       its minWidth, leaving 44dp for text;
+  //     * "Geri" is NOT too wide — 29.22dp in Inter_400Regular at 15px, from the same
+  //       kind of measurement.
+  //   The audit reported the label was GIVEN 29.9dp. It had more room than it needed and
+  //   ellipsized anyway, while ~14dp sat unused in the same row.
+  //
+  //   Because flexBasis is auto, the Text is allocated EXACTLY ITS OWN MEASURED WIDTH, and
+  //   justifyContent: 'flex-start' parks the column's spare space after it. A Text sized to
+  //   its own measurement has no tolerance at all for the measure pass and the draw pass
+  //   disagreeing by a fraction — and they do. flexGrow lets the label take the slack that
+  //   is already there, so the fraction has somewhere to go.
+  //
+  //   It changes no pixel that anyone can see: the text is left-aligned, so a wider box
+  //   extends rightward into space that was already empty. And it is inert exactly where it
+  //   must be — when the row has no free space (BusRoutes caps its pill at 120px and passes
+  //   a module title) flexGrow does nothing and flexShrink still does the work.
+  //
+  //   SIZING THE COLUMN FOR THE LONGEST LABEL WAS THE OTHER OPTION AND IT DOES NOT WORK:
+  //   the widest back label in any of the nine languages is insBackToTypes in French,
+  //   "Tous les types d'assurance" at 194.7dp, needing a 220.7dp column. That is most of a
+  //   phone, and it would eat the title it is supposed to sit beside.
+  label: { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary,
+           flexGrow: 1, flexShrink: 1 },
 })
