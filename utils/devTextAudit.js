@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { StyleSheet, View, PixelRatio } from 'react-native'
 import { sourceTextOf, renderedTextOf, display, dense } from './textAuditVerdict'
 import { devKeysForString } from '../constants/i18n'
@@ -159,11 +159,14 @@ const state = {
   watched:        0,      // Text nodes with numberOfLines that this audit is watching
   verdicts:       0,      // measurements actually evaluated
   reported:       0,
+  probes:         0,      // `needs` probes raised — see THE `needs` PROBE below
   installed:      false,
   positivePassed: false,
   negativePassed: false,
   positiveFired:  false,
   negativeFired:  false,
+  needsControlFired:  false,
+  needsControlPassed: false,
   seen:           new Set(),
 }
 
@@ -219,10 +222,24 @@ function ownerLocation() {
   }
 }
 
-function report(kind, key, message) {
-  const id = `${kind}:${key}`
-  if (state.seen.has(id)) return
+// ─── claim, then print — and they are now two steps, not one ───────────────
+//
+// These used to be one `report()` that deduped and printed together. They had to split
+// when the report started waiting on a `needs` probe: the claim has to happen the moment
+// a clip is found (or a second measurement of the same node queues a second probe before
+// the first has answered), while the print happens once the probe replies — by which time
+// the id is already in `seen` and the old guard would have swallowed the only copy.
+//
+// A dedupe that silently eats the finding it was meant to deduplicate is precisely the
+// instrument failure this file exists to avoid, so: claim returns whether it won the race,
+// and print is unconditional.
+function claim(id) {
+  if (state.seen.has(id)) return false
   state.seen.add(id)
+  return true
+}
+
+function print(message) {
   state.reported += 1
   console.warn(message)
 }
@@ -238,16 +255,202 @@ function report(kind, key, message) {
 // So it says it is alive, on a timer, and only when the numbers have moved. Navigating to
 // a new screen makes `watched` climb; if it stops climbing while you move around, the
 // audit is not watching any more and the silence is its own, not the app's.
-let lastBeat = { watched: -1, verdicts: -1 }
+//
+// ► `watched` COUNTS APP TEXT ONLY, AND THE `needs` PROBES DO NOT ENTER IT.
+//   A probe carries no numberOfLines, so AuditedText's own `props.numberOfLines > 0`
+//   test skips it before the counter is reached. `probes` is printed as its own figure
+//   instead — additive, so the number Berke reads to know the audit is alive keeps
+//   meaning exactly what it has always meant, and the probe machinery is still visible
+//   rather than being a silent third thing.
+let lastBeat = { watched: -1, verdicts: -1, probes: -1 }
 function heartbeat() {
   if (!state.positivePassed) return
-  if (state.watched === lastBeat.watched && state.verdicts === lastBeat.verdicts) return
-  lastBeat = { watched: state.watched, verdicts: state.verdicts }
+  if (state.watched === lastBeat.watched &&
+      state.verdicts === lastBeat.verdicts &&
+      state.probes === lastBeat.probes) return
+  lastBeat = { watched: state.watched, verdicts: state.verdicts, probes: state.probes }
   console.log(`[ada-audit] alive — ${state.watched} node(s) watched, ` +
-              `${state.verdicts} measurement(s) checked, ${state.reported} reported`)
+              `${state.verdicts} measurement(s) checked, ${state.reported} reported, ` +
+              `${state.probes} needs-probe(s)`)
 }
 
-function handleTruncation(source, lines, owner, boxWidth) {
+// ─── THE `needs` PROBE: the one number the report never had ────────────────
+//
+// Until 2026-09-19 a clip report printed two widths and NEITHER of them was what the
+// string needs. `room` was the Text's own laid-out box; `drew` was the width painted on
+// line 1 — that is, the width of the ALREADY-TRUNCATED string. Both are facts about the
+// failure. Neither says how much width the full string was asking for.
+//
+// The cost was a week. Eight clips across four components (BackButton, HomeHero,
+// LiveStrip, EventsScreen) were REASONED about instead — `room` against a hand-summed
+// advance table built from the real .ttf files — and the reasoning eliminated three
+// hypotheses and produced no cause, because the only comparison that decides anything
+// (needed vs available) could not be made from the numbers on the screen. The geometry
+// block below was added to abolish exactly that stylesheet arithmetic, and it did not,
+// because it printed the numbers this file already had rather than the number it lacked.
+//
+// So it is measured now. When a string is found clipped, the SAME text in the SAME
+// resolved style is rendered a second time with nothing constraining it, and its width
+// is printed beside the box it was actually given:
+//
+//   needs >  box    the Text really was too narrow. Go and measure the PARENT.
+//   needs <= box    the box was wide enough and it ellipsized anyway — the cut is in the
+//                   ellipsize comparison, not in the layout.
+//
+// ► THE PROBE MUST NOT AUDIT ITSELF — AND IT NEEDS NO SENTINEL TO AVOID IT.
+//   A deliberately unconstrained Text can never clip, so a probe that reported would be
+//   the instrument measuring its own reflection; and it would inflate `watched`, the one
+//   number the heartbeat uses to prove the audit is alive.
+//   Both are excluded STRUCTURALLY, by the predicate AuditedText already gates on:
+//   `props.numberOfLines > 0`. A probe sets no numberOfLines, so `source` stays null,
+//   `state.watched` is never incremented, no onTextLayout wrapper is attached, and
+//   handleTruncation is never reached for it. The early `<OriginalText {...props} />`
+//   forwards the probe's OWN onLayout/onTextLayout untouched, which is how it reports
+//   back here instead.
+//   A name check or a sentinel string would have been a second thing to keep in sync with
+//   the first, and the kind of hand-kept list this file already deleted once. This is the
+//   same predicate that defines the watch set, or it is nothing.
+//
+// ► AND IT MUST NEVER MAKE THE AUDIT QUIETER THAN IT ALREADY WAS.
+//   Deferring the report until a probe answers invents a new way for a finding to be
+//   found and never printed, which is the failure this whole file is built against. So
+//   every probe carries a hard timeout that prints the report WITHOUT `needs`, and it
+//   settles on whichever of the two layout events arrives rather than requiring both.
+//   The floor is today's report; `needs` is only ever an addition to it.
+const NEEDS_SETTLE_MS   = 120    // supersede intermediate probe measurements, as SETTLE_MS does
+const NEEDS_TIMEOUT_MS  = 2500   // past this, print without `needs` rather than not at all
+const NEEDS_HOST_WIDTH  = 4000   // wider than any chrome string can ask for; see `needsHost`
+
+// Stripped from the captured style: everything that CONSTRAINS or POSITIONS. What stays is
+// everything that changes how wide the glyphs and their box come out — fontSize, fontFamily,
+// fontWeight, letterSpacing, fontVariant, textTransform, includeFontPadding, padding and
+// border. Padding stays on purpose: `box` is a border-box width, so `needs` has to be one
+// too or the two numbers being subtracted are not the same kind of thing.
+const PROBE_STRIP = new Set([
+  'width', 'minWidth', 'maxWidth', 'height', 'minHeight', 'maxHeight',
+  'flex', 'flexGrow', 'flexShrink', 'flexBasis', 'alignSelf',
+  'position', 'top', 'left', 'right', 'bottom', 'start', 'end',
+  'margin', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
+  'marginHorizontal', 'marginVertical', 'marginStart', 'marginEnd',
+  'transform',
+])
+
+// Strings only. A nested <Text> span carries its own font, and an inline icon occupies
+// width with no characters — a probe rendering flattened text for either measures a
+// different thing than the node it is explaining, which is this repo's standing hazard
+// (the check and the thing checked in two different frames of reference). Refused and
+// SAID, rather than measured and wrong.
+function isPlainChildren(node) {
+  if (node === null || node === undefined || typeof node === 'boolean') return true
+  if (typeof node === 'string' || typeof node === 'number') return true
+  if (Array.isArray(node)) return node.every(isPlainChildren)
+  return false
+}
+
+function probeFromProps(props) {
+  if (!isPlainChildren(props.children)) {
+    return { ok: false, why: 'nested spans or inline elements — the probe cannot model mixed fonts' }
+  }
+  const flat = StyleSheet.flatten(props.style) || {}
+  const style = {}
+  for (const k of Object.keys(flat)) if (!PROBE_STRIP.has(k)) style[k] = flat[k]
+
+  // From PROPS, not style, and just as load-bearing: a Text that opted out of font scaling
+  // must be measured with it off, or `needs` is computed at a size the original never uses.
+  const textProps = {}
+  if (props.allowFontScaling !== undefined) textProps.allowFontScaling = props.allowFontScaling
+  if (props.maxFontSizeMultiplier !== undefined) textProps.maxFontSizeMultiplier = props.maxFontSizeMultiplier
+
+  return { ok: true, style, textProps, shrinks: !!props.adjustsFontSizeToFit }
+}
+
+// Probes stay mounted once raised. They are invisible and bounded by the number of DISTINCT
+// findings (`claim` admits each key once), and unmounting one races the layout event it
+// exists to deliver — a probe torn down a frame early reports nothing and looks exactly
+// like a probe that failed.
+const needsQueue = []
+let needsListener = null
+let probeSeq = 0
+
+function completeProbe(entry) {
+  if (entry.done) return
+  entry.done = true
+  if (entry.settle) clearTimeout(entry.settle)
+  if (entry.deadline) clearTimeout(entry.deadline)
+  // Its own try/catch: this runs from a layout event or a timer, OUTSIDE the one wrapping
+  // handleTruncation, so an exception here escapes to the global handler and the finding is
+  // lost behind a dismissible redbox.
+  try {
+    entry.finish({ box: entry.box, glyphs: entry.glyphs, lineCount: entry.lineCount })
+  } catch (e) {
+    console.warn('[ada-audit] a needs-probe result threw while being reported — this is a bug in\n' +
+                 '            utils/devTextAudit.js, not in the screen. The audit keeps running.\n' +
+                 `            ${e && e.message}`)
+  }
+}
+
+function requestNeeds(text, probe, finish) {
+  const entry = {
+    key: `needs-${probeSeq++}`,
+    text,
+    style: probe.style,
+    textProps: probe.textProps,
+    box: null, glyphs: null, lineCount: null,
+    settle: null, deadline: null, done: false,
+    finish,
+  }
+  entry.arrived = () => {
+    if (entry.done) return
+    if (entry.settle) clearTimeout(entry.settle)
+    entry.settle = setTimeout(() => completeProbe(entry), NEEDS_SETTLE_MS)
+  }
+  // Armed BEFORE the host is told to render, so a host that never mounts — or a platform
+  // where the probe fires no layout event — still produces the report.
+  entry.deadline = setTimeout(() => completeProbe(entry), NEEDS_TIMEOUT_MS)
+
+  needsQueue.push(entry)
+  state.probes += 1
+  if (needsListener) needsListener()
+  return entry
+}
+
+const fmt = v => v.toFixed(1)
+
+// `box` is a border-box width and `glyphs` is a content width, so comparing them needs the
+// horizontal padding and border taken off the first. Kept explicit rather than folded into
+// the subtraction, because these two are the numbers that separate the two live hypotheses
+// and a silent off-by-a-padding would point the diagnosis at the wrong pass.
+function horizontalInset(st) {
+  const n = v => (typeof v === 'number' ? v : 0)
+  return n(st.paddingLeft ?? st.paddingStart ?? st.paddingHorizontal ?? st.padding) +
+         n(st.paddingRight ?? st.paddingEnd ?? st.paddingHorizontal ?? st.padding) +
+         n(st.borderLeftWidth ?? st.borderWidth) +
+         n(st.borderRightWidth ?? st.borderWidth)
+}
+
+// What `needs` is allowed to claim, and what it must refuse to. Each refusal names its own
+// reason: an "unmeasured" that does not say why is a dead end, and the next person debugs
+// the screen instead of the instrument.
+function needsReport(r, probe) {
+  if (!probe.ok) return { text: `unmeasured — ${probe.why}`, box: null }
+  if (r.box == null && r.glyphs == null) {
+    return { text: `unmeasured — the probe did not report within ${NEEDS_TIMEOUT_MS}ms`, box: null }
+  }
+  if (r.lineCount != null && r.lineCount > 1) {
+    return { text: `unmeasured — the probe itself wrapped onto ${r.lineCount} lines, so no single ` +
+                   `line width describes it. Widen NEEDS_HOST_WIDTH in utils/devTextAudit.js.`,
+             box: null }
+  }
+  const parts = []
+  if (r.box != null) parts.push(`${fmt(r.box)}dp   the FULL string, unconstrained          (incl. padding)`)
+  if (r.glyphs != null) {
+    parts.push(`${parts.length ? '\n                      ' : ''}` +
+               `${fmt(r.glyphs)}dp   …its glyphs alone, on one line          (glyphs only)`)
+  }
+  return { text: parts.join(''), box: r.box }
+}
+
+function handleTruncation(source, lines, owner, boxWidth, makeProbe) {
   const rendered = renderedTextOf(lines)
 
   // ─── Control routing ─────────────────────────────────────────────────────
@@ -259,6 +462,35 @@ function handleTruncation(source, lines, owner, boxWidth) {
       : `[ada-audit] POSITIVE control FAILED — a string that must clip reported as complete.\n` +
         `            rendered ${dense(rendered).length} chars, source ${dense(source).length} (whitespace excluded).\n` +
         `            Truncation reporting stays OFF. onTextLayout may not be supported here.`)
+
+    // ► THE PROBE MACHINERY GETS A CONTROL OF ITS OWN, ON THE SAME PRINCIPLE AS THE TWO
+    //   ABOVE. Without it, the first time the `needs` path ever runs is on a real finding,
+    //   and if it is dead that report says `unmeasured` — a whole device launch spent
+    //   learning nothing, which is the cost this was built to stop paying.
+    //   The positive control is a ~95-character string in a 40dp box, so a working probe
+    //   must come back with a width in the hundreds. A number near 40 would mean the probe
+    //   is being constrained by its host rather than measuring freely.
+    if (state.positivePassed && !state.needsControlFired) {
+      state.needsControlFired = true
+      const probe = probeFromProps({ children: POSITIVE_PROBE, style: s.probeText })
+      requestNeeds(POSITIVE_PROBE, probe, r => {
+        if (r.box == null && r.glyphs == null) {
+          console.warn('[ada-audit] NEEDS probe DID NOT REPORT — every clip report will say\n' +
+                       `            "needs: unmeasured". The second render is not being laid out.\n` +
+                       '            Check that <AuditControls /> is still mounted in utils/devRoot.js.')
+        } else if (r.box != null && r.box < 100) {
+          console.warn('[ada-audit] NEEDS probe SUSPECT — an unconstrained ~95-character string\n' +
+                       `            measured only ${fmt(r.box)}dp. The probe host is squeezing it, so\n` +
+                       '            every `needs` figure would be an underestimate. Reported anyway,\n' +
+                       '            but treat them as a floor until this line goes away.')
+        } else {
+          state.needsControlPassed = true
+          console.log('[ada-audit] NEEDS probe PASSED — the positive control, which is laid out in a ' +
+                      `40dp box,\n            measures ${fmt(r.box)}dp unconstrained. ` +
+                      '`needs` is live.')
+        }
+      })
+    }
     return
   }
   if (source === NEGATIVE_PROBE) {
@@ -288,55 +520,102 @@ function handleTruncation(source, lines, owner, boxWidth) {
   if (keys.length === 0) return                                  // not UI chrome — see SCOPE
   if (keys.some(k => TRUNCATION_ALLOWED.has(k))) return
 
+  // Claimed HERE, before the probe is raised — not at print time. A node measured twice
+  // would otherwise queue two probes for one finding, and the settle window above does not
+  // cover it because each measurement arrives as its own verdict.
+  if (!claim(`truncate:${keys.join('|')}`)) return
+
   // ─── THE GEOMETRY, BECAUSE "IT CLIPPED" IS NOT A DIAGNOSIS ────────────────
   //
   // A report that says only WHAT was cut sends you to the stylesheet to derive what the
-  // width must have been — which is exactly what went wrong with the first real finding:
-  // the arithmetic said ~190dp available for a ~55dp word, and the arithmetic was wrong.
-  // Deriving a runtime width from a stylesheet means modelling flex, gaps, siblings, the
-  // parent chain and the font, and being right about all of them at once.
+  // width must have been. Deriving a runtime width from a stylesheet means modelling flex,
+  // gaps, siblings, the parent chain and the font, and being right about all of them at
+  // once — so the audit prints measured widths instead.
   //
-  // So the audit now prints the numbers it already has. `room` is the Text's own laid-out
-  // width; `drew` is what the engine actually painted on the first line. Between them the
-  // diagnosis forks immediately:
+  // ► EVERY WIDTH SAYS WHAT IT IS, IN THE LINE THAT PRINTS IT. Three numbers that all
+  //   read as "how wide the text is" is how a week went sideways: `room` and `drew` were
+  //   taken to mean "what the string needs", and they mean the box it got and the width
+  //   of the ALREADY-TRUNCATED string. Both labels were accurate and neither was safe.
+  //   The rule now is that no width appears without the phrase that disambiguates it,
+  //   including the two that have been here since the beginning.
   //
-  //   room is SMALL  -> something upstream is squeezing this Text; go and measure the
-  //                     parent, the problem is not the string.
-  //   room is LARGE  -> the Text had space and the glyphs still did not fit; suspect the
-  //                     font scale, which is why it is printed too.
+  // ► THE FORK IS `needs` vs `box`, AND IT REPLACES A WRONG ONE.
+  //   This block used to fork on "room is SMALL → measure the parent / room is LARGE →
+  //   suspect the font scale", and offered a Yoga ceil-vs-round model (PixelGrid.cpp:85)
+  //   as the explanation for sub-point deficits. THAT MODEL LOST ITS OWN TEST. Eight
+  //   clips measured on 2026-09-19 at fontScale 1 had `room` ALREADY LARGER than the sum
+  //   of their glyph advances — by +0.40 to +3.14dp — and truncated regardless, which no
+  //   rounding story survives; the quantum is 0.36dp and the gaps are up to 3. Commit
+  //   38289d0 records the same retraction in components/home/HomeHero.js, and the two
+  //   must not be allowed to disagree.
+  //   What replaces it is not a better model. It is a measurement: `needs`.
+  //
+  // ► ONE DECIMAL, NOT WHOLE dp, AND THE PRECISION IS THE POINT.
+  //   Layout lands on the physical pixel grid, so a real width is a multiple of 1/density
+  //   dp — 54.9 and 55.3 are both "55" and mean different things. Whole-dp output would
+  //   round away the entire quantity under discussion.
   //
   // fontScale is the user's accessibility text-size setting. At 1.3 or 1.5 every label in
   // the app is a third wider than any figure derived on a desk, and it is invisible in code.
-  //
-  // ► ONE DECIMAL, NOT WHOLE dp, AND THE PRECISION IS THE POINT.
-  //   The first real finding printed `room 55dp · drew 52dp`, and the explanation for it
-  //   turns on a deficit of well under a point: Yoga force-CEILS a text node's own frame
-  //   (PixelGrid.cpp:85 — "we never want to round down its size as this could lead to
-  //   unwanted text truncation") but a content-hugging ANCESTOR is NodeType::Default and
-  //   gets plain round-to-nearest, so it can discard the fraction that the text needed.
-  //
-  //   Whole-dp output rounds away exactly that quantity. It made the instrument report the
-  //   symptom while hiding the evidence, and left the deficit to be inferred from 55 vs 52
-  //   rather than read off. Layout lands on the physical pixel grid, so a real width is a
-  //   multiple of 1/density dp — 54.9 and 55.3 are both "55" and mean different things.
-  const fmt = v => v.toFixed(1)
   const lineW = lines[0] && typeof lines[0].width === 'number' ? lines[0].width : null
-  const geom = [
-    boxWidth != null ? `room ${fmt(boxWidth)}dp` : null,
-    lineW != null ? `drew ${fmt(lineW)}dp` : null,
-    `fontScale ${PixelRatio.getFontScale()}`,
-    `${lines.length} line(s)`,
-  ].filter(Boolean).join(' · ')
+  const probe = makeProbe ? makeProbe() : { ok: false, why: 'the caller supplied no style to measure' }
 
-  report('truncate', keys.join('|'),
-    `[ada-audit] TEXT CLIPPED  ${keys.map(k => `t('${k}')`).join(' or ')}\n` +
-    (owner ? `            at     : ${owner}\n` : '') +
-    `            wanted : "${display(source)}"\n` +
-    `            drew   : "${display(rendered)}"\n` +
-    `            box    : ${geom}\n` +
-    `            This label does not fit in its allowed lines in the current language.\n` +
-    `            If the clipping is intended, add the key to ALLOW_TRUNCATION in\n` +
-    `            constants/textAuditAllowlist.js with a reason.`)
+  const emit = r => {
+    const needs = needsReport(r, probe)
+    const deficit = (needs.box != null && boxWidth != null) ? needs.box - boxWidth : null
+
+    // ► EACH BRANCH STATES WHAT WAS MEASURED AND WHAT TO DO. None of them names a
+    //   mechanism it did not measure — that is the habit which produced the ceil-vs-round
+    //   model retired above, and a plausible cause printed in an instrument's own voice is
+    //   read as a finding.
+    let verdict
+    if (deficit == null) {
+      const missing = boxWidth == null
+        ? 'the box width never arrived (onLayout did not fire for this node)'
+        : 'see the `needs` line above'
+      verdict = `not enough to diagnose — ${missing}.`
+    } else if (deficit > 0.5) {
+      verdict = `the box is ${fmt(deficit)}dp NARROWER than this string needs. ` +
+                'The constraint is upstream:\n              measure the PARENT, not the string.'
+    } else if (deficit > 0) {
+      verdict = `the box is short by ${fmt(deficit)}dp. A pixel of slack on this Text covers it.`
+    } else {
+      // The box was big enough and it clipped regardless. Two different passes can be at
+      // fault and they take different fixes, so the glyph width decides between them rather
+      // than one of them being asserted.
+      const inset = probe.ok ? horizontalInset(probe.style) : 0
+      const contentBox = boxWidth - inset
+      if (r.glyphs != null && r.glyphs > contentBox) {
+        verdict = `the box measured ${fmt(-deficit)}dp WIDER than needed, yet the full string's\n` +
+                  `              glyphs are ${fmt(r.glyphs)}dp against ${fmt(contentBox)}dp of content box` +
+                  (inset ? ` (${fmt(boxWidth)} − ${fmt(inset)} padding/border)` : '') + '.\n' +
+                  '              The MEASURE pass gave this Text less than the DRAW pass needs.'
+      } else {
+        verdict = `the box was ${fmt(-deficit)}dp WIDER than the string needs, and the glyphs ` +
+                  `(${r.glyphs != null ? fmt(r.glyphs) + 'dp' : '?'})\n` +
+                  `              fit inside ${fmt(contentBox)}dp of content box. It ellipsized anyway:\n` +
+                  '              the cut is in the ellipsize comparison, not in either measurement.'
+      }
+    }
+
+    print(
+      `[ada-audit] TEXT CLIPPED  ${keys.map(k => `t('${k}')`).join(' or ')}\n` +
+      (owner ? `            at      : ${owner}\n` : '') +
+      `            wanted  : "${display(source)}"\n` +
+      `            painted : "${display(rendered)}"\n` +
+      `            box     : ${boxWidth != null ? fmt(boxWidth) + 'dp' : '   ?  '}   the width this Text was LAID OUT at     (incl. padding)\n` +
+      `            painted : ${lineW != null ? fmt(lineW) + 'dp' : '   ?  '}   that TRUNCATED string, on line 1        (glyphs only)\n` +
+      `            needs   : ${needs.text}\n` +
+      `            ⇒ ${verdict}\n` +
+      `            fontScale ${PixelRatio.getFontScale()} · ${lines.length} line(s)` +
+      (probe.shrinks ? '\n            NOTE: this Text sets adjustsFontSizeToFit, so it shrinks its own font to\n' +
+                       '                  fit. `needs` is measured at the UNSHRUNK size.' : '') + '\n' +
+      `            If the clipping is intended, add the key to ALLOW_TRUNCATION in\n` +
+      `            constants/textAuditAllowlist.js with a reason.`)
+  }
+
+  if (!probe.ok) { emit({ box: null, glyphs: null, lineCount: null }); return }
+  requestNeeds(source, probe, emit)
 }
 
 
@@ -435,7 +714,11 @@ export function install() {
             //   formatted is a bug in this file, not in the app, and it must say so rather
             //   than costing another launch to diagnose.
             try {
-              handleTruncation(source, lines, owner, boxWidth.current)
+              // The probe's style is built LAZILY, from this render's props, and only if a
+              // clip is actually found. Flattening a style on every measurement of every
+              // watched node in the app would be real dev-mode cost for the ~99% that are
+              // fine; this closure already holds the props, so deferring it is free.
+              handleTruncation(source, lines, owner, boxWidth.current, () => probeFromProps(props))
             } catch (e) {
               console.warn('[ada-audit] a verdict threw while being reported — this is a bug in\n' +
                            '            utils/devTextAudit.js, not in the screen. The audit keeps running.\n' +
@@ -496,6 +779,21 @@ export function install() {
 // audit depends on, not a lookalike of it.
 export function AuditControls() {
   const { Text } = require('react-native')
+
+  // The `needs` probes are raised from a layout callback, which is outside React. This is
+  // the subscription that turns one into a rendered node. It holds no copy of the queue —
+  // the queue is the module-level array, and this only asks to be re-run when it grows.
+  const [, bump] = useState(0)
+  useEffect(() => {
+    needsListener = () => bump(v => v + 1)
+    // An effect runs AFTER the first commit, so anything queued in the gap has no listener
+    // to wake it and would sit unrendered until the next finding. Its report is safe either
+    // way — the deadline covers that — but the startup NEEDS control would report DID NOT
+    // REPORT and condemn a probe path that is fine.
+    if (needsQueue.length) bump(v => v + 1)
+    return () => { needsListener = null }
+  }, [])
+
   return (
     <View style={s.probeHost} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <View style={s.probeNarrow}>
@@ -503,6 +801,36 @@ export function AuditControls() {
       </View>
       <View style={s.probeWide}>
         <Text numberOfLines={6} style={s.probeText}>{NEGATIVE_PROBE}</Text>
+      </View>
+
+      {/* ► NO numberOfLines ON ANY OF THESE, AND THAT IS THE WHOLE EXCLUSION.
+          It is what keeps a probe out of `state.watched` and out of handleTruncation —
+          see THE `needs` PROBE above. Do not add one "to be safe": it would make the
+          instrument audit its own reflection and inflate the heartbeat at the same time.
+
+          alignItems:'flex-start' on the host is what makes each probe HUG its text. A
+          column container stretches its children by default, which would hand every probe
+          the host's full width and make `needs` a constant — a probe that always returns
+          the same number being the textbook instrument that cannot fail. */}
+      <View style={s.needsHost}>
+        {needsQueue.map(entry => (
+          <Text
+            key={entry.key}
+            {...entry.textProps}
+            style={entry.style}
+            onLayout={e => {
+              const w = e && e.nativeEvent && e.nativeEvent.layout ? e.nativeEvent.layout.width : null
+              if (typeof w === 'number') { entry.box = w; entry.arrived() }
+            }}
+            onTextLayout={e => {
+              const ls = e && e.nativeEvent && e.nativeEvent.lines
+              if (!Array.isArray(ls) || ls.length === 0) return
+              entry.lineCount = ls.length
+              if (typeof ls[0].width === 'number') entry.glyphs = ls[0].width
+              entry.arrived()
+            }}
+          >{entry.text}</Text>
+        ))}
       </View>
     </View>
   )
@@ -518,4 +846,12 @@ const s = StyleSheet.create({
   probeNarrow: { width: 40 },
   probeWide:   { width: 200 },
   probeText:   { fontSize: 12, color: colors.textPrimary },
+
+  // Its OWN host, deliberately not probeHost's 220dp. A `needs` probe that hits the edge
+  // of its container wraps, and a wrapped probe is refused rather than reported (see
+  // needsReport) — so the width has to be far past anything UI chrome could ask for, and
+  // it is free: the host is absolutely positioned, off-screen and never painted.
+  // If a real string ever does wrap here, the report says so BY NAME and points at this
+  // constant, rather than quietly returning a width that means nothing.
+  needsHost:   { width: NEEDS_HOST_WIDTH, alignItems: 'flex-start' },
 })
