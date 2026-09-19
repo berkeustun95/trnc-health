@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, shadow } from '../../constants/theme'
+import { colors, shadow, ellipsizeSlack } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { Skeleton } from '../Skeleton'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../utils/dutyStatus'
@@ -204,7 +204,18 @@ const s = StyleSheet.create({
   // grid tiles — and an event starting in four hours is not that. White on #0E7C7B is
   // 5.01:1.
   tagSoon:       { backgroundColor: colors.primary },
-  tagText:       { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  // ...ellipsizeSlack — see constants/theme.js for the measurement.
+  //
+  // ► THIS ONE IS INFERRED, NOT MEASURED, and it is the only one of the eight that is.
+  //   The five labels with `needs == box` on the probe are all EventsScreen chips. This tag
+  //   has the same signature from the older report (box 83.6, painted 82.0) and the same
+  //   shape — a single-line label hugging its own width — so it gets the same token, but it
+  //   has not been through the probe.
+  //   If it still clips after that, it is the FIRST `needs > box` case and a different bug:
+  //   the constraint would be `tag`'s maxWidth:'84%' above squeezing the Text from outside,
+  //   which no amount of slack on the Text can fix. The audit's verdict line says which.
+  //   At 16 glyphs it also tests the claim that the fix does not scale with length.
+  tagText:       { ...ellipsizeSlack, fontSize: 10, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   band:          { position: 'absolute', left: 0, right: 0, bottom: 0, height: STRIP_BAND_H,
                    backgroundColor: 'rgba(0,0,0,0.78)', flexDirection: 'row', alignItems: 'center',
                    paddingHorizontal: 12, gap: 8 },

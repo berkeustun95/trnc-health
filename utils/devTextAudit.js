@@ -569,6 +569,8 @@ function handleTruncation(source, lines, owner, boxWidth, makeProbe) {
     //   model retired above, and a plausible cause printed in an instrument's own voice is
     //   read as a finding.
     let verdict
+    let fix = 'If the clipping is intended, add the key to ALLOW_TRUNCATION in\n' +
+              '            constants/textAuditAllowlist.js with a reason.'
     if (deficit == null) {
       const missing = boxWidth == null
         ? 'the box width never arrived (onLayout did not fire for this node)'
@@ -591,10 +593,21 @@ function handleTruncation(source, lines, owner, boxWidth, makeProbe) {
                   (inset ? ` (${fmt(boxWidth)} − ${fmt(inset)} padding/border)` : '') + '.\n' +
                   '              The MEASURE pass gave this Text less than the DRAW pass needs.'
       } else {
-        verdict = `the box was ${fmt(-deficit)}dp WIDER than the string needs, and the glyphs ` +
+        // Exact equality is the SIGNATURE of this bug, not an edge of it — all eight known
+        // instances landed here — so it gets said as equality rather than as "0.0dp wider".
+        const fit = deficit === 0
+          ? 'this string fits its box EXACTLY'
+          : `the box was ${fmt(-deficit)}dp WIDER than the string needs`
+        verdict = `${fit}, and the glyphs ` +
                   `(${r.glyphs != null ? fmt(r.glyphs) + 'dp' : '?'})\n` +
                   `              fit inside ${fmt(contentBox)}dp of content box. It ellipsized anyway:\n` +
                   '              the cut is in the ellipsize comparison, not in either measurement.'
+        // This branch KNOWS which bug it is, so it must not hand the reader the generic
+        // "add it to the allowlist" line — that is the wrong action, taken by the person
+        // who has just been shown the right one.
+        fix = 'THIS IS THE ellipsizeSlack BUG. Spread ...ellipsizeSlack (constants/theme.js)\n' +
+              '            into this style. It is NEVER an ALLOW_TRUNCATION entry: the label is not\n' +
+              '            too long for its box, it fits exactly and is cut anyway.'
       }
     }
 
@@ -610,8 +623,7 @@ function handleTruncation(source, lines, owner, boxWidth, makeProbe) {
       `            fontScale ${PixelRatio.getFontScale()} · ${lines.length} line(s)` +
       (probe.shrinks ? '\n            NOTE: this Text sets adjustsFontSizeToFit, so it shrinks its own font to\n' +
                        '                  fit. `needs` is measured at the UNSHRUNK size.' : '') + '\n' +
-      `            If the clipping is intended, add the key to ALLOW_TRUNCATION in\n` +
-      `            constants/textAuditAllowlist.js with a reason.`)
+      `            ${fix}`)
   }
 
   if (!probe.ok) { emit({ box: null, glyphs: null, lineCount: null }); return }

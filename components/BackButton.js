@@ -1,6 +1,6 @@
 import { TouchableOpacity, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../constants/theme'
+import { colors, ellipsizeSlack } from '../constants/theme'
 import { t } from '../constants/i18n'
 
 // The app's single back control. Replaces five ad-hoc variants (chevron-back at
@@ -101,10 +101,16 @@ const s = StyleSheet.create({
   //   on a crowded header; an auto-sized box containing a growing child is unbounded by
   //   construction, and the one header I measured simply had nothing to its right to lose.
   //
-  //   The tolerance therefore has to be BOUNDED. 2dp of padding adds 2dp to this Text and
-  //   to nothing else: it cannot consume a row, and it cannot vary with what is beside it.
-  //   flexShrink stays, so a genuinely constrained call site (BusRoutes caps its pill at
-  //   maxWidth 120 and passes a module title) still ellipsizes rather than overflowing.
-  label: { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary,
-           flexShrink: 1, paddingRight: 2 },
+  //   The tolerance therefore has to be BOUNDED, which is what ...ellipsizeSlack is: 2dp on
+  //   this Text and on nothing else. It cannot consume a row and cannot vary with what is
+  //   beside it. flexShrink stays, so a genuinely constrained call site (BusRoutes caps its
+  //   pill at maxWidth 120 and passes a module title) still ellipsizes rather than
+  //   overflowing.
+  //
+  //   This was a bare `paddingRight: 2` until 2026-09-20. It is the same bug as the five
+  //   EventsScreen chips and LiveStrip's tag — a string that fits its box EXACTLY and is
+  //   cut regardless — so it now points at the one token that carries the measurement.
+  //   constants/theme.js has the numbers and the three hypotheses that died getting to them.
+  label: { ...ellipsizeSlack, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary,
+           flexShrink: 1 },
 })

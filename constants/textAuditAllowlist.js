@@ -32,6 +32,17 @@
 //   signal. The audit only watches UI CHROME, which is where all four of the 2026-09-17
 //   bugs lived.
 //
+// ► ONE CLASS OF REPORT MUST NEVER BE SUPPRESSED HERE, AND IT IS THE COMMON ONE.
+//   If the report says `needs` equals `box` — the string fits its own box EXACTLY and was
+//   ellipsized regardless — that is not a label too long for its space. It is React
+//   Native's ellipsize comparison cutting on equality, and the fix is to spread
+//   `...ellipsizeSlack` (constants/theme.js) into that style. Eight labels across four
+//   components had it on 2026-09-20; the audit will keep finding more, because the bug is
+//   in the comparison rather than in any one screen.
+//   An allowlist entry here would hide a real, fixable defect behind a sentence saying the
+//   clipping was intended. It was not. The audit prints this instruction itself on that
+//   branch, so nobody should arrive at this file for one of them.
+//
 // Every entry needs a `reason`. An entry without one is a mute, not a decision.
 
 export const ALLOW_TRUNCATION = [

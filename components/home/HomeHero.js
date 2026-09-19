@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Feather, Ionicons } from '@expo/vector-icons'
-import { colors } from '../../constants/theme'
+import { colors, ellipsizeSlack } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../constants/regions'
 import { resolveHero } from '../../constants/homeHero'
@@ -468,42 +468,35 @@ const s = StyleSheet.create({
   // 14pt, down from 17. "Smaller and lighter" is the brief; the floor does not move with
   // size here because 17pt was never large-text either (that needs 18pt, or 14pt bold).
   //
-  // ─── THE ROUNDING MODEL LOST ITS OWN TEST. paddingRight IS THE ACTUAL FIX. ──
+  // ─── THE ROUNDING MODEL LOST ITS OWN TEST. ...ellipsizeSlack IS THE ACTUAL FIX. ──
   //
-  // 08d198f removed `alignSelf: 'flex-start'` from `chip` above and explained the clip
-  // with a Yoga pixel-grid argument: PixelGrid.cpp:85 force-CEILS a text node's frame,
-  // NodeType::Text is set only on nodes with a measure function (node/Node.cpp:113), so a
-  // content-hugging ancestor takes plain round-to-nearest and can discard the fraction the
-  // text needed. That commit was honest that the mechanism was a DIAGNOSIS and had not
-  // been empirically tested, and it said the next clip the detector found would be "the
-  // FIRST REAL TEST of this model, not a confirmation of it".
+  // 08d198f removed `alignSelf: 'flex-start'` from `chip` above and explained this clip
+  // with a Yoga pixel-grid argument: PixelGrid.cpp:85 force-CEILS a text node's frame, so
+  // a content-hugging ancestor taking plain round-to-nearest could discard the fraction
+  // the text needed. That commit was honest that the mechanism was a DIAGNOSIS and said
+  // the next clip the detector found would be "the FIRST REAL TEST of this model, not a
+  // confirmation of it". That clip was t('back') on ScreenHeader, and THE MODEL LOST — see
+  // 7e1210a. Lefkoşa also kept clipping after 08d198f shipped, which is the second failure.
   //
-  // That clip was t('back') on ScreenHeader, and THE MODEL LOST — see 7e1210a. Lefkoşa
-  // also kept clipping after 08d198f shipped, which is the second failure.
+  // ► REMOVING alignSelf WAS INERT BY CONSTRUCTION, and that is the part to carry forward.
+  //   flexBasis defaults to `auto`, which hands a Text EXACTLY ITS OWN MEASURED WIDTH
+  //   whether its parent hugs or stretches. The chip got wider; the Text did not. Nothing
+  //   about a hugging ancestor was ever reaching this Text's width.
   //
-  // ► REMOVING alignSelf WAS INERT BY CONSTRUCTION, and that is the part to carry
-  //   forward. flexBasis defaults to `auto`, which hands a Text EXACTLY ITS OWN MEASURED
-  //   WIDTH whether its parent hugs or stretches. The chip got wider; the Text did not.
-  //   Nothing about a hugging ancestor was ever reaching this Text's width.
+  // ► WHAT IT ACTUALLY IS, measured 2026-09-20 and recorded in constants/theme.js: RN cuts
+  //   a single-line Text whose string fits its box EXACTLY. Five labels measured
+  //   needs == box == glyphs to the decimal and ellipsized regardless, which puts the fault
+  //   in the comparison rather than in either measurement. THE NUMBERS LIVE WITH THE TOKEN,
+  //   not here — an earlier draft of this comment carried its own .ttf advance table and a
+  //   "the draw pass wants more than the measure pass gave" conclusion, and BOTH were
+  //   wrong: the table compared the engine against a font file rather than against itself.
+  //   One owner for the measurement is the point.
   //
-  // ► THE MEASUREMENTS, two fonts and two weights, read from the real .ttf files rather
-  //   than estimated:
-  //       Geri     Inter_400Regular 15   29.22dp of glyphs, given 29.9dp  — 1.023x
-  //       Lefkoşa  Inter_600SemiBold 14  53.86dp of glyphs, given 55.3dp  — 1.027x
-  //   Both ellipsized with ~2.5% headroom by the font's own metrics. A FONT-SCALE
-  //   explanation dies on exactly that: a scale factor produces ONE ratio, not two, and
-  //   the audit prints PixelRatio.getFontScale() in every report. What is left is the
-  //   draw pass wanting marginally more than the measure pass gave — and a Text sized to
-  //   its own measurement has no tolerance at all for that disagreement.
-  //
-  // ► SO: 2dp of bounded padding, the same fix BackButton's label carries. It adds 2dp to
-  //   this Text and to nothing else, so it cannot consume a row and cannot vary with what
-  //   sits beside it. NOT flexGrow — ab2c6bf reverted that on the back label because Yoga
-  //   measures an auto-width container against the space AVAILABLE to it, so a growing
-  //   child made the container swallow the whole header. flexShrink stays: a genuinely
-  //   long name must still ellipsize rather than overflow.
-  district:  { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#fff', flexShrink: 1,
-               paddingRight: 2,
+  // ► NOT flexGrow — ab2c6bf reverted that on the back label because Yoga measures an
+  //   auto-width container against the space AVAILABLE to it, so a growing child made the
+  //   container swallow the whole header. flexShrink stays: a genuinely long name must
+  //   still ellipsize rather than overflow.
+  district:  { ...ellipsizeSlack, fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#fff', flexShrink: 1,
                textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   chipDot:   { fontSize: 12, color: 'rgba(255,255,255,0.75)',
                textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
