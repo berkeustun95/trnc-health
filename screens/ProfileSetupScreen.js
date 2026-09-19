@@ -32,7 +32,7 @@
 //    profiles_completion_requires_fields_check (20261001) makes that write FAIL LOUDLY
 //    if any required field is somehow absent, rather than marking an empty profile done.
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
   ActivityIndicator, Modal, Platform, BackHandler, Alert,
@@ -58,9 +58,12 @@ import {
   RESIDENT_STATUSES, STUDENT_LEVELS, INSTITUTION_REQUIRED_LEVELS, RESIDENT_STATUS_STUDENT,
   RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
   DISPLAY_NAME_MAX, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY,
-  affiliationPatch, STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
+  STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
 } from '../constants/profileGate'
 import { subjectOptions, studyYearOptions, studyYearCeiling } from '../utils/studyFields'
+// The wizard writes ENROLMENTS now, not the five profiles columns. Same module and the
+// same rules ProfileScreen uses, so the two writers cannot drift apart.
+import { enrolmentRow, isInstitutionCouplingBlock, profilesAffiliationClear } from '../utils/education'
 
 // TWO steps. What used to be Steps 1 and 2 — the six required identity fields — is now
 // one screen; the old Step 3 (region, status, the student conditional) became Step 2.
@@ -262,14 +265,24 @@ export default function ProfileSetupScreen({
   const [region, setRegion] = useState(profile?.region ?? prefillRegion ?? null)
   const [status, setStatus] = useState(profile?.resident_status ?? null)
   const [level, setLevel] = useState(profile?.student_level ?? null)
-  const [institution, setInstitution] = useState(profile?.institution_id ?? null)
+  const [institution, setInstitution] = useState(null)
   const [institutions, setInstitutions] = useState([])
 
-  // Steps 3–4. Pre-filled from the row so a re-gated user sees what they already stored.
+  // Steps 3–4.
+  //
+  // ► SEEDED FROM THE ENROLMENT, NOT FROM `profile`. These four used to read
+  //   profile.institution_id / subject_id / study_start_year / study_end_year, and those
+  //   keys are gone from PROFILE_COLUMNS — after 20261027 they do not exist at all. A
+  //   re-gated user must still see what they already stored, so the open enrolment is
+  //   loaded once below and seeded in.
   const [subjects, setSubjects] = useState([])
-  const [subjectId, setSubjectId] = useState(profile?.subject_id ?? null)
-  const [startYear, setStartYear] = useState(profile?.study_start_year ?? null)
-  const [endYear, setEndYear] = useState(profile?.study_end_year ?? null)
+  const [subjectId, setSubjectId] = useState(null)
+  const [startYear, setStartYear] = useState(null)
+  const [endYear, setEndYear] = useState(null)
+  // One-shot. An async seed that could land after the user has started typing would
+  // overwrite their answer with the stored one — the seed is a starting point, not a
+  // correction, so it runs once and never again.
+  const seeded = useRef(false)
 
   const [picker, setPicker] = useState(null)  // 'day' | 'month' | 'year' | 'nat' | 'cc' | 'inst' | 'subject' | 'startYear' | 'endYear'
 
@@ -323,10 +336,82 @@ export default function ProfileSetupScreen({
   const lastStep = studyStepsOn ? TOTAL_STEPS + STUDY_STEPS : TOTAL_STEPS
   const subjectOpts = useMemo(() => subjectOptions(subjects, lang), [subjects, lang])
 
+  // The user's OPEN enrolment, if they have one — the only row this wizard can be editing,
+  // because student_education_one_open_per_user permits no second. A closed one is history
+  // and belongs on ProfileScreen, not in a signup gate.
+  useEffect(() => {
+    if (seeded.current || !profile?.profile_completed_at) return
+    let cancelled = false
+    supabase
+      .from('student_education')
+      .select('institution_id, level, subject_id, study_start_year, study_end_year')
+      .eq('user_id', session.user.id)
+      .is('study_end_year', null)
+      .maybeSingle()
+      .then(({ data }) => {
+        // maybeSingle returns {data: null, error: null} on zero rows — it does NOT throw,
+        // so "no enrolment yet" lands here as a plain null and seeds nothing.
+        if (cancelled || !data) { seeded.current = true; return }
+        setInstitution(data.institution_id ?? null)
+        setSubjectId(data.subject_id ?? null)
+        setStartYear(data.study_start_year ?? null)
+        setEndYear(data.study_end_year ?? null)
+        seeded.current = true
+      })
+    return () => { cancelled = true }
+  }, [profile?.profile_completed_at, session.user.id])
+
   async function save(patch) {
     setSaving(true)
     setSaveError(false)
     const { error } = await supabase.from('profiles').update(patch).eq('id', session.user.id)
+    setSaving(false)
+    return error
+  }
+
+  // ─── The wizard's ONE enrolment ────────────────────────────────────────────
+  //
+  // ► UPSERT, NOT INSERT, AND THAT IS MANDATORY RATHER THAN DEFENSIVE.
+  //   This wizard re-runs for EVERY user on a profile_schema_version bump, and steps 3 and
+  //   4 each write again within a single run. An insert would 23505 on
+  //   student_education_user_inst_level_key the second time any of those happens — which,
+  //   for the re-run case, means the gate refusing to let an existing student back out of
+  //   it. The conflict target is that UNIQUE key exactly: (user_id, institution_id, level).
+  //
+  // ► ONE OPEN ROW IS ALL THE WIZARD EVER WRITES. It asks about university only when
+  //   studyStepsOn — a CURRENT student at university level — so a graduate signing up
+  //   answers 'working' or 'resident', is never asked, and adds their degree afterwards on
+  //   ProfileScreen. There is no "previously studied" concept here and there should not be:
+  //   signup is not the place to collect a history.
+  //
+  // ► A CLOSED ENROLMENT FROM THIS WIZARD IS LEGAL AND IS NOT A BUG. Step 4's end year is
+  //   optional, so a student graduating this year can enter one — and then their profile
+  //   says resident_status = 'student' while "Currently studying" on ProfileScreen is
+  //   empty, because study_end_year IS NULL is the sole definition of current. Nothing
+  //   enforces agreement between the two: it is a cross-table invariant a CHECK cannot
+  //   express, and 20261030 removed the last arm that came close.
+  //
+  //   Both alternatives are worse. Forbidding an end year here is wrong for exactly the
+  //   person most likely to use it. Deriving resident_status from enrolments makes a
+  //   status answer the user gave subordinate to a date they may not have entered. So the
+  //   disagreement is allowed, deliberately, and written down here rather than left for
+  //   the next reader to file as a defect.
+  //
+  // mirror_owned = false comes from enrolmentRow() — every row this app writes is
+  // app-owned, or 20261026's transition trigger is still entitled to unlist it.
+  async function writeEnrolment({ subjectId: subj, startYear: sy, endYear: ey }) {
+    if (!institution || !INSTITUTION_REQUIRED_LEVELS.includes(level)) return null
+    setSaving(true)
+    setSaveError(false)
+    const row = enrolmentRow(
+      { institutionId: institution, level, startYear: sy ?? null, endYear: ey ?? null, subjectId: subj ?? null },
+      // listing_opt_in is NOT set here. It defaults to false, the wizard never asks, and
+      // consent to appear on a student list is not something to infer from signing up.
+      { userId: session.user.id, listingOptIn: false },
+    )
+    const { error } = await supabase
+      .from('student_education')
+      .upsert(row, { onConflict: 'user_id,institution_id,level' })
     setSaving(false)
     return error
   }
@@ -457,19 +542,20 @@ export default function ProfileSetupScreen({
     }
 
     if (step > TOTAL_STEPS) {
-      // Only what this step owns. endYear is passed as the STORED value on step 3 because
-      // it decides whether the institution survives, not because step 3 edits it.
-      const base = { status, level, institutionId: institution, endYear: profile?.study_end_year ?? null }
-      const patch = step === 3
-        ? (subjectId !== (profile?.subject_id ?? null) ? affiliationPatch({ ...base, subjectId }) : null)
-        : (startYear !== (profile?.study_start_year ?? null) || endYear !== (profile?.study_end_year ?? null)
-            ? affiliationPatch({ ...base, startYear, endYear }) : null)
-      if (patch) {
-        const error = await save(patch)
-        if (error) {
-          setSaveError(String(error.message ?? '').includes(STUDY_END_YEAR_IN_FUTURE) ? 'pgStudyEndFuture' : 'pgSaveError')
-          return
-        }
+      // ─── THE STUDY STEPS EDIT THE ENROLMENT, NOT THE PROFILE ─────────────────
+      //
+      // Step 2 has already written the row (see writeEnrolment below), so these two steps
+      // only ever UPDATE it. Each sends only what it owns: step 3 the subject, step 4 the
+      // years. The whole row is re-sent through the same upsert so there is one writer and
+      // one place where mirror_owned is set, rather than a second shape to keep in step.
+      // Both steps send the whole row. Step 3 has not collected years yet and step 4 has
+      // not changed the subject, but the values in hand ARE the current answers either way
+      // — so one upsert with one shape beats two partial patches that must each remember
+      // which columns they are allowed to leave alone.
+      const error = await writeEnrolment({ subjectId, startYear, endYear })
+      if (error) {
+        setSaveError(String(error.message ?? '').includes(STUDY_END_YEAR_IN_FUTURE) ? 'pgStudyEndFuture' : 'pgSaveError')
+        return
       }
       if (step === 3) { setStep(4); return }
       onDone()
@@ -479,9 +565,12 @@ export default function ProfileSetupScreen({
     const error = await save({
       region,
       resident_status: status,
-      // student_level, institution_id and — only when the institution goes — the four
-      // study columns. The stored end year is what keeps a graduate's institution.
-      ...affiliationPatch({ status, level, institutionId: institution, endYear: profile?.study_end_year ?? null }),
+      // ► student_level ONLY. The five affiliation columns are not written by this wizard
+      //   any more — the institution goes to student_education below, and naming a column
+      //   20261027 drops would 42703 the mandatory signup gate for every new user.
+      //   profiles_student_level_coupling_check still requires this to be NULL for anyone
+      //   whose resident_status is not 'student'.
+      student_level: status === RESIDENT_STATUS_STUDENT ? (level ?? null) : null,
       profile_completed_at: new Date().toISOString(),
       profile_schema_version: CURRENT_PROFILE_SCHEMA_VERSION,
       // ⚠ THE COLUMN IS SENT ONLY WHEN TICKED, AND OMITTING IT IS NOT THE SAME AS
@@ -497,13 +586,64 @@ export default function ProfileSetupScreen({
       // trigger says WHEN.
       ...(TERMS_CHECKBOX_LIVE && marketingOk ? { marketing_opt_in_at: new Date().toISOString() } : {}),
     })
-    if (error) {
+    let completionError = error
+
+    // ─── CLAIM, CLEAR, RETRY — the same recovery ProfileScreen carries, reached ──
+    // ─── through a different door. ──────────────────────────────────────────────
+    //
+    // A NEW signup never gets here: their institution_id is NULL, so
+    // profiles_institution_coupling_check passes outright. But THIS WIZARD RE-RUNS FOR
+    // EVERY USER on a profile_schema_version bump, and an existing CURRENT student with a
+    // stale institution_id who answers anything other than 'student' on that re-run sends
+    // student_level to NULL above and trips the same 23514 — inside a MANDATORY gate they
+    // cannot leave. Same narrow population as ProfileScreen, different door.
+    //
+    // The order is the safety property, not a preference. CLAIM first: 20261026's unlist
+    // branch is scoped `WHERE user_id = NEW.id AND mirror_owned`, so clearing
+    // institution_id while a row is still trigger-owned silently de-lists that person and
+    // tells them nothing. Then CLEAR the five alone — legal on its own, since institution_id
+    // IS NULL satisfies the coupling check outright and student_level is untouched at that
+    // moment. Then RETRY.
+    //
+    // Detected from the refusal, never predicted from a read: reading those columns to
+    // decide in advance would 42703 after 20261027, and this build is what is installed
+    // then. Once they are dropped the CHECK goes with them and this branch is unreachable —
+    // which is why the go-live checklist requires exercising it BEFORE the drop.
+    if (isInstitutionCouplingBlock(completionError)) {
+      await supabase.from('student_education')
+        .update({ mirror_owned: false }).eq('user_id', session.user.id)
+      await supabase.from('profiles')
+        .update(profilesAffiliationClear()).eq('id', session.user.id)
+      completionError = await save({
+        region,
+        resident_status: status,
+        student_level: status === RESIDENT_STATUS_STUDENT ? (level ?? null) : null,
+        profile_completed_at: new Date().toISOString(),
+        profile_schema_version: CURRENT_PROFILE_SCHEMA_VERSION,
+        ...(TERMS_CHECKBOX_LIVE && marketingOk ? { marketing_opt_in_at: new Date().toISOString() } : {}),
+      })
+    }
+
+    if (completionError) {
       // The final write is the ONE that can trip the completion constraint, because it is
       // the write that sets profile_completed_at. Everything before it is a partial row
       // the constraint deliberately ignores.
-      setSaveError(completionViolation(error) ? missingFieldMessage() : 'pgSaveError')
+      setSaveError(completionViolation(completionError) ? missingFieldMessage() : 'pgSaveError')
       return
     }
+
+    // ► COMPLETION FIRST, ENROLMENT SECOND, and the order is chosen for its failure mode.
+    //   If this write fails, the user has a COMPLETED profile and no enrolment — which is
+    //   exactly the state 20261030 legitimised, and which ProfileScreen's education section
+    //   is built to fill in. The reverse order leaves an orphan enrolment under an
+    //   incomplete profile: invisible to everything (listing_opt_in is false, so
+    //   can_see_student_lists stays false), but a row nobody asked for.
+    //
+    //   It also matches the rule this file already states below: the study steps come after
+    //   completion, never before.
+    const enrolError = await writeEnrolment({ subjectId, startYear, endYear })
+    if (enrolError) { setSaveError('pgSaveError'); return }
+
     // Completion is written. The study steps come after it, never before. Step 3 even if
     // the subject list has not arrived: Skip is there, and a jump to 4 on a slow network
     // would drop the subject question without anyone deciding to.
@@ -671,7 +811,7 @@ export default function ProfileSetupScreen({
               </Field>
               <Field label={t('pgResidentStatus', lang)} hint={t('pgResidentHelper', lang)}>
                 {/* The institution is NOT cleared here or on a level change: the write's
-                    affiliationPatch() decides, because a graduate's end year keeps it. */}
+                    the enrolment row keeps it, independently of resident_status. */}
                 <RowGroup options={statusOptions} value={status}
                   onSelect={v => { setStatus(v); if (v !== 'student') setLevel(null) }} />
               </Field>

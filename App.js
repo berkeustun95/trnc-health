@@ -141,7 +141,18 @@ function TypeSVGIcon({ type, size, color }) {
 // toggle reads marketing_opt_in_at, and a future re-acceptance round needs all four
 // without a second query. scripts/check-privacy-parity.mjs derives its field list from
 // this constant, so each of the four also had to be justified there.
-const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, institution_id, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible, terms_version, terms_accepted_at, terms_locale, marketing_opt_in_at, study_start_year, study_end_year, subject_id, student_listing_opt_in'
+// ► THE FIVE AFFILIATION COLUMNS ARE NOT SELECTED, and removing them was the last thing
+//   standing between this build and 20261027. This string feeds BOTH profile loads
+//   (below and in the auth listener), so naming a dropped column here is not a degraded
+//   screen — it is a 42703 on the only read that produces `profile`, for every user, on
+//   every launch. The app would not get past the loading frame.
+//
+//   Nothing downstream consumed them: grepping the whole client for
+//   profile.institution_id / study_start_year / study_end_year / subject_id /
+//   student_listing_opt_in found no reader outside the wizard's own seed, which now reads
+//   the enrolment instead. student_level STAYS — it is not one of the five, 20261027 does
+//   not drop it, and the profile gate still asks for it.
+const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible, terms_version, terms_accepted_at, terms_locale, marketing_opt_in_at'
 
 
 // ─── The signup tick, written now that there is a session to write it with ──

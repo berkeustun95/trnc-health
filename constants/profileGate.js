@@ -124,37 +124,21 @@ export const EDUCATION_COLUMNS = [
   'institution_id', 'level', 'subject_id', 'study_start_year', 'study_end_year', 'listing_opt_in',
 ]
 
-// ─── AFFILIATION PATCH (20261024) — the ONE writer both screens use ─────────
+// ─── AFFILIATION PATCH (20261024) — REMOVED 2026-09-19, and not coming back ──
 //
-// Four CHECKs and a trigger couple these columns, and a patch that honours three of
-// them fails on the fourth with a 23514 on a LIVE screen. So the rule lives once, here:
-//   • institution_id stays only while the effective level is university/postgraduate
-//     OR a study_end_year is present (a graduate keeps their institution, whatever
-//     resident_status now says — profiles_institution_coupling_check's third arm).
-//   • when it goes, study_start_year, study_end_year, subject_id and
-//     student_listing_opt_in go with it IN THE SAME PATCH
-//     (profiles_study_fields_require_institution_check, …_listing_opt_in_requires_…).
-// A study value that is `undefined` is OMITTED, never sent as null: the wizard's
-// completion write owns none of them and must not wipe what ProfileScreen stored.
-// endYear decides whether the institution survives, so a caller that does not own it
-// passes the STORED value.
-export function affiliationPatch({ status, level, institutionId, startYear, endYear, subjectId, listingOptIn }) {
-  const student_level = status === RESIDENT_STATUS_STUDENT ? (level ?? null) : null
-  const keep = institutionId != null &&
-    (INSTITUTION_REQUIRED_LEVELS.includes(student_level) || endYear != null)
-  if (!keep) {
-    return {
-      student_level, institution_id: null,
-      study_start_year: null, study_end_year: null, subject_id: null, student_listing_opt_in: false,
-    }
-  }
-  const patch = { student_level, institution_id: institutionId }
-  if (startYear !== undefined) patch.study_start_year = startYear
-  if (endYear !== undefined) patch.study_end_year = endYear
-  if (subjectId !== undefined) patch.subject_id = subjectId
-  if (listingOptIn !== undefined) patch.student_listing_opt_in = listingOptIn
-  return patch
-}
+// affiliationPatch() existed because five profiles columns were coupled by four CHECKs,
+// so a patch honouring three of them failed on the fourth with a 23514 on a live screen.
+// It was the single writer for two slices, and both of its callers are gone:
+// ProfileScreen and ProfileSetupScreen now write enrolments to student_education, and
+// 20261027 drops the columns it existed to keep consistent.
+//
+// Deliberately deleted rather than left unused. A helper whose whole job is to write
+// dropped columns is a loaded gun for the next person who greps for "how do I set the
+// institution" — and it would 42703 the moment they called it. The coupling rules it
+// encoded live on in the claim-then-clear-then-retry branch in both screens, which is the
+// only code that may name those columns at all and can only run while they exist.
+//
+// student_level is NOT one of the five and is still written by both screens directly.
 
 // Mirrors the static bound on both year CHECKs in 20261024. The upper bound a picker
 // offers is NOT 2100: it is the current UTC year (studyYearCeiling in utils/studyFields.js),
