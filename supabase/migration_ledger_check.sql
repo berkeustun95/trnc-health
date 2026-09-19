@@ -150,7 +150,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261030_completion_check_drops_institution.sql', '38ea7211d68eeb7b0a14214b3c971dd60a2c83af97be842bfc9a7ca2145a5164'),
   ('20261031_push_data_conversation.sql', '758213dbe6c3ce4a46ff0718b78241f21340f83a42d628ca6d7e7d9063fef4dd'),
   ('20261032_blocks_origin.sql', '840863d3f2f1225659b829b18a002bb1de4afa0b4884839c899919ab46dd8828'),
-  ('20261033_reviews_author_not_public.sql', '01ffcd249b0bd612649f307943eb90ead399375e55053a9a41761cef7fb54f76')
+  ('20261033_reviews_author_not_public.sql', 'e9e93116d478ce3a676310842b1b6d3d871fe1ef078777d0bd6fb9fd7a828bd4')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

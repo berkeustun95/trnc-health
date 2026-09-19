@@ -2687,14 +2687,20 @@ WITH report AS (
     -- believing reviews are anonymous — which they are on every screen that renders them.
     --
     -- A DERIVED COUNT, 8 columns x 2 roles, never a list of the eight names. A name list
-    -- goes quiet about whatever it forgot to name; this goes RED when a future ADD COLUMN
-    -- is granted (18) or a grant is lost (14), and that edit is the review moment.
+    -- goes quiet about whatever it forgot to name; this has a red to go to.
     --
-    -- ⚠ THE SECOND CLAUSE IS THE ONE THAT CATCHES THE MITIGATION THAT DOES NOTHING.
-    --   `REVOKE SELECT (customer_id) …` leaves the TABLE-level grant intact, so the column
-    --   stays readable while the count above reads 16 — green, closing nothing.
-    --   has_column_privilege is the only surface that can tell those two apart, and it
-    --   also sees a grant inherited from PUBLIC, which neither statement would name.
+    -- WHAT EACH CLAUSE ACTUALLY CATCHES — they are not redundant, and getting the reason
+    -- wrong is how the next reader deletes one of them:
+    --
+    --   • THE COUNT sees a surviving TABLE-level grant. information_schema.column_privileges
+    --     EXPANDS a table grant into one row per column, so the broken
+    --     `REVOKE SELECT (customer_id) …` (which leaves the table grant intact) reads
+    --     9 x 2 = 18 here, not 16. It also catches a lost column grant (14) and a future
+    --     ADD COLUMN that somebody granted (18) — and that edit is the review moment.
+    --   • has_column_privilege sees what the count CANNOT: the count filters on
+    --     grantee IN ('anon','authenticated'), so a grant made to PUBLIC, or reaching these
+    --     roles through role membership, never appears in it as a row at all.
+    --     has_column_privilege resolves inherited privilege and answers the real question.
     UNION ALL SELECT '1033_reviews_author_not_public','reviews exposes 8 columns to anon/authenticated, and customer_id is not one',
       (SELECT count(*) FROM information_schema.column_privileges
         WHERE table_schema='public' AND table_name='reviews'

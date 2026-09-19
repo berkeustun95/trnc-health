@@ -65,6 +65,17 @@
 --      on a column that plainly exists, which is not where anyone will look first.
 --   2. `select('*')` on reviews now fails permanently. No call site uses it today
 --      (checked); a future one fails loudly rather than quietly re-exposing the column.
+--      SURFACES SWEPT for readers of reviews.customer_id, named so the claim is
+--      falsifiable: client JS (two — FacilityProfileScreen's own-review filter and
+--      AdminScreen's moderation read, both rewritten in the OTA that precedes this);
+--      supabase/functions/ (does not exist — there are no edge functions); and every
+--      function body in supabase/migrations/. The SQL readers are delete_own_account
+--      (`DELETE FROM reviews WHERE customer_id = auth.uid()`) and block_content_author
+--      (`SELECT customer_id INTO v_author`) — BOTH SECURITY DEFINER, verified in
+--      pg_proc terms by their CREATE statements, so both run as the owner and are
+--      unaffected. Trigger bodies touch NEW/OLD.customer_id only, which is a record
+--      field and needs no privilege. The remaining readers are the RLS policy quals,
+--      which section 3 measures rather than assumes.
 --   3. The verification below runs BEFORE COMMIT and aborts the whole migration if the
 --      policy quals stop working. See section 3 for why that is not paranoia.
 --
@@ -282,11 +293,22 @@ GRANT EXECUTE ON FUNCTION public.admin_content_author(text, uuid) TO authenticat
 -- `authenticated` IS given a sub, because that is its only real state, and it is what
 -- makes the blocks subquery actually execute. The uuid belongs to nobody on purpose.
 -- The claim is set AFTER the anon pass so the anon pass cannot see it.
+--
+-- ⚠ EVERY FAILURE CARRIES ITS SQLSTATE AND MESSAGE, AND NOTHING IS ATTRIBUTED BY GUESS.
+--   The first draft caught only insufficient_privilege on the read and then announced
+--   "RLS policy quals ARE column-privilege checked" — but 42501 from that statement could
+--   equally come from the policy's blocks subquery, and any OTHER error would have
+--   escaped this block raw, with none of the framing above it. Both are the same hazard
+--   this repo keeps relearning: an assertion that names a cause it did not measure sends
+--   the reader to the wrong place. So: WHEN OTHERS, capture RETURNED_SQLSTATE and
+--   MESSAGE_TEXT, and print both in whatever is raised.
 DO $$
 DECLARE
   v_reads_ok  boolean;
   v_blocked   boolean;
   v_role      text;
+  v_state     text := '';
+  v_msg       text := '';
 BEGIN
   FOR v_role IN SELECT unnest(ARRAY['anon', 'authenticated']) LOOP
     EXECUTE format('SET LOCAL ROLE %I', v_role);
@@ -301,10 +323,14 @@ BEGIN
     --     Valid on an empty table: column privileges are checked at executor start from
     --     the range-table entry, so if quals were privilege-checked this would raise with
     --     zero rows just as it would with a million.
+    --     The `sub` above belongs to no profile, which is a state production never has.
+    --     get_my_role() and is_admin() are both SECURITY DEFINER plain-SQL SELECTs with no
+    --     INTO STRICT, so they return NULL rather than raising on it — checked, not assumed.
     BEGIN
       PERFORM count(*) FROM public.reviews;
       v_reads_ok := true;
-    EXCEPTION WHEN insufficient_privilege THEN
+    EXCEPTION WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT;
       v_reads_ok := false;
     END;
 
@@ -321,10 +347,20 @@ BEGIN
     RESET ROLE;
 
     IF NOT v_reads_ok THEN
-      RAISE EXCEPTION
-        'ABORTING as %: reading reviews now fails. RLS policy quals ARE column-privilege '
-        'checked against the invoker, so this whole approach is wrong and the public '
-        'review list would have broken in production. Nothing applied.', v_role;
+      IF v_state = '42501' THEN
+        RAISE EXCEPTION
+          'ABORTING as %: reading reviews now fails with 42501 (%). If the denied object is '
+          'reviews.customer_id itself, RLS policy quals ARE column-privilege checked against '
+          'the invoker and this whole approach is wrong — the public review list would have '
+          'broken in production. If it names blocks or profiles, the policy''s SUBQUERY is '
+          'what lacks privilege and the grant to fix is there, not here. READ THE MESSAGE '
+          'BEFORE CONCLUDING EITHER. Nothing applied.', v_role, v_msg;
+      ELSE
+        RAISE EXCEPTION
+          'ABORTING as %: reading reviews failed with SQLSTATE % (%). This is NOT the '
+          'privilege question this block exists to settle — diagnose the error itself. '
+          'Nothing applied.', v_role, v_state, v_msg;
+      END IF;
     END IF;
 
     IF NOT v_blocked THEN
@@ -397,13 +433,19 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261033_reviews_author_not_public.sql', '01ffcd249b0bd612649f307943eb90ead399375e55053a9a41761cef7fb54f76')
+VALUES ('20261033_reviews_author_not_public.sql', 'e9e93116d478ce3a676310842b1b6d3d871fe1ef078777d0bd6fb9fd7a828bd4')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
 COMMIT;
 
--- No ADD COLUMN here, but the GRANT changes what PostgREST is allowed to project and it
--- caches privileges alongside the schema. Without this reload the API keeps answering
--- from the old picture — which on THIS migration means it keeps serving customer_id.
+-- No ADD COLUMN here, and the REVOKE does NOT need this to take effect: Postgres enforces
+-- privileges at query time, so customer_id stops being served the moment this commits,
+-- cache or no cache.
+--
+-- The reload is for the two new FUNCTIONS. PostgREST will not expose an RPC it has not
+-- seen, so without it get_my_review and admin_content_author 404 while the column they
+-- replace is already gone — the one window in which the client's fallback has nothing to
+-- fall back to, and the admin queue cannot resolve an author. Brief and self-healing
+-- (PostgREST re-introspects on its own schedule), but it is the window this avoids.
 NOTIFY pgrst, 'reload schema';
