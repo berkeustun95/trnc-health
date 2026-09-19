@@ -70,14 +70,26 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
   // maybeSingle() returns {data: null, error: null} on zero rows — it does not throw.
   // A soft-deleted review is invisible to its own author under the read policy, so
   // deleting one correctly puts the composer back.
+  // ─── RPC FIRST, COLUMN SECOND — this must work on BOTH sides of 20261033 ───
+  //
+  // 20261033 revokes SELECT on reviews.customer_id, and Postgres requires SELECT on any
+  // column read in a WHERE clause — so the `.eq('customer_id', …)` filter below stops
+  // working at the same moment the column does. get_my_review() is the replacement.
+  //
+  // Both paths are kept because this OTA ships BEFORE the migration is applied: until
+  // then the function does not exist (PostgREST 404s with PGRST202) and the column is
+  // still readable; afterwards the reverse. One of the two always works. Same shape as
+  // loadBlocks() in ProfileScreen — see 20261032.
   async function loadMyReview() {
     if (!session?.user?.id) { setMyReview(null); return }
-    const { data } = await supabase.from('reviews')
+    const { data, error } = await supabase.rpc('get_my_review', { p_facility_id: facility.id })
+    if (!error) { setMyReview(data?.[0] ?? null); return }
+    const { data: row } = await supabase.from('reviews')
       .select('id, rating, comment')
       .eq('facility_id', facility.id)
       .eq('customer_id', session.user.id)
       .maybeSingle()
-    setMyReview(data ?? null)
+    setMyReview(row ?? null)
   }
 
   // THE APP'S ONLY REVIEW-WRITE PATH as of 20261004. It used to sit behind an appointment

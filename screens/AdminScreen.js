@@ -507,6 +507,13 @@ const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answ
 // messages.sender_id is ON DELETE SET NULL, so a reported message whose author deleted
 // their account has NO author to ban. confirmBan already refuses on a null authorId.
 const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by', profile: 'id', message: 'sender_id' }
+// Types whose author column the client may NOT read, so it comes from admin_content_author()
+// instead. reviews.customer_id is revoked by 20261033: it is the only person-uuid on a
+// truly public table, and once the Student Hub is live get_student_list() turns it into a
+// name — attributing an anonymous review of a clinic or a psychiatric hospital to somebody.
+// The column is still in AUTHOR_COL above because that is the key the resolved uuid is
+// written back under, and confirmBan reads it there.
+const AUTHOR_VIA_RPC = new Set(['review'])
 const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name', profile: 'display_name', message: 'body' }
 // Columns only SOME tables have. messages carries deleted_at — the sender withdrew it —
 // and an admin who could not see that would judge a message the participants can no longer
@@ -572,14 +579,48 @@ function ReportsTab({ session }) {
       // read and empty the queue of every type, not just this one.
       // Deduped: for 'profile' both TEXT_COL and AUTHOR_COL resolve to columns that
       // overlap with `id`, and PostgREST is given the same name twice.
-      const cols = [...new Set(READ_ONLY_REPORT_TYPES.includes(type)
-        ? ['id', TEXT_COL[type], AUTHOR_COL[type]]
-        : ['id', TEXT_COL[type], AUTHOR_COL[type], 'hidden_at', 'hidden_reason', ...(EXTRA_COLS[type] ?? [])])].join(', ')
+      // ► AUTHOR_COL IS OMITTED FOR THE TYPES IN AUTHOR_VIA_RPC, AND THAT IS LOAD-BEARING.
+      //   20261033 revokes SELECT on reviews.customer_id. PostgREST fails the WHOLE select
+      //   with 42501 if ONE named column is unreadable — so leaving it in here would empty
+      //   contentByKey of every review row and render exactly the lie the note above warns
+      //   about, on real reports, with Dismiss as the obvious action.
+      const viaRpc = AUTHOR_VIA_RPC.has(type)
+      const cols = [...new Set([
+        'id', TEXT_COL[type],
+        ...(viaRpc ? [] : [AUTHOR_COL[type]]),
+        ...(READ_ONLY_REPORT_TYPES.includes(type)
+          ? []
+          : ['hidden_at', 'hidden_reason', ...(EXTRA_COLS[type] ?? [])]),
+      ])].join(', ')
       const { data } = await supabase
         .from(CONTENT_TABLE[type])
         .select(cols)
         .in('id', ids)
       for (const row of data ?? []) contentByKey.set(`${type}:${row.id}`, row)
+
+      // ─── The author, fetched separately, RPC first and column second ────────
+      // Works on BOTH sides of 20261033: before it the function is absent (404) and the
+      // column readable, after it the reverse. One always works — the same shape as
+      // loadBlocks() in ProfileScreen. Without this, confirmBan has no author and refuses
+      // with "This content no longer exists", which is the same lie by another route.
+      if (viaRpc) {
+        const col = AUTHOR_COL[type]
+        const got = await Promise.all(ids.map(id =>
+          supabase.rpc('admin_content_author', { p_content_type: type, p_content_id: id })))
+        if (got.every(r => !r.error)) {
+          ids.forEach((id, i) => {
+            const row = contentByKey.get(`${type}:${id}`)
+            if (row) row[col] = got[i].data ?? null
+          })
+        } else {
+          const { data: authors } = await supabase
+            .from(CONTENT_TABLE[type]).select(`id, ${col}`).in('id', ids)
+          for (const a of authors ?? []) {
+            const row = contentByKey.get(`${type}:${a.id}`)
+            if (row) row[col] = a[col]
+          }
+        }
+      }
     }
 
     const byKey = new Map()

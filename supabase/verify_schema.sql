@@ -374,7 +374,15 @@ WITH report AS (
     -- The CHECK behind student_task_i18n.steps. Missing = the CHECK cannot exist either.
     ('1017_student_tasks','student_task_steps_valid'),
     -- "An end year is not in the future." A trigger, not a CHECK (current_date is STABLE).
-    ('1024_student_affiliation','check_profile_study_years')
+    ('1024_student_affiliation','check_profile_study_years'),
+    -- 20261033. These two are not conveniences: they are the ONLY way the client can still
+    -- reach data that reviews.customer_id used to carry, now that SELECT on it is revoked.
+    -- If get_my_review goes missing, a user who has already reviewed a facility is shown the
+    -- composer again and their second attempt is rejected by the partial unique index — an
+    -- error with no explanation. If admin_content_author goes missing, no review report can
+    -- be banned on, and the admin queue says the content no longer exists.
+    ('1033_reviews_author_not_public','get_my_review'),
+    ('1033_reviews_author_not_public','admin_content_author')
   ) e(m,o)
 
   UNION ALL
@@ -765,7 +773,13 @@ WITH report AS (
     -- true `anon`. The migration's own DO block asserts BOTH grants via
     -- has_function_privilege(); this row covers the `authenticated` half every other RPC
     -- here is measured on.
-    ('1008_ad_banners','bump_ad_counter')
+    ('1008_ad_banners','bump_ad_counter'),
+    -- 20261033. Without these grants the functions exist and every call returns a
+    -- permission error: the review composer shows itself to someone who already reviewed,
+    -- and the admin queue cannot resolve an author to ban. Both replaced a plain column
+    -- read, so the failure looks like the app forgetting something rather than a 42501.
+    ('1033_reviews_author_not_public','get_my_review'),
+    ('1033_reviews_author_not_public','admin_content_author')
   ) e(m,o)
 
   UNION ALL
@@ -2661,6 +2675,47 @@ WITH report AS (
       AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='block_user'
           AND pg_get_functiondef(p.oid) ILIKE '%''person''%')
+    -- ══ an anonymous review stops carrying its author (20261033) ════════════
+    -- NOTHING ELSE IN THIS FILE CAN SEE THIS. A privilege is not a named object: sections
+    -- A-G would all read OK against a database where reviews.customer_id is handed to
+    -- every signed-out visitor, which is the state prod is in until 20261033 is applied.
+    --
+    -- Why it matters: reviews is the only TRULY public table carrying a person's uuid, and
+    -- get_student_list() returns (user_id, display_name). Join them and an anonymous review
+    -- of a dentist, a clinic or a psychiatric hospital acquires a named author. That is a
+    -- health disclosure about an identified person, inferred from data they published
+    -- believing reviews are anonymous — which they are on every screen that renders them.
+    --
+    -- A DERIVED COUNT, 8 columns x 2 roles, never a list of the eight names. A name list
+    -- goes quiet about whatever it forgot to name; this goes RED when a future ADD COLUMN
+    -- is granted (18) or a grant is lost (14), and that edit is the review moment.
+    --
+    -- ⚠ THE SECOND CLAUSE IS THE ONE THAT CATCHES THE MITIGATION THAT DOES NOTHING.
+    --   `REVOKE SELECT (customer_id) …` leaves the TABLE-level grant intact, so the column
+    --   stays readable while the count above reads 16 — green, closing nothing.
+    --   has_column_privilege is the only surface that can tell those two apart, and it
+    --   also sees a grant inherited from PUBLIC, which neither statement would name.
+    UNION ALL SELECT '1033_reviews_author_not_public','reviews exposes 8 columns to anon/authenticated, and customer_id is not one',
+      (SELECT count(*) FROM information_schema.column_privileges
+        WHERE table_schema='public' AND table_name='reviews'
+          AND privilege_type='SELECT' AND grantee IN ('anon','authenticated')) = 16
+      AND NOT has_column_privilege('anon', 'public.reviews', 'customer_id', 'SELECT')
+      AND NOT has_column_privilege('authenticated', 'public.reviews', 'customer_id', 'SELECT')
+    -- The replacement reads, asserted for the properties a C-section name check cannot see.
+    -- admin_content_author resolves the author of ANY content type, so an ungated copy is a
+    -- deanonymiser with a friendly name — strictly worse than the column it replaced.
+    UNION ALL SELECT '1033_reviews_author_not_public','both replacement reads are DEFINER, search_path pinned, admin_content_author gated, no anon EXECUTE',
+      (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname IN ('get_my_review','admin_content_author')
+          AND p.prosecdef AND p.proconfig::text ILIKE '%search_path=public%') = 2
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='admin_content_author'
+          AND pg_get_functiondef(p.oid) LIKE '%is_admin()%')
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public' AND p.proname IN ('get_my_review','admin_content_author')
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
     -- ══ message push carries routing data (20261031) ════════════════════════
     -- CREATE OR REPLACE creates no named object, so E/F/G are blind to it and only a
     -- behaviour token can tell an applied database from an unapplied one.
