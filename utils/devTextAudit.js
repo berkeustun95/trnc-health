@@ -156,6 +156,9 @@ const POSITIVE_PROBE = 'ADA audit positive control this string is far too long t
 const NEGATIVE_PROBE = 'ADA audit negative control string which has to wrap across several lines and must never be reported as clipped'
 
 const state = {
+  watched:        0,      // Text nodes with numberOfLines that this audit is watching
+  verdicts:       0,      // measurements actually evaluated
+  reported:       0,
   installed:      false,
   positivePassed: false,
   negativePassed: false,
@@ -169,36 +172,48 @@ const state = {
 //
 // The reverse lookup answers WHAT string broke, and it is deliberately unable to answer
 // WHERE: four modules each define their own key for "Nicosia" with the same Turkish value,
-// so "Lefkoşa" maps to four keys and the audit cannot tell which of them rendered. That is
-// not a bug in the lookup — it is a dictionary, and a dictionary genuinely does not know
-// who read it.
+// so "Lefkoşa" maps to four keys and the audit cannot tell which. That is not a bug in the
+// lookup — it is a dictionary, and a dictionary does not know who read it.
 //
-// React 19 can answer it. captureOwnerStack() returns the chain of components that OWN the
-// currently-rendering element (dev builds only), so the app frames in it name the component
-// that wrote the <Text> and the ones that placed it.
+// React 19's captureOwnerStack() answers it, in dev builds only. Read DURING RENDER and
+// carried into the layout callback, because it is meaningless outside one.
 //
-// ► THREE FRAMES, NOT ONE, AND THE FIRST VERSION'S SINGLE FRAME WAS USELESS FOR EXACTLY
-//   THE CASE THAT MATTERED. t('back') clipped on 2026-09-19 and the report said
-//   "at BackButton" — a shared control on roughly 35 screens, so the one name it gave was
-//   the one name that could not narrow anything. A component is only half the address;
-//   the other half is who rendered it, because the constraint that squeezed the text
-//   almost always lives in the parent rather than in the shared child.
+// ► THREE FRAMES, NOT ONE. t('back') clipped on 2026-09-19 and a one-frame report said
+//   "at BackButton" — a shared control on ~35 screens, so the only name it gave was the
+//   only name that narrowed nothing. A component is half an address; the other half is who
+//   rendered it, because the constraint that squeezes the text usually lives in the parent.
 //
-// Degrades to null rather than throwing: it is a dev-only API, it returns null outside
-// render, and a report with no location is still worth having.
+// ► AND NO ASSUMPTION ABOUT WHAT A FRAME LOOKS LIKE. The first attempt at three frames
+//   filtered on /screens\/|components\// and shipped with NO owner line at all. The filter
+//   had never matched anything: the version before it ended `|| frames[0] || null`, and
+//   that fallback was doing the entire job while the regex quietly matched nothing. Taking
+//   the fallback away took the feature with it.
+//
+//   Which frame format React actually produces here — component names, bundle URLs, or
+//   real file paths from the JSX source transform — was never measured, only assumed. So
+//   this no longer guesses: it drops only the audit's OWN frames, keeps whatever remains,
+//   and PRINTS THE RAW STACK ONCE so the format stops being a guess for the next person.
 const OWNER_FRAMES = 3
+let rawStackShown = false
 
 function ownerLocation() {
   try {
     const stack = React.captureOwnerStack && React.captureOwnerStack()
     if (!stack) return null
     const frames = stack.split('\n').map(l => l.trim()).filter(Boolean)
-      .filter(l => /screens\/|components\//.test(l) && !/devTextAudit/.test(l))
     if (frames.length === 0) return null
-    // Innermost first, then outward — read it as "this component, inside this one, inside
-    // that one". The separator is an arrow rather than a newline so one finding stays one
-    // greppable line in a console that is already busy.
-    return frames.slice(0, OWNER_FRAMES).join('  <-  ')
+
+    // Once per session, and only once: the raw first frames, verbatim. An assumption about
+    // this format is what broke the owner line, and a value nobody has ever looked at is
+    // exactly the kind that gets assumed again.
+    if (!rawStackShown) {
+      rawStackShown = true
+      console.log('[ada-audit] owner-stack format (raw, first 3 frames):\n  ' +
+                  frames.slice(0, 3).join('\n  '))
+    }
+
+    const useful = frames.filter(l => !/devTextAudit|AuditedText/.test(l))
+    return (useful.length ? useful : frames).slice(0, OWNER_FRAMES).join('  <-  ')
   } catch {
     return null
   }
@@ -208,7 +223,28 @@ function report(kind, key, message) {
   const id = `${kind}:${key}`
   if (state.seen.has(id)) return
   state.seen.add(id)
+  state.reported += 1
   console.warn(message)
+}
+
+// ─── SILENCE MUST NOT MEAN TWO THINGS ──────────────────────────────────────
+//
+// "No output" currently reads as both "nothing is wrong" and "the audit is dead", and
+// those were indistinguishable on 2026-09-19 — a broken owner line looked exactly like a
+// quiet screen. An instrument whose failure and success print the same thing is the
+// hazard CLAUDE.md names: ask what a healthy system prints here, and make a broken one
+// print something else.
+//
+// So it says it is alive, on a timer, and only when the numbers have moved. Navigating to
+// a new screen makes `watched` climb; if it stops climbing while you move around, the
+// audit is not watching any more and the silence is its own, not the app's.
+let lastBeat = { watched: -1, verdicts: -1 }
+function heartbeat() {
+  if (!state.positivePassed) return
+  if (state.watched === lastBeat.watched && state.verdicts === lastBeat.verdicts) return
+  lastBeat = { watched: state.watched, verdicts: state.verdicts }
+  console.log(`[ada-audit] alive — ${state.watched} node(s) watched, ` +
+              `${state.verdicts} measurement(s) checked, ${state.reported} reported`)
 }
 
 function handleTruncation(source, lines, owner, boxWidth) {
@@ -350,12 +386,16 @@ export function install() {
   function AuditedText(props) {
     const pending = useRef(null)
     const boxWidth = useRef(null)
+    const counted = useRef(false)
 
     let source = null
     const needsSource = props.numberOfLines > 0
     if (needsSource) {
       source = sourceTextOf(props.children)
     }
+    // Counted at render rather than at layout: a node this audit is WATCHING is the number
+    // that should climb as you navigate, whether or not anything about it is wrong.
+    if (needsSource && !counted.current) { counted.current = true; state.watched += 1 }
 
     // captureOwnerStack() is only meaningful DURING render, so it is read here and carried
     // into the layout callback rather than being read from inside it.
@@ -387,7 +427,20 @@ export function install() {
           if (pending.current) clearTimeout(pending.current)
           pending.current = setTimeout(() => {
             pending.current = null
-            handleTruncation(source, lines, owner, boxWidth.current)
+            state.verdicts += 1
+            // ► A THROW IN HERE MUST NOT BE ABLE TO SILENCE THE AUDIT.
+            //   This runs from a timer, so an exception escapes to the global handler and
+            //   whatever redbox it raises can be dismissed — after which the screen looks
+            //   exactly like an app with nothing to report. A verdict that cannot be
+            //   formatted is a bug in this file, not in the app, and it must say so rather
+            //   than costing another launch to diagnose.
+            try {
+              handleTruncation(source, lines, owner, boxWidth.current)
+            } catch (e) {
+              console.warn('[ada-audit] a verdict threw while being reported — this is a bug in\n' +
+                           '            utils/devTextAudit.js, not in the screen. The audit keeps running.\n' +
+                           `            ${e && e.message}`)
+            }
           }, SETTLE_MS)
         }}
       />
@@ -423,6 +476,8 @@ export function install() {
                  '            build; the audit needs another way in.')
     return
   }
+
+  setInterval(heartbeat, 10000)
 
   setTimeout(() => {
     if (!state.positiveFired && !state.negativeFired) {
