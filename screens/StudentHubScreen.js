@@ -551,7 +551,11 @@ function TaskDetail({ task, lang, progress, offline, onToggle, onReset, onBack }
   )
 }
 
-export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewcomerEssentials, isGuest = false, onGoToProfile }) {
+export default function StudentHubScreen({
+  lang, onBack, onShowEsim, onShowNewcomerEssentials, isGuest = false, onGoToProfile,
+  initialConversationId = null,   // set by a tapped push notification
+  onConversationOpened,
+}) {
   const [tab, setTab] = useState('universities')
   const [universities, setUniversities] = useState(null)
   const [failed, setFailed] = useState(false)
@@ -664,6 +668,31 @@ export default function StudentHubScreen({ lang, onBack, onShowEsim, onShowNewco
     })
     return () => { cancelled = true }
   }, [isGuest])
+
+  // ─── A TAPPED PUSH NOTIFICATION LANDS HERE ────────────────────────────────
+  //
+  // The payload carries only `conversation_id` (20261031), so the row has to be resolved
+  // the same way openThreadWith does — through list_conversations(), the one sanctioned
+  // read path. A push is the ONLY way into a thread that does not pass through a profile
+  // page, which is why this cannot reuse that route.
+  //
+  // Cleared through onConversationOpened whatever the outcome, INCLUDING when the row is
+  // not found. A thread can legitimately be gone by the time somebody taps — declined,
+  // left, blocked, or the other account deleted — and leaving the id pending would retry
+  // forever and re-hijack the screen every time the hub re-renders. The messages tab is
+  // opened regardless, because that is where a missing thread should leave somebody.
+  useEffect(() => {
+    if (!initialConversationId || isGuest || !MODULE_FLAGS.studentHub) return
+    let cancelled = false
+    supabase.rpc('list_conversations').then(({ data }) => {
+      if (cancelled) return
+      const row = (data ?? []).find(r => r.conversation_id === initialConversationId)
+      setTab('messages')
+      if (row) { setComposeWith(null); setOpenConv(row) }
+      onConversationOpened?.()
+    })
+    return () => { cancelled = true }
+  }, [initialConversationId, isGuest, onConversationOpened])
 
   // A conversation opened from a profile has to be resolved to a real row before it can
   // be rendered, because start_conversation returns only a status. One extra RPC on a rare

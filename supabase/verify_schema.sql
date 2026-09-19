@@ -2636,6 +2636,25 @@ WITH report AS (
         WHERE n.nspname='public' AND p.proname='auto_hide_reported_content'
           AND pg_get_functiondef(p.oid) NOT ILIKE '%UPDATE messages%'
           AND pg_get_functiondef(p.oid) ILIKE '%UPDATE reviews%')
+    -- ══ message push carries routing data (20261031) ════════════════════════
+    -- CREATE OR REPLACE creates no named object, so E/F/G are blind to it and only a
+    -- behaviour token can tell an applied database from an unapplied one.
+    --
+    -- Both directions, and the second is the one that matters. UNAPPLIED, a tapped message
+    -- notification routes nowhere because the payload has no `data` key. But a careless
+    -- REPLACE of this function is the bigger risk: its body carries the nine-language
+    -- request copy (with an escaped ZWNJ inside the Persian) and the conditional
+    -- truncation ellipsis, and a draft of 20261031 itself very nearly replaced all of it
+    -- with a call to a function that does not exist here. Both markers are asserted so
+    -- that loss cannot pass as success.
+    UNION ALL SELECT '1031_push_data','notify_new_message routes to a conversation, and still speaks nine languages',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_new_message'
+          AND pg_get_functiondef(p.oid) LIKE '%conversation_id%'
+          AND pg_get_functiondef(p.oid) LIKE '%''screen''%'
+          AND pg_get_functiondef(p.oid) LIKE '%Yeni mesaj isteği%'
+          AND pg_get_functiondef(p.oid) LIKE '%200C%'
+          AND pg_get_functiondef(p.oid) LIKE '%2026%')
     -- ══ completion check loses institution_id (20261030) ════════════════════
     -- THE CONSTRAINT NAME DID NOT CHANGE. Section E asserts
     -- profiles_completion_requires_fields_check is PRESENT and stays green word for word

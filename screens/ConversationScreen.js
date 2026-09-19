@@ -124,8 +124,28 @@ export default function ConversationScreen({
   onBack,
   onChanged,               // the inbox refetches; also how a compose becomes a thread
 }) {
-  const other = conversation
-    ? { userId: conversation.other_user_id, displayName: conversation.display_name }
+  // ─── THE THREAD OWNS ITS OWN STATE ─────────────────────────────────────────
+  //
+  // `conversation` is a SNAPSHOT row from list_conversations(), taken when the inbox was
+  // last read. Every visible state on this screen is derived from it — accepted, closed,
+  // awaiting, and the other person's name — and accepting a request changes all of the
+  // first three server-side while leaving the snapshot untouched.
+  //
+  // That is what made Accept look broken: the RPC succeeded, onChanged() bumped the key
+  // the INBOX listens to (StudentHubScreen passes it as refreshKey to ConversationsScreen,
+  // which is not even mounted while a thread is open), and this screen re-rendered from
+  // the same stale prop. No state change, no error, nothing to see.
+  //
+  // ► ACCEPT WAS ONLY THE ONE THAT BIT. Block, leave and decline all pass onBack as their
+  //   success callback, so the screen unmounts before anyone can notice the row is stale —
+  //   the bug was MASKED BY NAVIGATION, not absent. Holding the row locally fixes the
+  //   class rather than the instance, so the next action that chooses to stay does not
+  //   quietly inherit it.
+  const [conv, setConv] = useState(conversation)
+  useEffect(() => { setConv(conversation) }, [conversation])
+
+  const other = conv
+    ? { userId: conv.other_user_id, displayName: conv.display_name }
     : composeWith
 
   const [rows, setRows]       = useState(conversation ? null : [])
@@ -153,12 +173,29 @@ export default function ConversationScreen({
   // must clear the same nav bar.
   const barPad = { paddingBottom: kbOpen ? 10 : Math.max(insets.bottom, 12) }
 
-  const accepted = conversation?.is_accepted === true
-  const closed   = conversation?.is_closed === true
+  const accepted = conv?.is_accepted === true
+  const closed   = conv?.is_closed === true
   // Only the recipient of an unaccepted thread is ever "awaiting": the initiator is never
   // told that a decline happened, so for them an unanswered thread simply has no reply.
-  const awaiting = conversation?.awaiting_me === true
+  const awaiting = conv?.awaiting_me === true
   const composing = !conversation
+
+  // Re-reads the row THROUGH list_conversations(), not off the table: awaiting_me,
+  // is_accepted, is_closed and display_name are all DERIVED by that function, and the
+  // conversations table carries none of them. It is also the only sanctioned read path —
+  // the same column-limited DEFINER the inbox uses, for the same reason (RLS has no column
+  // dimension, so a policy wide enough to expose a display name exposes the phone number
+  // beside it).
+  const refreshConversation = useCallback(async () => {
+    if (!conversation) return
+    const { data, error } = await supabase.rpc('list_conversations')
+    if (error) return
+    const row = (data ?? []).find(r => r.conversation_id === conversation.conversation_id)
+    // A row that has GONE is not an error: declining hides it from the initiator by RLS,
+    // and the other person deleting their account takes it with them. Keep the last known
+    // state rather than blanking the screen somebody is still reading.
+    if (row) setConv(row)
+  }, [conversation])
 
   const load = useCallback(() => {
     if (!conversation) return undefined
@@ -182,6 +219,7 @@ export default function ConversationScreen({
   }, [conversation])
 
   useEffect(() => load(), [load])
+  useEffect(() => { refreshConversation() }, [refreshConversation])
 
   async function send() {
     const text = body.trim()
@@ -235,6 +273,10 @@ export default function ConversationScreen({
     setBusy(false)
     setMenuOpen(false)
     if (error) { Alert.alert(t('msgActionFailedTitle', lang), t('msgActionFailedBody', lang)); return }
+    // THIS screen first, then the inbox. onChanged() refreshes the list behind us; without
+    // the line above it, an action that does not navigate away leaves the user looking at
+    // the state they just changed.
+    await refreshConversation()
     confirmed?.()
     onChanged?.()
   }

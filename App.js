@@ -511,6 +511,9 @@ export default function App() {
   const [showGarages, setShowGarages] = useState(false)
   const [showTowing, setShowTowing] = useState(false)
   const [showStudentHub, setShowStudentHub] = useState(false)
+  // The conversation a push asked for, held until StudentHubScreen has opened it. Cleared
+  // by the screen rather than here, so a tap that arrives before the hub mounts is not lost.
+  const [pendingConvId, setPendingConvId] = useState(null)
   const [showEsim, setShowEsim] = useState(false)
   // Sub-screen within Bağlantı & eSIM: null = landing, 'operator' = package list,
   // { pkg } = package detail. Mirrors petsSubScreen / gamesSubScreen.
@@ -1019,6 +1022,14 @@ export default function App() {
         setActiveTab('profile')
       } else if (screen === 'notifications') {
         setShowNotifs(true)
+      } else if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
+        // ► GATED ON THE FLAG, because a tap must never land on Coming Soon. The push that
+        //   carries this can only have been sent by 20261029's messaging, so if the module
+        //   is dark on this build the notification is from a feature this bundle does not
+        //   have — opening the hub would show a placeholder and read as the tap breaking.
+        //   Doing nothing leaves the user where they were, which is honest.
+        setPendingConvId(data.conversation_id ?? null)
+        setShowStudentHub(true)
       }
     })
     return () => sub.remove()
@@ -1030,8 +1041,18 @@ export default function App() {
     handledColdStartRef.current = true
     Notifications.getLastNotificationResponseAsync().then(response => {
       if (!response) return
-      const screen = response.notification.request.content.data?.screen
+      const data = response.notification.request.content.data ?? {}
+      const screen = data.screen
       if (screen === 'duty') setShowDutyList(true)
+      // ► THE COLD-START HANDLER KNEW ONLY 'duty'. A tap from a KILLED app is the common
+      //   case for a message notification — the app is not usually already open when one
+      //   arrives — and without this branch that tap landed on Home with no explanation.
+      //   The warm listener above and this one must stay in step; they are two paths to
+      //   the same destination and only one of them was ever exercised.
+      else if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
+        setPendingConvId(data.conversation_id ?? null)
+        setShowStudentHub(true)
+      }
     })
   }, [session])
 
@@ -1880,6 +1901,8 @@ export default function App() {
           // mounted holding the opt-in value it read before the user changed it — showing
           // the reciprocity copy again at the exact moment the setting started working.
           // Re-entering the hub re-mounts it and re-reads the row.
+          initialConversationId={pendingConvId}
+          onConversationOpened={() => setPendingConvId(null)}
           onGoToProfile={() => { setShowStudentHub(false); setActiveTab('profile') }} />
       : <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
   } else if (adminPreview === 'studentHub') {
