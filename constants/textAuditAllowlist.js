@@ -38,11 +38,7 @@ export const ALLOW_TRUNCATION = [
   // { key: 'someI18nKey', reason: 'why clipping is correct here', added: '2026-09-17' },
 ]
 
-export const ALLOW_ON_PHOTO = [
-  // { key: 'someI18nKey', reason: 'why this is legible on the photo anyway', added: '2026-09-17' },
-]
-
-// Both lists start EMPTY on purpose. Nothing has been suppressed yet because the audit has
+// The list starts EMPTY on purpose. Nothing has been suppressed yet because the audit has
 // not been run yet — the first run is what populates these, one considered line at a time.
 // Starting with pre-emptive entries would be guessing at which complaints are wrong before
 // hearing any of them.
@@ -50,4 +46,3 @@ export const ALLOW_ON_PHOTO = [
 const keysOf = list => new Set(list.map(e => e.key))
 
 export const TRUNCATION_ALLOWED = keysOf(ALLOW_TRUNCATION)
-export const ON_PHOTO_ALLOWED   = keysOf(ALLOW_ON_PHOTO)

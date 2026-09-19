@@ -1,13 +1,12 @@
 import * as React from 'react'
-import { useContext, useRef } from 'react'
+import { useRef } from 'react'
 import { StyleSheet, View, PixelRatio } from 'react-native'
-import { OnSafeSurface, photoBackdrop } from '../components/SurfaceContext'
 import { sourceTextOf, renderedTextOf, display, dense } from './textAuditVerdict'
 import { devKeysForString } from '../constants/i18n'
-import { TRUNCATION_ALLOWED, ON_PHOTO_ALLOWED } from '../constants/textAuditAllowlist'
-import { colors, contrastRatio } from '../constants/theme'
+import { TRUNCATION_ALLOWED } from '../constants/textAuditAllowlist'
+import { colors } from '../constants/theme'
 
-// ─── The dev-only UI audit: text that clipped, and text on the photo ────────
+// ─── The dev-only UI audit: text that clipped ───────────────────────────────
 //
 // Written 2026-09-17, after four UI bugs were found by one person looking at one Android
 // phone. Three of the four were visual, and the worst of them — tab labels overflowing in
@@ -35,8 +34,37 @@ import { colors, contrastRatio } from '../constants/theme'
 //       RENDERED vs SOURCE: join what the engine laid out, compare it to what we passed
 //       in, and if characters went missing the string did not fit.
 //
-// (2) CONTRAST. A low-contrast label sitting directly on PageBackground's photo, outside
-//     any card. That is the 'EĞİTİM' bug. Measured, not guessed — see PHOTO_BACKDROP.
+// ─── WHAT THIS USED TO ALSO WATCH, AND WHY IT NO LONGER DOES ───────────────
+//
+// A second rule flagged low-contrast text sitting on PageBackground's photo — the
+// 'EĞİTİM' bug. It is deleted, and the reason is worth more than the rule was.
+//
+// IT FOUND THE ORIGINAL BUG. It then produced THIRTY-PLUS hits in a single Turkish pass
+// on 2026-09-19: every module tile on Home, the tab bar, the search placeholder, every
+// district chip, the Student Hub tabs and header, and t('back'). Not one of them was
+// real — each sits on a tile, a bar or a pill that is perfectly opaque.
+//
+// At 30:1 it would have been muted long before it found a second real bug, and a muted
+// check is worse than no check because it still looks like coverage. That is the same
+// verdict the safe-area audit got, on the same evidence, for the same reason.
+//
+// ► IT WAS NOT A WEAK IMPLEMENTATION OF A GOOD IDEA. The fact it needed is not
+//   observable from where it stood:
+//     * Compositing is the renderer's business. Nothing in React Native reports what is
+//       painted beneath a node — measureInWindow returns geometry, never colour.
+//     * Geometry cannot substitute. PageBackground is absoluteFill, so it is behind every
+//       pixel; overlap is universal and says nothing about occlusion.
+//     * Context could carry it, but only if EVERY opaque surface declares itself — a
+//       hand-kept list where anything new defaults to "unsafe", so the false positives
+//       regenerate with each component somebody adds. That is the failure this repo
+//       removed twice in one day (the 72 unguarded constraints; the remembered policy
+//       list), and rebuilding it here would have been the third.
+//
+// A STATIC source-level rule could work, because in source the nesting is literal: a
+// low-contrast <Text> that is a syntactic descendant of a screen rendering
+// <PageBackground> and is inside nothing with a backgroundColor IN THE SAME FILE. All
+// four of the 2026-09-17 bugs had exactly that shape, and it fails safe across component
+// boundaries. That is a different tool, not a repair of this one, and it is not built.
 //
 // ─── SCOPE: i18n STRINGS ONLY, AND THAT IS DELIBERATE ──────────────────────
 //
@@ -136,21 +164,6 @@ const state = {
   seen:           new Set(),
 }
 
-// ─── The backdrop the contrast rule measures against ───────────────────────
-//
-// PageBackground is a photo under a 0.30 black scrim, and a photo has no single colour, so
-// there is no honest way to compute a ratio against "the background". What CAN be done is
-// to measure against a representative mid-tone of that scrimmed photo and require the text
-// to clear WCAG AA there.
-//
-// Measured for the real tokens (2026-09-17), ratio against this backdrop:
-//     textSecondary #64748B -> 1.45:1   fails — this is the 'EĞİTİM' bug
-//     textPrimary   #1A2B33 -> 2.12:1   fails — dark ink on a photo is the same bug
-//     white         #FFFFFF -> 6.90:1   passes — which is ADA's own on-photo convention
-// So the rule fires on the defect and not on the pattern the app already uses correctly.
-// That was checked before this was written, rather than assumed after.
-const PHOTO_BACKDROP = '#5a5a5a'
-const MIN_RATIO = 4.5
 
 // ─── WHERE did this render? ─────────────────────────────────────────────────
 //
@@ -160,19 +173,32 @@ const MIN_RATIO = 4.5
 // not a bug in the lookup — it is a dictionary, and a dictionary genuinely does not know
 // who read it.
 //
-// React 19 can answer it, though. captureOwnerStack() returns the chain of components that
-// OWN the currently-rendering element (dev builds only), so the first app frame in it is
-// the component that wrote the <Text>. That turns "one of these four keys" into a file and
-// a line.
+// React 19 can answer it. captureOwnerStack() returns the chain of components that OWN the
+// currently-rendering element (dev builds only), so the app frames in it name the component
+// that wrote the <Text> and the ones that placed it.
+//
+// ► THREE FRAMES, NOT ONE, AND THE FIRST VERSION'S SINGLE FRAME WAS USELESS FOR EXACTLY
+//   THE CASE THAT MATTERED. t('back') clipped on 2026-09-19 and the report said
+//   "at BackButton" — a shared control on roughly 35 screens, so the one name it gave was
+//   the one name that could not narrow anything. A component is only half the address;
+//   the other half is who rendered it, because the constraint that squeezed the text
+//   almost always lives in the parent rather than in the shared child.
 //
 // Degrades to null rather than throwing: it is a dev-only API, it returns null outside
 // render, and a report with no location is still worth having.
+const OWNER_FRAMES = 3
+
 function ownerLocation() {
   try {
     const stack = React.captureOwnerStack && React.captureOwnerStack()
     if (!stack) return null
     const frames = stack.split('\n').map(l => l.trim()).filter(Boolean)
-    return frames.find(l => /screens\/|components\//.test(l) && !/devTextAudit/.test(l)) || frames[0] || null
+      .filter(l => /screens\/|components\//.test(l) && !/devTextAudit/.test(l))
+    if (frames.length === 0) return null
+    // Innermost first, then outward — read it as "this component, inside this one, inside
+    // that one". The separator is an arrow rather than a newline so one finding stays one
+    // greppable line in a console that is already busy.
+    return frames.slice(0, OWNER_FRAMES).join('  <-  ')
   } catch {
     return null
   }
@@ -277,33 +303,6 @@ function handleTruncation(source, lines, owner, boxWidth) {
     `            constants/textAuditAllowlist.js with a reason.`)
 }
 
-function checkContrast(source, style, owner) {
-  // ► NOT gated on the controls, unlike truncation, and the asymmetry is deliberate.
-  //   The controls prove that onTextLayout fires and reports honestly. This check never
-  //   asks the layout engine anything — it reads a colour off a style at render time — so
-  //   coupling it to an onTextLayout capability would silently switch off a working check
-  //   on any platform where that event is missing. What it DOES depend on is the patch
-  //   having landed, and install() verifies that directly.
-  if (photoBackdrop.count === 0) return      // no photo on screen, nothing to sit on
-  const flat = StyleSheet.flatten(style)
-  const color = flat && flat.color
-  if (typeof color !== 'string') return      // inherited colour — not resolvable here
-  const ratio = contrastRatio(color, PHOTO_BACKDROP)
-  if (ratio == null || ratio >= MIN_RATIO) return
-
-  const keys = devKeysForString(source)
-  if (keys.length === 0) return
-  if (keys.some(k => ON_PHOTO_ALLOWED.has(k))) return
-
-  report('contrast', keys.join('|'),
-    `[ada-audit] LOW CONTRAST ON PHOTO  ${keys.map(k => `t('${k}')`).join(' or ')}\n` +
-    (owner ? `            at   : ${owner}\n` : '') +
-    `            "${display(source)}"\n` +
-    `            ${color} on the scrimmed photo measures ${ratio.toFixed(2)}:1 (needs ${MIN_RATIO}:1).\n` +
-    `            ADA's answer to this is a ContentCard — that is what every readable label\n` +
-    `            in the app sits on. If this one is legible anyway, add the key to\n` +
-    `            ALLOW_ON_PHOTO in constants/textAuditAllowlist.js with a reason.`)
-}
 
 // ─── The patch, on the FOURTH attempt ───────────────────────────────────────
 //
@@ -349,12 +348,11 @@ export function install() {
   }
 
   function AuditedText(props) {
-    const onSafeSurface = useContext(OnSafeSurface)
     const pending = useRef(null)
     const boxWidth = useRef(null)
 
     let source = null
-    const needsSource = props.numberOfLines > 0 || (!onSafeSurface && photoBackdrop.count > 0)
+    const needsSource = props.numberOfLines > 0
     if (needsSource) {
       source = sourceTextOf(props.children)
     }
@@ -362,8 +360,6 @@ export function install() {
     // captureOwnerStack() is only meaningful DURING render, so it is read here and carried
     // into the layout callback rather than being read from inside it.
     const owner = source ? ownerLocation() : null
-
-    if (source && !onSafeSurface) checkContrast(source, props.style, owner)
 
     // onTextLayout is attached ONLY where numberOfLines is set. It makes Fabric measure
     // every line of that node, so putting it on all text would be a real dev-mode cost for
