@@ -154,7 +154,7 @@ function ChipGroup({ options, value, onSelect }) {
 // Shipped together with the flex:1 change on rowText, knowingly: either alone might be
 // sufficient and we will not learn which. A mandatory gate where half the options are
 // one letter is not the place to run a clean experiment.
-function RowGroup({ options, value, onSelect }) {
+function RowGroup({ options, value, onSelect, disabled }) {
   return (
     <View>
       {options.map(o => {
@@ -162,11 +162,12 @@ function RowGroup({ options, value, onSelect }) {
         return (
           <TouchableOpacity
             key={o.value}
-            style={[s.row, on && s.rowOn]}
+            style={[s.row, on && s.rowOn, disabled && { opacity: 0.45 }]}
             onPress={() => onSelect(o.value)}
+            disabled={disabled}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityState={{ selected: on }}
+            accessibilityState={{ selected: on, disabled: !!disabled }}
           >
             <Text style={[s.rowText, on && s.rowTextOn]}>{o.label}</Text>
             <Feather
@@ -283,6 +284,9 @@ export default function ProfileSetupScreen({
   // overwrite their answer with the stored one — the seed is a starting point, not a
   // correction, so it runs once and never again.
   const seeded = useRef(false)
+  // The id of the OPEN enrolment this user already has, if any. Its presence is what makes
+  // the institution and level fields read-only — see the note on the Field below.
+  const [openEnrolment, setOpenEnrolment] = useState(null)
 
   const [picker, setPicker] = useState(null)  // 'day' | 'month' | 'year' | 'nat' | 'cc' | 'inst' | 'subject' | 'startYear' | 'endYear'
 
@@ -336,6 +340,25 @@ export default function ProfileSetupScreen({
   const lastStep = studyStepsOn ? TOTAL_STEPS + STUDY_STEPS : TOTAL_STEPS
   const subjectOpts = useMemo(() => subjectOptions(subjects, lang), [subjects, lang])
 
+  // ► NO PATH THROUGH THIS WIZARD MAY END IN AN ERROR THE USER CANNOT ACT ON.
+  //
+  // The institution and level fields are locked once an open enrolment is known, which is
+  // what actually prevents the collision. This is the BACKSTOP for the case where that
+  // knowledge is missing: the seed query failed, or the user was offline when it ran, so
+  // the lock was never applied and the write can still target a second open row.
+  //
+  // A generic "couldn't save" there is a dead end — the gate has no back button, no skip
+  // and no route to ProfileScreen. So the one collision this can produce gets a message
+  // that names the way out, and the years error keeps the specific copy it already had.
+  function enrolmentErrorKey(error) {
+    const msg = String(error?.message ?? '')
+    if (msg.includes(STUDY_END_YEAR_IN_FUTURE)) return 'pgStudyEndFuture'
+    if (error?.code === '23505' || /one_open_per_user|user_inst_level_key/.test(msg)) {
+      return 'pgEnrolmentConflict'
+    }
+    return 'pgSaveError'
+  }
+
   // The user's OPEN enrolment, if they have one — the only row this wizard can be editing,
   // because student_education_one_open_per_user permits no second. A closed one is history
   // and belongs on ProfileScreen, not in a signup gate.
@@ -344,7 +367,7 @@ export default function ProfileSetupScreen({
     let cancelled = false
     supabase
       .from('student_education')
-      .select('institution_id, level, subject_id, study_start_year, study_end_year')
+      .select('id, institution_id, level, subject_id, study_start_year, study_end_year')
       .eq('user_id', session.user.id)
       .is('study_end_year', null)
       .maybeSingle()
@@ -352,6 +375,7 @@ export default function ProfileSetupScreen({
         // maybeSingle returns {data: null, error: null} on zero rows — it does NOT throw,
         // so "no enrolment yet" lands here as a plain null and seeds nothing.
         if (cancelled || !data) { seeded.current = true; return }
+        setOpenEnrolment(data)
         setInstitution(data.institution_id ?? null)
         setSubjectId(data.subject_id ?? null)
         setStartYear(data.study_start_year ?? null)
@@ -553,10 +577,7 @@ export default function ProfileSetupScreen({
       // — so one upsert with one shape beats two partial patches that must each remember
       // which columns they are allowed to leave alone.
       const error = await writeEnrolment({ subjectId, startYear, endYear })
-      if (error) {
-        setSaveError(String(error.message ?? '').includes(STUDY_END_YEAR_IN_FUTURE) ? 'pgStudyEndFuture' : 'pgSaveError')
-        return
-      }
+      if (error) { setSaveError(enrolmentErrorKey(error)); return }
       if (step === 3) { setStep(4); return }
       onDone()
       return
@@ -642,7 +663,7 @@ export default function ProfileSetupScreen({
     //   It also matches the rule this file already states below: the study steps come after
     //   completion, never before.
     const enrolError = await writeEnrolment({ subjectId, startYear, endYear })
-    if (enrolError) { setSaveError('pgSaveError'); return }
+    if (enrolError) { setSaveError(enrolmentErrorKey(enrolError)); return }
 
     // Completion is written. The study steps come after it, never before. Step 3 even if
     // the subject list has not arrived: Skip is there, and a jump to 4 on a slow network
@@ -815,17 +836,44 @@ export default function ProfileSetupScreen({
                 <RowGroup options={statusOptions} value={status}
                   onSelect={v => { setStatus(v); if (v !== 'student') setLevel(null) }} />
               </Field>
+              {/* Locked for the same reason as the institution below, and it is the SAME
+                  key: (user_id, institution_id, level). university -> postgraduate targets
+                  a different row just as surely as changing university does, and dead-ends
+                  in exactly the same place. */}
               {status === 'student' && (
-                <Field label={t('pgStudentLevel', lang)}>
-                  <RowGroup options={levelOptions} value={level} onSelect={setLevel} />
+                <Field
+                  label={t('pgStudentLevel', lang)}
+                  hint={openEnrolment ? t('pgInstitutionLockedHint', lang) : undefined}
+                >
+                  <RowGroup options={levelOptions} value={level} onSelect={setLevel}
+                    disabled={!!openEnrolment} />
                 </Field>
               )}
+              {/* ► READ-ONLY ONCE AN ENROLMENT EXISTS, AND THAT IS A LOCKOUT FIX.
+                      The upsert key is (user_id, institution_id, level). Changing EITHER
+                      during a re-gate targets a different key, so the write inserts a
+                      SECOND open row — which student_education_one_open_per_user rejects.
+                      That surfaced as a generic save error inside a gate with no back
+                      button, no skip and no route to ProfileScreen: a dead end at signup.
+
+                      Editing the existing row in place instead was considered and refused.
+                      It removes the dead end, but a forced re-gate would then be able to
+                      overwrite an enrolment the user built on ProfileScreen — rewriting
+                      EMU into NEU and losing the years and subject attached to it. A gate
+                      nobody chose to enter must not be able to destroy history; deferring
+                      the edit costs one trip to the profile screen and loses nothing.
+
+                      So the field shows what they have and says where to change it. */}
               {status === 'student' && INSTITUTION_REQUIRED_LEVELS.includes(level) && (
-                <Field label={t('pgInstitution', lang)}>
+                <Field
+                  label={t('pgInstitution', lang)}
+                  hint={openEnrolment ? t('pgInstitutionLockedHint', lang) : undefined}
+                >
                   <SelectField
                     value={instOptions.find(o => o.value === institution)?.label || ''}
                     placeholder={t('pgInstitutionSearch', lang)}
-                    onPress={() => setPicker('inst')}
+                    onPress={() => { if (!openEnrolment) setPicker('inst') }}
+                    disabled={!!openEnrolment}
                   />
                 </Field>
               )}
