@@ -447,33 +447,63 @@ const s = StyleSheet.create({
   // numbers may lean on. The scrim is what carries the contrast.
   // ─── DO NOT ADD alignSelf: 'flex-start' BACK ────────────────────────────────
   //
-  // It was here, and it clipped the district name in Turkish on the home screen — the
-  // first thing most users see, in the language most of them read. "Lefkoşa" drew as
-  // "Lefko…" with 55.3dp of room, found 2026-09-18 by the __DEV__ text audit.
+  // It was here when the district name clipped in Turkish on the home screen — the first
+  // thing most users see, in the language most of them read. "Lefkoşa" drew as "Lefko…"
+  // with 55.3dp of room, found 2026-09-18 by the __DEV__ text audit.
   //
-  // The hug was VESTIGIAL. This row used to be a rgba(0,0,0,0.74) pill, and a pill must
-  // hug — its background has to wrap the text. The pill went on 2026-09-07 (see the note
-  // below); the hug stayed, and with no background left to size it did nothing but turn
-  // ~190dp of free space into a width derived from the text's own measurement.
-  //
-  // Why that clips, which is the part worth keeping:
-  //   Yoga force-CEILS a text node's own frame, deliberately — PixelGrid.cpp:85,
-  //   "If a node has a custom measure function we never want to round down its size as
-  //   this could lead to unwanted text truncation". But NodeType::Text is set only on
-  //   nodes that HAVE a measure function (node/Node.cpp:113), so this View is
-  //   NodeType::Default and takes plain round-to-nearest. A content-hugging ancestor
-  //   therefore derives its width from the text's fractional measurement and can round
-  //   that fraction away, and `flexShrink: 1` on the district then lets the Text absorb
-  //   the loss instead of overflowing by a sub-pixel nobody would ever see.
+  // ⚠ IT WAS NOT THE CAUSE. Removing it (08d198f) did not fix the clip; the real fix is
+  //   on `district` below, and the reasoning that blamed the hug is corrected there. This
+  //   heading stays because the removal is still right for its OWN reason, which is that
+  //   the hug was VESTIGIAL: this row used to be a rgba(0,0,0,0.74) pill, and a pill must
+  //   hug — its background has to wrap the text. The pill went on 2026-09-07 (see the note
+  //   below); the hug stayed, and with no background left to size it did nothing but turn
+  //   ~190dp of free space into a width derived from the text's own measurement.
   //
   // Stretching costs nothing: there is no background to hug, justifyContent defaults to
   // flex-start so the children still start at the left, and pointerEvents="box-none"
-  // means the wider box adds no touch target. It buys the Text real slack, so flexShrink
-  // stays as a genuine safety valve for a long name rather than firing on a rounding error.
+  // means the wider box adds no touch target. So the removal stays — but it is not what
+  // fixed the clip, and the paragraph that used to sit here explaining why it would have
+  // was wrong. See the note on `district` below.
   chip:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // 14pt, down from 17. "Smaller and lighter" is the brief; the floor does not move with
   // size here because 17pt was never large-text either (that needs 18pt, or 14pt bold).
+  //
+  // ─── THE ROUNDING MODEL LOST ITS OWN TEST. paddingRight IS THE ACTUAL FIX. ──
+  //
+  // 08d198f removed `alignSelf: 'flex-start'` from `chip` above and explained the clip
+  // with a Yoga pixel-grid argument: PixelGrid.cpp:85 force-CEILS a text node's frame,
+  // NodeType::Text is set only on nodes with a measure function (node/Node.cpp:113), so a
+  // content-hugging ancestor takes plain round-to-nearest and can discard the fraction the
+  // text needed. That commit was honest that the mechanism was a DIAGNOSIS and had not
+  // been empirically tested, and it said the next clip the detector found would be "the
+  // FIRST REAL TEST of this model, not a confirmation of it".
+  //
+  // That clip was t('back') on ScreenHeader, and THE MODEL LOST — see 7e1210a. Lefkoşa
+  // also kept clipping after 08d198f shipped, which is the second failure.
+  //
+  // ► REMOVING alignSelf WAS INERT BY CONSTRUCTION, and that is the part to carry
+  //   forward. flexBasis defaults to `auto`, which hands a Text EXACTLY ITS OWN MEASURED
+  //   WIDTH whether its parent hugs or stretches. The chip got wider; the Text did not.
+  //   Nothing about a hugging ancestor was ever reaching this Text's width.
+  //
+  // ► THE MEASUREMENTS, two fonts and two weights, read from the real .ttf files rather
+  //   than estimated:
+  //       Geri     Inter_400Regular 15   29.22dp of glyphs, given 29.9dp  — 1.023x
+  //       Lefkoşa  Inter_600SemiBold 14  53.86dp of glyphs, given 55.3dp  — 1.027x
+  //   Both ellipsized with ~2.5% headroom by the font's own metrics. A FONT-SCALE
+  //   explanation dies on exactly that: a scale factor produces ONE ratio, not two, and
+  //   the audit prints PixelRatio.getFontScale() in every report. What is left is the
+  //   draw pass wanting marginally more than the measure pass gave — and a Text sized to
+  //   its own measurement has no tolerance at all for that disagreement.
+  //
+  // ► SO: 2dp of bounded padding, the same fix BackButton's label carries. It adds 2dp to
+  //   this Text and to nothing else, so it cannot consume a row and cannot vary with what
+  //   sits beside it. NOT flexGrow — ab2c6bf reverted that on the back label because Yoga
+  //   measures an auto-width container against the space AVAILABLE to it, so a growing
+  //   child made the container swallow the whole header. flexShrink stays: a genuinely
+  //   long name must still ellipsize rather than overflow.
   district:  { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#fff', flexShrink: 1,
+               paddingRight: 2,
                textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   chipDot:   { fontSize: 12, color: 'rgba(255,255,255,0.75)',
                textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
