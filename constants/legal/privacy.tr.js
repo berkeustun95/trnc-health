@@ -81,7 +81,7 @@ Diğer kullanıcıların görebildikleri:
 • Yazdığınız değerlendirmelerin, soruların ve cevapların yanında görünen adınız.
 • Yazdığınız değerlendirmelerin, soruların ve cevapların içeriği ile verdiğiniz puanlar.
 
-Diğer kullanıcıların göremedikleri: adınız ve soyadınız, doğum tarihiniz, uyruğunuz, telefon numaranız, bölgeniz, ikamet durumunuz, öğrenim düzeyiniz ve e-posta adresiniz.
+Diğer kullanıcıların göremedikleri: adınız ve soyadınız, doğum tarihiniz, uyruğunuz, telefon numaranız, bölgeniz, ikamet durumunuz ve e-posta adresiniz.
 
 Hizmet sağlayıcılara hiçbir kişisel veriniz gösterilmez. Bir kurumun sayfasında soru sorduğunuzda hizmet sağlayıcı yalnızca soruyu ve görünen adınızı görür — gerçek adınızı, doğum tarihinizi, telefon numaranızı, bölgenizi veya ikamet durumunuzu görmez.
 
@@ -120,7 +120,7 @@ Onay verirseniz:
 
 7. VERİLERİN SAKLANMASI VE SAKLAMA SÜRELERİ
 
-Tüm veriler Supabase üzerinde, bir AB bölgesinde saklanır. Satır Düzeyi Güvenlik (RLS) politikaları yalnızca kendi kayıtlarınıza erişebilmenizi sağlar. Verileriniz, üniversitenizin öğrenci listesinde görünmeyi seçmediğiniz sürece diğer kullanıcılara görünmez. Bu ayarı açarsanız, listede yer alan diğer kullanıcılar görünen adınızı, profil fotoğrafınızı, üniversitelerinizi, bölümünüzü ve öğrenim yıllarınızı görebilir ve size mesaj isteği gönderebilir. Ayarı istediğiniz zaman kapatabilirsiniz.
+Tüm veriler Supabase üzerinde, bir AB bölgesinde saklanır. Satır Düzeyi Güvenlik (RLS) politikaları yalnızca kendi kayıtlarınıza erişebilmenizi sağlar. Verileriniz, üniversitenizin öğrenci listesinde görünmeyi seçmediğiniz sürece diğer kullanıcılara görünmez. Bu ayarı açarsanız, listede yer alan diğer kullanıcılar görünen adınızı, profil fotoğrafınızı, üniversitelerinizi, öğrenim düzeyinizi, bölümünüzü ve öğrenim yıllarınızı görebilir ve size mesaj isteği gönderebilir. Ayarı istediğiniz zaman kapatabilirsiniz.
 
 KKTC'den faaliyet gösterdiğimiz için yöneticilerimiz verilerinize AB/AEA dışından erişmektedir. Bu erişime, verilerin saklandığı ortama uyguladığımız korumaların aynısını uygularız.
 
