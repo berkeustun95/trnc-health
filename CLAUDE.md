@@ -117,6 +117,37 @@ Until 2026-08-30 this folder deployed nothing and was documented as inert; it li
 - A customer must NEVER be able to read another customer's data.
 - Never put the Supabase service_role key or the database password in app code.
   Only the anon public key belongs in lib/supabase.js.
+- **NO RLS OR STORAGE POLICY CHANGES THROUGH THE SUPABASE DASHBOARD. Migrations only.**
+  A dashboard policy exists in production and nowhere else: no migration creates it, so a
+  rebuild from `supabase/migrations/` produces a DIFFERENT SECURITY POSTURE than the live
+  database, and `verify_schema.sql` cannot drift-check an object it has never heard of.
+  Measured 2026-09-21: **17 of ~35 `storage.objects` policies existed only in the
+  dashboard.** One of them, `"Public avatar read"`, cost a full debug cycle — check #2 of
+  the hardening script stayed red against a bucket that was already closed, and the cause
+  was a policy no file in this repo mentioned. It was a sample, not an outlier.
+- **A DO BLOCK ASSERTS THE FULL POLICY SET FOR THE OBJECT IT TOUCHES, never just its own.**
+  RLS is **PERMISSIVE-OR**: presence-of-mine can never prove absence-of-theirs. `20261040`
+  added four correct, guest-guarded avatars policies, verified that its own four existed,
+  and passed — while `"Users manage own avatar"` (ALL, authenticated, no
+  `is_anonymous_session` guard) went on granting guests exactly what the four withheld.
+  So: assert `count(*)` of every policy reaching that object, PRINT the names, and assert
+  that **no permissive policy is bucket-unscoped** — an expression that never mentions
+  `bucket_id` applies to every bucket while naming none, which makes it invisible to any
+  check that finds candidates by searching for the bucket's name.
+- **TEST THE ROLE THE CLAIM IS ABOUT.** Two wrong conclusions in one session came from
+  probing with the anon key and generalising to `authenticated`: "20261033 is applied"
+  (only `anon` was proved denied) and "avatars are broken for everyone" (anon *should*
+  fail — `avatars_read_authenticated` excludes it by design; the measurement was the
+  policy working). `authenticated` includes every signed-in user AND every guest, and
+  `TO authenticated` does not exclude guests — only `NOT is_anonymous_session()` does.
+  Where a JWT is not available, `has_column_privilege` / `has_table_privilege` answer for
+  a named role as postgres, and they resolve INHERITED grants that a grantee-filtered
+  count cannot see.
+- **A CHECK THAT PASSES HARDEST WHEN THE FEATURE IS BROKEN IS NOT A CHECK.** Every denial
+  assertion needs a matching "and the legitimate path still works" beside it, or the suite
+  is a one-way ratchet that scores full marks on a bucket nobody can read.
+  `verify-storage-hardening.sh` had four "must not be readable" checks and nothing
+  asserting that a signed URL still resolves.
 
 ## Migrations (manual-apply — no CI)
 Migrations are applied by hand (SQL editor, Role → postgres), so nothing catches a
