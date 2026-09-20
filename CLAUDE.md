@@ -36,6 +36,22 @@ eas build --platform android --profile production
 # then submit new AAB to Play Store closed testing track
 ```
 
+⚠ **QUEUED FOR THE NEXT NATIVE BUILD — ride it with the CONNECTIVITY_LIVE / eSIM build,
+never as a standalone.** `app.config.js` still tells the OS this is a health app
+(*"ADA uses your location to show nearby pharmacies, clinics, and hospitals"*), and **no OTA
+can change an OS permission dialog**. The same pass removes three permissions the app does
+not use — `NSCameraUsageDescription`, `NSMicrophoneUsageDescription` and Android
+`RECORD_AUDIO`, all injected by `expo-image-picker`'s plugin defaults — plus the two
+background-location keys, on an app that only ever calls
+`requestForegroundPermissionsAsync`. On a declared mixed-audience app an unused mic
+permission is the bigger liability of the two.
+**The trap:** the location string exists in THREE places and `applyPermissions` resolves
+`plugin option || ios.infoPlist || plugin default`, so `:87-88` wins and `:27-28` is inert —
+editing only the `ios.infoPlist` pair changes nothing and looks like the build ignoring you.
+Full plan, resolved-config baseline and the Play health-declaration evidence:
+`~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md`.
+Commit it separately from the eSIM work so it reverts alone. `slug` stays `trnc-health`.
+
 **Never use** `process.env.EAS_BUILD` conditionals in `app.config.js` — it caused `checkAutomatically: 'NEVER'` to bake into a production build, breaking OTA entirely. Always hardcode `'ON_LOAD'`.
 
 **Publish OTA with `npm run ota`, NEVER `eas update` directly.** The wrapper runs
