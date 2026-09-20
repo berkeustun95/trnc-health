@@ -39,18 +39,34 @@ eas build --platform android --profile production
 ⚠ **QUEUED FOR THE NEXT NATIVE BUILD — ride it with the CONNECTIVITY_LIVE / eSIM build,
 never as a standalone.** `app.config.js` still tells the OS this is a health app
 (*"ADA uses your location to show nearby pharmacies, clinics, and hospitals"*), and **no OTA
-can change an OS permission dialog**. The same pass removes three permissions the app does
-not use — `NSCameraUsageDescription`, `NSMicrophoneUsageDescription` and Android
-`RECORD_AUDIO`, all injected by `expo-image-picker`'s plugin defaults — plus the two
-background-location keys, on an app that only ever calls
-`requestForegroundPermissionsAsync`. On a declared mixed-audience app an unused mic
-permission is the bigger liability of the two.
+can change an OS permission dialog**. Decisions are locked: mic off
+(`microphonePermission: false`, which also blocks Android `RECORD_AUDIO`), **camera KEPT** for
+planned image messaging, both background-location keys deleted (the app only ever calls
+`requestForegroundPermissionsAsync`), location moved to a single source, and `expo.locales`
+for all nine locales **in the same slice** — the string is English-only until it lands.
 **The trap:** the location string exists in THREE places and `applyPermissions` resolves
 `plugin option || ios.infoPlist || plugin default`, so `:87-88` wins and `:27-28` is inert —
 editing only the `ios.infoPlist` pair changes nothing and looks like the build ignoring you.
-Full plan, resolved-config baseline and the Play health-declaration evidence:
+Verify with `npx expo config --type introspect`, never by reading `app.config.js`.
+The Play health declaration is drafted **when the build is scheduled**, not before.
+Plan, resolved-config baseline and evidence:
 `~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md`.
 Commit it separately from the eSIM work so it reverts alone. `slug` stays `trnc-health`.
+
+⚠ **IMAGE MESSAGING IS BLOCKED ON A SAFETY SCOPE, AND THE SCOPE IS THE FEATURE.**
+`20261029_student_messaging.sql` already says it — *"NO IMAGES. Slice 7, and it waits on CSAM
+detection procurement… a migration and a procurement decision, in that order."* Before any
+attachment column, bucket or upload path exists, answer the questions in
+`~/ObsidianVault/10-ada/2026-09-20_image-messaging-safety-scope-PARKED.md`.
+Three things make it unlike every other UGC surface here: it is private and between MINORS
+(`may_initiate_by_age` stops an adult initiating with a minor, but two 15-year-olds are the
+declared audience), `contains_blocked_term` **cannot see an image**, and
+`auto_hide_reported_content` has no messages branch — it fires at 3 reporters and a two-person
+thread can never reach 3, so there is no automatic takedown at all.
+⚠ And **every existing bucket in this app is PUBLIC** (`avatars`, `facility-images`,
+`event-images`, `property-images` all use `getPublicUrl`). A message image in a public bucket
+is a private message with a guessable URL. The only signed-URL precedent is
+`AdminScreen.js:23`. Report and block already exist; **image filtering is the whole gap.**
 
 **Never use** `process.env.EAS_BUILD` conditionals in `app.config.js` — it caused `checkAutomatically: 'NEVER'` to bake into a production build, breaking OTA entirely. Always hardcode `'ON_LOAD'`.
 
