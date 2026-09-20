@@ -84,7 +84,7 @@ const CITY = {
 // Mirrors events_description_check / events_description_i18n_check exactly. Checked
 // here so a violation is a readable error on a local file rather than a CHECK
 // failure partway through a live import.
-const MAX_DESC = 2500
+const MAX_DESC = 3000
 const MAX_I18N_JSON = 6000
 
 const args = process.argv.slice(2)
