@@ -1213,6 +1213,23 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               ) : !listingOn ? (
                 <Text style={s.fieldHint}>{t('eduListingOffHint', lang)}</Text>
               ) : null}
+              {/* ► WHAT TURNING IT ON ACTUALLY DOES, IN BOTH STATES.
+                  Until 2026-09-20 the ON state rendered NOTHING and toggleListing writes
+                  immediately with no confirmation, so the only thing a person saw at the
+                  moment of becoming visible was the label — "Show me in my university's
+                  student list" — which names a list and none of what is on it.
+                  The privacy policy discloses it; a policy is not where consent happens.
+                  This is, so it is shown BEFORE the decision as well as after: a sentence
+                  that only appears once you have already flipped the switch is a receipt,
+                  not a disclosure.
+                  The list is the union of what get_student_list (6 columns) and
+                  get_student_profile (8) return — the profile page is one tap from the
+                  list and adds university and study level, which is exactly the pair the
+                  policy itself got wrong before this. If either RETURNS TABLE changes,
+                  this sentence is the other half of that edit. */}
+              {enrolments?.length ? (
+                <Text style={s.fieldHint}>{t('eduListingDisclosure', lang)}</Text>
+              ) : null}
             </View>
           )}
 
