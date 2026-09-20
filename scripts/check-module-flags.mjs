@@ -119,26 +119,28 @@ const WAITLIST_BLAST_DONE = new Set([
   //   nothing blocked. Do not go back to writing a date before sending one.
   'explore',
   // ─── studentHub ───────────────────────────────────────────────────────────
-  // 6 OWED, NOT YET SENT. Measured 2026-09-20 as postgres, before the flip:
+  // 6 notified 2026-09-20, on the day of launch and none late. Read BEFORE the blast,
+  // which is the only order in which the number means anything:
   //
   //     select module, count(*) filter (where notified_at is not null) as notified,
-  //            count(*) as total, min(notified_at), max(notified_at)
-  //     from module_waitlist group by module order by module;
+  //            count(*) as total
+  //     from module_waitlist where module = 'studentHub';     -- 0 of 6
+  //     select notify_module_waitlist('studentHub');          -- 6
   //
-  //   studentHub read 0/6 — six signups, none notified, the list intact. Every other
-  //   stamped module is one that actually launched, each with a single timestamp, so
-  //   nothing had fired early. That check is now at step 10 of the SOP, because a BURNT
-  //   list and an EMPTY list are the same number: notify_module_waitlist stamps
-  //   notified_at as it goes, so a list consumed by anything other than a launch
-  //   returns 0 and reads as "nobody ever signed up".
+  //   The pre-read is not ceremony. A BURNT list and an EMPTY list are the same number
+  //   coming out of the blast: notify_module_waitlist stamps notified_at as it goes, so
+  //   a list consumed by anything other than a launch returns 0 and reads as "nobody
+  //   ever signed up". 0 of 6 beforehand is what makes the 6 afterwards evidence of
+  //   delivery rather than of an empty table. That check is now step 10 of the SOP.
   //
-  //   Send with notify_module_waitlist('studentHub') at step 10, AFTER the OTA is
-  //   verified on device across two launch cycles. Notifying earlier sends six people to
-  //   a screen that has not updated yet. Then change this line to read "6 notified
-  //   <date>", the way pets and events do.
+  //   Sent after the OTA was verified on device across two launch cycles, and after both
+  //   window-only tests — the stale-affiliation recovery path and the message deep link,
+  //   warm and cold — which stop being testable once 20261027 lands.
   //
-  //   This entry is an ACKNOWLEDGEMENT, not proof of delivery — the guard runs offline.
-  //   supabase/audit_module_waitlist_owed.sql is the half that checks reality.
+  //   Still an ACKNOWLEDGEMENT rather than proof of delivery: this guard runs offline and
+  //   cannot see exp.host. supabase/audit_module_waitlist_owed.sql is the half that
+  //   checks reality, and pets is why — four people sat un-notified for sixteen days
+  //   with every check in this repo green.
   'studentHub',
 ])
 
