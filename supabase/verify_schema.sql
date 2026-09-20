@@ -206,7 +206,6 @@ WITH report AS (
     ('1001_profile_completion','profiles','resident_status'),
     ('1001_profile_completion','profiles','resident_status_updated_at'),
     ('1001_profile_completion','profiles','student_level'),
-    ('1001_profile_completion','profiles','institution_id'),
     ('1001_profile_completion','profiles','display_preference'),
     ('1001_profile_completion','profiles','profile_completed_at'),
     ('1001_profile_completion','profiles','profile_schema_version'),
@@ -238,10 +237,6 @@ WITH report AS (
     ('1017_student_tasks','student_tasks','source_checked_at'),
     -- Student affiliation (1024). App.js PROFILE_COLUMNS is an explicit list, so these do
     -- not break today's reads if MISSING — they break the slice-2 wizard's first write.
-    ('1024_student_affiliation','profiles','study_start_year'),
-    ('1024_student_affiliation','profiles','study_end_year'),
-    ('1024_student_affiliation','profiles','subject_id'),
-    ('1024_student_affiliation','profiles','student_listing_opt_in'),
     ('1024_student_affiliation','institutions','website_url')
 
   ) e(m,t,c)
@@ -365,7 +360,6 @@ WITH report AS (
     -- The transition mirror. 20261027 drops it in the same transaction as the columns
     -- it reads; while profiles still HAS them, its absence means an old client's write
     -- never reaches student_education and the student list silently misses that user.
-    ('1026_student_education','mirror_profile_affiliation'),
     -- The ONLY write path the app has on ad_banners: the client is never granted UPDATE on
     -- that table, so if this function is missing every view and tap counts ZERO — silently,
     -- and a silent zero reads as "nobody looks at the ads", which is a conclusion somebody
@@ -427,11 +421,10 @@ WITH report AS (
     ('0904_accommodation_partner_feed','properties_touch_updated_at'),
     ('0905_towing_companies','towing_touch_updated_at'),
     ('1001_profile_completion','check_profile_name_content'),
-    ('1024_student_affiliation','check_profile_study_years')
     -- Slice 6. The numeric prefixes ARE the firing order (triggers of a kind fire
     -- alphabetically); the 1029 H-token pins the whole sequence as one string, which is
     -- the only check that can see a rename that reorders them.
-    ,('1029_student_messaging','msg_10_stamp_sender'),
+    ('1029_student_messaging','msg_10_stamp_sender'),
     ('1029_student_messaging','msg_20_age_rule'),
     ('1029_student_messaging','msg_30_ugc_screen'),
     ('1029_student_messaging','msg_40_immutable'),
@@ -542,7 +535,6 @@ WITH report AS (
     ('1001_profile_completion','profiles_resident_status_check'),
     ('1001_profile_completion','profiles_student_level_check'),
     ('1001_profile_completion','profiles_student_level_coupling_check'),
-    ('1001_profile_completion','profiles_institution_coupling_check'),
     ('1001_profile_completion','profiles_display_preference_check'),
     ('1001_profile_completion','profiles_display_name_length_check'),
     ('1001_profile_completion','profiles_dob_range_check'),
@@ -550,7 +542,6 @@ WITH report AS (
     ('1001_profile_completion','profiles_nationality_code_check'),
     ('1001_profile_completion','profiles_schema_version_check'),
     ('1001_profile_completion','profiles_completion_requires_fields_check'),
-    ('1001_profile_completion','profiles_institution_id_fkey'),
     -- UNIQUE: correctness. institutions.name is what the seed's ON CONFLICT and any
     -- future admin add both key on.
     ('1001_profile_completion','institutions_name_unique'),
@@ -607,12 +598,6 @@ WITH report AS (
     ('1024_student_affiliation','subjects_slug_check'),
     ('1024_student_affiliation','subject_i18n_lang_check'),
     ('1024_student_affiliation','subject_i18n_name_check'),
-    ('1024_student_affiliation','profiles_subject_id_fkey'),
-    ('1024_student_affiliation','profiles_study_start_year_range_check'),
-    ('1024_student_affiliation','profiles_study_end_year_range_check'),
-    ('1024_student_affiliation','profiles_study_years_order_check'),
-    ('1024_student_affiliation','profiles_study_fields_require_institution_check'),
-    ('1024_student_affiliation','profiles_listing_opt_in_requires_institution_check'),
     ('1024_student_affiliation','institutions_website_url_scheme_check'),
     ('1026_student_education','student_education_level_check'),
     ('1026_student_education','student_education_user_inst_level_key'),
@@ -683,8 +668,6 @@ WITH report AS (
     -- an impersonation vector. See the H-token below for the half that matters more:
     -- that it is built on the NORMALIZED column and not the raw string.
     ('1001_profile_completion','profiles_display_name_norm_uniq'),
-    ('1001_profile_completion','idx_profiles_institution_id'),
-    ('1024_student_affiliation','idx_profiles_subject_id'),
     ('1026_student_education','student_education_one_open_per_user'),
     ('1026_student_education','idx_student_education_listed'),
     -- ► conversations_one_live_per_pair is PARTIAL, and the partial-ness is the design.
@@ -1513,25 +1496,58 @@ WITH report AS (
     --    So the student_level coupling is compared to production's catalog text character for
     --    character. pg_get_constraintdef appends " NOT VALID" to an unvalidated CHECK, so
     --    equality also proves it is validated.
-    --    The INSTITUTION coupling's exact text belongs to 1024, which rewrites it (third arm,
-    --    graduates). One owner: this token keeps only the half that is 22's under both —
-    --    the student_level null guard, which a 20261001 re-run removes.
-    UNION ALL SELECT '1022_profiles_coupling_checks_null_safe','profiles coupling CHECKs keep 22''s null guards (student_level check exact)',
+    --    ⚠ SPLIT 2026-09-20 by 20261027. This token asserted BOTH couplings. The
+    --    INSTITUTION one is dropped with institution_id, so that clause would have sat
+    --    STALE/MISSING forever against a database that is exactly right — and this file
+    --    records twice what one known-stale row does to the reader's attention. The
+    --    student_level half is untouched by 20261027 and is entirely 22's own: a
+    --    20261001 re-run still restores the form that passes on UNKNOWN, which is the
+    --    failure this token exists for. Split, not deleted, and not bumped.
+    UNION ALL SELECT '1022_profiles_coupling_checks_null_safe','profiles_student_level_coupling_check keeps 22''s null guard (exact text)',
       EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
-        AND conname='profiles_institution_coupling_check'
-        AND pg_get_constraintdef(oid) LIKE '%(student_level IS NOT NULL) AND%')
-      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
         AND conname='profiles_student_level_coupling_check'
         AND pg_get_constraintdef(oid) = 'CHECK (((student_level IS NULL) OR ((resident_status IS NOT NULL) AND (resident_status = ''student''::text))))')
+
+    -- ══ the affiliation leaves profiles (20261027) ══════════════════════════
+    -- Sections B/C/D/E/F lost seventeen registrations in the same commit, so they are
+    -- blind to this by construction: an object that is gone on purpose cannot be checked
+    -- by a list that no longer names it. Only a token can assert the ABSENCE, and only a
+    -- token can assert the two things that must SURVIVE the drop.
+    --
+    --   1. The five columns are gone. DERIVED, so a sixth affiliation column added later
+    --      and then dropped would also register here rather than slipping past a list.
+    --   2. mirror_profile_affiliation is gone, function and trigger both.
+    --   3. ⚠ check_profile_study_years() SURVIVES and is still bound to student_education.
+    --      One function, two triggers: 20261027 drops the profiles one only. Dropping the
+    --      function — the obvious move when its name says `profile` — would silently take
+    --      the future-end-year rule off student_education, and nothing else checks that
+    --      rule at write time.
+    --   4. ⚠ student_education.mirror_owned SURVIVES. Inert after the trigger goes, but
+    --      the shipped client SELECTs it (utils/education.js:34) and WRITES it
+    --      (ProfileScreen.js:399 — the opt-in switch), so dropping it 42703s every
+    --      enrolment read and the consent control. Asserted POSITIVELY so removing it has
+    --      to be a deliberate act with this clause to delete.
+    UNION ALL SELECT '1027_drop_profile_affiliation','the five affiliation columns and the mirror are gone; the year rule and mirror_owned survive',
+      NOT EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='profiles'
+          AND column_name IN ('institution_id','study_start_year','study_end_year',
+                              'subject_id','student_listing_opt_in'))
+      AND to_regprocedure('public.mirror_profile_affiliation()') IS NULL
+      AND NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.profiles')
+        AND tgname='mirror_profile_affiliation' AND NOT tgisinternal)
+      AND to_regprocedure('public.check_profile_study_years()') IS NOT NULL
+      AND EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.student_education')
+        AND tgname='check_student_education_years' AND NOT tgisinternal)
+      AND EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='student_education' AND column_name='mirror_owned')
     -- ── 1024 student affiliation. Catalogs only: naming public.subjects directly would fail
     --    at plan time on a database that has not applied 1024 and take the report down.
     -- (1) THE PRIVACY DEFAULT. A reverted DEFAULT creates no named object, and once a
     --     student list exists it means every write that omits the column LISTS the user.
-    UNION ALL SELECT '1024_student_affiliation','profiles.student_listing_opt_in NOT NULL DEFAULT false',
-      EXISTS(SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='profiles'
-          AND column_name='student_listing_opt_in' AND column_default='false' AND is_nullable='NO')
-    -- (2) The is_active inversion, as on student_tasks.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "profiles.student_listing_opt_in NOT NULL DEFAULT false".
+    --   the column is dropped; the opt-in is per-enrolment and 1026 owns its DEFAULT token.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
     UNION ALL SELECT '1024_student_affiliation','subjects.is_active DEFAULT false',
       EXISTS(SELECT 1 FROM information_schema.columns
         WHERE table_schema='public' AND table_name='subjects'
@@ -1540,17 +1556,10 @@ WITH report AS (
     --     profiles_institution_coupling_check. Section E sees the names; only the body shows
     --     whether the IS NOT NULL arm that stops UNKNOWN from passing is still there. Each
     --     pattern is the null guard of that specific CHECK, so a naive rewrite reads MISSING.
-    UNION ALL SELECT '1024_student_affiliation','study/listing coupling CHECKs keep their IS NOT NULL guards',
-      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
-        AND conname='profiles_study_years_order_check'
-        AND pg_get_constraintdef(oid) LIKE '%study_start_year IS NOT NULL%')
-      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
-        AND conname='profiles_study_fields_require_institution_check'
-        AND pg_get_constraintdef(oid) LIKE '%institution_id IS NOT NULL%')
-      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
-        AND conname='profiles_listing_opt_in_requires_institution_check'
-        AND pg_get_constraintdef(oid) LIKE '%institution_id IS NOT NULL%')
-    -- (4) Language key: full names, never ISO — same token shape as 1017's.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "study/listing coupling CHECKs keep their IS NOT NULL guards".
+    --   all three constraints are dropped with the columns they coupled.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
     UNION ALL SELECT '1024_student_affiliation','subject_i18n_lang_check = full names, no ISO codes',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='subject_i18n_lang_check'
         AND pg_get_constraintdef(c.oid) LIKE '%''Turkish''%'
@@ -1567,36 +1576,14 @@ WITH report AS (
     -- (6) The institution coupling as 1024 rewrote it: 22's two arms plus
     --     "OR study_end_year IS NOT NULL", so a graduate keeps their institution. Exact text,
     --     so both a 22 re-run (arm gone) and a 20261001 re-run (guard gone) read MISSING.
-    UNION ALL SELECT '1024_student_affiliation','profiles_institution_coupling_check = 1024 form (graduate arm)',
-      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
-        AND conname='profiles_institution_coupling_check'
-        AND pg_get_constraintdef(oid) = 'CHECK (((institution_id IS NULL) OR ((student_level IS NOT NULL) AND (student_level = ANY (ARRAY[''university''::text, ''postgraduate''::text]))) OR (study_end_year IS NOT NULL)))')
-    -- (7) The end-year rule lives in a trigger body, and sections C and D only see NAMES. The
-    --     body pattern is a code shape no comment contains; the trigger must be enabled and
-    --     call this function. (Not pg_get_triggerdef equality: it prints the function name
-    --     with or without "public." depending on search_path.)
-    UNION ALL SELECT '1024_student_affiliation','check_profile_study_years rejects a future end year, trigger enabled on profiles',
-      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-        WHERE n.nspname='public' AND p.proname='check_profile_study_years'
-          AND p.prosrc LIKE '%NEW.study_end_year > extract(year FROM current_date)%'
-          AND p.prosrc LIKE '%RAISE EXCEPTION%')
-      AND EXISTS(SELECT 1 FROM pg_trigger t
-        WHERE t.tgrelid='public.profiles'::regclass AND t.tgname='check_profile_study_years'
-          AND NOT t.tgisinternal AND t.tgenabled='O'
-          AND t.tgfoid=(SELECT p.oid FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-                         WHERE n.nspname='public' AND p.proname='check_profile_study_years' LIMIT 1))
-    -- ── 1018 / 1020 institutions, reconciled to YÖDAK's list by hand on 2026-09-15. CONTENT
-    --    tokens, reading public.institutions directly — safe, 1001 is applied (the 1010
-    --    home_services tokens do the same). Everything is keyed on id or a count, never on a
-    --    name remembered from the file; the one name compared is the rename itself.
-    --    1019 has NO token, deliberately: 20 overwrote every value 19 set, so a token for
-    --    19's state would sit red forever against a correct database.
-    -- (1) THE COUNT, one owner, and it moves with whichever migration last changed it —
-    --     bump it IN THAT COMMIT and say why. 22/21 after 1018; 25/24 after 1021, which
-    --     added the three held universities (Ankara Sosyal Bilimler, Altınbaş Kıbrıs,
-    --     Uluslararası Alasia). The state checks inside 20261018/19/20 still pin 22/21 and
-    --     now fail permanently: they are historical records and must NOT be edited (their
-    --     ledger rows carry their current checksums). This token is the live count.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "profiles_institution_coupling_check = 1024 form (graduate arm)".
+    --   the constraint is dropped; the affiliation is not on profiles any more.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "check_profile_study_years rejects a future end year, trigger enabled on profiles".
+    --   the trigger on profiles is dropped. The FUNCTION survives and the rule is still enforced — 1026 token "check_profile_study_years is bound to student_education" owns that now. One fact, one owner.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
     UNION ALL SELECT '1021_institutions_held_three','institutions: 25 rows, 24 active',
       (SELECT count(*) FROM public.institutions) = 25
       AND (SELECT count(*) FROM public.institutions WHERE is_active) = 24
@@ -2419,30 +2406,14 @@ WITH report AS (
     -- re-send a stale institution_id and retire the enrolment they had just added in the
     -- new app — the safety net destroying the thing it exists to protect, in exactly the
     -- window it exists for. Anchored on the comparison itself, which no comment contains.
-    UNION ALL SELECT '1026_student_education','mirror_profile_affiliation is a no-op on an unchanged write',
-      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-        WHERE n.nspname='public' AND p.proname='mirror_profile_affiliation'
-          AND pg_get_functiondef(p.oid) ILIKE '%IS NOT DISTINCT FROM OLD.institution\_id%'
-          AND pg_get_functiondef(p.oid) ILIKE '%IS NOT DISTINCT FROM OLD.student\_listing\_opt\_in%')
-    -- (10) THE RULE THE WHOLE TRIGGER IS BUILT AROUND: it may create a row and update one
-    -- it created itself (mirror_owned), and NOTHING else. It never deletes. This trigger is
-    -- scaffolding that 20261027 removes, and temporary scaffolding must not be able to
-    -- destroy permanent user data — two drafts of it were wrong in exactly that way, the
-    -- second one deleting a master's degree somebody had just added on another device.
-    -- Negative anchored on the code shape, which no comment in that body contains, plus
-    -- positives so an emptied or renamed body cannot satisfy the negative by vanishing.
-    UNION ALL SELECT '1026_student_education','mirror_profile_affiliation NEVER deletes, and respects mirror_owned',
-      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-        WHERE n.nspname='public' AND p.proname='mirror_profile_affiliation'
-          AND pg_get_functiondef(p.oid) NOT ILIKE '%DELETE FROM student\_education%'
-          AND pg_get_functiondef(p.oid) ILIKE '%mirror\_owned%'
-          AND pg_get_functiondef(p.oid) ILIKE '%INSERT INTO student\_education%')
-    -- (11) …and the DEFAULT that makes the rule hold for code nobody has written yet.
-    -- The app never names mirror_owned, so every row it inserts is app-owned and therefore
-    -- untouchable, automatically. Same inversion as towing_companies.is_active (20260907),
-    -- and registered here for the same reason: a reverted DEFAULT creates no named object
-    -- and is otherwise undetectable. Flip it to true and the trigger reclaims the right to
-    -- overwrite every row the app has ever created, silently.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "mirror_profile_affiliation is a no-op on an unchanged write".
+    --   the transition trigger and its function are dropped; the window it covered is closed.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "mirror_profile_affiliation NEVER deletes, and respects mirror_owned".
+    --   same — the function is gone. mirror_owned itself STAYS and keeps its own 1026 token.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
     UNION ALL SELECT '1026_student_education','student_education.mirror_owned DEFAULTs to false',
       EXISTS(SELECT 1 FROM information_schema.columns
               WHERE table_schema='public' AND table_name='student_education'

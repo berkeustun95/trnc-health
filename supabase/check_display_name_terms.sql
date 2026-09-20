@@ -80,11 +80,20 @@ SELECT
 --       filters display_name IS NOT NULL, so they leave every list until they pick one;
 --   (b) set ugc_banned_until — which delists them AND removes their access to lists,
 --       and unlike clearing the opt-in it is not something they can switch back on.
+-- ⚠ REPOINTED 2026-09-20 by 20261027. This read `p.student_listing_opt_in` until that
+--   migration dropped the column: the opt-in is per-ENROLMENT now (20261026), so one
+--   boolean on the person cannot express "listed at the university I attend, not at the
+--   one I left". EXISTS over student_education is the same question asked of the table
+--   that now answers it — and it is deliberately NOT is_listed_student(), which is
+--   SECURITY DEFINER and reads auth.uid(): this file is run by a human in the SQL editor
+--   where auth.uid() is NULL, so that function would answer false for everybody and the
+--   column would read "nobody is listed" against a database where people are.
 SELECT
   'display_name' AS field,
   p.id           AS user_id,
   p.display_name AS value,
-  p.student_listing_opt_in AS currently_listed
+  EXISTS (SELECT 1 FROM public.student_education e
+           WHERE e.user_id = p.id AND e.listing_opt_in) AS currently_listed
 FROM public.profiles p
 WHERE p.display_name IS NOT NULL
   AND public.contains_blocked_term(p.display_name)
@@ -97,7 +106,8 @@ SELECT
   'full_name',
   p.id,
   p.full_name,
-  p.student_listing_opt_in
+  EXISTS (SELECT 1 FROM public.student_education e
+           WHERE e.user_id = p.id AND e.listing_opt_in)
 FROM public.profiles p
 WHERE p.full_name IS NOT NULL
   AND public.contains_blocked_term(p.full_name)
@@ -107,9 +117,10 @@ ORDER BY 1, 3;
 -- is_reserved_display_name() is enforced at write time too, and reserved_names grows by
 -- hand exactly like blocked_terms. A name reserved after someone took it keeps it.
 SELECT
-  p.id                     AS user_id,
-  p.display_name           AS value,
-  p.student_listing_opt_in AS currently_listed
+  p.id           AS user_id,
+  p.display_name AS value,
+  EXISTS (SELECT 1 FROM public.student_education e
+           WHERE e.user_id = p.id AND e.listing_opt_in) AS currently_listed
 FROM public.profiles p
 WHERE p.display_name IS NOT NULL
   AND public.is_reserved_display_name(public.normalize_display_name(p.display_name))
