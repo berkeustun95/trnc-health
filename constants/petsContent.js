@@ -32,7 +32,7 @@ import { LANG_CODES } from './i18n.js'
 //   days — on import rules for a live health module, where the cost of reviewing early is
 //   a phone call and the cost of reviewing late is somebody at Ercan with the wrong
 //   paperwork. Err toward the phone call.
-export const verifiedOn = '2026-06'
+export const verifiedOn = '2026-09'
 
 // ─── PENDING EXTERNAL VERIFICATION ──────────────────────────────────────────
 //
