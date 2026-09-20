@@ -17,7 +17,6 @@ import { supabase, isGuest } from './lib/supabase'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
-import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE } from './constants/flags'
 import { promosAllowed } from './constants/homeStrip'
@@ -47,6 +46,7 @@ import EstateAgentOnboardingScreen from './screens/EstateAgentOnboardingScreen'
 import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import HomeServiceDashboardScreen from './screens/HomeServiceDashboardScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
+import Avatar from './components/Avatar'
 import HomeServicesScreen from './screens/HomeServicesScreen'
 import JobPostingsScreen from './screens/JobPostingsScreen'
 import TransportScreen from './screens/TransportScreen'
@@ -2069,24 +2069,12 @@ export default function App() {
         <Animated.View style={[styles.menuDrawer, { transform: [{ translateX: menuAnim }] }]}>
           <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <View style={styles.menuUserRow}>
-            {(() => {
-              const preset = getPreset(profile?.avatar_url)
-              if (preset) return (
-                <View style={[styles.menuAvatar, { backgroundColor: preset.bg }]}>
-                  <Text style={{ fontSize: 22 }}>{preset.emoji}</Text>
-                </View>
-              )
-              if (profile?.avatar_url?.startsWith('http')) return (
-                <Image source={{ uri: profile.avatar_url }} style={styles.menuAvatar} />
-              )
-              return (
-                <View style={[styles.menuAvatar, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.menuAvatarText}>
-                    {session.user.email?.[0]?.toUpperCase() ?? t('guestLabel', lang)[0].toUpperCase()}
-                  </Text>
-                </View>
-              )
-            })()}
+            <Avatar
+              avatarUrl={profile?.avatar_url}
+              initials={session.user.email?.[0]?.toUpperCase() ?? t('guestLabel', lang)[0].toUpperCase()}
+              size={44}
+              textSize={18}
+            />
             <Text style={styles.menuEmail} numberOfLines={1}>{session.user.email ?? t('guestLabel', lang)}</Text>
             <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ flexShrink: 0 }}>
               <Ionicons name="close" size={24} color={colors.textPrimary} />
@@ -2550,8 +2538,6 @@ const styles = StyleSheet.create({
   menuBackdrop:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 10 },
   menuDrawer:       { position: 'absolute', top: 0, right: 0, bottom: 0, width: 260, backgroundColor: colors.bg, zIndex: 11, paddingHorizontal: 20, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: -4, height: 0 }, elevation: 20 },
   menuUserRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
-  menuAvatar:       { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  menuAvatarText:   { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#fff' },
   menuEmail:        { flex: 1, minWidth: 0, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   menuDivider:      { height: 1, backgroundColor: colors.border, marginVertical: 8 },
   menuItem:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 13 },

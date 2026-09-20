@@ -15,7 +15,7 @@ import StudentProfileScreen from './StudentProfileScreen'
 import ConversationsScreen from './ConversationsScreen'
 import ConversationScreen from './ConversationScreen'
 import { MODULE_FLAGS } from '../constants/flags'
-import { getPreset } from '../constants/avatars'
+import Avatar, { prefetchAvatars } from '../components/Avatar'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
@@ -57,7 +57,6 @@ function UniversityRow({ uni, lang, onOpen }) {
 // means graduated (20261024's third arm, and the trigger that rejects future end years is
 // what keeps that true).
 function StudentRow({ row, lang, isMe, onOpen }) {
-  const preset  = getPreset(row.avatar_url)
   const alumni  = row.study_end_year != null
   const years   = row.study_start_year
     ? `${row.study_start_year} – ${row.study_end_year ?? t('studentListPresent', lang)}`
@@ -77,17 +76,12 @@ function StudentRow({ row, lang, isMe, onOpen }) {
         accessibilityRole="button"
         accessibilityLabel={row.display_name}
       >
-      {preset ? (
-        <View style={[s.studentAvatar, { backgroundColor: preset.bg }]}>
-          <Text style={s.studentAvatarEmoji}>{preset.emoji}</Text>
-        </View>
-      ) : row.avatar_url?.startsWith('http') ? (
-        <Image source={{ uri: row.avatar_url }} style={s.studentAvatar} />
-      ) : (
-        <View style={[s.studentAvatar, s.studentAvatarBlank]}>
-          <Text style={s.studentAvatarInitial}>{row.display_name?.[0]?.toUpperCase() ?? '?'}</Text>
-        </View>
-      )}
+      <Avatar
+        avatarUrl={row.avatar_url}
+        initials={row.display_name?.[0]?.toUpperCase() ?? '?'}
+        size={44}
+        textSize={17}
+      />
 
       <View style={s.studentBody}>
         <View style={s.studentNameRow}>
@@ -145,7 +139,8 @@ function StudentList({ uni, lang, isGuest, listingOptIn, meFailed, myId, onGoToP
         // decided; anything else is a real failure. Either way the raw message never
         // reaches the user.
         if (error) { setFailed(true); return }
-        setRows(data ?? [])
+        // ONE signing round trip for the whole list, not one per student.
+        prefetchAvatars((data ?? []).map(r => r.avatar_url)).finally(() => setRows(data ?? []))
       })
     return () => { cancelled = true }
   }, [uni.id, lang, eligible])
@@ -968,10 +963,6 @@ const s = StyleSheet.create({
   // not, and the same row layout it replaced — the menu is a sibling, not a child.
   studentTap:          { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   studentDivider:      { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  studentAvatar:       { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
-  studentAvatarEmoji:  { fontSize: 22 },
-  studentAvatarBlank:  { backgroundColor: colors.cardBg },
-  studentAvatarInitial:{ fontSize: 18, fontWeight: '700', color: colors.textSecondary },
   studentBody:         { flex: 1, minWidth: 0 },
   studentNameRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
   studentName:         { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },

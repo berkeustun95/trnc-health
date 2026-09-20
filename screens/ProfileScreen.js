@@ -32,7 +32,8 @@ import {
 import { subjectOptions, studyYearOptions, studyYearCeiling } from '../utils/studyFields'
 import LegalScreen from './LegalScreen'
 import { TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
-import { PRESET_AVATARS, getPreset } from '../constants/avatars'
+import { PRESET_AVATARS } from '../constants/avatars'
+import Avatar, { prefetchAvatars, invalidateAvatar } from '../components/Avatar'
 import BackButton from '../components/BackButton'
 
 
@@ -61,24 +62,6 @@ function decode(base64) {
   return buf
 }
 
-function AvatarDisplay({ avatarUrl, initials, size = 72, textSize = 26 }) {
-  const preset = getPreset(avatarUrl)
-  if (preset) {
-    return (
-      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: preset.bg, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ fontSize: textSize * 0.9 }}>{preset.emoji}</Text>
-      </View>
-    )
-  }
-  if (avatarUrl?.startsWith('http')) {
-    return <Image source={{ uri: avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />
-  }
-  return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: textSize, fontFamily: 'Inter_700Bold', color: '#fff' }}>{initials}</Text>
-    </View>
-  )
-}
 
 
 // ─── Slice 3a: the wizard's ten fields become reviewable and editable ───────
@@ -317,7 +300,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   //   behaviour, which is merely unhelpful rather than untrue.
   async function loadBlocks() {
     const { data, error } = await supabase.rpc('list_my_blocks')
-    if (!error && data) { setBlocks(data); return }
+    if (!error && data) {
+      // One signing round trip for the whole blocked list, not one per row.
+      await prefetchAvatars(data.map(b => b.avatar_url))
+      setBlocks(data); return
+    }
     const { data: rows } = await supabase.from('blocks')
       .select('blocked_id, created_at')
       .order('created_at', { ascending: false })
@@ -513,17 +500,40 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     setAvatarError(null)
     try {
       const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
-      const path = `${session.user.id}/avatar.${ext}`
+      // ─── THE UID STAYS A FOLDER SEGMENT; THE FILENAME GAINS A RANDOM SUFFIX ───
+      // The uid prefix is what 20261040's RLS pins on — `(storage.foldername(name))[1] =
+      // auth.uid()` — so it is load-bearing, not cosmetic. The random suffix is
+      // defence-in-depth for REPLACEMENT: the old object is deleted below, so any signed
+      // URL still circulating for it 404s instead of resolving to a photo the user
+      // believes they removed. A fixed `avatar.jpg` would be re-uploaded to the same path
+      // and an old URL would keep serving the NEW image.
+      //
+      // Math.random is adequate BECAUSE the bucket is private — the secrecy of this
+      // string is not what protects the object, the RLS policy is. expo-crypto's
+      // randomUUID() is the upgrade and it is a NATIVE dep, so it waits for the eSIM
+      // build rather than breaking the OTA-only rule for a defence-in-depth nicety.
+      const rand = Math.random().toString(36).slice(2, 10)
+      const path = `${session.user.id}/avatar-${rand}.${ext}`
+      const previous = avatarUrl   // a PATH on current rows, an https URL on legacy ones
       const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+      // upsert:false — every upload is a NEW path now, so an upsert could only ever mask
+      // a collision, and a collision here would mean the random suffix repeated.
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(path, decode(asset.base64), { contentType, upsert: true })
+        .upload(path, decode(asset.base64), { contentType, upsert: false })
       if (uploadError) throw uploadError
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
-      const url = `${publicUrl}?t=${Date.now()}`
-      await supabase.from('profiles').update({ avatar_url: url }).eq('id', session.user.id)
-      setAvatarUrl(url)
-      onAvatarChange?.(url)
+      // The COLUMN HOLDS THE PATH, never a URL. A stored URL would be a credential with
+      // an expiry, and it would be dead the moment the bucket went private.
+      await supabase.from('profiles').update({ avatar_url: path }).eq('id', session.user.id)
+      setAvatarUrl(path)
+      onAvatarChange?.(path)
+      // Delete the old object AFTER the row points at the new one. The other order leaves
+      // a window where the row references a deleted object and the avatar is a blank.
+      // Fire-and-forget: a failed cleanup is an orphaned object, not a broken profile.
+      if (previous && !previous.startsWith('http') && !previous.startsWith('preset:') && previous !== path) {
+        invalidateAvatar(previous)
+        supabase.storage.from('avatars').remove([previous]).catch(() => {})
+      }
       setShowAvatarPicker(false)
     } catch {
       setAvatarError('Upload failed. Try again.')
@@ -858,7 +868,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
           <View style={s.avatarSection}>
             <TouchableOpacity style={s.avatarWrap} onPress={() => { setAvatarError(null); setShowAvatarPicker(true) }} activeOpacity={0.8}>
-              <AvatarDisplay avatarUrl={avatarUrl} initials={initials} size={80} textSize={28} />
+              <Avatar avatarUrl={avatarUrl} initials={initials} size={80} textSize={28} />
               <View style={s.avatarEditBadge}>
                 <Feather name="edit-2" size={11} color="#fff" />
               </View>
@@ -1286,7 +1296,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   <View key={b.blocked_id} style={s.blockedRow}>
                     {named ? (
                       <View style={s.blockedWho}>
-                        <AvatarDisplay avatarUrl={b.avatar_url} initials={(b.display_name[0] ?? '?').toUpperCase()} size={32} textSize={13} />
+                        <Avatar avatarUrl={b.avatar_url} initials={(b.display_name[0] ?? '?').toUpperCase()} size={32} textSize={13} />
                         <View style={s.blockedWhoBody}>
                           <Text style={s.blockedName} numberOfLines={1}>{b.display_name}</Text>
                           <Text style={s.blockedLabel}>

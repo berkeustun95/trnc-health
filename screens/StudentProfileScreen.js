@@ -7,7 +7,7 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import ContentCard from '../components/ContentCard'
 import ContentReportMenu from '../components/ContentReportMenu'
-import { getPreset } from '../constants/avatars'
+import Avatar from '../components/Avatar'
 import { STUDENT_LEVEL_LABEL_KEY } from '../constants/profileGate'
 import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -103,7 +103,6 @@ export default function StudentProfileScreen({ userId, lang, isMe = false, onBac
   useEffect(() => load(), [load])
 
   const header = rows?.[0] ?? null
-  const preset = getPreset(header?.avatar_url)
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -132,17 +131,12 @@ export default function StudentProfileScreen({ userId, lang, isMe = false, onBac
           <>
             <ContentCard>
               <View style={s.headRow}>
-                {preset ? (
-                  <View style={[s.avatar, { backgroundColor: preset.bg }]}>
-                    <Text style={s.avatarEmoji}>{preset.emoji}</Text>
-                  </View>
-                ) : header.avatar_url?.startsWith('http') ? (
-                  <Image source={{ uri: header.avatar_url }} style={s.avatar} />
-                ) : (
-                  <View style={[s.avatar, s.avatarBlank]}>
-                    <Text style={s.avatarInitial}>{header.display_name?.[0]?.toUpperCase() ?? '?'}</Text>
-                  </View>
-                )}
+                <Avatar
+                  avatarUrl={header.avatar_url}
+                  initials={header.display_name?.[0]?.toUpperCase() ?? '?'}
+                  size={64}
+                  textSize={24}
+                />
 
                 <View style={s.headBody}>
                   <Text style={s.name} numberOfLines={2}>{header.display_name}</Text>
@@ -214,10 +208,6 @@ const s = StyleSheet.create({
   retryText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
 
   headRow:   { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatar:    { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  avatarEmoji:  { fontSize: 30 },
-  avatarBlank:  { backgroundColor: colors.border },
-  avatarInitial: { fontSize: 24, fontWeight: '700', color: colors.textSecondary },
   headBody:  { flex: 1, gap: 6 },
   name:      { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
   youPill:   { alignSelf: 'flex-start', backgroundColor: colors.primaryLight, borderRadius: radius.sm,

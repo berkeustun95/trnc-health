@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import ContentCard from '../components/ContentCard'
-import { getPreset } from '../constants/avatars'
+import Avatar, { prefetchAvatars } from '../components/Avatar'
 import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { monthNames } from '../constants/months'
@@ -40,7 +40,6 @@ function stamp(iso, lang) {
 }
 
 function Row({ row, lang, onOpen }) {
-  const preset = getPreset(row.avatar_url)
   return (
     <TouchableOpacity
       style={s.row}
@@ -49,17 +48,12 @@ function Row({ row, lang, onOpen }) {
       accessibilityRole="button"
       accessibilityLabel={row.display_name ?? t('msgDeletedUser', lang)}
     >
-      {preset ? (
-        <View style={[s.avatar, { backgroundColor: preset.bg }]}>
-          <Text style={s.avatarEmoji}>{preset.emoji}</Text>
-        </View>
-      ) : row.avatar_url?.startsWith('http') ? (
-        <Image source={{ uri: row.avatar_url }} style={s.avatar} />
-      ) : (
-        <View style={[s.avatar, s.avatarBlank]}>
-          <Text style={s.avatarInitial}>{row.display_name?.[0]?.toUpperCase() ?? '?'}</Text>
-        </View>
-      )}
+      <Avatar
+        avatarUrl={row.avatar_url}
+        initials={row.display_name?.[0]?.toUpperCase() ?? '?'}
+        size={46}
+        textSize={18}
+      />
 
       <View style={s.body}>
         <View style={s.nameRow}>
@@ -111,7 +105,8 @@ export default function ConversationsScreen({ lang, canSee, onOpen, onGoToProfil
       // checked through canSee, so they are a load failure here rather than a state with
       // its own copy. The raw message never reaches the user either way.
       if (error) { setFailed(true); return }
-      setRows(data ?? [])
+      // One signing round trip for the whole inbox, not one per row.
+      prefetchAvatars((data ?? []).map(r => r.avatar_url)).finally(() => setRows(data ?? []))
     })
     return () => { cancelled = true }
   }, [canSee, refreshKey])
@@ -189,10 +184,6 @@ const s = StyleSheet.create({
   row:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: 12, paddingTop: 12 },
 
-  avatar:        { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  avatarEmoji:   { fontSize: 22 },
-  avatarBlank:   { backgroundColor: colors.border },
-  avatarInitial: { fontSize: 18, fontWeight: '700', color: colors.textSecondary },
 
   body:    { flex: 1, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
