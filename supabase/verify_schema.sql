@@ -1342,6 +1342,33 @@ WITH report AS (
     UNION ALL SELECT '0904_accommodation_partner_feed','storage property_images_upload excludes partner/',
       EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
         AND policyname='property_images_upload' AND with_check ILIKE '%partner%')
+    -- ── 20261039. The 0904 token above owns "excludes partner/" and is left alone —
+    -- one fact, one owner. THIS owns the two guards 0904 never had, and neither is
+    -- visible to a policy-existence check: the policy kept its NAME through the
+    -- rewrite, so QUERY 4 lists it either way and section E has no storage section
+    -- at all.
+    --
+    -- Both halves, because each fails differently and both fail SILENTLY:
+    --   • the uid pin is what stops one agent writing over another's listing photos;
+    --   • the guest guard is what stops signInAnonymously() — one tap from a cold
+    --     start, and in the `authenticated` role with a real auth.uid() — uploading
+    --     arbitrary bytes to this project's storage. `auth.role() = 'authenticated'`
+    --     does NOT exclude guests, which is exactly how the old policy admitted them.
+    --
+    -- The UPDATE policy is asserted too: INSERT alone leaves overwrite open on a
+    -- bucket whose objects are addressable by path, which is the same hole through
+    -- the back door.
+    UNION ALL SELECT '1039_property_images_owner_scoped','property-images writes pin the uid and refuse guests (INSERT + UPDATE)',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+        AND policyname='property_images_upload'
+        AND with_check ILIKE '%foldername%'
+        AND with_check ILIKE '%uid%'
+        AND with_check ILIKE '%is_anonymous_session%')
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+        AND policyname='property_images_update_own'
+        AND qual ILIKE '%foldername%'
+        AND with_check ILIKE '%foldername%'
+        AND with_check ILIKE '%is_anonymous_session%')
 
     -- The trigger must IGNORE last_seen_at (stamped on every row every sync run) and
     -- view_count. Section D only proves the trigger EXISTS; an unconditional body would
