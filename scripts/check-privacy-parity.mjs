@@ -37,6 +37,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { GOLIVE_STALE } from './lib/legal-claims.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -226,20 +227,9 @@ const EXEMPT = {
 // that the retracted claims are gone, and the DERIVED disclosure rules above independently
 // keep student_listing_opt_in itemised in all three English copies.
 const GOLIVE_FLAG = 'studentHub'
-const GOLIVE_STALE = [
-  { key: 'never visible to other customers',
-    en: /never visible to other customers/i,
-    tr: /diğer müşterilere hiçbir zaman görünmez/i,
-    why: 'the student list shows one customer to another' },
-  { key: 'no student list yet',
-    en: /there is no student list in the app yet/i,
-    tr: /henüz bir öğrenci listesi yoktur/i,
-    why: 'there is one now, and opting in shows you to people' },
-  { key: 'nothing reads the study fields',
-    en: /nothing in the app reads them/i,
-    tr: /uygulamada bu veriler hiçbir yerde kullanılmıyor/i,
-    why: 'get_student_list reads four of them (20261026)' },
-]
+// MOVED to scripts/lib/legal-claims.mjs 2026-09-20, imported above. check-legal-live.mjs
+// asks the same question of the published URLs, and two copies of this list would drift
+// into a pair that reports something neither of them means. One owner.
 const GOLIVE_COPIES = [
   { label: 'docs/privacy.html',              path: 'docs/privacy.html',              lang: 'en' },
   { label: 'web/privacy.html',               path: 'web/privacy.html',               lang: 'en' },
