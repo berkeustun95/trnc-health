@@ -1375,6 +1375,27 @@ WITH report AS (
     --   3. no row still holds a public URL — such a row renders as initials forever;
     --   4. the INSERT pins the uid and refuses guests, which is what stops one user
     --      replacing another's photo.
+    -- ── 20261041. A DIFFERENT FACT FROM 1040's, and the split is the point. 1040 owns
+    -- "the bucket is private and my four policies exist". THIS owns "and NOTHING ELSE
+    -- reaches this bucket" — which is what 1040 could not see and what cost us: two
+    -- dashboard-era policies, created outside every migration, were still granting what
+    -- the four were written to deny. RLS is PERMISSIVE-OR; presence-of-mine can never
+    -- prove absence-of-theirs.
+    --
+    -- Clause 2 is the general form and the one that outlives this incident: a permissive
+    -- policy whose expression never mentions bucket_id applies to EVERY bucket while
+    -- naming none, so any check that finds candidates by looking for the word 'avatars'
+    -- is blind to it by construction. Zero such policies is the passing state.
+    UNION ALL SELECT '1041_avatars_drop_dashboard_policies','exactly 4 policies reach avatars, none bucket-unscoped, the dashboard pair is gone',
+      (SELECT count(*) FROM pg_policies
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE'
+          AND COALESCE(with_check, qual, '') ILIKE '%avatars%') = 4
+      AND NOT EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE'
+          AND COALESCE(with_check, qual, '') NOT ILIKE '%bucket_id%')
+      AND NOT EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='storage' AND tablename='objects'
+          AND policyname IN ('Public avatar read','Users manage own avatar'))
     UNION ALL SELECT '1040_avatars_private','avatars bucket is PRIVATE, 4 owner-scoped policies, no row still holds a public URL',
       COALESCE((SELECT NOT public FROM storage.buckets WHERE id = 'avatars'), false)
       AND (SELECT count(*) FROM pg_policies
