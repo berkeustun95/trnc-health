@@ -12,7 +12,7 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: bab387b487750ef9b3a9eb2e895d6a96e860ebd68e7eba6cc74f1b6a5512a52a
-export default `Version: 2026-09
+export default `Version: 2026-09-20
 Last updated: September 2026
 
 These Terms of Service are an agreement between you and Astarte Digital Trading Ltd., a company incorporated in the Turkish Republic of Northern Cyprus (TRNC) under the Companies Law (Cap. 113), company number MŞ29454. Our registered postal address is available on request.

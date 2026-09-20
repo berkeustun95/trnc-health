@@ -12,8 +12,8 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
-export default `Version: 2026-09
-Last updated: September 2026
+export default `Version: 2026-09-20
+Last updated: September 20, 2026
 
 WHO WE ARE
 
@@ -38,7 +38,7 @@ Profile data. Each field is listed with what it is for. Where a field is marked 
 • Phone number — optional. If you provide it, it is held on your account so that we can contact you about your account. It is not shown to other users and is not given to providers. You can use ADA fully without giving us a phone number.
 • Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Not used yet — nothing in the app reads it.
 • Resident status — student, working here, resident, or visiting — and, if you are a student, your study level and, for university and postgraduate study, your institution. This is intended to decide which parts of ADA are put in front of you, because someone who has just arrived needs different things from someone who has lived here ten years. Not used yet — nothing in the app reads it.
-• University details, if you add them — a university you study at now or studied at before (you do not need to be a student now), your field of study, the year you started and the year you graduated, and whether you have asked to appear in your university's student list. That setting is off unless you turn it on, and there is no student list in the app yet, so turning it on shows you to no one. Not used yet — nothing in the app reads them.
+• University details, if you add them — the universities you study at now or studied at before (you do not need to be a student now), your field of study, the years you started and graduated, and whether you have chosen to appear in your university's student list. That setting is off unless you turn it on.
 • Preferred language — to show the app, and the notifications we send you, in your language.
 
 Profile picture: optional. Either a preset avatar you choose, or an image you upload, which is stored in our file storage.
@@ -46,6 +46,9 @@ Profile picture: optional. Either a preset avatar you choose, or an image you up
 Push notification token: stored to send you duty pharmacy alerts and replies to questions you have asked. You can disable this in your device settings at any time.
 
 Reviews, questions and answers you submit.
+
+• Messages you send — the text of your messages to other students and who you sent them to. A message you delete is hidden from both of you but kept for a period so a report can be reviewed. If someone reports a message, an administrator can read that message and nothing else from the conversation.
+• Attempts to start a conversation — when you try to message someone, we record that the attempt happened, whether or not it went through. Only administrators can see this, and it is deleted after 30 days.
 
 Moderation data: content you report, and users you block. Your block list is private and is never shown to the user you blocked.
 
@@ -78,7 +81,7 @@ Other users can see:
 • Your display name, next to reviews, questions and answers you post.
 • The content of the reviews, questions and answers you post, and the ratings you give.
 
-Other users cannot see: your first and last name, your date of birth, your nationality, your phone number, your region, your resident status, your study level, institution, field of study or study years, or your email address.
+Other users cannot see: your first and last name, your date of birth, your nationality, your phone number, your region, your resident status, your study level, or your email address.
 
 Providers are not shown any of your personal data. When you ask a question on a facility's page, the provider sees the question and your display name — not your real name, your date of birth, your phone number, your region or your resident status.
 
@@ -117,7 +120,7 @@ If you opt in:
 
 7. DATA STORAGE AND RETENTION
 
-All data is stored on Supabase, in an EU region. Row-Level Security (RLS) policies ensure you can only access your own records. Your data is never visible to other customers.
+All data is stored on Supabase, in an EU region. Row-Level Security (RLS) policies ensure you can only access your own records. Your data is not visible to other users unless you choose to appear in your university's student list. If you turn that on, other listed users can see your display name, profile picture, universities, field of study and study years, and can send you a message request. You can turn it off at any time.
 
 Because we operate from the TRNC, our administrators access your data from outside the EU/EEA. We apply the same protections to that access as we do to the data at rest.
 

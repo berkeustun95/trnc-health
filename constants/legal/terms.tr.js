@@ -12,7 +12,7 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: c39dac725f057d5121f2d1a27bc543677c3836209d26ab3438af3e3ccdbe5286
-export default `Sürüm: 2026-09
+export default `Sürüm: 2026-09-20
 Son güncelleme: Eylül 2026
 
 Bu Kullanım Koşulları, sizinle Kuzey Kıbrıs Türk Cumhuriyeti'nde (KKTC) Şirketler Yasası (Fasıl 113) uyarınca kurulmuş Astarte Digital Trading Ltd. arasında yapılmış bir sözleşmedir. Şirket numarası: MŞ29454. Kayıtlı posta adresimiz talep üzerine paylaşılır.

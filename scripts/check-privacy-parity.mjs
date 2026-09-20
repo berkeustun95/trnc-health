@@ -152,8 +152,17 @@ const DISCLOSURE = {
   // 20261024. "subject" alone is useless here — every copy already says "subject to the
   // advertising restrictions" — so each rule names a phrase only the disclosure uses.
   subject_id:             /field of study/i,
-  study_start_year:       /year you started/i,
-  study_end_year:         /year you graduated/i,
+  // ⚠ THESE MATCH PROSE, SO THEY MUST NOT PIN ONE PHRASING. Both read
+  //   /year you .../ until 2026-09-20, which disclosed the same two facts as "the year
+  //   you started and the year you graduated". The Student Hub rewrite said "the years
+  //   you started and graduated" — plural, and the two facts merged into one clause —
+  //   and the guard went red on copy that discloses BOTH of them perfectly well.
+  //   The only way to green without touching this was to make reviewed legal copy worse,
+  //   which is the trap the 0902 note in CLAUDE.md describes: when a check forbids a
+  //   CORRECT system from doing something, the check is what is wrong.
+  //   Still discriminating — "the years you started" alone leaves study_end_year red.
+  study_start_year:       /years? you started/i,
+  study_end_year:         /years? you (started and )?graduated/i,
   student_listing_opt_in: /student list/i,
   // student_education's names for facts profiles already discloses (20261026). Both
   // spellings carry a rule so the check survives 20261027 moving the column between
@@ -391,7 +400,7 @@ function self() {
   }
   console.log('  baseline: the real files PASS, so any red below is caused by the mutation\n')
   const cases = [
-    ['date drift in one copy', () => [copies.map((c,i) => i===0 ? {...c, text: c.text.replace(/Last updated:\s*\w+ \d{4}/, 'Last updated: June 2026')} : c), columns],
+    ['date drift in one copy', () => [copies.map((c,i) => i===0 ? {...c, text: c.text.replace(/Last updated:\s*[A-Za-z]+(?: \d{1,2},)? \d{4}/, 'Last updated: June 2026')} : c), columns],
       ([cs]) => /June 2026/.test(cs[0].text)],
     ['30-day rule dropped from web copy', () => [copies.map(c => c.label.startsWith('web') ? {...c, text: c.text.replace(/deleted automatically after 30 days/ig, 'kept')} : c), columns],
       ([cs]) => !/deleted automatically after 30 days/i.test(cs[1].text)],
@@ -408,20 +417,33 @@ function self() {
     //    the way a new profiles column does.
     ['a NEW student_education column appears', () => [copies, [...columns, 'transcript_url']],
       ([,cols]) => cols.includes('transcript_url')],
-    // ── The go-live tripwire. Flipping ONLY the flag must turn it red against the
-    //    real, unmodified privacy files — that is the whole point of it.
+    // ── The go-live tripwire. Flipping the flag against copy that still carries a
+    //    retracted sentence must turn it red.
+    //
+    //    ⚠ THE STALE SENTENCE IS INJECTED, NOT BORROWED FROM THE REAL FILES. Both cases
+    //      below used to mutate only the flag and rely on realWorld.texts still being
+    //      stale. That worked exactly until the copy was legitimately rewritten
+    //      (2026-09-20), at which point neither mutation could land and BOTH paths went
+    //      unreachable — reported as "MUTATION DID NOT LAND", i.e. a self-test that
+    //      expires the moment the thing it guards is fixed. Injecting makes them
+    //      permanently reachable, and `landed()` still runs the real GOLIVE_STALE regex
+    //      over the injected text, so a sentence that drifts from its rule says so
+    //      loudly instead of quietly passing.
     ['Student Hub goes live on stale privacy copy',
-      () => [copies, columns, { flagOn: true, texts: realWorld.texts }],
-      ([,,w]) => w.flagOn === true && /never visible to other customers/i.test(w.texts['constants/legal/privacy.en.js'])],
-    // ── …and the Turkish copy is checked INDEPENDENTLY. With all three English copies
-    //    rewritten and privacy.tr.js left alone, this must still fire — otherwise a
-    //    Turkish reader keeps a promise the English reader has had retracted.
-    ['live, English rewritten, Turkish left stale',
       () => {
         const texts = { ...realWorld.texts }
-        for (const c of GOLIVE_COPIES.filter(x => x.lang === 'en')) {
-          texts[c.path] = GOLIVE_STALE.reduce((s, st) => s.replace(st.en, 'REWRITTEN'), texts[c.path])
-        }
+        texts['constants/legal/privacy.en.js'] += '\nYour data is never visible to other customers.\n'
+        return [copies, columns, { flagOn: true, texts }]
+      },
+      ([,,w]) => w.flagOn === true && /never visible to other customers/i.test(w.texts['constants/legal/privacy.en.js'])],
+    // ── …and the Turkish copy is checked INDEPENDENTLY: English clean, Turkish carrying
+    //    the retracted sentence, must still fire — otherwise a Turkish reader keeps a
+    //    promise the English reader has had retracted. That is the worse half of the
+    //    failure, because the Turkish reader is the one most likely to be a student here.
+    ['live, English clean, Turkish left stale',
+      () => {
+        const texts = { ...realWorld.texts }
+        texts['constants/legal/privacy.tr.js'] += '\nVerileriniz diğer müşterilere hiçbir zaman görünmez.\n'
         return [copies, columns, { flagOn: true, texts }]
       },
       ([,,w]) => !/never visible to other customers/i.test(w.texts['web/privacy.html'])

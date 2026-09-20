@@ -29,10 +29,21 @@ import TERMS_TR   from './terms.tr.js'
 // acceptance events, two records) and not a constant to split quietly.
 //
 // Bumped 2026-08 -> 2026-09 when the Turkish translations, the advertising clause, the
-// legal-basis table and the entity block landed. It is the value written to
+// legal-basis table and the entity block landed.
+//
+// Bumped 2026-09 -> 2026-09-20 for the Student Hub privacy rewrite: the student list,
+// messages, and conversation attempts. DAY PRECISION because the previous bump was the
+// same month — the scheme is YYYY-MM until a month needs a second version, and '2026-10'
+// would have dated the document to a month it was not written in. Lexical order still
+// holds: '2026-09' < '2026-09-20' < '2026-10'.
+//
+// ⚠ 10 rows carry terms_version = '2026-09' and are NOT being re-asked. They accepted a
+//   document that said "your data is never visible to other customers"; this version is
+//   the one that does not. That distinction only survives because the string moved —
+//   `terms_version IS DISTINCT FROM '2026-09-20'` is what finds them if that changes. It is the value written to
 // profiles.terms_version, so a bump means every future acceptance records the new one —
 // it does NOT re-ask anyone who already accepted. Re-asking is a separate decision.
-export const LEGAL_VERSION = '2026-09'
+export const LEGAL_VERSION = '2026-09-20'
 
 // Locales with a translated body. NOT a hand-kept list — derived from what is actually
 // imported, so adding a body is one import and one map entry and this follows.

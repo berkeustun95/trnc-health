@@ -12,8 +12,8 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
-export default `Sürüm: 2026-09
-Son güncelleme: Eylül 2026
+export default `Sürüm: 2026-09-20
+Son güncelleme: 20 Eylül 2026
 
 KİM OLDUĞUMUZ
 
@@ -38,7 +38,7 @@ Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listele
 • Telefon numarası — isteğe bağlıdır. Verirseniz, hesabınızla ilgili konularda sizinle iletişime geçebilmemiz için hesabınızda saklanır. Diğer kullanıcılara gösterilmez ve hizmet sağlayıcılara verilmez. Telefon numarası vermeden ADA'yı eksiksiz kullanabilirsiniz.
 • KKTC içindeki bölgeniz — listelerin, nöbetçi eczane çizelgelerinin ve arama sonuçlarının yalnızca telefonunuzun o anda bulunduğu yere göre değil, yaşadığınız yere göre sıralanabilmesi için. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
 • İkamet durumu — öğrenci, burada çalışıyor, ikamet ediyor veya ziyaretçi — ve öğrenciyseniz öğrenim düzeyiniz ile üniversite ve lisansüstü öğrenim için kurumunuz. Bu bilgi, ADA'nın hangi bölümlerinin önünüze çıkarılacağını belirlemek için düşünülmüştür; çünkü yeni gelmiş birinin ihtiyaçlarıyla on yıldır burada yaşayan birinin ihtiyaçları aynı değildir. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
-• Üniversite bilgileri (eklerseniz) — hâlen ya da daha önce okuduğunuz bir üniversite (şu anda öğrenci olmanız gerekmez), bölümünüz, başlama yılınız ve mezuniyet yılınız; ayrıca üniversitenizin öğrenci listesinde görünmeyi seçip seçmediğiniz. Bu ayar siz açmadıkça kapalıdır ve uygulamada henüz bir öğrenci listesi yoktur; bu nedenle ayarı açmanız sizi kimseye göstermez. Henüz kullanılmıyor — uygulamada bu veriler hiçbir yerde kullanılmıyor.
+• Üniversite bilgileri (eklerseniz) — hâlen ya da daha önce okuduğunuz üniversiteler (şu anda öğrenci olmanız gerekmez), bölümünüz, başlama ve mezuniyet yıllarınız; ayrıca üniversitenizin öğrenci listesinde görünmeyi seçip seçmediğiniz. Bu ayar siz açmadıkça kapalıdır.
 • Tercih ettiğiniz dil — uygulamayı ve size gönderdiğimiz bildirimleri kendi dilinizde gösterebilmek için.
 
 Profil fotoğrafı: isteğe bağlıdır. Ya hazır avatarlardan birini seçersiniz ya da kendi yüklediğiniz bir görsel kullanılır; yüklenen görsel dosya depolamamızda saklanır.
@@ -46,6 +46,9 @@ Profil fotoğrafı: isteğe bağlıdır. Ya hazır avatarlardan birini seçersin
 Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını ve sorduğunuz sorulara gelen cevapları gönderebilmek için saklanır. Cihaz ayarlarınızdan istediğiniz zaman kapatabilirsiniz.
 
 Yazdığınız değerlendirmeler, sorular ve cevaplar.
+
+• Gönderdiğiniz mesajlar — diğer öğrencilere gönderdiğiniz mesajların içeriği ve kime gönderdiğiniz. Sildiğiniz bir mesaj iki taraftan da gizlenir, ancak bir şikâyetin incelenebilmesi için bir süre saklanır. Bir mesaj şikâyet edilirse, yönetici yalnızca o mesajı okuyabilir, konuşmanın geri kalanını göremez.
+• Konuşma başlatma denemeleri — birine mesaj göndermeye çalıştığınızda, iletilip iletilmediğinden bağımsız olarak bu denemenin gerçekleştiğini kaydederiz. Bunu yalnızca yöneticiler görebilir ve 30 gün sonra silinir.
 
 Moderasyon verileri: bildirdiğiniz içerikler ve engellediğiniz kullanıcılar. Engelleme listeniz özeldir ve engellediğiniz kullanıcıya asla gösterilmez.
 
@@ -78,7 +81,7 @@ Diğer kullanıcıların görebildikleri:
 • Yazdığınız değerlendirmelerin, soruların ve cevapların yanında görünen adınız.
 • Yazdığınız değerlendirmelerin, soruların ve cevapların içeriği ile verdiğiniz puanlar.
 
-Diğer kullanıcıların göremedikleri: adınız ve soyadınız, doğum tarihiniz, uyruğunuz, telefon numaranız, bölgeniz, ikamet durumunuz, öğrenim düzeyiniz, kurumunuz, bölümünüz, öğrenim yıllarınız ve e-posta adresiniz.
+Diğer kullanıcıların göremedikleri: adınız ve soyadınız, doğum tarihiniz, uyruğunuz, telefon numaranız, bölgeniz, ikamet durumunuz, öğrenim düzeyiniz ve e-posta adresiniz.
 
 Hizmet sağlayıcılara hiçbir kişisel veriniz gösterilmez. Bir kurumun sayfasında soru sorduğunuzda hizmet sağlayıcı yalnızca soruyu ve görünen adınızı görür — gerçek adınızı, doğum tarihinizi, telefon numaranızı, bölgenizi veya ikamet durumunuzu görmez.
 
@@ -117,7 +120,7 @@ Onay verirseniz:
 
 7. VERİLERİN SAKLANMASI VE SAKLAMA SÜRELERİ
 
-Tüm veriler Supabase üzerinde, bir AB bölgesinde saklanır. Satır Düzeyi Güvenlik (RLS) politikaları yalnızca kendi kayıtlarınıza erişebilmenizi sağlar. Verileriniz diğer müşterilere hiçbir zaman görünmez.
+Tüm veriler Supabase üzerinde, bir AB bölgesinde saklanır. Satır Düzeyi Güvenlik (RLS) politikaları yalnızca kendi kayıtlarınıza erişebilmenizi sağlar. Verileriniz, üniversitenizin öğrenci listesinde görünmeyi seçmediğiniz sürece diğer kullanıcılara görünmez. Bu ayarı açarsanız, listede yer alan diğer kullanıcılar görünen adınızı, profil fotoğrafınızı, üniversitelerinizi, bölümünüzü ve öğrenim yıllarınızı görebilir ve size mesaj isteği gönderebilir. Ayarı istediğiniz zaman kapatabilirsiniz.
 
 KKTC'den faaliyet gösterdiğimiz için yöneticilerimiz verilerinize AB/AEA dışından erişmektedir. Bu erişime, verilerin saklandığı ortama uyguladığımız korumaların aynısını uygularız.
 
