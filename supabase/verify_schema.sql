@@ -2722,6 +2722,28 @@ WITH report AS (
         LEFT JOIN pg_roles r ON r.oid = a.grantee
         WHERE n.nspname='public' AND p.proname IN ('get_my_review','admin_content_author')
           AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+
+    -- ══ anon cannot fire the go-live blast (20261034) ═══════════════════════
+    -- Grants create no named object, so E/F/G cannot see this and only a behaviour token
+    -- separates an applied database from one where anon can still push every waiting user
+    -- and burn the list. THREE clauses, and each fails differently on purpose:
+    --   1. anon holds EXECUTE on neither function — the fix itself.
+    --   2. authenticated KEEPS it on notify_module_waitlist — without this the token would
+    --      go green on a database where the admin blast is broken, which is the failure
+    --      that looks like success at go-live step 10.
+    --   3. the guard reads current_setting('role') — the defence that survives a grant
+    --      coming back, which ALTER DEFAULT PRIVILEGES can do without anybody typing GRANT.
+    UNION ALL SELECT '1034_waitlist_blast_not_anon','anon cannot EXECUTE the blast or the featured cron; authenticated keeps the blast; guard reads role not uid',
+      NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public'
+          AND p.proname IN ('notify_module_waitlist','process_featured_expiring')
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+      AND has_function_privilege('authenticated','public.notify_module_waitlist(text)','EXECUTE')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_module_waitlist'
+          AND pg_get_functiondef(p.oid) LIKE '%current_setting(''role'', true)%')
     -- ══ message push carries routing data (20261031) ════════════════════════
     -- CREATE OR REPLACE creates no named object, so E/F/G are blind to it and only a
     -- behaviour token can tell an applied database from an unapplied one.
