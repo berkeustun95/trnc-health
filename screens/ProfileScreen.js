@@ -764,7 +764,34 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   // their degrees, and a working person can add one. So this section is shown to every
   // completed profile, not only to students.
   const { current: currentEnrol, past: pastEnrol } = splitEnrolments(enrolments ?? [])
-  const showEducation = MODULE_FLAGS.studentHub && isComplete
+  // ─── ONE CONDITION, BOTH SURFACES, AND `isComplete` IS NOT IT ──────────────
+  //
+  // This read `MODULE_FLAGS.studentHub && isComplete` until 2026-09-20, while the opt-in
+  // switch below read the flag alone. They disagree for exactly one value —
+  // profiles.profile_completed_at — and that is reachable: App.js's gate only fires for
+  // `profile.role === 'customer'` and never for a guest, so a provider, organizer or
+  // estate_agent with a null profile_completed_at lands on this screen with the switch
+  // live and the education section GONE. They could turn listing on and off and never
+  // see, edit or remove the enrolment behind it.
+  //
+  // Fixed in this direction on purpose. Gating the SWITCH on isComplete instead would
+  // strand anyone already listed with no way to turn it off, which is worse than the bug:
+  // a consent control you cannot withdraw is not a consent control.
+  //
+  // isComplete was presumably here to keep education UI out of a half-finished profile —
+  // but ProfileSetupScreen owns that, and the profiles that actually reach THIS screen
+  // incomplete are precisely the ones that need the section.
+  const showEducation = MODULE_FLAGS.studentHub
+
+  // ─── THE LIST SHOWS YOUR DISPLAY NAME, SO IT IS A PREREQUISITE ─────────────
+  //
+  // is_listed_student() requires `p.display_name IS NOT NULL`. Without one, writing
+  // listing_opt_in = true succeeds, changes nothing, and leaves the switch reading ON
+  // for somebody who is not on any list — a consent control reporting a state that is
+  // not real. Read from savedForm, never from `form`: savedForm is what is IN the
+  // database (set on load, and again on a successful save), so a name typed but not yet
+  // saved does not unlock a switch whose effect depends on the saved row.
+  const hasDisplayName = !!(savedForm?.display_name ?? '').trim()
   // Adding a new CURRENT enrolment while one is open requires closing that one in the same
   // form — the index leaves no other order. See saveEnrolment.
   const draftNeedsClose = draft != null && draft.endYear == null &&
@@ -1197,7 +1224,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   onValueChange={toggleListing}
                   // Nothing to write to until an enrolment exists — the opt-in is a column
                   // on student_education, one per row, not a property of the person.
-                  disabled={listingBusy || !enrolments?.length}
+                  disabled={listingBusy || !enrolments?.length || !hasDisplayName}
                   trackColor={{ true: colors.primary }}
                   thumbColor="#fff"
                 />
@@ -1208,7 +1235,15 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   locked out — and telling them apart on screen would be inventing a
                   distinction the gate does not make. The hint explains what to DO, which is
                   the only part that actually differs. */}
-              {!enrolments?.length ? (
+              {/* ► DISPLAY NAME FIRST, because it is the prerequisite the person is least
+                     likely to guess and because it is the one case where the switch can
+                     read ON while the answer is no: listing_opt_in may already be true on
+                     the row, and is_listed_student() still returns false without a name.
+                     This sentence is what makes that ON non-deceptive — it says plainly
+                     that they do not appear and what to do about it. */}
+              {!hasDisplayName ? (
+                <Text style={s.fieldHint}>{t('eduListingNeedsDisplayName', lang)}</Text>
+              ) : !enrolments?.length ? (
                 <Text style={s.fieldHint}>{t('eduListingNeedsEnrolment', lang)}</Text>
               ) : !listingOn ? (
                 <Text style={s.fieldHint}>{t('eduListingOffHint', lang)}</Text>
@@ -1227,7 +1262,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   list and adds university and study level, which is exactly the pair the
                   policy itself got wrong before this. If either RETURNS TABLE changes,
                   this sentence is the other half of that edit. */}
-              {enrolments?.length ? (
+              {hasDisplayName && enrolments?.length ? (
                 <Text style={s.fieldHint}>{t('eduListingDisclosure', lang)}</Text>
               ) : null}
             </View>
