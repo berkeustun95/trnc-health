@@ -66,6 +66,20 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 // The surfaces this guard covers. Adding a file here widens the scope deliberately.
 const SURFACES = [
+  // ⚠ ADDED 2026-09-20 WITH THE CAROUSEL REBUILD, IN THE SAME COMMIT — not after.
+  //   Same argument as ProfileSetupScreen below: that is the only screen every user is
+  //   FORCED through, and this is the other one. It is the FIRST screen of a fresh
+  //   install, it renders PRE-AUTH in whatever language the user just picked, and an
+  //   untranslated key here is English on an RTL screen before the user has an account
+  //   or any way past it.
+  //
+  //   It could not be added in slice 2, and the reason is worth keeping: this scan
+  //   derives its keys by READING the file, and until the rebuild the screen still
+  //   referenced the old slide1Title set. Adding it then would have guarded the keys
+  //   being deleted and none of the nine replacing them. Measured at the time rather
+  //   than assumed — with the Arabic value set to the raw English string, i18n:validate
+  //   still reported OK.
+  'screens/OnboardingScreen.js',
   'screens/ExploreMapScreen.js',
   'screens/ExploreProfileScreen.js',
   'components/ComingSoonScreen.js',

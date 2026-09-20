@@ -31,14 +31,16 @@ export const LANGUAGES = [
 const translations = {
   en: {
 
-    // ─── First-run carousel (slice 2) ──────────────────────────────────────
-    // Semantic names, NOT positional. The set these replace was slide1Title…
-    // onboardingP4, and a positional name makes reordering a slide into a rename
-    // across nine locales. The old set plus onboardingTagline is deleted in slice 3,
-    // in the same commit that rebuilds screens/OnboardingScreen.js — they have exactly
-    // one consumer, and t() returns the raw KEY when a key is absent from every locale,
-    // so deleting them while the screen still reads them renders 'slide1Title' on a
-    // fresh install.
+    // ─── First-run carousel ────────────────────────────────────────────────
+    // Semantic names, NOT positional. The set these replaced was slide1Title…
+    // onboardingP4 plus onboardingTagline, and a positional name makes reordering a
+    // slide into a rename across nine locales. Reordering the SLIDES array in
+    // screens/OnboardingScreen.js is now the whole change.
+    //
+    // Those nine keys were DELETED in the commit that rebuilt the screen, not in the
+    // one that added these — they had exactly one consumer, and t() returns the raw KEY
+    // when a key is absent from every locale, so deleting them while the screen still
+    // read them would have rendered the literal 'slide1Title' on every fresh install.
     //
     // onboardingSoonNote names two modules that are NOT live: MODULE_FLAGS.transport is
     // false (Coming Soon) and CONNECTIVITY_LIVE is false (waitlist, and flipping it needs
@@ -59,7 +61,7 @@ const translations = {
     onboardingSettleBody: 'Housing and dorms, renovation and repair, pets, student life.',
     onboardingSoonNote: 'Transport and eSIM — coming soon.',
     onboardingOliTitle: 'Oli is here to help',
-    onboardingOliBody: "Tonight's duty pharmacy and emergency numbers — a tap away.",
+    onboardingOliBody: "Today's duty pharmacy and emergency numbers — a tap away.",
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
@@ -236,16 +238,7 @@ const translations = {
     tonightDuty: "Today's duty pharmacies",
     allRegions: 'All on-call pharmacies by region',
     chooseLanguage: 'Choose your language',
-    onboardingTagline: 'Everything you need as a newcomer to North Cyprus',
-    onboardingP1: 'Discover beaches, landmarks, events and the best of what North Cyprus has to offer',
-    onboardingP2: 'See which pharmacy is on duty today',
-    onboardingP3: 'Find trusted pharmacies, clinics, hospitals and dentists — hours, phone, location and the duty roster, in your language',
-    onboardingP4: 'Home services, transport, accommodation, events and municipalities — everything for daily life in TRNC',
     next: 'Next',
-    slide1Title: 'Explore TRNC',
-    slide2Title: 'Duty Pharmacy',
-    slide3Title: 'Health & Clinics',
-    slide4Title: 'Services & Life',
     
     
     
@@ -1711,7 +1704,7 @@ const translations = {
     onboardingSettleBody: 'Emlak ve konaklama, yurtlar, tadilat ve onarım, evcil hayvanlar, öğrenci hayatı.',
     onboardingSoonNote: 'Ulaşım ve eSIM — yakında.',
     onboardingOliTitle: 'Oli yardıma hazır',
-    onboardingOliBody: 'Bu gecenin nöbetçi eczanesi ve acil numaralar — tek dokunuş uzakta.',
+    onboardingOliBody: 'Bugünün nöbetçi eczanesi ve acil numaralar — tek dokunuş uzakta.',
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
@@ -1885,16 +1878,7 @@ const translations = {
     tonightDuty: 'Bugünkü nöbetçi eczaneler',
     allRegions: 'Bölgeye göre tüm nöbetçi eczaneler',
     chooseLanguage: 'Dilinizi seçin',
-    onboardingTagline: 'Kuzey Kıbrıs\'ta ihtiyacın olan her şey',
-    onboardingP1: 'Plajları, tarihi yerleri, etkinlikleri ve KKTC\'nin en iyilerini keşfet',
-    onboardingP2: 'Bugün nöbetçi eczaneyi öğren',
-    onboardingP3: 'Güvenilir eczane, klinik, hastane ve diş hekimlerini bul — çalışma saatleri, telefon, konum ve nöbet listesi, kendi dilinde',
-    onboardingP4: 'Ev hizmetleri, ulaşım, konaklama, etkinlikler ve belediyeler — KKTC\'deki günlük yaşam için her şey',
     next: 'İleri',
-    slide1Title: 'KKTC\'yi Keşfet',
-    slide2Title: 'Nöbetçi Eczane',
-    slide3Title: 'Sağlık ve Klinikler',
-    slide4Title: 'Hizmetler ve Yaşam',
     
     
     
@@ -3366,7 +3350,7 @@ const translations = {
     onboardingSettleBody: 'العقارات والإقامة، السكن الطلابي، التجديد والإصلاح، الحيوانات الأليفة، حياة الطلاب.',
     onboardingSoonNote: 'المواصلات و eSIM — قريباً.',
     onboardingOliTitle: 'أولي هنا للمساعدة',
-    onboardingOliBody: 'صيدلية النوبة الليلة وأرقام الطوارئ — على بُعد نقرة واحدة.',
+    onboardingOliBody: 'صيدلية نوبة اليوم وأرقام الطوارئ — على بُعد نقرة واحدة.',
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
@@ -3652,16 +3636,7 @@ const translations = {
     tonightDuty: 'صيدليات المناوبة اليوم',
     allRegions: 'جميع الصيدليات المناوبة حسب المنطقة',
     chooseLanguage: 'اختر لغتك',
-    onboardingTagline: 'كل ما تحتاجه كقادم جديد إلى شمال قبرص',
-    onboardingP1: 'اكتشف الشواطئ والمعالم والفعاليات وأجمل ما تقدمه شمال قبرص',
-    onboardingP2: 'اعرف أي صيدلية مناوبة اليوم',
-    onboardingP3: 'ابحث عن الصيدليات والعيادات والمستشفيات الموثوقة — ساعات العمل والهاتف والموقع وقائمة المناوبة، بلغتك',
-    onboardingP4: 'خدمات منزلية ومواصلات وسكن وفعاليات وبلديات — كل ما تحتاجه للحياة اليومية في شمال قبرص',
     next: 'التالي',
-    slide1Title: 'استكشف شمال قبرص',
-    slide2Title: 'صيدلية النوبة',
-    slide3Title: 'الصحة والعيادات',
-    slide4Title: 'الخدمات والحياة',
     
     
     
@@ -5074,16 +5049,7 @@ const translations = {
     tonightDuty: 'Дежурные аптеки сегодня',
     allRegions: 'Все дежурные аптеки по районам',
     chooseLanguage: 'Выберите язык',
-    onboardingTagline: 'Всё необходимое для жизни на Северном Кипре',
-    onboardingP1: 'Пляжи, достопримечательности, события и лучшее на Северном Кипре',
-    onboardingP2: 'Узнайте, какая аптека дежурит сегодня',
-    onboardingP3: 'Найдите аптеки, клиники, больницы и стоматологов — часы работы, телефон, адрес и график дежурств, на вашем языке',
-    onboardingP4: 'Бытовые услуги, транспорт, жильё, события и муниципалитеты — всё для жизни на Северном Кипре',
     next: 'Далее',
-    slide1Title: 'Откройте Северный Кипр',
-    slide2Title: 'Дежурная аптека',
-    slide3Title: 'Здоровье и клиники',
-    slide4Title: 'Услуги и жизнь',
     
     
     
@@ -6209,7 +6175,7 @@ const translations = {
     onboardingSettleBody: 'Στέγη και εστίες, ανακαίνιση και επισκευές, κατοικίδια, φοιτητική ζωή.',
     onboardingSoonNote: 'Μεταφορές και eSIM — σύντομα.',
     onboardingOliTitle: 'Ο Όλι είναι εδώ για να βοηθήσει',
-    onboardingOliBody: 'Το εφημερεύον φαρμακείο απόψε και οι αριθμοί έκτακτης ανάγκης — με ένα άγγιγμα.',
+    onboardingOliBody: 'Το εφημερεύον φαρμακείο σήμερα και οι αριθμοί έκτακτης ανάγκης — με ένα άγγιγμα.',
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
@@ -6495,16 +6461,7 @@ const translations = {
     tonightDuty: 'Εφημερεύοντα φαρμακεία σήμερα',
     allRegions: 'Όλα τα εφημερεύοντα φαρμακεία ανά περιοχή',
     chooseLanguage: 'Επιλέξτε γλώσσα',
-    onboardingTagline: 'Όλα όσα χρειάζεστε ως νεοαφιχθέντες στη Βόρεια Κύπρο',
-    onboardingP1: 'Ανακαλύψτε παραλίες, αξιοθέατα, εκδηλώσεις και τα καλύτερα της Βόρειας Κύπρου',
-    onboardingP2: 'Δείτε ποιο φαρμακείο εφημερεύει σήμερα',
-    onboardingP3: 'Βρείτε αξιόπιστα φαρμακεία, κλινικές και νοσοκομεία — ώρες, τηλέφωνο, τοποθεσία και εφημερίες, στη γλώσσα σας',
-    onboardingP4: 'Οικιακές υπηρεσίες, μεταφορές, στέγαση, εκδηλώσεις και δήμοι — όλα για τη ζωή στη Βόρεια Κύπρο',
     next: 'Επόμενο',
-    slide1Title: 'Εξερευνήστε',
-    slide2Title: 'Εφημερεύον',
-    slide3Title: 'Υγεία & Κλινικές',
-    slide4Title: 'Υπηρεσίες & Ζωή',
     
     
     
@@ -7630,7 +7587,7 @@ const translations = {
     onboardingSettleBody: 'Logement et résidences, rénovation et réparation, animaux, vie étudiante.',
     onboardingSoonNote: 'Transport et eSIM — bientôt.',
     onboardingOliTitle: 'Oli est là pour vous aider',
-    onboardingOliBody: "La pharmacie de garde ce soir et les numéros d'urgence — en un geste.",
+    onboardingOliBody: "La pharmacie de garde aujourd'hui et les numéros d'urgence — en un geste.",
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
@@ -7918,16 +7875,7 @@ const translations = {
     tonightDuty: "Pharmacies de garde aujourd'hui",
     allRegions: 'Toutes les pharmacies de garde par région',
     chooseLanguage: 'Choisissez votre langue',
-    onboardingTagline: 'Tout ce dont vous avez besoin en tant que nouveaux arrivants à Chypre du Nord',
-    onboardingP1: 'Découvrez des plages, des monuments, des événements et le meilleur de Chypre du Nord',
-    onboardingP2: "Voyez quelle pharmacie est de garde aujourd'hui",
-    onboardingP3: 'Trouvez des pharmacies, cliniques et hôpitaux de confiance — horaires, téléphone, adresse et pharmacies de garde, dans votre langue',
-    onboardingP4: 'Services à domicile, transport, logement, événements et municipalités — tout pour la vie quotidienne à Chypre du Nord',
     next: 'Suivant',
-    slide1Title: 'Explorer',
-    slide2Title: 'Pharmacie de Garde',
-    slide3Title: 'Santé & Cliniques',
-    slide4Title: 'Services & Vie',
     
     
     
@@ -9340,16 +9288,7 @@ const translations = {
     tonightDuty: 'Farmacias de guardia hoy',
     allRegions: 'Todas las farmacias de guardia por región',
     chooseLanguage: 'Elige tu idioma',
-    onboardingTagline: 'Todo lo que necesitas como recién llegado al norte de Chipre',
-    onboardingP1: 'Descubre playas, monumentos, eventos y lo mejor que el norte de Chipre tiene para ofrecer',
-    onboardingP2: 'Consulta qué farmacia está de guardia hoy',
-    onboardingP3: 'Encuentra farmacias, clínicas y hospitales de confianza — horarios, teléfono, ubicación y farmacias de guardia, en tu idioma',
-    onboardingP4: 'Servicios del hogar, transporte, alojamiento, eventos y municipios — todo para la vida diaria en el norte de Chipre',
     next: 'Siguiente',
-    slide1Title: 'Explorar',
-    slide2Title: 'Farmacia de Guardia',
-    slide3Title: 'Salud & Clínicas',
-    slide4Title: 'Servicios & Vida',
     
     
     
@@ -10475,7 +10414,7 @@ const translations = {
     onboardingSettleBody: 'Wohnen und Wohnheime, Renovierung und Reparatur, Haustiere, Studentenleben.',
     onboardingSoonNote: 'Transport und eSIM — bald.',
     onboardingOliTitle: 'Oli hilft dir weiter',
-    onboardingOliBody: 'Die Notdienstapotheke heute Abend und die Notrufnummern — nur ein Tipp.',
+    onboardingOliBody: 'Die Notdienstapotheke für heute und die Notrufnummern — nur ein Tipp.',
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
@@ -10761,16 +10700,7 @@ const translations = {
     tonightDuty: 'Notdienst heute',
     allRegions: 'Alle Bereitschaftsapotheken nach Region',
     chooseLanguage: 'Sprache wählen',
-    onboardingTagline: 'Alles, was Sie als Neuankömmlinge in Nordzypern brauchen',
-    onboardingP1: 'Entdecken Sie Strände, Sehenswürdigkeiten, Veranstaltungen und das Beste von Nordzypern',
-    onboardingP2: 'Erfahren Sie, welche Apotheke heute Dienst hat',
-    onboardingP3: 'Finden Sie Apotheken, Kliniken und Krankenhäuser — Öffnungszeiten, Telefon, Adresse und Notdienst, in Ihrer Sprache',
-    onboardingP4: 'Haushaltsservices, Transport, Unterkunft, Veranstaltungen und Kommunen — alles für das tägliche Leben in Nordzypern',
     next: 'Weiter',
-    slide1Title: 'Entdecken',
-    slide2Title: 'Notdienstapotheke',
-    slide3Title: 'Gesundheit & Kliniken',
-    slide4Title: 'Dienste & Leben',
     
     
     
@@ -11897,7 +11827,7 @@ const translations = {
     onboardingSettleBody: 'مسکن و خوابگاه، بازسازی و تعمیرات، حیوانات خانگی، زندگی دانشجویی.',
     onboardingSoonNote: 'حمل‌ونقل و eSIM — به‌زودی.',
     onboardingOliTitle: 'اولی اینجاست تا کمک کند',
-    onboardingOliBody: 'داروخانه کشیک امشب و شماره‌های اضطراری — تنها با یک لمس.',
+    onboardingOliBody: 'داروخانه کشیک امروز و شماره‌های اضطراری — تنها با یک لمس.',
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
@@ -12183,16 +12113,7 @@ const translations = {
     tonightDuty: 'داروخانه‌های نوبت‌دار امروز',
     allRegions: 'همه داروخانه‌های نوبت‌دار بر اساس منطقه',
     chooseLanguage: 'زبان خود را انتخاب کنید',
-    onboardingTagline: 'همه چیزی که به عنوان تازه‌وارد در قبرس شمالی نیاز دارید',
-    onboardingP1: 'ساحل‌ها، جاذبه‌های تاریخی، رویدادها و بهترین‌های قبرس شمالی را کشف کنید',
-    onboardingP2: 'ببینید کدام داروخانه امروز نوبت دارد',
-    onboardingP3: 'داروخانه‌ها، کلینیک‌ها و بیمارستان‌های معتبر را پیدا کنید — ساعات کاری، تلفن، موقعیت و داروخانه‌های کشیک، به زبان خودتان',
-    onboardingP4: 'خدمات خانگی، حمل‌ونقل، اقامت، رویدادها و شهرداری‌ها — همه چیز برای زندگی روزمره در قبرس شمالی',
     next: 'بعدی',
-    slide1Title: 'کشف قبرس شمالی',
-    slide2Title: 'داروخانه کشیک',
-    slide3Title: 'سلامت و کلینیک',
-    slide4Title: 'خدمات و زندگی',
     
     
     
