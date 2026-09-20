@@ -151,6 +151,37 @@ raw feed (their export)
                  └─ scripts/import-gisekibris-events.mjs   upsert + image mirror
 ```
 
+**EVERY EXPORT IS THE FULL ACTIVE CATALOGUE, NOT A DELTA.** Confirmed by Gişe Kıbrıs on
+**2026-09-20**, in their words: *"Bunlar şu anda aktifler."* ("These are the ones active
+right now.")
+
+The consequence is the part that matters, because it closes a hypothesis that cost a
+detour on the 2026-09-20 drop: **a row we hold that is absent from a new export is either
+past-dated or cancelled. It is never "the export was partial."** That reading is now ruled
+out by the partner, not by inference.
+
+**To tell the two apart, use `scripts/check-gisekibris-urls.mjs`, not the start date and
+never the HTTP status.** A cancelled event keeps its page and still serves **200**, so a
+status-only probe cannot distinguish a live event from a cancelled one — it was run on the
+2026-09-20 drop and pointed the wrong way on all five rows it was asked about. The
+discriminator is the partner's own `"isCancelled"` flag in the JSON embedded in the event
+page, which that script now parses three-valued: live / cancelled / **unknown**. The field
+is absent on roughly a quarter of pages (seat-map venues render a different, much larger
+page), and absent means unknown — never "not cancelled". A cancelled row in the feed makes
+the script exit non-zero so an import cannot run behind it; `--selftest` proves the parser
+still works against a page known to be cancelled.
+
+Rows that vanish are reported and **never deleted** by the importer. Retiring one is a
+deliberate act — `status = 'cancelled'` (`20261038`), which keeps the row, its images and
+its `ticket_url` intact so a reinstatement is a flip back to `approved` and not a re-import.
+
+**PENDING, NOT PLANNED — partner automation.** Gişe Kıbrıs said on 2026-09-20 that their
+automation is built and will be shared with us soon: *"hazırlandı her şey, yakında sizinle
+paylaşırlar."* **No endpoint, no auth method and no schema have been supplied**, so there is
+nothing to design against yet. Recorded here so the next person knows it is coming and does
+not start building a poller against a contract that does not exist; the manual drop above
+remains the only supported path until they send something concrete.
+
 **Identity — `external_id` = `gk-` + the partner's own event id.** Their id appears in
 two independent places and the prepare script cross-checks them on every row:
 `.../etkinlikler/<slug>--<ID>` and `.../o/events-v2%2F<ID>%2Fbanner.png`. Ids are
