@@ -40,6 +40,15 @@ const EXPECTED_MODULES = {
   events:        true,   // live
   jobs:          false,
   accommodation: true,   // live 2026-08-24 — Novest partner feed, 88 listings
+  // ⚠ BEFORE YOU CHANGE THIS LINE — a decision, not a reminder.
+  //   10 accounts accepted terms_version '2026-09', a privacy policy promising their
+  //   data is never visible to other users. Flipping studentHub is the act that makes
+  //   that false FOR THEM, not only for people who sign up afterwards; the published
+  //   policy is 2026-09-20 and says the opposite. Nobody has been re-asked.
+  //     SELECT id, terms_accepted_at FROM profiles
+  //      WHERE terms_version IS DISTINCT FROM '2026-09-20';
+  //   It sits here rather than only in the SOP because this line is the one you cannot
+  //   flip the module without editing. Full note: step 6 of the go-live SOP in CLAUDE.md.
   studentHub:    false,
   explore:       true,   // live 2026-08-26 — Explore module + map tab
   towing:        true,   // live
