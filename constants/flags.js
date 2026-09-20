@@ -106,7 +106,7 @@ export const MODULE_FLAGS = {
   events:       true,
   jobs:         false,
   accommodation: true,
-  studentHub:   false,
+  studentHub:   true,
   explore:      true,   // live 2026-08-26 — 42 places, nature + heritage tiles
   // Çekici & Yol Yardım (towing / roadside assistance). Admin-seeded directory, no
   // self-serve. Stays false until Slice 3 seeds real firms — an emergency screen with

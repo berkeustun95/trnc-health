@@ -49,7 +49,7 @@ const EXPECTED_MODULES = {
   //      WHERE terms_version IS DISTINCT FROM '2026-09-20';
   //   It sits here rather than only in the SOP because this line is the one you cannot
   //   flip the module without editing. Full note: step 6 of the go-live SOP in CLAUDE.md.
-  studentHub:    false,
+  studentHub:    true,
   explore:       true,   // live 2026-08-26 — Explore module + map tab
   towing:        true,   // live
   checkins:      false,
@@ -118,6 +118,28 @@ const WAITLIST_BLAST_DONE = new Set([
   //   blast has actually run. Two commits, one truthful git record at every point, and
   //   nothing blocked. Do not go back to writing a date before sending one.
   'explore',
+  // ─── studentHub ───────────────────────────────────────────────────────────
+  // 6 OWED, NOT YET SENT. Measured 2026-09-20 as postgres, before the flip:
+  //
+  //     select module, count(*) filter (where notified_at is not null) as notified,
+  //            count(*) as total, min(notified_at), max(notified_at)
+  //     from module_waitlist group by module order by module;
+  //
+  //   studentHub read 0/6 — six signups, none notified, the list intact. Every other
+  //   stamped module is one that actually launched, each with a single timestamp, so
+  //   nothing had fired early. That check is now at step 10 of the SOP, because a BURNT
+  //   list and an EMPTY list are the same number: notify_module_waitlist stamps
+  //   notified_at as it goes, so a list consumed by anything other than a launch
+  //   returns 0 and reads as "nobody ever signed up".
+  //
+  //   Send with notify_module_waitlist('studentHub') at step 10, AFTER the OTA is
+  //   verified on device across two launch cycles. Notifying earlier sends six people to
+  //   a screen that has not updated yet. Then change this line to read "6 notified
+  //   <date>", the way pets and events do.
+  //
+  //   This entry is an ACKNOWLEDGEMENT, not proof of delivery — the guard runs offline.
+  //   supabase/audit_module_waitlist_owed.sql is the half that checks reality.
+  'studentHub',
 ])
 
 const EXPECTED_SCALARS = {
