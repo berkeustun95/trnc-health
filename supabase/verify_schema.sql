@@ -1358,6 +1358,37 @@ WITH report AS (
     -- The UPDATE policy is asserted too: INSERT alone leaves overwrite open on a
     -- bucket whose objects are addressable by path, which is the same hole through
     -- the back door.
+    -- ── 20261040. THE BUCKET FLAG IS THE WHOLE FIX, and nothing else in this file
+    -- can see it: `public` is a column on storage.buckets, not a named object, and a
+    -- bucket flipped back to public serves object reads WITHOUT EVALUATING RLS — so the
+    -- four policies below would still be present, still correct, and completely inert.
+    -- That is the failure this token exists for, and it is silent: every avatar keeps
+    -- rendering, for everyone, including the entire internet.
+    --
+    -- Measured before the fix (anon key only): list/avatars returned 4 folder names,
+    -- each a user id, and the object GET returned 200 with NO apikey and NO
+    -- Authorization header at all.
+    --
+    -- Four clauses, each failing differently:
+    --   1. the bucket is private — without it the rest is decoration;
+    --   2. four owner-scoped policies, DERIVED as a count so a fifth is a review moment;
+    --   3. no row still holds a public URL — such a row renders as initials forever;
+    --   4. the INSERT pins the uid and refuses guests, which is what stops one user
+    --      replacing another's photo.
+    UNION ALL SELECT '1040_avatars_private','avatars bucket is PRIVATE, 4 owner-scoped policies, no row still holds a public URL',
+      COALESCE((SELECT NOT public FROM storage.buckets WHERE id = 'avatars'), false)
+      AND (SELECT count(*) FROM pg_policies
+            WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE'
+              AND policyname IN ('avatars_read_authenticated','avatars_insert_own',
+                                 'avatars_update_own','avatars_delete_own')) = 4
+      AND NOT EXISTS(SELECT 1 FROM public.profiles
+            WHERE avatar_url LIKE '%/object/public/avatars/%')
+      AND EXISTS(SELECT 1 FROM pg_policies
+            WHERE schemaname='storage' AND tablename='objects'
+              AND policyname='avatars_insert_own'
+              AND with_check ILIKE '%foldername%'
+              AND with_check ILIKE '%uid%'
+              AND with_check ILIKE '%is_anonymous_session%')
     UNION ALL SELECT '1039_property_images_owner_scoped','property-images writes pin the uid and refuse guests (INSERT + UPDATE)',
       EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
         AND policyname='property_images_upload'
@@ -3082,9 +3113,18 @@ GROUP BY tablename ORDER BY tablename;
 --                  pre-existing *_admin_read SELECT. No public/anon rows.
 --                • estate-agent-documents INSERT + event-images INSERT pin the
 --                  uploader UID by folder segment ([1] and [2] respectively).
---                • public image buckets (avatars/facility-images/property-images/
---                  event-images) keep their broad `USING (bucket_id=…)` SELECT —
---                  known follow-up (anon object enumeration), not changed here.
+--                • public image buckets — SEE THE NEXT PARAGRAPH, THIS IS NOW PARTLY CLOSED.
+--                  facility-images / property-images / event-images keep their broad
+--                  `USING (bucket_id=…)` SELECT and remain enumerable; their content is
+--                  business and place photos, not people.
+--                ✅ CLOSED 2026-09-20 FOR avatars, by 20261040 — the one bucket whose
+--                  path was IDENTITY-DERIVED (`{user_id}/avatar.{ext}`), so enumerating
+--                  it returned a face WITH its owner's uuid, on a declared 13-17 app.
+--                  Fixed by making the bucket PRIVATE (public = false) plus four
+--                  owner-scoped policies and signed URLs on the client — NOT by
+--                  tightening a SELECT policy, for the reason stated immediately below.
+--                  Also closed 2026-09-20: property-images writes, by 20261039 — they
+--                  pinned no uid and admitted GUESTS.
 --                  ⚠ AND NOTE (measured 2026-08-23 against towing-logos): for a bucket
 --                  with public = true, Storage serves reads WITHOUT evaluating RLS at
 --                  all — a request with no apikey and no Authorization header still
