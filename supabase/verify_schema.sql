@@ -2759,6 +2759,23 @@ WITH report AS (
       AND public.is_listed_student('00000000-0000-4000-8000-0000000000a1') = false
       AND pg_get_functiondef(to_regprocedure('public.may_initiate_by_age(uuid,uuid)')) LIKE '%auth.uid() IS NULL%'
       AND pg_get_functiondef(to_regprocedure('public.is_listed_student(uuid)')) LIKE '%auth.uid() IS NOT NULL%'
+
+    -- ══ a guest is not a caller (20261036) ══════════════════════════════════
+    -- 20261035 closed the `anon` role; this closes signInAnonymously(), which is one tap
+    -- from a cold start and carries a REAL auth.uid(). Asserted by CALLING as a guest —
+    -- a body that reads is_anonymous_session() and ignores it passes any text check.
+    -- The claims are set and cleared inside this SELECT; the second clause is the control
+    -- that stops "return false always" (which closes the oracle AND kills messaging)
+    -- from reading as a pass.
+    UNION ALL SELECT '1036_age_oracle_needs_a_real_caller','may_initiate_by_age and is_listed_student refuse a GUEST session, and still answer a real one',
+      (SELECT set_config('request.jwt.claims',
+         '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","is_anonymous":true}', true) IS NOT NULL)
+      AND public.is_anonymous_session()
+      AND public.may_initiate_by_age('00000000-0000-4000-8000-0000000000a2','00000000-0000-4000-8000-0000000000a3') = false
+      AND public.is_listed_student('00000000-0000-4000-8000-0000000000a2') = false
+      AND (SELECT set_config('request.jwt.claims','',true) IS NOT NULL)
+      AND pg_get_functiondef(to_regprocedure('public.may_initiate_by_age(uuid,uuid)')) LIKE '%is_anonymous_session()%'
+      AND pg_get_functiondef(to_regprocedure('public.is_listed_student(uuid)')) LIKE '%is_anonymous_session()%'
     -- ══ message push carries routing data (20261031) ════════════════════════
     -- CREATE OR REPLACE creates no named object, so E/F/G are blind to it and only a
     -- behaviour token can tell an applied database from an unapplied one.
