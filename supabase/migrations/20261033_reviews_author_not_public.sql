@@ -58,6 +58,60 @@
 -- created_at is unforgeable there for precisely this reason — it is not in the column
 -- list. Same mechanism, different verb.
 --
+-- ─── ⚠ THE SECOND FIX THAT LOOKED RIGHT — THE SAME SHAPE, ONE LEVEL UP ──────
+--
+-- This file went out with the section above written, understood, and then repeated as a
+-- defect twelve lines further down. The function grants read:
+--
+--     REVOKE ALL ON FUNCTION public.get_my_review(uuid) FROM PUBLIC;   -- NOT ENOUGH
+--
+-- and that is the column story again with the nouns changed. Supabase runs
+-- ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon,
+-- authenticated — so a function is born with anon ALREADY IN ITS ACL, by name, not via
+-- PUBLIC. Measured in PGlite rather than argued:
+--
+--     new function          {=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres}
+--     after REVOKE ... FROM PUBLIC   {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres}
+--
+-- The revoke strips `=X/` — PUBLIC — and anon survives it untouched. A table-level grant
+-- defeats a column-level revoke; a role-level default grant defeats a PUBLIC-level one.
+-- Both are "the mitigation is the thing that is broken", and the second was written by
+-- somebody who had just finished explaining the first.
+--
+-- ─── ⚠ AND THE CLASSIFICATION, BECAUSE IT IS NOT THE FAMILIAR ONE ───────────
+--
+-- Three times in the week before this, a check went red against a system that was
+-- correct, and each time the lesson was: when a check fails, suspect the check. THIS IS
+-- THE OPPOSITE CASE AND IT MUST NOT BE FILED WITH THEM. The assertion was RIGHT. The
+-- migration was WRONG. The guard did precisely its job on its first contact with a real
+-- Supabase, refused to commit two SECURITY DEFINER functions that anon could call — one
+-- of which resolves the author uuid of any content type in the app — and cost nothing,
+-- because it ran inside BEGIN/COMMIT.
+--
+-- What failed was the TEST ENVIRONMENT. The harness seeded Supabase's default privileges
+-- ON TABLES and never ON FUNCTIONS, so every function under test was born with a stock
+-- Postgres ACL and this assertion was UNREACHABLE in every environment it ever ran in —
+-- PGlite and two real Postgres versions all passed it. Confirmed afterwards by rebuilding
+-- the harness both ways: with ON FUNCTIONS seeded the unchanged file fails with the exact
+-- production error; without it, the unchanged file passes and the ACLs read
+-- {postgres,authenticated} with no anon in sight.
+--
+-- The harness modelled the table default-privileges correctly BECAUSE TABLES WERE THE
+-- SUBJECT of this file — the whole REVOKE-then-GRANT-columns argument needed them. The
+-- function ones were incidental to what was being thought about, so they defaulted to
+-- stock Postgres and took the assertion with them. You model what you are looking at.
+--
+-- So the defence for this class is NOT "what would this print if the system were
+-- perfect?" — that catches an instrument that cannot fail, and this instrument could.
+-- It is:
+--
+--     WHAT DOES MY TEST ENVIRONMENT DO DIFFERENTLY FROM PRODUCTION,
+--     IN THE DIMENSION I AM ACTUALLY TESTING?
+--
+-- Asked here, it reads: this file is about GRANTS, my fixture seeds GRANTS for tables
+-- only, and the file also grants FUNCTIONS. One question, asked before the run, and the
+-- go-live is not blocked.
+--
 -- ─── THREE CONSEQUENCES, WRITTEN DOWN BECAUSE THEY WILL SURPRISE SOMEBODY ───
 --
 --   1. A future ADD COLUMN on reviews is INVISIBLE to the client until it is granted.
@@ -255,8 +309,17 @@ BEGIN
 END;
 $function$;
 
+-- ⚠ BOTH LINES PER FUNCTION, AND THE anon ONE IS NOT REDUNDANT. See the note headed
+--   "THE SECOND FIX THAT LOOKED RIGHT" above: on Supabase a new function is born with
+--   anon and authenticated already in its ACL via ALTER DEFAULT PRIVILEGES, so revoking
+--   PUBLIC removes a grantee that was never there. Every other function in this repo
+--   that must not be anon-callable revokes both ways — get_student_list,
+--   get_student_profile, list_my_blocks, normalize_display_name. This file did not, and
+--   its own assertion caught it.
 REVOKE ALL ON FUNCTION public.get_my_review(uuid)              FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_my_review(uuid)              FROM anon;
 REVOKE ALL ON FUNCTION public.admin_content_author(text, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_content_author(text, uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_my_review(uuid)              TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_content_author(text, uuid) TO authenticated;
 
@@ -309,6 +372,7 @@ DECLARE
   v_role      text;
   v_state     text := '';
   v_msg       text := '';
+  v_bad_exec  text;
 BEGIN
   FOR v_role IN SELECT unnest(ARRAY['anon', 'authenticated']) LOOP
     EXECUTE format('SET LOCAL ROLE %I', v_role);
@@ -409,14 +473,31 @@ BEGIN
 
   -- Neither function may be callable by anon. `authenticated` includes anonymous sessions
   -- in Supabase, so this is not the whole guard — it is the half that a stray GRANT breaks.
-  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-             LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
-             LEFT JOIN pg_roles r ON r.oid = a.grantee
-             WHERE n.nspname = 'public'
-               AND p.proname IN ('get_my_review', 'admin_content_author')
-               AND a.privilege_type = 'EXECUTE'
-               AND (a.grantee = 0 OR r.rolname = 'anon')) THEN
-    RAISE EXCEPTION 'ABORTING: one of the new functions is EXECUTE-able by anon or PUBLIC.';
+  -- ⚠ IT NAMES THE FUNCTION AND THE GRANTEE. The first version raised a fixed string —
+  --   "one of the new functions is EXECUTE-able by anon or PUBLIC" — and when it fired for
+  --   real on 2026-09-20 neither half of that sentence could be resolved without going and
+  --   asking somebody. Which function? Which of the two grantees? The assertion had read
+  --   both and thrown them away. That is the corollary this repo already wrote down: an
+  --   assertion that fails without showing what it read is a dead end, and the reader
+  --   suspects the system before the test. Cost here: one round trip on a blocked go-live.
+  SELECT string_agg(format('%s is EXECUTE-able by %s', p.proname, COALESCE(r.rolname, 'PUBLIC')),
+                    '; ' ORDER BY p.proname)
+    INTO v_bad_exec
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+    LEFT JOIN pg_roles r ON r.oid = a.grantee
+   WHERE n.nspname = 'public'
+     AND p.proname IN ('get_my_review', 'admin_content_author')
+     AND a.privilege_type = 'EXECUTE'
+     AND (a.grantee = 0 OR r.rolname = 'anon');
+
+  IF v_bad_exec IS NOT NULL THEN
+    RAISE EXCEPTION
+      'ABORTING: %. On Supabase ALTER DEFAULT PRIVILEGES puts anon and authenticated in a '
+      'new function''s ACL at creation, so REVOKE ... FROM PUBLIC removes a grantee that '
+      'was never there and anon keeps EXECUTE. Revoke FROM anon as well. Nothing applied.',
+      v_bad_exec;
   END IF;
 
   RAISE NOTICE '20261033 verified: reviews readable without customer_id, both roles; 2 DEFINER reads in place.';
@@ -433,7 +514,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261033_reviews_author_not_public.sql', 'e9e93116d478ce3a676310842b1b6d3d871fe1ef078777d0bd6fb9fd7a828bd4')
+VALUES ('20261033_reviews_author_not_public.sql', '44d79efb3a02822899457044da9b81e4e01954d36256beea58931b66accf2d12')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
