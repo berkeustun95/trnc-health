@@ -25,8 +25,9 @@ We are pinned to Expo SDK 54 to match the Expo Go app on the test phone.
 ## Release & Update Flow
 **JS-only fix** (UI, logic, styles, bug fixes — anything in .js files):
 ```bash
-eas update --channel production --message "description"
+npm run ota -- --message "description"
 ```
+Never `eas update` directly — see the rule below. Stash check and clean tree first.
 Users get it on next launch. No Play Store involved.
 
 **New native build required** only when changing: `app.config.js`, native dependencies, permissions, icons, SDK version.
@@ -133,6 +134,23 @@ went missing). Two mandatory rules:
   circuits everything below). Any admin preview surface must be entered from
   AdminScreen via the `adminPreview` state, never from a HomeScreen tile gated on
   `isAdmin` (that tile is unreachable for admins and hidden for customers).
+- **NEVER use an admin account as a test identity — it is the LEAST reproducible role in
+  the app.** Admin is the tempting choice because `|| isAdmin` unlocks every dark
+  `MODULE_FLAGS` module without touching a flag, so one login reaches surfaces a customer
+  cannot. It also silently switches on behaviour no customer ever sees: `showFeatured` is
+  `FEATURED_LIVE || isAdmin` (same shape for `EXPLORE_FEATURED_LIVE`), and both flags are
+  `false`, so **a customer gets a deterministic sort while an admin gets a `Math.random()`
+  Fisher-Yates shuffle** — `utils/featured.js:14`, via `partitionFeatured()`, reached from
+  `ExploreScreen.js:320` and `GaragesScreen.js:143`. The same list is in a different order
+  every launch, for the admin only.
+  So a bug reproduced as admin may not exist for users, a bug that only appears for users
+  may be invisible as admin, and anything automated that logs in as admin is comparing a
+  shuffled list against itself. Use a **guest** (`WelcomeScreen.js:20`
+  `signInAnonymously()` — one tap from cold start, no credentials, and it bypasses the
+  profile gate) or a real completed customer. To reach a dark module, flip the flag
+  locally and uncommitted, which is what the go-live SOP already says.
+  Found 2026-09-17 while scoping UI test automation; it is a footgun for any testing work,
+  not just that.
 - A filter row (or any fixed-height View) placed as a flex sibling ABOVE a scrollable
   list in a `flex:1` column MUST set `flexShrink: 0` — otherwise it gets vertically
   compressed when the list overflows, cropping its text top and bottom. It only
@@ -575,6 +593,17 @@ in this sequence. Deviations that look harmless are how modules ship half-launch
    created for otherwise.
 6. **Flip the flag in BOTH files, in ONE commit** — `constants/flags.js` and
    `scripts/check-module-flags.mjs`. Either alone fails the guard, which is the design.
+
+   ⚠ **STUDENT HUB ONLY — DECIDE RE-ASKING AT THIS STEP, NOT AFTER IT.**
+   10 accounts hold `terms_version = '2026-09'`. That document promised their data is
+   never visible to other users, and flipping this flag is the act that makes it false
+   — for THEM, not only for people who sign up afterwards. The published policy is now
+   `2026-09-20`, which says the opposite. Nobody has been re-asked.
+   They are findable, and the number is still small:
+   `SELECT id, terms_accepted_at FROM profiles WHERE terms_version IS DISTINCT FROM '2026-09-20';`
+   Not re-asking was the right call while the module was dark, because nothing about
+   their data had changed yet. This step is where that stops being true. Decide it here,
+   with the query in front of you, rather than discovering the question later.
 7. **Stash check, then clean tree.** `eas update` bundles the WORKING TREE, not HEAD. A
    long-lived stash is not a blocker and must stay stashed.
 8. **`npm run ota -- --message "..."`** — never `eas update` directly, and note the `--`:
@@ -590,6 +619,48 @@ in this sequence. Deviations that look harmless are how modules ship half-launch
 
 Steps 6 and 10 are enforced mechanically by `check-module-flags.mjs`. The rest are not,
 and rely on this list.
+
+### ⚠ STUDENT HUB ONLY — a REQUIRED step that exists for one window and then never again
+
+**Between the Student Hub OTA and `20261027`, exercise the stale-affiliation recovery path
+on a test account. It is not optional and it cannot be deferred.**
+
+ProfileScreen and ProfileSetupScreen both carry a recovery branch that fires on a 23514
+naming `profiles_institution_coupling_check`: it CLAIMS every `student_education` row
+(`mirror_owned = false`), CLEARS the five affiliation columns, then retries the write. It
+exists for exactly one population — somebody whose `profiles` row still carries an
+institution with **no** `study_end_year`, moving their `resident_status` away from
+`'student'`.
+
+To trigger it: a test account with a stale `profiles.institution_id` and
+`study_end_year IS NULL`, then change resident status away from student in the app.
+Expect the save to succeed, the five columns to end up NULL, and **the account to still
+appear on the student list** — that last part is what the claim protects, and the whole
+reason the order is claim-then-clear rather than the reverse.
+
+**`20261027` drops those columns, which drops the CHECK, which makes the branch
+unreachable forever.** After that nobody can ever learn whether it worked — and the branch
+is the only thing standing between that population and a 23514 they cannot clear from any
+screen, or a silent de-listing nobody is told about. Test it inside the window or ship it
+untested permanently.
+
+### ⚠ STUDENT HUB ONLY — the message deep link, also testable only after the OTA
+
+**Tap a real message push on the PLAY STORE build, WARM and COLD, once the OTA has
+shipped.** Both, because they are different code paths that have never both run:
+`addNotificationResponseReceivedListener` (App.js) handles a tap while the app is running;
+`getLastNotificationResponseAsync` handles a tap that launches it. The cold one is the
+COMMON case for a message — the app is usually not open when one arrives — and until
+2026-09-19 it knew only `'duty'`, so such a tap landed on Home.
+
+It cannot be exercised before then, and the reason is not a bug: Expo Go cannot hold a push
+token on SDK 53+, so `profiles.push_token` belongs to the production build. A push sent
+during development is therefore delivered to the Play Store app, whose bundle has no
+messaging in it, and tapping it correctly does nothing.
+
+Expect: the app opens on the Student Hub's Messages tab with that thread open. A thread
+that has since been declined, left or blocked should land on the Messages tab with no
+thread — not on Home, and not on a spinner.
 
 - Always spot-check new UI in Turkish before declaring it done. Turkish labels are longer
   than English, so they routinely push lists past the viewport (hitting bugs like the one
