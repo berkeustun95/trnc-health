@@ -648,10 +648,62 @@ WITH report AS (
         AND pg_get_constraintdef(c.oid) ILIKE '%concert%')
     -- The widening keeps the constraint NAME, so E-constraint existence cannot see
     -- it. Without this token a DB still on the 500-char limit reads as OK, and the
-    -- Gişe Kıbrıs import (longest row 2039 chars) fails at insert time.
-    UNION ALL SELECT '0830_events_gisekibris_import','events_description_check widened to 2500',
+    -- Gişe Kıbrıs import fails at insert time.
+    --
+    -- ⚠ THE 0830 TOKEN THAT LIVED HERE IS RETIRED (2026-09-20), NOT BUMPED. It
+    -- asserted ILIKE '%2500%'. 20261037 moves both description caps to 3000, so it
+    -- would have gone STALE/MISSING against a database that is exactly right — and
+    -- keeping both would guarantee exactly ONE red row at all times, whichever side
+    -- of the apply you are on, which is the known-stale row this file warns about
+    -- three times. One fact, one owner; 20261037 owns the cap now.
+    --
+    -- BOTH constraints, because they are one change: events_description_check bounds
+    -- the legacy text column and events_description_i18n_check bounds ->>'tr' and
+    -- ->>'en' separately at the same number. Widening one and not the other still
+    -- rejects the row that prompted the change, and the half-applied state is
+    -- invisible to a token that only reads the first.
+    --
+    -- The 6000-byte TOTAL cap on the jsonb is asserted UNCHANGED on purpose: it is
+    -- the thing that stops 3000+3000 bilingual rows arriving without anyone deciding
+    -- that 9 locales x 3000 is the shape this column should grow into.
+    --
+    -- EXPECTED RED until 20261037 is applied — that is the point of registering it,
+    -- not a defect.
+    UNION ALL SELECT '1037_events_description_3000','description caps are 3000 on BOTH the text column and each jsonb key (total still 6000)',
       EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='events_description_check'
-        AND pg_get_constraintdef(c.oid) ILIKE '%2500%')
+        AND pg_get_constraintdef(c.oid) ILIKE '%3000%')
+      AND EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='events_description_i18n_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%3000%'
+        AND pg_get_constraintdef(c.oid) ILIKE '%6000%'
+        AND pg_get_constraintdef(c.oid) ILIKE '%jsonb_typeof%')
+    -- events_status_check gains 'cancelled' (20261038). The constraint keeps its
+    -- NAME, so section E is blind to it — and section E does not list this
+    -- constraint at all, so before this token NOTHING in the report could see the
+    -- events status vocabulary.
+    --
+    -- DERIVED as a whole SET, never "does it contain cancelled": that weaker form
+    -- passes on a constraint that has quietly LOST 'rejected', which would break the
+    -- admin moderation queue while reading green. If a sixth value is ever added
+    -- legitimately, change the array here in the same commit and say why — that edit
+    -- is the review moment a substring test never creates.
+    --
+    -- EXPECTED RED until 20261038 is applied — that is the point of registering it,
+    -- not a defect.
+    --
+    -- ⚠ The first reading of the evidence here was WRONG and the correction is worth
+    -- keeping: a probe of the five vanished rows' partner pages read only the HTTP
+    -- STATUS, got 200 on all five, and concluded they were still live. A cancelled
+    -- event keeps its page and still serves 200, so that probe could never have
+    -- failed on the case it existed to detect. The pages' own "isCancelled" field
+    -- reads TRUE on all five and FALSE on every readable feed row — which is what
+    -- actually established that the five are cancelled and this vocabulary is needed.
+    UNION ALL SELECT '1038_events_status_cancelled','events_status_check vocabulary is exactly draft/pending/approved/rejected/cancelled',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.events')
+          AND c.conname = 'events_status_check')
+      = ARRAY['approved','cancelled','draft','pending','rejected']
     -- Data migration, so it creates no named object at all and every other section
     -- is blind to it. If it was committed but never applied, the next Gişe Kıbrıs
     -- import matches nothing on the real key and INSERTS a duplicate of all 69 rows
