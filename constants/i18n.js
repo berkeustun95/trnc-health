@@ -31,6 +31,36 @@ export const LANGUAGES = [
 const translations = {
   en: {
 
+    // ─── First-run carousel (slice 2) ──────────────────────────────────────
+    // Semantic names, NOT positional. The set these replace was slide1Title…
+    // onboardingP4, and a positional name makes reordering a slide into a rename
+    // across nine locales. The old set plus onboardingTagline is deleted in slice 3,
+    // in the same commit that rebuilds screens/OnboardingScreen.js — they have exactly
+    // one consumer, and t() returns the raw KEY when a key is absent from every locale,
+    // so deleting them while the screen still reads them renders 'slide1Title' on a
+    // fresh install.
+    //
+    // onboardingSoonNote names two modules that are NOT live: MODULE_FLAGS.transport is
+    // false (Coming Soon) and CONNECTIVITY_LIVE is false (waitlist, and flipping it needs
+    // a native build). It is qualified with the established comingSoon wording in every
+    // locale for that reason, and slide 3 renders it subordinate to the body. If either
+    // module goes live, this line changes in the same commit as the flag.
+    //
+    // Borrowed vocabulary is lifted from the keys that already own it so the carousel and
+    // the tile never disagree: duty pharmacy ← coachDutyTitle, emergency ← menuEmergency,
+    // dorms ← accomDorms, transport/eSIM ← menuTransportation/menuEsim, 'soon' ←
+    // comingSoon, Oli ← oliGreeting. Slide 3 deliberately does NOT carry hsTitle's
+    // partner-signed 'Tadilat · Bakım · Onarım' — it is a generic category descriptor.
+    onboardingWelcomeTitle: 'One app for life in North Cyprus',
+    onboardingWelcomeBody: 'Arriving or already here — find what you need, in your language.',
+    onboardingExploreTitle: 'Get to know the island',
+    onboardingExploreBody: "Beaches, historic places and what's on this week.",
+    onboardingSettleTitle: 'Settle in',
+    onboardingSettleBody: 'Housing and dorms, renovation and repair, pets, student life.',
+    onboardingSoonNote: 'Transport and eSIM — coming soon.',
+    onboardingOliTitle: 'Oli is here to help',
+    onboardingOliBody: "Tonight's duty pharmacy and emergency numbers — a tap away.",
+
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
     // nine locales. The REGULATORY strings (rules, intervals, fees, laws, breed lists,
@@ -1671,6 +1701,17 @@ const translations = {
     heroCreditNote: "This photo comes from Wikimedia Commons and is used under the licence shown above. It has been cropped and resized to fit this screen.",
   },
   tr: {
+
+    // First-run carousel (slice 2). See the en block for the reasoning.
+    onboardingWelcomeTitle: "Kuzey Kıbrıs'ta yaşam için tek uygulama",
+    onboardingWelcomeBody: 'Yeni geldiyseniz de, zaten buradaysanız da — ihtiyacınız olanı kendi dilinizde bulun.',
+    onboardingExploreTitle: 'Adayı tanıyın',
+    onboardingExploreBody: 'Plajlar, tarihi yerler ve bu hafta neler var.',
+    onboardingSettleTitle: 'Yerleşin',
+    onboardingSettleBody: 'Emlak ve konaklama, yurtlar, tadilat ve onarım, evcil hayvanlar, öğrenci hayatı.',
+    onboardingSoonNote: 'Ulaşım ve eSIM — yakında.',
+    onboardingOliTitle: 'Oli yardıma hazır',
+    onboardingOliBody: 'Bu gecenin nöbetçi eczanesi ve acil numaralar — tek dokunuş uzakta.',
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
@@ -3316,6 +3357,17 @@ const translations = {
   },
   ar: {
 
+    // First-run carousel (slice 2). See the en block for the reasoning.
+    onboardingWelcomeTitle: 'تطبيق واحد للحياة في شمال قبرص',
+    onboardingWelcomeBody: 'سواء وصلت للتو أو كنت هنا بالفعل — اعثر على ما تحتاجه بلغتك.',
+    onboardingExploreTitle: 'تعرّف على الجزيرة',
+    onboardingExploreBody: 'الشواطئ والأماكن التاريخية وفعاليات هذا الأسبوع.',
+    onboardingSettleTitle: 'استقرّ هنا',
+    onboardingSettleBody: 'العقارات والإقامة، السكن الطلابي، التجديد والإصلاح، الحيوانات الأليفة، حياة الطلاب.',
+    onboardingSoonNote: 'المواصلات و eSIM — قريباً.',
+    onboardingOliTitle: 'أولي هنا للمساعدة',
+    onboardingOliBody: 'صيدلية النوبة الليلة وأرقام الطوارئ — على بُعد نقرة واحدة.',
+
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
     // nine locales. The REGULATORY strings (rules, intervals, fees, laws, breed lists,
@@ -4727,6 +4779,17 @@ const translations = {
   },
   ru: {
 
+    // First-run carousel (slice 2). See the en block for the reasoning.
+    onboardingWelcomeTitle: 'Одно приложение для жизни на Северном Кипре',
+    onboardingWelcomeBody: 'Только приехали или уже живёте здесь — найдите нужное на своём языке.',
+    onboardingExploreTitle: 'Познакомьтесь с островом',
+    onboardingExploreBody: 'Пляжи, исторические места и события этой недели.',
+    onboardingSettleTitle: 'Обустройтесь',
+    onboardingSettleBody: 'Жильё и общежития, ремонт и обслуживание, питомцы, студенческая жизнь.',
+    onboardingSoonNote: 'Транспорт и eSIM — скоро.',
+    onboardingOliTitle: 'Оли готов помочь',
+    onboardingOliBody: 'Дежурная аптека на сегодня и службы спасения — в одно касание.',
+
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
     // nine locales. The REGULATORY strings (rules, intervals, fees, laws, breed lists,
@@ -6137,6 +6200,17 @@ const translations = {
   },
   el: {
 
+    // First-run carousel (slice 2). See the en block for the reasoning.
+    onboardingWelcomeTitle: 'Μία εφαρμογή για τη ζωή στη Βόρεια Κύπρο',
+    onboardingWelcomeBody: 'Μόλις φτάσατε ή ζείτε ήδη εδώ — βρείτε ό,τι χρειάζεστε στη γλώσσα σας.',
+    onboardingExploreTitle: 'Γνωρίστε το νησί',
+    onboardingExploreBody: 'Παραλίες, ιστορικά μέρη και οι εκδηλώσεις της εβδομάδας.',
+    onboardingSettleTitle: 'Εγκατασταθείτε',
+    onboardingSettleBody: 'Στέγη και εστίες, ανακαίνιση και επισκευές, κατοικίδια, φοιτητική ζωή.',
+    onboardingSoonNote: 'Μεταφορές και eSIM — σύντομα.',
+    onboardingOliTitle: 'Ο Όλι είναι εδώ για να βοηθήσει',
+    onboardingOliBody: 'Το εφημερεύον φαρμακείο απόψε και οι αριθμοί έκτακτης ανάγκης — με ένα άγγιγμα.',
+
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
     // nine locales. The REGULATORY strings (rules, intervals, fees, laws, breed lists,
@@ -7546,6 +7620,17 @@ const translations = {
     heroCreditNote: "Η φωτογραφία προέρχεται από το Wikimedia Commons και χρησιμοποιείται με την παραπάνω άδεια. Έχει περικοπεί και αλλάξει μέγεθος για να ταιριάζει σε αυτήν την οθόνη.",
   },
   fr: {
+
+    // First-run carousel (slice 2). See the en block for the reasoning.
+    onboardingWelcomeTitle: 'Une seule application pour vivre à Chypre du Nord',
+    onboardingWelcomeBody: "Vous venez d'arriver ou vous êtes déjà là — trouvez ce qu'il vous faut, dans votre langue.",
+    onboardingExploreTitle: "Découvrez l'île",
+    onboardingExploreBody: 'Plages, lieux historiques et les événements de la semaine.',
+    onboardingSettleTitle: 'Installez-vous',
+    onboardingSettleBody: 'Logement et résidences, rénovation et réparation, animaux, vie étudiante.',
+    onboardingSoonNote: 'Transport et eSIM — bientôt.',
+    onboardingOliTitle: 'Oli est là pour vous aider',
+    onboardingOliBody: "La pharmacie de garde ce soir et les numéros d'urgence — en un geste.",
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
@@ -8960,6 +9045,17 @@ const translations = {
   },
   es: {
 
+    // First-run carousel (slice 2). See the en block for the reasoning.
+    onboardingWelcomeTitle: 'Una sola app para vivir en el norte de Chipre',
+    onboardingWelcomeBody: 'Acabas de llegar o ya estás aquí: encuentra lo que necesitas en tu idioma.',
+    onboardingExploreTitle: 'Conoce la isla',
+    onboardingExploreBody: 'Playas, lugares históricos y los eventos de esta semana.',
+    onboardingSettleTitle: 'Instálate',
+    onboardingSettleBody: 'Vivienda y residencias, reformas y reparaciones, mascotas, vida estudiantil.',
+    onboardingSoonNote: 'Transporte y eSIM — próximamente.',
+    onboardingOliTitle: 'Oli está aquí para ayudarte',
+    onboardingOliBody: 'La farmacia de guardia de hoy y los números de emergencia — a un toque.',
+
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
     // nine locales. The REGULATORY strings (rules, intervals, fees, laws, breed lists,
@@ -10369,6 +10465,17 @@ const translations = {
     heroCreditNote: "Esta foto procede de Wikimedia Commons y se usa bajo la licencia indicada arriba. Ha sido recortada y redimensionada para esta pantalla.",
   },
   de: {
+
+    // First-run carousel (slice 2). See the en block for the reasoning.
+    onboardingWelcomeTitle: 'Eine App für das Leben in Nordzypern',
+    onboardingWelcomeBody: 'Gerade angekommen oder schon länger hier — finde, was du brauchst, in deiner Sprache.',
+    onboardingExploreTitle: 'Lerne die Insel kennen',
+    onboardingExploreBody: 'Strände, historische Orte und die Termine dieser Woche.',
+    onboardingSettleTitle: 'Richte dich ein',
+    onboardingSettleBody: 'Wohnen und Wohnheime, Renovierung und Reparatur, Haustiere, Studentenleben.',
+    onboardingSoonNote: 'Transport und eSIM — bald.',
+    onboardingOliTitle: 'Oli hilft dir weiter',
+    onboardingOliBody: 'Die Notdienstapotheke heute Abend und die Notrufnummern — nur ein Tipp.',
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
@@ -11780,6 +11887,17 @@ const translations = {
     heroCreditNote: "Dieses Foto stammt von Wikimedia Commons und wird unter der oben genannten Lizenz verwendet. Es wurde für diesen Bildschirm zugeschnitten und skaliert.",
   },
   fa: {
+
+    // First-run carousel (slice 2). See the en block for the reasoning.
+    onboardingWelcomeTitle: 'یک اپلیکیشن برای زندگی در قبرس شمالی',
+    onboardingWelcomeBody: 'تازه رسیده‌اید یا از قبل اینجا هستید — آنچه را لازم دارید به زبان خودتان پیدا کنید.',
+    onboardingExploreTitle: 'جزیره را بشناسید',
+    onboardingExploreBody: 'ساحل‌ها، مکان‌های تاریخی و رویدادهای این هفته.',
+    onboardingSettleTitle: 'مستقر شوید',
+    onboardingSettleBody: 'مسکن و خوابگاه، بازسازی و تعمیرات، حیوانات خانگی، زندگی دانشجویی.',
+    onboardingSoonNote: 'حمل‌ونقل و eSIM — به‌زودی.',
+    onboardingOliTitle: 'اولی اینجاست تا کمک کند',
+    onboardingOliBody: 'داروخانه کشیک امشب و شماره‌های اضطراری — تنها با یک لمس.',
 
     // ─── Pets module — WRAPPER copy only ───────────────────────────────────
     // Titles, headings, buttons, tabs, empty states, disclaimers and notices, in all
