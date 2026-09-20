@@ -56,7 +56,7 @@ const STRIP_DUTY_IMAGE = require('../../assets/backgrounds/ada-bg-duty-pharmacy.
 // bundle. There is no branch here that renders fewer than two cards, and no data state —
 // offline, RLS-blocked, empty database, unapplied migration — that can produce one.
 
-function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress, innerRef }) {
+function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress, onDismiss, innerRef }) {
   return (
     <TouchableOpacity
       ref={innerRef}
@@ -91,6 +91,27 @@ function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress,
         </View>
       )}
 
+      {/* ─── DISMISS — ONLY EVER ON A NOTICE ──────────────────────────────────
+          It shares the top-right corner with `tag`, and they can never collide: a tag is
+          rendered for `sponsored` or `soon`, and a notice is neither — sponsored is false
+          by database constraint (20261043 forbids sponsor_name on a notice) and `soon`
+          belongs to the event ranks. Nothing else passes onDismiss.
+
+          A SIBLING of the card's TouchableOpacity, not a child of its content, so the tap
+          does not fall through to the card's own onPress and open accommodation on the
+          way out. hitSlop because the glyph is 14pt in a 24pt box — well under the 44pt
+          minimum on its own. */}
+      {!!onDismiss && (
+        <TouchableOpacity
+          style={s.dismiss}
+          onPress={onDismiss}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+        >
+          <Ionicons name="close" size={14} color={colors.textPrimary} />
+        </TouchableOpacity>
+      )}
+
       {/* A solid band, not a gradient: expo-linear-gradient is not installed and this repo
           does not add a package for a visual effect. Solid is also strictly better here —
           its contrast is a constant rather than a function of which photograph loaded.
@@ -123,7 +144,7 @@ function StripSkeleton() {
 }
 
 export default function LiveStrip({
-  item, loading, lang, dutyStatus = DUTY_FRESH, onPressEvent, onPressDuty, dutyRef,
+  item, loading, lang, dutyStatus = DUTY_FRESH, onPressEvent, onPressDuty, onDismiss, dutyRef,
 }) {
   // Recorded when SHOWN, not when resolved — a mount abandoned mid-flight resolves
   // something nobody saw, and the promo rule is about what appeared. The LEFT card only:
@@ -156,6 +177,7 @@ export default function LiveStrip({
         tag={item?.sponsored ? t('stripSponsored', lang) : item?.soon ? t('stripStartingSoon', lang) : null}
         tagTone={item?.sponsored ? 'sponsored' : 'soon'}
         onPress={() => onPressEvent?.(item)}
+        onDismiss={item?.kind === 'notice' && onDismiss ? () => onDismiss(item) : undefined}
       />
       {/* ─── THE DUTY CARD IS UNCONDITIONAL ──────────────────────────────────
           It is not resolved, not ranked and cannot be outranked — a stronger guarantee
@@ -192,6 +214,9 @@ const s = StyleSheet.create({
   cardAlert:     { borderWidth: 1, borderColor: colors.danger },
   photo:         { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   photoAlert:    { backgroundColor: colors.dangerLight },
+  dismiss:       { position: 'absolute', top: 8, right: 8, width: 24, height: 24, borderRadius: 12,
+                   backgroundColor: 'rgba(255,255,255,0.94)', justifyContent: 'center', alignItems: 'center',
+                   zIndex: 2 },
   badge:         { position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: 14,
                    backgroundColor: 'rgba(255,255,255,0.94)', justifyContent: 'center', alignItems: 'center' },
   // White glyph on colors.danger is 4.36:1 — clear of the 3:1 floor that applies to a UI

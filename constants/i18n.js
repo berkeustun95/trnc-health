@@ -30,6 +30,11 @@ export const LANGUAGES = [
 ]
 const translations = {
   en: {
+    // The what's-new notice card in the live strip (20261043). TITLE ONLY — the
+    // strip's cards lost their subtitles, so the band holds 2 lines at 14pt in a
+    // 97pt box at 360dp. The breadth message cannot fit here and lives at the
+    // DESTINATION instead; npm run labels:check measures this string.
+    stripNoticeTitle: "What's new in ADA",
 
     // ─── First-run carousel ────────────────────────────────────────────────
     // Semantic names, NOT positional. The set these replaced was slide1Title…
@@ -1694,6 +1699,8 @@ const translations = {
     heroCreditNote: "This photo comes from Wikimedia Commons and is used under the licence shown above. It has been cropped and resized to fit this screen.",
   },
   tr: {
+    // Live-strip notice card. See the en block.
+    stripNoticeTitle: "ADA'da neler yeni?",
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: "Kuzey Kıbrıs'ta yaşam için tek uygulama",
@@ -3340,6 +3347,8 @@ const translations = {
     heroCreditNote: "Bu fotoğraf Wikimedia Commons'tan alınmıştır ve yukarıda belirtilen lisansla kullanılmaktadır. Bu ekrana sığması için kırpılmış ve yeniden boyutlandırılmıştır.",
   },
   ar: {
+    // Live-strip notice card. See the en block.
+    stripNoticeTitle: 'ما الجديد في ADA؟',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'تطبيق واحد للحياة في شمال قبرص',
@@ -4753,6 +4762,8 @@ const translations = {
     heroCreditNote: "هذه الصورة مأخوذة من ويكيميديا كومنز وتُستخدم بموجب الترخيص الموضح أعلاه. وقد تم اقتصاصها وتغيير حجمها لتناسب هذه الشاشة.",
   },
   ru: {
+    // Live-strip notice card. See the en block.
+    stripNoticeTitle: 'Что нового в ADA',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'Одно приложение для жизни на Северном Кипре',
@@ -6165,6 +6176,8 @@ const translations = {
     heroCreditNote: "Эта фотография взята из Викисклада и используется по указанной выше лицензии. Она была обрезана и уменьшена под этот экран.",
   },
   el: {
+    // Live-strip notice card. See the en block.
+    stripNoticeTitle: 'Τι νέο στο ADA',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'Μία εφαρμογή για τη ζωή στη Βόρεια Κύπρο',
@@ -7577,6 +7590,8 @@ const translations = {
     heroCreditNote: "Η φωτογραφία προέρχεται από το Wikimedia Commons και χρησιμοποιείται με την παραπάνω άδεια. Έχει περικοπεί και αλλάξει μέγεθος για να ταιριάζει σε αυτήν την οθόνη.",
   },
   fr: {
+    // Live-strip notice card. See the en block.
+    stripNoticeTitle: 'Quoi de neuf',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'Une seule application pour vivre à Chypre du Nord',
@@ -8992,6 +9007,8 @@ const translations = {
     heroCreditNote: "Cette photo provient de Wikimedia Commons et est utilisée sous la licence indiquée ci-dessus. Elle a été recadrée et redimensionnée pour cet écran.",
   },
   es: {
+    // Live-strip notice card. See the en block.
+    stripNoticeTitle: 'Novedades en ADA',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'Una sola app para vivir en el norte de Chipre',
@@ -10404,6 +10421,8 @@ const translations = {
     heroCreditNote: "Esta foto procede de Wikimedia Commons y se usa bajo la licencia indicada arriba. Ha sido recortada y redimensionada para esta pantalla.",
   },
   de: {
+    // Live-strip notice card. See the en block.
+    stripNoticeTitle: 'Neu in ADA',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'Eine App für das Leben in Nordzypern',
@@ -11817,6 +11836,8 @@ const translations = {
     heroCreditNote: "Dieses Foto stammt von Wikimedia Commons und wird unter der oben genannten Lizenz verwendet. Es wurde für diesen Bildschirm zugeschnitten und skaliert.",
   },
   fa: {
+    // Live-strip notice card. See the en block.
+    stripNoticeTitle: 'تازه‌های ADA',
 
     // First-run carousel (slice 2). See the en block for the reasoning.
     onboardingWelcomeTitle: 'یک اپلیکیشن برای زندگی در قبرس شمالی',

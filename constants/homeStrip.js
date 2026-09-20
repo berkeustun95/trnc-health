@@ -36,7 +36,11 @@
 //   and is never resolved, ranked or outranked. That is a stronger guarantee than the old
 //   permanent row had, and it is the one thing about this section that must not be
 //   refactored into the resolver.
-export const STRIP_KINDS = ['event', 'place', 'promo']
+// 'notice' joined the set in 20261043: a FIRST-PARTY card, never labelled, routing
+// in-app through the same module map the tile grid uses. It is not a fourth way to sell
+// the slot — the database forbids it carrying a sponsor_name, a link_url or its own
+// title, so the three things that would make it an advert are all unrepresentable.
+export const STRIP_KINDS = ['event', 'place', 'promo', 'notice']
 
 // ─── CARD HEIGHT — ONE NUMBER, TWO CONSUMERS ────────────────────────────────
 //

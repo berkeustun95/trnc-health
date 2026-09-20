@@ -11,6 +11,7 @@ import { STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY } from '../
 //   1  a pinned item for today          home_strip_pin, pin_date = today
 //   2  an event starting within 6h      the "leave now" case
 //   3  an event later today             still actionable, less urgent
+//   3b a first-party notice            home_strip_pin kind='notice', standing + windowed
 //   4  a place added in the last 7 days  real content — see the caveat on readNewPlace
 //   5  a sponsored promo                labelled, gated, never displacing a real item
 //   6  the events module's generic card  <- terminal, and it is NOT a rank that can fail
@@ -40,8 +41,12 @@ import { STRIP_SOON_HOURS, STRIP_NEW_PLACE_DAYS, STRIP_LAST_KIND_KEY } from '../
 // ─── EVERY RANK IS STILL INDIVIDUALLY FALLIBLE ──────────────────────────────
 //
 // Each source runs inside its own try/catch and a throw drops THAT RANK ONLY:
-//   • home_strip_pin DOES NOT EXIST IN PRODUCTION as this ships — the DDL is written and
-//     deliberately unapplied, so ranks 1 and 4 answer 42P01 on every call.
+//   • home_strip_pin EXISTS IN PRODUCTION. ⚠ This line used to say it did not — that the
+//     DDL was "written and deliberately unapplied, so ranks 1 and 4 answer 42P01 on every
+//     call". 20261007 was applied at some point and the comment was never corrected.
+//     Measured 2026-09-21: PostgREST returns 200 with an empty array, not PGRST205/404
+//     the way a genuinely absent table does. The try/catch below is therefore a guard
+//     against RLS and the network, not against a missing table.
 //   • Offline, every network rank fails.
 //   • RLS: a guest cannot read `events` at all ("read approved events" is TO
 //     authenticated), so ranks 2 and 3 are structurally empty for them. A correct empty.
@@ -81,7 +86,7 @@ const firstImage = v => (Array.isArray(v) ? v.find(Boolean) : v) || null
 async function readPins() {
   const { data, error } = await supabase
     .from('home_strip_pin')
-    .select('id, kind, target_id, link_url, sponsor_name, title_i18n, subtitle_i18n, image_url, pin_date, starts_at, ends_at')
+    .select('id, kind, target_id, link_url, sponsor_name, title_i18n, subtitle_i18n, image_url, pin_date, starts_at, ends_at, route')
     .eq('is_active', true)
   if (error) throw error
   const now = Date.now()
@@ -120,6 +125,29 @@ async function hydratePin(pin, lang) {
       imageUrl: pin.image_url || firstImage(data.images) || data.source_image_url || null,
       sponsored: false,
       action: { type: 'events', id: data.id },
+    }
+  }
+  // ─── NOTICE — first-party, never labelled, routes IN-APP ────────────────
+  // sponsored:false is not a policy decision made here; it is the only value this branch
+  // CAN return, because 20261043's shape_check forbids a notice from carrying a
+  // sponsor_name at all. The database is the guarantee; this line just agrees with it.
+  if (pin.kind === 'notice') {
+    if (!pin.route) return null
+    // ─── THE COPY IS A KEY, NOT A STRING FROM THE ROW ─────────────────────
+    // Same shape as the generic card (`generic: true` + `titleKey`), and for a reason
+    // the generic card did not have: scripts/check-tile-labels.mjs measures t(key) out
+    // of constants/i18n.js and CANNOT see a jsonb column. A DB-authored title would be
+    // unmeasured copy in an 83pt box at 320dp — the tightest text box in the app.
+    // 20261043 makes it unrepresentable (`title_i18n IS NULL` on the notice arm), so
+    // this is not a preference the client is expressing; it is the only readable state.
+    return {
+      kind: 'notice', id: pin.id,
+      generic: true,
+      titleKey: 'stripNoticeTitle',
+      icon: 'sparkles-outline',
+      imageUrl: pin.image_url || null,
+      sponsored: false,
+      action: { type: 'route', route: pin.route },
     }
   }
   if (pin.kind === 'place') {
@@ -257,14 +285,20 @@ function genericEventsItem() {
 // `promosEligible` is computed by the CALLER from promosAllowed() in constants/homeStrip.js
 // — the policy lives there, this file only obeys it. A resolver that read `profile` would
 // be the place the guest/DOB/age rule silently drifts from the place it is documented.
-export async function resolveStripItem({ lang, promosEligible = false, now = new Date() }) {
+// `dismissedIds` is a Set of home_strip_pin ids the user has dismissed on THIS DEVICE.
+// Dismissal removes the row from the ladder rather than blanking the slot: rank 3b simply
+// does not match, and the ladder continues to rank 4 and then to the terminal rank 6,
+// which reads nothing and cannot fail. So a dismissed notice can never leave an empty
+// card — that property comes from the ladder's existing shape, not from new code.
+export async function resolveStripItem({ lang, promosEligible = false, now = new Date(), dismissedIds = null }) {
+  const isDismissed = id => !!dismissedIds && dismissedIds.has(String(id))
   const todayIso = isoDay(now)
   let pins = null
 
   // ── RANK 1 ── a pin for today, any kind.
   try {
     pins = await readPins()
-    const todays = pins.filter(p => p.pin_date === todayIso)
+    const todays = pins.filter(p => p.pin_date === todayIso && !isDismissed(p.id))
     for (const p of todays) {
       const item = await hydratePin(p, lang)
       if (item) return item
@@ -278,6 +312,25 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
       const withinSoon = e.startsAt - now.getTime() <= STRIP_SOON_HOURS * 60 * 60 * 1000
       const { startsAt, ...item } = e
       return { ...item, soon: withinSoon }
+    }
+  } catch { /* fall through */ }
+
+  // ── RANK 3b ── a first-party notice. BELOW the event ranks on purpose: an event
+  // starting in six hours is time-critical and an announcement is not, so the notice
+  // waits rather than displacing it. Above the place rank because a notice is an
+  // editorial act with an end date, where rank 4 is an approximation (see the created_at
+  // caveat on readNewPlace).
+  //
+  // Standing + windowed, never day-pinned: readPins() already drops anything outside
+  // starts_at/ends_at, so a notice expires by itself and there is no row to remember to
+  // remove. pin_date is left NULL — 28 day-rows for a four-week run would be 28 chances
+  // to get one of them wrong.
+  try {
+    if (!pins) pins = await readPins()
+    const notices = pins.filter(p => p.kind === 'notice' && !p.pin_date && !isDismissed(p.id))
+    for (const n of notices) {
+      const item = await hydratePin(n, lang)
+      if (item) return item
     }
   } catch { /* fall through */ }
 
@@ -298,7 +351,7 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
       try { lastKind = await AsyncStorage.getItem(STRIP_LAST_KIND_KEY) } catch { /* absent is fine */ }
       if (lastKind !== 'promo') {
         if (!pins) pins = await readPins()
-        const pool = pins.filter(p => p.kind === 'promo' && !p.pin_date)
+        const pool = pins.filter(p => p.kind === 'promo' && !p.pin_date && !isDismissed(p.id))
         for (const p of pool) {
           const item = await hydratePin(p, lang)
           if (item) return item
