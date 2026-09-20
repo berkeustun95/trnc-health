@@ -1386,6 +1386,46 @@ WITH report AS (
     -- policy whose expression never mentions bucket_id applies to EVERY bucket while
     -- naming none, so any check that finds candidates by looking for the word 'avatars'
     -- is blind to it by construction. Zero such policies is the passing state.
+    -- ── 20261042. THE BASELINE. 36 policies on storage.objects, and this is the first
+    -- moment the repo can claim to know what they all are: 27 created by migrations and
+    -- 9 that existed ONLY in the dashboard until 2026-09-21, captured verbatim.
+    --
+    -- A COUNT ALONE WOULD NOT BE ENOUGH and that is why there are three clauses: 36 can
+    -- stay 36 while one policy vanishes and another appears. So the count is asserted,
+    -- AND no unknown name may exist, AND no known name may be missing. The first is the
+    -- cheap check; the second is the one that catches the next dashboard edit; the third
+    -- catches a deletion that a replacement disguises.
+    --
+    -- ⚠ THE NAME LIST HERE IS THE POINT, NOT AN EXCEPTION TO THE DERIVE RULE. Elsewhere
+    --   this file argues against asserting a remembered set — but a BASELINE is exactly
+    --   the case where the set IS the fact being asserted. It was derived once, from
+    --   pg_policies and from the migrations (anchored so commented-out CREATE POLICY
+    --   statements do not count), reconciled to 36 disjoint names, and 20261042 carries
+    --   the same list in its own DO block. Two copies, deliberately: this one is the
+    --   standing check, that one is the apply-time gate.
+    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 36 policies, all named, none unknown, none missing',
+      (SELECT count(*) FROM pg_policies
+        WHERE schemaname='storage' AND tablename='objects') = 36
+      AND (SELECT count(*) FROM pg_policies
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 36
+      AND (SELECT count(*) FROM pg_policies
+             WHERE schemaname='storage' AND tablename='objects'
+               AND policyname NOT IN (
+                 'ad_images_admin_delete','ad_images_admin_insert','ad_images_admin_update',
+                 'ad_images_public_read','authenticated upload event images','avatars_delete_own',
+                 'avatars_insert_own','avatars_read_authenticated','avatars_update_own',
+                 'estate_agent_documents_owner_insert','place_photos_delete','place_photos_public',
+                 'place_photos_upload','property_images_update_own','property_images_upload',
+                 'provider_credentials_owner_delete','provider_credentials_owner_insert',
+                 'provider_credentials_owner_select','provider_credentials_owner_update',
+                 'provider_documents_owner_delete','provider_documents_owner_insert',
+                 'provider_documents_owner_select','provider_documents_owner_update',
+                 'towing_logos_admin_delete','towing_logos_admin_insert','towing_logos_admin_update',
+                 'towing_logos_public_read',
+                 'Providers manage own facility images','Public facility image read',
+                 'estate_agent_documents_admin_read','organizer delete own event images',
+                 'property_images_delete','property_images_public','provider_credentials_admin_read',
+                 'provider_documents_admin_read','public read event images')) = 0
     UNION ALL SELECT '1041_avatars_drop_dashboard_policies','exactly 4 policies reach avatars, none bucket-unscoped, the dashboard pair is gone',
       (SELECT count(*) FROM pg_policies
         WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE'
@@ -3146,6 +3186,27 @@ GROUP BY tablename ORDER BY tablename;
 --                  tightening a SELECT policy, for the reason stated immediately below.
 --                  Also closed 2026-09-20: property-images writes, by 20261039 — they
 --                  pinned no uid and admitted GUESTS.
+--                ── OPEN, KNOWN, AND DELIBERATELY UNFIXED (captured 2026-09-21) ──
+--                  20261042 made all 36 policies drift-checkable by capturing the nine
+--                  that existed only in the dashboard. It captured them VERBATIM,
+--                  defects included, so that each fix below lands as a visible diff
+--                  against a known baseline rather than as an untraceable improvement.
+--                  All of these belong to the PLACE-PHOTOS SLICE:
+--                    • "Providers manage own facility images" — FOR ALL TO **public**,
+--                      gated only on facility ownership. The widest grant in the set:
+--                      every command, to `public` rather than `authenticated`.
+--                    • "organizer delete own event images"    — uid-pinned at segment
+--                      [2], NO is_anonymous_session() guard. A guest carries a real
+--                      auth.uid(), so the pin admits guests.
+--                    • property_images_delete                 — uid-pinned at segment
+--                      [1], NO guest guard, AND granted TO **public**. Both at once.
+--                    • place_photos_upload (20260823)         — guest-guarded but NOT
+--                      uid-pinned: the mirror-image defect.
+--                    • ad-images / event-images / place-photos / property-images /
+--                      towing-logos carry NO file_size_limit and NO allowed_mime_types.
+--                  Two captured policies also reference UNQUALIFIED `facilities` and
+--                  `is_admin()`, so they bind against search_path at CREATE time.
+--                  Qualifying them is part of the same slice.
 --                  ⚠ AND NOTE (measured 2026-08-23 against towing-logos): for a bucket
 --                  with public = true, Storage serves reads WITHOUT evaluating RLS at
 --                  all — a request with no apikey and no Authorization header still
