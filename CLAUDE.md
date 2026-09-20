@@ -613,7 +613,30 @@ in this sequence. Deviations that look harmless are how modules ship half-launch
    the Play Store build. A preview APK has no production channel and never receives OTA.
 10. **THEN `notify_module_waitlist('<module>')`.** Last, and only after step 9 is
     confirmed. Notifying before the OTA has landed sends people to a screen that has not
-    updated yet — the one thing worse than not notifying them. Then add the module to
+    updated yet — the one thing worse than not notifying them.
+
+    ⚠ **READ THE LIST BEFORE AND AFTER, BECAUSE A BURNT LIST AND AN EMPTY LIST ARE THE
+    SAME NUMBER.** The blast returns a count, and `0` means either "nobody signed up" or
+    "these rows were already stamped `notified_at` and can never be notified again". Step
+    10 cannot tell those apart on its own, and the second one is silent:
+
+    ```sql
+    select module,
+           count(*) filter (where notified_at is not null) as notified,
+           count(*) as total,
+           min(notified_at) as first_stamp,
+           max(notified_at) as last_stamp
+    from module_waitlist group by module order by module;
+    ```
+
+    Healthy looks like: every stamped module is one you actually launched, each with a
+    single tight timestamp range. Scattered stamps, or any stamp on a module that has
+    never gone live, means the list was consumed by something other than a launch. Run it
+    BEFORE the blast (the module you are about to launch should read `0/n`) and AFTER
+    (it should read `n/n`, stamped today).
+
+    Baseline taken 2026-09-20, all clean: accommodation 7/7 · events 1/1 · explore 2/2 ·
+    pets 4/4, each on its own launch date; studentHub 0/6 intact; everything else 0. Then add the module to
     `WAITLIST_BLAST_DONE` in `scripts/check-module-flags.mjs`; the guard blocks the next
     push until you do.
 
