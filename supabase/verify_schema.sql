@@ -2744,6 +2744,21 @@ WITH report AS (
       AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname='notify_module_waitlist'
           AND pg_get_functiondef(p.oid) LIKE '%current_setting(''role'', true)%')
+
+    -- ══ the age rule needs a caller (20261035) ══════════════════════════════
+    -- CREATE OR REPLACE creates no named object, so only behaviour separates an applied
+    -- database from one where any anonymous request can ask whether a named user is
+    -- under 18. Asserted by CALLING them with no session rather than by reading their
+    -- text: a body that mentions auth.uid() and ignores it would pass a text check.
+    -- The pair is the point — false for a caller with no session, and the second clause
+    -- is what stops "return false always" (which closes the oracle AND kills messaging)
+    -- from reading as a pass.
+    UNION ALL SELECT '1035_age_oracle_needs_a_caller','may_initiate_by_age and is_listed_student answer false to a caller with no session',
+      (SELECT set_config('request.jwt.claims','',true) IS NOT NULL)
+      AND public.may_initiate_by_age('00000000-0000-4000-8000-0000000000a1','00000000-0000-4000-8000-0000000000a2') = false
+      AND public.is_listed_student('00000000-0000-4000-8000-0000000000a1') = false
+      AND pg_get_functiondef(to_regprocedure('public.may_initiate_by_age(uuid,uuid)')) LIKE '%auth.uid() IS NULL%'
+      AND pg_get_functiondef(to_regprocedure('public.is_listed_student(uuid)')) LIKE '%auth.uid() IS NOT NULL%'
     -- ══ message push carries routing data (20261031) ════════════════════════
     -- CREATE OR REPLACE creates no named object, so E/F/G are blind to it and only a
     -- behaviour token can tell an applied database from an unapplied one.
