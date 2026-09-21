@@ -5,8 +5,9 @@
 // ─── THREE THINGS THAT ARE NOT NEGOTIABLE HERE ──────────────────────────────
 //
 // 1. NO SKIP, NO DISMISS. There is no close button, no "later", and the caller passes no
-//    onBack. Android's hardware back moves between steps and, on the first step, is left
-//    to close the app — see App.js. A back button that does nothing reads as a frozen
+//    onBack. (Steps 3–4 DO carry a Skip: they exist only after step 2 has written
+//    profile_completed_at, and every field on them is optional by decision.) Android's
+//    hardware back moves between steps and, on the first step, is left to close the app — see App.js. A back button that does nothing reads as a frozen
 //    screen; closing the app is honest and leaves the gate in place next launch.
 //
 // 2. THE EMERGENCY BUTTON IS ON EVERY STEP, INCLUDING THE INTRO. It is a HEADER button,
@@ -31,7 +32,7 @@
 //    profiles_completion_requires_fields_check (20261001) makes that write FAIL LOUDLY
 //    if any required field is somehow absent, rather than marking an empty profile done.
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
   ActivityIndicator, Modal, Platform, BackHandler, Alert,
@@ -44,7 +45,7 @@ import { pad, ageOn, daysInMonth } from '../utils/profileFields'
 import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../components/DisplayNameCheck'
 import { supabase } from '../lib/supabase'
 import { colors, shadow, radius } from '../constants/theme'
-import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE } from '../constants/flags'
+import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
 import LegalScreen from './LegalScreen'
 import LegalLinkedText from '../components/LegalLinkedText'
 import { t, LANGUAGES, LANG_CODES } from '../constants/i18n'
@@ -57,7 +58,12 @@ import {
   RESIDENT_STATUSES, STUDENT_LEVELS, INSTITUTION_REQUIRED_LEVELS, RESIDENT_STATUS_STUDENT,
   RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
   DISPLAY_NAME_MAX, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY,
+  STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
 } from '../constants/profileGate'
+import { subjectOptions, studyYearOptions, studyYearCeiling } from '../utils/studyFields'
+// The wizard writes ENROLMENTS now, not the five profiles columns. Same module and the
+// same rules ProfileScreen uses, so the two writers cannot drift apart.
+import { enrolmentRow, isInstitutionCouplingBlock, profilesAffiliationClear } from '../utils/education'
 
 // TWO steps. What used to be Steps 1 and 2 — the six required identity fields — is now
 // one screen; the old Step 3 (region, status, the student conditional) became Step 2.
@@ -67,18 +73,24 @@ import {
 // why resumeStep() no longer has a landing place between them.
 const TOTAL_STEPS = 2
 
+// ─── STEPS 3–4: SUBJECT, THEN STUDY YEARS (Slice 2, behind MODULE_FLAGS.studentHub) ───
+// Only for a university/postgraduate student, and only AFTER step 2's completion write
+// has succeeded, so nothing on them can block completion — the gate's own constraint
+// does not know these columns exist. Each is skippable; a force-quit on either leaves a
+// completed profile, and the fields stay editable in ProfileScreen.
+const STUDY_STEPS = 2
+
 // ─── Presentational pieces, defined OUTSIDE the screen ──────────────────────
 // A component declared inside its parent is a new type on every render, so React
 // unmounts and remounts it — which blurs a TextInput mid-typing. House rule.
 
-// Derived from TOTAL_STEPS, never a literal — a hardcoded dot count is a decoration
-// that disagrees with the wizard the day the step count moves, and it moved today.
-const STEP_NUMBERS = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1)
-
-function Dots({ step }) {
+// Derived from the step count, never a literal — a hardcoded dot count is a decoration
+// that disagrees with the wizard the day the step count moves. `total` is 2, or 4 once a
+// university-level student is on step 2 and the study steps will follow.
+function Dots({ step, total }) {
   return (
     <View style={s.dots}>
-      {STEP_NUMBERS.map(i => (
+      {Array.from({ length: total }, (_, i) => i + 1).map(i => (
         <View key={i} style={[s.dot, i === step && s.dotOn, i < step && s.dotDone]} />
       ))}
     </View>
@@ -142,7 +154,7 @@ function ChipGroup({ options, value, onSelect }) {
 // Shipped together with the flex:1 change on rowText, knowingly: either alone might be
 // sufficient and we will not learn which. A mandatory gate where half the options are
 // one letter is not the place to run a clean experiment.
-function RowGroup({ options, value, onSelect }) {
+function RowGroup({ options, value, onSelect, disabled }) {
   return (
     <View>
       {options.map(o => {
@@ -150,11 +162,12 @@ function RowGroup({ options, value, onSelect }) {
         return (
           <TouchableOpacity
             key={o.value}
-            style={[s.row, on && s.rowOn]}
+            style={[s.row, on && s.rowOn, disabled && { opacity: 0.45 }]}
             onPress={() => onSelect(o.value)}
+            disabled={disabled}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityState={{ selected: on }}
+            accessibilityState={{ selected: on, disabled: !!disabled }}
           >
             <Text style={[s.rowText, on && s.rowTextOn]}>{o.label}</Text>
             <Feather
@@ -171,9 +184,10 @@ function RowGroup({ options, value, onSelect }) {
   )
 }
 
-function SelectField({ value, placeholder, onPress, flex }) {
+function SelectField({ value, placeholder, onPress, flex, disabled }) {
   return (
-    <TouchableOpacity style={[s.select, flex && { flex: 1 }]} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={[s.select, flex && { flex: 1 }, disabled && { opacity: 0.45 }]}
+      onPress={onPress} disabled={disabled} activeOpacity={0.7}>
       <Text style={[s.selectText, !value && s.selectPlaceholder]} numberOfLines={1}>
         {value || placeholder}
       </Text>
@@ -252,10 +266,29 @@ export default function ProfileSetupScreen({
   const [region, setRegion] = useState(profile?.region ?? prefillRegion ?? null)
   const [status, setStatus] = useState(profile?.resident_status ?? null)
   const [level, setLevel] = useState(profile?.student_level ?? null)
-  const [institution, setInstitution] = useState(profile?.institution_id ?? null)
+  const [institution, setInstitution] = useState(null)
   const [institutions, setInstitutions] = useState([])
 
-  const [picker, setPicker] = useState(null)  // 'day' | 'month' | 'year' | 'nat' | 'cc' | 'inst'
+  // Steps 3–4.
+  //
+  // ► SEEDED FROM THE ENROLMENT, NOT FROM `profile`. These four used to read
+  //   profile.institution_id / subject_id / study_start_year / study_end_year, and those
+  //   keys are gone from PROFILE_COLUMNS — after 20261027 they do not exist at all. A
+  //   re-gated user must still see what they already stored, so the open enrolment is
+  //   loaded once below and seeded in.
+  const [subjects, setSubjects] = useState([])
+  const [subjectId, setSubjectId] = useState(null)
+  const [startYear, setStartYear] = useState(null)
+  const [endYear, setEndYear] = useState(null)
+  // One-shot. An async seed that could land after the user has started typing would
+  // overwrite their answer with the stored one — the seed is a starting point, not a
+  // correction, so it runs once and never again.
+  const seeded = useRef(false)
+  // The id of the OPEN enrolment this user already has, if any. Its presence is what makes
+  // the institution and level fields read-only — see the note on the Field below.
+  const [openEnrolment, setOpenEnrolment] = useState(null)
+
+  const [picker, setPicker] = useState(null)  // 'day' | 'month' | 'year' | 'nat' | 'cc' | 'inst' | 'subject' | 'startYear' | 'endYear'
 
   const months = useMemo(() => monthNames(lang), [lang])
   const thisYear = new Date().getFullYear()
@@ -277,6 +310,15 @@ export default function ProfileSetupScreen({
       .then(({ data }) => setInstitutions(data ?? []))
   }, [])
 
+  useEffect(() => {
+    if (!MODULE_FLAGS.studentHub) return
+    supabase.from('subjects')
+      .select('id, sort_order, subject_i18n(lang, name)')
+      .eq('is_active', true)
+      .order('sort_order')
+      .then(({ data }) => setSubjects(data ?? []))
+  }, [])
+
   // ─── Validity per step ────────────────────────────────────────────────────
   const nameOk = nameState?.status === 'available'
   // PHONE IS OPTIONAL. Empty passes; non-empty must still be 4-15 digits, so a typo is
@@ -293,10 +335,107 @@ export default function ProfileSetupScreen({
     (status !== 'student' || level) &&
     (!INSTITUTION_REQUIRED_LEVELS.includes(level) || institution)
 
+  const studyStepsOn = MODULE_FLAGS.studentHub && status === RESIDENT_STATUS_STUDENT &&
+    INSTITUTION_REQUIRED_LEVELS.includes(level) && !!institution
+  const lastStep = studyStepsOn ? TOTAL_STEPS + STUDY_STEPS : TOTAL_STEPS
+  const subjectOpts = useMemo(() => subjectOptions(subjects, lang), [subjects, lang])
+
+  // ► NO PATH THROUGH THIS WIZARD MAY END IN AN ERROR THE USER CANNOT ACT ON.
+  //
+  // The institution and level fields are locked once an open enrolment is known, which is
+  // what actually prevents the collision. This is the BACKSTOP for the case where that
+  // knowledge is missing: the seed query failed, or the user was offline when it ran, so
+  // the lock was never applied and the write can still target a second open row.
+  //
+  // A generic "couldn't save" there is a dead end — the gate has no back button, no skip
+  // and no route to ProfileScreen. So the one collision this can produce gets a message
+  // that names the way out, and the years error keeps the specific copy it already had.
+  function enrolmentErrorKey(error) {
+    const msg = String(error?.message ?? '')
+    if (msg.includes(STUDY_END_YEAR_IN_FUTURE)) return 'pgStudyEndFuture'
+    if (error?.code === '23505' || /one_open_per_user|user_inst_level_key/.test(msg)) {
+      return 'pgEnrolmentConflict'
+    }
+    return 'pgSaveError'
+  }
+
+  // The user's OPEN enrolment, if they have one — the only row this wizard can be editing,
+  // because student_education_one_open_per_user permits no second. A closed one is history
+  // and belongs on ProfileScreen, not in a signup gate.
+  useEffect(() => {
+    if (seeded.current || !profile?.profile_completed_at) return
+    let cancelled = false
+    supabase
+      .from('student_education')
+      .select('id, institution_id, level, subject_id, study_start_year, study_end_year')
+      .eq('user_id', session.user.id)
+      .is('study_end_year', null)
+      .maybeSingle()
+      .then(({ data }) => {
+        // maybeSingle returns {data: null, error: null} on zero rows — it does NOT throw,
+        // so "no enrolment yet" lands here as a plain null and seeds nothing.
+        if (cancelled || !data) { seeded.current = true; return }
+        setOpenEnrolment(data)
+        setInstitution(data.institution_id ?? null)
+        setSubjectId(data.subject_id ?? null)
+        setStartYear(data.study_start_year ?? null)
+        setEndYear(data.study_end_year ?? null)
+        seeded.current = true
+      })
+    return () => { cancelled = true }
+  }, [profile?.profile_completed_at, session.user.id])
+
   async function save(patch) {
     setSaving(true)
     setSaveError(false)
     const { error } = await supabase.from('profiles').update(patch).eq('id', session.user.id)
+    setSaving(false)
+    return error
+  }
+
+  // ─── The wizard's ONE enrolment ────────────────────────────────────────────
+  //
+  // ► UPSERT, NOT INSERT, AND THAT IS MANDATORY RATHER THAN DEFENSIVE.
+  //   This wizard re-runs for EVERY user on a profile_schema_version bump, and steps 3 and
+  //   4 each write again within a single run. An insert would 23505 on
+  //   student_education_user_inst_level_key the second time any of those happens — which,
+  //   for the re-run case, means the gate refusing to let an existing student back out of
+  //   it. The conflict target is that UNIQUE key exactly: (user_id, institution_id, level).
+  //
+  // ► ONE OPEN ROW IS ALL THE WIZARD EVER WRITES. It asks about university only when
+  //   studyStepsOn — a CURRENT student at university level — so a graduate signing up
+  //   answers 'working' or 'resident', is never asked, and adds their degree afterwards on
+  //   ProfileScreen. There is no "previously studied" concept here and there should not be:
+  //   signup is not the place to collect a history.
+  //
+  // ► A CLOSED ENROLMENT FROM THIS WIZARD IS LEGAL AND IS NOT A BUG. Step 4's end year is
+  //   optional, so a student graduating this year can enter one — and then their profile
+  //   says resident_status = 'student' while "Currently studying" on ProfileScreen is
+  //   empty, because study_end_year IS NULL is the sole definition of current. Nothing
+  //   enforces agreement between the two: it is a cross-table invariant a CHECK cannot
+  //   express, and 20261030 removed the last arm that came close.
+  //
+  //   Both alternatives are worse. Forbidding an end year here is wrong for exactly the
+  //   person most likely to use it. Deriving resident_status from enrolments makes a
+  //   status answer the user gave subordinate to a date they may not have entered. So the
+  //   disagreement is allowed, deliberately, and written down here rather than left for
+  //   the next reader to file as a defect.
+  //
+  // mirror_owned = false comes from enrolmentRow() — every row this app writes is
+  // app-owned, or 20261026's transition trigger is still entitled to unlist it.
+  async function writeEnrolment({ subjectId: subj, startYear: sy, endYear: ey }) {
+    if (!institution || !INSTITUTION_REQUIRED_LEVELS.includes(level)) return null
+    setSaving(true)
+    setSaveError(false)
+    const row = enrolmentRow(
+      { institutionId: institution, level, startYear: sy ?? null, endYear: ey ?? null, subjectId: subj ?? null },
+      // listing_opt_in is NOT set here. It defaults to false, the wizard never asks, and
+      // consent to appear on a student list is not something to infer from signing up.
+      { userId: session.user.id, listingOptIn: false },
+    )
+    const { error } = await supabase
+      .from('student_education')
+      .upsert(row, { onConflict: 'user_id,institution_id,level' })
     setSaving(false)
     return error
   }
@@ -426,11 +565,33 @@ export default function ProfileSetupScreen({
       return
     }
 
+    if (step > TOTAL_STEPS) {
+      // ─── THE STUDY STEPS EDIT THE ENROLMENT, NOT THE PROFILE ─────────────────
+      //
+      // Step 2 has already written the row (see writeEnrolment below), so these two steps
+      // only ever UPDATE it. Each sends only what it owns: step 3 the subject, step 4 the
+      // years. The whole row is re-sent through the same upsert so there is one writer and
+      // one place where mirror_owned is set, rather than a second shape to keep in step.
+      // Both steps send the whole row. Step 3 has not collected years yet and step 4 has
+      // not changed the subject, but the values in hand ARE the current answers either way
+      // — so one upsert with one shape beats two partial patches that must each remember
+      // which columns they are allowed to leave alone.
+      const error = await writeEnrolment({ subjectId, startYear, endYear })
+      if (error) { setSaveError(enrolmentErrorKey(error)); return }
+      if (step === 3) { setStep(4); return }
+      onDone()
+      return
+    }
+
     const error = await save({
       region,
       resident_status: status,
-      student_level: status === 'student' ? level : null,
-      institution_id: INSTITUTION_REQUIRED_LEVELS.includes(level) ? institution : null,
+      // ► student_level ONLY. The five affiliation columns are not written by this wizard
+      //   any more — the institution goes to student_education below, and naming a column
+      //   20261027 drops would 42703 the mandatory signup gate for every new user.
+      //   profiles_student_level_coupling_check still requires this to be NULL for anyone
+      //   whose resident_status is not 'student'.
+      student_level: status === RESIDENT_STATUS_STUDENT ? (level ?? null) : null,
       profile_completed_at: new Date().toISOString(),
       profile_schema_version: CURRENT_PROFILE_SCHEMA_VERSION,
       // ⚠ THE COLUMN IS SENT ONLY WHEN TICKED, AND OMITTING IT IS NOT THE SAME AS
@@ -446,14 +607,76 @@ export default function ProfileSetupScreen({
       // trigger says WHEN.
       ...(TERMS_CHECKBOX_LIVE && marketingOk ? { marketing_opt_in_at: new Date().toISOString() } : {}),
     })
-    if (error) {
+    let completionError = error
+
+    // ─── CLAIM, CLEAR, RETRY — the same recovery ProfileScreen carries, reached ──
+    // ─── through a different door. ──────────────────────────────────────────────
+    //
+    // A NEW signup never gets here: their institution_id is NULL, so
+    // profiles_institution_coupling_check passes outright. But THIS WIZARD RE-RUNS FOR
+    // EVERY USER on a profile_schema_version bump, and an existing CURRENT student with a
+    // stale institution_id who answers anything other than 'student' on that re-run sends
+    // student_level to NULL above and trips the same 23514 — inside a MANDATORY gate they
+    // cannot leave. Same narrow population as ProfileScreen, different door.
+    //
+    // The order is the safety property, not a preference. CLAIM first: 20261026's unlist
+    // branch is scoped `WHERE user_id = NEW.id AND mirror_owned`, so clearing
+    // institution_id while a row is still trigger-owned silently de-lists that person and
+    // tells them nothing. Then CLEAR the five alone — legal on its own, since institution_id
+    // IS NULL satisfies the coupling check outright and student_level is untouched at that
+    // moment. Then RETRY.
+    //
+    // Detected from the refusal, never predicted from a read: reading those columns to
+    // decide in advance would 42703 after 20261027, and this build is what is installed
+    // then. Once they are dropped the CHECK goes with them and this branch is unreachable —
+    // which is why the go-live checklist requires exercising it BEFORE the drop.
+    if (isInstitutionCouplingBlock(completionError)) {
+      await supabase.from('student_education')
+        .update({ mirror_owned: false }).eq('user_id', session.user.id)
+      await supabase.from('profiles')
+        .update(profilesAffiliationClear()).eq('id', session.user.id)
+      completionError = await save({
+        region,
+        resident_status: status,
+        student_level: status === RESIDENT_STATUS_STUDENT ? (level ?? null) : null,
+        profile_completed_at: new Date().toISOString(),
+        profile_schema_version: CURRENT_PROFILE_SCHEMA_VERSION,
+        ...(TERMS_CHECKBOX_LIVE && marketingOk ? { marketing_opt_in_at: new Date().toISOString() } : {}),
+      })
+    }
+
+    if (completionError) {
       // The final write is the ONE that can trip the completion constraint, because it is
       // the write that sets profile_completed_at. Everything before it is a partial row
       // the constraint deliberately ignores.
-      setSaveError(completionViolation(error) ? missingFieldMessage() : 'pgSaveError')
+      setSaveError(completionViolation(completionError) ? missingFieldMessage() : 'pgSaveError')
       return
     }
+
+    // ► COMPLETION FIRST, ENROLMENT SECOND, and the order is chosen for its failure mode.
+    //   If this write fails, the user has a COMPLETED profile and no enrolment — which is
+    //   exactly the state 20261030 legitimised, and which ProfileScreen's education section
+    //   is built to fill in. The reverse order leaves an orphan enrolment under an
+    //   incomplete profile: invisible to everything (listing_opt_in is false, so
+    //   can_see_student_lists stays false), but a row nobody asked for.
+    //
+    //   It also matches the rule this file already states below: the study steps come after
+    //   completion, never before.
+    const enrolError = await writeEnrolment({ subjectId, startYear, endYear })
+    if (enrolError) { setSaveError(enrolmentErrorKey(enrolError)); return }
+
+    // Completion is written. The study steps come after it, never before. Step 3 even if
+    // the subject list has not arrived: Skip is there, and a jump to 4 on a slow network
+    // would drop the subject question without anyone deciding to.
+    if (studyStepsOn) { setStep(3); return }
     onDone()
+  }
+
+  function skipStudyStep() {
+    if (saving) return
+    setSaveError(null)
+    if (step === 3) setStep(4)
+    else onDone()
   }
 
   // Registered only while the legal sheet is open so it runs before App.js's handler
@@ -494,8 +717,16 @@ export default function ProfileSetupScreen({
   // currentYear-100 … currentYear-MIN_SIGNUP_AGE, newest first.
   const yearOptions = Array.from({ length: MAX_SIGNUP_AGE - MIN_SIGNUP_AGE + 1 },
     (_, i) => thisYear - MIN_SIGNUP_AGE - i).map(y => ({ value: y, label: String(y) }))
+  // Capped at the UTC year: check_profile_study_years() rejects a future end year.
+  const studyYearMax = studyYearCeiling()
+  const startYearOptions = studyYearOptions(studyYearMax, STUDY_YEAR_MIN)
+  const endYearOptions = [
+    { value: null, label: t('pgStillStudying', lang) },
+    ...studyYearOptions(studyYearMax, startYear ?? STUDY_YEAR_MIN),
+  ]
 
-  const canAdvance = step === 0 || (step === 1 && step1Ok) || (step === 2 && step2Ok)
+  const canAdvance = step === 0 || (step === 1 && step1Ok) || (step === 2 && step2Ok) ||
+    (step === 3 && !!subjectId) || (step === 4 && !!startYear)
   const title = step === 0 ? '' : t(STEP_TITLE_KEY[step], lang)
 
   return (
@@ -506,7 +737,7 @@ export default function ProfileSetupScreen({
             It only reproduces once the form is long enough to scroll, which Turkish
             reaches before English does. House rule. */}
         <View style={s.header}>
-          {step > 0 ? <Dots step={step} /> : <View style={s.dots} />}
+          {step > 0 ? <Dots step={step} total={lastStep} /> : <View style={s.dots} />}
           <View style={s.headerActions}>
             <TouchableOpacity style={s.langBtn} onPress={() => setPicker('lang')} activeOpacity={0.8}>
               <Ionicons name="globe-outline" size={14} color={colors.textSecondary} />
@@ -532,7 +763,7 @@ export default function ProfileSetupScreen({
               the two screens reads better is a device judgement, and the flag makes it
               a one-line revert instead of an unpick. */}
           {step > 0 && SHOW_WIZARD_HEADINGS && (
-            <Text style={s.stepLabel}>{t('pgStep', lang).replace('{n}', step).replace('{total}', TOTAL_STEPS)}</Text>
+            <Text style={s.stepLabel}>{t('pgStep', lang).replace('{n}', step).replace('{total}', lastStep)}</Text>
           )}
           {step > 0 && SHOW_WIZARD_HEADINGS && <Text style={s.title}>{title}</Text>}
 
@@ -600,21 +831,49 @@ export default function ProfileSetupScreen({
                 <ChipGroup options={regionOptions} value={region} onSelect={setRegion} />
               </Field>
               <Field label={t('pgResidentStatus', lang)} hint={t('pgResidentHelper', lang)}>
+                {/* The institution is NOT cleared here or on a level change: the write's
+                    the enrolment row keeps it, independently of resident_status. */}
                 <RowGroup options={statusOptions} value={status}
-                  onSelect={v => { setStatus(v); if (v !== 'student') { setLevel(null); setInstitution(null) } }} />
+                  onSelect={v => { setStatus(v); if (v !== 'student') setLevel(null) }} />
               </Field>
+              {/* Locked for the same reason as the institution below, and it is the SAME
+                  key: (user_id, institution_id, level). university -> postgraduate targets
+                  a different row just as surely as changing university does, and dead-ends
+                  in exactly the same place. */}
               {status === 'student' && (
-                <Field label={t('pgStudentLevel', lang)}>
-                  <RowGroup options={levelOptions} value={level}
-                    onSelect={v => { setLevel(v); if (!INSTITUTION_REQUIRED_LEVELS.includes(v)) setInstitution(null) }} />
+                <Field
+                  label={t('pgStudentLevel', lang)}
+                  hint={openEnrolment ? t('pgInstitutionLockedHint', lang) : undefined}
+                >
+                  <RowGroup options={levelOptions} value={level} onSelect={setLevel}
+                    disabled={!!openEnrolment} />
                 </Field>
               )}
+              {/* ► READ-ONLY ONCE AN ENROLMENT EXISTS, AND THAT IS A LOCKOUT FIX.
+                      The upsert key is (user_id, institution_id, level). Changing EITHER
+                      during a re-gate targets a different key, so the write inserts a
+                      SECOND open row — which student_education_one_open_per_user rejects.
+                      That surfaced as a generic save error inside a gate with no back
+                      button, no skip and no route to ProfileScreen: a dead end at signup.
+
+                      Editing the existing row in place instead was considered and refused.
+                      It removes the dead end, but a forced re-gate would then be able to
+                      overwrite an enrolment the user built on ProfileScreen — rewriting
+                      EMU into NEU and losing the years and subject attached to it. A gate
+                      nobody chose to enter must not be able to destroy history; deferring
+                      the edit costs one trip to the profile screen and loses nothing.
+
+                      So the field shows what they have and says where to change it. */}
               {status === 'student' && INSTITUTION_REQUIRED_LEVELS.includes(level) && (
-                <Field label={t('pgInstitution', lang)}>
+                <Field
+                  label={t('pgInstitution', lang)}
+                  hint={openEnrolment ? t('pgInstitutionLockedHint', lang) : undefined}
+                >
                   <SelectField
                     value={instOptions.find(o => o.value === institution)?.label || ''}
                     placeholder={t('pgInstitutionSearch', lang)}
-                    onPress={() => setPicker('inst')}
+                    onPress={() => { if (!openEnrolment) setPicker('inst') }}
+                    disabled={!!openEnrolment}
                   />
                 </Field>
               )}
@@ -658,6 +917,29 @@ export default function ProfileSetupScreen({
             </>
           )}
 
+          {step === 3 && (
+            <Field label={t('pgSubject', lang)} hint={t('pgStudyOptionalHint', lang)}>
+              <SelectField
+                value={subjectOpts.find(o => o.value === subjectId)?.label || ''}
+                placeholder={t('pgSubjectSearch', lang)}
+                onPress={() => setPicker('subject')}
+              />
+            </Field>
+          )}
+
+          {step === 4 && (
+            <>
+              <Field label={t('pgStudyStart', lang)}>
+                <SelectField value={startYear ? String(startYear) : ''} placeholder={t('pgYear', lang)}
+                  onPress={() => setPicker('startYear')} />
+              </Field>
+              <Field label={t('pgStudyEnd', lang)} hint={t('pgStudyOptionalHint', lang)}>
+                <SelectField value={endYear ? String(endYear) : ''} placeholder={t('pgStillStudying', lang)}
+                  onPress={() => setPicker('endYear')} disabled={!startYear} />
+              </Field>
+            </>
+          )}
+
           {saveError && <Text style={s.err}>{t(saveError.key ?? saveError, lang).replace('{field}', saveError.field ? t(saveError.field, lang) : '')}</Text>}
 
           {/* ⚠ BOTTOM OF THE SCROLL, NOT THE HEADER — AND THAT WAS MEASURED, not chosen.
@@ -682,9 +964,16 @@ export default function ProfileSetupScreen({
         </ScrollView>
 
         <View style={s.footer}>
-          {step > 1 && (
+          {step === TOTAL_STEPS && (
             <TouchableOpacity style={s.backBtn} onPress={() => setStep(step - 1)} activeOpacity={0.8}>
               <Text style={s.backBtnText}>{t('pgBack', lang)}</Text>
+            </TouchableOpacity>
+          )}
+          {/* No Back past completion: going back to step 2 would re-run the completion
+              write. Skip is the way on. */}
+          {step > TOTAL_STEPS && (
+            <TouchableOpacity style={s.backBtn} onPress={skipStudyStep} disabled={saving} activeOpacity={0.8}>
+              <Text style={s.backBtnText}>{t('pgSkip', lang)}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -696,7 +985,7 @@ export default function ProfileSetupScreen({
             {saving
               ? <ActivityIndicator color="#fff" />
               : <Text style={s.primaryBtnText}>
-                  {step === 0 ? t('pgIntroStart', lang) : step === TOTAL_STEPS ? t('pgFinish', lang) : t('pgContinue', lang)}
+                  {step === 0 ? t('pgIntroStart', lang) : step === lastStep ? t('pgFinish', lang) : t('pgContinue', lang)}
                 </Text>}
           </TouchableOpacity>
         </View>
@@ -717,6 +1006,15 @@ export default function ProfileSetupScreen({
       <SearchModal visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
         searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
         value={institution} onSelect={v => { setInstitution(v); setPicker(null) }} onClose={() => setPicker(null)} />
+      <SearchModal visible={picker === 'subject'} searchable title={t('pgSubject', lang)}
+        searchPlaceholder={t('pgSubjectSearch', lang)} options={subjectOpts}
+        value={subjectId} onSelect={v => { setSubjectId(v); setPicker(null) }} onClose={() => setPicker(null)} />
+      <SearchModal visible={picker === 'startYear'} title={t('pgStudyStart', lang)} options={startYearOptions}
+        value={startYear}
+        onSelect={v => { setStartYear(v); if (endYear != null && endYear < v) setEndYear(null); setPicker(null) }}
+        onClose={() => setPicker(null)} />
+      <SearchModal visible={picker === 'endYear'} title={t('pgStudyEnd', lang)} options={endYearOptions}
+        value={endYear} onSelect={v => { setEndYear(v); setPicker(null) }} onClose={() => setPicker(null)} />
       {/* Nothing here is re-read from `profile` on a language change, so every value the
           user has typed survives it: the fields are component state, the screen is not
           remounted (same type, same slot in App.js's content chain), and the one effect

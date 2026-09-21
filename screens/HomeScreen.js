@@ -27,6 +27,7 @@ import FavouritesEditSheet from '../components/home/FavouritesEditSheet'
 import HomeListBottomSlot from '../components/ads/HomeListBottomSlot'
 import { HOME_MODULES } from '../constants/homeModules'
 import { resolveStripItem } from '../utils/homeStripResolver'
+import { readStripDismissals, addStripDismissal } from '../utils/stripDismissals'
 import { resolveFavourites } from '../constants/homeFavourites'
 import { loadUsage, loadPins, savePins, recordModuleOpen } from '../utils/moduleUsage'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
@@ -217,6 +218,9 @@ export default function HomeScreen({
   // The live strip. `stripLoading` starts TRUE so the first paint is the fixed-height
   // skeleton rather than a collapsed row that grows when the resolver returns.
   const [stripItem, setStripItem]       = useState(null)
+  // Bumped by a dismissal so the resolve effect re-runs. A counter rather than a boolean:
+  // two dismissals in one session must both trigger, and a boolean can only flip once.
+  const [stripDismissTick, setStripDismissTick] = useState(0)
   const [stripLoading, setStripLoading] = useState(true)
 
   // ─── Sık kullandıkların ───────────────────────────────────────────────────
@@ -284,10 +288,15 @@ export default function HomeScreen({
     if (!HOME_V2_LIVE || showFacilityList) return
     let alive = true
     setStripLoading(true)
-    resolveStripItem({ lang, promosEligible })
+    // Dismissals are read on EVERY resolve rather than once per mount: dismissing writes
+    // the key and bumps `stripDismissTick`, and the ladder then re-runs and lands on
+    // whatever rank comes next. That is what makes the slot fill again instead of going
+    // blank — the card is not hidden, the item is re-resolved without it.
+    readStripDismissals()
+      .then(dismissedIds => resolveStripItem({ lang, promosEligible, dismissedIds }))
       .then(item => { if (alive) { setStripItem(item); setStripLoading(false) } })
     return () => { alive = false }
-  }, [lang, promosEligible, showFacilityList])
+  }, [lang, promosEligible, showFacilityList, stripDismissTick])
 
   // ─── Sık kullandıkların — resolved ONCE per mount ─────────────────────────
   //
@@ -357,6 +366,17 @@ export default function HomeScreen({
 
   // The strip's `action` is a plain descriptor, never a closure — the resolver has no
   // navigation in it, and this is the one place that turns a kind into a destination.
+  // ─── DISMISSAL IS PER-ID AND PER-DEVICE ───────────────────────────────────
+  // Keyed on the row id, not on "the notice", so a future second notice is not silently
+  // pre-dismissed by somebody having closed the first one. AsyncStorage, so it survives
+  // relaunch; there is no server-side record and none is wanted — this is a UI
+  // preference, not consent, and it must not become a per-user row somebody could read.
+  async function dismissStripItem(item) {
+    if (!item?.id) return
+    try { await addStripDismissal(item.id) } catch { /* a failed write just means it returns */ }
+    setStripDismissTick(n => n + 1)
+  }
+
   function handleStripPress(item) {
     const a = item?.action
     if (!a) return
@@ -376,6 +396,13 @@ export default function HomeScreen({
       // branch that can only ever be wrong about why it exists.
       // Promos are the only outbound link on this screen. openURL can reject on a
       // malformed href, and an unhandled rejection here would be a red box over Home.
+      // A NOTICE routes IN-APP through moduleHandlers — the SAME map the tile grid uses,
+      // so a notice can only reach somewhere a tile could already reach, and a route that
+      // is not wired does nothing rather than crashing. The DB vocabulary is ad_banners'
+      // 18 values and every one of them is a key in that map; `moduleHandlers` is
+      // declared below this function but hoisting makes it available at call time, which
+      // is the same way the 'events' arm above already works.
+      case 'route':     moduleHandlers[a.route]?.(); break
       case 'link':      if (a.url) Linking.openURL(a.url).catch(() => {}); break
     }
   }
@@ -729,6 +756,7 @@ export default function HomeScreen({
               lang={lang}
               dutyStatus={dutyRosterStatus}
               onPressEvent={handleStripPress}
+              onDismiss={dismissStripItem}
               onPressDuty={onShowDutyList}
               dutyRef={dutyBannerRef}
             />

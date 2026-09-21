@@ -28,7 +28,7 @@ const REASONS = [
 // server-side. It authorizes against the caller's OWN content_reports row, so it also
 // cannot be used to spam admins about a report nobody filed.
 
-export default function ContentReportMenu({ contentType, contentId, lang = 'English', style, onBlocked, onRequireAccount }) {
+export default function ContentReportMenu({ contentType, contentId, lang = 'English', style, onBlocked, onRequireAccount, blockUserId = null }) {
   const [open, setOpen]       = useState(false)
   const [step, setStep]       = useState('menu')   // menu | form | done | blockConfirm | blockDone
   const [reason, setReason]   = useState(null)
@@ -40,8 +40,32 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
   // Reviews are the only surface where one user sees another user's content, so
   // they are the only place a block is meaningful. Questions/answers are a
   // private thread with the business — the RPC rejects them server-side too.
-  const canBlock   = contentType === 'review'
+  // ─── TWO DIFFERENT BLOCKS, AND THEY ARE NOT THE SAME VERB ─────────────────
+  //
+  // `block_content_author(type, id)` blocks WHOEVER WROTE THIS — the reviewer stays
+  // anonymous and their id is resolved server-side and never returned. It is the right
+  // shape for a review and it rejects every other content type server-side.
+  //
+  // `block_user(uuid)` (20261029) blocks A PERSON you are already looking at, and also
+  // CLOSES any live conversation with them, because a block you can still be messaged
+  // through is not a block. Passing `blockUserId` selects it.
+  //
+  // Not offered on a message: a message bubble is a piece of content, and blocking its
+  // sender belongs in the thread header where the person is, not on one of their
+  // sentences. One place per verb.
+  const blocksPerson = blockUserId != null
+  const canBlock   = contentType === 'review' || blocksPerson
   const isFacility = contentType === 'facility'
+  // A private message is content, but reporting one has a consequence the other surfaces
+  // do not: it makes that single message readable by an admin, who otherwise can read
+  // NOTHING in anybody's inbox. The copy says so — see reportMessageSub.
+  const isMessage  = contentType === 'message'
+  // A student-list entry is a PERSON, not a piece of content, and "Report this content /
+  // we remove violating content" reads as a category error over somebody's name. Same
+  // shape as the facility branch above — copy only; the insert is identical.
+  // Slice 5 resolved the note that used to sit here: the profile page now passes
+  // `blockUserId`, which turns the block row into block_user(uuid).
+  const isProfile  = contentType === 'profile'
 
   function close() {
     setOpen(false)
@@ -58,10 +82,12 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
     setError(null)
     // The author's id is resolved server-side and never returned — the blocker
     // never learns who wrote the (anonymous) review they blocked.
-    const { error: err } = await supabase.rpc('block_content_author', {
-      p_content_type: contentType,
-      p_content_id:   contentId,
-    })
+    const { error: err } = blocksPerson
+      ? await supabase.rpc('block_user', { p_user_id: blockUserId })
+      : await supabase.rpc('block_content_author', {
+          p_content_type: contentType,
+          p_content_id:   contentId,
+        })
     setSaving(false)
     if (err) { setError(t('blockError', lang)); return }
     setDidBlock(true)
@@ -122,7 +148,7 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
                 {canBlock && (
                   <TouchableOpacity style={s.actionRow} onPress={() => setStep('blockConfirm')}>
                     <Ionicons name="ban-outline" size={18} color={colors.danger} />
-                    <Text style={s.actionText}>{t('blockReviewer', lang)}</Text>
+                    <Text style={s.actionText}>{t(blocksPerson ? 'msgBlockPerson' : 'blockReviewer', lang)}</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity style={s.cancelBtn} onPress={close}>
@@ -133,8 +159,8 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
 
             {step === 'blockConfirm' && (
               <>
-                <Text style={s.title}>{t('blockReviewerTitle', lang)}</Text>
-                <Text style={s.sub}>{t('blockReviewerBody', lang)}</Text>
+                <Text style={s.title}>{t(blocksPerson ? 'msgBlockPersonTitle' : 'blockReviewerTitle', lang)}</Text>
+                <Text style={s.sub}>{t(blocksPerson ? 'msgBlockPersonBody' : 'blockReviewerBody', lang)}</Text>
                 {error ? <Text style={s.error}>{error}</Text> : null}
                 <View style={s.btnRow}>
                   <TouchableOpacity style={s.secondaryBtn} onPress={close}>
@@ -152,8 +178,8 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
             {step === 'blockDone' && (
               <View style={s.doneWrap}>
                 <Ionicons name="checkmark-circle" size={40} color={colors.success} />
-                <Text style={s.doneTitle}>{t('blockDoneTitle', lang)}</Text>
-                <Text style={s.doneBody}>{t('blockDoneBody', lang)}</Text>
+                <Text style={s.doneTitle}>{t(blocksPerson ? 'msgBlockPersonDone' : 'blockDoneTitle', lang)}</Text>
+                <Text style={s.doneBody}>{t(blocksPerson ? 'msgBlockPersonDoneBody' : 'blockDoneBody', lang)}</Text>
                 <TouchableOpacity style={s.primaryBtn} onPress={close}>
                   <Text style={s.primaryBtnText}>{t('done', lang)}</Text>
                 </TouchableOpacity>
@@ -162,8 +188,8 @@ export default function ContentReportMenu({ contentType, contentId, lang = 'Engl
 
             {step === 'form' && (
               <>
-                <Text style={s.title}>{t(isFacility ? 'reportBusinessTitle' : 'reportTitle', lang)}</Text>
-                <Text style={s.sub}>{t(isFacility ? 'reportBusinessSub' : 'reportSubtitle', lang)}</Text>
+                <Text style={s.title}>{t(isMessage ? 'reportMessageTitle' : isProfile ? 'reportProfileTitle' : isFacility ? 'reportBusinessTitle' : 'reportTitle', lang)}</Text>
+                <Text style={s.sub}>{t(isMessage ? 'reportMessageSub' : isProfile ? 'reportProfileSub' : isFacility ? 'reportBusinessSub' : 'reportSubtitle', lang)}</Text>
 
                 {REASONS.map(r => (
                   <TouchableOpacity

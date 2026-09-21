@@ -1,6 +1,6 @@
 import { TouchableOpacity, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../constants/theme'
+import { colors, ellipsizeSlack } from '../constants/theme'
 import { t } from '../constants/i18n'
 
 // The app's single back control. Replaces five ad-hoc variants (chevron-back at
@@ -39,6 +39,7 @@ export default function BackButton({
   onPress,
   style,
   accessibilityLabel,
+  onLayout,            // passthrough; TouchableOpacity supports it and callers may measure
 }) {
   const text = label ?? t('back', lang)
   const hero = variant === 'hero'
@@ -53,6 +54,7 @@ export default function BackButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? text}
       style={[s.base, style]}
+      onLayout={onLayout}
     >
       <Ionicons
         name="chevron-back"
@@ -82,5 +84,33 @@ const s = StyleSheet.create({
   // pill style; with those stripped, the icon and label would otherwise touch.
   base:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start',
            minHeight: MIN_TARGET, minWidth: MIN_TARGET, gap: 2 },
-  label: { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, flexShrink: 1 },
+  // ─── WHY THIS IS A PADDING AND NOT flexGrow ────────────────────────────────
+  //
+  // The label clips without help. Measured on device 2026-09-19: ScreenHeader's back
+  // column is 70.0dp, the chevron's advance is exactly 1.0 em (24.00dp at size 24, read
+  // from Ionicons.ttf), "Geri" is 29.22dp in Inter_400Regular at 15px — and the audit
+  // reported the Text was GIVEN 29.9dp and ellipsized anyway, with ~14dp spare in the row.
+  // Because flexBasis is auto, a Text is allocated EXACTLY its own measured width, and it
+  // has no tolerance at all for the measure pass and the draw pass disagreeing.
+  //
+  // ► flexGrow: 1 WAS THE FIRST FIX AND IT BROKE EVERY HEADER IN THE APP.
+  //   Yoga measures an auto-width container against the space AVAILABLE to it. A flexGrow
+  //   child inside consumes that available space, so BackButton's measured content width
+  //   became the FULL header width — the title was pushed out and clipped, and the
+  //   right-hand buttons disappeared entirely. It is not that the fix was too aggressive
+  //   on a crowded header; an auto-sized box containing a growing child is unbounded by
+  //   construction, and the one header I measured simply had nothing to its right to lose.
+  //
+  //   The tolerance therefore has to be BOUNDED, which is what ...ellipsizeSlack is: 2dp on
+  //   this Text and on nothing else. It cannot consume a row and cannot vary with what is
+  //   beside it. flexShrink stays, so a genuinely constrained call site (BusRoutes caps its
+  //   pill at maxWidth 120 and passes a module title) still ellipsizes rather than
+  //   overflowing.
+  //
+  //   This was a bare `paddingRight: 2` until 2026-09-20. It is the same bug as the five
+  //   EventsScreen chips and LiveStrip's tag — a string that fits its box EXACTLY and is
+  //   cut regardless — so it now points at the one token that carries the measurement.
+  //   constants/theme.js has the numbers and the three hypotheses that died getting to them.
+  label: { ...ellipsizeSlack, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary,
+           flexShrink: 1 },
 })

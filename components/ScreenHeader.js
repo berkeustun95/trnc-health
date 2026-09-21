@@ -15,6 +15,7 @@ export default function ScreenHeader({
     <View style={s.bar}>
       <BackButton lang={lang} label={backLabel} onPress={onBack} style={s.back} />
 
+
       <View style={s.center}>
         {titleIcon ? (
           <View style={s.iconTitleRow}>
@@ -42,6 +43,10 @@ const s = StyleSheet.create({
                   backgroundColor: colors.cardBg,
                   borderBottomWidth: 1, borderBottomColor: colors.border,
                   marginBottom: 18 },
+  // 70 is the matched pair with `right` below: equal side columns are what make the
+  // flex:1 centre an actual centre. Measured at 70.0dp on device and NOT the cause of the
+  // Turkish back-label clip — that was the label being allocated exactly its own measured
+  // width while 14dp sat spare in this very column. See the note on BackButton's `label`.
   back:         { minWidth: 70, justifyContent: 'flex-start' },
   center:       { flex: 1, alignItems: 'center' },
   iconTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

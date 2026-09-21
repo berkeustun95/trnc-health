@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Feather, Ionicons } from '@expo/vector-icons'
-import { colors } from '../../constants/theme'
+import { colors, ellipsizeSlack } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../constants/regions'
 import { resolveHero } from '../../constants/homeHero'
@@ -415,9 +415,10 @@ const s = StyleSheet.create({
                borderRadius: 23, backgroundColor: '#fff', paddingHorizontal: 16 },
   searchText:{ flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   // A single pill, deliberately shallow: paddingVertical 6 against the old stack's ~71pt.
-  // alignSelf flex-start so it hugs its content instead of stretching across the hero.
-  // flex:1 so the bottom-right column stays pinned right; the chip itself hugs its
-  // content via alignSelf.
+  // flex:1 so the bottom-right column stays pinned right.
+  //
+  // The chip used to hug its content via alignSelf: 'flex-start'. That was removed on
+  // 2026-09-18 — see the note on `chip` below for why it had become actively harmful.
   chipCol:   { flex: 1 },
   // ─── NO BACKDROP. PLAIN TEXT ON THE PHOTOGRAPH ────────────────────────────
   //
@@ -444,10 +445,58 @@ const s = StyleSheet.create({
   // The textShadow is a belt-and-braces perceptual aid at glyph EDGES and is deliberately
   // not counted in any figure above: WCAG has no method for it, so it is not something the
   // numbers may lean on. The scrim is what carries the contrast.
-  chip:      { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  // ─── DO NOT ADD alignSelf: 'flex-start' BACK ────────────────────────────────
+  //
+  // It was here when the district name clipped in Turkish on the home screen — the first
+  // thing most users see, in the language most of them read. "Lefkoşa" drew as "Lefko…"
+  // with 55.3dp of room, found 2026-09-18 by the __DEV__ text audit.
+  //
+  // ⚠ IT WAS NOT THE CAUSE. Removing it (08d198f) did not fix the clip; the real fix is
+  //   on `district` below, and the reasoning that blamed the hug is corrected there. This
+  //   heading stays because the removal is still right for its OWN reason, which is that
+  //   the hug was VESTIGIAL: this row used to be a rgba(0,0,0,0.74) pill, and a pill must
+  //   hug — its background has to wrap the text. The pill went on 2026-09-07 (see the note
+  //   below); the hug stayed, and with no background left to size it did nothing but turn
+  //   ~190dp of free space into a width derived from the text's own measurement.
+  //
+  // Stretching costs nothing: there is no background to hug, justifyContent defaults to
+  // flex-start so the children still start at the left, and pointerEvents="box-none"
+  // means the wider box adds no touch target. So the removal stays — but it is not what
+  // fixed the clip, and the paragraph that used to sit here explaining why it would have
+  // was wrong. See the note on `district` below.
+  chip:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // 14pt, down from 17. "Smaller and lighter" is the brief; the floor does not move with
   // size here because 17pt was never large-text either (that needs 18pt, or 14pt bold).
-  district:  { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#fff', flexShrink: 1,
+  //
+  // ─── THE ROUNDING MODEL LOST ITS OWN TEST. ...ellipsizeSlack IS THE ACTUAL FIX. ──
+  //
+  // 08d198f removed `alignSelf: 'flex-start'` from `chip` above and explained this clip
+  // with a Yoga pixel-grid argument: PixelGrid.cpp:85 force-CEILS a text node's frame, so
+  // a content-hugging ancestor taking plain round-to-nearest could discard the fraction
+  // the text needed. That commit was honest that the mechanism was a DIAGNOSIS and said
+  // the next clip the detector found would be "the FIRST REAL TEST of this model, not a
+  // confirmation of it". That clip was t('back') on ScreenHeader, and THE MODEL LOST — see
+  // 7e1210a. Lefkoşa also kept clipping after 08d198f shipped, which is the second failure.
+  //
+  // ► REMOVING alignSelf WAS INERT BY CONSTRUCTION, and that is the part to carry forward.
+  //   flexBasis defaults to `auto`, which hands a Text EXACTLY ITS OWN MEASURED WIDTH
+  //   whether its parent hugs or stretches. The chip got wider; the Text did not. Nothing
+  //   about a hugging ancestor was ever reaching this Text's width.
+  //
+  // ► WHAT IT ACTUALLY IS, measured 2026-09-20 and recorded in constants/theme.js: RN cuts
+  //   a single-line Text whose string fits its box EXACTLY. Five labels measured
+  //   needs == box == glyphs to the decimal and ellipsized regardless, which puts the fault
+  //   in the comparison rather than in either measurement. THE NUMBERS LIVE WITH THE TOKEN,
+  //   not here — an earlier draft of this comment carried its own .ttf advance table and a
+  //   "the draw pass wants more than the measure pass gave" conclusion, and BOTH were
+  //   wrong: the table compared the engine against a font file rather than against itself.
+  //   One owner for the measurement is the point.
+  //
+  // ► NOT flexGrow — ab2c6bf reverted that on the back label because Yoga measures an
+  //   auto-width container against the space AVAILABLE to it, so a growing child made the
+  //   container swallow the whole header. flexShrink stays: a genuinely long name must
+  //   still ellipsize rather than overflow.
+  district:  { ...ellipsizeSlack, fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#fff', flexShrink: 1,
                textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   chipDot:   { fontSize: 12, color: 'rgba(255,255,255,0.75)',
                textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },

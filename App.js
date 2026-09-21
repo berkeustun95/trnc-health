@@ -17,7 +17,6 @@ import { supabase, isGuest } from './lib/supabase'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
-import { getPreset } from './constants/avatars'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE } from './constants/flags'
 import { promosAllowed } from './constants/homeStrip'
@@ -47,6 +46,7 @@ import EstateAgentOnboardingScreen from './screens/EstateAgentOnboardingScreen'
 import EstateAgentDashboardScreen from './screens/EstateAgentDashboardScreen'
 import HomeServiceDashboardScreen from './screens/HomeServiceDashboardScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
+import Avatar from './components/Avatar'
 import HomeServicesScreen from './screens/HomeServicesScreen'
 import JobPostingsScreen from './screens/JobPostingsScreen'
 import TransportScreen from './screens/TransportScreen'
@@ -77,6 +77,7 @@ import WelcomeScreen from './screens/WelcomeScreen'
 import HomeScreen from './screens/HomeScreen'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
+import StudentHubScreen from './screens/StudentHubScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
 import GamesHubScreen from './screens/games/GamesHubScreen'
 import XoxGameScreen from './screens/games/XoxGameScreen'
@@ -130,14 +131,28 @@ function TypeSVGIcon({ type, size, color }) {
 //   bundle — not just the feature the column belongs to. The four consent columns arrive
 //   with 20261016, so that migration must be applied BEFORE the OTA that carries this
 //   line, never after. A select list is not a feature and TERMS_CHECKBOX_LIVE does not
-//   protect it.
+//   protect it. The four study columns arrive with 20261024 (applied 2026-09-15; an anon
+//   select naming them returned 200 through PostgREST the same day). The wizard needs
+//   study_end_year even with the module dark: it is what keeps a graduate's institution
+//   through a re-gate.
 //
 // terms_locale is read by nothing today. It is here so the loaded row carries the whole
 // consent record rather than three quarters of it — the flush compares terms_version, the
 // toggle reads marketing_opt_in_at, and a future re-acceptance round needs all four
 // without a second query. scripts/check-privacy-parity.mjs derives its field list from
 // this constant, so each of the four also had to be justified there.
-const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, institution_id, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible, terms_version, terms_accepted_at, terms_locale, marketing_opt_in_at'
+// ► THE FIVE AFFILIATION COLUMNS ARE NOT SELECTED, and removing them was the last thing
+//   standing between this build and 20261027. This string feeds BOTH profile loads
+//   (below and in the auth listener), so naming a dropped column here is not a degraded
+//   screen — it is a 42703 on the only read that produces `profile`, for every user, on
+//   every launch. The app would not get past the loading frame.
+//
+//   Nothing downstream consumed them: grepping the whole client for
+//   profile.institution_id / study_start_year / study_end_year / subject_id /
+//   student_listing_opt_in found no reader outside the wizard's own seed, which now reads
+//   the enrolment instead. student_level STAYS — it is not one of the five, 20261027 does
+//   not drop it, and the profile gate still asks for it.
+const PROFILE_COLUMNS = 'role, preferred_language, avatar_url, first_name, last_name, display_name, date_of_birth, region, resident_status, student_level, phone, nationality, nationality_code, profile_completed_at, profile_schema_version, age_ineligible, terms_version, terms_accepted_at, terms_locale, marketing_opt_in_at'
 
 
 // ─── The signup tick, written now that there is a session to write it with ──
@@ -484,7 +499,7 @@ export default function App() {
   const [showJobPostings,  setShowJobPostings]  = useState(false)
   const [showExploreBeach, setShowExploreBeach] = useState(false)
   const [showExplore, setShowExplore] = useState(false)   // the full Explore module tile (dark until MODULE_FLAGS.explore)
-  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | (future preview keys). Admins never reach HomeScreen /
+  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'studentHub'. Admins never reach HomeScreen /
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
                                                                          // not a per-surface boolean.
@@ -496,6 +511,9 @@ export default function App() {
   const [showGarages, setShowGarages] = useState(false)
   const [showTowing, setShowTowing] = useState(false)
   const [showStudentHub, setShowStudentHub] = useState(false)
+  // The conversation a push asked for, held until StudentHubScreen has opened it. Cleared
+  // by the screen rather than here, so a tap that arrives before the hub mounts is not lost.
+  const [pendingConvId, setPendingConvId] = useState(null)
   const [showEsim, setShowEsim] = useState(false)
   // Sub-screen within Bağlantı & eSIM: null = landing, 'operator' = package list,
   // { pkg } = package detail. Mirrors petsSubScreen / gamesSubScreen.
@@ -777,7 +795,6 @@ export default function App() {
       if (showGrooming) { setShowGrooming(false); return true }
       if (showGarages) { setShowGarages(false); return true }
       if (showTowing) { setShowTowing(false); return true }
-      if (showStudentHub) { setShowStudentHub(false); return true }
       // Walks the module one level at a time: package -> package list -> landing. A bare
       // pop to null would skip the list entirely and read as the app losing its place.
       if (connectivitySub?.view === 'package' || connectivitySub === 'stores') { setConnectivitySub('operator'); return true }
@@ -787,9 +804,12 @@ export default function App() {
       if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
       if (showExploreBeach)     { setShowExploreBeach(false); return true }
       if (showExplore)          { setShowExplore(false); return true }
-      if (adminPreview)         { setAdminPreview(null); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
+      // Below eSIM, Welcome Guide and Exchange Rates: Student Hub opens those ON TOP of itself
+      // (they render earlier in the content chain), so Back must pop them before the hub.
+      if (showStudentHub) { setShowStudentHub(false); return true }
+      if (adminPreview)         { setAdminPreview(null); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
       if (showGames) { setShowGames(false); return true }
       if (activeTab !== 'home') { setActiveTab('home'); return true }
@@ -1002,6 +1022,14 @@ export default function App() {
         setActiveTab('profile')
       } else if (screen === 'notifications') {
         setShowNotifs(true)
+      } else if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
+        // ► GATED ON THE FLAG, because a tap must never land on Coming Soon. The push that
+        //   carries this can only have been sent by 20261029's messaging, so if the module
+        //   is dark on this build the notification is from a feature this bundle does not
+        //   have — opening the hub would show a placeholder and read as the tap breaking.
+        //   Doing nothing leaves the user where they were, which is honest.
+        setPendingConvId(data.conversation_id ?? null)
+        setShowStudentHub(true)
       }
     })
     return () => sub.remove()
@@ -1013,8 +1041,18 @@ export default function App() {
     handledColdStartRef.current = true
     Notifications.getLastNotificationResponseAsync().then(response => {
       if (!response) return
-      const screen = response.notification.request.content.data?.screen
+      const data = response.notification.request.content.data ?? {}
+      const screen = data.screen
       if (screen === 'duty') setShowDutyList(true)
+      // ► THE COLD-START HANDLER KNEW ONLY 'duty'. A tap from a KILLED app is the common
+      //   case for a message notification — the app is not usually already open when one
+      //   arrives — and without this branch that tap landed on Home with no explanation.
+      //   The warm listener above and this one must stay in step; they are two paths to
+      //   the same destination and only one of them was ever exercised.
+      else if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
+        setPendingConvId(data.conversation_id ?? null)
+        setShowStudentHub(true)
+      }
     })
   }, [session])
 
@@ -1414,7 +1452,7 @@ export default function App() {
       />
     }
   } else if (profile.role === 'admin' && !adminPreview) {
-    content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} />
+    content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')} />
   } else if (profile.role === 'provider') {
     if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
       content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
@@ -1853,11 +1891,29 @@ export default function App() {
       ? <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} />
       : <ComingSoonScreen lang={lang} moduleKey="towing" titleKey="menuTowing" session={session} onBack={() => setShowTowing(false)} />
   } else if (showStudentHub) {
-    // No StudentHubScreen in main yet (it lives on the unmerged feat/student-hub
-    // branch). Route ALL users — admins included — to Coming Soon; the flag exists
-    // so a future merge can restore the standard gate:
-    //   (MODULE_FLAGS.studentHub || isAdmin) ? <StudentHubScreen/> : <ComingSoonScreen/>
-    content = <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
+    // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
+    // earlier in this chain, so Back returns here.
+    content = (MODULE_FLAGS.studentHub || isAdmin)
+      ? <StudentHubScreen lang={lang} onBack={() => setShowStudentHub(false)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
+          isGuest={isGuest(session)}
+          // CLOSES the hub on the way to the profile, deliberately. The student list's
+          // one action is "turn on the listing setting", and the hub would otherwise stay
+          // mounted holding the opt-in value it read before the user changed it — showing
+          // the reciprocity copy again at the exact moment the setting started working.
+          // Re-entering the hub re-mounts it and re-reads the row.
+          initialConversationId={pendingConvId}
+          onConversationOpened={() => setPendingConvId(null)}
+          onGoToProfile={() => { setShowStudentHub(false); setActiveTab('profile') }} />
+      : <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
+  } else if (adminPreview === 'studentHub') {
+    // After showEsim and showNewcomerEssentials, not beside the Explore preview — the
+    // cross-links only stack if their targets render first. Never clear adminPreview to
+    // open them: an admin with no preview set short-circuits to AdminScreen.
+    // An admin previewing has no customer profile tab to send anyone to — the content
+    // selector is role-first and short-circuits to AdminScreen — so the reciprocity CTA
+    // just closes the preview rather than routing into a tab that does not exist here.
+    content = <StudentHubScreen lang={lang} onBack={() => setAdminPreview(null)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
+      isGuest={false} onGoToProfile={() => setAdminPreview(null)} />
   } else {
     inTabShell = true
     // Utility-only drawer. Home's module grid is the app's navigation now, so the
@@ -2013,24 +2069,12 @@ export default function App() {
         <Animated.View style={[styles.menuDrawer, { transform: [{ translateX: menuAnim }] }]}>
           <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <View style={styles.menuUserRow}>
-            {(() => {
-              const preset = getPreset(profile?.avatar_url)
-              if (preset) return (
-                <View style={[styles.menuAvatar, { backgroundColor: preset.bg }]}>
-                  <Text style={{ fontSize: 22 }}>{preset.emoji}</Text>
-                </View>
-              )
-              if (profile?.avatar_url?.startsWith('http')) return (
-                <Image source={{ uri: profile.avatar_url }} style={styles.menuAvatar} />
-              )
-              return (
-                <View style={[styles.menuAvatar, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.menuAvatarText}>
-                    {session.user.email?.[0]?.toUpperCase() ?? t('guestLabel', lang)[0].toUpperCase()}
-                  </Text>
-                </View>
-              )
-            })()}
+            <Avatar
+              avatarUrl={profile?.avatar_url}
+              initials={session.user.email?.[0]?.toUpperCase() ?? t('guestLabel', lang)[0].toUpperCase()}
+              size={44}
+              textSize={18}
+            />
             <Text style={styles.menuEmail} numberOfLines={1}>{session.user.email ?? t('guestLabel', lang)}</Text>
             <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ flexShrink: 0 }}>
               <Ionicons name="close" size={24} color={colors.textPrimary} />
@@ -2092,7 +2136,7 @@ export default function App() {
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
-    setShowNewcomerEssentials(false); setShowExchangeRates(false)
+    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
       case 'pharmacy':      setActiveTab('home'); setShowDutyList(true); break
@@ -2121,7 +2165,7 @@ export default function App() {
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
-    setShowNewcomerEssentials(false); setShowExchangeRates(false)
+    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
       case 'beaches': setExploreBeachRegion(region); setShowExploreBeach(true); break
@@ -2494,8 +2538,6 @@ const styles = StyleSheet.create({
   menuBackdrop:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 10 },
   menuDrawer:       { position: 'absolute', top: 0, right: 0, bottom: 0, width: 260, backgroundColor: colors.bg, zIndex: 11, paddingHorizontal: 20, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: -4, height: 0 }, elevation: 20 },
   menuUserRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
-  menuAvatar:       { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  menuAvatarText:   { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#fff' },
   menuEmail:        { flex: 1, minWidth: 0, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   menuDivider:      { height: 1, backgroundColor: colors.border, marginVertical: 8 },
   menuItem:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 13 },

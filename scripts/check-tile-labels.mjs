@@ -333,7 +333,8 @@ for (const W of WIDTHS) {
     // being ellipsed in every locale before 2026-09-05 — found by this tool, not by review
     // — and they now live in a box a third the width, so they are re-measured here rather
     // than assumed to have survived the move.
-    for (const k of ['stripDutyTitle', 'stripDutyPartialTitle', 'stripDutyStaleTitle', 'stripEventsTitle']) {
+    for (const k of ['stripDutyTitle', 'stripDutyPartialTitle', 'stripDutyStaleTitle', 'stripEventsTitle',
+                     'stripNoticeTitle']) {
       assess('card', t(k, L), 14, cardBox(W), `${W}dp ${L} card:${k}`, CURSIVE.has(L))
     }
     // The subtitle loop is gone with the subtitles (2026-09-10). Measuring keys that no

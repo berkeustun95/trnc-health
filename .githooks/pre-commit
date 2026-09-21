@@ -11,3 +11,14 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-dorms.mjs || {
   echo "  If this is the dorm fixture: node scripts/dev/dorm-fixture.mjs --revert"
   exit 1
 }
+
+# Refuse a commit where a __DEV__ UI audit reaches into React Native in one of the three
+# ways that have already taken the whole app down: a dynamic require (fails the BUNDLE), an
+# assignment to a module export (throws at import — the app never starts), or a deep import.
+# Both outages were found by a human launching the app and pasting the error back; this is
+# the cheaper place to find them.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-dev-audits.mjs || {
+  echo ""
+  echo "  pre-commit: refused. See above."
+  exit 1
+}

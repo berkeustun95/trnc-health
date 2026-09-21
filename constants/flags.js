@@ -1,6 +1,7 @@
 // Dark-launch feature flags. Kept out of App.js so leaf components (directory +
 // owner card) can import the flag directly without prop-drilling it four levels.
 
+
 // Featured tier (paid promotion for facility listings). false = the "Featured"
 // badge/pinning is hidden from normal users and the owner "request featured" CTA
 // is hidden; admins still see both (isAdmin override) so the tier can be previewed
@@ -87,9 +88,11 @@ export const MODULE_FLAGS = {
   // is_partner, and hs_insert_self is closed. What flipping this reveals is a curated
   // list of firms ADA has agreements with.
   //
-  // ⚠ IT DOES NOT MAKE THE PARTNER VISIBLE. TadilArt is still status='pending', so the
-  //   module opens on its empty state until the go-live UPDATE runs. That ordering is
-  //   deliberate — see HS_SELF_REGISTRATION below for the block and why it runs LAST.
+  // ⚠ IT DOES NOT MAKE A PARTNER VISIBLE. Visibility is the row: hs_select_public shows
+  //   status='active' AND is_partner. TadilArt Cyprus is LIVE — active and is_partner=true
+  //   (read back as anon 2026-09-14). A future partner stays invisible until its own go-live
+  //   UPDATE runs, and that ordering is deliberate — see HS_SELF_REGISTRATION below for the
+  //   block and why it runs LAST.
   //
   // ⚠ AND IT IS THE OFF SWITCH. Turning the module off needs no SQL and no rollback of
   //   anything: flip this back to false and OTA. That is why activation is allowed to be
@@ -103,7 +106,7 @@ export const MODULE_FLAGS = {
   events:       true,
   jobs:         false,
   accommodation: true,
-  studentHub:   false,
+  studentHub:   true,
   explore:      true,   // live 2026-08-26 — 42 places, nature + heritage tiles
   // Çekici & Yol Yardım (towing / roadside assistance). Admin-seeded directory, no
   // self-serve. Stays false until Slice 3 seeds real firms — an emergency screen with

@@ -25,8 +25,9 @@ We are pinned to Expo SDK 54 to match the Expo Go app on the test phone.
 ## Release & Update Flow
 **JS-only fix** (UI, logic, styles, bug fixes — anything in .js files):
 ```bash
-eas update --channel production --message "description"
+npm run ota -- --message "description"
 ```
+Never `eas update` directly — see the rule below. Stash check and clean tree first.
 Users get it on next launch. No Play Store involved.
 
 **New native build required** only when changing: `app.config.js`, native dependencies, permissions, icons, SDK version.
@@ -34,6 +35,38 @@ Users get it on next launch. No Play Store involved.
 eas build --platform android --profile production
 # then submit new AAB to Play Store closed testing track
 ```
+
+⚠ **QUEUED FOR THE NEXT NATIVE BUILD — ride it with the CONNECTIVITY_LIVE / eSIM build,
+never as a standalone.** `app.config.js` still tells the OS this is a health app
+(*"ADA uses your location to show nearby pharmacies, clinics, and hospitals"*), and **no OTA
+can change an OS permission dialog**. Decisions are locked: mic off
+(`microphonePermission: false`, which also blocks Android `RECORD_AUDIO`), **camera KEPT** for
+planned image messaging, both background-location keys deleted (the app only ever calls
+`requestForegroundPermissionsAsync`), location moved to a single source, and `expo.locales`
+for all nine locales **in the same slice** — the string is English-only until it lands.
+**The trap:** the location string exists in THREE places and `applyPermissions` resolves
+`plugin option || ios.infoPlist || plugin default`, so `:87-88` wins and `:27-28` is inert —
+editing only the `ios.infoPlist` pair changes nothing and looks like the build ignoring you.
+Verify with `npx expo config --type introspect`, never by reading `app.config.js`.
+The Play health declaration is drafted **when the build is scheduled**, not before.
+Plan, resolved-config baseline and evidence:
+`~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md`.
+Commit it separately from the eSIM work so it reverts alone. `slug` stays `trnc-health`.
+
+⚠ **IMAGE MESSAGING IS BLOCKED ON A SAFETY SCOPE, AND THE SCOPE IS THE FEATURE.**
+`20261029_student_messaging.sql` already says it — *"NO IMAGES. Slice 7, and it waits on CSAM
+detection procurement… a migration and a procurement decision, in that order."* Before any
+attachment column, bucket or upload path exists, answer the questions in
+`~/ObsidianVault/10-ada/2026-09-20_image-messaging-safety-scope-PARKED.md`.
+Three things make it unlike every other UGC surface here: it is private and between MINORS
+(`may_initiate_by_age` stops an adult initiating with a minor, but two 15-year-olds are the
+declared audience), `contains_blocked_term` **cannot see an image**, and
+`auto_hide_reported_content` has no messages branch — it fires at 3 reporters and a two-person
+thread can never reach 3, so there is no automatic takedown at all.
+⚠ And **every existing bucket in this app is PUBLIC** (`avatars`, `facility-images`,
+`event-images`, `property-images` all use `getPublicUrl`). A message image in a public bucket
+is a private message with a guessable URL. The only signed-URL precedent is
+`AdminScreen.js:23`. Report and block already exist; **image filtering is the whole gap.**
 
 **Never use** `process.env.EAS_BUILD` conditionals in `app.config.js` — it caused `checkAutomatically: 'NEVER'` to bake into a production build, breaking OTA entirely. Always hardcode `'ON_LOAD'`.
 
@@ -62,6 +95,17 @@ Until 2026-08-30 this folder deployed nothing and was documented as inert; it li
 `~/ada-worker-support`, on one laptop, with no git — which is how it became unfindable.
 `git push` does NOT publish it (that is `docs/`, via GitHub Pages).
 
+⚠ **THE LIVE-STRIP NOTICE CARD IS DORMANT, NOT DEAD — LEAVE IT.** `kind = 'notice'`
+(`20261043`, applied), the `NOTICE_FALLBACK` route→image map in `LiveStrip.js`, rank 3b in
+`homeStripResolver.js`, `stripNoticeTitle` in nine locales, and `utils/stripDismissals.js`
+all ship and all work. The one production row was switched OFF (`is_active = false`) on
+2026-09-21 after the device pass: **"Bugün ADA'da" carries events + duty and no
+announcements.** That is a product decision about the strip, not a defect in the mechanism.
+So: **do not delete the notice code, and do not repurpose it to put an announcement back in
+that strip.** Re-enabling is one `UPDATE … SET is_active = true` on an existing row, and
+deleting the path would turn that into a rebuild. Same reasoning as the `showAgentOnboarding`
+branch in App.js, which carries the identical warning for the identical reason.
+
 **OTA only reaches the production build.** A preview APK (`eas build --profile preview`) does not have `channel: "production"` baked in and will never receive OTA updates. Always test OTA on the Play Store install, not a sideloaded APK.
 
 **EAS environment variables:** Use `eas env:create` (not `eas secret:create` — deprecated). `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is set for the production environment. Changes to env vars require a new native build to take effect.
@@ -84,8 +128,59 @@ Until 2026-08-30 this folder deployed nothing and was documented as inert; it li
 - A customer must NEVER be able to read another customer's data.
 - Never put the Supabase service_role key or the database password in app code.
   Only the anon public key belongs in lib/supabase.js.
+- **NO RLS OR STORAGE POLICY CHANGES THROUGH THE SUPABASE DASHBOARD. Migrations only.**
+  A dashboard policy exists in production and nowhere else: no migration creates it, so a
+  rebuild from `supabase/migrations/` produces a DIFFERENT SECURITY POSTURE than the live
+  database, and `verify_schema.sql` cannot drift-check an object it has never heard of.
+  Measured 2026-09-21: **17 of ~35 `storage.objects` policies existed only in the
+  dashboard.** One of them, `"Public avatar read"`, cost a full debug cycle — check #2 of
+  the hardening script stayed red against a bucket that was already closed, and the cause
+  was a policy no file in this repo mentioned. It was a sample, not an outlier.
+- **A DO BLOCK ASSERTS THE FULL POLICY SET FOR THE OBJECT IT TOUCHES, never just its own.**
+  RLS is **PERMISSIVE-OR**: presence-of-mine can never prove absence-of-theirs. `20261040`
+  added four correct, guest-guarded avatars policies, verified that its own four existed,
+  and passed — while `"Users manage own avatar"` (ALL, authenticated, no
+  `is_anonymous_session` guard) went on granting guests exactly what the four withheld.
+  So: assert `count(*)` of every policy reaching that object, PRINT the names, and assert
+  that **no permissive policy is bucket-unscoped** — an expression that never mentions
+  `bucket_id` applies to every bucket while naming none, which makes it invisible to any
+  check that finds candidates by searching for the bucket's name.
+- **TEST THE ROLE THE CLAIM IS ABOUT.** Two wrong conclusions in one session came from
+  probing with the anon key and generalising to `authenticated`: "20261033 is applied"
+  (only `anon` was proved denied) and "avatars are broken for everyone" (anon *should*
+  fail — `avatars_read_authenticated` excludes it by design; the measurement was the
+  policy working). `authenticated` includes every signed-in user AND every guest, and
+  `TO authenticated` does not exclude guests — only `NOT is_anonymous_session()` does.
+  Where a JWT is not available, `has_column_privilege` / `has_table_privilege` answer for
+  a named role as postgres, and they resolve INHERITED grants that a grantee-filtered
+  count cannot see.
+- **A CHECK THAT PASSES HARDEST WHEN THE FEATURE IS BROKEN IS NOT A CHECK.** Every denial
+  assertion needs a matching "and the legitimate path still works" beside it, or the suite
+  is a one-way ratchet that scores full marks on a bucket nobody can read.
+  `verify-storage-hardening.sh` had four "must not be readable" checks and nothing
+  asserting that a signed URL still resolves.
 
 ## Migrations (manual-apply — no CI)
+- **A SCRIPT FOR THE SUPABASE SQL EDITOR MUST NOT REFERENCE ANY OBJECT IT CREATED EARLIER
+  IN THE SAME SCRIPT.** Two incidents, and the second one disproved the explanation
+  written after the first:
+    * **2026-09-15 — `20261024`.** Created TEMP tables as top-level statements, used them
+      in a `DO` block, died on this database with **42P01** naming one of them. The same
+      file applied cleanly on stock PostgreSQL 15.18, 17.10 and PGlite. It was recorded as
+      a `pg_temp` problem.
+    * **2026-09-21 — `verify_home_strip_pin.sql`.** Created an **ORDINARY** table inside
+      `BEGIN … ROLLBACK` — written that way specifically to sidestep the `pg_temp` theory
+      — and died identically: `ERROR: 42P01: relation "_hsp_verify" does not exist`.
+  **So the schema of the object never mattered, and the first explanation was wrong.** The
+  mechanism is still unconfirmed (a pooler, or the editor not holding the script on one
+  connection or in one transaction, would both explain it) and **is not worth confirming
+  in production.** The rule is what carries.
+  Write the whole thing as **ONE statement that creates nothing**: a `DO` block that
+  accumulates a report in a variable and ends with `RAISE EXCEPTION` carrying it. The
+  exception is the only output channel that editor reliably shows — **`RAISE NOTICE` is
+  invisible there**, which is a second way to ship a check nobody can read — and the abort
+  is also the rollback, so such a script cannot leave a row behind on any path. Accept
+  that a healthy run shows red: put the verdict in the first line of the message.
 Migrations are applied by hand (SQL editor, Role → postgres), so nothing catches a
 file that was committed but never applied (this is how `facilities.area` silently
 went missing). Two mandatory rules:
@@ -97,6 +192,13 @@ went missing). Two mandatory rules:
 - **Every ADD COLUMN migration ends with `NOTIFY pgrst, 'reload schema';`** (after
   `RESET ROLE;`). Without it, a stale PostgREST cache reports 42703 "column does
   not exist" through the REST API even though the column exists in Postgres.
+- **Migration filename prefixes are SEQUENCE NUMBERS, not dates.** The next file is the
+  highest existing prefix + 1 (`ls supabase/migrations | tail -1`), never today's date.
+  Prefixes matched the commit date through 20260801; from 20260802 they ran ahead of it,
+  almost without exception — +1 day at first, 34 days by 20261015, 35 by 20261020. So a
+  filename says nothing about when anything was written or applied; the only applied date
+  is `schema_migrations_applied.applied_at`. Re-measure rather than trust these figures:
+  compare the prefix with `git log --diff-filter=A --format=%ad --date=short -- <file>`.
 - **Changing `normalize_for_moderation()` now also changes the display-name uniqueness
   key.** `normalize_display_name()` wraps it, and `profiles.display_name_normalized` is
   a STORED column filled by `check_profile_name_content()` — so a redefinition leaves
@@ -112,11 +214,37 @@ went missing). Two mandatory rules:
 - Functional React components with hooks.
 - Keep components small; one screen per file.
 - Facility types are limited to: pharmacy, clinic, hospital, dentist.
+- **Languages are stored as FULL ENGLISH NAMES (`'Turkish'`, `'English'`), never ISO
+  codes.** The values are the `LANGUAGES` keys in `constants/i18n.js`; they flow through
+  `profiles.preferred_language` into `lang` (App.js), `t()`, `student_task_i18n.lang` and
+  `module_notif_text(p_lang)`. Prod on 2026-09-15: 31 Turkish, 19 English, 1 French,
+  1 Persian, 190 NULL — zero `'en'`/`'tr'`. An ISO comparison never errors; it just matches
+  nothing. Two bugs so far: `lang === 'tr'` in the feat/student-hub StudentHubScreen
+  (line 78), and a probe of `module_notif_text` keyed on an ISO code.
+  `student_task_i18n_lang_check` rejects `'tr'`/`'en'` for this reason — do the same on any
+  new per-language column.
 - Admins never reach HomeScreen or the customer module chain — the App.js content
   selector is role-first (`profile.role === 'admin'` renders AdminScreen and short-
   circuits everything below). Any admin preview surface must be entered from
   AdminScreen via the `adminPreview` state, never from a HomeScreen tile gated on
   `isAdmin` (that tile is unreachable for admins and hidden for customers).
+- **NEVER use an admin account as a test identity — it is the LEAST reproducible role in
+  the app.** Admin is the tempting choice because `|| isAdmin` unlocks every dark
+  `MODULE_FLAGS` module without touching a flag, so one login reaches surfaces a customer
+  cannot. It also silently switches on behaviour no customer ever sees: `showFeatured` is
+  `FEATURED_LIVE || isAdmin` (same shape for `EXPLORE_FEATURED_LIVE`), and both flags are
+  `false`, so **a customer gets a deterministic sort while an admin gets a `Math.random()`
+  Fisher-Yates shuffle** — `utils/featured.js:14`, via `partitionFeatured()`, reached from
+  `ExploreScreen.js:320` and `GaragesScreen.js:143`. The same list is in a different order
+  every launch, for the admin only.
+  So a bug reproduced as admin may not exist for users, a bug that only appears for users
+  may be invisible as admin, and anything automated that logs in as admin is comparing a
+  shuffled list against itself. Use a **guest** (`WelcomeScreen.js:20`
+  `signInAnonymously()` — one tap from cold start, no credentials, and it bypasses the
+  profile gate) or a real completed customer. To reach a dark module, flip the flag
+  locally and uncommitted, which is what the go-live SOP already says.
+  Found 2026-09-17 while scoping UI test automation; it is a footgun for any testing work,
+  not just that.
 - A filter row (or any fixed-height View) placed as a flex sibling ABOVE a scrollable
   list in a `flex:1` column MUST set `flexShrink: 0` — otherwise it gets vertically
   compressed when the list overflows, cropping its text top and bottom. It only
@@ -559,6 +687,17 @@ in this sequence. Deviations that look harmless are how modules ship half-launch
    created for otherwise.
 6. **Flip the flag in BOTH files, in ONE commit** — `constants/flags.js` and
    `scripts/check-module-flags.mjs`. Either alone fails the guard, which is the design.
+
+   ⚠ **STUDENT HUB ONLY — DECIDE RE-ASKING AT THIS STEP, NOT AFTER IT.**
+   10 accounts hold `terms_version = '2026-09'`. That document promised their data is
+   never visible to other users, and flipping this flag is the act that makes it false
+   — for THEM, not only for people who sign up afterwards. The published policy is now
+   `2026-09-20`, which says the opposite. Nobody has been re-asked.
+   They are findable, and the number is still small:
+   `SELECT id, terms_accepted_at FROM profiles WHERE terms_version IS DISTINCT FROM '2026-09-20';`
+   Not re-asking was the right call while the module was dark, because nothing about
+   their data had changed yet. This step is where that stops being true. Decide it here,
+   with the query in front of you, rather than discovering the question later.
 7. **Stash check, then clean tree.** `eas update` bundles the WORKING TREE, not HEAD. A
    long-lived stash is not a blocker and must stay stashed.
 8. **`npm run ota -- --message "..."`** — never `eas update` directly, and note the `--`:
@@ -568,12 +707,77 @@ in this sequence. Deviations that look harmless are how modules ship half-launch
    the Play Store build. A preview APK has no production channel and never receives OTA.
 10. **THEN `notify_module_waitlist('<module>')`.** Last, and only after step 9 is
     confirmed. Notifying before the OTA has landed sends people to a screen that has not
-    updated yet — the one thing worse than not notifying them. Then add the module to
+    updated yet — the one thing worse than not notifying them.
+
+    ⚠ **READ THE LIST BEFORE AND AFTER, BECAUSE A BURNT LIST AND AN EMPTY LIST ARE THE
+    SAME NUMBER.** The blast returns a count, and `0` means either "nobody signed up" or
+    "these rows were already stamped `notified_at` and can never be notified again". Step
+    10 cannot tell those apart on its own, and the second one is silent:
+
+    ```sql
+    select module,
+           count(*) filter (where notified_at is not null) as notified,
+           count(*) as total,
+           min(notified_at) as first_stamp,
+           max(notified_at) as last_stamp
+    from module_waitlist group by module order by module;
+    ```
+
+    Healthy looks like: every stamped module is one you actually launched, each with a
+    single tight timestamp range. Scattered stamps, or any stamp on a module that has
+    never gone live, means the list was consumed by something other than a launch. Run it
+    BEFORE the blast (the module you are about to launch should read `0/n`) and AFTER
+    (it should read `n/n`, stamped today).
+
+    Baseline taken 2026-09-20, all clean: accommodation 7/7 · events 1/1 · explore 2/2 ·
+    pets 4/4, each on its own launch date; studentHub 0/6 intact; everything else 0. Then add the module to
     `WAITLIST_BLAST_DONE` in `scripts/check-module-flags.mjs`; the guard blocks the next
     push until you do.
 
 Steps 6 and 10 are enforced mechanically by `check-module-flags.mjs`. The rest are not,
 and rely on this list.
+
+### ⚠ STUDENT HUB ONLY — a REQUIRED step that exists for one window and then never again
+
+**Between the Student Hub OTA and `20261027`, exercise the stale-affiliation recovery path
+on a test account. It is not optional and it cannot be deferred.**
+
+ProfileScreen and ProfileSetupScreen both carry a recovery branch that fires on a 23514
+naming `profiles_institution_coupling_check`: it CLAIMS every `student_education` row
+(`mirror_owned = false`), CLEARS the five affiliation columns, then retries the write. It
+exists for exactly one population — somebody whose `profiles` row still carries an
+institution with **no** `study_end_year`, moving their `resident_status` away from
+`'student'`.
+
+To trigger it: a test account with a stale `profiles.institution_id` and
+`study_end_year IS NULL`, then change resident status away from student in the app.
+Expect the save to succeed, the five columns to end up NULL, and **the account to still
+appear on the student list** — that last part is what the claim protects, and the whole
+reason the order is claim-then-clear rather than the reverse.
+
+**`20261027` drops those columns, which drops the CHECK, which makes the branch
+unreachable forever.** After that nobody can ever learn whether it worked — and the branch
+is the only thing standing between that population and a 23514 they cannot clear from any
+screen, or a silent de-listing nobody is told about. Test it inside the window or ship it
+untested permanently.
+
+### ⚠ STUDENT HUB ONLY — the message deep link, also testable only after the OTA
+
+**Tap a real message push on the PLAY STORE build, WARM and COLD, once the OTA has
+shipped.** Both, because they are different code paths that have never both run:
+`addNotificationResponseReceivedListener` (App.js) handles a tap while the app is running;
+`getLastNotificationResponseAsync` handles a tap that launches it. The cold one is the
+COMMON case for a message — the app is usually not open when one arrives — and until
+2026-09-19 it knew only `'duty'`, so such a tap landed on Home.
+
+It cannot be exercised before then, and the reason is not a bug: Expo Go cannot hold a push
+token on SDK 53+, so `profiles.push_token` belongs to the production build. A push sent
+during development is therefore delivered to the Play Store app, whose bundle has no
+messaging in it, and tapping it correctly does nothing.
+
+Expect: the app opens on the Student Hub's Messages tab with that thread open. A thread
+that has since been declined, left or blocked should land on the Messages tab with no
+thread — not on Home, and not on a spinner.
 
 - Always spot-check new UI in Turkish before declaring it done. Turkish labels are longer
   than English, so they routinely push lists past the viewport (hitting bugs like the one
@@ -582,6 +786,19 @@ and rely on this list.
 ## Android Gotchas
 - Views with `borderRadius` + `borderWidth` on Android may render an opaque background unless `backgroundColor: 'transparent'` is set explicitly.
 - Never cache element positions in `onLayout` for later use — layout can shift (e.g. async data loading) and the cached value goes stale. Always measure with `measureRef()` at the moment you need the position.
+- **A REINSTALL DOES NOT RESET FIRST-RUN STATE ON ANDROID — Auto Backup restores it.**
+  Confirmed 2026-09-21 on the onboarding device pass: uninstall + reinstall SKIPPED the
+  carousel, because Android's Auto Backup for Apps had restored `@trnc_onboarded` (and
+  restores every other AsyncStorage key with it — `@trnc_coach_v2`, `@trnc_city_*`,
+  `@trnc_strip_dismissed`, `@trnc_module_pins`).
+  **This is NOT a user-facing bug.** A genuinely new user has no backup to restore from,
+  so they see the carousel exactly once, as designed. It is a TESTING artifact, and the
+  expensive version of it is mistaking it for a regression and "fixing" code that works.
+  To actually re-test a first run: **Settings → Apps → ADA → Storage → Clear storage**
+  (not just Clear cache), or `adb shell pm clear com.berkeustun95.ada`.
+  ⚠ A dev-only "replay onboarding" button was considered and NOT added: the flow is
+  pre-auth, so a button would have to live on a screen the gate renders, and
+  `EXPO_PUBLIC_DEV_ONBOARDED` + Clear storage already cover both directions.
 
 ## Advisor
 

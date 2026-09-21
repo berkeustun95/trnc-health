@@ -233,11 +233,80 @@ function colsInExpr(expr, knownCols) {
 // events_description_i18n_check in section K when nothing was wrong with them.
 // (Caveat: JS code-unit order and COLLATE "C" byte order agree on ASCII, which is all
 // a constraint body has ever contained here. Non-ASCII literals could diverge.)
+// A NEGATIVE CONSTANT IS RENDERED AS A QUOTED STRING, and that asymmetry produced a false
+// positive the first time this section was pointed at real data. The repo writes
+//     floor BETWEEN -5 AND 200
+// and pg_get_constraintdef renders it
+//     ((floor >= '-5'::integer) AND (floor <= 200))
+// so the live side saw the STRING '-5' while the repo side's \b\d+\b skipped the minus and
+// saw the NUMBER 5. Same constraint, different signature, reported as drift —
+// properties_structure_range_check, 2026-09-18. A drift checker that cries wolf teaches
+// people to skim its output, which is the failure this whole file exists to avoid.
+//
+// Both sides now unwrap a quoted numeric (with or without its cast) to a bare number
+// first, then read the sign. The minus is only taken when it follows a space or an open
+// paren, which is where a negative CONSTANT appears and a subtraction operator does not —
+// and either way both sides apply the identical rule, so parity holds even where the
+// heuristic is arguable.
 function litSig(def) {
+  const s = String(def).replace(/'(-?\d+(?:\.\d+)?)'(?:::[a-z0-9_ ]+)?/gi, '$1')
   const out = new Set()
-  for (const m of String(def).matchAll(/'((?:[^']|'')*)'/g)) out.add(m[1].replace(/''/g, "'"))
-  for (const m of String(def).matchAll(/\b(\d+(?:\.\d+)?)\b/g)) out.add(m[1])
+  for (const m of s.matchAll(/'((?:[^']|'')*)'/g)) out.add(m[1].replace(/''/g, "'"))
+  for (const m of s.matchAll(/\b(\d+(?:\.\d+)?)\b/g)) out.add(m[1])
+  for (const m of s.matchAll(/[ (](-\d+(?:\.\d+)?)\b/g)) out.add(m[1])
   return [...out].sort().join('|')
+}
+
+// ─── WHY A SECOND SIGNATURE EXISTS, AND THE SIX DAYS THAT PAID FOR IT ───────
+//
+// A LITERAL SIGNATURE CANNOT SEE A REMOVED ARM THAT CONTAINS NO LITERAL. That is a
+// property of the design above, not an oversight in it, and it held silently while
+// everyone trusted section K.
+//
+// The case that proved it: profiles_completion_requires_fields_check lost
+// `phone IS NOT NULL` — removed BY HAND in production on or before 2026-09-12, as the
+// database half of commit 721c0d3, with no migration. The repo went on claiming the
+// clause existed. Section K compared the two and passed, because both sides serialise to
+// the identical signature:
+//
+//     repo (with phone) : postgraduate|student|university
+//     live (no phone)   : postgraduate|student|university
+//
+// Removing `phone IS NOT NULL` removes no quoted string and no number, so there was
+// nothing in the signature to change. The drift sat undetected for six days behind a
+// green check, next to a vault note that named the exact remedy and a commit that said
+// a follow-up was coming. Both existed; neither was done; and the guard that should have
+// made that not matter could not see it.
+//
+// So the signature gains the SET OF COLUMNS the expression references. Column names
+// survive Postgres's rewriting unchanged — unlike the expression text, which gains
+// parens and ::casts and turns IN (…) into = ANY (ARRAY[…]) — which is what makes this
+// comparable across the two sides at all.
+//
+// ─── ⚠ WHAT THIS STILL DOES NOT COVER. A GREEN drift:check IS NOT "THE SCHEMA ──
+// ─────  MATCHES". Three changes pass both signatures untouched: ──────────────
+//
+//   1. AN OPERATOR CHANGE with the same columns and literals. `study_start_year >= 1950`
+//      narrowed to `> 1950` moves no literal and no column. So does flipping <= to <,
+//      or = to <>.
+//   2. A REORDERING. Both signatures are sorted sets, deliberately — that is what makes
+//      them stable against Postgres rewriting the expression — so any permutation of the
+//      same arms is invisible. For an AND/OR chain that is usually harmless; for a CASE
+//      or a short-circuit it need not be.
+//   3. A SWAP OF TWO COLUMNS THAT ARE BOTH ALREADY PRESENT. `(a IS NOT NULL AND b > 0)`
+//      becoming `(b IS NOT NULL AND a > 0)` has the same column set and the same
+//      literals.
+//
+// Catching those needs full expression normalisation against Postgres's own rewriting,
+// which is a much larger job and is NOT attempted here. Read this list before concluding
+// from a clean run that nothing has moved.
+//
+// Parity note: both sides match a column name anywhere in the definition, INCLUDING
+// inside a quoted literal — so a table with a column named `student` would see 'student'
+// in a value list count as a reference. Both sides do it identically, so it cannot
+// produce a false mismatch; it can only make a signature slightly coarser than it looks.
+function colSig(cols) {
+  return [...new Set((cols ?? []).map(c => String(c).toLowerCase()))].sort().join('|')
 }
 
 // Inline constraints written on a single column, from EITHER a CREATE TABLE column
@@ -267,6 +336,40 @@ const idxEvents = []                  // ordered {name, op:'add'|'drop'}
 const ensure = t => (repo[t] ??= {})
 
 const parsed = files.map(f => ({ f, sql: blank(readFileSync(resolve(ROOT, f), 'utf8')) }))
+
+// ─── CONSTRAINTS CREATED INSIDE A DO BLOCK ─────────────────────────────────
+//
+// blank() erases $$ … $$ bodies before anything is parsed — correct for statement
+// splitting, because a procedural body is not DDL and its semicolons are not statement
+// terminators. The cost is that DDL written INSIDE such a body disappears with it.
+//
+// That is not hypothetical. 20261007 and 20261008 create all 13 of their constraints as
+//     DO $$ BEGIN
+//       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'x') THEN
+//         ALTER TABLE public.ad_banners ADD CONSTRAINT x CHECK (…);
+//       END IF;
+//     END $$;
+// which is a perfectly ordinary idempotency idiom. The repo modelled those constraints as
+// NOT EXISTING, so all 13 sat permanently in F-live-only-constraint — reported as "the
+// database has something no migration creates" when a migration creates every one of
+// them. Found 2026-09-18 by diffing the audit against a full export of live CHECKs.
+//
+// So the raw text is scanned a second time for ALTER TABLE … ADD CONSTRAINT inside those
+// bodies. Only that one shape: an IF NOT EXISTS guard around a CREATE or a DROP has
+// different semantics and is deliberately not inferred from here.
+function constraintsInDoBlocks(sql) {
+  const found = []
+  const re = /\$\$([\s\S]*?)\$\$/g
+  let m
+  while ((m = re.exec(sql)) !== null) {
+    const body = m[1].replace(/--.*$/gm, '')
+    const inner = /\bALTER\s+TABLE\s+(?:public\.)?([\w"]+)\s+ADD\s+CONSTRAINT\s+([\w"]+)\s+([\s\S]*?);/gi
+    let a
+    while ((a = inner.exec(body)) !== null) found.push({ tbl: a[1], name: a[2], spec: a[3].trim() })
+  }
+  return found
+}
+
 
 // ── Phase 1: every CREATE TABLE, so a table always exists before it is altered.
 for (const { f, sql } of parsed) {
@@ -334,7 +437,10 @@ for (const { f, sql } of parsed) {
       }
       if (/^PRIMARY\s+KEY/i.test(tc.spec) && !tc.name) name = `${t}_pkey`
       taken.add(name)
-      conEvents.push({ name, op: 'add', body: tc.spec, from: f })
+      // tbl is recorded so the column signature can be derived at emission. The ALTER
+      // paths below always set it; these two CREATE TABLE paths did not, which left all
+      // 13 inline CHECK constraints with an empty signature and silently outside K2.
+      conEvents.push({ name, op: 'add', body: tc.spec, from: f, tbl: t })
     }
   }
 }
@@ -358,7 +464,7 @@ for (const { f, sql } of parsed) {
         for (const ic of inlineConstraintsFor(t, c, rest)) {
           const name = ic.name ?? (ic.kind === 'pkey' ? `${t}_pkey` : autoName(t, ic.cols, ic.kind, taken))
           taken.add(name)
-          conEvents.push({ name, op: 'add', body: ic.body, from: f })
+          conEvents.push({ name, op: 'add', body: ic.body, from: f, tbl: t })
         }
       } else if ((am = a.match(/^ALTER\s+(?:COLUMN\s+)?([\w"]+)\s+SET\s+NOT\s+NULL$/i))) {
         const c = ensure(t)[colName(am[1])]; if (c) c.notnull = true
@@ -413,6 +519,21 @@ for (const { f, sql } of parsed) {
     fileIdx.push({ at: mm.index, name: colName(mm[1]), op: 'drop', from: f })
   fileIdx.sort((a, b) => a.at - b.at)
   idxEvents.push(...fileIdx)
+
+  // ► DO-BLOCK CONSTRAINTS ARE EMITTED HERE, PER FILE, NOT APPENDED AT THE END.
+  //   The first version collected them across all files and pushed them after the whole
+  //   replay, reasoning that a name defined only inside a DO block has no competing event
+  //   so ordering could not matter. That reasoning was WRONG and the audit caught it on
+  //   the next run: 20261008 creates ad_banners_slot_check in a DO block, and 20261009
+  //   DROPS it at top level along with the slot column. settle() takes the last event per
+  //   name, so an end-appended add resurrected a constraint that had been deliberately
+  //   dropped, and the repo then expected a constraint prod was right not to have.
+  //
+  //   Emitting per file restores replay order across files, which is the ordering that
+  //   actually decides these cases.
+  for (const c of constraintsInDoBlocks(readFileSync(resolve(ROOT, f), 'utf8'))) {
+    conEvents.push({ name: c.name, op: 'add', body: c.spec, from: f, tbl: c.tbl })
+  }
 }
 
 // ─── DROP TABLE ─────────────────────────────────────────────────────────────
@@ -555,7 +676,16 @@ const colVals = Object.entries(repo).flatMap(([t, cols]) =>
   Object.entries(cols).map(([c, v]) =>
     `    (${q(t)}, ${q(c)}, ${v.notnull}, ${v.default == null ? 'NULL' : q(v.default)}, ${v.type == null ? 'NULL' : q(v.type)})`))
 
-const conVals = constraints.map(c => `    (${q(c.name)}, ${q(litSig(c.body ?? ''))})`)
+// The column set is derived HERE, from the settled body and the table's modelled columns,
+// rather than read off the event — conEvents records {name, op, body, from, tbl} and has
+// never carried a column list. The first version of this line read c.cols and emitted an
+// empty signature for all 264 constraints, which K2 then skipped as "both sides empty":
+// a new check that silently covered nothing. Caught by asking what the repo signature for
+// profiles_completion_requires_fields_check should contain, and finding it blank.
+const conVals = constraints.map(c => {
+  const known = new Set(Object.keys(repo[c.tbl] ?? {}))
+  return `    (${q(c.name)}, ${q(litSig(c.body ?? ''))}, ${q(colSig(colsInExpr(c.body ?? '', known)))})`
+})
 const idxVals = indexes.map(n => `    (${q(n)})`)
 
 const sql = `-- ─── Schema drift audit — READ ONLY, SINGLE RESULT SET ───────────────────────
@@ -587,7 +717,7 @@ const sql = `-- ─── Schema drift audit — READ ONLY, SINGLE RESULT SET �
 WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
 ${colVals.join(',\n')}
 ),
-expected_constraint (cname, litsig) AS (VALUES
+expected_constraint (cname, litsig, colsig) AS (VALUES
 ${conVals.join(',\n')}
 ),
 expected_index (iname) AS (VALUES
@@ -622,11 +752,27 @@ live_con AS (
          (SELECT coalesce(string_agg(x, '|' ORDER BY x COLLATE "C"), '')
             FROM (
               SELECT DISTINCT x FROM (
-                SELECT (regexp_matches(pg_get_constraintdef(k.oid), '''((?:[^'']|'''')*)''', 'g'))[1] AS x
+                -- Quoted numerics unwrapped FIRST, exactly as litSig() does it, so a negative
+              -- constant reads as a number on both sides instead of a string on one.
+              SELECT (regexp_matches(regexp_replace(pg_get_constraintdef(k.oid), '''(-?\\d+(\\.\\d+)?)''(::[a-z0-9_ ]+)?', '\\1', 'g'), '''((?:[^'']|'''')*)''', 'g'))[1] AS x
                 UNION ALL
-                SELECT (regexp_matches(pg_get_constraintdef(k.oid), '\\y(\\d+(?:\\.\\d+)?)\\y', 'g'))[1]
+                SELECT (regexp_matches(regexp_replace(pg_get_constraintdef(k.oid), '''(-?\\d+(\\.\\d+)?)''(::[a-z0-9_ ]+)?', '\\1', 'g'), '\\y(\\d+(?:\\.\\d+)?)\\y', 'g'))[1]
+                UNION ALL
+                SELECT (regexp_matches(regexp_replace(pg_get_constraintdef(k.oid), '''(-?\\d+(\\.\\d+)?)''(::[a-z0-9_ ]+)?', '\\1', 'g'), '[ (](-\\d+(\\.\\d+)?)\\y', 'g'))[1]
               ) u WHERE x IS NOT NULL
-            ) s) AS litsig
+            ) s) AS litsig,
+         -- Live COLUMN signature, computed the same way colSig() computes the repo side:
+         -- every column of THIS table whose name appears as a whole word anywhere in the
+         -- definition, distinct, sorted in byte order. The \\y is Postgres's word boundary,
+         -- matching the JS side's \\b, so region cannot match inside resident_status.
+         --
+         -- This is the half that would have caught the 2026-09-12 phone removal: the repo
+         -- signature carries phone, the live one does not, and the literal signatures
+         -- are identical either way. See the note above colSig() in the generator.
+         (SELECT coalesce(string_agg(DISTINCT a.attname, '|' ORDER BY a.attname COLLATE "C"), '')
+            FROM pg_attribute a
+           WHERE a.attrelid = k.conrelid AND a.attnum > 0 AND NOT a.attisdropped
+             AND pg_get_constraintdef(k.oid) ~ ('\\y' || a.attname || '\\y')) AS colsig
   FROM pg_constraint k JOIN pg_class t ON t.oid = k.conrelid
   WHERE k.connamespace = 'public'::regnamespace AND t.relkind = 'r'
 )
@@ -687,9 +833,26 @@ SELECT * FROM (
   UNION ALL
   -- K. names match, BODIES differ. This is the events_description_check 500-to-2500
   --    class — invisible to a name-only comparison, which is exactly why it exists.
+  -- Reported separately from the literal mismatch so the row SAYS WHICH SIGNATURE MOVED.
+  -- "the value set changed" and "an arm was added or removed" are different bugs with
+  -- different causes, and a single K row that could mean either sends the reader to diff
+  -- the whole definition by eye.
   SELECT 'K-constraint-body', l.tbl, l.cname, left(l.cdef, 110), 'repo literals: ' || e.litsig
   FROM live_con l JOIN expected_constraint e ON e.cname = l.cname
   WHERE e.litsig <> '' AND l.litsig <> '' AND e.litsig <> l.litsig
+
+  UNION ALL
+  -- K2. Same name, same literals, DIFFERENT SET OF COLUMNS — an arm added or removed, or
+  -- a test moved to another column. Invisible to the literal signature by construction:
+  -- removing the phone IS NOT NULL arm removes no string and no number. This is the
+  -- section that would have caught the hand-edit of 2026-09-12 on the first run after it.
+  --
+  -- Both sides may legitimately be empty (a constraint naming no column of its own table),
+  -- so an empty signature on either side is skipped rather than reported as a difference.
+  SELECT 'K2-constraint-columns', l.tbl, l.cname,
+         'live cols: ' || l.colsig, 'repo cols: ' || e.colsig
+  FROM live_con l JOIN expected_constraint e ON e.cname = l.cname
+  WHERE e.colsig <> '' AND l.colsig <> '' AND e.colsig <> l.colsig
 
   UNION ALL
   -- G. index the repo creates, database lacks

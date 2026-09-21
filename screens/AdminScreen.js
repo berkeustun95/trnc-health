@@ -488,9 +488,40 @@ function DashboardTab({ onNavigate }) {
 // publish a 24h removal commitment in the Terms).
 
 const REASON_LABELS  = { offensive: 'Offensive', harassment: 'Harassment', spam: 'Spam', false_info: 'False info', other: 'Other' }
-const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places' }
-const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by' }
-const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name' }
+// 'profile' (20261026) is READ here but never WRITTEN: profiles has no hidden_at, and
+// what "hidden" should mean for a person is a decision that has not been made. Its row
+// is fetched so the report renders as itself; every write action is suppressed below.
+// Without the fetch branch a profile report falls to `missing` and renders "Content no
+// longer exists — the author likely deleted their account", which is a lie that an admin
+// would act on by dismissing a real report.
+// 'message' (20261029) is a NORMAL type here: messages has hidden_at and hidden_reason,
+// so Remove/Restore/Ban all work and it must NOT join READ_ONLY_REPORT_TYPES.
+//
+// ► ADMIN ACCESS TO A MESSAGE IS SCOPED TO THE REPORT, not granted by is_admin(). The RLS
+//   policy requires a content_reports row of type 'message' pointing at that exact id — an
+//   admin can read the reported message and NOTHING ELSE in anybody's inbox, not the
+//   thread around it and not the conversation metadata. Every action below runs off a
+//   pending report, so the policy is satisfied; if a report row were deleted mid-action,
+//   updateOrAlert's "0 rows changed — most likely an RLS policy" branch is what fires.
+const CONTENT_TABLE  = { review: 'reviews', question: 'questions', answer: 'answers', facility: 'facilities', place: 'places', profile: 'profiles', message: 'messages' }
+// messages.sender_id is ON DELETE SET NULL, so a reported message whose author deleted
+// their account has NO author to ban. confirmBan already refuses on a null authorId.
+const AUTHOR_COL     = { review: 'customer_id', question: 'customer_id', answer: 'provider_id', facility: 'provider_id', place: 'submitted_by', profile: 'id', message: 'sender_id' }
+// Types whose author column the client may NOT read, so it comes from admin_content_author()
+// instead. reviews.customer_id is revoked by 20261033: it is the only person-uuid on a
+// truly public table, and once the Student Hub is live get_student_list() turns it into a
+// name — attributing an anonymous review of a clinic or a psychiatric hospital to somebody.
+// The column is still in AUTHOR_COL above because that is the key the resolved uuid is
+// written back under, and confirmBan reads it there.
+const AUTHOR_VIA_RPC = new Set(['review'])
+const TEXT_COL       = { review: 'comment', question: 'body', answer: 'body', facility: 'name', place: 'name', profile: 'display_name', message: 'body' }
+// Columns only SOME tables have. messages carries deleted_at — the sender withdrew it —
+// and an admin who could not see that would judge a message the participants can no longer
+// see, without knowing it. Selecting it unconditionally would 42703 every other type and
+// empty the whole queue, which is the trap the profile branch below already documents.
+const EXTRA_COLS     = { message: ['deleted_at'] }
+// Types whose remedy is not built. Read-only in triage: Dismiss is the only action.
+const READ_ONLY_REPORT_TYPES = ['profile']
 
 // PlacesTab reviews THREE sources (beaches/landmarks frozen + the new places table). The
 // WRITE path (approve/reject/delete) MUST switch on _type to the right table — a `place`
@@ -537,14 +568,59 @@ function ReportsTab({ session }) {
     // type. It may be missing entirely — delete_own_account hard-deletes a user's
     // reviews, which leaves their reports dangling.
     const contentByKey = new Map()
-    for (const type of ['review', 'question', 'answer', 'facility', 'place']) {
+    // ► THIS LIST IS SEPARATE FROM CONTENT_TABLE AND BOTH MUST BE EDITED. A type added to
+    //   the maps but not here is silently never fetched: `g.content` stays null and the
+    //   card renders "Content no longer exists — the author likely deleted their account",
+    //   which is a lie an admin would act on by dismissing a real report.
+    for (const type of ['review', 'question', 'answer', 'facility', 'place', 'profile', 'message']) {
       const ids = [...new Set(reports.filter(r => r.content_type === type).map(r => r.content_id))]
       if (!ids.length) continue
+      // profiles has no hidden_at/hidden_reason — selecting them would 42703 the whole
+      // read and empty the queue of every type, not just this one.
+      // Deduped: for 'profile' both TEXT_COL and AUTHOR_COL resolve to columns that
+      // overlap with `id`, and PostgREST is given the same name twice.
+      // ► AUTHOR_COL IS OMITTED FOR THE TYPES IN AUTHOR_VIA_RPC, AND THAT IS LOAD-BEARING.
+      //   20261033 revokes SELECT on reviews.customer_id. PostgREST fails the WHOLE select
+      //   with 42501 if ONE named column is unreadable — so leaving it in here would empty
+      //   contentByKey of every review row and render exactly the lie the note above warns
+      //   about, on real reports, with Dismiss as the obvious action.
+      const viaRpc = AUTHOR_VIA_RPC.has(type)
+      const cols = [...new Set([
+        'id', TEXT_COL[type],
+        ...(viaRpc ? [] : [AUTHOR_COL[type]]),
+        ...(READ_ONLY_REPORT_TYPES.includes(type)
+          ? []
+          : ['hidden_at', 'hidden_reason', ...(EXTRA_COLS[type] ?? [])]),
+      ])].join(', ')
       const { data } = await supabase
         .from(CONTENT_TABLE[type])
-        .select(`id, ${TEXT_COL[type]}, ${AUTHOR_COL[type]}, hidden_at, hidden_reason`)
+        .select(cols)
         .in('id', ids)
       for (const row of data ?? []) contentByKey.set(`${type}:${row.id}`, row)
+
+      // ─── The author, fetched separately, RPC first and column second ────────
+      // Works on BOTH sides of 20261033: before it the function is absent (404) and the
+      // column readable, after it the reverse. One always works — the same shape as
+      // loadBlocks() in ProfileScreen. Without this, confirmBan has no author and refuses
+      // with "This content no longer exists", which is the same lie by another route.
+      if (viaRpc) {
+        const col = AUTHOR_COL[type]
+        const got = await Promise.all(ids.map(id =>
+          supabase.rpc('admin_content_author', { p_content_type: type, p_content_id: id })))
+        if (got.every(r => !r.error)) {
+          ids.forEach((id, i) => {
+            const row = contentByKey.get(`${type}:${id}`)
+            if (row) row[col] = got[i].data ?? null
+          })
+        } else {
+          const { data: authors } = await supabase
+            .from(CONTENT_TABLE[type]).select(`id, ${col}`).in('id', ids)
+          for (const a of authors ?? []) {
+            const row = contentByKey.get(`${type}:${a.id}`)
+            if (row) row[col] = a[col]
+          }
+        }
+      }
     }
 
     const byKey = new Map()
@@ -649,9 +725,13 @@ function ReportsTab({ session }) {
     await notifyAuthor(
       g,
       'Posting suspended',
+      // "post reviews or questions" was the whole story until messaging shipped. A UGC ban
+      // writes profiles.ugc_banned_until, and is_listed_student() — which start_conversation
+      // and send_message both gate on — excludes a banned account. So a ban silently stops
+      // their messaging too, and this notice has to say so or it understates what was done.
       days
-        ? `Your ${g.contentType} was removed and you cannot post reviews or questions for ${days} days.`
-        : `Your ${g.contentType} was removed and you can no longer post reviews or questions.`,
+        ? `Your ${g.contentType} was removed and you cannot post or send messages for ${days} days.`
+        : `Your ${g.contentType} was removed and you can no longer post or send messages.`,
     )
     setBusy(null); load()
   }
@@ -683,7 +763,14 @@ function ReportsTab({ session }) {
         const missing     = !g.content
         const hidden      = !!g.content?.hidden_at
         const autoHidden  = g.content?.hidden_reason === 'auto_reports'
+        // Only messages can be withdrawn by their author (sender-only soft delete). The
+        // row and the text survive precisely so a report still has something to point at,
+        // but neither participant can see it any more — and an admin judging it needs to
+        // know that, both to read the exchange correctly and because Remove on something
+        // already invisible to both people achieves nothing.
+        const withdrawn   = !!g.content?.deleted_at
         const text        = g.content?.[TEXT_COL[g.contentType]]
+        const readOnly    = READ_ONLY_REPORT_TYPES.includes(g.contentType)
         const reasonCount = g.reports.reduce((acc, r) => ({ ...acc, [r.reason]: (acc[r.reason] ?? 0) + 1 }), {})
         const isBusy      = busy === g.key
 
@@ -700,6 +787,11 @@ function ReportsTab({ session }) {
                   </Text>
                 </View>
               )}
+              {withdrawn && (
+                <View style={s.reportBadge}>
+                  <Text style={s.reportBadgeText}>WITHDRAWN BY SENDER</Text>
+                </View>
+              )}
               <View style={{ flex: 1 }} />
               <Text style={s.cardSub}>{timeAgo(oldest.created_at)}</Text>
             </View>
@@ -707,6 +799,15 @@ function ReportsTab({ session }) {
             {missing
               ? <Text style={s.reportMissing}>Content no longer exists — the author likely deleted their account. Dismiss to clear.</Text>
               : <Text style={s.reportBody}>{text || <Text style={s.reportMissing}>(rating only, no text)</Text>}</Text>}
+
+            {readOnly && !missing && (
+              <Text style={s.reportMissing}>
+                Reported display name. No action is available here yet — profiles have no
+                hidden state. Act on the user directly (clear the display name to force a
+                new one, or set a UGC ban, which also removes them from every student
+                list), then Dismiss.
+              </Text>
+            )}
 
             <Text style={s.reportMeta}>
               {g.reports.length} report{g.reports.length !== 1 ? 's' : ''} ·{' '}
@@ -722,7 +823,7 @@ function ReportsTab({ session }) {
                 <ActivityIndicator color={colors.primary} style={{ paddingVertical: 7 }} />
               ) : (
                 <>
-                  {!missing && (hidden
+                  {!missing && !readOnly && (hidden
                     ? <TouchableOpacity style={s.ghostBtn} onPress={() => restoreContent(g)}>
                         <Text style={s.ghostBtnText}>Restore</Text>
                       </TouchableOpacity>
@@ -730,7 +831,7 @@ function ReportsTab({ session }) {
                         <Text style={s.dangerGhostText}>Remove</Text>
                       </TouchableOpacity>
                   )}
-                  {!missing && g.contentType !== 'facility' && g.contentType !== 'place' && (
+                  {!missing && !readOnly && g.contentType !== 'facility' && g.contentType !== 'place' && (
                     <TouchableOpacity style={s.dangerGhostBtn} onPress={() => confirmBan(g)}>
                       <Text style={s.dangerGhostText}>Ban author</Text>
                     </TouchableOpacity>
@@ -4305,7 +4406,7 @@ function ModerationTab() {
   )
 }
 
-export default function AdminScreen({ session, lang, onShowExplore }) {
+export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub }) {
   const [tab, setTab] = useState('Dashboard')
   const navigateTo = t => setTab(t)
 
@@ -4329,6 +4430,15 @@ export default function AdminScreen({ session, lang, onShowExplore }) {
           <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowExplore} activeOpacity={0.85}>
             <Ionicons name="map-outline" size={16} color={colors.primary} />
             <Text style={s.explorePreviewText}>Open Explore (preview)</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Same reason as Explore above: admins never reach the customer module chain, so
+            the dark Student Hub (MODULE_FLAGS.studentHub) is previewed from here. */}
+        {onShowStudentHub && (
+          <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowStudentHub} activeOpacity={0.85}>
+            <Ionicons name="school-outline" size={16} color={colors.primary} />
+            <Text style={s.explorePreviewText}>Open Student Hub (preview)</Text>
           </TouchableOpacity>
         )}
 

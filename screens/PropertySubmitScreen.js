@@ -135,9 +135,15 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
     const asset = result.assets[0]
     setUploading(true)
     try {
-      const propId = isEdit ? editProp.id : `tmp-${session.user.id}-${Date.now()}`
+      // ─── THE UID IS SEGMENT [1], AND THAT IS WHAT MAKES THE POLICY EXPRESSIBLE ──
+      // 20261039 pins (storage.foldername(name))[1] = auth.uid() on property-images.
+      // The old path was `{propId}/{ts}.{ext}`, which carries no uid at all on an edit
+      // and buries it inside a `tmp-{uid}-{ts}` STRING on a create — a substring, not a
+      // segment, so foldername() cannot see it. Hence {uid}/{propId}/…, the same shape
+      // estate-agent-documents already uses.
+      const propId = isEdit ? editProp.id : `tmp-${Date.now()}`
       const ext    = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
-      const path   = `${propId}/${Date.now()}.${ext}`
+      const path   = `${session.user.id}/${propId}/${Date.now()}.${ext}`
       const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
       const { error: upErr } = await supabase.storage
         .from('property-images')

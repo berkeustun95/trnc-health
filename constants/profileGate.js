@@ -19,6 +19,18 @@ export const MIN_SIGNUP_AGE = 13
 // Oldest plausible account holder. Only used to bound the year dropdown.
 export const MAX_SIGNUP_AGE = 100
 
+// Majority, for the messaging age rule: an adult may not INITIATE a conversation with an
+// under-18. Minor→minor, minor→adult and adult→adult are all fine; only adult→minor is
+// refused, and it is refused server-side in may_initiate_by_age() because a client-side
+// age check is a client-side age check.
+//
+// NEVER INLINE THIS EITHER. Exactly twice, same contract as MIN_SIGNUP_AGE: here, and as
+// `interval '18 years'` in may_initiate_by_age() (20261029). It cannot be a CHECK
+// constraint — CURRENT_DATE is STABLE and a CHECK needs IMMUTABLE — so a function is the
+// only home it has. `npm run profile:check` fails if the two halves disagree, and the
+// migration's own DO block fails if a SECOND function in the schema grows a copy.
+export const ADULT_AGE = 18
+
 // ─── SCHEMA VERSION ──────────────────────────────────────────────────────────
 // The gate fires when profiles.profile_schema_version < this. The column DEFAULTs to 0
 // in the database, so every existing row and every new signup is gated until the wizard
@@ -89,6 +101,53 @@ export const INSTITUTION_REQUIRED_LEVELS = ['university', 'postgraduate']
 
 export const DISPLAY_PREFERENCES = ['display_name', 'full_name']
 
+// ─── student_education's disclosable columns (20261026) ─────────────────────
+//
+// THIS EXISTS TO STOP A GUARD GOING GREEN BECAUSE THE DATA MOVED.
+// check-privacy-parity derives what must be disclosed from App.js PROFILE_COLUMNS. When
+// 20261027 drops institution_id / study_start_year / study_end_year / subject_id /
+// student_listing_opt_in from profiles, they leave that list — and the disclosure rules
+// for them stop being exercised, while the obligation is completely unchanged, because
+// the app still collects every one of these facts. The guard would certify its own blind
+// spot, which is worse than having no guard.
+//
+// So the guard reads BOTH lists. Keep this in step with the table: a column added here
+// fails the guard until it is disclosed in all four privacy copies or exempted with a
+// reason, which is the review moment a hardcoded list never creates.
+//
+// `level` is here because it is the SAME FACT as profiles.student_level — recorded once
+// per enrolment rather than once per person — and that fact is already disclosed as
+// "study level" in all four copies. An earlier draft left it out on the reasoning that a
+// "university details" sentence covered it; no copy says that, and reasoning a column off
+// the list is how a derived guard turns back into a remembered one.
+export const EDUCATION_COLUMNS = [
+  'institution_id', 'level', 'subject_id', 'study_start_year', 'study_end_year', 'listing_opt_in',
+]
+
+// ─── AFFILIATION PATCH (20261024) — REMOVED 2026-09-19, and not coming back ──
+//
+// affiliationPatch() existed because five profiles columns were coupled by four CHECKs,
+// so a patch honouring three of them failed on the fourth with a 23514 on a live screen.
+// It was the single writer for two slices, and both of its callers are gone:
+// ProfileScreen and ProfileSetupScreen now write enrolments to student_education, and
+// 20261027 drops the columns it existed to keep consistent.
+//
+// Deliberately deleted rather than left unused. A helper whose whole job is to write
+// dropped columns is a loaded gun for the next person who greps for "how do I set the
+// institution" — and it would 42703 the moment they called it. The coupling rules it
+// encoded live on in the claim-then-clear-then-retry branch in both screens, which is the
+// only code that may name those columns at all and can only run while they exist.
+//
+// student_level is NOT one of the five and is still written by both screens directly.
+
+// Mirrors the static bound on both year CHECKs in 20261024. The upper bound a picker
+// offers is NOT 2100: it is the current UTC year (studyYearCeiling in utils/studyFields.js),
+// because check_profile_study_years() rejects a future end year.
+export const STUDY_YEAR_MIN = 1950
+
+// Raised by check_profile_study_years() as P0001, not 23514 — matched on the message.
+export const STUDY_END_YEAR_IN_FUTURE = 'STUDY_END_YEAR_IN_FUTURE'
+
 // i18n keys for the two single-select groups. They live HERE, not inside the wizard,
 // for the same reason REGION_LABEL_KEY lives in constants/regions.js:
 // scripts/validate-i18n-coverage.mjs finds keys by scanning surface files for a LITERAL
@@ -116,7 +175,9 @@ export const RESIDENT_STATUS_LABEL_KEY = {
 // gone from all nine locales; the surviving titles are the ones that still describe a
 // screen. Renumbering the keys would rewrite nine locales to say the same words under a
 // different name.
-export const STEP_TITLE_KEY = { 1: 'pgTitle1', 2: 'pgTitle3' }
+// Steps 3 and 4 are the OPTIONAL study steps (Slice 2), reached only after step 2 has
+// written profile_completed_at.
+export const STEP_TITLE_KEY = { 1: 'pgTitle1', 2: 'pgTitle3', 3: 'pgTitleSubject', 4: 'pgTitleStudyYears' }
 
 export const HELP_ROW_LABEL_KEY = {
   numbers:   'pgHelpNumbers',

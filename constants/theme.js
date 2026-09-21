@@ -118,6 +118,74 @@ export const spacing = {
   xl: 40,
 }
 
+// ─── ellipsizeSlack ─────────────────────────────────────────────────────────
+//
+// React Native ellipsizes a single-line <Text> whose string fits its box EXACTLY. Not
+// "nearly" — exactly, to the decimal. Spread this into any `numberOfLines` label that hugs
+// its own measured width, and the string draws in full.
+//
+//     chipText: { ...ellipsizeSlack, fontSize: 13, fontFamily: 'Inter_400Regular' },
+//
+// ─── THE MEASUREMENT, WHICH IS THE WHOLE JUSTIFICATION ─────────────────────
+//
+// Measured on device 2026-09-20 with the `needs` probe in utils/devTextAudit.js, which
+// renders the same text in the same resolved style with nothing constraining it. Five
+// clipped labels, all at fontScale 1:
+//
+//     string        box     needs   glyphs     (all three: the engine's own numbers)
+//     Diğer         33.8    33.8    33.8
+//     Spor          29.5    29.5    29.5
+//     Aile          23.8    23.8    23.8
+//     Gece Hayatı   76.4    76.4    76.4
+//     Bu hafta      51.6    51.6    51.6
+//
+// `box` is the width the Text was laid out at, `needs` the same Text measured
+// unconstrained, `glyphs` the full string's own width. THE MEASURE PASS AND THE DRAW PASS
+// AGREE TO THE DECIMAL, the string fits its box exactly, and it is ellipsized regardless.
+// That pins the fault to the COMPARISON — not to either measurement — so any slack at all
+// is the fix, and it does not have to scale with the string. The 16-glyph
+// t('stripStartingSoon') takes the same 2dp as the 4-glyph t('catSports') — though that
+// tag is INFERRED from the same signature, not one of the five measured. See LiveStrip.
+//
+// ► THE EXACT COMPARISON BUG IS NOT MEASURED AND IS NOT CLAIMED. A `>=` where `>` was
+//   meant, or a fraction dropped in a cast, would both produce this; nothing here
+//   distinguishes them, and naming one would be a mechanism invented to explain a number
+//   rather than read off it. What is measured is that equality cuts, and that slack cures.
+//
+// ► 2dp BECAUSE 2dp IS WHAT WAS TESTED ON DEVICE, twice, before this token existed
+//   (38289d0 on HomeHero's district, ab2c6bf on BackButton's label). 1dp would very
+//   probably do — the bug needs any slack, and 1dp is 3 physical pixels at density 3 —
+//   but it has not been tried, and shrinking a value that is known to work in order to
+//   save a point of padding is not a trade worth making.
+//
+// ► THREE HYPOTHESES DIED HERE. Recorded because each was reasonable, each cost time, and
+//   each will look reasonable again to the next person:
+//     * PIXEL-GRID ROUNDING (08d198f, via PixelGrid.cpp:85's force-ceil). Killed by scale:
+//       the grid quantum is 0.36dp and the apparent gaps ran to 3.14dp. Killed again by
+//       `needs == box`, which leaves no fraction anywhere to round.
+//     * A FONT SWAP AT DRAW TIME — fallback, synthetic weight, or EventsScreen's active
+//       chip switching Inter_400Regular to Inter_700Bold. Killed by measuring the painted
+//       strings against both weights: |drew − Regular| was 0.08–0.66dp, |drew − Bold|
+//       1.63–2.81dp. The draw font is exactly what the style names, and every clipped chip
+//       was inactive.
+//     * letterSpacing / fontVariant ADDING TRACKING AFTER MEASUREMENT. Killed by sweep:
+//       none of the four components carries either on these styles. EventsScreen's
+//       `letterSpacing: 0.6` is on `catLabel`, a card label, not on `chipText`.
+//
+// ► AND ONE CORRECTION THAT MATTERS MORE THAN THE THREE DEAD ONES, because it was an
+//   instrument error and it nearly became a fourth hypothesis. Before the probe existed,
+//   these clips were investigated by summing glyph advances out of the real .ttf files and
+//   comparing that total to the laid-out box. Every instance came back with the box ALREADY
+//   WIDER than the advances — +0.40 to +3.14dp — truncating anyway, which looked like a
+//   deep contradiction and was reported as one.
+//   It was not. The engine's own width for those same strings is EXACTLY the box, so that
+//   entire spread was the gap between ANDROID'S TEXT MEASUREMENT AND A BARE ADVANCE SUM,
+//   never slack in the layout. Two measurement systems, subtracted from each other as
+//   though they were one — the standing hazard in CLAUDE.md, arrived at from a new
+//   direction. Do not rebuild that table: compare the engine to the engine, which is what
+//   `needs` is for.
+export const ellipsizeSlack = { paddingRight: 2 }
+
 export const fontSize = {
   sm: 13,
   md: 16,

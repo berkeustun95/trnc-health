@@ -15,7 +15,7 @@ import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
-import { colors, shadow } from '../constants/theme'
+import { colors, shadow, ellipsizeSlack } from '../constants/theme'
 import { t, tCity, LANG_CODES } from '../constants/i18n'
 import { resolveRegion } from '../utils/resolveRegion'
 import { openTicketUrl } from '../utils/events'
@@ -785,7 +785,12 @@ const s = StyleSheet.create({
                         backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipWithIcon:       { flexDirection: 'row', alignItems: 'center', gap: 5 },
   chipActive:         { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText:           { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  // ...ellipsizeSlack: RN cuts a single-line Text whose string fits its box exactly, and
+  // five of these chips did — catSports, catFamily, catOther, catNightlife, dateThisWeek,
+  // all measured needs == box to the decimal. constants/theme.js carries the measurement.
+  // One edit covers all five: every chip renders [s.chipText, active && s.chipTextActive],
+  // so chipText is always applied, and chipTextActive sets no padding to override it.
+  chipText:           { ...ellipsizeSlack, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   chipTextActive:     { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   // Date picker sheet (iOS) — mirrors the OrganizerScreen picker.

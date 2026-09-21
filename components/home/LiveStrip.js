@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, shadow } from '../../constants/theme'
+import { colors, shadow, ellipsizeSlack } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { Skeleton } from '../Skeleton'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../utils/dutyStatus'
@@ -25,6 +25,30 @@ const STRIP_EVENTS_IMAGE = require('../../assets/backgrounds/ada-bg-events.png')
 //   screen — so it is on-brand, correctly licensed, and actually depicts a pharmacy.
 //   Swapping it is this one line and nothing else.
 const STRIP_DUTY_IMAGE = require('../../assets/backgrounds/ada-bg-duty-pharmacy.png')
+
+// ─── A NOTICE'S FALLBACK IMAGE FOLLOWS ITS ROUTE ────────────────────────────
+//
+// A notice with no image_url used to fall back to the EVENTS photograph while routing to
+// accommodation — a card showing a concert and opening a housing list. The fallback is
+// keyed on the route instead, so the picture and the destination agree.
+//
+// Already in the bundle and already the accommodation screen's own background
+// (components/PageBackground.js), so this adds no asset and nothing to upload — and it
+// reuses the image a user will see again the moment they tap through, which is a
+// continuity the events photo could not give.
+//
+// ⚠ ANY ROUTE NOT LISTED FALLS BACK TO THE EVENTS IMAGE, deliberately. The route
+//   vocabulary is 18 values and this map has one: an unmapped route gets a neutral
+//   photograph rather than no card, and the missing entry is a visual mismatch somebody
+//   notices rather than a crash. Add a route here when a notice is actually pointed at
+//   it, not in advance.
+//
+// ⚠ THE SOURCE IS A PORTRAIT PAGE BACKGROUND (704x1520) IN A LANDSCAPE CARD. resizeMode
+//   is 'cover', so it centre-crops hard — roughly the middle fifth of the image is what
+//   shows at 176x120. That is a judgement to make on device, not from the file.
+const NOTICE_FALLBACK = {
+  accommodation: require('../../assets/backgrounds/ada-bg-accommodation.png'),
+}
 
 // Bugün ADA'da — two photo cards, side by side.
 //
@@ -56,7 +80,7 @@ const STRIP_DUTY_IMAGE = require('../../assets/backgrounds/ada-bg-duty-pharmacy.
 // bundle. There is no branch here that renders fewer than two cards, and no data state —
 // offline, RLS-blocked, empty database, unapplied migration — that can produce one.
 
-function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress, innerRef }) {
+function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress, onDismiss, innerRef }) {
   return (
     <TouchableOpacity
       ref={innerRef}
@@ -91,6 +115,27 @@ function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress,
         </View>
       )}
 
+      {/* ─── DISMISS — ONLY EVER ON A NOTICE ──────────────────────────────────
+          It shares the top-right corner with `tag`, and they can never collide: a tag is
+          rendered for `sponsored` or `soon`, and a notice is neither — sponsored is false
+          by database constraint (20261043 forbids sponsor_name on a notice) and `soon`
+          belongs to the event ranks. Nothing else passes onDismiss.
+
+          A SIBLING of the card's TouchableOpacity, not a child of its content, so the tap
+          does not fall through to the card's own onPress and open accommodation on the
+          way out. hitSlop because the glyph is 14pt in a 24pt box — well under the 44pt
+          minimum on its own. */}
+      {!!onDismiss && (
+        <TouchableOpacity
+          style={s.dismiss}
+          onPress={onDismiss}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+        >
+          <Ionicons name="close" size={14} color={colors.textPrimary} />
+        </TouchableOpacity>
+      )}
+
       {/* A solid band, not a gradient: expo-linear-gradient is not installed and this repo
           does not add a package for a visual effect. Solid is also strictly better here —
           its contrast is a constant rather than a function of which photograph loaded.
@@ -123,7 +168,7 @@ function StripSkeleton() {
 }
 
 export default function LiveStrip({
-  item, loading, lang, dutyStatus = DUTY_FRESH, onPressEvent, onPressDuty, dutyRef,
+  item, loading, lang, dutyStatus = DUTY_FRESH, onPressEvent, onPressDuty, onDismiss, dutyRef,
 }) {
   // Recorded when SHOWN, not when resolved — a mount abandoned mid-flight resolves
   // something nobody saw, and the promo rule is about what appeared. The LEFT card only:
@@ -149,13 +194,17 @@ export default function LiveStrip({
   return (
     <View style={s.row}>
       <StripCard
-        image={STRIP_EVENTS_IMAGE}
+        // Only a notice consults the route map; every other kind keeps the events image
+        // exactly as before, and a notice WITH an image_url never reaches it either —
+        // imageUrl wins inside StripCard.
+        image={(item?.kind === 'notice' && NOTICE_FALLBACK[item?.action?.route]) || STRIP_EVENTS_IMAGE}
         imageUrl={item?.imageUrl}
         icon={item?.icon || 'calendar-outline'}
         title={evTitle}
         tag={item?.sponsored ? t('stripSponsored', lang) : item?.soon ? t('stripStartingSoon', lang) : null}
         tagTone={item?.sponsored ? 'sponsored' : 'soon'}
         onPress={() => onPressEvent?.(item)}
+        onDismiss={item?.kind === 'notice' && onDismiss ? () => onDismiss(item) : undefined}
       />
       {/* ─── THE DUTY CARD IS UNCONDITIONAL ──────────────────────────────────
           It is not resolved, not ranked and cannot be outranked — a stronger guarantee
@@ -192,6 +241,9 @@ const s = StyleSheet.create({
   cardAlert:     { borderWidth: 1, borderColor: colors.danger },
   photo:         { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   photoAlert:    { backgroundColor: colors.dangerLight },
+  dismiss:       { position: 'absolute', top: 8, right: 8, width: 24, height: 24, borderRadius: 12,
+                   backgroundColor: 'rgba(255,255,255,0.94)', justifyContent: 'center', alignItems: 'center',
+                   zIndex: 2 },
   badge:         { position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: 14,
                    backgroundColor: 'rgba(255,255,255,0.94)', justifyContent: 'center', alignItems: 'center' },
   // White glyph on colors.danger is 4.36:1 — clear of the 3:1 floor that applies to a UI
@@ -204,7 +256,18 @@ const s = StyleSheet.create({
   // grid tiles — and an event starting in four hours is not that. White on #0E7C7B is
   // 5.01:1.
   tagSoon:       { backgroundColor: colors.primary },
-  tagText:       { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  // ...ellipsizeSlack — see constants/theme.js for the measurement.
+  //
+  // ► THIS ONE IS INFERRED, NOT MEASURED, and it is the only one of the eight that is.
+  //   The five labels with `needs == box` on the probe are all EventsScreen chips. This tag
+  //   has the same signature from the older report (box 83.6, painted 82.0) and the same
+  //   shape — a single-line label hugging its own width — so it gets the same token, but it
+  //   has not been through the probe.
+  //   If it still clips after that, it is the FIRST `needs > box` case and a different bug:
+  //   the constraint would be `tag`'s maxWidth:'84%' above squeezing the Text from outside,
+  //   which no amount of slack on the Text can fix. The audit's verdict line says which.
+  //   At 16 glyphs it also tests the claim that the fix does not scale with length.
+  tagText:       { ...ellipsizeSlack, fontSize: 10, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   band:          { position: 'absolute', left: 0, right: 0, bottom: 0, height: STRIP_BAND_H,
                    backgroundColor: 'rgba(0,0,0,0.78)', flexDirection: 'row', alignItems: 'center',
                    paddingHorizontal: 12, gap: 8 },

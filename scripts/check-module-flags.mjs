@@ -40,7 +40,16 @@ const EXPECTED_MODULES = {
   events:        true,   // live
   jobs:          false,
   accommodation: true,   // live 2026-08-24 — Novest partner feed, 88 listings
-  studentHub:    false,
+  // ⚠ BEFORE YOU CHANGE THIS LINE — a decision, not a reminder.
+  //   10 accounts accepted terms_version '2026-09', a privacy policy promising their
+  //   data is never visible to other users. Flipping studentHub is the act that makes
+  //   that false FOR THEM, not only for people who sign up afterwards; the published
+  //   policy is 2026-09-20 and says the opposite. Nobody has been re-asked.
+  //     SELECT id, terms_accepted_at FROM profiles
+  //      WHERE terms_version IS DISTINCT FROM '2026-09-20';
+  //   It sits here rather than only in the SOP because this line is the one you cannot
+  //   flip the module without editing. Full note: step 6 of the go-live SOP in CLAUDE.md.
+  studentHub:    true,
   explore:       true,   // live 2026-08-26 — Explore module + map tab
   towing:        true,   // live
   checkins:      false,
@@ -109,6 +118,30 @@ const WAITLIST_BLAST_DONE = new Set([
   //   blast has actually run. Two commits, one truthful git record at every point, and
   //   nothing blocked. Do not go back to writing a date before sending one.
   'explore',
+  // ─── studentHub ───────────────────────────────────────────────────────────
+  // 6 notified 2026-09-20, on the day of launch and none late. Read BEFORE the blast,
+  // which is the only order in which the number means anything:
+  //
+  //     select module, count(*) filter (where notified_at is not null) as notified,
+  //            count(*) as total
+  //     from module_waitlist where module = 'studentHub';     -- 0 of 6
+  //     select notify_module_waitlist('studentHub');          -- 6
+  //
+  //   The pre-read is not ceremony. A BURNT list and an EMPTY list are the same number
+  //   coming out of the blast: notify_module_waitlist stamps notified_at as it goes, so
+  //   a list consumed by anything other than a launch returns 0 and reads as "nobody
+  //   ever signed up". 0 of 6 beforehand is what makes the 6 afterwards evidence of
+  //   delivery rather than of an empty table. That check is now step 10 of the SOP.
+  //
+  //   Sent after the OTA was verified on device across two launch cycles, and after both
+  //   window-only tests — the stale-affiliation recovery path and the message deep link,
+  //   warm and cold — which stop being testable once 20261027 lands.
+  //
+  //   Still an ACKNOWLEDGEMENT rather than proof of delivery: this guard runs offline and
+  //   cannot see exp.host. supabase/audit_module_waitlist_owed.sql is the half that
+  //   checks reality, and pets is why — four people sat un-notified for sixteen days
+  //   with every check in this repo green.
+  'studentHub',
 ])
 
 const EXPECTED_SCALARS = {

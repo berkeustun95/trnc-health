@@ -14,6 +14,21 @@ function timeAgo(isoString) {
   return `${Math.floor(hrs / 24)}d`
 }
 
+// ⚠ THE ROWS ARE NOT TAPPABLE, AND NOTHING HERE NAVIGATES ANYWHERE.
+//
+// Recorded 2026-09-19 because it is easy to assume otherwise: every row is rendered by a
+// plain View, and the only touchables on this screen are back, mark-all-read and clear-all.
+// `notifications` rows carry a title and a body and nothing to route on — no type, no
+// target id — so even a tap handler would have nowhere to send anybody.
+//
+// The PUSH path does route, as of 20261031: its payload carries
+// { screen: 'conversation', conversation_id } and App.js's two notification handlers act
+// on it. This in-app list is a separate path and did not gain that. So a message
+// notification is actionable from the lock screen and inert from inside the app, which is
+// a real inconsistency and not an oversight to be fixed casually — giving these rows a
+// destination means putting a target on the notifications table, which is a schema change
+// and a decision about every notification type, not just messages.
+
 export default function NotificationsScreen({ notifications, loading, lang, onBack, onMarkAllRead, onClearAll, onNotifPress, onMarkRead }) {
   const unreadCount = notifications.filter(n => !n.read).length
 
