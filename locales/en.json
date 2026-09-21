@@ -1,7 +1,7 @@
 {
   "ios": {
     "NSLocationWhenInUseUsageDescription": "ADA uses your location to show nearby places, services and duty pharmacies.",
-    "NSPhotoLibraryUsageDescription": "ADA needs access to your photos to let you set a profile picture.",
-    "NSCameraUsageDescription": "ADA uses your camera so you can take photos and send them in messages."
+    "NSPhotoLibraryUsageDescription": "ADA uses your photo library so you can choose photos for your profile, your messages or your business page.",
+    "NSCameraUsageDescription": "ADA uses your camera so you can take photos for your messages."
   }
 }

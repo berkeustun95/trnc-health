@@ -1,7 +1,7 @@
 {
   "ios": {
     "NSLocationWhenInUseUsageDescription": "ADA, yakınınızdaki yerleri, hizmetleri ve nöbetçi eczaneleri göstermek için konumunuzu kullanır.",
-    "NSPhotoLibraryUsageDescription": "ADA, profil fotoğrafı belirleyebilmeniz için fotoğraflarınıza erişim ister.",
-    "NSCameraUsageDescription": "ADA, fotoğraf çekip mesajlarda gönderebilmeniz için kameranızı kullanır."
+    "NSPhotoLibraryUsageDescription": "ADA, profiliniz, mesajlarınız veya işletme sayfanız için görsel seçebilmeniz amacıyla fotoğraflarınıza erişir.",
+    "NSCameraUsageDescription": "ADA, mesajlarınız için fotoğraf çekebilmeniz amacıyla kameranızı kullanır."
   }
 }

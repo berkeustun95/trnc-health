@@ -121,6 +121,11 @@ branch in App.js, which carries the identical warning for the identical reason.
 - Make the changes according to the prompt then say its done and explain shortly. so dont ask to proceed everytime
 - One bounded task at a time. If scope is unclear, ask.
 - Match the existing data-fetch pattern: query Supabase -> useState -> render.
+- **Ask for ONE item per message.** When you need something from me (an ID, a query result,
+  a decision), ask for exactly one and wait. A list of asks gets partial answers.
+- **Push the working branch after EVERY slice**, feature branches included — not only when I
+  say "push to git" (that one still means main). On 2026-09-21 the code production was
+  running (OTA `53e92f02`, commit `95c6a9f`) existed on this laptop and nowhere else.
 
 ## Security (non-negotiable — this is a health app)
 - Row Level Security (RLS) is the security boundary. Every table with user data

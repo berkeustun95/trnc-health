@@ -69,11 +69,16 @@ export default {
       [
         'expo-image-picker',
         {
-          photosPermission: 'ADA needs access to your photos to let you set a profile picture.',
-          // Kept for planned image messaging, which does not exist yet — a named, accepted
-          // review risk. If messaging is dropped or slips past the build after 1.2.0, set
-          // this to false. See ~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md
-          cameraPermission: 'ADA uses your camera so you can take photos and send them in messages.',
+          photosPermission:
+            'ADA uses your photo library so you can choose photos for your profile, your messages or your business page.',
+          // Names MESSAGES ONLY, deliberately: no screen in this build calls launchCameraAsync
+          // (profile and business photos are library-only), and a purpose string may not claim
+          // a flow the reviewer cannot open. Messages stays because photo sending will arrive
+          // by OTA onto this binary, and these strings only change with a native build. Add
+          // profile / business page back in the build that gives those flows a camera.
+          // If image messaging is dropped, set this to false. See
+          // ~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md
+          cameraPermission: 'ADA uses your camera so you can take photos for your messages.',
           // false also puts RECORD_AUDIO in blockedPermissions. No audio anywhere in the app.
           microphonePermission: false,
         },

@@ -1,7 +1,7 @@
 {
   "ios": {
     "NSLocationWhenInUseUsageDescription": "ADA verwendet deinen Standort, um Orte, Dienste und Apotheken im Bereitschaftsdienst in deiner Nähe anzuzeigen.",
-    "NSPhotoLibraryUsageDescription": "ADA braucht Zugriff auf deine Fotos, damit du ein Profilbild festlegen kannst.",
-    "NSCameraUsageDescription": "ADA verwendet deine Kamera, damit du Fotos aufnehmen und in Nachrichten senden kannst."
+    "NSPhotoLibraryUsageDescription": "ADA verwendet deine Fotomediathek, damit du Fotos für dein Profil, deine Nachrichten oder deine Unternehmensseite auswählen kannst.",
+    "NSCameraUsageDescription": "ADA verwendet deine Kamera, damit du Fotos für deine Nachrichten aufnehmen kannst."
   }
 }
