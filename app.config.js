@@ -70,7 +70,7 @@ export default {
         'expo-image-picker',
         {
           photosPermission:
-            'ADA uses your photo library so you can choose photos for your profile, your messages or your business page.',
+            'ADA uses your photo library so you can add photos to your profile and messages, and to the listings, events, places and business pages you share.',
           // Names MESSAGES ONLY, deliberately: no screen in this build calls launchCameraAsync
           // (profile and business photos are library-only), and a purpose string may not claim
           // a flow the reviewer cannot open. Messages stays because photo sending will arrive
