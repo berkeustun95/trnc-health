@@ -150,6 +150,26 @@ Until 2026-08-30 this folder deployed nothing and was documented as inert; it li
   asserting that a signed URL still resolves.
 
 ## Migrations (manual-apply — no CI)
+- **A SCRIPT FOR THE SUPABASE SQL EDITOR MUST NOT REFERENCE ANY OBJECT IT CREATED EARLIER
+  IN THE SAME SCRIPT.** Two incidents, and the second one disproved the explanation
+  written after the first:
+    * **2026-09-15 — `20261024`.** Created TEMP tables as top-level statements, used them
+      in a `DO` block, died on this database with **42P01** naming one of them. The same
+      file applied cleanly on stock PostgreSQL 15.18, 17.10 and PGlite. It was recorded as
+      a `pg_temp` problem.
+    * **2026-09-21 — `verify_home_strip_pin.sql`.** Created an **ORDINARY** table inside
+      `BEGIN … ROLLBACK` — written that way specifically to sidestep the `pg_temp` theory
+      — and died identically: `ERROR: 42P01: relation "_hsp_verify" does not exist`.
+  **So the schema of the object never mattered, and the first explanation was wrong.** The
+  mechanism is still unconfirmed (a pooler, or the editor not holding the script on one
+  connection or in one transaction, would both explain it) and **is not worth confirming
+  in production.** The rule is what carries.
+  Write the whole thing as **ONE statement that creates nothing**: a `DO` block that
+  accumulates a report in a variable and ends with `RAISE EXCEPTION` carrying it. The
+  exception is the only output channel that editor reliably shows — **`RAISE NOTICE` is
+  invisible there**, which is a second way to ship a check nobody can read — and the abort
+  is also the rollback, so such a script cannot leave a row behind on any path. Accept
+  that a healthy run shows red: put the verdict in the first line of the message.
 Migrations are applied by hand (SQL editor, Role → postgres), so nothing catches a
 file that was committed but never applied (this is how `facilities.area` silently
 went missing). Two mandatory rules:
