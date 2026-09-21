@@ -36,22 +36,24 @@ eas build --platform android --profile production
 # then submit new AAB to Play Store closed testing track
 ```
 
-⚠ **QUEUED FOR THE NEXT NATIVE BUILD — ride it with the CONNECTIVITY_LIVE / eSIM build,
-never as a standalone.** `app.config.js` still tells the OS this is a health app
-(*"ADA uses your location to show nearby pharmacies, clinics, and hospitals"*), and **no OTA
-can change an OS permission dialog**. Decisions are locked: mic off
-(`microphonePermission: false`, which also blocks Android `RECORD_AUDIO`), **camera KEPT** for
-planned image messaging, both background-location keys deleted (the app only ever calls
-`requestForegroundPermissionsAsync`), location moved to a single source, and `expo.locales`
-for all nine locales **in the same slice** — the string is English-only until it lands.
-**The trap:** the location string exists in THREE places and `applyPermissions` resolves
-`plugin option || ios.infoPlist || plugin default`, so `:87-88` wins and `:27-28` is inert —
-editing only the `ios.infoPlist` pair changes nothing and looks like the build ignoring you.
-Verify with `npx expo config --type introspect`, never by reading `app.config.js`.
-The Play health declaration is drafted **when the build is scheduled**, not before.
-Plan, resolved-config baseline and evidence:
-`~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md`.
-Commit it separately from the eSIM work so it reverts alone. `slug` stays `trnc-health`.
+⚠ **PERMISSION STRINGS: LANDED ON `feat/social-auth`, SHIP WITH THE 1.2.0 BUILD.** No OTA
+can change an OS permission dialog, so they are live only once 1.2.0 is installed. Every usage
+description now has ONE source, its plugin option: `applyPermissions` resolves
+`plugin option || ios.infoPlist || plugin default`, so a copy in `ios.infoPlist` is inert while
+it matches and ignored the moment it doesn't. Mic off (`RECORD_AUDIO` removed), camera KEPT
+with real copy for planned image messaging (a named, accepted review risk), both
+background-location keys deleted. Verify with `npx expo config --type introspect`, never by
+reading `app.config.js`. The Play health declaration is drafted **when the build is
+scheduled**. Plan: `~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md`.
+⚠ **`expo.locales` DECLARES SEVEN LEFT-TO-RIGHT LANGUAGES AND MUST NEVER GAIN `ar` OR `fa`.**
+Each entry becomes an `<lang>.lproj` in the iOS bundle, and a bundle with an Arabic or Persian
+localization is exactly what makes React Native mirror the WHOLE layout for a device in that
+language (`RCTI18nUtil`: `allowRTL` defaults YES, nothing here sets it; `allowRTL(false)` from
+JS is read at bridge init, so the first launch would still mirror). Arabic/Persian users get
+the English strings, as everyone did before. RTL support is a separate, app-wide decision.
+Android is untouched by `expo.locales` (empty `values-b+xx`), but RN Android mirrors by DEVICE
+locale with `supportsRtl="true"`, so an Arabic-locale Android phone is probably mirrored
+TODAY — unverified, on the 1.2.0 device-test list.
 
 ⚠ **IMAGE MESSAGING IS BLOCKED ON A SAFETY SCOPE, AND THE SCOPE IS THE FEATURE.**
 `20261029_student_messaging.sql` already says it — *"NO IMAGES. Slice 7, and it waits on CSAM

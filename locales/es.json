@@ -1,0 +1,7 @@
+{
+  "ios": {
+    "NSLocationWhenInUseUsageDescription": "ADA usa tu ubicación para mostrarte lugares, servicios y farmacias de guardia cercanos.",
+    "NSPhotoLibraryUsageDescription": "ADA necesita acceso a tus fotos para que puedas poner una foto de perfil.",
+    "NSCameraUsageDescription": "ADA usa tu cámara para que puedas hacer fotos y enviarlas en mensajes."
+  }
+}
