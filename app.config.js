@@ -2,7 +2,7 @@ export default {
   expo: {
     name: 'ADA',
     slug: 'trnc-health',
-    version: '1.1.0',
+    version: '1.2.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
     splash: {
@@ -22,6 +22,7 @@ export default {
     ios: {
       supportsTablet: false,
       bundleIdentifier: 'com.berkeustun95.ada',
+      usesAppleSignIn: true,
       minimumOsVersion: '14.0',
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
@@ -66,6 +67,7 @@ export default {
     plugins: [
       '@react-native-community/datetimepicker',
       'expo-font',
+      'expo-apple-authentication',
       [
         'expo-image-picker',
         {

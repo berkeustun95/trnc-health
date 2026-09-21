@@ -547,3 +547,21 @@ export const TERMS_CHECKBOX_LIVE = true   // live 2026-09-13
 //
 // Reverting is this one boolean, and so is the emergency direction.
 export const CONNECTIVITY_LIVE = false
+
+// ─── SOCIAL SIGN-IN — A KILL-SWITCH, SO IT DEFAULTS ON ──────────────────────
+//
+// The inverse of every other flag here: it exists to switch a LIVE feature OFF by OTA if
+// a provider breaks, not to hold a dark one back. ONE flag for both buttons, never two —
+// App Store 4.8 lets Google sit on iOS only beside Sign in with Apple, so hiding Apple
+// alone would ship a rejection.
+//
+// ⚠ OFF LOCKS OUT SOCIAL-ONLY ACCOUNTS. They have no password, so with the buttons gone
+//   their only way back in is "Forgot password" — and for an Apple user who hid their
+//   email that is a private-relay address, which drops our reset mail unless Apple's
+//   email relay is set up for the sending domain. It is not. So for them OFF is a full
+//   lockout until the flag comes back. Pull it for a broken provider, never for a
+//   cosmetic bug.
+//
+// Needs the 1.2.0 binary: the native modules behind both buttons are absent from every
+// build before it, and runtimeVersion 1.2.0 is what keeps this JS off those installs.
+export const SOCIAL_AUTH_LIVE = true
