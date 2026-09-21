@@ -95,6 +95,17 @@ Until 2026-08-30 this folder deployed nothing and was documented as inert; it li
 `~/ada-worker-support`, on one laptop, with no git — which is how it became unfindable.
 `git push` does NOT publish it (that is `docs/`, via GitHub Pages).
 
+⚠ **THE LIVE-STRIP NOTICE CARD IS DORMANT, NOT DEAD — LEAVE IT.** `kind = 'notice'`
+(`20261043`, applied), the `NOTICE_FALLBACK` route→image map in `LiveStrip.js`, rank 3b in
+`homeStripResolver.js`, `stripNoticeTitle` in nine locales, and `utils/stripDismissals.js`
+all ship and all work. The one production row was switched OFF (`is_active = false`) on
+2026-09-21 after the device pass: **"Bugün ADA'da" carries events + duty and no
+announcements.** That is a product decision about the strip, not a defect in the mechanism.
+So: **do not delete the notice code, and do not repurpose it to put an announcement back in
+that strip.** Re-enabling is one `UPDATE … SET is_active = true` on an existing row, and
+deleting the path would turn that into a rebuild. Same reasoning as the `showAgentOnboarding`
+branch in App.js, which carries the identical warning for the identical reason.
+
 **OTA only reaches the production build.** A preview APK (`eas build --profile preview`) does not have `channel: "production"` baked in and will never receive OTA updates. Always test OTA on the Play Store install, not a sideloaded APK.
 
 **EAS environment variables:** Use `eas env:create` (not `eas secret:create` — deprecated). `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is set for the production environment. Changes to env vars require a new native build to take effect.
@@ -775,6 +786,19 @@ thread — not on Home, and not on a spinner.
 ## Android Gotchas
 - Views with `borderRadius` + `borderWidth` on Android may render an opaque background unless `backgroundColor: 'transparent'` is set explicitly.
 - Never cache element positions in `onLayout` for later use — layout can shift (e.g. async data loading) and the cached value goes stale. Always measure with `measureRef()` at the moment you need the position.
+- **A REINSTALL DOES NOT RESET FIRST-RUN STATE ON ANDROID — Auto Backup restores it.**
+  Confirmed 2026-09-21 on the onboarding device pass: uninstall + reinstall SKIPPED the
+  carousel, because Android's Auto Backup for Apps had restored `@trnc_onboarded` (and
+  restores every other AsyncStorage key with it — `@trnc_coach_v2`, `@trnc_city_*`,
+  `@trnc_strip_dismissed`, `@trnc_module_pins`).
+  **This is NOT a user-facing bug.** A genuinely new user has no backup to restore from,
+  so they see the carousel exactly once, as designed. It is a TESTING artifact, and the
+  expensive version of it is mistaking it for a regression and "fixing" code that works.
+  To actually re-test a first run: **Settings → Apps → ADA → Storage → Clear storage**
+  (not just Clear cache), or `adb shell pm clear com.berkeustun95.ada`.
+  ⚠ A dev-only "replay onboarding" button was considered and NOT added: the flow is
+  pre-auth, so a button would have to live on a screen the gate renders, and
+  `EXPO_PUBLIC_DEV_ONBOARDED` + Clear storage already cover both directions.
 
 ## Advisor
 
