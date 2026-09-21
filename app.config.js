@@ -1,3 +1,17 @@
+import { readFileSync } from 'fs'
+import { join } from 'path'
+
+// Google's iOS URL scheme is the iOS client ID reversed, and constants/auth.js is the one
+// place that ID lives. It cannot be imported here: only THIS file is transpiled when the
+// config is evaluated, and constants/ is ESM. A scheme that disagrees with the ID does not
+// fail the build — GoogleSignIn throws at the first tap on iOS — so it fails HERE instead.
+const iosClientId = readFileSync(join(__dirname, 'constants/auth.js'), 'utf8')
+  .match(/export const GOOGLE_IOS_CLIENT_ID = '([^']+)'/)?.[1]
+if (!iosClientId?.endsWith('.apps.googleusercontent.com')) {
+  throw new Error('app.config.js: GOOGLE_IOS_CLIENT_ID not found in constants/auth.js')
+}
+const googleIosUrlScheme = iosClientId.split('.').reverse().join('.')
+
 export default {
   expo: {
     name: 'ADA',
@@ -66,6 +80,7 @@ export default {
       '@react-native-community/datetimepicker',
       'expo-font',
       'expo-apple-authentication',
+      ['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }],
       [
         'expo-image-picker',
         {

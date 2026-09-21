@@ -10,3 +10,7 @@
 // NOT the Firebase project behind google-services.json (642226758237) — so the iOS client and
 // both Android clients (upload SHA-1 + Play App Signing SHA-1) must be created in 441674392222.
 export const GOOGLE_WEB_CLIENT_ID = '441674392222-tllp5h2bsuoreedpo5fd6f2ep01skssb.apps.googleusercontent.com'
+
+// app.config.js derives the iOS URL scheme (this ID reversed) by READING this line, so keep
+// it a single-quoted literal on one line — that file fails at config time if it cannot.
+export const GOOGLE_IOS_CLIENT_ID = '441674392222-fhgrls44epd5egi9a6bm5e4q085jsaqr.apps.googleusercontent.com'
