@@ -1403,6 +1403,41 @@ WITH report AS (
     --   statements do not count), reconciled to 36 disjoint names, and 20261042 carries
     --   the same list in its own DO block. Two copies, deliberately: this one is the
     --   standing check, that one is the apply-time gate.
+    -- ── 20261043. The notice kind, and a CORRECTION to that file's own header.
+    --
+    -- ⚠ 20261043's header says the promo arm is unchanged — "not one character" — and
+    --   asserts "BYTE-FOR-BYTE" and "all four promo requirements, each named". None of
+    --   that is true of what it actually does:
+    --     • it ADDED `route IS NULL` to the promo arm, so the arm was TIGHTENED. Safe —
+    --       no promo ever carried a route, the column did not exist — but not unchanged.
+    --     • its DO block asserts the promo arm with ONE substring, `link_url IS NOT
+    --       NULL`. Dropping promo's `title_i18n IS NOT NULL` or `target_id IS NULL`
+    --       would have passed it.
+    --     • it proves promo can still be ACCEPTED and never that an invalid one is
+    --       REFUSED, which a constraint accepting everything would also satisfy.
+    --   The file is APPLIED and is NOT edited — amending an applied migration is what
+    --   this project's ledger rule exists to prevent. The correction lives here and in
+    --   supabase/verify_home_strip_pin.sql, which is the behavioural half: 9 rejection
+    --   cases and 2 acceptance cases, in a transaction that rolls back.
+    --
+    -- This token is the STRUCTURAL half. It names every clause the two arms must carry,
+    -- so the one-substring gap cannot recur here.
+    UNION ALL SELECT '1043_home_strip_pin_notice','shape_check: promo keeps all 4 clauses, notice keeps all 5',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='home_strip_pin_shape_check'
+        AND pg_get_constraintdef(oid) LIKE '%link_url IS NOT NULL%'
+        AND pg_get_constraintdef(oid) LIKE '%title_i18n IS NOT NULL%'
+        AND pg_get_constraintdef(oid) LIKE '%title_i18n IS NULL%'
+        AND pg_get_constraintdef(oid) LIKE '%sponsor_name IS NULL%'
+        AND pg_get_constraintdef(oid) LIKE '%route IS NOT NULL%'
+        AND pg_get_constraintdef(oid) LIKE '%route IS NULL%')
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conname='home_strip_pin_kind_check'
+        AND pg_get_constraintdef(oid) LIKE '%notice%')
+      -- The route vocabulary never admits the three surfaces that are not for sale.
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conname='home_strip_pin_route_check'
+        AND pg_get_constraintdef(oid) LIKE '%accommodation%'
+        AND pg_get_constraintdef(oid) NOT LIKE '%''duty''%'
+        AND pg_get_constraintdef(oid) NOT LIKE '%''emergency''%'
+        AND pg_get_constraintdef(oid) NOT LIKE '%''health''%')
     UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 36 policies, all named, none unknown, none missing',
       (SELECT count(*) FROM pg_policies
         WHERE schemaname='storage' AND tablename='objects') = 36
