@@ -74,6 +74,7 @@ import TutorialCoachMarks from './screens/TutorialCoachMarks'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
+import { signOutGoogle } from './utils/socialAuth'
 import HomeScreen from './screens/HomeScreen'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
@@ -438,6 +439,9 @@ export default function App() {
     // conditionally — a hook may not sit behind a boolean. The flag chooses which family
     // ModuleTile NAMES, not which files exist.
     Manrope_500Medium: require('./assets/fonts/Manrope-Medium.ttf'),
+    // Google's sign-in button guideline names Roboto Medium. Same single-file pattern as
+    // Manrope, not a barrel; Android OEM system fonts are not reliably Roboto.
+    Roboto_500Medium: require('./assets/fonts/Roboto-Medium.ttf'),
   })
   const [session, setSession] = useState(undefined)
   const [facilities, setFacilities] = useState([])
@@ -708,6 +712,8 @@ export default function App() {
       // A normal sign-out returns to the entry screen; a gate-driven one is on its way
       // to the sign-up form, so don't bounce it back to the entry screen.
       if (event === 'SIGNED_OUT') {
+        // Every sign-out path in the app lands here, so this one line covers them all.
+        signOutGoogle()
         if (toSignUpRef.current) { toSignUpRef.current = false; setShowWelcome(false) }
         else setShowWelcome(true)
       }
