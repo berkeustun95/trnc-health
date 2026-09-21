@@ -503,6 +503,11 @@ export default function App() {
   const [showJobPostings,  setShowJobPostings]  = useState(false)
   const [showExploreBeach, setShowExploreBeach] = useState(false)
   const [showExplore, setShowExplore] = useState(false)   // the full Explore module tile (dark until MODULE_FLAGS.explore)
+  // Set by the wizard's Google/Apple under-13 branch AFTER delete_own_account succeeded and
+  // before it signs out, so the notice replaces the welcome screen that SIGNED_OUT would show.
+  // Session state is right here, unlike the flag path: the account no longer exists, so
+  // there is nothing a relaunch could escape back into.
+  const [ageDeletedNotice, setAgeDeletedNotice] = useState(false)
   const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'studentHub'. Admins never reach HomeScreen /
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
@@ -1331,6 +1336,12 @@ export default function App() {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   } else if (onboarded === false) {
     content = <OnboardingScreen onComplete={completeOnboarding} />
+  } else if (ageDeletedNotice) {
+    // A sign-out that failed offline would leave a session for a deleted user; retry it here.
+    content = <AgeIneligibleScreen lang={lang} onDone={() => {
+      setAgeDeletedNotice(false)
+      if (sessionRef.current) supabase.auth.signOut()
+    }} />
   } else if (!session && showWelcome) {
     content = (
       <WelcomeScreen
@@ -1445,6 +1456,7 @@ export default function App() {
            from it on this render and on every launch after. No second code path, and
            no network call standing between the flag and the block it causes. */
         onAgeIneligible={() => setProfile(p => (p ? { ...p, age_ineligible: true } : p))}
+        onAgeIneligibleDeleted={() => setAgeDeletedNotice(true)}
         onEmergencyNumbers={() => setShowEmergencyModal(true)}
         onDutyList={() => setShowDutyList(true)}
         onHealthDirectory={() => setGateHealthList(true)}

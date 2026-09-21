@@ -113,9 +113,10 @@ export async function signInWithApple({ consent } = {}) {
 }
 
 // ─── APPLE SENDS THE NAME ONCE ──────────────────────────────────────────────
-// Only on the first authorisation for this Apple ID and this app, never again — not even
-// after the account is deleted and recreated. So it is written now or it is lost, and App
-// Store 4.0 forbids asking an Apple user for it afterwards.
+// Only on the first authorisation for this Apple ID and this app. Deleting the ADA account
+// does not reset that — only revoking the app's Apple authorisation does, which is what
+// slice 5's token revocation is for. So it is written now or it is lost, and App Store 4.0
+// forbids asking an Apple user for it afterwards.
 //
 // Profile FIRST, then user_metadata: updateUser fires USER_UPDATED, App.js's session effect
 // reloads the profile, and that reload then carries the name. `is('first_name', null)` means
@@ -175,6 +176,14 @@ export async function revokeGoogle() {
   } catch {
     return false
   }
+}
+
+// The provider the account was CREATED with. app_metadata.provider is the first identity, so
+// an email account that later linked Google stays 'email' — which is what keeps the social
+// branches (wizard consent, hidden names, under-13 deletion) off every pre-existing account.
+export const socialProvider = session => {
+  const p = session?.user?.app_metadata?.provider
+  return p === 'google' || p === 'apple' ? p : null
 }
 
 export const hasGoogleIdentity = session =>

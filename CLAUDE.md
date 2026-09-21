@@ -644,6 +644,33 @@ went missing). Two mandatory rules:
   and it happened anyway, because those warnings were about rows somebody might ADD, not
   about a row that goes stale on its own when a LATER migration moves the number.
 
+## Social sign-in (Google + Apple, native) — from build 1.2.0
+
+Plan, decisions and evidence: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
+
+- **Runtime 1.2.0 is the fence.** `runtimeVersion` is `appVersion`; the native modules exist
+  only from 1.2.0, and EAS serves an update only to an identical runtime. Hotfixes for 1.1.0
+  installs are published from a tree whose `version` is still 1.1.0 (a `release/1.1` branch
+  once social-auth is on main), so every fix ships twice until 1.1.0 fades.
+- **Every social branch keys on `app_metadata.provider`** (`socialProvider()` in
+  `utils/socialAuth.js`) — the FIRST identity. An email account that later linked Google stays
+  `'email'`, which keeps pre-existing accounts out of the social consent tick, the hidden
+  names and the under-13 deletion.
+- **`revokeGoogle()` runs BEFORE anything signs out of Supabase.** SIGNED_OUT calls
+  `signOutGoogle()`, after which `revokeAccess()` is a silent no-op.
+- **Under 13: Google/Apple accounts are DELETED, email accounts are FLAGGED.** A social
+  identity links back to the same auth user, so a flag would lock it out forever.
+- **A name the provider gave is never asked for again** (App Store 4.0). The wizard hides a
+  name field only while it holds exactly the provider's value; a missing one is shown.
+  Apple sends the name ONCE per authorisation — only a token revocation resets that.
+- **`display_name` is labelled "Username" in all nine locales** — never "name" (4.0).
+- **The three native modules are `require()`d inside functions**, and
+  `check-native-import-safety.mjs` enforces it: google-signin calls
+  `TurboModuleRegistry.getEnforcing` at evaluation, so a top-level import kills Expo Go.
+- **`handle_new_user` still reads no metadata** (0827). Names reach `profiles` from the
+  client, through `check_profile_name_content`, never from the trigger — a BLOCKED_TERM there
+  would abort the `auth.users` insert.
+
 ## Compliance (Google Play — declared mixed-audience app)
 
 Target age groups were set to **13-15 / 16-17 / 18 and over** on 2026-08-29, which makes

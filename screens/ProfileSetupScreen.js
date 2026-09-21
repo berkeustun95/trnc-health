@@ -44,6 +44,8 @@ import SearchModal from '../components/SearchModal'
 import { pad, ageOn, daysInMonth } from '../utils/profileFields'
 import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../components/DisplayNameCheck'
 import { supabase } from '../lib/supabase'
+import { socialProvider, hasGoogleIdentity, revokeGoogle } from '../utils/socialAuth'
+import { LEGAL_VERSION, legalLocaleFor, isLegalFallback } from '../constants/legal'
 import { colors, shadow, radius } from '../constants/theme'
 import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
 import LegalScreen from './LegalScreen'
@@ -225,13 +227,28 @@ function resumeStep(p) {
 // profiles_completion_requires_fields_check is the SOLE server-side guard on completeness
 // (no RPC and no trigger touches it), so a client whose required set drifts from it gets a
 // raw Postgres error inside a mandatory gate — a dead end with no way forward.
+// ─── Names the sign-in provider already gave us ──────────────────────────────
+// Google's arrive in the id token and GoTrue copies the claims into user_metadata. Apple's
+// arrive once, and utils/socialAuth.js writes them to the profile and the metadata the moment
+// they do. Fallback split matches 20261001's backfill: a single-token name is a first name.
+function providerNames(profile, meta) {
+  const full = String(meta?.full_name || meta?.name || '').trim()
+  const [head = '', ...rest] = full ? full.split(/\s+/) : []
+  return {
+    first: profile?.first_name || String(meta?.given_name || '').trim() || head,
+    last: profile?.last_name || String(meta?.family_name || '').trim() || rest.join(' '),
+  }
+}
+
 const completionViolation = err =>
   err?.code === '23514' && String(err?.message ?? '').includes('profiles_completion_requires_fields_check')
 
 export default function ProfileSetupScreen({
-  session, lang, profile, prefillRegion, onDone, onAgeIneligible,
+  session, lang, profile, prefillRegion, onDone, onAgeIneligible, onAgeIneligibleDeleted,
   onEmergencyNumbers, onDutyList, onHealthDirectory, onLangChange,
 }) {
+  const provider = socialProvider(session)
+  const provided = provider ? providerNames(profile, session.user.user_metadata) : { first: '', last: '' }
   const [step, setStep] = useState(() => resumeStep(profile))
   const [saving, setSaving] = useState(false)
   // An i18n KEY or null, not a boolean. 'Check your connection' is the wrong sentence
@@ -248,8 +265,32 @@ export default function ProfileSetupScreen({
   const [marketingOk, setMarketingOk] = useState(false)
 
   // Step 1 — name half
-  const [firstName, setFirstName] = useState(profile?.first_name ?? '')
-  const [lastName, setLastName] = useState(profile?.last_name ?? '')
+  const [firstName, setFirstName] = useState(profile?.first_name ?? provided.first)
+  const [lastName, setLastName] = useState(profile?.last_name ?? provided.last)
+
+  // ─── A NAME THE PROVIDER GAVE IS NOT ASKED FOR AGAIN (App Store 4.0) ───────
+  // Each field is hidden only while it still holds exactly what the provider supplied, so
+  // one that is missing — Apple with the name withheld, a single-name Google account — is
+  // shown and asked, which is the only way to a row the completion CHECK accepts. Apple's
+  // name can land AFTER this mounts (USER_UPDATED reloads the profile), so a late value
+  // fills a field that is still empty; it never overwrites typing.
+  // revealNames: a BLOCKED_TERM on save cannot say whether the name or the display name
+  // tripped it, and a hidden field would leave the user nothing to fix.
+  const [revealNames, setRevealNames] = useState(false)
+  useEffect(() => { if (provided.first) setFirstName(v => v || provided.first) }, [provided.first])
+  useEffect(() => { if (provided.last) setLastName(v => v || provided.last) }, [provided.last])
+  const hideFirst = !!provider && !revealNames && !!provided.first && firstName === provided.first
+  const hideLast = !!provider && !revealNames && !!provided.last && lastName === provided.last
+
+  // ─── CONSENT FOR A SOCIAL ACCOUNT THAT NEVER SAW THE SIGNUP BOX (D2) ───────
+  // Email signups tick it on AuthScreen. A new Google/Apple account can be created from the
+  // Login tab with no consent moment at all, so it is asked HERE — only for those accounts
+  // and only while nothing is recorded. A tick carried across from the signup tab has
+  // already been flushed by App.js, and terms_version is then set.
+  // Unticked, always, never pre-filled, for the reason AuthScreen gives.
+  const [termsOk, setTermsOk] = useState(false)
+  const [termsRecorded, setTermsRecorded] = useState(false)
+  const needsTerms = TERMS_CHECKBOX_LIVE && !!provider && profile?.terms_version == null && !termsRecorded
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
   const [nameState, setNameState] = useDisplayNameCheck(displayName)
 
@@ -329,7 +370,7 @@ export default function ProfileSetupScreen({
   // client requires MORE, the user is blocked by a button with no explanation; if it
   // requires LESS, the final write fails with a raw 23514. Both were live bugs.
   const phoneOk = !phone.trim() || /^\d{4,15}$/.test(phone.trim())
-  const step1Ok = firstName.trim() && lastName.trim() && nameOk &&
+  const step1Ok = (!needsTerms || termsOk) && firstName.trim() && lastName.trim() && nameOk &&
     dobY && dobM && dobD && nationality && phoneOk
   const step2Ok = region && status &&
     (status !== 'student' || level) &&
@@ -514,6 +555,25 @@ export default function ProfileSetupScreen({
     ])
   }
 
+  // ─── UNDER 13 ON A GOOGLE OR APPLE ACCOUNT: DELETE, DO NOT FLAG ─────────────
+  // The flag path's only way out is "sign out and sign up again with a truthful date" — but a
+  // Google or Apple identity links straight back to this same auth user, so a flagged row
+  // would lock that identity out for good, and we would be keeping a child's provider name,
+  // email and photo. So the account goes. Email signups keep the flag path.
+  // Nothing about the date is written, exactly as on the flag path.
+  // ORDER: Google access is revoked FIRST — SIGNED_OUT signs Google out, after which
+  // revokeAccess() is a silent no-op — then the RPC, then sign-out. The notice is raised
+  // before sign-out so App.js shows it instead of the welcome screen.
+  async function deleteUnderageAccount() {
+    setSaving(true)
+    setSaveError(false)
+    if (hasGoogleIdentity(session)) await revokeGoogle()
+    const { error } = await supabase.rpc('delete_own_account')
+    if (error) { setSaving(false); setSaveError('pgSaveError'); return }
+    onAgeIneligibleDeleted()
+    await supabase.auth.signOut()
+  }
+
   async function advance() {
     if (saving) return
     if (step === 0) { setStep(1); return }
@@ -524,6 +584,10 @@ export default function ProfileSetupScreen({
       // and a date of birth do not reach the row on the way past. The trigger backstops
       // a client that sends it anyway, and profiles_age_ineligible_no_dob_check
       // backstops both.
+      if (ageOn(dobY, dobM, dobD) < MIN_SIGNUP_AGE && provider) {
+        await deleteUnderageAccount()
+        return
+      }
       if (ageOn(dobY, dobM, dobD) < MIN_SIGNUP_AGE) {
         // ⚠ THE ERROR IS CHECKED NOW, AND IT WAS NOT BEFORE. The old code awaited this
         //   write, ignored whatever came back and set a local `ageBlocked` boolean — so
@@ -534,6 +598,20 @@ export default function ProfileSetupScreen({
         if (error) { setSaveError('pgSaveError'); return }
         onAgeIneligible()
         return
+      }
+      // Consent BEFORE the profile data it covers, and proven by reading it back: an update
+      // RLS filters to zero rows returns no error (flushPendingConsent in App.js, same rule).
+      if (needsTerms) {
+        setSaving(true)
+        setSaveError(false)
+        const { data, error: termsErr } = await supabase.from('profiles')
+          .update({ terms_version: LEGAL_VERSION, terms_locale: legalLocaleFor('terms', lang) })
+          .eq('id', session.user.id)
+          .select('terms_version')
+          .single()
+        setSaving(false)
+        if (termsErr || data?.terms_version !== LEGAL_VERSION) { setSaveError('pgSaveError'); return }
+        setTermsRecorded(true)
       }
       // ONE patch for all six fields. The merge makes this atomic rather than two
       // sequential writes, which is strictly better: the failure that actually happens
@@ -560,6 +638,7 @@ export default function ProfileSetupScreen({
       // returns fresh suggestions rather than surfacing a raw Postgres error inside a
       // mandatory gate; a null back from it means the failure was not about the name.
       const nameErr = await displayNameSaveError(error, displayName.trim())
+      if (nameErr?.status === 'blocked' && (hideFirst || hideLast)) setRevealNames(true)
       if (nameErr) { setNameState(nameErr); return }
       setSaveError('pgSaveError')
       return
@@ -783,14 +862,18 @@ export default function ProfileSetupScreen({
 
           {step === 1 && (
             <>
-              <Field label={t('pgFirstName', lang)}>
-                <TextInput style={s.input} value={firstName} onChangeText={setFirstName}
-                  autoCapitalize="words" autoCorrect={false} />
-              </Field>
-              <Field label={t('pgLastName', lang)}>
-                <TextInput style={s.input} value={lastName} onChangeText={setLastName}
-                  autoCapitalize="words" autoCorrect={false} />
-              </Field>
+              {!hideFirst && (
+                <Field label={t('pgFirstName', lang)}>
+                  <TextInput style={s.input} value={firstName} onChangeText={setFirstName}
+                    autoCapitalize="words" autoCorrect={false} />
+                </Field>
+              )}
+              {!hideLast && (
+                <Field label={t('pgLastName', lang)}>
+                  <TextInput style={s.input} value={lastName} onChangeText={setLastName}
+                    autoCapitalize="words" autoCorrect={false} />
+                </Field>
+              )}
               <Field label={t('pgDisplayName', lang)} hint={t('pgDisplayNameHint', lang)}>
                 <TextInput style={s.input} value={displayName} onChangeText={setDisplayName}
                   autoCapitalize="none" autoCorrect={false} maxLength={DISPLAY_NAME_MAX} />
@@ -822,6 +905,25 @@ export default function ProfileSetupScreen({
                 {phone.trim() && !/^\d{4,15}$/.test(phone.trim())
                   ? <Text style={s.err}>{t('pgPhoneInvalid', lang)}</Text> : null}
               </Field>
+              {/* The same box and the same words as AuthScreen's signup tick — one
+                  acceptance, whichever door the account came through. Continue stays
+                  disabled until it is ticked. The whole row toggles; the two document
+                  links keep their own taps. */}
+              {needsTerms && (
+                <>
+                  <TouchableOpacity style={s.termsRow} onPress={() => setTermsOk(v => !v)} activeOpacity={0.7}
+                    accessibilityRole="checkbox" accessibilityState={{ checked: termsOk }}>
+                    <View style={[s.checkbox, termsOk && s.checkboxOn]}>
+                      {termsOk && <Feather name="check" size={14} color="#fff" />}
+                    </View>
+                    <LegalLinkedText templateKey="signupTermsCheckbox" lang={lang}
+                      style={s.termsText} linkStyle={s.legalFooterLink} onOpen={setLegalTab} />
+                  </TouchableOpacity>
+                  {isLegalFallback('terms', lang) && (
+                    <Text style={s.legalFallback}>{t('legalAvailableInEnTr', lang)}</Text>
+                  )}
+                </>
+              )}
             </>
           )}
 
@@ -879,7 +981,7 @@ export default function ProfileSetupScreen({
               )}
 
               {/* ─── THE LAST STEP CARRIES A POINTER AND AN OFFER, NOT A CONSENT ───
-                  NO CHECKBOX FOR THE DOCUMENTS, DELIBERATELY, AND DO NOT ADD ONE. The
+                  NO CHECKBOX FOR THE DOCUMENTS HERE, DELIBERATELY, AND DO NOT ADD ONE. The
                   wizard collects the fields ADA needs in order to function on a CONTRACT
                   basis, not on consent — the acceptance already happened at signup, and
                   a second tick here would manufacture a second acceptance event on a
@@ -887,6 +989,11 @@ export default function ProfileSetupScreen({
                   documents; it does not ask for anything, and its wording must stay that
                   way ("how this is used is set out in…", never "by continuing you
                   agree…").
+
+                  The ONE exception lives on step 1, not here: a Google/Apple account with
+                  no recorded acceptance never saw the signup box, so for it there is no
+                  "already happened" — see needsTerms. It is the first acceptance, not a
+                  second one.
 
                   The marketing opt-in below is the opposite and that is why it looks
                   different: genuinely optional, genuinely consent, and therefore an
@@ -1154,6 +1261,17 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', marginTop: 1,
   },
   optInBoxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+
+  // The REQUIRED terms box for a social account (step 1). Copied from AuthScreen's measured
+  // checkbox — 2pt textSecondary border (4.76:1 / 4.21:1), 24pt, opaque white — and NOT the
+  // tinted opt-in surface above: a required acceptance must not look optional.
+  termsRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 4,
+                paddingHorizontal: 2, paddingVertical: 8 },
+  checkbox:   { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: colors.textSecondary,
+                backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  termsText:  { flex: 1, fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+  legalFallback: { fontSize: 12, lineHeight: 17, color: colors.textSecondary, marginTop: 4, opacity: 0.85 },
   optInText: { color: colors.textPrimary, fontSize: 14, lineHeight: 20 },
   optInHint: { color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
   legalFooter: { color: colors.textSecondary, fontSize: 12.5, lineHeight: 19, marginTop: 16 },
