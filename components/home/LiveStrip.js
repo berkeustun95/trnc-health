@@ -26,6 +26,30 @@ const STRIP_EVENTS_IMAGE = require('../../assets/backgrounds/ada-bg-events.png')
 //   Swapping it is this one line and nothing else.
 const STRIP_DUTY_IMAGE = require('../../assets/backgrounds/ada-bg-duty-pharmacy.png')
 
+// ─── A NOTICE'S FALLBACK IMAGE FOLLOWS ITS ROUTE ────────────────────────────
+//
+// A notice with no image_url used to fall back to the EVENTS photograph while routing to
+// accommodation — a card showing a concert and opening a housing list. The fallback is
+// keyed on the route instead, so the picture and the destination agree.
+//
+// Already in the bundle and already the accommodation screen's own background
+// (components/PageBackground.js), so this adds no asset and nothing to upload — and it
+// reuses the image a user will see again the moment they tap through, which is a
+// continuity the events photo could not give.
+//
+// ⚠ ANY ROUTE NOT LISTED FALLS BACK TO THE EVENTS IMAGE, deliberately. The route
+//   vocabulary is 18 values and this map has one: an unmapped route gets a neutral
+//   photograph rather than no card, and the missing entry is a visual mismatch somebody
+//   notices rather than a crash. Add a route here when a notice is actually pointed at
+//   it, not in advance.
+//
+// ⚠ THE SOURCE IS A PORTRAIT PAGE BACKGROUND (704x1520) IN A LANDSCAPE CARD. resizeMode
+//   is 'cover', so it centre-crops hard — roughly the middle fifth of the image is what
+//   shows at 176x120. That is a judgement to make on device, not from the file.
+const NOTICE_FALLBACK = {
+  accommodation: require('../../assets/backgrounds/ada-bg-accommodation.png'),
+}
+
 // Bugün ADA'da — two photo cards, side by side.
 //
 //   LEFT   today's event, resolved through the ladder in utils/homeStripResolver.js,
@@ -170,7 +194,10 @@ export default function LiveStrip({
   return (
     <View style={s.row}>
       <StripCard
-        image={STRIP_EVENTS_IMAGE}
+        // Only a notice consults the route map; every other kind keeps the events image
+        // exactly as before, and a notice WITH an image_url never reaches it either —
+        // imageUrl wins inside StripCard.
+        image={(item?.kind === 'notice' && NOTICE_FALLBACK[item?.action?.route]) || STRIP_EVENTS_IMAGE}
         imageUrl={item?.imageUrl}
         icon={item?.icon || 'calendar-outline'}
         title={evTitle}
