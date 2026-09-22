@@ -677,8 +677,12 @@ export default function App() {
     if (isGuest(session)) return
     await supabase.from('profiles').update({ preferred_language: langKey }).eq('id', session.user.id)
   }
+  // The first 8 characters of the OTA this launch is running, so "did the phone take the
+  // update?" is answered on the device instead of guessed. Nothing is shown on the embedded
+  // bundle — that is the answer "no OTA yet". Compare with `eas update:list`.
   function showAbout() {
-    Alert.alert('ADA', `Version ${Constants.expoConfig?.version ?? '1.1.0'}\n\n${t('aboutDescription', lang)}`, [{ text: 'OK' }])
+    const ota = !Updates.isEmbeddedLaunch && Updates.updateId ? ` · ${Updates.updateId.slice(0, 8)}` : ''
+    Alert.alert('ADA', `Version ${Constants.expoConfig?.version ?? '1.1.0'}${ota}\n\n${t('aboutDescription', lang)}`, [{ text: 'OK' }])
   }
 
   function toggleFavorite(id) {
