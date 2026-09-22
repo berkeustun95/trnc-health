@@ -36,6 +36,18 @@ eas build --platform android --profile production
 # then submit new AAB to Play Store closed testing track
 ```
 
+**iOS builds and submits need no Apple login: `npm run ios:build` / `npm run ios:submit`.**
+They source `~/.appstoreconnect/ada-eas.env` (OUTSIDE the repo, mode 600), which points
+eas-cli at the App Store Connect API key "EAS Build" (`WYJ38BNP8L`, **Admin**, team
+MAQ8XPJ8Z6, Individual) in `~/.appstoreconnect/private_keys/`. eas-cli regenerates a
+provisioning profile in `--non-interactive` mode ONLY with an ASC API key, and ONLY one
+supplied through `EXPO_ASC_API_KEY_PATH` / `EXPO_ASC_KEY_ID` / `EXPO_ASC_ISSUER_ID`
+(+ `EXPO_APPLE_TEAM_ID`, `EXPO_APPLE_TEAM_TYPE`) — a key stored on EAS for submissions is
+never used by the build path (`SetUpProvisioningProfile.js`, `AppStoreApi.js`). Never
+commit the key, never print it, never copy it into the repo. If this Mac is lost, revoke it
+in App Store Connect → Users and Access → Integrations. Android AABs are uploaded to Play
+Console by hand: there is no Play service-account key on this machine.
+
 ⚠ **PERMISSION STRINGS: LANDED ON `feat/social-auth`, SHIP WITH THE 1.2.0 BUILD.** No OTA
 can change an OS permission dialog, so they are live only once 1.2.0 is installed. Every usage
 description now has ONE source, its plugin option: `applyPermissions` resolves
