@@ -17,7 +17,7 @@ import { t } from '../constants/i18n'
 const FX_CACHE_KEY = 'ada_kktc_fx_cache_v1'
 
 // ─── PINNED SCHEMA — KKTC Merkez Bankası daily FX feed ──────────────────────
-// Source: https://www.mb.gov.ct.tr/kur/gunluk.xml  (official TRNC Central Bank,
+// Source: https://mb.gov.ct.tr/kur/gunluk.xml  (official TRNC Central Bank,
 // public, no API key, XML published since 2011). Parsed with regex against a
 // FIXED, government-controlled flat schema — deliberately no XML library.
 // Header:   <Kur_Tarihi> DD/MM/YYYY   <Gecerli_Tarih_Araligi> single date OR
@@ -26,7 +26,7 @@ const FX_CACHE_KEY = 'ada_kktc_fx_cache_v1'
 //           <Efektif_Alis> <Efektif_Satis> … </Resmi_Kur>
 // If parseKktcFx() starts returning null, these element names likely changed —
 // diff against a fresh fetch of the URL above to diagnose.
-const FX_URL = 'https://www.mb.gov.ct.tr/kur/gunluk.xml'
+const FX_URL = 'https://mb.gov.ct.tr/kur/gunluk.xml'
 
 // Display order + flags. Adding a currency = one entry here (parser is generic).
 const PAIRS = [
