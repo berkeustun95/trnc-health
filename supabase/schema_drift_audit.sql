@@ -620,7 +620,11 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('conversation_attempts', 'initiator_id', true, NULL, 'uuid'),
     ('conversation_attempts', 'recipient_id', true, NULL, 'uuid'),
     ('conversation_attempts', 'outcome', true, NULL, 'text'),
-    ('conversation_attempts', 'created_at', true, 'now()', 'timestamp with time zone')
+    ('conversation_attempts', 'created_at', true, 'now()', 'timestamp with time zone'),
+    ('apple_refresh_tokens', 'user_id', true, NULL, 'uuid'),
+    ('apple_refresh_tokens', 'refresh_token', true, NULL, 'text'),
+    ('apple_refresh_tokens', 'created_at', true, 'now()', 'timestamp with time zone'),
+    ('apple_refresh_tokens', 'updated_at', true, 'now()', 'timestamp with time zone')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -638,6 +642,8 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('answers_pkey', '', 'id'),
     ('answers_provider_id_fkey', '', 'id|provider_id'),
     ('answers_question_id_fkey', '', 'id|question_id'),
+    ('apple_refresh_tokens_pkey', '', ''),
+    ('apple_refresh_tokens_user_id_fkey', '', ''),
     ('beaches_access_type_check', 'private|public', 'access_type'),
     ('beaches_district_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'district'),
     ('beaches_pkey', '', ''),

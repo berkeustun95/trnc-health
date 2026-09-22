@@ -74,6 +74,9 @@ WITH report AS (
     ('1029_student_messaging','conversations'),
     ('1029_student_messaging','messages'),
     ('1029_student_messaging','conversation_attempts'),
+    -- Slice 5 of social sign-in: Apple refresh tokens, service_role only. The 1044 H-tokens
+    -- are what see that nobody else can touch it; a table name cannot.
+    ('1044_apple_refresh_tokens','apple_refresh_tokens'),
     ('1024_student_affiliation','subject_i18n'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
@@ -608,7 +611,9 @@ WITH report AS (
     ('1029_student_messaging','conversations_not_both'),
     ('1029_student_messaging','conversations_closed_pair'),
     ('1029_student_messaging','conversation_attempts_outcome_check'),
-    ('1029_student_messaging','messages_body_check')
+    ('1029_student_messaging','messages_body_check'),
+    ('1044_apple_refresh_tokens','apple_refresh_tokens_pkey'),
+    ('1044_apple_refresh_tokens','apple_refresh_tokens_user_id_fkey')
 
   ) e(m,o)
 
@@ -3092,6 +3097,34 @@ WITH report AS (
         WHERE hs.id = '0496fb4c-4e5d-4e35-a238-dd1fcb402541'
           AND to_jsonb(hs)->'coverage_districts' = '["nicosia","kyrenia"]'::jsonb
           AND cardinality(hs.service_types) = 4)
+    -- ── 1044: apple_refresh_tokens is service_role ONLY ─────────────────────────
+    -- Reached through to_regclass() and the catalogs, NEVER by bare name: QUERY 1 is one
+    -- statement, and naming a table that does not exist yet fails at PLAN time and kills
+    -- the whole report on exactly the database you are checking. Absent => NULL => false.
+    -- The zero-policy COUNT is the assertion (never "the one policy I remember is absent").
+    UNION ALL SELECT '1044_apple_refresh_tokens','apple_refresh_tokens: RLS on and ZERO policies',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.apple_refresh_tokens')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='apple_refresh_tokens') = 0
+    -- has_table_privilege resolves INHERITED grants (a PUBLIC grant reaches anon), which a
+    -- grantee-filtered count cannot see. Any one privilege for either role fails it.
+    UNION ALL SELECT '1044_apple_refresh_tokens','apple_refresh_tokens: anon and authenticated hold NO privilege',
+      COALESCE(NOT has_table_privilege('anon', to_regclass('public.apple_refresh_tokens'),
+                   'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+           AND NOT has_table_privilege('authenticated', to_regclass('public.apple_refresh_tokens'),
+                   'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'), false)
+    -- The legitimate path: the Edge Function writes as service_role. Without this row, a
+    -- table NOBODY can touch would score full marks on the two above.
+    UNION ALL SELECT '1044_apple_refresh_tokens','apple_refresh_tokens: service_role can select/insert/update/delete',
+      COALESCE(has_table_privilege('service_role', to_regclass('public.apple_refresh_tokens'), 'SELECT')
+           AND has_table_privilege('service_role', to_regclass('public.apple_refresh_tokens'), 'INSERT')
+           AND has_table_privilege('service_role', to_regclass('public.apple_refresh_tokens'), 'UPDATE')
+           AND has_table_privilege('service_role', to_regclass('public.apple_refresh_tokens'), 'DELETE'), false)
+    -- Account deletion must take the row with it (delete_own_account is unchanged), and
+    -- the CLAUDE.md "revoke first" rule exists BECAUSE of this cascade.
+    UNION ALL SELECT '1044_apple_refresh_tokens','apple_refresh_tokens FK to auth.users is ON DELETE CASCADE',
+      EXISTS(SELECT 1 FROM pg_constraint
+        WHERE conrelid = to_regclass('public.apple_refresh_tokens') AND contype = 'f'
+          AND confrelid = 'auth.users'::regclass AND confdeltype = 'c')
   ) z
 
   UNION ALL
