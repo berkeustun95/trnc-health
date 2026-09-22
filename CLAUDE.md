@@ -701,6 +701,21 @@ Plan, decisions and evidence: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`
 
 ## Compliance (Google Play — declared mixed-audience app)
 
+⚠ **ON PLAY, ADA IS NOT A HEALTH APP, AND THAT IS A DELIBERATE, TESTED POSITION — DO NOT
+"CORRECT" IT.** Category is **Travel & Local** and the Health apps declaration says **no
+health features** (both set 2026-09-23); the store description carries no pharmacy or health
+content. The reason is the account type, not the category definitions: declaring health
+features accurately forces an **Organization** developer account, ADA is on an **individual**
+one, and that is precisely what got the app rejected on 2026-07-06. The facility directory
+and the duty roster stay in the app, treated as a local/places directory — a bet that has
+survived a review cycle.
+Google's own category text pulls the other way (*"Suitable for apps connecting patients with
+healthcare providers"* — Healthcare services and management), so a reader who checks only the
+definitions will conclude the declaration is wrong and re-tick it. That conclusion costs a
+rejection. The real unlock is an Organization account, which also brings the supplement quiz
+back. Full record: `~/ObsidianVault/10-ada/play-console-status.md`.
+
+
 Target age groups were set to **13-15 / 16-17 / 18 and over** on 2026-08-29, which makes
 ADA a declared mixed-audience app. Three standing consequences:
 
