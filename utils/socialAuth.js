@@ -103,6 +103,7 @@ export async function signInWithApple({ consent } = {}) {
     })
     if (!error) {
       await saveAppleName(data?.user, cred.fullName)
+      storeAppleToken(cred.authorizationCode)
       return null
     }
   } catch (e) {
@@ -138,6 +139,48 @@ async function saveAppleName(user, fullName) {
     })
   } catch {}
 }
+
+// ─── APPLE TOKEN REVOCATION (slice 5, App Store 5.1.1(v)) ───────────────────
+// The authorization code is single-use and dies in five minutes, so it goes to the
+// apple-token Edge Function straight after sign-in, which swaps it for a refresh token and
+// keeps it server-side (20261044). Fire-and-forget: a failure never touches a sign-in that
+// has already succeeded — Profile deletion then falls back to asking Apple once more.
+function storeAppleToken(code) {
+  if (!code) return
+  supabase.functions.invoke('apple-token', { body: { action: 'store', code } }).catch(() => {})
+}
+
+// ⚠ BEFORE the delete RPC, like revokeGoogle(): apple_refresh_tokens cascades with the auth
+//   user, so once the account is gone there is nothing left to revoke with.
+// Resolves { revoked, reason }; reason 'no_token' means nothing was stored for this account.
+export async function revokeApple() {
+  try {
+    const { data, error } = await supabase.functions.invoke('apple-token', { body: { action: 'revoke' } })
+    return error ? { revoked: false, reason: 'invoke_failed' } : data
+  } catch {
+    return { revoked: false, reason: 'invoke_failed' }
+  }
+}
+
+// The fallback for a user-initiated deletion when no token was ever stored: one more Apple
+// sheet for a fresh code, revoked on the spot. Never used in the under-13 branch — a child
+// should not meet an unexplained Apple prompt. A cancel just means no revocation.
+export async function revokeAppleWithPrompt() {
+  try {
+    const Apple = require('expo-apple-authentication')
+    const cred = await Apple.signInAsync({ requestedScopes: [] })
+    if (!cred.authorizationCode) return false
+    const { data, error } = await supabase.functions.invoke('apple-token', {
+      body: { action: 'revoke_code', code: cred.authorizationCode },
+    })
+    return !error && data?.revoked === true
+  } catch {
+    return false
+  }
+}
+
+export const hasAppleIdentity = session =>
+  session?.user?.app_metadata?.providers?.includes('apple') === true
 
 function tokenEmail(jwt) {
   try {

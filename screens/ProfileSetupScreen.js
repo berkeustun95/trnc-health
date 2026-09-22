@@ -44,7 +44,7 @@ import SearchModal from '../components/SearchModal'
 import { pad, ageOn, daysInMonth } from '../utils/profileFields'
 import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../components/DisplayNameCheck'
 import { supabase } from '../lib/supabase'
-import { socialProvider, hasGoogleIdentity, revokeGoogle } from '../utils/socialAuth'
+import { socialProvider, hasGoogleIdentity, revokeGoogle, hasAppleIdentity, revokeApple } from '../utils/socialAuth'
 import { LEGAL_VERSION, legalLocaleFor, isLegalFallback } from '../constants/legal'
 import { colors, shadow, radius } from '../constants/theme'
 import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
@@ -561,13 +561,16 @@ export default function ProfileSetupScreen({
   // would lock that identity out for good, and we would be keeping a child's provider name,
   // email and photo. So the account goes. Email signups keep the flag path.
   // Nothing about the date is written, exactly as on the flag path.
-  // ORDER: Google access is revoked FIRST — SIGNED_OUT signs Google out, after which
-  // revokeAccess() is a silent no-op — then the RPC, then sign-out. The notice is raised
+  // ORDER: Google and Apple access are revoked FIRST — SIGNED_OUT signs Google out (after
+  // which revokeAccess() is a silent no-op) and the RPC cascades the Apple token away —
+  // then the RPC, then sign-out. The notice is raised
   // before sign-out so App.js shows it instead of the welcome screen.
   async function deleteUnderageAccount() {
     setSaving(true)
     setSaveError(false)
     if (hasGoogleIdentity(session)) await revokeGoogle()
+    // Apple too, from the stored token only: no second Apple prompt in a child's flow.
+    if (hasAppleIdentity(session)) await revokeApple()
     const { error } = await supabase.rpc('delete_own_account')
     if (error) { setSaving(false); setSaveError('pgSaveError'); return }
     onAgeIneligibleDeleted()

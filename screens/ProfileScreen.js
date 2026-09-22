@@ -9,7 +9,7 @@ import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
-import { revokeGoogle, hasGoogleIdentity } from '../utils/socialAuth'
+import { revokeGoogle, hasGoogleIdentity, revokeApple, revokeAppleWithPrompt, hasAppleIdentity } from '../utils/socialAuth'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { getNatLabel, NATIONALITIES, NATIONALITY_CODES } from '../constants/nationalityTranslations'
@@ -686,6 +686,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     // blocks the deletion, and if the RPC then fails the account is intact and the next
     // Google sign-in simply asks for consent again.
     if (hasGoogleIdentity(session)) await revokeGoogle()
+    // Apple: same order, same reason — the token row cascades with the account.
+    if (hasAppleIdentity(session)) {
+      const apple = await revokeApple()
+      if (apple?.reason === 'no_token') await revokeAppleWithPrompt()
+    }
     const { error } = await supabase.rpc('delete_own_account')
     if (error) {
       setDeleteError(error.message)
