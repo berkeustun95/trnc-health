@@ -13,7 +13,7 @@
 //
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
 export default `Sürüm: 2026-09-20
-Son güncelleme: 20 Eylül 2026
+Son güncelleme: 22 Eylül 2026
 
 KİM OLDUĞUMUZ
 

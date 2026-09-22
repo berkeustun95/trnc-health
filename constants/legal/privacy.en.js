@@ -13,7 +13,7 @@
 //
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
 export default `Version: 2026-09-20
-Last updated: September 20, 2026
+Last updated: September 22, 2026
 
 WHO WE ARE
 
