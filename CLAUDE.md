@@ -687,6 +687,14 @@ Plan, decisions and evidence: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`
 - **The three native modules are `require()`d inside functions**, and
   `check-native-import-safety.mjs` enforces it: google-signin calls
   `TurboModuleRegistry.getEnforcing` at evaluation, so a top-level import kills Expo Go.
+- **Deleting an Apple user OUTSIDE the app: revoke FIRST, then delete.** Apple refresh tokens
+  live in `apple_refresh_tokens`, which is `ON DELETE CASCADE` to `auth.users` — so deleting
+  the user from the Supabase dashboard (or any SQL/admin path) destroys the only thing that
+  could revoke Apple's authorisation, and it can never be revoked afterwards: Apple keeps the
+  Apple ID linked to ADA and withholds the name on the next sign-in. Run
+  `node scripts/revoke-apple-token.mjs <user-id>` first (service role key in the environment
+  for that one command, never saved; the script lands with slice 5), confirm it reports
+  revoked, THEN delete. In-app deletions (Profile, under-13) already revoke before deleting.
 - **`handle_new_user` still reads no metadata** (0827). Names reach `profiles` from the
   client, through `check_profile_name_content`, never from the trigger — a BLOCKED_TERM there
   would abort the `auth.users` insert.
