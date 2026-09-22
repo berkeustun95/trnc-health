@@ -51,7 +51,10 @@ import { readFileSync } from 'node:fs'
 export const SUPABASE_SEED = `
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;
-CREATE ROLE service_role NOLOGIN;
+-- BYPASSRLS, as in production: it is how every Edge Function writes an RLS table. Without
+-- it the fixture is STRICTER than Supabase and a service_role write fails here while
+-- succeeding live — found on 20261044, whose positive control is exactly that write.
+CREATE ROLE service_role NOLOGIN BYPASSRLS;
 
 -- ⚠ BOTH LINES. The second one is the one that was missing, and its absence is what let
 --   a real defect through a green test suite. Do not delete either without reading the

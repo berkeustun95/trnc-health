@@ -35,11 +35,15 @@ import { t } from '../constants/i18n'
 //   thirteenth birthday is the realistic case — gets out by signing out and creating an
 //   account with a truthful date. That makes this one button load-bearing, which is why
 //   it reports a failure instead of silently doing nothing. See lib/supabase.js.
-export default function AgeIneligibleScreen({ lang }) {
+// onDone: the Google/Apple under-13 branch. That account is already DELETED when this shows,
+// so there is nothing to sign out of — the button just dismisses to the entry screen. Same
+// words either way: "we can't create an account" is exactly what happened.
+export default function AgeIneligibleScreen({ lang, onDone }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
 
   async function signOut() {
+    if (onDone) { onDone(); return }
     if (busy) return
     setBusy(true)
     setError(false)

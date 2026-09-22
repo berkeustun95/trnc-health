@@ -242,6 +242,10 @@ const SURFACES = [
   // same commit as the screens themselves, which is the only moment anyone remembers.
   'screens/ConversationsScreen.js',
   'screens/ConversationScreen.js',
+  // Social sign-in, added with the component. Its two ERROR keys (socialSignInFailed,
+  // socialPlayServicesMissing) are reached as t(errorKey) and so are invisible to the literal
+  // scan; they were checked present in all nine locales by hand when added.
+  'components/SocialSignInButtons.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —

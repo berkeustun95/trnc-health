@@ -10,9 +10,10 @@ import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import LegalScreen from './LegalScreen'
 import LegalLinkedText from '../components/LegalLinkedText'
-import { TERMS_CHECKBOX_LIVE } from '../constants/flags'
+import { TERMS_CHECKBOX_LIVE, SOCIAL_AUTH_LIVE } from '../constants/flags'
 import { isLegalFallback, LEGAL_VERSION, legalLocaleFor } from '../constants/legal'
 import { savePendingConsent } from '../utils/pendingConsent'
+import SocialSignInButtons from '../components/SocialSignInButtons'
 
 const LANGUAGES = [
   { key: 'English', code: 'EN' }, { key: 'Turkish', code: 'TR' }, { key: 'Arabic', code: 'AR' },
@@ -253,6 +254,19 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Both tabs, and NOT gated on the terms box: a new user can equally tap Google on
+              the Login tab, so the wizard is where a social account with no recorded
+              acceptance is asked. A tick that IS on at the moment of the tap is carried
+              across instead (utils/socialAuth.js), so nobody is asked twice. */}
+          {SOCIAL_AUTH_LIVE && (
+            <SocialSignInButtons
+              lang={lang}
+              consent={TERMS_CHECKBOX_LIVE && mode === 'signup' && termsOk
+                ? { version: LEGAL_VERSION, locale: legalLocaleFor('terms', lang) }
+                : null}
+            />
+          )}
 
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>{t('email', lang)}</Text>

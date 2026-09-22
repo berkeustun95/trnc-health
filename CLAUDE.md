@@ -36,22 +36,44 @@ eas build --platform android --profile production
 # then submit new AAB to Play Store closed testing track
 ```
 
-⚠ **QUEUED FOR THE NEXT NATIVE BUILD — ride it with the CONNECTIVITY_LIVE / eSIM build,
-never as a standalone.** `app.config.js` still tells the OS this is a health app
-(*"ADA uses your location to show nearby pharmacies, clinics, and hospitals"*), and **no OTA
-can change an OS permission dialog**. Decisions are locked: mic off
-(`microphonePermission: false`, which also blocks Android `RECORD_AUDIO`), **camera KEPT** for
-planned image messaging, both background-location keys deleted (the app only ever calls
-`requestForegroundPermissionsAsync`), location moved to a single source, and `expo.locales`
-for all nine locales **in the same slice** — the string is English-only until it lands.
-**The trap:** the location string exists in THREE places and `applyPermissions` resolves
-`plugin option || ios.infoPlist || plugin default`, so `:87-88` wins and `:27-28` is inert —
-editing only the `ios.infoPlist` pair changes nothing and looks like the build ignoring you.
-Verify with `npx expo config --type introspect`, never by reading `app.config.js`.
-The Play health declaration is drafted **when the build is scheduled**, not before.
-Plan, resolved-config baseline and evidence:
-`~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md`.
-Commit it separately from the eSIM work so it reverts alone. `slug` stays `trnc-health`.
+**iOS builds and submits need no Apple login: `npm run ios:build` / `npm run ios:submit`.**
+They source `~/.appstoreconnect/ada-eas.env` (OUTSIDE the repo, mode 600), which points
+eas-cli at the App Store Connect API key "EAS Build" (`WYJ38BNP8L`, **Admin**, team
+MAQ8XPJ8Z6, Individual) in `~/.appstoreconnect/private_keys/`. eas-cli regenerates a
+provisioning profile in `--non-interactive` mode ONLY with an ASC API key, and ONLY one
+supplied through `EXPO_ASC_API_KEY_PATH` / `EXPO_ASC_KEY_ID` / `EXPO_ASC_ISSUER_ID`
+(+ `EXPO_APPLE_TEAM_ID`, `EXPO_APPLE_TEAM_TYPE`) — a key stored on EAS for submissions is
+never used by the build path (`SetUpProvisioningProfile.js`, `AppStoreApi.js`).
+⚠ **The wrappers pin `eas-cli@24.7.0` via npx, and that pin is load-bearing.** The global
+eas-cli here is 20.0.0, which in `--non-interactive` mode never authenticates before
+validating: it checks the stored profile LOCALLY (cert, bundle ID, expiry — never
+entitlements), trusts it, and ships it. That is exactly how 1.2.0 build 9 died:
+Apple had INVALIDATED profile `8GVX2BBF9V` when Sign In with Apple was enabled, 20.0.0 reused
+it anyway, and Xcode failed on the missing `com.apple.developer.applesignin` entitlement.
+24.7.0 authenticates with the ASC key first (`SetUpProvisioningProfile.js:56`) and
+regenerates an invalid profile. Do not swap the wrappers back to bare `eas`. Never
+commit the key, never print it, never copy it into the repo. If this Mac is lost, revoke it
+in App Store Connect → Users and Access → Integrations. Android AABs are uploaded to Play
+Console by hand: there is no Play service-account key on this machine.
+
+⚠ **PERMISSION STRINGS: LANDED ON `feat/social-auth`, SHIP WITH THE 1.2.0 BUILD.** No OTA
+can change an OS permission dialog, so they are live only once 1.2.0 is installed. Every usage
+description now has ONE source, its plugin option: `applyPermissions` resolves
+`plugin option || ios.infoPlist || plugin default`, so a copy in `ios.infoPlist` is inert while
+it matches and ignored the moment it doesn't. Mic off (`RECORD_AUDIO` removed), camera KEPT
+with real copy for planned image messaging (a named, accepted review risk), both
+background-location keys deleted. Verify with `npx expo config --type introspect`, never by
+reading `app.config.js`. The Play health declaration is drafted **when the build is
+scheduled**. Plan: `~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md`.
+⚠ **`expo.locales` DECLARES SEVEN LEFT-TO-RIGHT LANGUAGES AND MUST NEVER GAIN `ar` OR `fa`.**
+Each entry becomes an `<lang>.lproj` in the iOS bundle, and a bundle with an Arabic or Persian
+localization is exactly what makes React Native mirror the WHOLE layout for a device in that
+language (`RCTI18nUtil`: `allowRTL` defaults YES, nothing here sets it; `allowRTL(false)` from
+JS is read at bridge init, so the first launch would still mirror). Arabic/Persian users get
+the English strings, as everyone did before. RTL support is a separate, app-wide decision.
+Android is untouched by `expo.locales` (empty `values-b+xx`), but RN Android mirrors by DEVICE
+locale with `supportsRtl="true"`, so an Arabic-locale Android phone is probably mirrored
+TODAY — unverified, on the 1.2.0 device-test list.
 
 ⚠ **IMAGE MESSAGING IS BLOCKED ON A SAFETY SCOPE, AND THE SCOPE IS THE FEATURE.**
 `20261029_student_messaging.sql` already says it — *"NO IMAGES. Slice 7, and it waits on CSAM
@@ -119,6 +141,11 @@ branch in App.js, which carries the identical warning for the identical reason.
 - Make the changes according to the prompt then say its done and explain shortly. so dont ask to proceed everytime
 - One bounded task at a time. If scope is unclear, ask.
 - Match the existing data-fetch pattern: query Supabase -> useState -> render.
+- **Ask for ONE item per message.** When you need something from me (an ID, a query result,
+  a decision), ask for exactly one and wait. A list of asks gets partial answers.
+- **Push the working branch after EVERY slice**, feature branches included — not only when I
+  say "push to git" (that one still means main). On 2026-09-21 the code production was
+  running (OTA `53e92f02`, commit `95c6a9f`) existed on this laptop and nowhere else.
 
 ## Security (non-negotiable — this is a health app)
 - Row Level Security (RLS) is the security boundary. Every table with user data
@@ -636,6 +663,41 @@ went missing). Two mandatory rules:
   about that twice — for `claim_requests.kteb_confirmed` and for the 0925 matcher token —
   and it happened anyway, because those warnings were about rows somebody might ADD, not
   about a row that goes stale on its own when a LATER migration moves the number.
+
+## Social sign-in (Google + Apple, native) — from build 1.2.0
+
+Plan, decisions and evidence: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
+
+- **Runtime 1.2.0 is the fence.** `runtimeVersion` is `appVersion`; the native modules exist
+  only from 1.2.0, and EAS serves an update only to an identical runtime. Hotfixes for 1.1.0
+  installs are published from a tree whose `version` is still 1.1.0 (a `release/1.1` branch
+  once social-auth is on main), so every fix ships twice until 1.1.0 fades.
+- **Every social branch keys on `app_metadata.provider`** (`socialProvider()` in
+  `utils/socialAuth.js`) — the FIRST identity. An email account that later linked Google stays
+  `'email'`, which keeps pre-existing accounts out of the social consent tick, the hidden
+  names and the under-13 deletion.
+- **`revokeGoogle()` runs BEFORE anything signs out of Supabase.** SIGNED_OUT calls
+  `signOutGoogle()`, after which `revokeAccess()` is a silent no-op.
+- **Under 13: Google/Apple accounts are DELETED, email accounts are FLAGGED.** A social
+  identity links back to the same auth user, so a flag would lock it out forever.
+- **A name the provider gave is never asked for again** (App Store 4.0). The wizard hides a
+  name field only while it holds exactly the provider's value; a missing one is shown.
+  Apple sends the name ONCE per authorisation — only a token revocation resets that.
+- **`display_name` is labelled "Username" in all nine locales** — never "name" (4.0).
+- **The three native modules are `require()`d inside functions**, and
+  `check-native-import-safety.mjs` enforces it: google-signin calls
+  `TurboModuleRegistry.getEnforcing` at evaluation, so a top-level import kills Expo Go.
+- **Deleting an Apple user OUTSIDE the app: revoke FIRST, then delete.** Apple refresh tokens
+  live in `apple_refresh_tokens`, which is `ON DELETE CASCADE` to `auth.users` — so deleting
+  the user from the Supabase dashboard (or any SQL/admin path) destroys the only thing that
+  could revoke Apple's authorisation, and it can never be revoked afterwards: Apple keeps the
+  Apple ID linked to ADA and withholds the name on the next sign-in. Run
+  `node scripts/revoke-apple-token.mjs <user-id>` first (service role key in the environment
+  for that one command, never saved; the script lands with slice 5), confirm it reports
+  revoked, THEN delete. In-app deletions (Profile, under-13) already revoke before deleting.
+- **`handle_new_user` still reads no metadata** (0827). Names reach `profiles` from the
+  client, through `check_profile_name_content`, never from the trigger — a BLOCKED_TERM there
+  would abort the `auth.users` insert.
 
 ## Compliance (Google Play — declared mixed-audience app)
 

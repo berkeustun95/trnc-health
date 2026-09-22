@@ -47,7 +47,17 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 // Native modules that were added AFTER a production build shipped, and so must never be
 // statically imported. Add to this list whenever a native dependency is introduced.
-const GUARDED = ['expo-web-browser']
+// react-native-webview: installed 2026-09-21 to ride the 1.2.0 build for the Adabüs map, with
+// nothing importing it yet. It is a native COMPONENT, so its eventual require() belongs inside
+// the rendering component, with a fallback.
+//
+// The three social sign-in modules: the 1.2.0 runtime fences old binaries from them, but
+// google-signin's JS calls TurboModuleRegistry.getEnforcing at evaluation, so a top-level
+// import would also crash Expo Go at launch. All three stay require()-in-function.
+const GUARDED = [
+  'expo-web-browser', 'react-native-webview',
+  '@react-native-google-signin/google-signin', 'expo-apple-authentication', 'expo-crypto',
+]
 
 const SKIP = new Set(['node_modules', '.git', 'assets', 'docs', 'web', 'supabase', 'scripts'])
 

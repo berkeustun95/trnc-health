@@ -1,0 +1,7 @@
+{
+  "ios": {
+    "NSLocationWhenInUseUsageDescription": "ADA utilise votre position pour afficher les lieux, services et pharmacies de garde à proximité.",
+    "NSPhotoLibraryUsageDescription": "ADA utilise votre photothèque pour vous permettre d'ajouter des photos à votre profil et à vos messages, ainsi qu'aux annonces, événements, lieux et pages d'entreprise que vous partagez.",
+    "NSCameraUsageDescription": "ADA utilise votre appareil photo pour vous permettre de prendre des photos pour vos messages."
+  }
+}

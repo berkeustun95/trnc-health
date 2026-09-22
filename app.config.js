@@ -1,8 +1,22 @@
+import { readFileSync } from 'fs'
+import { join } from 'path'
+
+// Google's iOS URL scheme is the iOS client ID reversed, and constants/auth.js is the one
+// place that ID lives. It cannot be imported here: only THIS file is transpiled when the
+// config is evaluated, and constants/ is ESM. A scheme that disagrees with the ID does not
+// fail the build — GoogleSignIn throws at the first tap on iOS — so it fails HERE instead.
+const iosClientId = readFileSync(join(__dirname, 'constants/auth.js'), 'utf8')
+  .match(/export const GOOGLE_IOS_CLIENT_ID = '([^']+)'/)?.[1]
+if (!iosClientId?.endsWith('.apps.googleusercontent.com')) {
+  throw new Error('app.config.js: GOOGLE_IOS_CLIENT_ID not found in constants/auth.js')
+}
+const googleIosUrlScheme = iosClientId.split('.').reverse().join('.')
+
 export default {
   expo: {
     name: 'ADA',
     slug: 'trnc-health',
-    version: '1.1.0',
+    version: '1.2.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
     splash: {
@@ -22,14 +36,13 @@ export default {
     ios: {
       supportsTablet: false,
       bundleIdentifier: 'com.berkeustun95.ada',
+      usesAppleSignIn: true,
       minimumOsVersion: '14.0',
+      // Usage descriptions are NOT set here. Each has ONE source, its plugin option below:
+      // applyPermissions resolves `plugin option || ios.infoPlist || plugin default`, so a
+      // copy here is inert while it matches and silently ignored the moment it doesn't.
+      // Verify with `npx expo config --type introspect`, never by reading this file.
       infoPlist: {
-        NSLocationWhenInUseUsageDescription:
-          'ADA uses your location to show nearby pharmacies, clinics, and hospitals.',
-        NSLocationAlwaysAndWhenInUseUsageDescription:
-          'ADA uses your location to show nearby pharmacies, clinics, and hospitals.',
-        NSPhotoLibraryUsageDescription:
-          'ADA needs access to your photos to let you set a profile picture.',
         ITSAppUsesNonExemptEncryption: false,
         CFBundleDisplayName: 'ADA - North Cyprus Assistant',
         CFBundleName: 'ADANorthCyprus',
@@ -66,10 +79,23 @@ export default {
     plugins: [
       '@react-native-community/datetimepicker',
       'expo-font',
+      'expo-apple-authentication',
+      ['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }],
       [
         'expo-image-picker',
         {
-          photosPermission: 'ADA needs access to your photos to let you set a profile picture.',
+          photosPermission:
+            'ADA uses your photo library so you can add photos to your profile and messages, and to the listings, events, places and business pages you share.',
+          // Names MESSAGES ONLY, deliberately: no screen in this build calls launchCameraAsync
+          // (profile and business photos are library-only), and a purpose string may not claim
+          // a flow the reviewer cannot open. Messages stays because photo sending will arrive
+          // by OTA onto this binary, and these strings only change with a native build. Add
+          // profile / business page back in the build that gives those flows a camera.
+          // If image messaging is dropped, set this to false. See
+          // ~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md
+          cameraPermission: 'ADA uses your camera so you can take photos for your messages.',
+          // false also puts RECORD_AUDIO in blockedPermissions. No audio anywhere in the app.
+          microphonePermission: false,
         },
       ],
       [
@@ -85,10 +111,28 @@ export default {
         'expo-location',
         {
           locationWhenInUsePermission:
-            'ADA uses your location to show nearby pharmacies, clinics, and hospitals.',
+            'ADA uses your location to show nearby places, services and duty pharmacies.',
+          // Foreground only: nothing calls requestBackgroundPermissionsAsync.
+          locationAlwaysPermission: false,
+          locationAlwaysAndWhenInUsePermission: false,
         },
       ],
     ],
+    // iOS permission-dialog translations. SEVEN left-to-right languages ONLY — never add
+    // ar or fa here. Each entry becomes an <lang>.lproj in the bundle, and a bundle with an
+    // Arabic/Persian localization is exactly what makes React Native mirror the whole
+    // layout for a device in that language (RCTI18nUtil: allowRTL defaults YES). RTL
+    // support is a separate, app-wide decision. Without an entry those users get the
+    // English strings above, as everyone did before this.
+    locales: {
+      en: './locales/en.json',
+      tr: './locales/tr.json',
+      ru: './locales/ru.json',
+      el: './locales/el.json',
+      fr: './locales/fr.json',
+      es: './locales/es.json',
+      de: './locales/de.json',
+    },
     extra: {
       eas: {
         projectId: '704d192a-1a80-41f8-ab98-cb3c8f078d7c',

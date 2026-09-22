@@ -29,10 +29,12 @@ ADA, Kuzey Kıbrıs'ta yaşayanlar ve buraya yeni gelenler için hazırlanmış 
 
 Hesap verileri: e-posta adresiniz, şifreniz (Supabase Auth tarafından şifrelenir — biz şifrenizi hiçbir zaman görmeyiz) ve hesap rolünüz.
 
+Google veya Apple ile giriş: E-posta ve şifre yerine bunlardan birini kullanırsanız, Google veya Apple bize adınızı, e-posta adresinizi ve onlardaki hesabınıza ait bir tanımlayıcıyı gönderir. Apple, paylaşılan adı düzenlemenize ve e-posta adresinizi gizlemenize izin verir; gizlerseniz, Apple'ın size yönlendirdiği özel bir aktarma adresi alırız. Google ayrıca Google profil fotoğrafınızın bağlantısını da gönderebilir; bunu giriş bilgilerinizle birlikte saklarız ve hiçbir yerde göstermeyiz. Google veya Apple şifrenizi hiçbir zaman görmeyiz. ADA hesabınızı sildiğinizde, Google veya Apple'dan ADA'nın hesabınızla bağlantısını kesmesini de isteriz; ADA'yı dilediğiniz zaman Google Hesabı veya Apple Hesabı ayarlarınızdan kendiniz de kaldırabilirsiniz.
+
 Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listelenmiştir. Bir alanın yanında "henüz kullanılmıyor" yazıyorsa bu ifade birebir doğrudur: veriyi belirtilen amaç için topluyoruz ve uygulamada bugün bu veriyi okuyan hiçbir bölüm yoktur. Bu işaretler yukarıdaki "Son güncelleme" tarihi itibarıyla geçerlidir.
 
 • Ad ve soyad — gerçek adınız. Hesabınızda saklanır; kimlerin görebileceği için 3. bölüme bakınız.
-• Görünen ad — 3 ile 20 karakter arasında, kendi seçtiğiniz bir ad. Gerçek adınız olmak zorunda değildir. Yazdığınız değerlendirmelerin, soruların ve cevapların yanında gösterilen ad budur ve diğer kullanıcıların gördüğü tek addır.
+• Görünen ad (uygulamada “Kullanıcı adı” olarak geçer) — 3 ile 20 karakter arasında, kendi seçtiğiniz bir ad. Gerçek adınız olmak zorunda değildir. Yazdığınız değerlendirmelerin, soruların ve cevapların yanında gösterilen ad budur ve diğer kullanıcıların gördüğü tek addır.
 • Doğum tarihi — 13 yaşında veya daha büyük olduğunuzu doğrulamak için. Girdiğiniz anda kontrol edilir ve bu bilgi olmadan hesap tamamlanamaz. Ayrıca 18 yaşından küçük olup olmadığınızı belirlemek için kullanılır; bu da size gösterilen reklamları etkiler (5. bölüme bakınız).
 • Uyruk — hangi ikamet, izin ve evrak bilgilerinin sizin için geçerli olduğunu ve öncelikle hangi dilleri sunmamız gerektiğini belirleyebilmek için. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
 • Telefon numarası — isteğe bağlıdır. Verirseniz, hesabınızla ilgili konularda sizinle iletişime geçebilmemiz için hesabınızda saklanır. Diğer kullanıcılara gösterilmez ve hizmet sağlayıcılara verilmez. Telefon numarası vermeden ADA'yı eksiksiz kullanabilirsiniz.

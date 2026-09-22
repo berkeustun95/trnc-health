@@ -29,10 +29,12 @@ ADA is a directory and services app for residents of and newcomers to Northern C
 
 Account data: email address, password (hashed by Supabase Auth — we never see it), and your account role.
 
+Sign in with Google or Apple: if you use one of these instead of an email and password, Google or Apple sends us your name, your email address and an identifier for your account with them. Apple lets you edit the name it shares and hide your email address — if you hide it, we receive a private relay address that Apple forwards to you. Google may also send a link to your Google profile photo; we keep it with your sign-in details and do not show it anywhere. We never see your Google or Apple password. When you delete your ADA account, we also ask Google or Apple to disconnect ADA from your account with them, and you can remove ADA yourself at any time in your Google Account or Apple Account settings.
+
 Profile data. Each field is listed with what it is for. Where a field is marked "not used yet", that is literal: we collect it for the stated purpose and nothing in the app reads it today. Those markers are accurate as of the "Last updated" date above.
 
 • First and last name — your real name. Held on your account; see section 3 for who can see it.
-• Display name — a name you choose, 3 to 20 characters. It does not have to be your real name. This is the name shown next to reviews, questions and answers you post, and it is the only name other users see.
+• Display name (labelled “Username” in the app) — a name you choose, 3 to 20 characters. It does not have to be your real name. This is the name shown next to reviews, questions and answers you post, and it is the only name other users see.
 • Date of birth — to confirm you are 13 or over. This is checked when you enter it and the account cannot be completed without it. It is also used to determine whether you are under 18, which affects the advertising you are shown (see section 5).
 • Nationality — so that we can tell which residency, permit and paperwork information applies to you, and which languages to offer first. Not used yet — nothing in the app reads it.
 • Phone number — optional. If you provide it, it is held on your account so that we can contact you about your account. It is not shown to other users and is not given to providers. You can use ADA fully without giving us a phone number.
