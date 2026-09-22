@@ -43,7 +43,15 @@ MAQ8XPJ8Z6, Individual) in `~/.appstoreconnect/private_keys/`. eas-cli regenerat
 provisioning profile in `--non-interactive` mode ONLY with an ASC API key, and ONLY one
 supplied through `EXPO_ASC_API_KEY_PATH` / `EXPO_ASC_KEY_ID` / `EXPO_ASC_ISSUER_ID`
 (+ `EXPO_APPLE_TEAM_ID`, `EXPO_APPLE_TEAM_TYPE`) — a key stored on EAS for submissions is
-never used by the build path (`SetUpProvisioningProfile.js`, `AppStoreApi.js`). Never
+never used by the build path (`SetUpProvisioningProfile.js`, `AppStoreApi.js`).
+⚠ **The wrappers pin `eas-cli@24.7.0` via npx, and that pin is load-bearing.** The global
+eas-cli here is 20.0.0, which in `--non-interactive` mode never authenticates before
+validating: it checks the stored profile LOCALLY (cert, bundle ID, expiry — never
+entitlements), trusts it, and ships it. That is exactly how 1.2.0 build 9 died:
+Apple had INVALIDATED profile `8GVX2BBF9V` when Sign In with Apple was enabled, 20.0.0 reused
+it anyway, and Xcode failed on the missing `com.apple.developer.applesignin` entitlement.
+24.7.0 authenticates with the ASC key first (`SetUpProvisioningProfile.js:56`) and
+regenerates an invalid profile. Do not swap the wrappers back to bare `eas`. Never
 commit the key, never print it, never copy it into the repo. If this Mac is lost, revoke it
 in App Store Connect → Users and Access → Integrations. Android AABs are uploaded to Play
 Console by hand: there is no Play service-account key on this machine.
