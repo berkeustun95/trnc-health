@@ -663,7 +663,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('claim_requests_requester_id_fkey', '', 'id|requester_id'),
     ('claim_requests_status_check', 'approved|pending|rejected', 'status'),
     ('claim_requests_verified_by_fkey', '', ''),
-    ('contact_events_action_check', 'call|call_secondary|website|whatsapp', 'action'),
+    ('contact_events_action_check', 'call|call_secondary|maps|website|whatsapp', 'action'),
     ('contact_events_module_check', 'accommodation|events|explore|garages|grooming|homeServices|insurance|jobs|pets|studentHub|towing|transport', 'module'),
     ('contact_events_pkey', '', ''),
     ('contact_events_region_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'region'),
