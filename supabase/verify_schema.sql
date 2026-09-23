@@ -78,6 +78,9 @@ WITH report AS (
     -- are what see that nobody else can touch it; a table name cannot.
     ('1044_apple_refresh_tokens','apple_refresh_tokens'),
     ('1024_student_affiliation','subject_i18n'),
+    -- Visit NCY walking routes (1048). Dark until go-live: is_active DEFAULT false.
+    ('1048_walking_routes','walking_routes'),
+    ('1048_walking_routes','walking_route_stops'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -622,7 +625,20 @@ WITH report AS (
     -- places provenance (1045). The UNIQUE is registered here only (it is a constraint);
     -- a plain UNIQUE is what PostgREST's ON CONFLICT (source, source_id) can infer.
     ('1045_places_source','places_source_pair_check'),
-    ('1045_places_source','places_source_source_id_key')
+    ('1045_places_source','places_source_source_id_key'),
+    -- walking routes (1048). The FK delete ACTIONS are asserted in H, not here: a name survives CASCADE.
+    ('1048_walking_routes','walking_routes_pkey'),
+    ('1048_walking_routes','walking_routes_region_check'),
+    ('1048_walking_routes','walking_routes_name_check'),
+    ('1048_walking_routes','walking_routes_km_check'),
+    ('1048_walking_routes','walking_routes_source_pair_check'),
+    ('1048_walking_routes','walking_routes_source_source_id_key'),
+    ('1048_walking_routes','walking_route_stops_pkey'),
+    ('1048_walking_routes','walking_route_stops_route_place_key'),
+    ('1048_walking_routes','walking_route_stops_route_id_fkey'),
+    ('1048_walking_routes','walking_route_stops_place_id_fkey'),
+    ('1048_walking_routes','walking_route_stops_position_check'),
+    ('1048_walking_routes','walking_route_stops_leg_check')
 
   ) e(m,o)
 
@@ -706,7 +722,9 @@ WITH report AS (
     -- name is deliberately NOT registered here any more: a token for a dropped index
     -- would sit red forever against a database that is exactly right, and this file
     -- already records twice what a known-stale row does to the reader's attention.
-    ('1009_ad_position_module','idx_ad_banners_position_module_live')
+    ('1009_ad_position_module','idx_ad_banners_position_module_live'),
+    -- 1048: the RESTRICT check on a places delete looks stops up by place_id.
+    ('1048_walking_routes','idx_walking_route_stops_place_id')
 
   ) e(m,o)
 
@@ -3176,6 +3194,33 @@ WITH report AS (
       COALESCE(pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) ILIKE '%FROM places p%'
            AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%FROM landmarks l%'
            AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%FROM beaches b%', false)
+    -- ── 1048: walking routes ─────────────────────────────────────────────────────
+    -- (1) The pre-launch inversion. A reverted DEFAULT creates no named object; without it a
+    --     route inserted without the column publishes itself before the flag flips.
+    UNION ALL SELECT '1048_walking_routes','walking_routes.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='walking_routes'
+          AND column_name='is_active' AND column_default = 'false')
+    -- (2) Read-only to clients, DERIVED: exactly one permissive SELECT policy per table (RLS is
+    --     permissive-OR, so a second widens it), and no client write privilege — has_table_privilege
+    --     resolves inherited grants. Through to_regclass so an absent table reads false, not an error.
+    UNION ALL SELECT '1048_walking_routes','walking tables: 1 SELECT policy each, RLS on, clients hold no write privilege',
+      COALESCE((SELECT bool_and(c.relrowsecurity) FROM pg_class c
+                 WHERE c.oid IN (to_regclass('public.walking_routes'), to_regclass('public.walking_route_stops'))), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='walking_routes') = 1
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='walking_route_stops') = 1
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
+        AND tablename IN ('walking_routes','walking_route_stops') AND (cmd <> 'SELECT' OR permissive <> 'PERMISSIVE'))
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.walking_routes'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.walking_routes'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('anon', to_regclass('public.walking_route_stops'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.walking_route_stops'), 'INSERT,UPDATE,DELETE,TRUNCATE'), false)
+    -- (3) A place on a route cannot be deleted silently: place_id RESTRICT ('r'), route_id CASCADE ('c').
+    --     Section E sees the constraint NAMES, which survive a change of delete action.
+    UNION ALL SELECT '1048_walking_routes','walking_route_stops: place_id ON DELETE RESTRICT, route_id ON DELETE CASCADE',
+      (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.walking_route_stops') AND contype = 'f')
+      IS NOT DISTINCT FROM 'walking_route_stops_place_id_fkey=r,walking_route_stops_route_id_fkey=c'
   ) z
 
   UNION ALL
