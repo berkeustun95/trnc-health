@@ -43,7 +43,8 @@ import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   TRNC_CENTER,
 } from '../constants/mapSources.js'
-import { MODULE_FLAGS } from '../constants/flags.js'
+import { MODULE_FLAGS, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
+import { routesLayerVisible, resolveRoutes, walkEstimate } from '../constants/walkingRoutes.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
          NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES } from '../constants/exploreCategories.js'
@@ -280,6 +281,55 @@ console.log('\nduty pharmacy')
 const duty = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: 'pha-0', isAdmin: false })
 check('duty pin is unreachable until pharmacies are geocoded',
   duty.flatMap(s => s.pins).filter(p => p.isDuty).length, 0)
+
+// ─── Walking routes (Visit NCY) — a LAYER, gated on its own flag ─────────────
+//
+// The discriminating case is the second one: an ADMIN, no review mode, flag false. The
+// house pattern everywhere else on this map is `|| isAdmin`, and that is exactly the
+// one-line "fix" that would show dark partner routes to every admin in production. It is
+// asserted here so that change fails a push rather than surviving review.
+console.log(`\nwalking routes — EXPLORE_ROUTES_LIVE is ${EXPLORE_ROUTES_LIVE}`)
+check('layer hidden: user, flag off',              routesLayerVisible({ routesLive: false, review: false, isAdmin: false }), false)
+check('layer hidden: ADMIN, flag off, no review',  routesLayerVisible({ routesLive: false, review: false, isAdmin: true }), false)
+check('layer hidden: review env but not admin',    routesLayerVisible({ routesLive: false, review: true,  isAdmin: false }), false)
+check('layer shown: review env + admin',           routesLayerVisible({ routesLive: false, review: true,  isAdmin: true }), true)
+check('layer shown: flag on, plain user',          routesLayerVisible({ routesLive: true,  review: false, isAdmin: false }), true)
+check('committed flag hides the layer from an admin',
+  routesLayerVisible({ routesLive: EXPLORE_ROUTES_LIVE, review: false, isAdmin: true }), EXPLORE_ROUTES_LIVE)
+
+// Fixture: 5 live stops ~300 m apart on a line, one pending stop in the middle (absent from
+// the loaded places, as RLS makes it), plus an inactive route and a route with one live stop.
+const RS = Array.from({ length: 6 }, (_, i) => ({ id: `rs-${i}`, latitude: 35.17, longitude: 33.36 + i * 0.0033 }))
+const loaded = new Map(RS.filter(p => p.id !== 'rs-2').map(p => [p.id, p]))
+const stopsOf = ids => ids.map((id, i) => ({ position: i + 1, place_id: id }))
+const ROUTE_ROWS = [
+  { id: 'r-live', is_active: true,  sort_order: 1, walking_route_stops: stopsOf(RS.map(p => p.id)) },
+  { id: 'r-dark', is_active: false, sort_order: 0, walking_route_stops: stopsOf(['rs-0', 'rs-1', 'rs-3']) },
+  { id: 'r-thin', is_active: true,  sort_order: 2, walking_route_stops: stopsOf(['rs-0', 'rs-2']) },
+]
+const resolved = resolveRoutes(ROUTE_ROWS, loaded)
+check('inactive route never resolves outside review', resolved.map(r => r.id), ['r-live'])
+check('review mode keeps the inactive route, in sort_order', resolveRoutes(ROUTE_ROWS, loaded, { review: true }).map(r => r.id), ['r-dark', 'r-live'])
+check('a non-live stop is skipped and the rest renumbered', resolved[0]?.stops.map(p => p.id), ['rs-0', 'rs-1', 'rs-3', 'rs-4', 'rs-5'])
+check('a route left with < 2 drawable stops is dropped', resolved.some(r => r.id === 'r-thin'), false)
+const est = walkEstimate(resolved[0]?.stops ?? [])
+check('≈ figures are rounded: whole km, minutes in 5s', [Number.isInteger(est.km), est.min % 5], [true, 0])
+check('≈ figures use ×1.3 at 4.5 km/h (~1.5 km straight → ≈2 km, ≈25 min)', est, { km: 2, min: 25 })
+
+// The gate above is only worth something if the screen USES it. Code-shape checks, anchored
+// to code (not prose), with the raw value printed on failure.
+const MAP_SRC = readFileSync(resolve(ROOT, 'screens/ExploreMapScreen.js'), 'utf8')
+const REVIEW_SRC = readFileSync(resolve(ROOT, 'utils/exploreReview.js'), 'utf8')
+check('ExploreMapScreen gates the layer on EXPLORE_ROUTES_LIVE via routesLayerVisible',
+  /routesLayerVisible\(\{\s*routesLive:\s*EXPLORE_ROUTES_LIVE\b/.test(MAP_SRC), true)
+const routesQuery = MAP_SRC.indexOf(".from('walking_routes')")
+const effectStart = MAP_SRC.lastIndexOf('useEffect(', routesQuery)
+check('the walking_routes query sits behind `if (!routesOn) return`',
+  routesQuery > 0 && MAP_SRC.slice(effectStart, routesQuery).includes('if (!routesOn) return'), true)
+check('outside review the client filters is_active itself (RLS opens inactive rows to admins)',
+  MAP_SRC.includes("if (!review) q = q.eq('is_active', true)"), true)
+check('review mode is __DEV__-folded (utils/exploreReview.js)',
+  /export const EXPLORE_REVIEW = __DEV__ && /.test(REVIEW_SRC), true)
 
 if (problems.length) {
   console.error('\n  ┌─ MAP SOURCE GATE FAILED ───────────────────────────────────────┐')

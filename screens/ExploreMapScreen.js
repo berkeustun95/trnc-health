@@ -30,6 +30,10 @@ import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { EXPLORE_ROUTES_LIVE } from '../constants/flags'
+import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
+import { routesLayerVisible, resolveRoutes, ROUTE_COLOR } from '../constants/walkingRoutes'
+import { RouteOverlay, RoutePicker, RoutePanel, fitRoute } from '../components/WalkingRoutes'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
@@ -94,14 +98,16 @@ function ClusterMarker({ cluster, onPress }) {
 // thing. Counts are shown because "Kültürel Miras 38" is the single most useful fact on
 // this screen for someone deciding where to look.
 
-function Chip({ label, count, color, colorBg, active, icon, onPress }) {
+function Chip({ label, count, color, colorBg, active, icon, ionicon, onPress }) {
   return (
     <TouchableOpacity
       style={[ch.chip, active && { backgroundColor: colorBg, borderColor: color }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      {icon
+      {ionicon
+        ? <Ionicons name={ionicon} size={14} color={active ? color : colors.textSecondary} />
+        : icon
         ? <Feather name={icon} size={13} color={active ? color : colors.textSecondary} />
         : color ? <View style={[ch.dot, { backgroundColor: color }]} /> : null}
       <Text style={[ch.label, active && { color }]} numberOfLines={1}>{label}</Text>
@@ -112,7 +118,7 @@ function Chip({ label, count, color, colorBg, active, icon, onPress }) {
   )
 }
 
-function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, onOpenNow, lang }) {
+function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, onOpenNow, showRoutes, routesMode, onRoutes, lang }) {
   return (
     <ScrollView
       horizontal
@@ -122,17 +128,29 @@ function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, 
     >
       <Chip
         label={t('all', lang)}
-        active={selectedKeys.size === 0}
+        active={!routesMode && selectedKeys.size === 0}
         color={colors.primary}
         colorBg={colors.primaryLight}
         onPress={onAll}
       />
+      {/* A MODE, not a filter: routes replace the pins while it is on, and any other chip
+          leaves it. Numbered stops under a layer of clustered pins would be unreadable. */}
+      {showRoutes && (
+        <Chip
+          label={t('routesChip', lang)}
+          ionicon="walk"
+          active={routesMode}
+          color={ROUTE_COLOR}
+          colorBg="#E0F2F1"
+          onPress={onRoutes}
+        />
+      )}
       {/* Hidden while no facility has parseable hours — see openNowApplicable(). */}
       {canOpenNow && (
         <Chip
           label={t('openNow', lang)}
           icon="clock"
-          active={openNow}
+          active={!routesMode && openNow}
           color={colors.success}
           colorBg={colors.successLight}
           onPress={onOpenNow}
@@ -145,7 +163,7 @@ function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, 
           count={src.pins.length}
           color={src.color}
           colorBg={src.colorBg}
-          active={selectedKeys.has(src.key)}
+          active={!routesMode && selectedKeys.has(src.key)}
           onPress={() => onToggle(src.key)}
         />
       ))}
@@ -229,6 +247,13 @@ export default function ExploreMapScreen({
   const [selectedKeys, setSelectedKeys] = useState(() => new Set())
   const [openNow, setOpenNow] = useState(false)
 
+  const review   = EXPLORE_REVIEW && isAdmin
+  const routesOn = routesLayerVisible({ routesLive: EXPLORE_ROUTES_LIVE, review: EXPLORE_REVIEW, isAdmin })
+  const [routeRows, setRouteRows]         = useState([])
+  const [routesError, setRoutesError]     = useState(false)
+  const [routesMode, setRoutesMode]       = useState(false)
+  const [selectedRoute, setSelectedRoute] = useState(null)
+
   const initialRegion = useMemo(() => (
     userLocation
       ? { latitude: userLocation.latitude, longitude: userLocation.longitude,
@@ -248,7 +273,8 @@ export default function ExploreMapScreen({
       //
       // `places` ONLY. beaches and landmarks are frozen legacy mirrors of these same 42
       // rows; querying them too would double every pin.
-      let q = supabase.from('places').select(BROWSE_COLS).eq('status', 'active')
+      let q = supabase.from('places').select(review ? `${BROWSE_COLS}, status` : BROWSE_COLS)
+        .in('status', reviewStatuses(review))
       const cats = mapFetchCategories(isAdmin)
       if (cats) q = q.in('category', cats)
       const { data } = await q
@@ -257,7 +283,58 @@ export default function ExploreMapScreen({
       setLoading(false)
     })()
     return () => { active = false }
-  }, [isAdmin])
+  }, [isAdmin, review])
+
+  // Five rows, fetched only when the layer is on — with EXPLORE_ROUTES_LIVE false and no
+  // review mode this effect never queries. is_active is filtered HERE as well as by RLS,
+  // because RLS opens inactive routes to admins and an admin in production is a user.
+  useEffect(() => {
+    if (!routesOn) return
+    let active = true
+    ;(async () => {
+      let q = supabase.from('walking_routes')
+        .select('id, region, name_i18n, sort_order, is_active, walking_route_stops(position, place_id)')
+      if (!review) q = q.eq('is_active', true)
+      const { data, error } = await q
+      if (!active) return
+      setRoutesError(!!error)
+      setRouteRows(error ? [] : (data || []))
+    })()
+    return () => { active = false }
+  }, [routesOn, review])
+
+  // Stops resolve against the places this screen ALREADY loaded — RLS- and status-filtered —
+  // so a stop that is not live is skipped and the rest renumbered (resolveRoutes).
+  const routes = useMemo(
+    () => resolveRoutes(routeRows, new Map(places.map(p => [p.id, p])), { review }),
+    [routeRows, places, review]
+  )
+  const showRoutesChip = routesOn && (routeRows.length > 0 || routesError)
+
+  const fitTo = useCallback((coords, bottomShare) => {
+    if (!coords.length) return
+    mapRef.current?.fitToCoordinates(coords, {
+      edgePadding: { top: 110, right: 40, bottom: Math.round(height * bottomShare), left: 40 },
+      animated: true,
+    })
+  }, [height])
+
+  const enterRoutes = useCallback(() => {
+    setSelected(null)
+    setSelectedRoute(null)
+    setRoutesMode(true)
+    fitTo(routes.flatMap(fitRoute), 0.3)
+  }, [routes, fitTo])
+  const leaveRoutes = useCallback(() => { setRoutesMode(false); setSelectedRoute(null) }, [])
+
+  const openRoute = useCallback(r => {
+    setSelectedRoute(r)
+    fitTo(fitRoute(r), 0.55)
+  }, [fitTo])
+  const closeRoute = useCallback(() => {
+    setSelectedRoute(null)
+    fitTo(routes.flatMap(fitRoute), 0.3)
+  }, [routes, fitTo])
 
   const sources = useMemo(
     () => buildMapSources({ facilities, places, dutyFacilityId, isAdmin }),
@@ -278,13 +355,14 @@ export default function ExploreMapScreen({
 
   const toggleSource = useCallback(key => {
     setSelected(null)
+    leaveRoutes()
     setSelectedKeys(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
       return next
     })
-  }, [])
+  }, [leaveRoutes])
 
   const index = useMemo(() => {
     const idx = new Supercluster(CLUSTER_OPTS)
@@ -356,7 +434,15 @@ export default function ExploreMapScreen({
         onRegionChangeComplete={setRegion}
         onPress={() => setSelected(null)}
       >
-        {clusters.map(c => {
+        {routesMode && (
+          <RouteOverlay
+            routes={routes}
+            selected={selectedRoute}
+            onSelectRoute={openRoute}
+            onSelectStop={p => onSelectPlace?.(p)}
+          />
+        )}
+        {!routesMode && clusters.map(c => {
           if (c.properties.cluster) {
             return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} onPress={expandCluster} />
           }
@@ -377,12 +463,27 @@ export default function ExploreMapScreen({
         sources={sources}
         selectedKeys={selectedKeys}
         onToggle={toggleSource}
-        onAll={() => { setSelected(null); setSelectedKeys(new Set()) }}
+        onAll={() => { setSelected(null); leaveRoutes(); setSelectedKeys(new Set()) }}
         openNow={openNow}
         canOpenNow={canOpenNow}
-        onOpenNow={() => { setSelected(null); setOpenNow(v => !v) }}
+        onOpenNow={() => { setSelected(null); leaveRoutes(); setOpenNow(v => !v) }}
+        showRoutes={showRoutesChip}
+        routesMode={routesMode}
+        onRoutes={() => (routesMode ? leaveRoutes() : enterRoutes())}
         lang={lang}
       />
+
+      {routesMode && (selectedRoute
+        ? <RoutePanel
+            route={selectedRoute}
+            lang={lang}
+            maxHeight={Math.round(height * 0.55)}
+            review={review}
+            onClose={closeRoute}
+            onSelectStop={p => onSelectPlace?.(p)}
+          />
+        : <RoutePicker routes={routes} lang={lang} error={routesError} onSelectRoute={openRoute} />
+      )}
 
       {loading && (
         <View style={s.loading} pointerEvents="none">

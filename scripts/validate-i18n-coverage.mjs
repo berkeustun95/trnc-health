@@ -81,6 +81,9 @@ const SURFACES = [
   //   still reported OK.
   'screens/OnboardingScreen.js',
   'screens/ExploreMapScreen.js',
+  // The walking-routes layer drawn on that map (Visit NCY). Added with the component, while
+  // EXPLORE_ROUTES_LIVE is still false — guarded before the flip, not after.
+  'components/WalkingRoutes.js',
   'screens/ExploreProfileScreen.js',
   'components/ComingSoonScreen.js',
   // Widened 2026-08-26 for the duty-roster error state. Measured before widening: these

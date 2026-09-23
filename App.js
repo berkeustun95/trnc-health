@@ -19,6 +19,8 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE } from './constants/flags'
+import { EXPLORE_REVIEW } from './utils/exploreReview'
+import ScreenHeader from './components/ScreenHeader'
 import { promosAllowed } from './constants/homeStrip'
 import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
@@ -508,7 +510,7 @@ export default function App() {
   // Session state is right here, unlike the flag path: the account no longer exists, so
   // there is nothing a relaunch could escape back into.
   const [ageDeletedNotice, setAgeDeletedNotice] = useState(false)
-  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'studentHub'. Admins never reach HomeScreen /
+  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'exploreMap' (dev review) | 'studentHub'. Admins never reach HomeScreen /
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
                                                                          // not a per-surface boolean.
@@ -1474,7 +1476,8 @@ export default function App() {
       />
     }
   } else if (profile.role === 'admin' && !adminPreview) {
-    content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')} />
+    content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')}
+      onShowExploreReview={EXPLORE_REVIEW ? () => setAdminPreview('exploreMap') : undefined} />
   } else if (profile.role === 'provider') {
     if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
       content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
@@ -1696,6 +1699,28 @@ export default function App() {
       </BLErrorBoundary>
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />
+    )
+  } else if (adminPreview === 'exploreMap') {
+    // Dev-only Visit NCY review (utils/exploreReview.js): the Keşfet map with pending places
+    // and the routes layer, for an admin — who otherwise never reaches the tab shell. Only
+    // AdminScreen's review button sets this, and App passes that button only when
+    // EXPLORE_REVIEW — which compiles to a constant `false` in a release bundle (measured
+    // 2026-09-23 on `expo export` WITH the env var set: `var t=!1`).
+    content = (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScreenHeader onBack={() => setAdminPreview(null)} title="Keşfet · review mode" lang={lang} />
+        <ExploreMapScreen
+          onShowList={() => setAdminPreview('explore')}
+          facilities={facilities}
+          dutyFacilityId={dutyFacilityId}
+          userLocation={userLocation}
+          isAdmin={isAdmin}
+          onSelectFacility={setSelectedFacility}
+          onSelectUnclaimed={setUnclaimedFacility}
+          onSelectPlace={setSelectedExplorePlace}
+          lang={lang}
+        />
+      </SafeAreaView>
     )
   } else if (adminPreview === 'explore') {
     content = (

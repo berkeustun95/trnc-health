@@ -15,6 +15,7 @@ import { EXPLORE_FEATURED_LIVE } from '../constants/flags'
 import { isFeatured } from '../utils/featured'
 import { resolveAttribution } from '../utils/photoAttribution'
 import PhotoCredit from '../components/PhotoCredit'
+import { VISITNCY_SOURCE } from '../constants/walkingRoutes'
 import ContentReportMenu from '../components/ContentReportMenu'
 import BackButton from '../components/BackButton'
 import ComingSoonScreen from '../components/ComingSoonScreen'
@@ -264,6 +265,16 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
             </View>
           )}
 
+          {/* Partner credit for places imported from Visit NCY's city walking maps. Reads
+              `source`, which reaches this screen only because BROWSE_COLS / PLACE_COLS
+              select it — there is no re-fetch here. */}
+          {place.source === VISITNCY_SOURCE && (
+            <View style={s.partnerCredit}>
+              <Ionicons name="ribbon-outline" size={13} color={colors.textSecondary} />
+              <Text style={s.partnerCreditText}>{t('routeCredit', lang)}</Text>
+            </View>
+          )}
+
           {/* Amenities (any category, when non-empty) — was beach "facilities" */}
           {place.amenities?.length > 0 && (
             <View style={s.section}>
@@ -434,6 +445,8 @@ const s = StyleSheet.create({
   accessText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   section:      { marginBottom: 20 },
+  partnerCredit:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
+  partnerCreditText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
 
   desc: { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary,

@@ -82,7 +82,7 @@ const HEALTH_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 // photo_attribution is INCLUDED and must stay: ExploreProfileScreen renders the credit
 // line and source link from it, and both callers here are production routes to that
 // screen.
-const PLACE_COLS = 'id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until'
+const PLACE_COLS = 'id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until, source'
 
 // ⚠ V1's TILE LIST. It uses this file's OWN three-value tint vocabulary (urgent /
 //   service / lifestyle, TINTS above); constants/homeModules.js uses V2's two-value one
