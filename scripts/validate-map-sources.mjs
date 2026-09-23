@@ -35,6 +35,9 @@
 //     ✗ flag on, explore DARK: the pin still appears → 0
 //     The in-region check PASSED on zero pins in this run ([].every() is true); it now
 //     compares map(inBox) to [true].
+//   placeColors.petHotel set to the old lifestyle orange #C2410C, then to violet #6D28D9
+//     ✗ hue 17: duty pharmacy (0 deg), hospital (25), heritage (18)
+//     ✗ hue 263: health:pharmacy (1 deg)
 //
 // WORTH KNOWING: the gate break left FIVE of the eight dark-state checks green, "beaches
 // stay live" among them. A suite that asserted only the happy path would have shipped the
@@ -52,6 +55,7 @@ import {
   TRNC_CENTER,
 } from '../constants/mapSources.js'
 import { MODULE_FLAGS, PET_HOTEL_LIVE } from '../constants/flags.js'
+import { colors, typeColors } from '../constants/theme.js'
 import { PET_PARTNERS } from '../constants/petPartners.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
@@ -330,6 +334,28 @@ check('flag on, explore DARK: the Explore world is otherwise unchanged (11 + 1)'
 check('default petHotelLive follows PET_HOTEL_LIVE',
   phPins(buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true })).length,
   PET_HOTEL_LIVE ? 1 : 0)
+// ANDROID PIN HUE. react-native-maps' default Android marker keeps only the HUE of
+// pinColor, so two pins of similar hue are the same pin there. The pet hotel pin must sit
+// >= 30 degrees from every other source and from the duty-pharmacy accent, which has no
+// source of its own. Hues are READ from the built sources, never listed by hand.
+const hueOf = hex => {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+  const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b)
+  if (!d) return 0
+  const x = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return (x * 60 + 360) % 360
+}
+const hueGap = (a, b) => { const d = Math.abs(hueOf(a) - hueOf(b)); return Math.min(d, 360 - d) }
+const phColor = phOnLive.find(s => s.key === phKey)?.color
+// EVERY source that can ever exist, not just today's pinnable ones: buildMapSources drops a
+// source with zero pins, which would silently skip pharmacy (0 geocoded) — the very case
+// this guards. Built from the same tables mapSources.js colours pins with.
+const rivals = [['duty pharmacy', colors.accent],
+  ...HEALTH_TYPES.map(t => [`health:${t}`, (typeColors[t] || typeColors.clinic).text]),
+  ...Object.entries(GROUP_META).map(([g, m]) => [`explore:${g}`, m.colorToken.text])]
+const tooClose = rivals.filter(([, c]) => !phColor || hueGap(phColor, c) < 30)
+  .map(([k, c]) => `${k} ${c} (${phColor ? hueGap(phColor, c).toFixed(0) : '?'} deg)`)
+check(`pet hotel pin hue ${phColor ? hueOf(phColor).toFixed(0) : '?'} is >= 30 deg from all ${rivals.length} other pins`, tooClose, [])
 check('pethotel chip label resolves in English', t('petHotelDogBoarding', 'English') !== 'petHotelDogBoarding', true)
 
 if (problems.length) {

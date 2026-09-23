@@ -291,9 +291,15 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
     logContactEvent('accommodation', partner.id, 'website', region)
     Linking.openURL(url).catch(() => {})
   }
+  // ⚠ 'maps' REQUIRES 20261046_contact_events_maps_action.sql TO BE APPLIED, and unlike
+  //   'website' above there is NO flag between this line and users: DORMS_LIVE is already
+  //   true. Before 20261046 the CHECK rejects the row and logContactEvent swallows it, so
+  //   the tap still opens maps but is never counted. Do not OTA this ahead of 20261046
+  //   (verify with pg_get_constraintdef, or verify_schema's 20261046_maps_action tokens).
   const openDirections = () => {
     if (!sec.coords) return
     const { latitude, longitude } = sec.coords
+    logContactEvent('accommodation', partner.id, 'maps', region)
     Linking.openURL(`https://maps.google.com/?q=${latitude},${longitude}`).catch(() => {})
   }
 

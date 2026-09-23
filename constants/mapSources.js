@@ -28,7 +28,7 @@
 import { MODULE_FLAGS, PET_HOTEL_LIVE } from './flags.js'
 import { HEALTH_TYPES } from './facilityTypes.js'
 import { parseIsOpen } from '../utils/facilityUtils.js'
-import { typeColors, placeColors, colors } from './theme.js'
+import { typeColors, placeColors } from './theme.js'
 import { PET_PARTNERS } from './petPartners.js'
 import {
   EXPLORE_GROUPS, GROUP_ORDER, GROUP_META, LIVE_TILE_GROUPS,
@@ -150,12 +150,8 @@ function placePins(places) {
 // `petHotelLive` defaults to the real flag and is a parameter ONLY so
 // validate-map-sources.mjs can assert both worlds, the same reason `exploreLive` is.
 //
-// The lifestyle tint pair, not raw accent: an active chip draws its label in `color` on
-// `colorBg`, and accent on accentLight is 2.17:1 (theme.js), unreadable. Orange keeps it
-// in the partner-badge family, apart from ADA's own teal and blue categories.
-// ⚠ On Android pinColor keeps only the hue, so this pin looks like the duty-pharmacy pin
-//   (colors.accent). Unreachable today, because no pharmacy has coordinates; revisit when
-//   pharmacies are geocoded.
+// placeColors.petHotel (lime) — see its note in theme.js. It used to be the lifestyle tint
+// pair, whose hue (17) Android rendered identically to the duty-pharmacy pin (18).
 function petHotelPins(partners) {
   return (partners || [])
     .filter(p => p.coords && Number.isFinite(p.coords.latitude) && Number.isFinite(p.coords.longitude))
@@ -165,8 +161,8 @@ function petHotelPins(partners) {
       row:     p,
       lat:     p.coords.latitude,
       lng:     p.coords.longitude,
-      color:   colors.tintLifestyleFg,
-      colorBg: colors.tintLifestyleBg,
+      color:   placeColors.petHotel.text,
+      colorBg: placeColors.petHotel.bg,
       isDuty:  false,
     }))
 }
@@ -223,8 +219,8 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
     sources.push({
       key:      'pethotel',
       labelKey: 'petHotelDogBoarding',
-      color:    colors.tintLifestyleFg,
-      colorBg:  colors.tintLifestyleBg,
+      color:    placeColors.petHotel.text,
+      colorBg:  placeColors.petHotel.bg,
       pins:     petHotelPins(petPartners),
     })
   }

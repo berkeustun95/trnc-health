@@ -68,6 +68,11 @@ export const typeColors = {
 export const placeColors = {
   beach:    { bg: '#E0F2FE', text: '#0369A1' },
   landmark: { bg: '#FEF9C3', text: '#A16207' },
+  // Pet hotel partner pin (constants/mapSources.js). Lime, hue 86: Android's default marker
+  // keeps only the HUE of pinColor, so this must sit well clear of every other pin, the
+  // duty-pharmacy accent (hue 18) above all. validate-map-sources.mjs asserts >= 30 degrees
+  // from every source. Text on bg is 4.82:1.
+  petHotel: { bg: '#F7FEE7', text: '#4D7C0F' },
 }
 
 export const gameColors = {

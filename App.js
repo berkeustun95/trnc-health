@@ -533,6 +533,15 @@ export default function App() {
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
+  // True only while PetHotelPartnerScreen was opened from the Explore map pin, so back
+  // returns to the map in one press instead of stopping on Pets home. Cleared whenever the
+  // pets module closes, so a stale true can never make a later card-opened visit exit pets.
+  const [petHotelFromMap, setPetHotelFromMap] = useState(false)
+  useEffect(() => { if (!showPets) setPetHotelFromMap(false) }, [showPets])
+  const closePetHotel = () => {
+    if (petHotelFromMap) setShowPets(false)
+    setPetsSubScreen(null)
+  }
   const [showGames, setShowGames] = useState(false)
   const [gamesSubScreen, setGamesSubScreen] = useState(null)
   const [openedProperty, setOpenedProperty] = useState(null)
@@ -801,6 +810,7 @@ export default function App() {
       if (showAccommodation) { setShowAccommodation(false); return true }
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
       if (selectedFacility) { setSelectedFacility(null); return true }
+      if (petsSubScreen === 'pethotel') { closePetHotel(); return true }
       if (petsSubScreen) { setPetsSubScreen(null); return true }
       if (showPets) { setShowPets(false); return true }
       if (showHomeServices) { setShowHomeServices(false); return true }
@@ -832,7 +842,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -1772,7 +1782,7 @@ export default function App() {
           partner={PET_PARTNERS[0]}
           lang={lang}
           region={null}
-          onBack={() => setPetsSubScreen(null)}
+          onBack={closePetHotel}
         />
       )
     } else if (petsSubScreen === 'owning') {
@@ -2045,9 +2055,9 @@ export default function App() {
                 onSelectFacility={setSelectedFacility}
                 onSelectUnclaimed={setUnclaimedFacility}
                 onSelectPlace={setSelectedExplorePlace}
-                // Same route the pets cards use, flag re-checked there. Back lands on
-                // PetsHomeScreen, not the map: petsSubScreen clears first.
-                onSelectPetHotel={() => { setShowPets(true); setPetsSubScreen('pethotel') }}
+                // Same route the pets cards use, flag re-checked there. petHotelFromMap
+                // makes back return here in one press (closePetHotel).
+                onSelectPetHotel={() => { setShowPets(true); setPetsSubScreen('pethotel'); setPetHotelFromMap(true) }}
                 lang={lang}
               />
             ) : (
