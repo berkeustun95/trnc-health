@@ -1,11 +1,12 @@
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, useWindowDimensions } from 'react-native'
+import { View, Text, Image, ScrollView, FlatList, TouchableOpacity, StyleSheet, Linking, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import BackButton from '../../components/BackButton'
+import PartnerLogoStrip from '../../components/PartnerLogoStrip'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t, LANG_CODES } from '../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../constants/regions'
-import { partnerAsset } from '../../constants/partnerAssets'
+import { partnerAsset, partnerLogo } from '../../constants/partnerAssets'
 import { petPartnerSections, petWaUrl, petPartnerWebsiteUrl, SECTION_ORDER } from '../../constants/petPartners'
 import { logContactEvent } from '../../utils/logContactEvent'
 
@@ -48,6 +49,11 @@ const CONTACT_BAR_CLEARANCE = 120
 // One source for the horizontal gallery gap. The style and the snap interval must agree,
 // and they cannot if the number is typed twice.
 const STRIP_GAP = 10
+// Same box as DormPartnerScreen's hero. PartnerLogoStrip fits a square mark to height x
+// height, left-aligned, and renders nothing when no logo is wired.
+const HERO_LOGO = { width: 200, height: 56 }
+
+const StripGap = () => <View style={{ width: STRIP_GAP }} />
 
 function Block({ title, children }) {
   return (
@@ -180,6 +186,19 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
                 <Text style={s.badgeText}>{t('petHotelBadge', lang)}</Text>
               </View>
 
+              {/* ⚠ LIGHT ONLY. The app has no dark theme (app.config.js userInterfaceStyle
+                  'light'), so nothing passes 'dark' here. If one arrives, do NOT use
+                  partnerLogo(partner, 'dark'): it falls back to `logo`, and Shiny Paw's mark
+                  is keyed from white and breaks on dark (PENDING_FIELDS.logoOnDark). With
+                  logoOnDark pending, a dark hero renders no logo at all. */}
+              <PartnerLogoStrip
+                source={partnerLogo(partner)}
+                name={partner.name}
+                width={HERO_LOGO.width}
+                height={HERO_LOGO.height}
+                style={{ marginBottom: 8 }}
+              />
+
               {/* ⚠ DOG BOARDING, NEVER "PETS". The one claim on this page most likely to
                   drift: the surface sits inside a module called Evcil Hayvanlar and every
                   icon around it is a paw. partner.displayType is the source, so widening
@@ -201,22 +220,35 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
               {/* Photos carry their OWN aspect from config. A single container aspect for a
                   mixed set centre-crops whichever photo disagrees — which for a 512x640
                   portrait is most of the subject. */}
+              {/* ⚠ WINDOWED, NOT A ScrollView. A horizontal ScrollView mounts every child, and
+                  an Image starts loading when it mounts, not when it scrolls into view, so all
+                  five photos decoded together as the hero rendered. windowSize 3 keeps about one
+                  viewport either side mounted. The cost: a frame scrolled far out of the window
+                  unmounts, and on the way back it shows the sand ground while it decodes again. */}
               {!!sec.photos && (
-                <ScrollView
+                <FlatList
                   horizontal
+                  data={sec.photos}
+                  keyExtractor={(_, i) => String(i)}
+                  renderItem={({ item: ph }) => (
+                    <View style={[s.shot, { width: SHOT_W, aspectRatio: ph.aspect }]}>
+                      <Image source={ph.source} style={s.shotImg} resizeMode="cover" />
+                    </View>
+                  )}
+                  ItemSeparatorComponent={StripGap}
+                  // Offsets from the same numbers the layout uses (16 = s.strip paddingHorizontal),
+                  // so windowing never waits on measurement.
+                  getItemLayout={(_, i) => ({ length: SHOT_W, offset: 16 + i * SNAP, index: i })}
+                  initialNumToRender={2}
+                  maxToRenderPerBatch={1}
+                  windowSize={3}
                   showsHorizontalScrollIndicator={false}
                   snapToInterval={SNAP}
                   snapToAlignment="start"
                   decelerationRate="fast"
                   contentContainerStyle={s.strip}
                   style={s.stripWrap}
-                >
-                  {sec.photos.map((ph, i) => (
-                    <View key={i} style={[s.shot, { width: SHOT_W, aspectRatio: ph.aspect }]}>
-                      <Image source={ph.source} style={s.shotImg} resizeMode="cover" />
-                    </View>
-                  ))}
-                </ScrollView>
+                />
               )}
             </View>
           )
@@ -350,7 +382,7 @@ const s = StyleSheet.create({
   stripWrap:    { marginTop: 14, marginHorizontal: -16 },
   // paddingHorizontal equals the content padding so the first frame lines up with the text
   // above it and the last one has the same breathing room as the gap between frames.
-  strip:        { gap: STRIP_GAP, paddingHorizontal: 16 },
+  strip:        { paddingHorizontal: 16 },
   shot:         { borderRadius: radius.sm, overflow: 'hidden', backgroundColor: colors.sand },
   shotImg:      { width: '100%', height: '100%' },
 
