@@ -216,6 +216,10 @@ export const PET_PARTNERS = [
         note: 'partner-supplied, real photo, AI-edited per partner — the yard, two dogs.' },
     ],
 
+    // The card's 64pt square thumb has its OWN file. Pointing it at the first gallery photo
+    // decoded 900x900 (3.2 MB) to fill 192x192 px. check-pet-partners.mjs caps its size.
+    thumb: 'shinypaw/kennel-row-thumb',
+
     // ─── PENDING (see PENDING_FIELDS above for the reason on each) ──────────
     //
     // Written out in full rather than omitted. An absent key and a null one read the same

@@ -127,6 +127,9 @@ export const PARTNER_ASSETS = {
   //   were rejected for AI anatomy or layout, and a filename proves nothing.
   'shinypaw/logo':            require('../assets/partners/shinypaw/logo.png'),
   'shinypaw/kennel-row':      require('../assets/partners/shinypaw/kennel-row.jpg'),
+  // 192x192 = PetHotelPartnerCard's 64pt thumb at 3x. Resized from the same source as
+  // kennel-row.jpg, not from the 900 px file, so it is one resample rather than two.
+  'shinypaw/kennel-row-thumb': require('../assets/partners/shinypaw/kennel-row-thumb.jpg'),
   'shinypaw/yard-three-dogs': require('../assets/partners/shinypaw/yard-three-dogs.jpg'),
   'shinypaw/hose':            require('../assets/partners/shinypaw/hose.jpg'),
   'shinypaw/yard-feeding':    require('../assets/partners/shinypaw/yard-feeding.jpg'),

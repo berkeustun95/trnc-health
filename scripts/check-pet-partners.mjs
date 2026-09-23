@@ -109,6 +109,7 @@ const seenSlugs = new Set()
 const referencedKeys = new Set()
 const referencedAssets = new Set()
 let placeholderPhotos = 0
+const thumbKeys = []
 const disputedPhotos = []
 const PROVENANCE = new Set(['photograph', 'partner-edited', 'disputed'])
 
@@ -253,7 +254,8 @@ for (const p of PET_PARTNERS) {
   }
 
   if (p.aboutKey) referencedKeys.add(p.aboutKey)
-  for (const a of ['logo', 'logoOnDark']) if (p[a]) referencedAssets.add(p[a])
+  for (const a of ['logo', 'logoOnDark', 'thumb']) if (p[a]) referencedAssets.add(p[a])
+  if (p.thumb) thumbKeys.push(p.thumb)
 
   // ─── 4. PENDING_FIELDS must still be null ───────────────────────────────
   //
@@ -469,6 +471,10 @@ function pixelSize(file) {
 }
 
 let diskBytes = 0, decodeBytes = 0, unsized = 0
+const thumbSizes = []
+// The card thumb is a 64pt box, so 3x density needs 192 px. A thumb key pointed at a gallery
+// frame decodes 900x900 (3.2 MB) and renders identically, so only a size check can catch it.
+const THUMB_MAX_PX = 256
 for (const key of referencedAssets) {
   const m = readFileSync(resolve(ROOT, 'constants/partnerAssets.js'), 'utf8')
     .match(new RegExp(`'${key.replace(/[.*+?^\${}()|[\]\\]/g, '\\$&')}':\\s*require\\('([^']+)'\\)`))
@@ -478,6 +484,11 @@ for (const key of referencedAssets) {
     diskBytes += statSync(file).size
     const px = pixelSize(file)
     if (px) decodeBytes += px.w * px.h * 4; else unsized++
+    if (thumbKeys.includes(key)) {
+      thumbSizes.push(`${key} ${px ? `${px.w}x${px.h}` : '?'}`)
+      if (!px || px.w > THUMB_MAX_PX || px.h > THUMB_MAX_PX)
+        problems.push(`thumb ${key} is ${px ? `${px.w}x${px.h}` : 'unmeasurable'}, over ${THUMB_MAX_PX} px: a 64pt card box needs 192`)
+    }
   } catch { unsized++ }
 }
 const MB = n => (n / 1048576).toFixed(2) + ' MB'
@@ -506,6 +517,7 @@ console.log(c.d(`                      per-locale coverage belongs to npm run i1
 console.log(`  asset keys          ${referencedAssets.size}`)
 console.log(`  asset footprint     ${MB(diskBytes)} on disk · ${MB(decodeBytes)} decoded (ARGB8888)`
   + (unsized ? c.r(`  [${unsized} unmeasured]`) : ''))
+console.log(`  card thumb          ${thumbSizes.length ? thumbSizes.join(', ') : c.d('none: the card decodes the first gallery photo')}`)
 console.log(`  assertions made     ${assertions}`)
 console.log(c.d(`  ─────────────────────────────────────────────────────────────`))
 

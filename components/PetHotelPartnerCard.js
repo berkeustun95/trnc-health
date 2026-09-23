@@ -29,10 +29,12 @@ import { partnerAsset } from '../constants/partnerAssets'
 export default function PetHotelPartnerCard({ partner, lang, onPress }) {
   if (!partner) return null
 
-  // The first resolvable photo. Falls through the list rather than indexing [0], so an
-  // unwired or dropped key degrades to the next one instead of to a blank thumbnail — and
-  // to no thumbnail at all if none resolve, which the layout handles.
-  const thumb = (partner.photos || []).map(p => partnerAsset(p.key)).find(Boolean)
+  // The dedicated thumb file first: a 64pt box needs 192 px, not a 900 px gallery frame.
+  // Failing that, the first resolvable photo. That falls through the list rather than
+  // indexing [0], so an unwired or dropped key degrades to the next one instead of to a
+  // blank thumbnail, and to no thumbnail at all if none resolve, which the layout handles.
+  const thumb = partnerAsset(partner.thumb)
+    || (partner.photos || []).map(p => partnerAsset(p.key)).find(Boolean)
   const districtKey = REGION_LABEL_KEY[partner.district]
 
   return (

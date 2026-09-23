@@ -89,6 +89,7 @@ for (const [file, exportName] of CONFIGS) {
   for (const p of list) {
     if (p.logo) declared.add(p.logo)
     if (p.logoOnDark) declared.add(p.logoOnDark)
+    if (p.thumb) declared.add(p.thumb)
     // ⚠ PER-ITEM PHOTOS, and this guard was blind to them until 2026-09-10. A dorm's six
     //   room types each carry their own `photo` key; a typo in one resolved to undefined
     //   and the row rendered without a picture — which is ALSO the legitimate no-photo
