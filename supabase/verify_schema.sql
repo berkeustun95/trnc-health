@@ -3150,6 +3150,14 @@ WITH report AS (
       COALESCE(pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%if auth.uid() is null then return new%'
            AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := null%'
            AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := old.source_id%', false)
+    -- ── 1047: search_content reads places ───────────────────────────────────────
+    -- Explore has read places since 0822; search kept two arms on the legacy tables, so
+    -- any place added since was unfindable. Anchored to code (FROM <table> <alias>): the
+    -- places arm's own comment names no table, so no prose can satisfy or trip this.
+    UNION ALL SELECT '1047_search_content_places_arm','search_content reads places, not beaches/landmarks',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) ILIKE '%FROM places p%'
+           AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%FROM landmarks l%'
+           AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%FROM beaches b%', false)
   ) z
 
   UNION ALL
