@@ -166,7 +166,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261045_places_source.sql', '6078688d67661955f6721edd620f71fb2e7cd52e8cbde917eba67b8a1b4fb545'),
   ('20261046_contact_events_maps_action.sql', '093629116bc76d1bd415ad10e88e67992877533db59698e90ee0463de3938496'),
   ('20261047_search_content_places_arm.sql', '626e14e8b3d58bb2ff8ad0a20b00078ce1186134fae4c39a1a18b4f5b1cb56a6'),
-  ('20261048_walking_routes.sql', '9bd81116cba72d8b72ddbeff9530d6dca4588fbdee57b987fc2371a6080d99c5')
+  ('20261048_walking_routes.sql', '67eb944a009bb7d19d2c47207ca114b304c551510c067c6d007e72efc44e9fba')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

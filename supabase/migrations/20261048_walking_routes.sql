@@ -207,8 +207,10 @@ BEGIN
     BEGIN
       DELETE FROM public.places WHERE id = v_place;
       v_restrict := 'DELETED';
-    -- ON DELETE RESTRICT raises 23001 restrict_violation, NOT 23503 foreign_key_violation.
-    EXCEPTION WHEN restrict_violation THEN v_restrict := 'refused';
+    -- The SQLSTATE of a RESTRICT refusal differs by Postgres version: prod raised 23503
+    -- foreign_key_violation (first apply, 2026-09-23), the PGlite harness raises 23001
+    -- restrict_violation. Either one means the delete was refused; anything else propagates.
+    EXCEPTION WHEN foreign_key_violation OR restrict_violation THEN v_restrict := 'refused';
     END;
 
     RAISE EXCEPTION 'ZZ_PROBE_ROLLBACK';
@@ -241,7 +243,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261048_walking_routes.sql', '9bd81116cba72d8b72ddbeff9530d6dca4588fbdee57b987fc2371a6080d99c5')
+VALUES ('20261048_walking_routes.sql', '67eb944a009bb7d19d2c47207ca114b304c551510c067c6d007e72efc44e9fba')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
