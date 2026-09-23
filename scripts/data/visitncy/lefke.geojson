@@ -1,0 +1,221 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": 3316499096,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.851057,
+     35.116721
+    ]
+   },
+   "properties": {
+    "title": "Lefke Mahkemeler Camii",
+    "image": {
+     "id": "rwb8h34xesg7jhjx",
+     "w": 680,
+     "h": 314,
+     "tip_color": "#454126",
+     "avg_color": "#6f6756"
+    },
+    "marker-symbol": "trail",
+    "description": "Direction\nhttps://goo.gl/maps/LvGrfZ7SA7rsdbJx5?coh=178573&entry=tt\n\nIt is a single-room building made of cut stone in the lower quarter of Lefke. As it is known as the Lower Mosque, it is also known as the \"Court Mosque\" and \"Abu Bekir Mosque\". Although the construction date of the old mosque is not known for now, it is believed that it was built before this date, based on the tombstone dated 5 Muharram 1235 H (25 October 1819) belonging to Mulla Hüseyin, who worked in the service of the Lefke Naibi Said Efendi, which was found in the garden of the mosque and transferred to the Güzelyurt Archeology and Nature Museum. is understood. The current mosque was built on 4 November 1901 on the site of the old mosque. A minaret was built in recent years for this mosque, which was without a minaret at that time. There are three pointed arches on the front of the last congregation place and one on both sides. The gaps between the arches are closed in a wooden lattice rail. There is a plain mihrab and an unadorned wooden pulpit on the south east wall. In the northwest corner of the mosque's sanctuary, there is a single-storey women's gathering place sitting on a wooden platform.\n\n...\n\nLefke'nin aşağı mahallesinde bulunan kesme taştan yapılmış tek mekanlı bir yapıdır. Aşağı Cami olarak bilindiği gibi \"Mahkeme Camisi\" ve \"Ebu Bekir Camisi\" olarak da bilinmektedir. Eski caminin yapım tarihi şimdilik bilinmemekle birlikte, caminin bahçesinde bulunup Güzelyurt Arkeoloji ve Doğa Müzesi'ne nakledilen Lefke Naibi Said Efendi'nin hizmetinde çalışan Mulla Hüseyin'e ait 5 Muharrem 1235 H (25 Ekim 1819) tarihli mezar tapına dayanılarak bu tarihten önce yapılmış olduğu anlayılmaktadır. Şimdiki cami, eski caminin yerine 4 Kasım 1901 tarihinde inşa edilmiştir. O sıralarda minaresiz olan bu camiye son yıllarda bir minare inşa edilmiştic Son cemaat yerinin cephesinde üç, iki yanlarında ise birer sivri kemer bulunmaktadır. Kemerlerin araları ahşap kafes parmaklikda kapatılmıştır. Güney doğu duvarında sade bir mihrap ile süslemesiz ahşap bir minber bulunmaktadır. Cami hariminin kuzeybatı köşesinde ahjap bir platform üzerine oturan tek katlı bir kadınlar mahfili bulunmaktadır."
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 296747250,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.851216,
+     35.116572
+    ]
+   },
+   "properties": {
+    "image": {
+     "id": "cpz0qiiubqtkvqdl",
+     "w": 1000,
+     "h": 1500,
+     "tip_color": "#0b0d06",
+     "avg_color": "#4b6265"
+    },
+    "description": "Direction\nhttps://goo.gl/maps/dFyWrYHPPERaPe5x9?coh=178573&entry=tt\n\nInitially a church, this historic build was later twice converted into an Islamic house of worship.\n\nTravelling from the main road up towards the village of Lefke, you will come across this structure also referred to Yukari Mosque and Minareli Mosque.\n\nThe Byzantine Empire also known as the Eastern Roman Empire, was the continuation of the Roman Empire in its eastern provinces during Late Antiquity and the Middle Ages, also stretching over the island of Cyprus.\n\nDuring the rule Byzantium rule of Cyprus, the church of St. George was erected at this site, the exact date unknown.\n\nFrom the 7th to 10th century the island was repeatedly subject to Arab raids, after which this church was converted into a mosque – however over the years the site fell into disrepair from neglect.\n\nWhen the Ottoman Empire extended their stronghold onto the island in 1571 under the leadership of Sultan Suleyman the Magnificent, one of the empire’s Viziers, a high executive office named Mehmet Bey was governor of the Paphos sancak, administrative divisions of the Ottoman Empire, and soon included the village of Lefke into this greater province.\n\nWhen in Lefke, Mehmet Bey spotted the neglected mosque and instructed for it to be rebuilt, naming it after his grandfather, Piri Mehmed Pasha, an Ottoman Turk statesman and grand Vizier of the empire from 1518 to 1523.\n\n...\n\nBaşta bir kilise olan bu tarihi yapı daha sonra iki defa cami olarak dönüşüm geçirmiştir.\n\nLefke köyüne doğru yokuş yukarı ana yolda giderken Yukarı Camii veya Minareli Cami olarak da adlandırılan bu yapıyla karşılaşacaksınız.\n\nDoğu Roma İmparatorluğu olarak da bilinen Bizans İmparatorluğu, Geç Antik Çağ ve Orta Çağ dönemlerinde Roma İmparatorluğunun doğu illerindeki bir devamıydı ve Kıbrıs adasına kadar uzanmaktaydı.\n\nKıbrıs’ın Bizanslıların hükmünde olduğu dönemde, St. George kilisesi bu alana inşa edilmiştir ve kesin tarihi bilinmemektedir.\n\n7. ile 10. yy’lar arasında ada defalarca Arap saldırılarına maruz kalmıştır, daha sonrasında kilise bir camiye dönüştürülmüştür ancak yıllar içinde bakımsızlıktan harap düşmüştür.\n\nKanuni Sultan Süleyman döneminde Osmanlı İmparatorluğu 1571 yılında adayı sınırları içine aldığında, imparatorluk vezirlerinden biri olan Mehmet Bey, Osmanlı İmparatorluğunun idari birimi olan Paphos sancağının idaresini elinde tutmaktaydı ve yakın zamanda Lefke köyünü bu yerleşim yerinin sınırlarına dahil etmiştir.\n\nMehmet Bey Lefke’deyken bakımsız kalmış bu camiyi fark etmiştir ve tekrar inşa edilmesi için emir vererek camiye, Osmanlı Türk devlet adamı ve 1518-1523 yılları arasında sadrazamlık yapmış dedesi Piri Mehmet Paşa’nın ismini vermiştir.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/piri-mehmet-pasa-camii/",
+    "marker-symbol": "trail",
+    "title": "Piri Mehmet Pasha Mosque / Piri Mehmet Paşa Camii",
+    "url": "https://www.visitncy.com/tr/kesfet/piri-mehmet-pasa-camii/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 4173567590,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.851222,
+     35.116578
+    ]
+   },
+   "properties": {
+    "title": "Vezir Osman Paşa Tomb / Türbesi",
+    "image": {
+     "id": "jm4nhin7z6c0qewr",
+     "w": 656,
+     "h": 400,
+     "tip_color": "#624f3a",
+     "avg_color": "#808070"
+    },
+    "marker-symbol": "trail",
+    "description": "Direction\nhttps://goo.gl/maps/dFyWrYHPPERaPe5x9?coh=178573&entry=tt\n\nIt is the oldest of the three mosques in Lefke. As it is known as \"Piri Pasha Mosque\" and \"Piri Mehmet Pasha Mosque\". It is also known as the \"Upper Mosque and the \"Minaret Mosque\" because it is located in the Yukarı Neighborhood of Lefke and was the only mosque in Lefke with a minaret at that time. The Church of Ay. Yorgi, located in Istanbul, was converted into a mosque and used. However, this mosque was in a state of disrepair until 1571 AD, when Kibru entered the Ottoman Administration, after it was repaired and converted into a mosque (and/or the current mosque was built in its place) by Ebubekir Bey, who participated in the conquest of Cyprus. , named the mosque after his grandfather Piri Mehmed Pasha. Although it is similar in plan to other Lefke mosques, it has an original minaret unlike the others. Although the empty land around the mosque was used as a cemetery for many years, it was completely dispersed in 1970. The rich buried in the cemetery and among the famous people, only the original sarcophagus of Mir-i Miran Vizier Osman Pasha has survived to the present day in good condition.\nThe city of Lefke, which has a picturesque appearance, is among our rare settlements that can maintain its continuity until the present day by being mixed with Byzantine, Lizzinian, Venetian, Ottoman, Turkish, Greek and English cultures, starting from the Neolithic Period, due to its abundant water resources. The roadsides reflecting the traditional Cypriot-Ottoman architecture, built in accordance with the topography, and the houses in the gardens are remarkable for their narrow streets. Just after the Ottomans had a say in the administration of the island in 1571, Ottoman Turks settled in the houses and lands here. For this reason, the urban texture and residences reflecting the traditional life largely bear the characteristics of the Middle Ages and the Ottoman Empire. The houses that make up the texture of the city center are structured in an adjacent order. The residences are located on small parcels and there is a small garden behind them. The residences consist of a main building moved to the street border, a courtyard behind it that integrates with citrus groves, and generally kitchen, cellar, toilet, bath, warehouse and similar service units located in the courtyard in addition to the main building. The gardens behind the houses were surrounded by a wall in accordance with the privacy rules of the Ottomans. Since the use and life span of the houses are limited, the oldest surviving houses of Lefke reflecting the architectural features of the Ottoman Period are generally dated between 1900-1938. These houses, with their bay windows, arches and masonry mud brick structures, have typical Ottoman architectural characteristics. The interior layout is enriched with three arched, staircase and rafter ceiling details. It is remarkable with its numerous windows, the crescent and star on the entrance door, and the records showing the start and end dates of the construction, and the Baghdadi bay windows protruding from the road.\n\n...\n\nLefke'de bulunan üç camiden en eski olanıdır. \"Piri Paşa Camisi\" ile \"Piri Mehmet Paşa Camisi\" olarak bilindiği gibi. Lefke'nin Yukarı Mahalle'de yer alması ve o dönemde Lefke'nin minareli tek camisi olması nedeniyle \"Yukarı Camii ile \"Minareli Cami\" olarak da anılmaktadır. Rivayete göre, M.S 649-963 yılları arasında Kıbrıs'a gerçekleştirilen Islám akınlarından birinde, burada bulunan Ay. Yorgi Kilisesi camiye dönüştürülüp kullanılmış. Ancak bu cami Kibru'in Osmanlı Idaresi'ne girdiği M.S 1571 yılına kadar bakımsızlıktan yıkılacak durumdaymış Kıbrıs'ın fethine katılan Ebubekir Bey tarafından tamir edilerek camiye dönüştürüldükten (ve/veya yerine şimdiki camiyi inşa ettirdikten) sonra, camiye, dedesi Piri Mehmed Paşa'nın adını vermiş. Plan itibariyle diğer Lefke camilerinin bir benzeri olmasına karşın, diğerlerinden farklı olarak orijinal bir minaresi vardır. Caminin çevresindeki boş arazi çok uzun yıllar mezarlık olarak kullanılmış olmasına karşın 1970 yılında tamamen dağıtılmıştır. Mezarlığa gömülen zengin ve ünlü kişilerden sadece Mir-i Miran Vezir Osman Paşa'nın orijinal lahit mezarı iyi durumda günümüze kadar gelebilmiştir.\n\nPitoresk bir görünüme sahip olan Lefke kenti, bol su kaynaklarına sahip olması itibariyle Neolitik Dönem'den başlayarak, Bizans, Lizzinyan, Venedik, Osmanlı, Türk, Rum ve Ingiliz kültürleriyle yoğrularak günümüze kadar sürekliliğini koruyabilen nadir yerleşim yerlerimiz arasında yer almaktadır. Topografyaya uygun olarak yapılan geleneksel Kibris-Osmanlı mimarisini yansıtan yol kenarları ile bahçe içlerindeki konutları, daracık sokakları itibariyle dikkat çekicidir. Osmanlılar'ın adanın idaresinde söz sahibi oldukları 1571 yılından hemen sonra buradaki ev ve arazilere Osmanlı Türkleri yerleştirilmiştir. Bu nedenle geleneksel yaşamı yansıtan kent dokusu ile konutları büyük ölçüde Ortaçağ ile Osmanlı karakteri taşımaktadır. Kent merkezinin dokusunu oluşturan konutlar bitişik nizamda yapılandırılmıştır. Konutlar küçük parseller üzerinde yer almakta ve arkalarında küçük bir bahçe bulunmaktadır. Konutlar, sokak sınırına taşınmış bir ana bina, bunun arkasında narenciye bahçeleriyle bütünleşen bir avlu ve genellikle ana binaya ek olarak avlu içinde yer alan mutfak, kiler, tuvalet, hamam, depo ve benzeri servis birimlerinden oluşmaktadır. Konutların gerisindeki bahçeler, Osmanlılar'daki mahremiyet kurallarına uygun olarak bir duvarla çevrilmiştir. Konutların kullanım ve yaşam süreleri sınırlı olduğundan Lefke'nin ayakta kalan Osmanlı Dönemi mimari özelliklerini yansıtan en eski evleri genellikle 1900-1938 yılları arasına tarihlenmektedir. Bu konutlar, cumbaları, kemerleri ve yığma kerpiç yapıları ile tipik Osmanlı konut mimari özelliği taşımaktadır. İç mekan düzeni, üç kemerli, merdivenli ve mertekli tavan detaylarıyla zenginleştirilmiştir. Çok sayıdaki pencereleri, giriş kapısı üzerinde ay yıldız ile inşaatın başlangıç ve bitiş tarihlerini gösterir kayıtları ve yola çıkıntı yapan bağdadi cumbalarıyla dikkat çekicidir."
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 581959243,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.858555,
+     35.116985
+    ]
+   },
+   "properties": {
+    "image": {
+     "id": "mgeht8y7vuq1ug9v",
+     "w": 1500,
+     "h": 1001,
+     "tip_color": "#6c5739",
+     "avg_color": "#665431"
+    },
+    "description": "Direction\nhttps://goo.gl/maps/FeRqebGBEHDxpV8b8?coh=178573&entry=tt\n\nThe Acendu fountain is found in the eastern part of the town of Lefke, in the area which takes its name from.\n\nSituated in the foothills of the Troodos mountains, Lefke was served by a system of aqueducts and springs to provide its water supply – this fountain was one of them.\n\nIt was thought to have been built during the 15th or 16th centuries during the Venetian rule of Cyprus, between the Lefke River and Laguna Mountain skirts. Prior to its construction, there was no ready supply of water to the town.\n\nThe Venetian ruler at the time was named Cento, and the water was known locally as Aqua de cento – over the years, the name was truncated to Cento.\n\nThe fountain still provides water for the orange groves which surround it.\n\n...\n\nAcendu Çeşmesi Lefke’nin doğu kısmında, ismini aldığı yerde bulunmaktadır.\n\nTroodos dağlarının eteklerinde bulunan Lefke’de pek çok su yolu ve kaynak vardır ve bu çeşme de bunlardan birisidir.\n\nÇeşmenin, 15. veya 16. yüzyılda Kıbrıs Venediklilerin kontrolündeyken, Lefke Nehri ve Laguna Dağı etekleri arasına inşa edildiği düşünülmektedir. Çeşmenin inşasından önce, şehirde halihazırda bir su kaynağı bulunmuyordu.\n\nO dönemki Venedikli hükümdar Cento olarak adlandırılmaktaydı ve suya yerel dilde Aqua de cento denmekteydi, yıllar geçtikçe Cento olarak kısaltılarak kullanılmıştır.\n\nÇeşmeden günümüzde hala, çevresindeki portakal bahçelerine tedarik sağlamak için su akmaktadır.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/acendu-fountain/",
+    "marker-symbol": "trail",
+    "title": "Acendu Fountain / Çeşmesi",
+    "url": "https://www.visitncy.com/tr/kesfet/acendu-fountain/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 1170418205,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.852227,
+     35.114471
+    ]
+   },
+   "properties": {
+    "image": {
+     "id": "mxeaj8uwwifx7aax",
+     "w": 2000,
+     "h": 1333,
+     "tip_color": "#df9f36",
+     "avg_color": "#4f673e"
+    },
+    "description": "Direction\nhttps://goo.gl/maps/SphbHdBUBCa7pcGGA?coh=178573&entry=tt\n\nMehmet Nazım Adil, commonly known as Sheikh Nazim was a Turkish Cypriot Sufi Muslim sheikh and spiritual leader of the Naqshbandi tariqa.\n\nPrior to his passing in 2014, thousands of visitors visited Shaykh Nazim each month at his home and Dergah in the town of Lefke, and international followers came to share in the blessings of this living Sufi Master.\n\nNazim was regularly recognized among the world’s fifty most influential Muslims in the annual publication, “The 500 Most Influential Muslims”, and has since been preceded by his son Mawlana Shaykh Mohammad Adil Haqqani welcoming Sufi worshippers from near and afar throughout the year.\n\nVisitors can stay at the Guesthouses with prior permission. Men can also stay at the Dergah, while women are accommodated at a hostel allocated for females – all facilities in these two places are shared in common.\n\n...\n\nGenellikle Şeyh Nazım olarak bilinen Mehmet Nazım Adil, Kıbrıs Türkü Sufi Müslüman şeyhidir ve Nakşibendi tarikatının dini lideridir.\n\n2014 yılında vefat etmeden önce, binlerce ziyaretçi Şeyh Nazım’ı her ay evinde ve Lefke’deki Dergâhta ziyaret etmiştir ve uluslararası takipçileri bu yaşayan tasavvuf ustasının nimetlerini paylaşmak için gelmiştir.\n\nNazım, yıllık “500 En Etkili Müslüman” yayınında her yıl dünyadaki 50 en etkili Müslümanların arasında yerini almaktaydı, kendisinden sonra oğlu Mevlâna Şeyh Muhammed Adil Hakkani, yakından ve uzaktan gelen Sufi inançlı kimseleri tüm yıl boyunca ağırlamıştır.\n\nZiyaretçiler daha önce alacakları bir izinle Misafirhanede kalabilirler. Dergâhta yalnızca erkekler kalabilmekteyken, kadınlar ise sadece kadınlara tahsis edilmiş bir otelde konaklamaktadır ancak bu iki yerdeki tüm tesisler ortak kullanılmaktadır.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/mevlana-seyh-nazim-dergahi/",
+    "marker-symbol": "trail",
+    "title": "Sheikh Nazim’s Dergah / Şeyh Nazım Dergâhı",
+    "url": "https://www.visitncy.com/tr/kesfet/mevlana-seyh-nazim-dergahi/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 4166625600,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.853338,
+     35.114067
+    ]
+   },
+   "properties": {
+    "image": {
+     "id": "ail6imtqvbtrymmp",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#353433",
+     "avg_color": "#687c87"
+    },
+    "description": "Direction\nhttps://goo.gl/maps/UtkKWQKqmsk2cAEe9\n\nWith long and hot summer periods, in the past the island has always had a significant shortage of water.\n\nClean water supply to the urban residential areas had always been one of the most important concerns of Cyprus governors.\n\nThroughout the centuries, water generally depended on rain fall, snow fall on the mountains as well as from natural springs, the main one located in Lefke.\n\nSince the Roman era, water supply to cities was handled from the fresh springs via aqueducts, the water carrying systems consisting of chains of wells, underground water channels and bridges. During the sieges however most of the conduits were demolished which created shortage after the conquest.\n\nAt the beginning of the Ottoman administration, the existing water systems were inspected and repaired, new ones were constructed.\n\nThe Lefke aqueduct is thought to have been built around 1609. With its bridge of ten arches, this stone-built construction running in the centre of the town is considered one of the best Ottoman monuments inherited by the residents of Lefke.\n\nThis aqueduct is still used today for irrigating the orchards and fields.\n\nLefke, which has fertile fields leading up to the sea, was also one of the grain production bases during the Ottoman periods. For this reason, many mills and water stretches were built to run them for the grinding of grain.\n\nThe great English explorer Sir Samuel White Baker, who recalled Cyprus in 1879, wrote that the stonework in the waterways that pour water into the mills that returned with water in Lefke was elegant and braided.\n\nOnly 10 of these arches have survived to this day, and worth visiting on a day-trip to this town.\n\n...\n\nAda geçmişte uzun ve sıcak yaz aylarında, daima önemli su sıkıntıları yaşamıştır.\n\nKırsal yaşam alanlarına temiz su tedariki, daima en önemli problemlerinden biri olmuştur.\n\nYüzyıllar boyunca, su genellikle dağlara düşen yağmur ve kar yağış miktarına ve en önemli olanı Lefke’de bulunan doğal kaynaklardan gelen miktara bağlı olmuştur.\n\nRoma döneminden bu yana şehirlere su temini su kemerleri, kuyu zincirleri, yeraltı su kanalları ve köprülerden oluşan su taşıma sistemleri vasıtasıyla gerçekleştirilmiştir. Ancak kuşatmalar sırasında kanalların çoğu tahrip edilmiştir ve bu da fetihten sonra su kıtlığı yaşanmasına sebep olmuştur.  \n\nOsmanlı yönetiminin başında mevcut su sistemleri gözden geçirilmiştir ve onarılmıştır, ayrıca yeni sistemler de inşa edilmiştir.\n\nLefke su kemerinin 1609 civarında inşa edildiği düşünülmektedir. On kemerli köprüsü ile şehrin merkezinde bulunan bu taş yapı, Lefke yerleşimcileri tarafından miras bırakılan en iyi Osmanlı eserlerinden biri olarak kabul edilmektedir.\n\nBu su kemeri bugün meyve bahçeleri ve tarlaları sulamak için halen kullanılmaktadır.\n\nDenize doğru bereketli tarlalara sahip olan Lefke, Osmanlı döneminde de tahıl üretim üslerinden biriydi. Bu nedenle, tahılların öğütülmesi için onları birçok değirmen ve su yolları inşa edilmiştir.\n\n1879 yılında Kıbrıs’a gelen büyük İngiliz kâşif Sir Samuel White Baker, Lefke’de su ile dönen değirmenlere su sağlayan su yollarındaki taş işlemelerin oldukça zarif ve bağlantılı olduğunu yazmıştır. Bu kemerlerin sadece 10 tanesi günümüze kadar gelebilmiştir ve bu kemerler, bu yerleşim yerine yapılacak günübirlik bir gezide görülmeye değerdir.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/lefke-su-kemerleri/",
+    "marker-symbol": "trail",
+    "title": "Lefke Aqueduct /  Su Kemerleri",
+    "url": "https://www.visitncy.com/tr/kesfet/lefke-su-kemerleri/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3974348697,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.851529,
+     35.113446
+    ]
+   },
+   "properties": {
+    "title": "Sheikh Nazım Orta Masque / Şeyh Nazım Orta Camii",
+    "image": {
+     "id": "0wx653dwy6o1ikp4",
+     "w": 680,
+     "h": 510,
+     "tip_color": "#696b66",
+     "avg_color": "#7b7c7e"
+    },
+    "marker-symbol": "trail",
+    "description": "Direction\nhttps://goo.gl/maps/oSRskgNJBLxPKH147?coh=178573&entry=tt"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 1001637377,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.849484,
+     35.111818
+    ]
+   },
+   "properties": {
+    "image": {
+     "id": "7vpvotmc9zfdpmaq",
+     "w": 1200,
+     "h": 826,
+     "tip_color": "#b59572",
+     "avg_color": "#aa8559"
+    },
+    "description": "Direction\nhttps://goo.gl/maps/igJZsoi132oZetY9A?coh=178573&entry=tt\n\nYou can find this cylindrical monument in the centre of the town of Lefke.\n\nIt takes the form of a water storage tank, and was built to commemorate the coronation of George VI, King of the United Kingdom and the Dominions of the British Commonwealth.\n\nErected during the British Empire dating 1937, carvings on the monument illustrate the coronation of the king.\n\n...\n\nBu silindir şeklindeki anıt, Lefke yerleşim yerinin merkezinde bulunmaktadır.\n\nTarihi su deposu olan bu anıt, Birleşik Krallık ve İngiliz Hükümetler Topluluğu Hükümdarlarının Kralı VI. George’un taç giyme töreni anısına inşa edilmiştir.\n\n1937 yılında Britanya İmparatorluğu tarafından inşa edilmiştir ve anıt üzerindeki yazılarla kralın taç giyme töreni anlatılmaktadır.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/vi-george-ingiliz-armasi/",
+    "marker-symbol": "trail",
+    "title": "George VI Coronation Monument / VI. George Taç Giyme Anıtı",
+    "url": "https://www.visitncy.com/tr/kesfet/vi-george-ingiliz-armasi/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 234843719,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.841542,
+     35.106636
+    ]
+   },
+   "properties": {
+    "image": {
+     "id": "thgksp9lgvrr26p0",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#58731a",
+     "avg_color": "#6e7c67"
+    },
+    "description": "Direction\nhttps://goo.gl/maps/Z1z48zLUB6Dvv4NdA?coh=178573&entry=tt\n\nA long time ago there was a unique form of transport that was spread across all of Cyprus – the magnificent triumph of engineering that was the Cyprus Government Railway (CGR).\n\nToday no trains run in North Cyprus, and the only forms of transport are road, sea and air – however a site in Lefke exhibits trains over a hundred years of age.  \n\nThe CGR was a 2 ft 6 in (762 mm) narrow gauge railway network that operated in Cyprus from October 1905 to December 1951. With a total length of 122 kilometres and 39 stations, it served from Camlikoy station in Lefke to Guzelyurt, through to Nicosia and all the way to the Famagusta station on the east coast of the island.\n\nAll the stations were named in Turkish, Green and English, and some operated as telephone centres, telegram offices and postal offices, as a place where goods could be exchanged.\n\nWith 12 locomotives, 17 coaches and over 100 multi-purpose wagons, the average speed of the trains ranged from 30 to 40 km/hour and there were two train departures each day, used for different means by both authorities and the local population.\n\nA freight transfer system served the port of Famagusta and timber was also transferred from the mountains to towns and cities all over Cyprus.\n\nThe CGR closed down for financial reasons and the last train to ever run was Engine No.1 which left from Nicosia station at 14:57 on the 31st December 1951 and arrived at Famagusta at 16:38. When it finished its journey, it was lifted to its final resting place – the ”Locomotive 1” can be seen today in Polatpaşa Bulvarı near the centre of Famagusta.\n\nOverall, the CGR carried 3,199,934 tons of commercial goods and freight and 7,348,643 passengers throughout its history. Although it closed, an extension of the railway was built to serve the American mining company Cyprus Mines Corporation until 1974, carrying freight, ore and minerals on behalf of the CMC from the Lefke region.\n\nIn and around the town of Lefke, today visitors can find a total of 10 locomotives and 20 wagons on display, from nearly a century ago. \n\nEach yellow coated wagon was purpose built to carry over 50 tons of freight, each bearing the year in which they were constructed as well as the name of the train they belonged to.\n\nIf you are visiting the area, seek out these unique exhibits. Although not in the best condition, these antiques display years of the past and well worth a selfie!\n\n...\n\nUzun zaman önce tüm Kıbrıs’a yayılmış eşsiz bir ulaşım şekli vardı: muhteşem mühendislik zaferi olan Kıbrıs Demiryolu İşletmesi(KDİ).\n\nBugün Kuzey Kıbrıs’ta tren seferleri bulunmamaktadır; sadece kara, deniz ve hava yoluyla ulaşım sağlanmaktadır; ancak Lefke’deki bir yer, yüz yaşın üzerindeki trenleri sergilemeye devam etmektedir. \n\nKıbrıs Demiryolu İşletmesi, Ekim 1905 ile Aralık 1951 tarihleri arasında Kıbrıs’ta faaliyet gösteren 762 mm’lik dar bir demiryolu ağıydı. Toplam 122 kilometre uzunluk ve 39 istasyonuyla Lefke’deki Çamlıköy’den Güzelyurt’a, Lefkoşa üzerinden ve adanın doğu kıyısındaki Gazimagusa istasyonuna kadar hizmet vermiştir.\n\nTüm istasyonlar Türkçe, Yunanca ve İngilizce olarak adlandırılmıştır ve bazıları malların değiş tokuş edilebildiği bir yer olarak telefon merkezleri, telgraf ofisleri ve posta ofisleri olarak işletilmiştir.\n\n12 lokomotif, 17 otobüs ve 100’den fazla çok amaçlı vagon ile trenlerin ortalama hızı 30 ile 40 km/saat arasında değişmekteydi ve hem yetkililer hem de yerel halk tarafından farklı sebeplerle kullanılan her gün iki tren kalkışı gerçekleşmekteydi.\n\nGazimagusa limanına hizmet sunan bir yük transfer sistemi ve keresteler de dağlardan Kıbrıs’ın dört bir yanındaki kasaba ve şehirlere aktarılmaktaydı.\n\nKDİ finansal nedenlerden dolayı kapandı ve en son çalışan tren 31 Aralık 1951’de Lefkoşa istasyonundan saat 14:57’de ayrılan ve 16:38’de Gazimagusa’ya varan Motor No.1 idi. Yolculuğunu tamamladığında, son istirahat alanına kaldırılmıştır. ”Lokomotif 1” bugün Gazimagusa merkezi yakınlarındaki Polatpaşa Bulvarı’nda görülebilmektedir.\n\nGenel olarak KDİ, tarihi boyunca 3.199.934 ton ticari mal ve yük ile 7.348.643 yolcu taşımıştır. Kapalı olmasına rağmen, demiryolunun bir uzantısı 1974 yılına kadar Amerikan madencilik şirketi Kıbrıs Madencilik Kooperatifi’ne hizmet vermek üzere inşa edilmiştir ve KDİ adına Lefke bölgesinden yük, maden ve mineral taşımaktaydı.\n\nLefke kasabası ve çevresinde, bugün ziyaretçiler yaklaşık yüzyıl öncesine ait sergilenmeye sunulmuş toplam 10 lokomotif ve 20 vagonu görebilmektedir. \n\nHer sarı kaplamalı vagon, inşa edildikleri yıl ve ait oldukları trenin adını taşıyan 50 tondan fazla yük taşımak amacıyla inşa edilmiştir.\n\nEğer bölgeyi ziyaret ediyorsanız, bu benzersiz sergileri mutlaka araştırmalısınız. Her ne kadar çok iyi durumda olmasalar da bu antikalar geçmiş zamanı sergilemekte ve bir selfie çekilmeye değerler! \n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/lokomotif-trenler/",
+    "marker-symbol": "trail",
+    "title": "Locomotive Trains / Lokomotif Trenler",
+    "url": "https://www.visitncy.com/tr/kesfet/lokomotif-trenler/"
+   }
+  }
+ ],
+ "groups": [],
+ "markers": [],
+ "properties": {}
+}

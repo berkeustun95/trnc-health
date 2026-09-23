@@ -1,0 +1,332 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": 3533086396,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.320986,
+     35.340116
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "0ucqmyxmdg0sgl2m",
+     "w": 555,
+     "h": 400,
+     "tip_color": "#23390a",
+     "avg_color": "#647463",
+     "caption": null
+    },
+    "title": "Baldöken Ottoman Graveyard/Mezarlığı",
+    "description": "Direction\nhttps://goo.gl/maps/tBMtPiQHZV4YnLqP8\n\nLocated at the top of the town, Baldöken is also known as the Islam Graveyard or Graveyard of Forlorn.\n\nWhen the Ottomans conquered Cyprus in 1571, this area outside Kyrenia Castle was reserved as a cemetery for soldiers. It was used for this purpose until the end of the 17th century.\n\nWhen the cemetery for soldiers began to accept non-soldiers, the name was changed to Islam Graveyard, and in the 19th century, it was also used as a public burial place for the homeless and destitute.\n\nThe graveyard once covered a large area, today only the remains of a small part exist but is still an intriguing place of visit, right next to the Anglican St Andrew’s Church.\n\nCisterns, water canals and architectural tombs were built within. Restored in 1995, a ‘Turbe’ (mausoleum) of the Garrison Commander of the Ottomans is located in the graveyard that has adopted its present name.\n\n...\n\nMezarlık Girne şehir merkezinde yer almaktadır.  Mezarlığın doğusunda keşfedilen mozaik kalıntılar göz önünde bulundurulduğunda, alanın Roma ve Bizans dönemlerinde de kullanıldığı anlaşılmaktadır. Alan, mezarlık olarak kullanıldığı zamanlar şehrin dışında yer almaktaydı. Mezarlıktan günümüze kademeli prizma biçimli 3 mezar, sarnıç ve kubbeli türbe kalmıştır. Türbenin, 1764 yılında Kıbrıs Valisi Çil Osman’a karşı ayaklanması nedeniyle kafası kesilmek suretiyle idam edilen Girneli Halil Dizdar’a ait olduğuna inanılmaktadır. \n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/baldoken-mezarligi/",
+    "url": "https://www.visitncy.com/tr/kesfet/baldoken-mezarligi/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 843311359,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.321381,
+     35.340425
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "z9d6bpyb3u6smb4r",
+     "w": 555,
+     "h": 400,
+     "tip_color": "#434139",
+     "avg_color": "#615a4a",
+     "caption": null
+    },
+    "title": "Es Seyyid Emin Efendi Watern Cistern/Su Sarnıcı",
+    "description": "Direction\nhttps://goo.gl/maps/mP846xhK6ixfWAKJ8\n\nMost visitors are likely to stumble upon this site whilst on the track of Kyrenia Harbour.\n\nThis cistern dates back to Ottoman Rule, which constructed public water taps for passer-by’s.\n\nMade of hewn stone and with an arched roof, it is located northeast of St Andrew’s Church.\n\nA marble inscription written in old Turkish reveals the water cistern was constructed by Es-Seyid Mehmed Emin Efendi, who was on duty in Cyprus as clerk to the tax collector between 1816 and 1821 and later Governor of Cyprus in 1834.\n\nConstruction of the one of the holiest places for Muslims in the world, Hala Sultan Tekke located in Larnaca in South Cyprus, was also initiated in 1817 by Emin Efendi in classical Ottoman style.\n\nHala Sultan Tekke is a listed Ancient Monument with thousands of pilgrimage visits to the site each year.\n\n...\n\nKesme taştan yapılmış ve kemerli bir çatıya sahip olan su sarnıcı, St. Andrew Kilisesi'nin kuzeydoğusunda yer almaktadır. Sarnıcın batı cephesinde Mevlevihane Dervişi Feyzi Dede’nin eski Türkçe olarak yazdığı mermer bir kitabe bulunmaktadır. Kitabede, su sarnıcının 1816-1821 yılları arasında, Kıbrıs'ta vergi tahsildarı olarak görev yapan ve 1834 yılında Kıbrıs Valisi olan Esseyid Mehmet Emin Efendi (Küçük Mehmet) tarafından yaptırıldığı belirtilmektedir.\n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/seyyid-emin-efendi-su-sarnici/",
+    "url": "https://www.visitncy.com/tr/kesfet/seyyid-emin-efendi-su-sarnici/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2821211289,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.321326,
+     35.340562
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "gkwvegi3i9eosxvm",
+     "w": 555,
+     "h": 400,
+     "tip_color": "#485059",
+     "avg_color": "#607785",
+     "caption": null
+    },
+    "title": "St. Andrew Anglican Church/St. Andrew Kilisesi",
+    "description": "Direction\nhttps://goo.gl/maps/UQJ35t21d6wUL1mG9\n\nOne of two Anglican churches located in North Cyprus, St. Andrew’s is regarded widely as an oasis of joy and peace.\n\nBuilt in 1913 thanks to the generosity of a lay reader Ernest Eldred McDonald and a wealthy Scottish mine owner George Houstoun, St Andrew’s is approaching 110 years of service to the Kyrenia community.\n\nDespite the unsure foundations, the site of St Andrew’s Church was well chosen. A few yards from Kyrenia Castle and the Harbour, it is near to the centre of the town. Indeed, much of the congregation of St Andrew’s is composed of holiday visitors.\n\nWell seen from the outside, the church tower itself was constructed 25 years after the main build. Items of interest within the church include the bowl of the font which is a domestic marble mortar found in 1949 at Lambousa and assigned to the 6th century A.D.  \n\nSt Andrew’s Church is part of the Diocese of Cyprus and the Gulf (one of the four dioceses that make up the Episcopal Province of Jerusalem and the Middle East), which includes Cyprus, the Gulf States, Iraq and Yemen, and also a part of the worldwide Anglican Communion.\n\n...\n\nGirne Kalesi'nin güneydoğu köşesinde yer alan Kilise, halen Kuzey Kıbrıs'taki göçmen İngiliz halkı için bir ibadet yeri olarak hizmet vermektedir. Kilise girişinde, \"Bu bina 1913'te Bay George Houston tarafından cömertçe bağışlanan araziye Bay ve Bayan Ernest Mc Donald tarafından inşa edilmiştir.\" yazan bir pano bulunmaktadır. Kilise, 1949'da daha büyük bir binaya duyulan ihtiyaç nedeniyle, Bay ve Bayan B.C. Petrides’in cömert bağışlarıyla genişletilmiştir.\n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/aziz-andrew-kilisesi/",
+    "url": "https://www.visitncy.com/tr/kesfet/aziz-andrew-kilisesi/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2217705893,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.32088,
+     35.341111
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "whchhlhtjmvb8aek",
+     "w": 1500,
+     "h": 1000,
+     "tip_color": "#ab9679",
+     "avg_color": "#685533",
+     "caption": null
+    },
+    "title": "Hasan Kavizade Hüseyin Efendi Fountain and Stone Steps/Çeşmesi ve Taş Merdivenleri",
+    "description": "Direction\nhttps://goo.gl/maps/WW3Dv5oEwMZZor2C8\n\nSituated in the quiet back streets of Kyrenia, this historic fountain is easily missed.\n\nThis square-shaped fountain with a barrel vault and reservoir is positioned southeast of the Agha Cafer Pasha Mosque.\n\nVisitors of the mosque who pray complete their ablution using this fountain, fed from the natural spring.\n\nThe marble inscription below the three arches of the fountain tells us that it was constructed on 16th November 1841 during Hasan Kavizade Huseyin Efendi’s time.\n\nIn the middle arch a crescent, a coat of arms and branch figures are carved into the stonework.\n\nThe stone stairwells next to the fountain were built by the last Ottoman Provincial Governor, Cemal Bey and the last Ottoman Mayor, Abdul Efendi.\n\n...\n\nSu haznesi de bulunan kare şeklindeki çeşme, Ağa Cafer Paşa Camii’nin güneydoğusunda bulunmaktadır. Camiye gelen ziyaretçiler bu çeşmeden abdest alabilmektedirler. Üçlü kemerin altındaki mermer kitabede, 16 Kasım 1841'de Hasan Kavizade Hüseyin Efendi zamanında yapıldığı yazmaktadır. Çeşmenin yanındaki basamaklar son Osmanlı Eyalet Valisi Cemal Bey ve son Osmanlı Belediye Başkanı Abdül Efendi tarafından yaptırılmıştır.\n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/hasan-kavizade-huseyin-efendi-cesmesi/",
+    "url": "https://www.visitncy.com/tr/kesfet/hasan-kavizade-huseyin-efendi-cesmesi/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3627103014,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.322293,
+     35.341777
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "modj5gyohuo5cnbd",
+     "w": 1500,
+     "h": 1000,
+     "tip_color": "#24bf82",
+     "avg_color": "#6699ab",
+     "caption": null
+    },
+    "title": "Kyrenia Castle & Shipwreck Museum/Girne Kalesi ve Batık Gemi Müzesi",
+    "description": "Direction\nhttps://goo.gl/maps/UBzhbEMWz2ULqrpM8\n\nIf the grand fortifications of Kyrenia Castle could talk, many a tales could be told.\n\nThe castle was first built by the Byzantines, possibly over the remains of an earlier Roman fort, in the 7th century to guard the city against the new Arab maritime threat.\n\nSubsequently every era of conquerors from Richard the Lionheart to the Ottomans has added its own touch to the castle’s bulk.\n\nThe first historical reference to the castle occurs in 1191, when King Richard I of England captured it on his way to the Third Crusade by defeating Isaac Comnenus, an upstart local governor who had proclaimed himself emperor.\n\nThe Byzantine construction of four towers linked by walls was later strengthened again and enlarged by the Lusignan’s, but the current appearance of Kyrenia Castle mostly dates to the Venetian rule of Cyprus from around 1489.\n\nThe Venetians were concerned about the possibility of the invasion of Cyprus by the rapidly expanding Ottoman Empire. With the Ottoman mainland only miles away, and their forces gaining strength every year, the Venetians set about fortifying Cyprus.\n\nThe walls of Kyrenia Castle were enlarged, thickened and reinforced to defeat artillery attacks and to resist any siege. The Venetians replaced the original drawbridge at the castle’s entrance with the protected gatehouse that still exists today. They also kept the 12th century Byzantine Chapel of St George safely within the walls. When the Ottoman invasion finally occurred in 1571, the Venetians were defeated with ease.\n\nKyrenia Castle lies at the entrance to the town’s famous harbour and stands majestic guard over the port. Well worth a visit, the castle is in a remarkable state of preservation and is fully accessible to the public today.\n\nA large rectangular structure, the castle contains a cistern, dungeon, chapel and two small museums, though the real highlight is walking along the ramparts high above the harbour.\n\nAs well as offering a fascinating glimpse into the history of Cyprus, and the stunning views on offer to visitors, Kyrenia Castle is home to North Cyprus’ Kyrenia Shipwreck Museum, the setting for one of the world’s most important and well-preserved pieces of marine history.\n\n...\n\nKalıntılara göre kale, M.S 7. yüzyılda, ilk olarak Bizans döneminde ve şehri Arap denizcilerinin tehdidine karşı korumak amacıyla inşa edilmiştir. Kalenin büyük bir bölümü M.S 1208-1211 yıllarında, Kral John Dibeline’in emri ile kalıntıların üzerine inşa edilmiştir. Lüzinyan kralları için kale, barış zamanlarında dinlenme, savaş zamanlarında ise sığınma yeri olmuştur. 1373'teki Ceneviz baskınları sırasında büyük ölçüde tahrip olan kale, Venedikliler tarafından, top saldırılarına direnmek amacıyla, 1489 -1570 yılları arasında daha da geliştirilip, yeniden inşa edilmiştir. 1570 yılında direnmeden Osmanlılara teslim olan kale, İngiliz Sömürge Yönetimi (1878-1960) sırasında, polis akademisi ve hapishane olarak kullanılmıştır. Kale, günümüzde hem eski eser deposu, hem de Girne ilçesindeki eski eserlerin sergilendiği bir müze olarak kullanılmaktadır. Kale’deki  bölümler, 'Batık Gemi bölümü' (M.Ö 4), 'Vrysi Neolitik Yerleşimi bölümü' (M.Ö 4410-3750), Pınarbaşı/Kırnı Mezarı bölümü' (M.Ö 2075-1725), 'Akdeniz Köyü bölümü’, ‘Kral Mezarı bölümü’ (M.Ö 3. ile 2. yüzyıl-631/32 M.S) ve 'Orta Çağ Zindanı bölümü’ olarak adlandırılmıştır. En popüler turistik yerlerden biri olan Girne Kalesi’nin, limana ve denize bakan muhteşem bir manzarası bulunmaktadır. \n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/discover/kyrenia-castle-shipwreck-museum/",
+    "url": "https://www.visitncy.com/discover/kyrenia-castle-shipwreck-museum/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2869744242,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.320579,
+     35.341179
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "qykzyvlalzgpy0le",
+     "w": 1000,
+     "h": 1500,
+     "tip_color": "#806b63",
+     "avg_color": "#908e8d",
+     "caption": null
+    },
+    "title": "Agha Cafer Pasha Mosque / Ağa Cafer Paşa Camii",
+    "description": "Direction\nhttps://goo.gl/maps/xH8zfvdAQFqEhmNz9\n\nStanding by a steep cobbled street running directly to the Kyrenia Harbour, it is named after the Ottoman Governor of Cyprus who donated the land where it is built.\n\nThe mosque, in an obviously Ottoman style, was built in the 1580’s, although some sources claim the building was converted from a Lusignan warehouse.\n\nThe cut stone rectangular construction has three main rooms and furnished with a single minaret.\n\nAgha Cafer Pasha Mosque is frequented by Muslim worshippers to date. \n\nAt the southeast of the mosque is the Hasan Kavizade Huseyn Efendi fountain, built in 1841.\n\nThe northern face has three arches and is typical of the Ottoman design in the mid-19th century. In the middle arch there is a marble inscription crescent, a coat of arms and branch figures carved into the stonework.\n\n...\n\nAğa Cafer Paşa Caddesi üzerinde yer alan cami, kesme taştan yapılmış etkileyici bir yapıdır. Camii, Yukarı Girne'deki Türk Mahallesi'nde bulunan ve yapı olarak daha küçük olan Yazıcızade ve Acemzade Camileri ile birlikte, Girne kasabasındaki 3 camiden biriydi. Aşağı Girne'de yaptırılan Ağa Cafer Paşa Camii, 1589-1590 yıllarında Kıbrıs Valisi (Vergi Tahsilat Katibi) Ağa Cafer Paşa'nın isteği üzerine ve yanına da bir ilkokul eklenerek  yapılmıştır. Kuzeybatı köşesinde, Ağa Cafer Paşa'nın tarihini anlatan mermer kitabenin bulunduğu bir minare bulunmaktadır.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/aga-cafer-pasa-camii/",
+    "url": "https://www.visitncy.com/discover/agha-cafer-pasha-mosque/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 1813638915,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.319717,
+     35.341349
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "mneaogfkfrnuxape",
+     "w": 1500,
+     "h": 1000,
+     "tip_color": "#574724",
+     "avg_color": "#a89078",
+     "caption": null
+    },
+    "title": "Chrysopolitissa Church/Kilisesi",
+    "description": "Direction\nhttps://goo.gl/maps/bmiUVaNod4K4wdKr7\n\nThis small roofless ruin is Kyrenia’s oldest church, dating back to the 1500’s.\n\nBuilt as a Latin church, it is located in the narrow back streets of Kyrenia Harbour.\n\nIts most interesting architectural feature is the Gothic doorway on the north side. The Crucifixion of Jesus Christ is also depicted on the wall of the front entrance.\n\n...\n\nKilise, Girne Limanı’nın arka sokaklarında, Ağa Cafer Paşa Camii ile aynı sokakta yer almaktadır. Yapı, 16. yüzyılda Gotik tarzda inşa  edilmiş olup, şehrin en eski kilisesidir.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/chrysopolitissa-kilisesi/",
+    "url": "https://www.visitncy.com/tr/kesfet/chrysopolitissa-kilisesi/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 257701315,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.319868,
+     35.341526
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/2RdJ49qyHHWXmnAN7\n\nThe Girne Cyprus House and Carob Warehouse situated on the Girne Strand road and was the first opened in 1974. The building itself is a chance to see surviving Cyprus three story home and warehouse has its  main entrance opening to the harbour. The house contains many traditional Cypriot items such as oil-mill, plough, agricaltural instruments, large earthware jar, weaving loom, room fot watchman ect.\n\n...\n\nGirne Yat Limanı’nda yer alan Kıbrıs Evi ve Harnup Deposu, 1974 yılında açılmıştır. Günümüze kadar gelmeyi başaran üç katlı yapı, ev ve depo olarak kullanılmış olup, yapının limana açılan bir ana girişi vardır. Binada yağ değirmeni, pulluk, tarım aletleri, büyük bir toprak küp, dokuma tezgâhı gibi birçok geleneksel Kıbrıs eşyası bulunmakta olup, bir de bekçi odası vardır.",
+    "image": {
+     "id": "rwpjrybjw2wjnt0x",
+     "w": 4368,
+     "h": 2912,
+     "tip_color": "#aeb2c1",
+     "avg_color": "#604d3e",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "The Cyprus House & Carob Warehouse / Kıbrıs Evi & Harnup Deposu"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3856368209,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.319627,
+     35.342021
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "hh91gguczzhuzdbt",
+     "w": 1500,
+     "h": 1124,
+     "tip_color": "#070c0e",
+     "avg_color": "#545f66",
+     "caption": null
+    },
+    "title": "Kyrenia Strand and Harbour/Girne Antik Limanı",
+    "description": "Direction\nhttps://goo.gl/maps/Z5KAL5a1AiCk7hDo7\n\nThe restaurants and bars surrounding Kyrenia’s horseshoe shaped Old Harbour serve guests in a unique atmosphere and is a rare setting for relaxing on holiday.\n\nThe town of Kyrenia was founded probably in the first millennium BC and was one of the early city kingdoms whose rulers governed the island.\n\nIts central position on the northern coastline was perfect for trading with the countries to the east and what is now Turkey to the north. With the southern coast of Anatolia only forty miles away, cargo vessels could make the Mediterranean crossing frequently and an anchorage has existed here from earliest times.\n\nIn its heyday, just before the British occupation of the island in 1878, local caïques (traditional fishing boats) conducted a thriving trade from Kyrenia Harbour. Depending on the season, they exported wheat and olives, carobs, donkeys and goats and more. The caiques brought in wood, earthenware, legumes, dairies and small luxuries items such as silk and cotton cloth, buttons and odd pieces of furniture.\n\nLarger boats, mostly from Europe, arrived in the late fall and early winter to take in the crop of carobs, the main export item of the area also known as “Cyprus Black Gold” for the abundance of wealth it brought to the island.  \n\nSlowly, two storied buildings emerged around the harbour as the owners used the lower floor as warehouses and the second floor as their residences.\n\nToday Kyrenia Harbour is full of yachts and fishing boats and framed by the colossal hulk of its Crusader castle. With the backdrop of the jagged mountains behind and the calm sparkling sea in front, the harbour has an intoxicatingly serene atmosphere.\n\nThe graceful arc of the harbourside is filled with the tables of restaurants and cafés, ideal for sitting back and simply watching the world go by. The former carob warehouses or Venetian dwellings have been converted into restaurants and shops, giving the harbour a bustling lively feel without feeling rushed or crowded.\n\nHardly changed over the last four and a half centuries, the carefully thought out modernisation has effectively preserved the architectural integrity of the buildings and there are no large flashing neon signs or loud music. The restaurants serve for the most part, delicious Turkish Cypriot cuisine with the emphasis being on locally caught fresh fish and seafood.\n\nWhere trading vessels once moored there are now pleasure craft and boats offering coastal cruises – some unique places of accommodation are also situated within the harbour vicinity.\n\nAt night when the lights twinkle on the water this is a magical place to sit and enjoy a leisurely mezze feasting accompanied by a Rakı or traditional Brandy Sour. \n\n...\n\nGirne Yat Limanı Lüzinyanlar döneminde at nalı şeklindeydi. Liman’ı korsanlardan ve diğer düşmanlardan korumak için gümrük binasının yanındaki kuleden, Liman’ın ortasındaki kuleye kadar kalın bir zincir çekilmişti. Sığ ve kayalık olan liman, yüzyıllar boyunca balıkçı tekneleri ve küçük ticaret gemilerine sığınak olmuştur. Limandan 18. yüzyıldan 20. yüzyılın başına kadar, harnup (keçiboynuzu) ürünleri ihraç edildiğinden dolayı, liman boyunca yapılmış harnup ambarları bulunmaktaydı. Bu ambarlarda depolanan harnup ve diğer mallar, limanın açığında demirlemiş daha büyük gemilere götürmek üzere kayıklara yükleniyordu. Gazimağusa Limanı İngilizler döneminde daha büyük ve daha ağır gemileri barındırabilecek şekilde inşa edildiği için, daha küçük bir liman olarak kalan Girne Limanı, balıkçı tekneleri için barınak olarak kullanıldı.  Amacını yitiren harnup ambarları ise, turizm amacı ile kullanılmıştır. Lady Margaret Loch'un sahibi olduğu harup ambarı, 1966 yılında Eski Eserler Dairesi'ne bağışlanmış ve Etnografya Müzesi olarak düzenlenerek, yerli ve yabancı ziyaretçilere hizmet vermeye başlamıştır. İngiliz döneminde limana mendirek ve tek katlı bir gümrük ofisi eklenerek, harnup dahil olmak üzere bazı ürünler ihraç edildi. Gümrük ofisine 1914 yılında ikinci bir kat ilave edilerek, bugünkü görünümüne kavuşturulmuştur. \n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/girne-limani/",
+    "url": "https://www.visitncy.com/tr/kesfet/girne-limani/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2638718206,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.318672,
+     35.342168
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "dg8r5qyshfsam2u5",
+     "w": 1500,
+     "h": 1000,
+     "tip_color": "#6f7175",
+     "avg_color": "#617074",
+     "caption": null
+    },
+    "title": "Archangelos Michael Church and Icon Museum/Kilisesi ve İkon Müzesi",
+    "description": "Direction\nhttps://goo.gl/maps/H3C5v2AMsv8mUJtc6\n\nThe 19th-century Greek Church, with its white bell tower rising above the surrounding Kyrenia harbourside buildings.\n\nNowadays used as a museum displaying icons dating from the 18th and 19th centuries, its collection is made up of icons collected from Orthodox churches throughout North Cyprus.\n\nNotable depictions include Saint George and the Dragon, the beheading of John the Baptist, and the Virgin and Child.\n\n...\n\nYapı, Girne Limanı'nın batısında olup, Girne Limanı'na bakmaktadır. Kilise bölümü Osmanlı döneminde 1860 yılında, çan kulesi ise 1875 yılında inşa edilmiştir. Bina, Eski Eserler ve Müzeler Dairesi tarafından, 18.-20. yüzyıl eşya ve ikonlarının sergilendiği İkon Müzesi olarak ziyarete açmıştır. Binanın dışında Bizans mermerinden bir türbe bulunmaktadır.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/archangelos-michael-kilisesi/",
+    "url": "https://www.visitncy.com/tr/kesfet/archangelos-michael-kilisesi/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2931005499,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.318253,
+     35.341904
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "6k4ifpx24vrtdree",
+     "w": 1500,
+     "h": 1000,
+     "tip_color": "#d4bdb2",
+     "avg_color": "#988a62",
+     "caption": null
+    },
+    "title": "Greco-Roman Rock Tombs/Kaya Mezarları",
+    "description": "Direction\nhttps://goo.gl/maps/jQGPnK4Yq4gVwVjZ8\n\nAll in all, there are around 70 known tombs in Kyrenia, a few of which are especially of distinction.\n\nWhen talking about Kyrenia’s catacombs, it is difficult to narrow them down to a specific location. It must be remembered that the Romans built their cemeteries outside the town, and as the Roman and Byzantine town was to the east of the castle, this meant their graves were towards the west.\n\nAs the modern town lies much further west than that of the Romans, the area that was rich with catacombs has been largely built on over in the last few years. When an ancient tomb is found, it is excavated, and any finds removed for study. Some catacombs can still be found in the cellars of buildings.\n\nNotable and easily accessible ancient tombs carved into the rock face are located in areas within Kyrenia town centre.\n\nTombs that have been exposed in the cliff face can be found within the carpark on the ‘Turgut Tahsin’ road.\n\nIn the old part of town, opposite the Icon Museum, you can see the remains of catacombs dating back to 400AD, which can however sometimes be concealed beneath overgrown plants.\n\nAlong from the Chrysopolitissa Church, you will find the entrance to a steep passage taking you to an underground chamber. This tomb, unlike others is entirely subterranean and is only open by special arrangement by the custodian at Kyrenia Castle.\n\n...\n\nKaya mezarları, Girne Limanı'nın arkasında, Archangelos Michael Kilisesi'nin batısında yer almaktadır. Kayalara oyulmuş mezarların çoğu 'Greko-Romen Kaya Mezarları' adıyla anılmaktadır. Lüzinyan döneminde mezarlık Girne surlarının dışında yer alıyordu. Antik Çağ’da tahrip edilip yağmalandığı için, mezarlar hakkında sınırlı bilgi bulunmaktadır. Mezarlığın kilitli kapısı doğudaki yola taraf açılmakta olup, zemin seviyesinin altında bulunan ana odaya giden taş basamakları vardır.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/greko-romen-kaya-mezarlari/",
+    "url": "https://www.visitncy.com/tr/kesfet/greko-romen-kaya-mezarlari/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 4097153666,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.319126,
+     35.340605
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "31lubjybzals1p3r",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#6d5926",
+     "avg_color": "#5b5a40",
+     "caption": null
+    },
+    "title": "The Old Market (Bandabulya) Eski Pazar",
+    "description": "Direction\nhttps://goo.gl/maps/Tm5fkha35VeUPgoB8\n\nThe 17th century “old market” has been renovated to retain its old charm.\n\nThe Kyrenia Bandabulya is in the centre of Kyrenia, close to one of the historic Round Tower’s.\n\nThe original building was constructed in 1878 during the British colonial rule as a City Hall, which also had an outdoor adjacent market. During the winter months, part of the building was converted making it the first stone building to house an indoor market.\n\nAs late as the 1970s, the marketplace was home to a large number of greengrocers, butchers and fishmongers. However, with the arrival of supermarkets, the Bandabulya was robbed a considerable amount of trade and by 1990, it ceased to function as a market.\n\nIn 2005 it was decided to restore the Bandabulya as a touristic market and craft centre, with areas for dining and drinking.\n\nDuring renovation, as much as possible of the original material was reused, the available sandstone was recycled. \n\nThe first thing you notice when you enter the bazaar is the reproduction of the ancient sailing vessel preserved in Kyrenia Castle. Identical to the original build it is in the centre of the building, providing a more intimate atmosphere. The old staircase ironwork above doorways is also striking.\n\nThe restaurants and cafes of the Bandabuliya serve local and Mediterranean foods, the market style shops have a great selection of local handmade crafts.\n\nSmaller than the Bandabulya Nicosia, in the evenings live music is performed by local musicians and for those searching for a romantic atmosphere, is definitely a recommended place to visit.\n\n...\n\nEski Girne Belediye Pazarı şehir merkezinin yakınlarında bulunmaktadır. 1878 yılında İngiliz Koloni döneminin başında Belediye Sarayı olarak yaptırılmış olup, o dönemlerde yapının yanında bir açık çarşı bulunuyordu. O dönem kış aylarında kısmen kapatılan çarşı, zamanla tamamen kapatılarak bugünkü görünümüne kavuşturulmuştur. Binanın ilk yapıldığı yıllarda içinde manavlar, kasaplar, balıkçılar ve kahvehaneler bulunmaktaydı. 1990'lı yıllarda işlevini yitiren bina restore edilip, 2006 yılında, otantik bir mekân olarak restoranlar, kafeler, el sanatları merkezi ve diğer turistik merkezlere ev sahipliği yapacak şekilde tekrar hizmete açılmıştır.\n\nFor more info / Daha fazlası için; \nhttps://www.visitncy.com/tr/kesfet/bandabulya-girne/",
+    "url": "https://www.visitncy.com/tr/kesfet/bandabulya-girne/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3450280138,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.319357,
+     35.340404
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "bdn1gaefouqzwdg2",
+     "w": 1500,
+     "h": 1000,
+     "tip_color": "#988073",
+     "avg_color": "#968779",
+     "caption": null
+    },
+    "title": "Lusignan Period City Walls and Round Towers/Lüzinyan Dönemi Surları ve Yuvarlak Kule",
+    "description": "Direction\nhttps://goo.gl/maps/SpJAjAmecFnXU8dK9\n\nVisit the round tower in Kyrenia Harbour for a real cultural experience and trip back into time.\n\nKyrenia Castle was originally built in the 7th century by the Byzantines to protect the town from Arab raids. This fortification was extended by the Lusignan’s and the round tower was built around 1300 using recycled Roman stones. It was joined to other round towers by a curtain wall enclosing the expanding town of Kyrenia.\n\nThe Venetians strengthened the fortification by widening the original Byzantine walls thus making the overextended Lusignan fortification largely redundant. The Lusignan walls fell down gradually, and by around 1600 when the Ottomans had become established, it was safe to build houses outside the walls. The round tower stood derelict for several hundred years and became a roofless shell.\n\nIn 1987, a local businessman received permission from the Ministry of Antiquities to restore the building – a fibre glass dome was put in place, a wooden gallery was erected, and during the excavation work a rough “shelf” was revealed. This and the floor have been covered in natural stone flags.\n\nSince 1988, the tower has been open to the public as a gift shop and art gallery, that sells souvenirs, books, carpets, furniture, crocheted tablecloths, cushion covers, postcards, jewellery and displays works of art by local painters.\n\nAlthough this round tower is the best preserved, there are remnants of the others still to be seen. One is on the back street leading from the Bandabuliya towards the harbour, and the another overlooks the harbour itself.\n\n...\n\n\nEski Girne surları ve kuleleri, Lüzinyanlar Dönemi'nde halkı saldırılara karşı korumak amacıyla yapılmıştır. Oldukça ince inşa edilen surların Venedik döneminde barutun kullanılmaya başlamasıyla etkisiz oldukları kanıtlanmıştır. Lüzinyan Dönemi'nde ikiz kuleli kent girişi, bugünkü Girne Belediye binasının kuzeyindeydi. Zaman içerisinde Lüzinyan Dönemi'nde yapılmış olan surlar yıkılmış ve taşları ev yapımında kullanılmıştır. Limanın ortasındaki kule, sahilin köşesindeki kule, Belediye Çarşısı çevresindeki iki kule ve eski Gümrük Binası yanındaki kule kalıntısı günümüze kadar ulaşan kalıntılardır.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/yuvarlak-kule/",
+    "url": "https://www.visitncy.com/tr/kesfet/yuvarlak-kule/"
+   }
+  }
+ ],
+ "groups": [],
+ "markers": [],
+ "properties": {}
+}

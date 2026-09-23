@@ -1,0 +1,363 @@
+{
+ "_readme": "Curated rows for the 59 Visit NCY stops that are NEW places. Hand-reviewed 2026-09-23: names are written, not split (the TR half of a MapHub title usually omits its subject). \"description\" overrides the splitter: tr_only = no English text exists; none = no prose. Read by scripts/import-visitncy-places.mjs.",
+ "stops": [
+  {
+   "maphub_id": 3533086396,
+   "category": "monument",
+   "name_en": "Baldöken Ottoman Graveyard",
+   "name_tr": "Baldöken Osmanlı Mezarlığı"
+  },
+  {
+   "maphub_id": 843311359,
+   "category": "monument",
+   "name_en": "Es Seyyid Emin Efendi Water Cistern",
+   "name_tr": "Es Seyyid Emin Efendi Su Sarnıcı"
+  },
+  {
+   "maphub_id": 2821211289,
+   "category": "religious_site",
+   "name_en": "St. Andrew Anglican Church",
+   "name_tr": "St. Andrew Kilisesi"
+  },
+  {
+   "maphub_id": 2217705893,
+   "category": "monument",
+   "name_en": "Hasan Kavizade Hüseyin Efendi Fountain and Stone Steps",
+   "name_tr": "Hasan Kavizade Hüseyin Efendi Çeşmesi ve Taş Merdivenleri"
+  },
+  {
+   "maphub_id": 2869744242,
+   "category": "religious_site",
+   "name_en": "Agha Cafer Pasha Mosque",
+   "name_tr": "Ağa Cafer Paşa Camii"
+  },
+  {
+   "maphub_id": 1813638915,
+   "category": "religious_site",
+   "name_en": "Chrysopolitissa Church",
+   "name_tr": "Chrysopolitissa Kilisesi"
+  },
+  {
+   "maphub_id": 3856368209,
+   "category": "monument",
+   "name_en": "Kyrenia Strand and Harbour",
+   "name_tr": "Girne Antik Limanı"
+  },
+  {
+   "maphub_id": 2931005499,
+   "category": "ancient_ruins",
+   "name_en": "Greco-Roman Rock Tombs",
+   "name_tr": "Kaya Mezarları"
+  },
+  {
+   "maphub_id": 4097153666,
+   "category": "monument",
+   "name_en": "Old Market (Bandabulya)",
+   "name_tr": "Eski Pazar (Bandabulya)"
+  },
+  {
+   "maphub_id": 3450280138,
+   "category": "castle_fortress",
+   "name_en": "Lusignan Period City Walls and Round Towers",
+   "name_tr": "Lüzinyan Dönemi Surları ve Yuvarlak Kule"
+  },
+  {
+   "maphub_id": 906744549,
+   "category": "castle_fortress",
+   "name_en": "Venetian City Walls",
+   "name_tr": "Venedik Surları"
+  },
+  {
+   "maphub_id": 2440853315,
+   "category": "museum",
+   "name_en": "Dr. Fazıl Küçük Museum",
+   "name_tr": "Dr. Fazıl Küçük Müzesi"
+  },
+  {
+   "maphub_id": 2025036881,
+   "category": "monument",
+   "name_en": "Samanbahçe Quarter",
+   "name_tr": "Samanbahçe Evleri"
+  },
+  {
+   "maphub_id": 3885869001,
+   "category": "monument",
+   "name_en": "British Colonial Law Courts",
+   "name_tr": "İngiliz Koloni Dönemi Mahkemeleri"
+  },
+  {
+   "maphub_id": 3075399680,
+   "category": "monument",
+   "name_en": "Venetian Column",
+   "name_tr": "Venedik Sütunu"
+  },
+  {
+   "maphub_id": 756507278,
+   "category": "religious_site",
+   "name_en": "Arabahmet Mosque",
+   "name_tr": "Arabahmet Camii"
+  },
+  {
+   "maphub_id": 2567252249,
+   "category": "monument",
+   "name_en": "Arabahmet Quarter",
+   "name_tr": "Arabahmet Mahallesi"
+  },
+  {
+   "maphub_id": 4124164353,
+   "category": "religious_site",
+   "name_en": "Armenian Church and Monastery",
+   "name_tr": "Ermeni Kilisesi ve Manastırı"
+  },
+  {
+   "maphub_id": 2629370949,
+   "category": "monument",
+   "name_en": "Büyük Hamam (Great Bath)",
+   "name_tr": "Büyük Hamam"
+  },
+  {
+   "maphub_id": 3684470489,
+   "category": "monument",
+   "name_en": "Kumarcılar Han (Gamblers' Inn)",
+   "name_tr": "Kumarcılar Hanı"
+  },
+  {
+   "maphub_id": 841647903,
+   "category": "monument",
+   "name_en": "Municipal Market (Bandabulya)",
+   "name_tr": "Belediye Pazarı (Bandabulya)"
+  },
+  {
+   "maphub_id": 1498683813,
+   "category": "religious_site",
+   "name_en": "Haydarpasha Mosque",
+   "name_tr": "Haydarpaşa Camii"
+  },
+  {
+   "maphub_id": 1180061556,
+   "category": "religious_site",
+   "name_en": "Yenicami Mosque",
+   "name_tr": "Yeni Cami"
+  },
+  {
+   "maphub_id": 1392119489,
+   "category": "museum",
+   "name_en": "Private Ethnographic Museum of Cyprus",
+   "name_tr": "Kıbrıs Özel Etnografya Müzesi"
+  },
+  {
+   "maphub_id": 3541002756,
+   "category": "religious_site",
+   "name_en": "St. Peter & St. Paul Church (Sinan Pasha Mosque)",
+   "name_tr": "St. Peter ve St. Paul Kilisesi (Sinan Paşa Camii)"
+  },
+  {
+   "maphub_id": 469828984,
+   "category": "ancient_ruins",
+   "name_en": "Venetian Royal Palace",
+   "name_tr": "Venedik Sarayı"
+  },
+  {
+   "maphub_id": 530857738,
+   "category": "religious_site",
+   "name_en": "Lala Mustafa Pasha Mosque (St. Nicholas Cathedral)",
+   "name_tr": "Lala Mustafa Paşa Camii (St. Nicholas Katedrali)"
+  },
+  {
+   "maphub_id": 1388493185,
+   "category": "religious_site",
+   "name_en": "St. Francis Church",
+   "name_tr": "St. Francis Kilisesi",
+   "description": "tr_only"
+  },
+  {
+   "maphub_id": 2321779993,
+   "category": "monument",
+   "name_en": "Cafer Pasha Bath and Fountain",
+   "name_tr": "Cafer Paşa Hamamı ve Çeşmesi"
+  },
+  {
+   "maphub_id": 3239934214,
+   "category": "religious_site",
+   "name_en": "Twin Churches",
+   "name_tr": "İkiz Kiliseler"
+  },
+  {
+   "maphub_id": 3273073652,
+   "category": "religious_site",
+   "name_en": "Nestorian Church (St. George Xorionos)",
+   "name_tr": "Nasturyan Kilisesi"
+  },
+  {
+   "maphub_id": 669692912,
+   "category": "religious_site",
+   "name_en": "Underground Church",
+   "name_tr": "Yeraltı Kilisesi"
+  },
+  {
+   "maphub_id": 559235776,
+   "category": "religious_site",
+   "name_en": "St. Anna Church",
+   "name_tr": "St. Anna Kilisesi"
+  },
+  {
+   "maphub_id": 4225216317,
+   "category": "religious_site",
+   "name_en": "Tanner's Mosque",
+   "name_tr": "Tabakhane Mescidi"
+  },
+  {
+   "maphub_id": 2045149503,
+   "category": "religious_site",
+   "name_en": "Carmelite Church",
+   "name_tr": "Karmelit Kilisesi"
+  },
+  {
+   "maphub_id": 155434555,
+   "category": "religious_site",
+   "name_en": "St. Mary Armenian Church",
+   "name_tr": "St. Mary Ermeni Kilisesi"
+  },
+  {
+   "maphub_id": 1008471921,
+   "category": "castle_fortress",
+   "name_en": "Martinengo Bastion",
+   "name_tr": "Martinengo Tabyası"
+  },
+  {
+   "maphub_id": 3070018015,
+   "category": "monument",
+   "name_en": "Keltikli Bath",
+   "name_tr": "Keltikli Hamamı"
+  },
+  {
+   "maphub_id": 518527922,
+   "category": "religious_site",
+   "name_en": "St. Claire (Ayia Phodou) Church and Underground Temple",
+   "name_tr": "St. Claire (Ayia Phodou) Kilisesi ve Yeraltı Tapınağı"
+  },
+  {
+   "maphub_id": 4009916499,
+   "category": "religious_site",
+   "name_en": "St. George of the Latins Church",
+   "name_tr": "St. George Latin Kilisesi"
+  },
+  {
+   "maphub_id": 909842874,
+   "category": "castle_fortress",
+   "name_en": "Porta del Mare and St. Anthony Church",
+   "name_tr": "Deniz Kapısı ve St. Anthony Kilisesi"
+  },
+  {
+   "maphub_id": 4157965694,
+   "category": "religious_site",
+   "name_en": "St. George of the Greeks Church",
+   "name_tr": "St. George Rum Kilisesi"
+  },
+  {
+   "maphub_id": 1970825479,
+   "category": "religious_site",
+   "name_en": "Ay. Nicholas Church",
+   "name_tr": "Ay. Nicholas Kilisesi"
+  },
+  {
+   "maphub_id": 2747624082,
+   "category": "religious_site",
+   "name_en": "Ayia Zoni Church",
+   "name_tr": "Ayia Zoni Kilisesi"
+  },
+  {
+   "maphub_id": 2830438330,
+   "category": "monument",
+   "name_en": "Historical Ottoman Graveyard",
+   "name_tr": "Tarihi Osmanlı Mezarlığı",
+   "description": "none"
+  },
+  {
+   "maphub_id": 880033748,
+   "category": "religious_site",
+   "name_en": "Kutup Osman Shrine and Lodge",
+   "name_tr": "Kutup Osman Türbesi ve Tekkesi"
+  },
+  {
+   "maphub_id": 2342288153,
+   "category": "religious_site",
+   "name_en": "St. James Church",
+   "name_tr": "St. James Kilisesi"
+  },
+  {
+   "maphub_id": 7274967,
+   "category": "museum",
+   "name_en": "Güzelyurt Archaeology and Nature Museum",
+   "name_tr": "Güzelyurt Arkeoloji ve Doğa Müzesi"
+  },
+  {
+   "maphub_id": 3535598963,
+   "category": "monument",
+   "name_en": "Sibyan Elementary School",
+   "name_tr": "Sıbyan Mektebi"
+  },
+  {
+   "maphub_id": 877515375,
+   "category": "monument",
+   "name_en": "Güzelyurt Municipality Culture House",
+   "name_tr": "Güzelyurt Belediyesi Kültür Evi",
+   "description": "none"
+  },
+  {
+   "maphub_id": 3316499096,
+   "category": "religious_site",
+   "name_en": "Lefke Mahkemeler Mosque",
+   "name_tr": "Lefke Mahkemeler Camii"
+  },
+  {
+   "maphub_id": 296747250,
+   "category": "religious_site",
+   "name_en": "Piri Mehmet Pasha Mosque",
+   "name_tr": "Piri Mehmet Paşa Camii"
+  },
+  {
+   "maphub_id": 4173567590,
+   "category": "monument",
+   "name_en": "Vezir Osman Pasha Tomb",
+   "name_tr": "Vezir Osman Paşa Türbesi"
+  },
+  {
+   "maphub_id": 581959243,
+   "category": "monument",
+   "name_en": "Acendu Fountain",
+   "name_tr": "Acendu Çeşmesi"
+  },
+  {
+   "maphub_id": 1170418205,
+   "category": "religious_site",
+   "name_en": "Sheikh Nazim's Dergah",
+   "name_tr": "Şeyh Nazım Dergâhı"
+  },
+  {
+   "maphub_id": 4166625600,
+   "category": "monument",
+   "name_en": "Lefke Aqueduct",
+   "name_tr": "Lefke Su Kemerleri"
+  },
+  {
+   "maphub_id": 3974348697,
+   "category": "religious_site",
+   "name_en": "Sheikh Nazim Orta Mosque",
+   "name_tr": "Şeyh Nazım Orta Camii",
+   "description": "none"
+  },
+  {
+   "maphub_id": 1001637377,
+   "category": "monument",
+   "name_en": "George VI Coronation Monument",
+   "name_tr": "VI. George Taç Giyme Anıtı"
+  },
+  {
+   "maphub_id": 234843719,
+   "category": "monument",
+   "name_en": "Locomotive Trains",
+   "name_tr": "Lokomotif Trenler"
+  }
+ ]
+}

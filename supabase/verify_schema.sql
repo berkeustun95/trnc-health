@@ -240,7 +240,10 @@ WITH report AS (
     ('1017_student_tasks','student_tasks','source_checked_at'),
     -- Student affiliation (1024). App.js PROFILE_COLUMNS is an explicit list, so these do
     -- not break today's reads if MISSING — they break the slice-2 wizard's first write.
-    ('1024_student_affiliation','institutions','website_url')
+    ('1024_student_affiliation','institutions','website_url'),
+    -- places provenance (1045). Written only by service_role; places_guard_source locks it.
+    ('1045_places_source','places','source'),
+    ('1045_places_source','places','source_id')
 
   ) e(m,t,c)
 
@@ -379,7 +382,8 @@ WITH report AS (
     -- error with no explanation. If admin_content_author goes missing, no review report can
     -- be banned on, and the admin queue says the content no longer exists.
     ('1033_reviews_author_not_public','get_my_review'),
-    ('1033_reviews_author_not_public','admin_content_author')
+    ('1033_reviews_author_not_public','admin_content_author'),
+    ('1045_places_source','places_guard_source')
   ) e(m,o)
 
   UNION ALL
@@ -431,7 +435,8 @@ WITH report AS (
     ('1029_student_messaging','msg_20_age_rule'),
     ('1029_student_messaging','msg_30_ugc_screen'),
     ('1029_student_messaging','msg_40_immutable'),
-    ('1029_student_messaging','msg_50_touch_conversation')
+    ('1029_student_messaging','msg_50_touch_conversation'),
+    ('1045_places_source','places_guard_source')
 
   ) e(m,o)
 
@@ -613,7 +618,11 @@ WITH report AS (
     ('1029_student_messaging','conversation_attempts_outcome_check'),
     ('1029_student_messaging','messages_body_check'),
     ('1044_apple_refresh_tokens','apple_refresh_tokens_pkey'),
-    ('1044_apple_refresh_tokens','apple_refresh_tokens_user_id_fkey')
+    ('1044_apple_refresh_tokens','apple_refresh_tokens_user_id_fkey'),
+    -- places provenance (1045). The UNIQUE is registered here only (it is a constraint);
+    -- a plain UNIQUE is what PostgREST's ON CONFLICT (source, source_id) can infer.
+    ('1045_places_source','places_source_pair_check'),
+    ('1045_places_source','places_source_source_id_key')
 
   ) e(m,o)
 
@@ -3125,6 +3134,22 @@ WITH report AS (
       EXISTS(SELECT 1 FROM pg_constraint
         WHERE conrelid = to_regclass('public.apple_refresh_tokens') AND contype = 'f'
           AND confrelid = 'auth.users'::regclass AND confdeltype = 'c')
+    -- ── 1045: places provenance lock ────────────────────────────────────────────
+    -- D proves the trigger EXISTS; it cannot see that it fires on UPDATE too. A trigger
+    -- recreated as BEFORE INSERT only would pass D and reopen the update path, through
+    -- which a customer could put source='visitncy' on their own row and wear the partner
+    -- credit. pg_get_triggerdef renders canonical SQL — nothing to decode.
+    UNION ALL SELECT '1045_places_source','places_guard_source fires BEFORE INSERT OR UPDATE, per row',
+      COALESCE((SELECT pg_get_triggerdef(t.oid) FROM pg_trigger t
+                 WHERE t.tgrelid = to_regclass('public.places') AND t.tgname = 'places_guard_source')
+               LIKE '%BEFORE INSERT OR UPDATE ON %places FOR EACH ROW%', false)
+    -- The body, anchored to CODE shapes (the function carries no comments, so no prose can
+    -- satisfy or trip these): service_role passes, a session's INSERT is nulled, a
+    -- session's UPDATE keeps the old value.
+    UNION ALL SELECT '1045_places_source','places_guard_source: no-session passes, session insert nulled, update keeps old',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%if auth.uid() is null then return new%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := null%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := old.source_id%', false)
   ) z
 
   UNION ALL

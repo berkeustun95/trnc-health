@@ -1,0 +1,112 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": 7274967,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.990678,
+     35.200746
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "dtqyir31hwwe47ns",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#cbcac1",
+     "avg_color": "#718490",
+     "caption": null
+    },
+    "title": "Archeology and Nature Museum Güzelyurt Arkeoloji ve Doğa Müzesi",
+    "description": "Direction\nhttps://goo.gl/maps/4tXUrkhgx3L5xZ61A\n\nThis petite site opened as a museum in 1979 after restoration.\n\nThe building was originally the palace of the Bishop of the region and housed town offices up to 1974.\n\nIt consists of a natural history section where flora and fauna of North Cyprus are displayed, and an archaeological floor which exhibits the island’s rich historical past from the Neolithic and Bronze Ages. A further room offers a display of finds from the Tumba Tou Skuru settlement.\n\nThe courtyard serves as an open-air museum exhibiting pieces from the Classical, Hellenistic and Roman periods.\n\nSince their discovery in 2005, the ‘Golden Leaves of Soli’ have been on display at this museum and are of great archaeological importance and aesthetics. The most breath-taking of all artefacts here, these are the ethereal tiara of gold leaves, artfully and delicately intertwined.\n\nAnother important work is the 2nd century AD statue of the Anatolian Goddess Artemis of Ephesus, discovered at the Salamis ruins in 1980.\n\nThis plain museum is around the corner from the major tourist attraction of St. Mamas Church and Icon Museum. If you have some time, stroll over to this little museum – you will be rewarded by the pièce de résistance.\n\n...\n\n\nGüzelyurt Arkeoloji ve Doğa Müzesi, 1974 öncesi Güzelyurt Piskoposu'nun sarayı olan binada yeralmaktadır.  Müzede kültür varlıkları ve mumyalanmış hayvan örnekleri sergilenmektedir. Zemin katta, Kıbrıs'a özgü birkaç doldurulmuş hayvanla birlikte, doğal tarih ve jeolojik örnekler bulunmaktadır. İkinci katın ilk odasında, Geç Tunç Çağı'na ait büyüleyici parçalar ve müzeye kısa bir sürüş mesafesindeki Soli Harabeleri’ndeki mezarlardan çıkarılan eserler, ikinci ve üçüncü odalarda, Toumba Tou Skourou'daki yerleşim yerinde bulunan eserler, dördüncü ve beşinci odalarda ise Geometrik, Arkaik, Klasik, Helenistik, Roma, Bizans ve Lüzinyan dönemlerine ait farklı kalıntılar sergilenmektedir.\n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/arkeoloji-ve-doga-tarihi-muzesi/",
+    "url": "https://www.visitncy.com/tr/kesfet/arkeoloji-ve-doga-tarihi-muzesi/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3535598963,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.989745,
+     35.200565
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/V2mLCfL1K8kwBaa48\n\nGüzelyurt Elementary School is located the south-west of the museum. It was created and run by the Omorphou Mosque Foundation during the Ottoman period, a foundation which also provided teachers salaries. The original mosque was replaced after 1974 by the larger, more modern mosque. In 1916, the elementary school was in ruins and was re-built with financial contributions from the local Muslim society and the Education Office of the Foundations Department in 1920/21. The sign over the main entrance states, in Ottoman Turkish, 'Omorphou Elementary School 1337 (1920)' and the metal work above the entrance door has the date '1921'.\n\n...\n\nYapı, Güzelyurt Arkeoloji ve Doğa Müzesi’nin güney batısında yer almakta olup, Osmanlı döneminde, Omorfou Camii Vakfı tarafından kurulmuştur. Bu Vakıf aynı zamanda öğretmenlerin maaşlarını da karşılamaktaydı. 1916 yılında harabe halinde olan İlkokul, 1920/21 yıllarında, Müslüman toplumunun ve Vakıflar İdaresi’nin Eğitim Birimi’nin mali katkılarıyla, yeniden inşa edilmiştir. Ana girişin üzerindeki tabelada Osmanlıca olarak 'Omorfou İlkokulu 1337 (1920)' yazmakla birlikte, giriş kapısının üzerindeki metalde de ‘1921’ tarihi yazmaktadır.",
+    "image": {
+     "id": "avcspkxoqlabtttg",
+     "w": 4400,
+     "h": 2936,
+     "tip_color": "#373224",
+     "avg_color": "#8d9084",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "Sibyan Elementary School / Mektebi"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3007565083,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.991161,
+     35.200412
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "cvuxe4twf0dygjbl",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#e9e2d5",
+     "avg_color": "#5c6a7c",
+     "caption": null
+    },
+    "title": "St. Mamas Monastery & Icon Museum / St. Mamas Manastırı & İkon Müzesi",
+    "description": "Direction \nhttps://goo.gl/maps/327DrrRjPAxeZyKh7\n\nDedicated to the island’s beloved tax-repelling patron saint, the church was formerly the site of a pagan temple.\n\nSt. Mamas Monastery in Guzelyurt is the third most important place of worship for the Greek Orthodox in North Cyprus, after the St. Barnabas Tomb at Famagusta and the Apostolos Andreas Monastery in Karpaz.\n\n----------------\n\nGüzelyurt Arkeoloji ve Doğa Müzesi’nin hemen bitişiğinde, 18. yüzyılda gotik tarzda inşa edilmiş Aziz Mamas Kilisesi yer almaktadır. Kilisedeki ahşap İkonostasis 1500'lü yıllara ait olup,  Lüzinyan ve Venedik dönemlerinin sembollerini taşımaktadır. İkonostasisin dört ahşap ayağında incir, üzüm, meşe palamudu, Venedik amblemi ve kalkan motifleri bulunmaktadır. Kilise’deki pulpit 1711'de yapılmış, kubbe ise 1925'te Kilise restore edildiğinde eklenmiştir. Manastır odaları 1779 yılında eklenmiştir. Aziz Mamas'ın beyaz mermer lahiti kilisede bir kemerin altında yer almakta olup, duvar içine örüldüğü için kilisenin hem içinden hem de dışından görülebilmektedir. Lahitin yanında, ziyaretçiler tarafından yakılan mumlar görülebilmektedir. 12. yüzyıla tarihlenen St. Mamas,  halk tarafından sağ elinde bir sopa ve sol kolunda bir koyun tutarken, aslana binen bir adam olarak tasvir edilmiştir. Efsaneye göre Aziz Mamas, Güzelyurt yakınlardaki bir mağarada yaşayan, mütevazı ve fakir bir adamdı. Dönemin Dükü, adada yaşayan herkesin vergi ödemekle yükümlü olduğunu söylemesine rağmen, Aziz Mamas bir mağarada yaşadığını ve hükümetin verdiği hizmetleri kullanmadığını dile getirerek,  ödeme yapmayı reddetmişti. Bu duruma öfkelenen Dük, Aziz Mamas'ın tutuklanıp Lefkoşa'ya gönderilmesini emretti. Aziz Mamas Lefkoşa'ya götürülürken, bir kuzunun üzerine atlayan bir aslan görür. Aslan tam onu parçalamak üzereyken, Aziz Mamas kolunu kaldırır ve aslanı yatıştırır. Kuzuyu kurtarıp kollarına aldıktan sonra, aslanın üzerine binerek, Dük'ün tahtının önündeki basamaklara gelir. Dük gördüklerinden o kadar etkilenir ki, Aziz Mamas'a vergi muafiyeti verilmesini emreder. Bu nedenle Aziz Mamas vergiden kaçanların koruyucusu olarak bilinmektedir.\n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/discover/st-mamas-monastery-icon-museum/",
+    "url": "https://goo.gl/maps/327DrrRjPAxeZyKh7"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 877515375,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.990549,
+     35.19804
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "title": "Güzelyurt Municipality Culture House / Güzelyurt Belediyesi Kültür Evi"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 4291375664,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.996782,
+     35.193429
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "title": "Railway Museum / Tren İstasyonu Müzesi"
+   }
+  }
+ ],
+ "groups": [],
+ "markers": [],
+ "properties": {}
+}
