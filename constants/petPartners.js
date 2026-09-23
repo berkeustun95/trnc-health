@@ -65,10 +65,9 @@ export const PENDING_FIELDS = {
   vaccinationRequirements: 'Not published. OwningPetScreen carries a general TRNC vaccination schedule; that is not this facility\'s intake policy and must not be presented as it.',
   acceptsCats:             'Not published. Everything they publish is dog-only, which is why displayType is dog_boarding — but "no cats mentioned" is not "cats refused", and stating either would be inventing their policy.',
   cameraAccess:            'PENDING ON PURPOSE, AND THE DISTINCTION IS THE POINT. Their 7/24 İzleme copy says THEY monitor with a camera system. It does NOT say the owner gets a feed. Those are different products and merging them promises something the partner never offered.',
-  logo:                    'No usable logo file collected yet. Until one is, PartnerLogoStrip renders a monogram — a finished state, not a placeholder box.',
-  logoOnDark:              'No inverted wordmark. partnerLogo() already falls back to `logo`, which is correct while every surface this sits on is light.',
+  logoOnDark:              'No inverted wordmark. The partner sent a JPEG on white; shinypaw/logo.png keys that white out, which is clean on light grounds but NOT on dark: the white strokes inside the mark vanish, a light halo remains, and the brown wordmark loses contrast. Ask the partner for a vector or a transparent PNG. partnerLogo() falls back to `logo`, and no surface that renders a pet partner is dark today.',
   accent:                  'No brand colour agreed. The screen falls back to colors.primary, which check-pet-partners.mjs proves is readable; an unvetted hex could ship unreadable text.',
-  photoPermission:         'WRITTEN PERMISSION NOT YET HELD for the four placeholder photos below. Tracked as a field so it is owed rather than remembered.',
+  photoPermission:         'WRITTEN PERMISSION NOT YET HELD for the five partner-supplied photos below — the partner sent the files, not a written permission. Tracked as a field so it is owed rather than remembered.',
 }
 
 // ─── THE PARTNERS ───────────────────────────────────────────────────────────
@@ -167,57 +166,54 @@ export const PET_PARTNERS = [
       { id: 'attention',  titleKey: 'petHotelSvcAttentionTitle',  bodyKey: 'petHotelSvcAttentionBody',  icon: 'people-outline' },
     ],
 
-    // ─── PHOTOS — PLACEHOLDERS, AND LABELLED AS SUCH IN THE DATA ────────────
+    // ─── PHOTOS — SHINY PAW'S OWN, SUPPLIED 2026-09-23 ──────────────────────
     //
-    // Four images lifted from their Wix site and bundled locally (constants/partnerAssets.js).
-    // NOT hotlinked: a Wix CDN URL is a dependency on somebody else's uptime, cache policy
-    // and willingness to keep a path stable, on a screen that is meant to work offline-ish
-    // on a phone.
+    // Sent by the partner over WhatsApp. The partner states these are real photographs of
+    // their facility, edited with AI tools; `note` carries that statement verbatim so it
+    // travels with each file. They replace the three Wix placeholders, so `placeholder` is
+    // false on all five — the guard still counts it on every run.
     //
-    // ⚠ EVERY ONE OF THESE IS AWAITING REPLACEMENT BY SHINY PAW'S OWN PHOTOGRAPHS.
-    //   `placeholder: true` is on each entry rather than stated once in this comment, so a
-    //   future reader who scrolls straight to the array still sees it, and so the guard can
-    //   COUNT them and print the number on every run.
+    // Bundled locally (constants/partnerAssets.js), never hotlinked. Downscaled to 900 px
+    // wide (SHOT_W caps at 300pt, x3 density) and re-encoded as JPEG q85. The four
+    // portraits arrived at 941x1672; each was cropped to 4:5 around the dogs, trimming
+    // empty paving, so the strip does not pair a 300pt-tall square with 533pt-tall
+    // neighbours. The kennel row stays square and comes FIRST: PetHotelPartnerCard's
+    // 64pt thumb is a square `cover` of the first photo.
     //
-    // ⚠ THE REST OF THEIR SITE'S IMAGERY IS AI-GENERATED AND MUST NOT BE USED ANYWHERE.
-    //   These four were selected as the ones that are photographs. Do not add a fifth
-    //   without checking it against that rule — an AI-generated dog on a real boarding
-    //   facility's listing is a misrepresentation of the premises somebody is about to
-    //   leave their animal at.
+    // photoPermission is still PENDING: we hold the files, not written permission.
     //
-    // photoPermission is PENDING: these are wired on Berke's instruction and the written
-    // permission item stays owed until it is in writing.
-    // ─── `aspect` IS THE DIVISION, NOT A DECIMAL ────────────────────────────
+    // ⚠ JUDGE THE PIXELS, NEVER THE PATH. Every file below was looked at before wiring.
+    //   Rejected, and deliberately not stored in the repo:
+    //   • `shinypaw/dog-at-mesh` (dropped 2026-09-14, resent in this batch as 14.48.35 (1))
+    //     — the near foreleg bent where no joint is, a paw attached to no visible leg, an
+    //     unexplained mid-body protrusion.
+    //   • 14.48.34 (3) (2026-09-23) — a dog with two merged heads and an extra leg.
+    //   • 14.48.33 (2026-09-23) — a two-panel collage; not usable as a gallery frame.
+    //   An AI-malformed dog on a real boarding facility's listing misrepresents the premises
+    //   somebody is about to leave their animal at, which this surface must never do.
     //
-    // Written as w / h so the number carries where it came from, the same convention
-    // constants/partners.js uses. These are NOT uniform — three are 640x640 and
-    // dog-at-mesh is 512x640 — and every shot renders with resizeMode 'cover', so a
-    // container aspect that disagrees with the source centre-crops. TadilArt's old
-    // hardcoded `1` cost ~12% of the height of a bathroom photo; declaring per photo is
-    // what stops that here.
+    // ─── `aspect` IS THE DIVISION OF THE FILE AS COMMITTED ──────────────────
+    // Written as w / h so the number shows where it came from. Every shot renders with
+    // resizeMode 'cover', so a declared aspect that disagrees with the file centre-crops it.
     //
-    // ─── `provenance` IS A REQUIRED FIELD, AND ONE OF THEM IS DISPUTED ──────
-    //
-    // 'photograph' = looks like a real photograph of the real premises.
-    // 'disputed'   = shows AI-generation tells and needs the partner to confirm.
-    //
-    // ⚠ THERE WERE FOUR. `shinypaw/dog-at-mesh` WAS DROPPED 2026-09-14 as AI-generated —
-    //   the near foreleg bent where no joint is, the upper-left paw was not attached to a
-    //   visible leg, and there was an unexplained mid-body protrusion. An AI-generated dog
-    //   on a real boarding facility's listing misrepresents the premises somebody is about
-    //   to leave their animal at, which is the one thing this surface must not do.
-    //
-    //   HOW IT WAS NEARLY MISSED, because the next person will face the same test: the
-    //   selection evidence was the FILENAME — Wix preserves uploaded names, and this one
-    //   was not marked AI. That is not evidence of anything. Only looking at the image was.
-    //   Judge the pixels, never the path.
+    // ─── `provenance` IS REQUIRED ───────────────────────────────────────────
+    // 'photograph'     = looks like a real, unedited photograph of the real premises.
+    // 'partner-edited' = the partner's own photograph, AI-edited by the partner, who
+    //                    confirmed that it shows the real premises. Judged by eye too.
+    // 'disputed'       = shows AI-generation tells and needs the partner to confirm.
     photos: [
-      { key: 'shinypaw/runs-collage', placeholder: true, aspect: 640 / 640, provenance: 'photograph',
-        note: 'Two-up composite of the kennel block, as they publish it — not two separate frames.' },
-      { key: 'shinypaw/runs-wide',    placeholder: true, aspect: 640 / 640, provenance: 'photograph',
-        note: 'Wide shot of the runs.' },
-      { key: 'shinypaw/entrance',     placeholder: true, aspect: 640 / 640, provenance: 'photograph',
-        note: 'Handler and dog at the entrance; the ridgeline behind is consistent with the north of the island.' },
+      { key: 'shinypaw/kennel-row',      placeholder: false, aspect: 900 / 900,  provenance: 'partner-edited',
+        note: 'partner-supplied, real photo, AI-edited per partner — the kennel row.' },
+      { key: 'shinypaw/yard-three-dogs', placeholder: false, aspect: 900 / 1125, provenance: 'partner-edited',
+        note: 'partner-supplied, real photo, AI-edited per partner — the yard, three dogs.' },
+      { key: 'shinypaw/hose',            placeholder: false, aspect: 900 / 1125, provenance: 'partner-edited',
+        note: 'partner-supplied, real photo, AI-edited per partner — a dog under the hose.' },
+      { key: 'shinypaw/yard-feeding',    placeholder: false, aspect: 900 / 1125, provenance: 'partner-edited',
+        note: 'partner-supplied, real photo, AI-edited per partner — two dogs feeding. Judged 2026-09-23: '
+          + 'four legs on the spaniel; the pointer\'s middle leg leaves the groin with a visible hock, so it '
+          + 'reads as the far hind leg. No anatomical error found.' },
+      { key: 'shinypaw/yard-two-dogs',   placeholder: false, aspect: 900 / 1125, provenance: 'partner-edited',
+        note: 'partner-supplied, real photo, AI-edited per partner — the yard, two dogs.' },
     ],
 
     // ─── PENDING (see PENDING_FIELDS above for the reason on each) ──────────
@@ -241,7 +237,7 @@ export const PET_PARTNERS = [
     vaccinationRequirements: null,
     acceptsCats:             null,
     cameraAccess:            null,
-    logo:                    null,
+    logo:                    'shinypaw/logo',
     logoOnDark:              null,
     accent:                  null,
     photoPermission:         null,

@@ -110,7 +110,7 @@ const referencedKeys = new Set()
 const referencedAssets = new Set()
 let placeholderPhotos = 0
 const disputedPhotos = []
-const PROVENANCE = new Set(['photograph', 'disputed'])
+const PROVENANCE = new Set(['photograph', 'partner-edited', 'disputed'])
 
 for (const p of PET_PARTNERS) {
   const who = p.slug || p.name || '<unnamed>'
