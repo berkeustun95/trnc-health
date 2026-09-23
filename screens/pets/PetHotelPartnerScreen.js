@@ -108,7 +108,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
   // scroll is broken rather than mistuned.
   const SNAP      = SHOT_W + STRIP_GAP
 
-  // ─── CONTACT ACTIONS — FOUR, ALL FOUR LOG (directions needs 20261046) ─────
+  // ─── CONTACT ACTIONS — FOUR, ALL FOUR LOG ──────────────────────────────────
   //
   // logContactEvent is fire-and-forget and can never throw. It is called on the line BEFORE
   // Linking.openURL precisely so a hanging analytics write cannot cost somebody their tap —
@@ -146,15 +146,8 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
   //
   // ⚠ THE DIRECTIONS TAP LOGS AS 'maps', ITS OWN ACTION. Until 2026-09-23 it did not log
   //   at all: contact_events_action_check had no 'maps', and logging it as 'website' would
-  //   have folded two intentions into one number. 20261046 adds 'maps' to the CHECK.
-  //
-  //   ⚠ 20261046 MUST BE APPLIED BEFORE PET_HOTEL_LIVE FLIPS. logContactEvent swallows a
-  //   rejected INSERT, so against an unapplied CHECK this line does nothing visible:
-  //   directions demand would read as zero, indistinguishable from nobody tapping.
-  //   Precondition recorded on the flag in constants/flags.js.
-  //
-  //   DormPartnerScreen's openDirections() is still unlogged; it can use 'maps' too once
-  //   20261046 is live. Out of scope here.
+  //   have folded two intentions into one number. 20261046 adds 'maps' to the CHECK;
+  //   applied and verified 2026-09-23. DormPartnerScreen's directions log 'maps' too.
   const openMaps = () => {
     if (!sec.location?.mapsUrl) return
     logContactEvent('pets', partner.id, 'maps', region)

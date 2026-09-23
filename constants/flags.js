@@ -352,15 +352,7 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //   table" hazard has no table to apply to here, so there is no window between activating
 //   content and flipping the flag, and therefore no way to end a session inside one.
 //
-// ⚠ PRECONDITION: 20261046 APPLIED BEFORE THIS FLIPS. The same trap DORMS_LIVE carries
-//   above. The directions button now logs action='maps', and until
-//   20261046_contact_events_maps_action.sql is applied the action CHECK rejects it. The
-//   rejection is swallowed, so directions demand would read as zero, identical to nobody
-//   tapping. Verify against the LIVE database, never the file: pg_get_constraintdef on
-//   contact_events_action_check must include 'maps', and supabase/verify_schema.sql's two
-//   20261046_maps_action tokens must be OK. (On 2026-09-14 the module CHECK was confirmed
-//   to permit 'pets' and the action CHECK 'website'; both are asserted by definition in
-//   verify_schema.sql.)
+// 20261046 ('maps' in the action CHECK) was applied and verified against the live database on 2026-09-23.
 //
 // ⚠ FLIPPING THIS IS NOT THE MODULE GO-LIVE SOP. That SOP exists for seeded TABLE content
 //   and most of its steps have no referent here: there are no rows to seed inactive, no
@@ -385,8 +377,8 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //   in this screen, and this screen deliberately does not start a one-off.
 //
 // ⚠ DIRECTIONS TAPS LOG AS 'maps', their own action, not 'website': folding them into
-//   website would merge two intentions into one number. Needs 20261046, per the precondition
-//   above. See the openMaps note in screens/pets/PetHotelPartnerScreen.js.
+//   website would merge two intentions into one number. See the openMaps note in
+//   screens/pets/PetHotelPartnerScreen.js.
 //
 //   And the clean-tree stash check before any OTA, as always.
 //
