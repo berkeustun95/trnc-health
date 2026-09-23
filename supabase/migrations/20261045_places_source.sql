@@ -48,38 +48,43 @@
 -- is a no-op, and a pin somebody has since moved to a THIRD value aborts the whole file
 -- rather than being overwritten.
 --
--- ─── THE FIRST APPLY DEADLOCKED (2026-09-23) — hence the lock prelude ───────
+-- ─── THE FIRST APPLY DEADLOCKED (2026-09-23) ────────────────────────────────
 --
 --   40P01  Process 2358884 waits for AccessExclusiveLock on relation 17235; blocked by 2358883.
 --          Process 2358883 waits for AccessShareLock on relation 19823; blocked by 2358884.
 --
--- Nothing committed (pins unmoved in both tables, no columns, no ledger row). Read as
--- 17235 = landmarks, 19823 = places: landmarks predates every migration in this repo and
--- places is from 0822, so it carries the higher OID. The OTHER process held landmarks and
--- waited to read places — the shape of any reader that touches both. This file does not
--- produce that cycle on its own: it asks ROW EXCLUSIVE on landmarks, never ACCESS
--- EXCLUSIVE, and takes places in its first statement while holding nothing. Confirm the
--- reading once with  SELECT 17235::regclass, 19823::regclass;
+-- 17235 = storage.buckets, 19823 = places (resolved in the live database). The first
+-- process named in a deadlock report is the one that received the error — this apply — so
+-- it HELD ACCESS EXCLUSIVE on places and ASKED for ACCESS EXCLUSIVE on storage.buckets.
+-- Nothing committed. Nothing in this file names storage; neither do the four trigger
+-- functions on places nor anything they call (as defined in supabase/migrations/), and no
+-- foreign key joins places to storage. So the request did not come from any statement
+-- written here — see vault 2026-09-23_visitncy-SLICE1-stops-to-places.md. The Postgres
+-- log entry for the deadlock carries the SQL of both sessions.
 --
--- So every lock is taken FIRST, before anything reads or writes, in the order such a
--- reader takes them (landmarks, then places): a reader already holding landmarks finishes
--- its read of places instead of closing a cycle, and two copies of this file queue on the
--- same first lock. lock_timeout turns any wait longer than 5 s into a clean abort (55P03)
--- rather than a queue that stalls every reader of places behind this transaction.
--- Residual: the probe's triggers still READ other tables (profiles, blocked_terms) after
--- the prelude. Only concurrent DDL on those can block that, and lock_timeout bounds it.
+-- What the file does about it:
+--   • lock_timeout = 5 s, and the one lock this file needs — ACCESS EXCLUSIVE on places —
+--     is taken FIRST, before anything reads or writes. Any wait becomes a clean abort
+--     (55P03) instead of a queue that stalls every reader of places behind this transaction.
+--   • CREATE OR REPLACE TRIGGER instead of DROP TRIGGER IF EXISTS + CREATE TRIGGER. Same
+--     idempotency, and the file no longer contains a DROP (Supabase's supautils extension
+--     intercepts DROP TRIGGER — an untested candidate for the storage.buckets request).
+--   • The assertion block ASSERTS that this transaction holds no lock in the storage schema
+--     and no ACCESS EXCLUSIVE lock on anything but places. If something still takes one,
+--     the apply aborts and names the relation and mode instead of committing silently.
 --
--- Apply: SQL Editor, Role = postgres, paste the whole file ONCE. Idempotent; re-runnable.
--- A 55P03 lock_timeout means something held one of the two tables for 5 s: nothing was
--- applied, run it again. ADD COLUMN ⇒ ends with NOTIFY pgrst (after COMMIT).
+-- Apply: SQL Editor, Role = postgres, paste the whole file ONCE, copied from DISK. Idempotent;
+-- re-runnable. A 55P03 lock_timeout means something held places for 5 s: nothing was applied,
+-- run it again. ADD COLUMN ⇒ ends with NOTIFY pgrst (after COMMIT).
 -- ═══════════════════════════════════════════════════════════════════════════
 
 BEGIN;
 
 -- SET LOCAL is scoped to this transaction (it is ignored outside one); nothing precedes it.
+-- landmarks is not locked here: its two-row UPDATE takes ROW EXCLUSIVE when it runs, which
+-- blocks no reader and no writer.
 SET LOCAL lock_timeout = '5s';
-LOCK TABLE public.landmarks IN ACCESS EXCLUSIVE MODE;
-LOCK TABLE public.places    IN ACCESS EXCLUSIVE MODE;
+LOCK TABLE public.places IN ACCESS EXCLUSIVE MODE;
 
 ALTER TABLE public.places ADD COLUMN IF NOT EXISTS source    text;
 ALTER TABLE public.places ADD COLUMN IF NOT EXISTS source_id text;
@@ -118,8 +123,7 @@ begin
   return new;
 end $function$;
 
-DROP TRIGGER IF EXISTS places_guard_source ON public.places;
-CREATE TRIGGER places_guard_source
+CREATE OR REPLACE TRIGGER places_guard_source
   BEFORE INSERT OR UPDATE ON public.places
   FOR EACH ROW EXECUTE FUNCTION public.places_guard_source();
 
@@ -150,6 +154,8 @@ DECLARE
   v_pair_ok  boolean := false;
   v_uniq_ok  boolean := false;
   v_upsert   boolean := false;
+  v_foreign  text;
+  v_own_ae   int;
   r          record;
 BEGIN
   SELECT string_agg(column_name || ':' || data_type, ', ' ORDER BY column_name) INTO v_cols
@@ -218,6 +224,26 @@ BEGIN
     ON CONFLICT (source, source_id) DO NOTHING;
     v_upsert := true;
 
+    -- Every relation lock this transaction holds, read HERE — at its widest point — because
+    -- the rollback below releases whatever the probe's triggers took. Allowed: nothing in the
+    -- storage schema, and ACCESS EXCLUSIVE on places and the index this file creates only.
+    -- The first apply asked for ACCESS EXCLUSIVE on storage.buckets; this names such a lock.
+    SELECT string_agg(format('%I.%I %s', n.nspname, c.relname, l.mode), ', ' ORDER BY n.nspname, c.relname)
+      INTO v_foreign
+      FROM pg_locks l
+      JOIN pg_class c     ON c.oid = l.relation
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE l.locktype = 'relation' AND l.pid = pg_backend_pid()
+       AND (n.nspname = 'storage'
+            OR (l.mode = 'AccessExclusiveLock'
+                AND c.oid <> 'public.places'::regclass
+                AND c.oid IS DISTINCT FROM to_regclass('public.places_source_source_id_key')));
+    -- Control: the same read must see the one lock this file certainly holds. A read that
+    -- finds nothing at all would pass the check above on every input.
+    SELECT count(*) INTO v_own_ae FROM pg_locks l
+     WHERE l.locktype = 'relation' AND l.pid = pg_backend_pid()
+       AND l.relation = 'public.places'::regclass AND l.mode = 'AccessExclusiveLock';
+
     RAISE EXCEPTION 'ZZ_PROBE_ROLLBACK';
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM IS DISTINCT FROM 'ZZ_PROBE_ROLLBACK' THEN RAISE; END IF;
@@ -242,6 +268,13 @@ BEGIN
   IF NOT v_pair_ok THEN RAISE EXCEPTION 'probe: a row with source but no source_id was accepted'; END IF;
   IF NOT v_uniq_ok THEN RAISE EXCEPTION 'probe: a duplicate (source, source_id) was accepted'; END IF;
   IF NOT v_upsert  THEN RAISE EXCEPTION 'probe: ON CONFLICT (source, source_id) did not run'; END IF;
+
+  IF v_own_ae IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'lock check: pg_locks shows % ACCESS EXCLUSIVE lock(s) on places for this session, expected 1 — the lock read is broken, so the check below would prove nothing', v_own_ae;
+  END IF;
+  IF v_foreign IS NOT NULL THEN
+    RAISE EXCEPTION 'this migration holds locks it must not take: % — Slice 1 touches no storage and needs ACCESS EXCLUSIVE on places only. Nothing was applied.', v_foreign;
+  END IF;
 
   IF EXISTS (SELECT 1 FROM public.places WHERE name LIKE 'zz provenance probe%') THEN
     RAISE EXCEPTION 'probe rows survived the rollback';
@@ -282,7 +315,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261045_places_source.sql', 'a9b06c69a8bc25dba7ea8a1064e6c54922a5061f97f98a57f2fa8893c267f0fd')
+VALUES ('20261045_places_source.sql', '6078688d67661955f6721edd620f71fb2e7cd52e8cbde917eba67b8a1b4fb545')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

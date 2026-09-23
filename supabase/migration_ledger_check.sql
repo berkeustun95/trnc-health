@@ -163,7 +163,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261042_capture_dashboard_storage_policies.sql', 'd5409bcc4fa9054fb1e9cc4db9ca74b1c20f931246c15ad19e98ebc59af5de9c'),
   ('20261043_home_strip_pin_notice.sql', 'f5b0c1263c5fbaf9bf46d54b86a10d439bf80c21faebdbedef5dfecb60f5072f'),
   ('20261044_apple_refresh_tokens.sql', '18c0d5fdfa5bbf1880b786debdb82576269485b1c50a1a3df3530521fe81bdf0'),
-  ('20261045_places_source.sql', 'a9b06c69a8bc25dba7ea8a1064e6c54922a5061f97f98a57f2fa8893c267f0fd')
+  ('20261045_places_source.sql', '6078688d67661955f6721edd620f71fb2e7cd52e8cbde917eba67b8a1b4fb545')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
