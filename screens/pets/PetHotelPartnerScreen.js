@@ -108,7 +108,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
   // scroll is broken rather than mistuned.
   const SNAP      = SHOT_W + STRIP_GAP
 
-  // ─── CONTACT ACTIONS — FOUR; THREE OF THEM LOG (see the directions note) ───
+  // ─── CONTACT ACTIONS — FOUR, ALL FOUR LOG (directions needs 20261046) ─────
   //
   // logContactEvent is fire-and-forget and can never throw. It is called on the line BEFORE
   // Linking.openURL precisely so a hanging analytics write cannot cost somebody their tap —
@@ -138,31 +138,26 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
     logContactEvent('pets', partner.id, 'website', region)
     Linking.openURL(url).catch(() => {})
   }
-  // ⚠ THEIR maps LINK, not a coordinate we resolved. coords is pending, and a lat/lng we
-  //   derived from "Lefkoşa" would put a wrong pin on a partner's own page. There is also
+  // ⚠ THEIR maps LINK for directions, not `coords`. The partner-confirmed coords feed the
+  //   Explore map pin; their own link stays the directions target. There is also
   //   no ADA rating here by decision — a config-only partner has no row to anchor one to —
   //   so this is the only review affordance on the screen, and their Wix testimonials are
   //   deliberately not imported.
   //
-  // ⚠ THE DIRECTIONS TAP IS DELIBERATELY NOT LOGGED, AND THAT IS A CHOICE, NOT AN
-  //   OMISSION. The brief asked for all four contact actions to log. There is no 'maps'
-  //   in contact_events_action_check (`call` / `whatsapp` / `call_secondary` / `website`),
-  //   and adding one is a migration — which this slice was told to stop and ask about
-  //   rather than write.
+  // ⚠ THE DIRECTIONS TAP LOGS AS 'maps', ITS OWN ACTION. Until 2026-09-23 it did not log
+  //   at all: contact_events_action_check had no 'maps', and logging it as 'website' would
+  //   have folded two intentions into one number. 20261046 adds 'maps' to the CHECK.
   //
-  //   The tempting shortcut was to log it as 'website'. REJECTED: it would silently fold
-  //   directions taps into the website count, so the partner report would read a number
-  //   that is the sum of two different intentions with nothing to say so. A MISSING metric
-  //   is honest and visibly missing; a CONFLATED one is wrong and looks fine — the same
-  //   argument this repo makes about a check that certifies its own blind spot.
+  //   ⚠ 20261046 MUST BE APPLIED BEFORE PET_HOTEL_LIVE FLIPS. logContactEvent swallows a
+  //   rejected INSERT, so against an unapplied CHECK this line does nothing visible:
+  //   directions demand would read as zero, indistinguishable from nobody tapping.
+  //   Precondition recorded on the flag in constants/flags.js.
   //
-  //   DormPartnerScreen reached the same place independently: its openDirections() has no
-  //   logContactEvent beside it while its whatsapp/call/website handlers all do.
-  //
-  //   To actually measure directions demand, extend the action CHECK to include 'maps'
-  //   (one migration, the shape of 20261014) and add the call here.
+  //   DormPartnerScreen's openDirections() is still unlogged; it can use 'maps' too once
+  //   20261046 is live. Out of scope here.
   const openMaps = () => {
     if (!sec.location?.mapsUrl) return
+    logContactEvent('pets', partner.id, 'maps', region)
     Linking.openURL(sec.location.mapsUrl).catch(() => {})
   }
 

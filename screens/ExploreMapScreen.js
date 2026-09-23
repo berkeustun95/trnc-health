@@ -28,6 +28,7 @@ import {
 } from '../constants/mapSources'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
+import { partnerAsset } from '../constants/partnerAssets'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -153,28 +154,47 @@ function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, 
   )
 }
 
+// Three pin kinds, three row shapes. A pet hotel pin carries a CONFIG entry
+// (constants/petPartners.js), not a places row: its photo is a bundled asset rather than a
+// URL, it has no `category`, and its region is `district`. Read as a place, it would render
+// a broken image, an undefined badge and a blank subtitle.
+function pinCardContent(pin, lang) {
+  const row = pin.row
+  if (pin.kind === 'health') return {
+    image: row.logo_url ? { uri: row.logo_url } : null,
+    title: row.name,
+    badge: t(row.type, lang),
+    sub:   row.address,
+  }
+  if (pin.kind === 'pethotel') return {
+    // The 192x192 card thumb, not a 900 px gallery frame, for a 56pt box.
+    image: partnerAsset(row.thumb) || null,
+    title: row.name,
+    badge: t('petHotelDogBoarding', lang),
+    sub:   REGION_LABEL_KEY[row.district] ? t(REGION_LABEL_KEY[row.district], lang) : null,
+  }
+  const photo = row.cover_image_url || row.photos?.[0]
+  return {
+    image: photo ? { uri: photo } : null,
+    title: placeName(row, lang),
+    badge: CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : row.category,
+    sub:   REGION_LABEL_KEY[row.region] ? t(REGION_LABEL_KEY[row.region], lang) : row.region,
+  }
+}
+
 function PinCard({ pin, lang, onClose, onViewProfile }) {
   const isHealth = pin.kind === 'health'
   const row      = pin.row
 
   const tc = { bg: pin.colorBg, text: pin.color }
 
-  const photo = isHealth ? row.logo_url : (row.cover_image_url || row.photos?.[0])
-  const title = isHealth ? row.name : placeName(row, lang)
-
-  const badge = isHealth
-    ? t(row.type, lang)
-    : (CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : row.category)
-
-  const sub = isHealth
-    ? row.address
-    : (REGION_LABEL_KEY[row.region] ? t(REGION_LABEL_KEY[row.region], lang) : row.region)
+  const { image, title, badge, sub } = pinCardContent(pin, lang)
 
   return (
     <View style={s.card}>
       <View style={s.cardRow}>
-        {photo
-          ? <Image source={{ uri: photo }} style={s.thumb} resizeMode={isHealth ? 'contain' : 'cover'} />
+        {image
+          ? <Image source={image} style={s.thumb} resizeMode={isHealth ? 'contain' : 'cover'} />
           : <View style={[s.thumb, s.thumbFallback, { backgroundColor: tc.bg }]}>
               <Text style={{ fontSize: 20 }}>{isHealth ? (TYPE_EMOJI[row.type] || '🏥') : '📍'}</Text>
             </View>
@@ -207,6 +227,9 @@ export default function ExploreMapScreen({
   onSelectFacility,
   onSelectUnclaimed,
   onSelectPlace,
+  // Opens PetHotelPartnerScreen. A pet hotel pin exists only while PET_HOTEL_LIVE is true
+  // (constants/mapSources.js), and App.js's route re-checks the flag.
+  onSelectPetHotel,
   // ─── THE DIRECTORY'S SECOND ENTRANCE ──────────────────────────────────────
   // Until 2026-09-11 the browsable places directory had exactly ONE non-admin entrance:
   // the `explore` tile on Home. This tab showed the same content as a map and offered no
@@ -399,6 +422,7 @@ export default function ExploreMapScreen({
             const pin = selected
             setSelected(null)
             if (pin.kind === 'place') { onSelectPlace?.(pin.row); return }
+            if (pin.kind === 'pethotel') { onSelectPetHotel?.(pin.row); return }
             // Health keeps the claimed / unclaimed split the tab has always had: an
             // unclaimed facility has no provider and opens the unclaimed sheet instead.
             if (pin.row.provider_id) onSelectFacility?.(pin.row)

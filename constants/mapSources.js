@@ -25,10 +25,11 @@
 
 // Extensions are explicit so plain Node (scripts/validate-map-sources.mjs) can import this
 // module and exercise the real gate against the real constants. Metro resolves both forms.
-import { MODULE_FLAGS } from './flags.js'
+import { MODULE_FLAGS, PET_HOTEL_LIVE } from './flags.js'
 import { HEALTH_TYPES } from './facilityTypes.js'
 import { parseIsOpen } from '../utils/facilityUtils.js'
-import { typeColors, placeColors } from './theme.js'
+import { typeColors, placeColors, colors } from './theme.js'
+import { PET_PARTNERS } from './petPartners.js'
 import {
   EXPLORE_GROUPS, GROUP_ORDER, GROUP_META, LIVE_TILE_GROUPS,
   categoryToGroup, groupVisible,
@@ -140,8 +141,40 @@ function placePins(places) {
 // of an empty module instead of an empty list. Today that silently drops Pharmacy and
 // Dentist (no geocoded rows) alongside Accommodation (88 rows, latitude NULL by privacy
 // design in 20260904) and Events (no approved rows).
+// ─── THE PET HOTEL PARTNER PIN — ITS OWN SOURCE, ITS OWN GATE ───────────────
+// Shiny Paw is config (constants/petPartners.js), not a `places` row, so it never passes
+// through the Explore group gate. PET_HOTEL_LIVE alone decides it: the flag is the single
+// switch for the partner's screen, card, cross-links AND this pin. That is deliberate —
+// a services-group pin would need 8 pinnable services rows before any user saw it.
+//
+// `petHotelLive` defaults to the real flag and is a parameter ONLY so
+// validate-map-sources.mjs can assert both worlds, the same reason `exploreLive` is.
+//
+// The lifestyle tint pair, not raw accent: an active chip draws its label in `color` on
+// `colorBg`, and accent on accentLight is 2.17:1 (theme.js), unreadable. Orange keeps it
+// in the partner-badge family, apart from ADA's own teal and blue categories.
+// ⚠ On Android pinColor keeps only the hue, so this pin looks like the duty-pharmacy pin
+//   (colors.accent). Unreachable today, because no pharmacy has coordinates; revisit when
+//   pharmacies are geocoded.
+function petHotelPins(partners) {
+  return (partners || [])
+    .filter(p => p.coords && Number.isFinite(p.coords.latitude) && Number.isFinite(p.coords.longitude))
+    .map(p => ({
+      id:      `pethotel:${p.id}`,
+      kind:    'pethotel',
+      row:     p,
+      lat:     p.coords.latitude,
+      lng:     p.coords.longitude,
+      color:   colors.tintLifestyleFg,
+      colorBg: colors.tintLifestyleBg,
+      isDuty:  false,
+    }))
+}
+
 export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = false,
-                                 exploreLive = MODULE_FLAGS.explore }) {
+                                 exploreLive = MODULE_FLAGS.explore,
+                                 petHotelLive = PET_HOTEL_LIVE,
+                                 petPartners = PET_PARTNERS }) {
   const health = healthPins(facilities, dutyFacilityId)
   const sources = HEALTH_TYPES.map(type => ({
     key:      `health:${type}`,
@@ -183,6 +216,16 @@ export function buildMapSources({ facilities, places, dutyFacilityId, isAdmin = 
       color:    (GROUP_META[g]?.colorToken || placeColors.landmark).text,
       colorBg:  (GROUP_META[g]?.colorToken || placeColors.landmark).bg,
       pins,
+    })
+  }
+
+  if (petHotelLive) {
+    sources.push({
+      key:      'pethotel',
+      labelKey: 'petHotelDogBoarding',
+      color:    colors.tintLifestyleFg,
+      colorBg:  colors.tintLifestyleBg,
+      pins:     petHotelPins(petPartners),
     })
   }
 

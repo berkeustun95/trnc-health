@@ -2045,6 +2045,9 @@ export default function App() {
                 onSelectFacility={setSelectedFacility}
                 onSelectUnclaimed={setUnclaimedFacility}
                 onSelectPlace={setSelectedExplorePlace}
+                // Same route the pets cards use, flag re-checked there. Back lands on
+                // PetsHomeScreen, not the map: petsSubScreen clears first.
+                onSelectPetHotel={() => { setShowPets(true); setPetsSubScreen('pethotel') }}
                 lang={lang}
               />
             ) : (

@@ -30,6 +30,7 @@
 //
 // The day any of those three changes, the guard goes RED and graduating the placeholder
 // becomes a deliberate act somebody reviews — which is the whole point.
+import { resolveRegion } from '../utils/resolveRegion.js'
 import { readFileSync, statSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -168,6 +169,14 @@ for (const p of PET_PARTNERS) {
 
   check(!p.coords || (typeof p.coords.latitude === 'number' && typeof p.coords.longitude === 'number'),
     `${who}: coords must be {latitude, longitude} numbers or null`)
+  // A pin and a district that disagree render as two different places on two surfaces
+  // (the map pin, and the hero's district line), silently. Derived, not remembered:
+  // resolveRegion() is the same function the app uses for coordinates.
+  if (p.coords) {
+    const r = resolveRegion(p.coords.latitude, p.coords.longitude)
+    check(r === p.district,
+      `${who}: coords resolve to region ${JSON.stringify(r)} but district is ${JSON.stringify(p.district)}`)
+  }
 
   // ─── The accent must be able to carry readable text ─────────────────────
   //

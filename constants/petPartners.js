@@ -55,7 +55,6 @@ export const SECTION_ORDER = ['hero', 'about', 'services', 'practical', 'pricing
 export const PENDING_FIELDS = {
   email:                   'info@shiny-paw.com is on their site but their domain is shinypawhotel.com. The mismatch is UNCONFIRMED, and a mail button that silently goes nowhere reads as a broken app rather than as a wrong address. Excluded from the contact bar by decision, not by oversight — confirm with the partner.',
   address:                 'Site says "Lefkoşa" and no more. A district is not a street address.',
-  coords:                  'No pin published. Geocoding "Lefkoşa" to a district centre would put a WRONG pin on a partner showcase, which is worse than no map. mapsUrl is THEIR link and carries the directions affordance instead.',
   prices:                  'Not published. A boarding rate depends on nights, size and season — there is no single number to quote and guessing one is a promise we cannot keep.',
   openingHours:            'Not published.',
   dropOffPickUpHours:      'Not published, and NOT the same question as opening hours — boarding facilities routinely restrict handover to narrower windows. Two fields, so a later answer to one cannot be silently read as an answer to both.',
@@ -118,8 +117,8 @@ export const PET_PARTNERS = [
     // ⚠ THEIR OWN MAPS LINK, used as the directions target rather than a coordinate we
     //   resolved ourselves — the same call dorms.js made for Alasia. A short link resolves
     //   to a pin SHINY PAW chose; a lat/lng we derived is our guess at where they mean.
-    //   `coords` stays null (PENDING_FIELDS), so no embedded map renders — this is the
-    //   DIRECTIONS button only.
+    //   The directions button uses this link, never `coords`. `coords` (below) feeds the
+    //   Explore map pin only.
     //
     // It is also the ONLY review affordance on this screen, by decision: the partner has
     // no ADA row to anchor a rating to, and their Wix testimonials are not imported.
@@ -134,6 +133,30 @@ export const PET_PARTNERS = [
     // undefined, t() would be handed undefined, and the hero would simply show no
     // district at all. A silent blank, which is why the guard asserts the slug resolves.
     district: 'nicosia',
+
+    // ─── COORDINATES: PARTNER-CONFIRMED 2026-09-23 ──────────────────────────
+    //
+    // VERBATIM AS SUPPLIED, not rounded, for the reason the phone number is: every
+    // transformation is a chance to lose a digit. Shiny Paw chose this point; we did not
+    // geocode it. check-pet-partners.mjs asserts that resolveRegion() puts it in `district`.
+    //
+    // It feeds ONE surface: the Explore map pin (constants/mapSources.js, gated on
+    // PET_HOTEL_LIVE). The partner screen has no embedded map, and directions still go
+    // through `mapsUrl`, their own link. The street address is still pending, and must not
+    // be reverse-geocoded from this point: a street name read off a pin is our guess.
+    //
+    // ─── WHY THIS IS NOT A `places` ROW (decided 2026-09-23) ────────────────
+    // A `pet_boarding` category plus a places row was scoped and dropped, for two reasons:
+    //   • the Explore map gates pins by group row count exactly as it gates tiles
+    //     (groupVisible, GROUP_TILE_THRESHOLD = 8). Services had 0 pinnable rows, so a
+    //     single boarding pin would have been visible to admins only;
+    //   • a `status = 'pending'` row sits in AdminScreen's place-submission queue as a fake
+    //     submission, one approval away from publishing without PET_HOTEL_LIVE.
+    // ⚠ REVISIT WHEN A SECOND BOARDING BUSINESS IS LISTED. With two, a `pet_boarding`
+    //   category (EXPLORE_GROUPS, CATEGORY_LABEL_KEY, resubmit_place()'s list,
+    //   CLAIMABLE_CATEGORIES, nine locales) starts to earn its keep: search, claims, a
+    //   directory. Until then this entry is the only boarding business, and it lives here.
+    coords:   { latitude: 35.23028092013417, longitude: 33.38629301540769 },
     // No neighbourhood published. Deliberately not guessed from the maps link: an area
     // name read off a pin is our inference, not their address.
     area:     null,
@@ -231,7 +254,6 @@ export const PET_PARTNERS = [
     //   here rather than dropped so the question survives; confirm with the partner.
     email:                   null,
     address:                 null,
-    coords:                  null,
     prices:                  null,
     openingHours:            null,
     dropOffPickUpHours:      null,

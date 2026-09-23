@@ -27,6 +27,14 @@
 //     ✗ All === ticking every chip by hand    ✗ one chip selects only that chip → 7
 //   openNowApplicable() dropping the parseIsOpen test
 //     ✗ not applicable against live-shaped data → true
+//   pet hotel source gated on `true` instead of petHotelLive (2026-09-23)
+//     ✗ flag off: zero pet hotel pins → [1,1]  ✗ flag off: no pethotel chip → [true,true]
+//     ✗ default petHotelLive follows PET_HOTEL_LIVE → 1   (plus every Explore total, +1)
+//   pet hotel source gated on `petHotelLive && false` (2026-09-23)
+//     ✗ flag on, explore live: exactly one pet hotel pin → 0
+//     ✗ flag on, explore DARK: the pin still appears → 0
+//     The in-region check PASSED on zero pins in this run ([].every() is true); it now
+//     compares map(inBox) to [true].
 //
 // WORTH KNOWING: the gate break left FIVE of the eight dark-state checks green, "beaches
 // stay live" among them. A suite that asserted only the happy path would have shipped the
@@ -43,7 +51,8 @@ import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   TRNC_CENTER,
 } from '../constants/mapSources.js'
-import { MODULE_FLAGS } from '../constants/flags.js'
+import { MODULE_FLAGS, PET_HOTEL_LIVE } from '../constants/flags.js'
+import { PET_PARTNERS } from '../constants/petPartners.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
          NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES } from '../constants/exploreCategories.js'
@@ -113,7 +122,7 @@ function summarise(sources) {
 console.log(`\nMODULE_FLAGS.explore is currently ${MODULE_FLAGS.explore} (live since 2026-08-26)`)
 
 console.log('\nexplore DARK (simulated — the pre-launch world, still asserted)')
-const dark = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false })
+const dark = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: false })
 const darkCounts = summarise(dark)
 
 check('sources are exactly clinic, hospital, nature', Object.keys(darkCounts),
@@ -129,7 +138,7 @@ check('fetch narrows to the nature categories', mapFetchCategories(false, false)
 console.log('\nexplore REACHABLE (the live world since 2026-08-26)')
 // isAdmin forces the outer gate open regardless of the flag, so this arm asserts the
 // same thing before and after launch.
-const live = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true })
+const live = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true, petHotelLive: false })
 const liveCounts = summarise(live)
 
 check('heritage appears with all 38', liveCounts['explore:heritage'], 38)
@@ -170,6 +179,7 @@ const HOURS_FIXTURE = buildMapSources({
   places: PLACES.filter(p => p.category === 'beach'),
   dutyFacilityId: null,
   isAdmin: false,
+  petHotelLive: false,
 })
 const hoursPins = selectedPins(HOURS_FIXTURE, new Set())
 check('applicable once one facility has parseable hours', openNowApplicable(hoursPins), true)
@@ -277,9 +287,50 @@ try {
 }
 
 console.log('\nduty pharmacy')
-const duty = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: 'pha-0', isAdmin: false })
+const duty = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: 'pha-0', isAdmin: false, petHotelLive: false })
 check('duty pin is unreachable until pharmacies are geocoded',
   duty.flatMap(s => s.pins).filter(p => p.isDuty).length, 0)
+
+// ─── PET HOTEL PIN: ITS OWN GATE, INDEPENDENT OF EXPLORE ────────────────────
+// Every call above pins petHotelLive: false, so their totals (11 / 49) describe the
+// Explore world alone and do not move by one the day PET_HOTEL_LIVE flips. The three
+// worlds below state the flag explicitly. The third one matters most: with the flag on and
+// Explore dark, the pin must appear AND heritage must still be absent — proof that the
+// partner pin bypasses the Explore gate without weakening it.
+console.log('\npet hotel partner pin')
+const phKey = 'pethotel'
+const phPins = sources => sources.flatMap(s => s.pins).filter(p => p.kind === 'pethotel')
+const phOff = [
+  buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true,  petHotelLive: false }),
+  buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: false }),
+]
+check('flag off: zero pet hotel pins, explore live or dark', phOff.map(w => phPins(w).length), [0, 0])
+check('flag off: no pethotel chip', phOff.map(w => w.some(s => s.key === phKey)), [false, false])
+check('flag off: All (the default path) draws no pet hotel pin',
+  phOff.map(w => selectedPins(w, new Set()).filter(p => p.kind === 'pethotel').length), [0, 0])
+
+const phOnLive = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: true,  petHotelLive: true })
+const phOnDark = buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: false, exploreLive: false, petHotelLive: true })
+const cfg = PET_PARTNERS.filter(p => p.coords).map(p => [p.coords.latitude, p.coords.longitude])
+check('config carries exactly one partner with coords', cfg.length, 1)
+check('flag on, explore live: exactly one pet hotel pin', phPins(phOnLive).length, 1)
+check('flag on, explore live: exactly one pethotel chip', phOnLive.filter(s => s.key === phKey).length, 1)
+check('flag on: the pin is the config coordinate, verbatim',
+  phPins(phOnLive).map(p => [p.lat, p.lng]), cfg)
+// map(), not every(): [].every() is true, so every() passed with NO pin at all (seen, 2026-09-23).
+check('flag on: the pin falls inside the default map region', phPins(phOnLive).map(inBox), [true])
+check('flag on: All (the default path) includes it', selectedPins(phOnLive, new Set()).filter(p => p.kind === 'pethotel').length, 1)
+check('flag on, explore DARK: the pin still appears', phPins(phOnDark).length, 1)
+check('flag on, explore DARK: heritage is still absent',
+  phOnDark.filter(s => s.key === 'explore:heritage').length, 0)
+check('flag on, explore DARK: the Explore world is otherwise unchanged (11 + 1)',
+  phOnDark.reduce((n, s) => n + s.pins.length, 0), 12)
+// The default must follow the real flag, or the app ships a different world from the one
+// asserted here.
+check('default petHotelLive follows PET_HOTEL_LIVE',
+  phPins(buildMapSources({ facilities: FACILITIES, places: PLACES, dutyFacilityId: null, isAdmin: true })).length,
+  PET_HOTEL_LIVE ? 1 : 0)
+check('pethotel chip label resolves in English', t('petHotelDogBoarding', 'English') !== 'petHotelDogBoarding', true)
 
 if (problems.length) {
   console.error('\n  ┌─ MAP SOURCE GATE FAILED ───────────────────────────────────────┐')
@@ -314,7 +365,7 @@ if (process.argv.includes('--live')) {
   // gated subset. Measuring the dark set would size the viewport to 11 pins and re-cut
   // Karpaz the day the flag flips — which is exactly the mistake this check exists for.
   const livePins = selectedPins(
-    buildMapSources({ facilities, places, dutyFacilityId: null, isAdmin: true }), new Set())
+    buildMapSources({ facilities, places, dutyFacilityId: null, isAdmin: true, petHotelLive: true }), new Set())
   const outside = livePins.filter(p => !inBox({ lng: p.lng, lat: p.lat }))
   console.log(`\nLIVE — ${livePins.length} pinnable rows fetched`)
   for (const p of outside) {

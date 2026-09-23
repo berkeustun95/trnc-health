@@ -324,8 +324,17 @@ export const DORMS_LIVE = true   // live 2026-09-13
 
 // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar.
 // false = the partner card does not render on PetsHomeScreen, the cross-links on
-// TravelWithPetScreen and OwningPetScreen do not render, and petsSubScreen='pethotel'
-// falls through to the module root. Nothing about the partner is reachable.
+// TravelWithPetScreen and OwningPetScreen do not render, the Explore map draws no pet hotel
+// pin and no pet hotel chip, and petsSubScreen='pethotel' falls through to the module root.
+// Nothing about the partner is reachable.
+//
+// ⚠ THIS FLAG IS THE SINGLE SWITCH FOR SCREEN, CARD, CROSS-LINKS AND MAP PIN (2026-09-23).
+//   The pin comes from petPartners.js `coords` through buildMapSources()'s own source, NOT
+//   through the Explore group gate. That was chosen over a `places` row: services sits far
+//   below GROUP_TILE_THRESHOLD, so a places pin would have reached admins only, and a
+//   pending places row sits in AdminScreen's submission queue one approval from publishing.
+//   scripts/validate-map-sources.mjs asserts zero pins with this false and exactly one with
+//   it true, and fails if the default stops following this value.
 //
 // NOT a MODULE_FLAGS key, and the reason is mechanical, not stylistic: it gates a PARTNER
 // inside a module that is ALREADY LIVE (MODULE_FLAGS.pets has been true since 2026-08-23).
@@ -343,15 +352,15 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //   table" hazard has no table to apply to here, so there is no window between activating
 //   content and flipping the flag, and therefore no way to end a session inside one.
 //
-// ⚠ NO PRECONDITION MIGRATION, AND THAT WAS CHECKED RATHER THAN ASSUMED. This is the
-//   trap DORMS_LIVE carries above: its website CTA needed 20261014 applied first, and an
-//   unapplied constraint would have made every tap a swallowed rejection reading as zero
-//   demand. The same two questions were asked here and answered against the LIVE database
-//   (pg_get_constraintdef, 2026-09-14) rather than against a migration file —
-//   contact_events_module_check permits 'pets' and contact_events_action_check permits
-//   'website', so all four contact actions log. Both are now asserted by DEFINITION in
-//   supabase/verify_schema.sql; the 'pets' tokens were added in this slice precisely
-//   because the repo could prove the file said it and not that the database did.
+// ⚠ PRECONDITION: 20261046 APPLIED BEFORE THIS FLIPS. The same trap DORMS_LIVE carries
+//   above. The directions button now logs action='maps', and until
+//   20261046_contact_events_maps_action.sql is applied the action CHECK rejects it. The
+//   rejection is swallowed, so directions demand would read as zero, identical to nobody
+//   tapping. Verify against the LIVE database, never the file: pg_get_constraintdef on
+//   contact_events_action_check must include 'maps', and supabase/verify_schema.sql's two
+//   20261046_maps_action tokens must be OK. (On 2026-09-14 the module CHECK was confirmed
+//   to permit 'pets' and the action CHECK 'website'; both are asserted by definition in
+//   verify_schema.sql.)
 //
 // ⚠ FLIPPING THIS IS NOT THE MODULE GO-LIVE SOP. That SOP exists for seeded TABLE content
 //   and most of its steps have no referent here: there are no rows to seed inactive, no
@@ -375,11 +384,9 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //   (I18nManager appears nowhere in this codebase) — the known standing state, not a bug
 //   in this screen, and this screen deliberately does not start a one-off.
 //
-// ⚠ DIRECTIONS TAPS DO NOT LOG, deliberately — contact_events_action_check has no 'maps',
-//   and logging them as 'website' would fold two intentions into one number. The migration
-//   that adds 'maps' is deferred to the EXPLORE slice, where the place record and address
-//   are already in scope; it lands before this flag flips and before any tap exists to
-//   lose. See the openMaps note in screens/pets/PetHotelPartnerScreen.js.
+// ⚠ DIRECTIONS TAPS LOG AS 'maps', their own action, not 'website': folding them into
+//   website would merge two intentions into one number. Needs 20261046, per the precondition
+//   above. See the openMaps note in screens/pets/PetHotelPartnerScreen.js.
 //
 //   And the clean-tree stash check before any OTA, as always.
 //
