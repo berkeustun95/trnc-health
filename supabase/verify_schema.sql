@@ -2029,6 +2029,24 @@ WITH report AS (
                 FROM (SELECT pg_get_constraintdef(oid) d FROM pg_constraint
                        WHERE conrelid = to_regclass('public.contact_events')
                          AND conname  = 'contact_events_action_check') x), false)
+    -- ── 20261046 contact_events action = 'maps'. Same DROP-then-ADD of the same name as
+    -- 20261014, so the same blind spot: the E-section name token cannot see it. The pet
+    -- hotel directions button logs action='maps'; unapplied, every tap is rejected and
+    -- swallowed and directions demand reads as zero. Apply BEFORE flipping PET_HOTEL_LIVE.
+    -- Literals are matched WITH quotes, so a dropped bare 'call' cannot hide inside
+    -- 'call_secondary'. Addition and survival are separate tokens, as for 20261014.
+    UNION ALL SELECT '20261046_maps_action','contact_events action CHECK permits maps',
+      COALESCE(position('''maps''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_action_check')) > 0, false)
+    UNION ALL SELECT '20261046_maps_action','contact_events action CHECK kept call/whatsapp/call_secondary/website',
+      COALESCE((SELECT position('''call''' in d) > 0
+                   AND position('''whatsapp''' in d) > 0
+                   AND position('''call_secondary''' in d) > 0
+                   AND position('''website''' in d) > 0
+                FROM (SELECT pg_get_constraintdef(oid) d FROM pg_constraint
+                       WHERE conrelid = to_regclass('public.contact_events')
+                         AND conname  = 'contact_events_action_check') x), false)
     -- ── 0910 contact_events MODULE vocabulary. THE SAME BLIND SPOT THE TWO TOKENS
     -- ABOVE CLOSE FOR `action`, left open for `module` until 2026-09-14.
     --

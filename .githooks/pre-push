@@ -22,6 +22,15 @@ node scripts/check-secrets.mjs || {
   exit 1
 }
 
+# Migration-number guard. Blocks a push where one migration prefix is taken by two
+# different files on ANY local or origin/* branch (or the working tree). The old rule,
+# `ls supabase/migrations | tail -1`, sees one branch — which is how 20261046 had to skip
+# a 20261045 living on another. Git only: anon cannot read the prod ledger.
+node scripts/check-migration-numbers.mjs || {
+  echo "  push blocked: renumber the unapplied file — npm run migration:next"
+  exit 1
+}
+
 # Explore map pin-source gate. Blocks a push where the map would draw a dark module's
 # content — a leak no flag guard sees, because the flag is still false and only the
 # CONSUMER of it is wrong. See the header of scripts/validate-map-sources.mjs.

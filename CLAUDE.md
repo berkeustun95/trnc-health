@@ -219,8 +219,16 @@ went missing). Two mandatory rules:
 - **Every ADD COLUMN migration ends with `NOTIFY pgrst, 'reload schema';`** (after
   `RESET ROLE;`). Without it, a stale PostgREST cache reports 42703 "column does
   not exist" through the REST API even though the column exists in Postgres.
-- **Migration filename prefixes are SEQUENCE NUMBERS, not dates.** The next file is the
-  highest existing prefix + 1 (`ls supabase/migrations | tail -1`), never today's date.
+- **Migration filename prefixes are SEQUENCE NUMBERS, not dates.** The next file is
+  `npm run migration:next` — the highest prefix on ANY local or origin/* branch + 1 —
+  never today's date and never `ls supabase/migrations | tail -1`, which sees one branch
+  (that is how 20261046 had to skip a 20261045 living on another). The pre-push guard
+  (`scripts/check-migration-numbers.mjs`) blocks a prefix taken by two different files.
+- **An applied migration lands on MAIN the same day, as a file** (`git checkout <branch>
+  -- <file>` onto a branch off main; never cherry-pick a commit that also carries app
+  code), with verify_schema.sql merged and the ledger check + drift audit REGENERATED.
+  Main's migrations folder must equal prod's ledger. 2026-09-23: 1045–1047 were applied
+  from two unmerged branches, so neither folder matched prod.
   Prefixes matched the commit date through 20260801; from 20260802 they ran ahead of it,
   almost without exception — +1 day at first, 34 days by 20261015, 35 by 20261020. So a
   filename says nothing about when anything was written or applied; the only applied date
