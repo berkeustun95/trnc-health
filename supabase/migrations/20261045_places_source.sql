@@ -48,11 +48,38 @@
 -- is a no-op, and a pin somebody has since moved to a THIRD value aborts the whole file
 -- rather than being overwritten.
 --
--- Apply: SQL Editor, Role = postgres, paste the whole file. Idempotent; re-runnable.
--- ADD COLUMN ⇒ ends with NOTIFY pgrst (after COMMIT).
+-- ─── THE FIRST APPLY DEADLOCKED (2026-09-23) — hence the lock prelude ───────
+--
+--   40P01  Process 2358884 waits for AccessExclusiveLock on relation 17235; blocked by 2358883.
+--          Process 2358883 waits for AccessShareLock on relation 19823; blocked by 2358884.
+--
+-- Nothing committed (pins unmoved in both tables, no columns, no ledger row). Read as
+-- 17235 = landmarks, 19823 = places: landmarks predates every migration in this repo and
+-- places is from 0822, so it carries the higher OID. The OTHER process held landmarks and
+-- waited to read places — the shape of any reader that touches both. This file does not
+-- produce that cycle on its own: it asks ROW EXCLUSIVE on landmarks, never ACCESS
+-- EXCLUSIVE, and takes places in its first statement while holding nothing. Confirm the
+-- reading once with  SELECT 17235::regclass, 19823::regclass;
+--
+-- So every lock is taken FIRST, before anything reads or writes, in the order such a
+-- reader takes them (landmarks, then places): a reader already holding landmarks finishes
+-- its read of places instead of closing a cycle, and two copies of this file queue on the
+-- same first lock. lock_timeout turns any wait longer than 5 s into a clean abort (55P03)
+-- rather than a queue that stalls every reader of places behind this transaction.
+-- Residual: the probe's triggers still READ other tables (profiles, blocked_terms) after
+-- the prelude. Only concurrent DDL on those can block that, and lock_timeout bounds it.
+--
+-- Apply: SQL Editor, Role = postgres, paste the whole file ONCE. Idempotent; re-runnable.
+-- A 55P03 lock_timeout means something held one of the two tables for 5 s: nothing was
+-- applied, run it again. ADD COLUMN ⇒ ends with NOTIFY pgrst (after COMMIT).
 -- ═══════════════════════════════════════════════════════════════════════════
 
 BEGIN;
+
+-- SET LOCAL is scoped to this transaction (it is ignored outside one); nothing precedes it.
+SET LOCAL lock_timeout = '5s';
+LOCK TABLE public.landmarks IN ACCESS EXCLUSIVE MODE;
+LOCK TABLE public.places    IN ACCESS EXCLUSIVE MODE;
 
 ALTER TABLE public.places ADD COLUMN IF NOT EXISTS source    text;
 ALTER TABLE public.places ADD COLUMN IF NOT EXISTS source_id text;
@@ -255,7 +282,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261045_places_source.sql', '7a6b60a850c43f3e5f21175677870b532afebd75bbb14ae4a5bff216e166f11b')
+VALUES ('20261045_places_source.sql', 'a9b06c69a8bc25dba7ea8a1064e6c54922a5061f97f98a57f2fa8893c267f0fd')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
