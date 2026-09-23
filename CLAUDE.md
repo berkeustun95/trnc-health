@@ -219,6 +219,18 @@ went missing). Two mandatory rules:
 - **Every ADD COLUMN migration ends with `NOTIFY pgrst, 'reload schema';`** (after
   `RESET ROLE;`). Without it, a stale PostgREST cache reports 42703 "column does
   not exist" through the REST API even though the column exists in Postgres.
+- **THE HARNESS IS NOT PROD'S POSTGRES — never let a probe depend on an error code or
+  behaviour that could differ between them.** `scripts/migration-harness.mjs` runs PGlite
+  0.5.8 = **PostgreSQL 18.3**; prod is an older major (≥15 — an applied migration uses a
+  15-only view option; exact version: `SELECT version();`). Measured 2026-09-23 on
+  20261048: an `ON DELETE RESTRICT` refusal raised **23001 `restrict_violation` in the
+  harness and 23503 `foreign_key_violation` in prod**. The probe caught only the harness's
+  code, so a CORRECT refusal aborted the prod apply (cleanly — nothing landed). So: in any
+  in-migration `EXCEPTION WHEN`, catch every SQLSTATE the behaviour can raise across
+  versions (`foreign_key_violation OR restrict_violation`), and treat a harness pass as
+  evidence about PG 18 only. Anything version-sensitive — error codes, catalog renderings
+  (`pg_get_*def` text), planner/locking behaviour — must also be checked against prod's
+  own output before a token or probe relies on it.
 - **Migration filename prefixes are SEQUENCE NUMBERS, not dates.** The next file is
   `npm run migration:next` — the highest prefix on ANY local or origin/* branch + 1 —
   never today's date and never `ls supabase/migrations | tail -1`, which sees one branch
