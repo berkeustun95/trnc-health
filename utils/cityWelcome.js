@@ -97,7 +97,7 @@ async function getForegroundFix() {
 // PRECISION: the raw ~100 m fix goes straight into resolveRegion, uncoarsened.
 // That is deliberate and privacy-neutral — resolveRegion is offline, so the
 // coordinate never leaves the device. `coarseCoord` is a TRANSMISSION guard (it
-// exists for the open-meteo call); coarsening here would buy no privacy and
+// exists for the global-search call); coarsening here would buy no privacy and
 // would push central-Lefkoşa users outside the outline. See the slice-1 report.
 export async function evaluateCityWelcome(trigger = 'unknown') {
   const state = await loadCityWelcomeState()

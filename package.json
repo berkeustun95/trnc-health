@@ -60,6 +60,7 @@
     "novest:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-novest-staleness.mjs",
     "novest:logo": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/upload-novest-logo.mjs",
     "map:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-map-sources.mjs",
+    "weather:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-weather-normalize.mjs",
     "drift:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.mjs --check",
     "drift:regen": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.mjs",
     "migration:next": "node scripts/check-migration-numbers.mjs --next",

@@ -135,8 +135,8 @@ const MARKERS = [
   // at a stated precision (tied to App.js below).
   { key: 'contact taps anonymous', re: /cannot be traced back to you/i,
     why: 'contact_events stores a district with no account, device or position' },
-  { key: 'weather processor',      re: /rounded to about 10 km and sent to Open-Meteo/i,
-    why: 'names the third party and the precision App.js actually sends' },
+  { key: 'weather processor',      re: /rounded to about 10 km and sent to our server, which asks MET Norway/i,
+    why: 'names the provider, the proxy and the precision App.js actually sends' },
 ]
 
 // ── The field list is DERIVED from App.js PROFILE_COLUMNS, not typed here. A column

@@ -18,7 +18,7 @@ import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
-import WeatherSheet from '../components/home/WeatherSheet'
+import WeatherSheet, { WeatherCredit } from '../components/home/WeatherSheet'
 import OliRow from '../components/home/OliRow'
 import ModuleGrid from '../components/home/ModuleGrid'
 import LiveStrip from '../components/home/LiveStrip'
@@ -32,7 +32,7 @@ import { resolveFavourites } from '../constants/homeFavourites'
 import { loadUsage, loadPins, savePins, recordModuleOpen } from '../utils/moduleUsage'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
-  haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherDesc, isAvailableToday, coarseCoord,
+  haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
 import BackButton from '../components/BackButton'
 
@@ -587,9 +587,9 @@ export default function HomeScreen({
     return (
       <TouchableOpacity style={s.weatherCard} onPress={() => setWeatherExpanded(v => !v)} activeOpacity={0.85}>
         <View style={s.weatherRow}>
-          <Text style={s.weatherEmoji}>{weatherIcon(cur.weather_code)}</Text>
+          <Text style={s.weatherEmoji}>{weatherIcon(cur.symbol)}</Text>
           <Text style={s.weatherTemp}>{Math.round(cur.temperature_2m)}°C</Text>
-          <Text style={s.weatherDescInline} numberOfLines={1}>{weatherDesc(cur.weather_code)}</Text>
+          <Text style={s.weatherDescInline} numberOfLines={1}>{t(weatherLabelKey(cur.symbol), lang)}</Text>
           <View style={{ flex: 1 }} />
           {uv && (
             <View style={[s.uvBadge, { backgroundColor: uv.color }]}>
@@ -616,7 +616,7 @@ export default function HomeScreen({
                   return (
                     <View key={date} style={s.forecastDay}>
                       <Text style={s.forecastLabel}>{label}</Text>
-                      <Text style={s.forecastIcon}>{weatherIcon(daily.weather_code[i])}</Text>
+                      <Text style={s.forecastIcon}>{weatherIcon(daily.symbol[i])}</Text>
                       <Text style={s.forecastMax}>{Math.round(daily.temperature_2m_max[i])}°</Text>
                       <Text style={s.forecastMin}>{Math.round(daily.temperature_2m_min[i])}°</Text>
                     </View>
@@ -624,6 +624,7 @@ export default function HomeScreen({
                 })}
               </View>
             )}
+            <WeatherCredit lang={lang} style={{ marginTop: 10 }} />
           </>
         )}
       </TouchableOpacity>

@@ -51,6 +51,7 @@ import { t, LANG_CODES } from '../constants/i18n.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories.js'
 import { REGION_LABEL_KEY } from '../constants/regions.js'
+import { WEATHER_LABEL_KEY } from '../utils/facilityUtils.js'
 import { RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY } from '../constants/profileGate.js'
 // Slice 6's send failures are reached as t(SEND_ERROR_KEY[token]) — a key looked up
 // through a variable, which the literal `t('key')` scan cannot see. Imported by name for
@@ -548,6 +549,8 @@ const viaVariable = [
   ...Object.values(HELP_ROW_LABEL_KEY),
   ...Object.values(CATEGORY_LABEL_KEY),
   ...Object.values(REGION_LABEL_KEY),
+  // Weather labels, reached as t(weatherLabelKey(symbol)) — English-only until 2026-09-24.
+  ...Object.values(WEATHER_LABEL_KEY),
   // ─── The pet hotel partner's own copy — 19 of its 34 keys, and ALL of the selling ──
   //
   // Listing screens/pets/PetHotelPartnerScreen.js in SURFACES covers the 15 keys it calls
