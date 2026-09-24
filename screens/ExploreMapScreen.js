@@ -29,7 +29,7 @@ import {
 } from '../constants/mapSources'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
-import { colors, shadow } from '../constants/theme'
+import { colors, shadow, ellipsizeSlack } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { EXPLORE_ROUTES_LIVE } from '../constants/flags'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
@@ -696,7 +696,9 @@ const ch = StyleSheet.create({
   barContent: { paddingHorizontal: 12, gap: 8, flexDirection: 'row', alignItems: 'center' },
   chip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1.5, borderColor: colors.border, ...shadow },
   dot:        { width: 8, height: 8, borderRadius: 4 },
-  label:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  // ellipsizeSlack: RN ellipsizes on EQUALITY — 'Kültürel Miras' needed exactly its box
+  // (89.6dp) and painted 'Kültürel Mir…' (dev text audit, 2026-09-24). See constants/theme.js.
+  label:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, ...ellipsizeSlack },
   count:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 })
 
