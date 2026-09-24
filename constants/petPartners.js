@@ -53,7 +53,6 @@ export const SECTION_ORDER = ['hero', 'about', 'services', 'practical', 'pricing
 // turned into a data structure. Independently corroborated: their own site states none of
 // these (fetched 2026-09-14), so there is no source to copy from either.
 export const PENDING_FIELDS = {
-  email:                   'info@shiny-paw.com is on their site but their domain is shinypawhotel.com. The mismatch is UNCONFIRMED, and a mail button that silently goes nowhere reads as a broken app rather than as a wrong address. Excluded from the contact bar by decision, not by oversight — confirm with the partner.',
   address:                 'Site says "Lefkoşa" and no more. A district is not a street address.',
   prices:                  'Not published. A boarding rate depends on nights, size and season — there is no single number to quote and guessing one is a promise we cannot keep.',
   openingHours:            'Not published.',
@@ -248,11 +247,10 @@ export const PET_PARTNERS = [
     // Written out in full rather than omitted. An absent key and a null one read the same
     // to `?.`, but only the null one tells the next person the question was ASKED.
     //
-    // ⚠ info@shiny-paw.com APPEARS ON THEIR SITE AND IS DELIBERATELY NOT WIRED. Their
-    //   domain is shinypawhotel.com; the shiny-paw.com mismatch is unconfirmed, and an
-    //   email button that silently goes nowhere is worse than no email button. Recorded
-    //   here rather than dropped so the question survives; confirm with the partner.
-    email:                   null,
+    // ⚠ NO `email` KEY, DELIBERATELY OMITTED (decided 2026-09-24). Contact is WhatsApp,
+    //   call, website and Maps only. Not pending, so not in PENDING_FIELDS, and not null,
+    //   because null means "asked, not yet known". check-pet-partners.mjs fails if an
+    //   `email` key appears or 'email' reaches the contact actions.
     address:                 null,
     prices:                  null,
     openingHours:            null,
@@ -339,7 +337,7 @@ export function petPartnerSections(partner, { resolveAsset = () => undefined } =
     practical: practical.length ? practical : null,
     pricing:   val(partner?.prices),
     location:  (address || mapsUrl) ? { address, mapsUrl, coords: partner?.coords || null } : null,
-    // Email is excluded BY DECISION, not by omission — see the note on the field above.
+    // No email, by decision (2026-09-24): contact is WhatsApp, call, website and Maps only.
     contact:   [
       partner?.whatsapp && 'whatsapp',
       partner?.phone    && 'call',

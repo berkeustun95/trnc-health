@@ -148,7 +148,8 @@ for (const p of PET_PARTNERS) {
     + `do not widen this one to 'pets'.`)
 
   check(!p.website || /^https:\/\//.test(p.website), `${who}: website must be https, got ${p.website}`)
-  check(!p.email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email), `${who}: email ${JSON.stringify(p.email)} is malformed`)
+  // Email is deliberately omitted (2026-09-24): the KEY must be absent, not merely null.
+  check(!('email' in p), `${who}: has an \`email\` key (${JSON.stringify(p.email)}). Email is omitted by decision — contact is WhatsApp, call, website and Maps only`)
   check(!p.mapsUrl || /^https:\/\//.test(p.mapsUrl), `${who}: mapsUrl must be https, got ${p.mapsUrl}`)
 
   // Phone/WhatsApp reach a real business. A malformed number fails at the moment somebody
@@ -350,21 +351,13 @@ for (const p of PET_PARTNERS) {
 
   // ─── 6. Contact actions: four, and email is NOT one of them ─────────────
   //
-  // A COUNT and a set, not a remembered name list. info@shiny-paw.com is on their site and
-  // is deliberately unwired — their domain is shinypawhotel.com and the mismatch is
-  // unconfirmed, so an email button would silently go nowhere.
-  //
-  // ⚠ THIS ASSERTION NEEDS TWO THINGS TO GO WRONG AT ONCE, and a red-first test that flips
-  //   only one reads GREEN against a working check. `email` is null (PENDING_FIELDS), so
-  //   adding `partner?.email && 'email'` to the builder changes nothing on its own; and
-  //   filling `email` in changes nothing while the builder omits it. It is a FORWARD guard:
-  //   it fires the day somebody confirms the address and wires the button in the same
-  //   commit, which is exactly the moment the decision needs re-making. Verified red by
-  //   mutating both halves together — a single-anchor break does not exercise it.
+  // A COUNT and a set, not a remembered name list. Email is omitted by decision
+  // (2026-09-24): contact is WhatsApp, call, website and Maps only. The config carries no
+  // `email` key (asserted above), and this catches the other half: a builder that grows
+  // an email action.
   check(!sec.contact.includes('email'),
-    `${who}: 'email' is in the contact actions. It is excluded BY DECISION — the shiny-paw.com / `
-    + `shinypawhotel.com mismatch is unconfirmed and a dead mail button reads as a broken app. `
-    + `If the address is confirmed, wire it and say so here.`)
+    `${who}: 'email' is in the contact actions. Email is omitted by decision (2026-09-24): `
+    + `contact is WhatsApp, call, website and Maps only.`)
   check(sec.contact.length === 4,
     `${who}: expected 4 contact actions (whatsapp, call, website, maps), got ${sec.contact.length}: [${sec.contact.join(', ')}]`)
 

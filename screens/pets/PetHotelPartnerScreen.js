@@ -64,9 +64,8 @@ function Block({ title, children }) {
   )
 }
 
-// A contact row. Kept as one component because four of them differ only in icon, label and
-// handler — and because a fifth (email, if the address is ever confirmed) should cost one
-// line rather than a copy-paste.
+// A contact row. Kept as one component because the four of them differ only in icon, label
+// and handler. There is no email row, by decision (2026-09-24).
 function ContactRow({ icon, label, value, onPress }) {
   return (
     <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.6}>
