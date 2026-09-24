@@ -63,6 +63,18 @@ export function resolveRoutes(rows, placesById, { review = false, legsByPair = n
 export const STALE_M = 50
 export const legKey = (fromId, toId) => `${fromId}>${toId}`
 
+// The path ends at the nearest WALKABLE point; the pin can sit on a monument the footpath
+// network does not enter. Those gaps are drawn as short dashed stubs, pin ↔ path end.
+// Under STUB_MIN_M the gap is just the router's rounding and is not drawn.
+export const STUB_MIN_M = 3
+export function stubsFor(from, coords, to) {
+  const out = []
+  if (metresBetween(from, coords[0]) >= STUB_MIN_M) out.push([{ latitude: from.latitude, longitude: from.longitude }, coords[0]])
+  const end = coords[coords.length - 1]
+  if (metresBetween(end, to) >= STUB_MIN_M) out.push([end, { latitude: to.latitude, longitude: to.longitude }])
+  return out
+}
+
 export function routeLegs(stops, legsByPair) {
   const legs = []
   for (let i = 1; i < stops.length; i++) {
@@ -72,8 +84,9 @@ export function routeLegs(stops, legsByPair) {
     const fresh = path
       && metresBetween({ latitude: path[0][1], longitude: path[0][0] }, a) <= STALE_M
       && metresBetween({ latitude: path[path.length - 1][1], longitude: path[path.length - 1][0] }, b) <= STALE_M
+    const coords = fresh ? path.map(([lng, lat]) => ({ latitude: lat, longitude: lng })) : null
     legs.push(fresh
-      ? { routed: true,  metres: row.metres, coords: path.map(([lng, lat]) => ({ latitude: lat, longitude: lng })) }
+      ? { routed: true, metres: row.metres, coords, stubs: stubsFor(a, coords, b) }
       : { routed: false, metres: metresBetween(a, b) * DETOUR_FACTOR, coords: [a, b].map(p => ({ latitude: p.latitude, longitude: p.longitude })) })
   }
   return legs

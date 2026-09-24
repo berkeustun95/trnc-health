@@ -37,7 +37,12 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ORS_URL = 'https://api.openrouteservice.org/v2/directions/foot-walking/geojson'
 const GAP_MS = 1600
 const MAX_RATIO = 2.5
-const MAX_SNAP_M = 30
+// A stop pin often sits ON a monument the footpath network does not enter (Gazimağusa's
+// walled city: Othello, Martinengo, Carmelite). The path is stored ending at the nearest
+// walkable point and the app draws a short DASHED STUB from there to the pin (Berke,
+// 2026-09-24). Up to MAX_STUB_M is accepted — kept under the app's STALE_M (50 m), or the
+// leg would read as stale the moment it was written.
+const MAX_STUB_M = 45
 const SHORT_LEG_M = 60
 // Short legs are exempt from the RATIO (pins sit inside buildings), but not from this: a
 // 16 m leg routed as 135 m (Girne 2→3, 2026-09-24) draws a loop that reads as a bug.
@@ -124,15 +129,18 @@ for (const [key, { a, b, route, leg }] of pairs) {
   const why = [
     straight >= SHORT_LEG_M && ratio > MAX_RATIO ? `ratio ${ratio.toFixed(2)}` : null,
     metres - straight > MAX_EXTRA_M && ratio > MAX_RATIO ? `+${Math.round(metres - straight)} m over the straight line` : null,
-    snapA > MAX_SNAP_M ? `start snap ${Math.round(snapA)} m` : null,
-    snapB > MAX_SNAP_M ? `end snap ${Math.round(snapB)} m` : null,
+    snapA > MAX_STUB_M ? `start stub ${Math.round(snapA)} m` : null,
+    snapB > MAX_STUB_M ? `end stub ${Math.round(snapB)} m` : null,
   ].filter(Boolean).join(', ')
   const line = { route, leg, a: a.name, b: b.name, straight: Math.round(straight), metres, seconds,
                  ratio: ratio.toFixed(2), snap: `${Math.round(snapA)}/${Math.round(snapB)}`, points: coords.length }
   console.log(`  ${why ? '✗' : '✓'} ${route.padEnd(20)} ${leg.padEnd(6)} ${String(line.straight).padStart(4)} m → ${String(metres).padStart(5)} m  ×${line.ratio}  snap ${line.snap} m  ${coords.length} pts${why ? '   ⇐ ' + why : ''}   ${a.name} → ${b.name}`)
   if (why) { flagged.push({ ...line, why }); continue }
+  // The walk includes the stubs (pin → path, path → pin), at the router's own pace.
+  const stubs = snapA + snapB
   rows.push({ from_place_id: a.id, to_place_id: b.id, path: coords.map(([x, y]) => [r5(x), r5(y)]),
-              metres, seconds, source: 'ors', fetched_at: new Date().toISOString() })
+              metres: Math.round(metres + stubs), seconds: Math.round(seconds * (metres + stubs) / metres),
+              source: 'ors', fetched_at: new Date().toISOString() })
 }
 
 const routedM = rows.reduce((s, r) => s + r.metres, 0)
