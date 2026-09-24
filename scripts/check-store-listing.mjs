@@ -106,6 +106,8 @@ for (const l of present) {
       else if (!first.includes(DISCLAIMER[l])) fails.push(`${l}/${file}: paragraph 1 is not the disclaimer → "${first.slice(0, 70)}…"`)
       for (const u of SOURCE_URLS) if (!txt.includes(u)) fails.push(`${l}/${file}: missing source URL ${u}`)
     }
+    // Greek copy names no state: institutions are "(Βόρεια Κύπρος)", never ΤΔΒΚ or its long form.
+    if (l === 'el-GR' && /ΤΔΒΚ|Τουρκική Δημοκρατία/u.test(txt)) fails.push(`${l}/${file}: contains ΤΔΒΚ / Τουρκική Δημοκρατία — use "(Βόρεια Κύπρος)"`)
     txt.split('\n').forEach((line, i) => {
       const re = hit(line)
       if (re) fails.push(`${l}/${file}:${i + 1} matches ${re} → "${line.trim()}"`)
