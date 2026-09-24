@@ -35,6 +35,14 @@ export function routeSummary(route, lang) {
   return base.replace('{n}', String(route.stops.length)).replace('{km}', String(km))
 }
 
+// The Ministry's click-through figure. Never from a dev build: review sessions run against
+// the production database, so an unguarded tap during a device pass would be counted as a
+// reader's. `__DEV__` is false in every release bundle and OTA, so production is unaffected.
+export function logCreditTap(entityId, region) {
+  if (__DEV__) return
+  logContactEvent('explore', entityId, 'website', region)
+}
+
 const coordsOf = route => route.stops.map(p => ({ latitude: p.latitude, longitude: p.longitude }))
 
 // Android snapshots a custom-child Marker on first layout; tracksViewChanges false from the
@@ -128,7 +136,7 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
   // click-through figure. module 'explore' + action 'website' — both admitted by the live
   // CHECKs (probed 2026-09-24, no row written).
   const openCredit = () => {
-    logContactEvent('explore', route.id, 'website', route.region)
+    logCreditTap(route.id, route.region)
     Linking.openURL(creditUrl(lang)).catch(() => {})
   }
 

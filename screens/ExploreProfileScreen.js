@@ -16,7 +16,7 @@ import { isFeatured } from '../utils/featured'
 import { resolveAttribution } from '../utils/photoAttribution'
 import PhotoCredit from '../components/PhotoCredit'
 import { VISITNCY_SOURCE, creditUrl } from '../constants/walkingRoutes'
-import { logContactEvent } from '../utils/logContactEvent'
+import { logCreditTap } from '../components/WalkingRoutes'
 import ContentReportMenu from '../components/ContentReportMenu'
 import BackButton from '../components/BackButton'
 import ComingSoonScreen from '../components/ComingSoonScreen'
@@ -272,7 +272,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
           {place.source === VISITNCY_SOURCE && (
             <TouchableOpacity style={s.partnerCredit} activeOpacity={0.7} accessibilityRole="link"
               onPress={() => {
-                logContactEvent('explore', place.id, 'website', place.region)
+                logCreditTap(place.id, place.region)
                 Linking.openURL(creditUrl(lang)).catch(() => {})
               }}>
               <Ionicons name="ribbon-outline" size={13} color={colors.primary} />
