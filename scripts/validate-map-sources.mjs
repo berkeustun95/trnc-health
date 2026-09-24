@@ -351,6 +351,14 @@ check('the walking_routes query sits behind `if (!routesOn) return`',
   routesQuery > 0 && MAP_SRC.slice(effectStart, routesQuery).includes('if (!routesOn) return'), true)
 check('outside review the client filters is_active itself (RLS opens inactive rows to admins)',
   MAP_SRC.includes("if (!review) q = q.eq('is_active', true)"), true)
+// "My location": gated with the routes flag, and the map never ASKS on open — the only
+// permission request in the screen sits inside the locate-me handler.
+check('locate-me + dot are gated with the routes layer', /const locateOn = routesOn\b/.test(MAP_SRC), true)
+const reqAt = [...MAP_SRC.matchAll(/requestForegroundPermissionsAsync/g)].map(m => m.index)
+const locateStart = MAP_SRC.indexOf('const locateMe = useCallback(')
+const locateEnd = MAP_SRC.indexOf('}, [walking, recenter, locating', locateStart)
+check('the map asks for location ONLY inside locate-me (never on open)',
+  reqAt.length === 1 && locateStart > 0 && reqAt[0] > locateStart && reqAt[0] < locateEnd, true)
 check('review mode is __DEV__-folded (utils/exploreReview.js)',
   /export const EXPLORE_REVIEW = __DEV__ && /.test(REVIEW_SRC), true)
 

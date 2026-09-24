@@ -266,6 +266,51 @@ export function useWalkPosition(active) {
   return { pos, status }
 }
 
+// Is location ALREADY granted? Read-only: never prompts. Re-read on return to the foreground,
+// so granting it in Settings shows the dot without reopening the map.
+export function useLocationGranted(active) {
+  const [granted, setGranted] = useState(false)
+  useEffect(() => {
+    if (!active) return
+    let gone = false
+    const check = () => Location.getForegroundPermissionsAsync()
+      .then(r => { if (!gone) setGranted(r.status === 'granted') })
+      .catch(() => {})
+    check()
+    const app = AppState.addEventListener('change', st => { if (st === 'active') check() })
+    return () => { gone = true; app.remove() }
+  }, [active])
+  return [granted, setGranted]
+}
+
+// Compass heading for follow mode ("turns with me"). Only while following; removed with the
+// same discipline as the position watch. Updates under 8° are dropped — the camera would
+// otherwise twitch on every sensor tick.
+export function useHeading(active) {
+  const [heading, setHeading] = useState(null)
+  useEffect(() => {
+    if (!active) { setHeading(null); return }
+    let sub = null, gone = false, starting = false
+    const stop = () => { sub?.remove(); sub = null }
+    const start = async () => {
+      if (sub || starting) return
+      starting = true
+      try {
+        const s = await Location.watchHeadingAsync(h => {
+          const deg = h.trueHeading >= 0 ? h.trueHeading : h.magHeading
+          setHeading(prev => (prev == null || Math.abs(((deg - prev + 540) % 360) - 180) >= 8 ? deg : prev))
+        })
+        if (gone || AppState.currentState !== 'active') s.remove()
+        else sub = s
+      } catch { /* no compass: follow still moves, just north-up */ } finally { starting = false }
+    }
+    start()
+    const app = AppState.addEventListener('change', st => (st === 'active' ? start() : stop()))
+    return () => { gone = true; stop(); app.remove() }
+  }, [active])
+  return heading
+}
+
 export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEnd, onSelectStop }) {
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => { onEnd(); return true })

@@ -15,8 +15,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
-  ActivityIndicator, ScrollView, useWindowDimensions,
+  ActivityIndicator, ScrollView, useWindowDimensions, Alert, Linking,
 } from 'react-native'
+import * as Location from 'expo-location'
 import MapView, { Marker } from 'react-native-maps'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import Supercluster from 'supercluster'
@@ -33,7 +34,7 @@ import { t } from '../constants/i18n'
 import { EXPLORE_ROUTES_LIVE } from '../constants/flags'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance } from '../constants/walkingRoutes'
-import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, fitRoute } from '../components/WalkingRoutes'
+import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useLocationGranted, useHeading, fitRoute } from '../components/WalkingRoutes'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
@@ -48,6 +49,11 @@ const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist
 // only on handoff, so switching tabs still starts the map fresh, exactly as before.
 // Module-level on purpose: it has to outlive the component.
 let returnSnapshot = null
+
+// NO LOCATION PERMISSION IS REQUESTED ON OPEN — still true. With EXPLORE_ROUTES_LIVE the map
+// shows the dot when permission is ALREADY granted, and asks only when the user taps
+// "locate me" (or starts a walk). Every watch is foreground-only and ends with the screen.
+const FOLLOW_ZOOM = 17, FOLLOW_ALTITUDE = 600   // zoom for Google (Android), altitude (m) for Apple (iOS)
 
 // Supercluster's radius/extent are tile-space pixels; the zoom we feed it is computed
 // below at Google's 256px tile scale. minPoints 3 keeps a lone pair of neighbours as two
@@ -275,6 +281,20 @@ export default function ExploreMapScreen({
   const [walk, setWalk] = useState(null)
   const { pos: walkPos, status: walkStatus } = useWalkPosition(!!walk && !!selectedRoute)
 
+  // "My location" — gated with the routes layer, so production keeps today's behaviour
+  // (dot only when App.js already holds a location) until the flag flips.
+  const locateOn = routesOn
+  const [locGranted, setLocGranted] = useLocationGranted(locateOn)
+  const [locating, setLocating] = useState(false)
+  // Follow mode (walk only): the camera tracks and turns with the walker; a pan pauses it.
+  const [follow, setFollow] = useState(snap?.follow ?? true)
+  const [followReady, setFollowReady] = useState(snap?.walkNext != null)
+  const firstFollow = useRef(true)
+  const followTimer = useRef(null)
+  useEffect(() => () => clearTimeout(followTimer.current), [])
+  const walking = !!walk
+  const heading = useHeading(walking && follow && walkStatus === 'granted')
+
   const initialRegion = useMemo(() => snap?.region ?? (
     userLocation
       ? { latitude: userLocation.latitude, longitude: userLocation.longitude,
@@ -350,7 +370,54 @@ export default function ExploreMapScreen({
     setWalk(w => (w ? walkAdvance(selectedRoute.stops, w, walkPos) : w))
   }, [walkPos, selectedRoute])
 
-  const endWalk  = useCallback(() => setWalk(null), [])
+  // Follow: centre on each fix and turn to the compass. Waits `followReady` (1.5 s after Başla)
+  // so the route overview is seen first. Zoom is set only on the first move after (re)engaging,
+  // so a pinch while following is kept. Only center/heading otherwise — a partial camera.
+  useEffect(() => {
+    if (!walking || !follow || !followReady || !walkPos) return
+    const cam = { center: walkPos, pitch: 0 }
+    if (heading != null) cam.heading = heading
+    if (firstFollow.current) { cam.zoom = FOLLOW_ZOOM; cam.altitude = FOLLOW_ALTITUDE; firstFollow.current = false }
+    mapRef.current?.animateCamera(cam, { duration: 600 })
+  }, [walking, follow, followReady, walkPos, heading])
+
+  const recenter = useCallback(() => { firstFollow.current = true; setFollow(true); setFollowReady(true) }, [])
+
+  const locateMe = useCallback(async () => {
+    if (walking) { recenter(); return }
+    if (locating) return
+    setLocating(true)
+    try {
+      let { status, canAskAgain } = await Location.getForegroundPermissionsAsync()
+      let justAsked = false
+      if (status !== 'granted' && canAskAgain) {
+        justAsked = true
+        ;({ status } = await Location.requestForegroundPermissionsAsync())
+      }
+      if (status !== 'granted') {
+        // Only point at Settings when the OS will no longer ask — never right after a "No".
+        if (!justAsked) Alert.alert(t('locationOffTitle', lang), t('locationOffBody', lang), [
+          { text: t('cancel', lang), style: 'cancel' },
+          { text: t('openSettings', lang), onPress: () => Linking.openSettings().catch(() => {}) },
+        ])
+        return
+      }
+      setLocGranted(true)
+      const loc = (await Location.getLastKnownPositionAsync({ maxAge: 60000 }))
+        ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }))
+      if (loc) mapRef.current?.animateCamera(
+        { center: { latitude: loc.coords.latitude, longitude: loc.coords.longitude }, zoom: 16, altitude: 1500 },
+        { duration: 600 })
+    } catch { /* no fix: the dot, if any, is still the answer */ } finally {
+      setLocating(false)
+    }
+  }, [walking, recenter, locating, lang, setLocGranted])
+
+  const endWalk  = useCallback(() => {
+    setWalk(null)
+    clearTimeout(followTimer.current)
+    mapRef.current?.animateCamera({ heading: 0, pitch: 0 }, { duration: 400 })   // north-up again
+  }, [])
   const stepWalk = useCallback(d => setWalk(w => w && walkStep(selectedRoute.stops, w.next + d, walkPos)),
     [selectedRoute, walkPos])
 
@@ -374,6 +441,11 @@ export default function ExploreMapScreen({
     if (!selectedRoute) return
     setWalk(walkStep(selectedRoute.stops, 0, walkPos))
     fitTo(fitRoute(selectedRoute), 0.42)
+    firstFollow.current = true
+    setFollow(true)
+    setFollowReady(false)
+    clearTimeout(followTimer.current)
+    followTimer.current = setTimeout(() => setFollowReady(true), 1500)
   }, [selectedRoute, walkPos, fitTo])
   const openRoute = useCallback(r => {
     panelScrollY.current = 0
@@ -427,10 +499,10 @@ export default function ExploreMapScreen({
     returnSnapshot = {
       region, selectedKeys: [...selectedKeys], openNow, routesMode,
       routeId: selectedRoute?.id ?? null, panelScrollY: panelScrollY.current, pinId,
-      walkNext: walk ? walk.next : null,
+      walkNext: walk ? walk.next : null, follow,
     }
     go()
-  }, [region, selectedKeys, openNow, routesMode, selectedRoute, walk])
+  }, [region, selectedKeys, openNow, routesMode, selectedRoute, walk, follow])
 
   const index = useMemo(() => {
     const idx = new Supercluster(CLUSTER_OPTS)
@@ -500,7 +572,9 @@ export default function ExploreMapScreen({
         initialRegion={initialRegion}
         // In walk mode the dot follows the walk's own permission, never asks for it: on iOS
         // showsUserLocation alone would raise the permission prompt.
-        showsUserLocation={!!userLocation || (!!walk && walkStatus === 'granted')}
+        showsUserLocation={locateOn ? (locGranted || walkStatus === 'granted') : (!!userLocation || (!!walk && walkStatus === 'granted'))}
+        showsMyLocationButton={false}
+        onPanDrag={walking && follow ? () => setFollow(false) : undefined}
         onRegionChangeComplete={setRegion}
         onPress={() => setSelected(null)}
       >
@@ -544,6 +618,24 @@ export default function ExploreMapScreen({
         onRoutes={() => (routesMode ? leaveRoutes() : enterRoutes())}
         lang={lang}
       />
+
+      {locateOn && (
+        <View style={s.locateWrap} pointerEvents="box-none">
+          {walking && !follow && walkStatus === 'granted' && (
+            <TouchableOpacity style={s.recenterPill} onPress={recenter} activeOpacity={0.85}>
+              <Ionicons name="navigate" size={14} color="#fff" />
+              <Text style={s.recenterText}>{t('locateRecenter', lang)}</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[s.locateBtn, walking && follow && s.locateBtnOn]} onPress={locateMe}
+            activeOpacity={0.85} accessibilityRole="button"
+            accessibilityLabel={walking ? t('locateRecenter', lang) : t('locateMe', lang)}>
+            {locating
+              ? <ActivityIndicator size="small" color={ROUTE_COLOR} />
+              : <Ionicons name={walking ? 'navigate' : 'locate'} size={20} color={walking && follow ? '#fff' : ROUTE_COLOR} />}
+          </TouchableOpacity>
+        </View>
+      )}
 
       {routesMode && (selectedRoute && walk
         ? <WalkPanel
@@ -631,6 +723,14 @@ const s = StyleSheet.create({
   segTextActive: { color: '#fff' },
 
   container:     { flex: 1 },
+  // Below the chip bar and the map/list control, clear of every bottom panel.
+  locateWrap:    { position: 'absolute', top: 100, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 6 },
+  locateBtn:     { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.cardBg,
+                   alignItems: 'center', justifyContent: 'center', ...shadow },
+  locateBtnOn:   { backgroundColor: ROUTE_COLOR },
+  recenterPill:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 36,
+                   borderRadius: 18, backgroundColor: ROUTE_COLOR, ...shadow },
+  recenterText:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
   map:           { flex: 1 },
   loading:       { position: 'absolute', top: 66, alignSelf: 'center', backgroundColor: colors.cardBg, borderRadius: 20, padding: 10, ...shadow },
   card:          { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: colors.cardBg, borderRadius: 20, padding: 16, ...shadow },
