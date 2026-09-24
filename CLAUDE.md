@@ -136,6 +136,27 @@ branch in App.js, which carries the identical warning for the identical reason.
 
 **facility_change_requests.proposed_changes:** The `languages` field is stored as a comma-separated string (e.g. `"English, Turkish"`). When approving and writing to `facilities.languages` (which is `text[]`), split it first: `changes.languages.split(',').map(l => l.trim())`.
 
+## Play listing
+
+The Play store listing TEXT lives in `fastlane/metadata/android/<lang>/` — `title.txt`,
+`short_description.txt`, `full_description.txt` — for tr-TR, en-US, ru-RU, ar, el-GR, fr-FR,
+es-ES, de-DE, fa. Editing the listing is a commit plus a push; there are no images, screenshots,
+changelogs or binaries in that folder, and pushing it involves no build and no OTA.
+- **Limits: title ≤ 30, short ≤ 80, full ≤ 4000 characters.** es-ES's title is exactly 30.
+- **Push with `npm run store:listing`** (dry run: `npm run store:listing -- --validate_only true`).
+  It runs `scripts/check-store-listing.mjs` first, which enforces the limits and forbids
+  health/pharmacy words (Compliance, below) and "eSIM" while `CONNECTIVITY_LIVE` is false.
+  Remove the eSIM pattern from that script on the day Connectivity goes live.
+- **Feature bullets name LIVE modules only.** A bullet for a gated module promises a Coming Soon
+  screen.
+- Needs `./google-play-service-account.json` (gitignored, never committed) with Play Console
+  "Manage store presence". **As of 2026-09-24 it does not exist on this machine**, so nothing
+  has been pushed yet.
+- ⚠ **`fastlane supply init` OVERWRITES this folder** with the live listing. To snapshot the
+  live listing, init into `fastlane/metadata-backup/android`, never into `fastlane/metadata/android`.
+- Ruby is the system 2.6; gems install into `vendor/bundle` (`.bundle/config`, gitignored install).
+  A fresh clone runs `bundle install` once.
+
 ## How I want you to work
 - Make MINIMAL changes. Do not refactor unrelated code.
 - Make the changes according to the prompt then say its done and explain shortly. so dont ask to proceed everytime
@@ -729,6 +750,9 @@ features accurately forces an **Organization** developer account, ADA is on an *
 one, and that is precisely what got the app rejected on 2026-07-06. The facility directory
 and the duty roster stay in the app, treated as a local/places directory — a bet that has
 survived a review cycle.
+**The rule covers `fastlane/metadata/android/` too** — that folder IS the store description
+now (see "Play listing"). No pharmacy, duty, health, clinic or doctor wording in any of the
+nine languages; `npm run store:check` refuses it before anything is pushed.
 Google's own category text pulls the other way (*"Suitable for apps connecting patients with
 healthcare providers"* — Healthcare services and management), so a reader who checks only the
 definitions will conclude the declaration is wrong and re-tick it. That conclusion costs a

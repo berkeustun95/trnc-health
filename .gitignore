@@ -57,3 +57,6 @@ hand-place-queue*.csv
 # Generated solid-colour PNGs, never real photographs, never committed. The config edits
 # the fixture makes are caught by scripts/check-dorms.mjs and .githooks/pre-commit.
 assets/partners/_fixture/
+
+# fastlane gems (Gemfile + .bundle/config are committed; the install is not)
+vendor/bundle/
