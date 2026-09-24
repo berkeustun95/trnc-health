@@ -39,6 +39,9 @@ const GAP_MS = 1600
 const MAX_RATIO = 2.5
 const MAX_SNAP_M = 30
 const SHORT_LEG_M = 60
+// Short legs are exempt from the RATIO (pins sit inside buildings), but not from this: a
+// 16 m leg routed as 135 m (Girne 2→3, 2026-09-24) draws a loop that reads as a bug.
+const MAX_EXTRA_M = 100
 const STALE_M = 50
 const dry = process.argv.includes('--dry')
 const force = process.argv.includes('--force')
@@ -120,6 +123,7 @@ for (const [key, { a, b, route, leg }] of pairs) {
   const ratio = metres / Math.max(straight, 1)
   const why = [
     straight >= SHORT_LEG_M && ratio > MAX_RATIO ? `ratio ${ratio.toFixed(2)}` : null,
+    metres - straight > MAX_EXTRA_M && ratio > MAX_RATIO ? `+${Math.round(metres - straight)} m over the straight line` : null,
     snapA > MAX_SNAP_M ? `start snap ${Math.round(snapA)} m` : null,
     snapB > MAX_SNAP_M ? `end snap ${Math.round(snapB)} m` : null,
   ].filter(Boolean).join(', ')
