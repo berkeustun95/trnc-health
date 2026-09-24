@@ -15,7 +15,7 @@ import { EXPLORE_FEATURED_LIVE } from '../constants/flags'
 import { isFeatured } from '../utils/featured'
 import { resolveAttribution } from '../utils/photoAttribution'
 import PhotoCredit from '../components/PhotoCredit'
-import { VISITNCY_SOURCE, creditUrl } from '../constants/walkingRoutes'
+import { VISITNCY_SOURCE, creditUrl, creditBrand } from '../constants/walkingRoutes'
 import { logCreditTap } from '../components/WalkingRoutes'
 import ContentReportMenu from '../components/ContentReportMenu'
 import BackButton from '../components/BackButton'
@@ -276,7 +276,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
                 Linking.openURL(creditUrl(lang)).catch(() => {})
               }}>
               <Ionicons name="ribbon-outline" size={13} color={colors.primary} />
-              <Text style={s.partnerCreditText}>{t('routeCredit', lang)}</Text>
+              <Text style={s.partnerCreditText}>{t('routeCredit', lang).replace('{brand}', creditBrand(lang))}</Text>
               <Ionicons name="open-outline" size={12} color={colors.primary} />
             </TouchableOpacity>
           )}
@@ -452,7 +452,7 @@ const s = StyleSheet.create({
 
   section:      { marginBottom: 20 },
   partnerCredit:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
-  partnerCreditText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.primary },
+  partnerCreditText: { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.primary },
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 10 },
 
   desc: { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary,

@@ -71,6 +71,11 @@ export function walkEstimate(stops) {
 export function creditUrl(lang) {
   return lang === 'Turkish' ? 'https://www.adakibrisim.com' : 'https://www.visitncy.com'
 }
+// The site's own brand, never translated — it fills routeCredit's {brand} slot, so the
+// name on the credit always matches the site the tap opens.
+export function creditBrand(lang) {
+  return lang === 'Turkish' ? 'Ada Kıbrıs' : 'Visit NCY'
+}
 
 export function walkingDirectionsUrl(stop) {
   return `https://www.google.com/maps/dir/?api=1&destination=${stop.latitude},${stop.longitude}&travelmode=walking`

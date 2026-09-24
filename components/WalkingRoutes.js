@@ -11,7 +11,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, BackHand
 import { Marker, Polyline } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { placeName } from '../screens/ExploreScreen'
-import { ROUTE_COLOR, walkingDirectionsUrl, creditUrl } from '../constants/walkingRoutes'
+import { ROUTE_COLOR, walkingDirectionsUrl, creditUrl, creditBrand } from '../constants/walkingRoutes'
 import { logContactEvent } from '../utils/logContactEvent'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
@@ -173,7 +173,7 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
       <TouchableOpacity style={p.credit} onPress={openCredit} activeOpacity={0.7}
         hitSlop={{ top: 8, bottom: 8 }} accessibilityRole="link">
         <Ionicons name="ribbon-outline" size={13} color={ROUTE_COLOR} />
-        <Text style={p.creditText}>{t('routeCredit', lang)}</Text>
+        <Text style={p.creditText}>{t('routeCredit', lang).replace('{brand}', creditBrand(lang))}</Text>
         <Ionicons name="open-outline" size={12} color={ROUTE_COLOR} />
       </TouchableOpacity>
       <TouchableOpacity style={p.startBtn} onPress={start} activeOpacity={0.85}>
@@ -216,7 +216,7 @@ const p = StyleSheet.create({
   stopName:   { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   stopCat:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 1 },
   credit:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, flexShrink: 0 },
-  creditText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: ROUTE_COLOR },
+  creditText: { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: ROUTE_COLOR },
   startBtn:   { flexShrink: 0, marginTop: 12, backgroundColor: ROUTE_COLOR, borderRadius: 12, paddingVertical: 13,
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   startText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
