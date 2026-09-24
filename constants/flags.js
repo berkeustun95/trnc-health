@@ -382,6 +382,13 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //       cards above it — which is the entire reason it is not a fourth journey. A paid
 //       placement that reads as ADA's own editorial guidance is the one failure this
 //       surface must not have, and no metric can answer it.
+//   Built since that probe, never seen on a phone (2026-09-24), all on the same pass:
+//     • the Explore map pin (lime), its "Köpek pansiyonu · 1" chip, and the pin card
+//     • back from a pin-opened partner screen returns to the map in ONE press
+//     • the hero: logo at 63x56pt (its TRAIL HOTEL line is ~3pt), teal-outlined badge/pill
+//     • about (11-17 lines), practical rows (wrapped values right-aligned; English camera
+//       row measured 0.2pt from wrapping at 320dp), address under Konum
+//     • the photo strip's sand flash when a far frame re-decodes after scrolling back
 //
 //   Turkish first, then ar and fa. Note ar/fa render RTL TEXT in an LTR LAYOUT app-wide
 //   (I18nManager appears nowhere in this codebase) — the known standing state, not a bug

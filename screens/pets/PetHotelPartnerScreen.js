@@ -26,10 +26,9 @@ import { logContactEvent } from '../../utils/logContactEvent'
 //   beyond tidiness: a screen-side `&&` chain cannot be tested without rendering, and it
 //   gets copied wrong when the second partner arrives.
 //
-//   TODAY THAT MEANS FIVE SECTIONS RENDER, NOT SEVEN. `about` is a pending key and
-//   `pricing` is declined by the partner, so the page is hero → services → practical →
-//   location → contact. That is the FINISHED page for what Shiny Paw has told us, not a
-//   degraded one: no empty rows, no "bilgi yok", no greyed placeholders. A greyed row tells
+//   TODAY THAT MEANS SIX SECTIONS RENDER, NOT SEVEN. `pricing` is declined by the partner,
+//   so the page is hero → about → services → practical → location → contact. A section
+//   with nothing to say is absent, never degraded: no empty rows, no "bilgi yok", no greyed placeholders. A greyed row tells
 //   the user the app is broken; an absent section tells them nothing, which is the honest
 //   answer when we know nothing.
 //
@@ -177,10 +176,10 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
               </View>
 
               {/* ⚠ LIGHT ONLY. The app has no dark theme (app.config.js userInterfaceStyle
-                  'light'), so nothing passes 'dark' here. If one arrives, do NOT use
-                  partnerLogo(partner, 'dark'): it falls back to `logo`, and Shiny Paw's mark
-                  is keyed from white and breaks on dark (PENDING_FIELDS.logoOnDark). With
-                  logoOnDark pending, a dark hero renders no logo at all. */}
+                  'light'), so nothing passes 'dark' here. Shiny Paw's logoOnDark is wired
+                  (keyed from black, 2026-09-24), so a future dark hero can use
+                  partnerLogo(partner, 'dark'). For a partner WITHOUT logoOnDark that call
+                  falls back to the light mark, which breaks on dark: render no logo instead. */}
               <PartnerLogoStrip
                 source={partnerLogo(partner)}
                 name={partner.name}

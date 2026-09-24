@@ -19,14 +19,14 @@
 //
 //   1. Most referenced keys must have an ENGLISH value. Per-LOCALE coverage is NOT this
 //      file's job and cannot be — see the note above the check itself.
-//   2. PENDING_KEYS must NOT resolve, in any locale. `petHotelShinyPawAbout` is referenced
-//      and deliberately unwritten — Shiny Paw has supplied no about copy, and inventing
-//      nine locales of marketing prose about a real business is fabrication with their
-//      name on it. A guard that only asked "does everything resolve" would be red on day
-//      one, and the tempting fix is to skip the key, which certifies nothing.
+//   2. PENDING_KEYS must NOT resolve, in any locale. A key listed there is copy the partner
+//      has not supplied, and inventing nine locales of marketing prose about a real business
+//      is fabrication with their name on it. Empty for Shiny Paw since 2026-09-24.
 //   3. PENDING_FIELDS must still be NULL. This is the "never invent a price, address,
-//      coordinate, phone number or capacity" rule with teeth: the day somebody types a
-//      capacity in without removing it from PENDING_FIELDS, this goes red.
+//      coordinate, phone number or capacity" rule with teeth: a value typed in without
+//      removing its PENDING_FIELDS entry goes red. Empty for Shiny Paw since 2026-09-24.
+//   Both lists may be EMPTY; the checks are functions proven live on every run by a
+//   synthetic entry that must fail, so empty is a finished state, not a vacuous pass.
 //
 // The day any of those three changes, the guard goes RED and graduating the placeholder
 // becomes a deliberate act somebody reviews — which is the whole point.
