@@ -45,6 +45,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const REQUIRED_PAGES = [
   { file: 'privacy.html', route: 'getadaapp.com/privacy', role: 'App Store + Play PRIVACY URL' },
   { file: 'support.html', route: 'getadaapp.com/support', role: 'App Store SUPPORT URL' },
+  { file: 'delete-account.html', route: 'getadaapp.com/delete-account', role: 'Play DELETE-ACCOUNT URL' },
 ]
 
 const EXPECTED_ASSETS = {

@@ -19,12 +19,15 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE } from './constants/flags'
+import { EXPLORE_REVIEW } from './utils/exploreReview'
+import ScreenHeader from './components/ScreenHeader'
 import { promosAllowed } from './constants/homeStrip'
 import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
 } from './constants/profileGate'
 import { REGIONS } from './constants/regions'
 import { LEGAL_VERSION } from './constants/legal'
+import { shouldShowPolicyNotice } from './utils/policyNoticeRules'
 import { readPendingConsent, clearPendingConsent } from './utils/pendingConsent'
 import { decidePendingConsent } from './utils/pendingConsentRules'
 import { resolveRegion } from './utils/resolveRegion'
@@ -71,6 +74,7 @@ import TravelWithPetScreen from './screens/pets/TravelWithPetScreen'
 import OwningPetScreen from './screens/pets/OwningPetScreen'
 import PetHotelPartnerScreen from './screens/pets/PetHotelPartnerScreen'
 import TutorialCoachMarks from './screens/TutorialCoachMarks'
+import PolicyUpdateNotice from './components/PolicyUpdateNotice'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
@@ -85,7 +89,7 @@ import XoxGameScreen from './screens/games/XoxGameScreen'
 import MemoryMatchScreen from './screens/games/MemoryMatchScreen'
 import Game2048Screen from './screens/games/Game2048Screen'
 import SudokuScreen from './screens/games/SudokuScreen'
-import { haversineKm, parseIsOpen, coarseCoord } from './utils/facilityUtils'
+import { haversineKm, parseIsOpen } from './utils/facilityUtils'
 import { dutyStatus, localDateKey, DUTY_FRESH } from './utils/dutyStatus'
 import {
   evaluateCityWelcome, markWelcomeShown, setCityWelcomeEnabled,
@@ -468,6 +472,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home')
   const [showDutyList, setShowDutyList] = useState(false)
   const [onboarded, setOnboarded] = useState(null)
+  // Policy-update notice (utils/policyNoticeRules.js). `policySeen` is undefined until read.
+  const [policySeen, setPolicySeen] = useState(undefined)
+  const [returningDevice, setReturningDevice] = useState(false)
   const [pendingLang, setPendingLang] = useState('English')
   const [facilityRatings, setFacilityRatings] = useState({})
   const [notifications, setNotifications] = useState([])
@@ -508,7 +515,7 @@ export default function App() {
   // Session state is right here, unlike the flag path: the account no longer exists, so
   // there is nothing a relaunch could escape back into.
   const [ageDeletedNotice, setAgeDeletedNotice] = useState(false)
-  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'studentHub'. Admins never reach HomeScreen /
+  const [adminPreview, setAdminPreview] = useState(null)                 // null | 'explore' | 'exploreMap' (dev review) | 'studentHub'. Admins never reach HomeScreen /
                                                                          // the customer module chain (role-first branch below), so any admin preview
                                                                          // surface is entered from AdminScreen via this single gate — one condition,
                                                                          // not a per-surface boolean.
@@ -848,9 +855,12 @@ export default function App() {
     Promise.all([
       AsyncStorage.getItem('@trnc_onboarded'),
       AsyncStorage.getItem('@trnc_lang'),
-    ]).then(([onboardedVal, langVal]) => {
+      AsyncStorage.getItem('@trnc_policy_seen'),
+    ]).then(([onboardedVal, langVal, policySeenVal]) => {
       if (langVal) setPendingLang(langVal)
       setOnboarded(onboardedVal === 'true')
+      setReturningDevice(onboardedVal === 'true')
+      setPolicySeen(policySeenVal ?? null)
     })
   }, [])
 
@@ -873,7 +883,9 @@ export default function App() {
   }
 
   async function completeOnboarding(selectedLang) {
-    await AsyncStorage.multiSet([['@trnc_onboarded', 'true'], ['@trnc_lang', selectedLang]])
+    // A new install meets the CURRENT policy at signup — it must never be told it "changed".
+    await AsyncStorage.multiSet([['@trnc_onboarded', 'true'], ['@trnc_lang', selectedLang], ['@trnc_policy_seen', LEGAL_VERSION]])
+    setPolicySeen(LEGAL_VERSION)
     setPendingLang(selectedLang)
     setOnboarded(true)
   }
@@ -1133,12 +1145,14 @@ export default function App() {
       }
 
       try {
-        const wLat = coarseCoord(resolvedCoords.latitude)
-        const wLon = coarseCoord(resolvedCoords.longitude)
-        const weatherRes = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${wLat}&longitude=${wLon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,uv_index&daily=temperature_2m_max,temperature_2m_min,weather_code,uv_index_max&timezone=auto&forecast_days=4`
-        )
-        const weatherJson = await weatherRes.json()
+        // MET Norway, through OUR Edge Function (supabase/functions/weather): the phone never
+        // talks to a weather provider and MET only ever sees our server. Rounded to 0.1°
+        // (~10 km) here as well as on the server — our server never needs better, and the
+        // privacy policy's Location section states this figure (check-privacy-parity ties the
+        // two). POST body, never a query string: invocation logs record URLs.
+        const wLat = Math.round(resolvedCoords.latitude * 10) / 10
+        const wLon = Math.round(resolvedCoords.longitude * 10) / 10
+        const { data: weatherJson } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon } })
         if (weatherJson?.current) setWeatherData(weatherJson)
       } catch {}
 
@@ -1484,7 +1498,8 @@ export default function App() {
       />
     }
   } else if (profile.role === 'admin' && !adminPreview) {
-    content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')} />
+    content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')}
+      onShowExploreReview={EXPLORE_REVIEW ? () => setAdminPreview('exploreMap') : undefined} />
   } else if (profile.role === 'provider') {
     if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
       content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
@@ -1706,6 +1721,28 @@ export default function App() {
       </BLErrorBoundary>
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />
+    )
+  } else if (adminPreview === 'exploreMap') {
+    // Dev-only Visit NCY review (utils/exploreReview.js): the Keşfet map with pending places
+    // and the routes layer, for an admin — who otherwise never reaches the tab shell. Only
+    // AdminScreen's review button sets this, and App passes that button only when
+    // EXPLORE_REVIEW — which compiles to a constant `false` in a release bundle (measured
+    // 2026-09-23 on `expo export` WITH the env var set: `var t=!1`).
+    content = (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScreenHeader onBack={() => setAdminPreview(null)} title="Keşfet · review mode" lang={lang} />
+        <ExploreMapScreen
+          onShowList={() => setAdminPreview('explore')}
+          facilities={facilities}
+          dutyFacilityId={dutyFacilityId}
+          userLocation={userLocation}
+          isAdmin={isAdmin}
+          onSelectFacility={setSelectedFacility}
+          onSelectUnclaimed={setUnclaimedFacility}
+          onSelectPlace={setSelectedExplorePlace}
+          lang={lang}
+        />
+      </SafeAreaView>
     )
   } else if (adminPreview === 'explore') {
     content = (
@@ -2230,6 +2267,27 @@ export default function App() {
     inTabShell && activeTab === 'home' &&
     inCustomerHub && !cityWelcomeVisible && !homeCityAskVisible
 
+  // The policy promises to tell users in the app when it changes. On Home only, never on
+  // top of the tutorial or a city prompt, and only once the profile has loaded (an account
+  // that already accepted this version must not see it flash).
+  const policyNoticeVisible =
+    inTabShell && activeTab === 'home' && policySeen !== undefined && (!session || profile !== null) &&
+    !showCoachMarks && !cityWelcomeVisible && !homeCityAskVisible &&
+    shouldShowPolicyNotice({ seen: policySeen, termsVersion: profile?.terms_version ?? null,
+                             current: LEGAL_VERSION, returning: returningDevice })
+  // Seen, NOT accepted: nothing is written to profiles.
+  // The notice closes on the STATE change, before and regardless of the storage write — a
+  // failed write can never keep it on screen. The write is retried so it also stays closed
+  // on the next launch; if every attempt fails it could return once after a relaunch, and
+  // closes again the same way.
+  const dismissPolicyNotice = (openPolicy) => {
+    setPolicySeen(LEGAL_VERSION)
+    if (openPolicy) setShowLegal(true)
+    const save = (left) => AsyncStorage.setItem('@trnc_policy_seen', LEGAL_VERSION)
+      .catch(() => { if (left > 0) setTimeout(() => save(left - 1), 1500) })
+    save(3)
+  }
+
   // Explicit answer -> asked=true, and city welcome goes live. 'visiting' is a
   // real answer, not an absence of one: it means every city is welcome-eligible.
   const resolveHomeCity = (value) => {
@@ -2247,6 +2305,17 @@ export default function App() {
       <View style={styles.rootFill} importantForAccessibility={oliSheetOpen ? 'no-hide-descendants' : 'auto'}>
         {content}
       </View>
+      {/* ⚠ RENDERED HERE, in the final return, never inside `content`. The content selector
+          runs BEFORE policyNoticeVisible / dismissPolicyNotice are assigned below it; Hermes
+          does not enforce the temporal dead zone, so inside `content` they read UNDEFINED —
+          and a Modal with visible={undefined} is SHOWN (RN defaults visible to true). That
+          shipped on 2026-09-24 as a notice every user saw and nobody could close. */}
+      <PolicyUpdateNotice
+        visible={policyNoticeVisible}
+        lang={lang}
+        onRead={() => dismissPolicyNotice(true)}
+        onDismiss={() => dismissPolicyNotice(false)}
+      />
       {oliVisible && (
         <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} hideFab={HOME_V2_LIVE} />
       )}

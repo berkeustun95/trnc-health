@@ -51,6 +51,7 @@ import { t, LANG_CODES } from '../constants/i18n.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories.js'
 import { REGION_LABEL_KEY } from '../constants/regions.js'
+import { WEATHER_LABEL_KEY } from '../utils/facilityUtils.js'
 import { RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY } from '../constants/profileGate.js'
 // Slice 6's send failures are reached as t(SEND_ERROR_KEY[token]) — a key looked up
 // through a variable, which the literal `t('key')` scan cannot see. Imported by name for
@@ -81,8 +82,13 @@ const SURFACES = [
   //   still reported OK.
   'screens/OnboardingScreen.js',
   'screens/ExploreMapScreen.js',
+  // The walking-routes layer drawn on that map (Visit NCY). Added with the component, while
+  // EXPLORE_ROUTES_LIVE is still false — guarded before the flip, not after.
+  'components/WalkingRoutes.js',
   'screens/ExploreProfileScreen.js',
   'components/ComingSoonScreen.js',
+  // The policy-update notice: shown to every existing user once per policy version.
+  'components/PolicyUpdateNotice.js',
   // Widened 2026-08-26 for the duty-roster error state. Measured before widening: these
   // two add 34 keys and ZERO new allowlist entries — both were already fully translated.
   // Free coverage on the highest-stakes copy in the app.
@@ -545,6 +551,8 @@ const viaVariable = [
   ...Object.values(HELP_ROW_LABEL_KEY),
   ...Object.values(CATEGORY_LABEL_KEY),
   ...Object.values(REGION_LABEL_KEY),
+  // Weather labels, reached as t(weatherLabelKey(symbol)) — English-only until 2026-09-24.
+  ...Object.values(WEATHER_LABEL_KEY),
   // ─── The pet hotel partner's own copy — 19 of its 34 keys, and ALL of the selling ──
   //
   // Listing screens/pets/PetHotelPartnerScreen.js in SURFACES covers the 15 keys it calls

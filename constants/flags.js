@@ -43,6 +43,17 @@ export const PRICE_COMPARE_LIVE = false
 // carries the baseline, so a flip left in the working tree cannot reach `eas update`.
 export const EXPLORE_MAP_LIVE = true
 
+// Visit NCY walking routes — the "Yürüyüş Rotaları" layer on the Keşfet map (20261048).
+// false = no chip, no lines, no route query. NOT `|| isAdmin`: an admin in production sees
+// what users see; the only preview is dev-only review mode (utils/exploreReview.js).
+// Not a MODULE_FLAGS key: a layer inside a live module has no Coming Soon screen and no
+// waitlist — the DORMS_LIVE reasoning.
+//
+// Go-live order (the order is the point): the routes' STOPS go status='active' first —
+// anon RLS hides pending places, so a route flipped on early draws with holes in it —
+// then walking_routes.is_active, then this flag, then the go-live SOP's OTA steps.
+export const EXPLORE_ROUTES_LIVE = true   // live 2026-09-24
+
 // Profile completion gate (Slice 2). false = the gate never fires and the wizard is
 // unreachable; the schema, the lookup tables and the availability RPC from Slice 1 are
 // all live either way and harmless on their own.

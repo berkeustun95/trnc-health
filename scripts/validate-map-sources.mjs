@@ -54,9 +54,10 @@ import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   TRNC_CENTER,
 } from '../constants/mapSources.js'
-import { MODULE_FLAGS, PET_HOTEL_LIVE } from '../constants/flags.js'
+import { MODULE_FLAGS, PET_HOTEL_LIVE, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
 import { colors, typeColors } from '../constants/theme.js'
 import { PET_PARTNERS } from '../constants/petPartners.js'
+import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots, walkStep, walkAdvance, walkDistance, routeLegs, legKey, stubsFor } from '../constants/walkingRoutes.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
          NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES } from '../constants/exploreCategories.js'
@@ -357,6 +358,107 @@ const tooClose = rivals.filter(([, c]) => !phColor || hueGap(phColor, c) < 30)
   .map(([k, c]) => `${k} ${c} (${phColor ? hueGap(phColor, c).toFixed(0) : '?'} deg)`)
 check(`pet hotel pin hue ${phColor ? hueOf(phColor).toFixed(0) : '?'} is >= 30 deg from all ${rivals.length} other pins`, tooClose, [])
 check('pethotel chip label resolves in English', t('petHotelDogBoarding', 'English') !== 'petHotelDogBoarding', true)
+
+// ─── Walking routes (Visit NCY) — a LAYER, gated on its own flag ─────────────
+//
+// The discriminating case is the second one: an ADMIN, no review mode, flag false. The
+// house pattern everywhere else on this map is `|| isAdmin`, and that is exactly the
+// one-line "fix" that would show dark partner routes to every admin in production. It is
+// asserted here so that change fails a push rather than surviving review.
+console.log(`\nwalking routes — EXPLORE_ROUTES_LIVE is ${EXPLORE_ROUTES_LIVE}`)
+check('layer hidden: user, flag off',              routesLayerVisible({ routesLive: false, review: false, isAdmin: false }), false)
+check('layer hidden: ADMIN, flag off, no review',  routesLayerVisible({ routesLive: false, review: false, isAdmin: true }), false)
+check('layer hidden: review env but not admin',    routesLayerVisible({ routesLive: false, review: true,  isAdmin: false }), false)
+check('layer shown: review env + admin',           routesLayerVisible({ routesLive: false, review: true,  isAdmin: true }), true)
+check('layer shown: flag on, plain user',          routesLayerVisible({ routesLive: true,  review: false, isAdmin: false }), true)
+check('committed flag hides the layer from an admin',
+  routesLayerVisible({ routesLive: EXPLORE_ROUTES_LIVE, review: false, isAdmin: true }), EXPLORE_ROUTES_LIVE)
+
+// Fixture: 5 live stops ~300 m apart on a line, one pending stop in the middle (absent from
+// the loaded places, as RLS makes it), plus an inactive route and a route with one live stop.
+const RS = Array.from({ length: 6 }, (_, i) => ({ id: `rs-${i}`, latitude: 35.17, longitude: 33.36 + i * 0.0033 }))
+const loaded = new Map(RS.filter(p => p.id !== 'rs-2').map(p => [p.id, p]))
+const stopsOf = ids => ids.map((id, i) => ({ position: i + 1, place_id: id }))
+const ROUTE_ROWS = [
+  { id: 'r-live', is_active: true,  sort_order: 1, walking_route_stops: stopsOf(RS.map(p => p.id)) },
+  { id: 'r-dark', is_active: false, sort_order: 0, walking_route_stops: stopsOf(['rs-0', 'rs-1', 'rs-3']) },
+  { id: 'r-thin', is_active: true,  sort_order: 2, walking_route_stops: stopsOf(['rs-0', 'rs-2']) },
+]
+const resolved = resolveRoutes(ROUTE_ROWS, loaded)
+check('inactive route never resolves outside review', resolved.map(r => r.id), ['r-live'])
+check('review mode keeps the inactive route, in sort_order', resolveRoutes(ROUTE_ROWS, loaded, { review: true }).map(r => r.id), ['r-dark', 'r-live'])
+check('a non-live stop is skipped and the rest renumbered', resolved[0]?.stops.map(p => p.id), ['rs-0', 'rs-1', 'rs-3', 'rs-4', 'rs-5'])
+check('a route left with < 2 drawable stops is dropped', resolved.some(r => r.id === 'r-thin'), false)
+const est = walkEstimate(resolved[0]?.stops ?? [])
+check('≈ figures are rounded: whole km, minutes in 5s', [Number.isInteger(est.km), est.min % 5], [true, 0])
+check('≈ figures use ×1.3 at 4.5 km/h (~1.5 km straight → ≈2 km, ≈25 min)', est, { km: 2, min: 25 })
+
+// Near-overlapping stops must each get their own slot (Lefke 2–3 is 1 m apart), and stops
+// that are comfortably apart must stay exactly on their point (slot 0).
+const at = (lat, lng) => ({ latitude: lat, longitude: lng })
+const M = 0.000009   // ≈ 1 m of latitude
+check('a 1 m pair is split into two slots', overlapSlots([at(35, 33), at(35 + M, 33)]), [-0.5, 0.5])
+check('stops 40 m apart stay on their point', overlapSlots([at(35, 33), at(35 + 40 * M, 33)]), [0, 0])
+check('a 20 m + 20 m chain spreads as one group of three', overlapSlots([at(35, 33), at(35 + 20 * M, 33), at(35 + 40 * M, 33)]), [-1, 0, 1])
+
+// Real paths (walking_legs). A leg is drawn only while it still joins the places as they are
+// now; a moved pin or no row falls back to the straight connector, leg by leg.
+const LA = { id: 'la', latitude: 35.17, longitude: 33.36 }, LB = { id: 'lb', latitude: 35.171, longitude: 33.362 }
+const LC = { id: 'lc', latitude: 35.172, longitude: 33.364 }
+const routed = new Map([[legKey('la', 'lb'), { metres: 260, path: [[33.36001, 35.17001], [33.361, 35.1712], [33.36199, 35.17099]] }]])
+const lg = routeLegs([LA, LB, LC], routed)
+check('a fresh stored leg is drawn from its path', [lg[0].routed, lg[0].coords.length, lg[0].metres], [true, 3, 260])
+check('a pair with no stored leg falls back to straight ×1.3', [lg[1].routed, lg[1].coords.length], [false, 2])
+const moved = routeLegs([LA, { ...LB, latitude: 35.1725 }], routed)
+check('a leg whose place moved > 50 m falls back (stale)', moved[0].routed, false)
+// Stubs: a path that ends at the walkable point nearest a monument gets a dashed stub to the
+// pin; one that ends on the pin gets none (Gazimağusa, 2026-09-24).
+const P0 = { latitude: 35.17, longitude: 33.36 }, P1 = { latitude: 35.1703, longitude: 33.3603 }
+const onMonument = { latitude: 35.1707, longitude: 33.3603 }   // ~44 m past the path's end
+check('a path ending ~44 m from the pin gets one stub, to the pin', stubsFor(P0, [P0, P1], onMonument).length, 1)
+check('a path ending on both pins gets no stubs', stubsFor(P0, [P0, P1], P1).length, 0)
+const stubbed = routeLegs([{ id: 'sa', ...P0 }, { id: 'sb', ...onMonument }], new Map([[legKey('sa', 'sb'), { metres: 80, path: [[P0.longitude, P0.latitude], [P1.longitude, P1.latitude]] }]]))
+check('a 44 m stub is still a FRESH routed leg (stub limit < STALE_M)', [stubbed[0].routed, stubbed[0].stubs.length], [true, 1])
+check('the reverse direction is a different leg', routeLegs([LB, LA], routed)[0].routed, false)
+check('≈ distance uses the routed metres where they exist', walkEstimate([LA, LB, LC], lg).km, Math.max(1, Math.round((260 + lg[1].metres) / 1000)))
+
+// Walk mode. The case that matters is the manual Previous: you are standing at the stop you
+// stepped back to, and a naive "within 30 m → advance" bounces you forward again at once.
+const W = [at(35, 33), at(35 + 100 * M, 33), at(35 + 300 * M, 33)]
+let ws = walkStep(W, 0, at(35 - 200 * M, 33))
+check('walk: starting far away arms stop 1', ws, { next: 0, armed: true })
+ws = walkAdvance(W, ws, at(35 - 5 * M, 33))
+check('walk: arriving within 30 m advances', ws.next, 1)
+ws = walkStep(W, 0, at(35 + 2 * M, 33))
+check('walk: manual Previous onto the stop you stand at is NOT armed', ws, { next: 0, armed: false })
+check('walk: …and the next fix there does not bounce you forward', walkAdvance(W, ws, at(35 + 2 * M, 33)).next, 0)
+ws = walkAdvance(W, walkAdvance(W, ws, at(35 + 60 * M, 33)), at(35 + 1 * M, 33))
+check('walk: walking away (>30 m) and back re-arms and advances', ws.next, 1)
+check('walk: nothing happens after the last stop', walkAdvance(W, { next: 3, armed: true }, at(35, 33)), { next: 3, armed: true })
+check('walk: distances are rounded, never raw', [walkDistance(123), walkDistance(2600)], [{ unit: 'm', n: 120 }, { unit: 'km', n: 3 }])
+
+// The gate above is only worth something if the screen USES it. Code-shape checks, anchored
+// to code (not prose), with the raw value printed on failure.
+const MAP_SRC = readFileSync(resolve(ROOT, 'screens/ExploreMapScreen.js'), 'utf8')
+const REVIEW_SRC = readFileSync(resolve(ROOT, 'utils/exploreReview.js'), 'utf8')
+check('ExploreMapScreen gates the layer on EXPLORE_ROUTES_LIVE via routesLayerVisible',
+  /routesLayerVisible\(\{\s*routesLive:\s*EXPLORE_ROUTES_LIVE\b/.test(MAP_SRC), true)
+const routesQuery = MAP_SRC.indexOf(".from('walking_routes')")
+const effectStart = MAP_SRC.lastIndexOf('useEffect(', routesQuery)
+check('the walking_routes query sits behind `if (!routesOn) return`',
+  routesQuery > 0 && MAP_SRC.slice(effectStart, routesQuery).includes('if (!routesOn) return'), true)
+check('outside review the client filters is_active itself (RLS opens inactive rows to admins)',
+  MAP_SRC.includes("if (!review) q = q.eq('is_active', true)"), true)
+// "My location": gated with the routes flag, and the map never ASKS on open — the only
+// permission request in the screen sits inside the locate-me handler.
+check('locate-me + dot are gated with the routes layer', /const locateOn = routesOn\b/.test(MAP_SRC), true)
+const reqAt = [...MAP_SRC.matchAll(/requestForegroundPermissionsAsync/g)].map(m => m.index)
+const locateStart = MAP_SRC.indexOf('const locateMe = useCallback(')
+const locateEnd = MAP_SRC.indexOf('}, [walking, recenter, locating', locateStart)
+check('the map asks for location ONLY inside locate-me (never on open)',
+  reqAt.length === 1 && locateStart > 0 && reqAt[0] > locateStart && reqAt[0] < locateEnd, true)
+check('review mode is __DEV__-folded (utils/exploreReview.js)',
+  /export const EXPLORE_REVIEW = __DEV__ && /.test(REVIEW_SRC), true)
 
 if (problems.length) {
   console.error('\n  ┌─ MAP SOURCE GATE FAILED ───────────────────────────────────────┐')

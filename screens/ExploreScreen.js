@@ -24,6 +24,7 @@ import {
   categoryToGroup, groupVisible,
 } from '../constants/exploreCategories'
 import { TRNC_CENTER } from '../constants/mapSources'
+import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 
 // name_i18n[lang] if present, else fall through to the plain `name` column (never '').
 function extractI18n(obj, lang) {
@@ -92,6 +93,8 @@ function PlaceCard({ item, lang, onPress, showFeatured, isSaved, onToggleSave })
 
       <View style={s.cardBody}>
         {showFeatured && isFeatured(item) && <FeaturedBadge lang={lang} style={{ marginBottom: 8 }} />}
+        {/* `status` is only SELECTED in dev review mode, so this cannot render in production. */}
+        {item.status === 'pending' && <Text style={s.reviewPending}>PENDING · review mode</Text>}
         <View style={s.nameRow}>
           <Text style={s.name} numberOfLines={1}>{placeName(item, lang)}</Text>
           <View style={s.districtBadge}>
@@ -268,14 +271,16 @@ function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
 // link, with nothing on screen to say why. That is the PropertyDetailScreen contact-bar
 // bug exactly (its populated branch was built, shipped and verified while the embed
 // feeding it selected none of the columns it needed).
+// `source` is here for the same reason: ExploreProfileScreen's Visit NCY credit reads it.
 export const BROWSE_COLS =
   'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
-  'cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until'
+  'cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until, source'
 
 export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, placeFavorites, onTogglePlaceFavorite, isAdmin = false, initialCategory = null, initialRegion = null, onAdNavigate }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin previewing.
   // Mirrors the GaragesScreen showFeatured gate. The owner "request featured" CTA lands in Slice 5.
   const showFeatured = EXPLORE_FEATURED_LIVE || isAdmin
+  const review = EXPLORE_REVIEW && isAdmin   // dev-only: pending places join the list (utils/exploreReview.js)
   // "Rooted" entry: opened pre-filtered to one category (the Beaches tile → category='beach').
   // Lands directly on that category's list, and its back button exits to onBack (Home) instead of
   // the group-tile landing — preserving the old Beaches-tile behavior (swap the engine, keep the nav).
@@ -300,7 +305,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
       // before 20260824 is applied), fall back to counting the visible set.
       const uid = session?.user?.id
       const [placesRes, countsRes, subsRes] = await Promise.all([
-        supabase.from('places').select(BROWSE_COLS).eq('status', 'active'),
+        supabase.from('places').select(review ? `${BROWSE_COLS}, status` : BROWSE_COLS).in('status', reviewStatuses(review)),
         supabase.rpc('explore_category_counts'),
         // ≥1-submission gate for the "My submissions" affordance — a COUNT, never a row fetch.
         uid ? supabase.from('places').select('id', { head: true, count: 'exact' }).eq('submitted_by', uid)
@@ -327,7 +332,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
     } finally {
       setLoading(false)
     }
-  }, [showFeatured, session?.user?.id])
+  }, [showFeatured, session?.user?.id, review])
 
   useEffect(() => { load() }, [load])
 
@@ -679,6 +684,9 @@ const s = StyleSheet.create({
   accessBadge:  { backgroundColor: colors.bg, paddingHorizontal: 8, paddingVertical: 3,
                   borderRadius: 10, borderWidth: 1, borderColor: colors.border },
   accessText:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+
+  reviewPending: { alignSelf: 'flex-start', marginBottom: 8, fontSize: 11, fontFamily: 'Inter_700Bold',
+                   color: '#8A5A00', backgroundColor: '#FFF3D6', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
 
   desc: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 19 },
 

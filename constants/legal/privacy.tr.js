@@ -12,8 +12,8 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
-export default `Sürüm: 2026-09-20
-Son güncelleme: 22 Eylül 2026
+export default `Sürüm: 2026-09-24
+Son güncelleme: 24 Eylül 2026
 
 KİM OLDUĞUMUZ
 
@@ -38,7 +38,7 @@ Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listele
 • Doğum tarihi — 13 yaşında veya daha büyük olduğunuzu doğrulamak için. Girdiğiniz anda kontrol edilir ve bu bilgi olmadan hesap tamamlanamaz. Ayrıca 18 yaşından küçük olup olmadığınızı belirlemek için kullanılır; bu da size gösterilen reklamları etkiler (5. bölüme bakınız).
 • Uyruk — hangi ikamet, izin ve evrak bilgilerinin sizin için geçerli olduğunu ve öncelikle hangi dilleri sunmamız gerektiğini belirleyebilmek için. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
 • Telefon numarası — isteğe bağlıdır. Verirseniz, hesabınızla ilgili konularda sizinle iletişime geçebilmemiz için hesabınızda saklanır. Diğer kullanıcılara gösterilmez ve hizmet sağlayıcılara verilmez. Telefon numarası vermeden ADA'yı eksiksiz kullanabilirsiniz.
-• KKTC içindeki bölgeniz — listelerin, nöbetçi eczane çizelgelerinin ve arama sonuçlarının yalnızca telefonunuzun o anda bulunduğu yere göre değil, yaşadığınız yere göre sıralanabilmesi için. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
+• KKTC içindeki bölgeniz — listelerin, nöbetçi eczane çizelgelerinin ve arama sonuçlarının yalnızca telefonunuzun o anda bulunduğu yere göre değil, yaşadığınız yere göre sıralanabilmesi için. Bugün Ana Sayfa'nın üstündeki bölge adını ve fotoğrafını seçer; uygulamada bu veriyi okuyan başka bir bölüm henüz yok.
 • İkamet durumu — öğrenci, burada çalışıyor, ikamet ediyor veya ziyaretçi — ve öğrenciyseniz öğrenim düzeyiniz ile üniversite ve lisansüstü öğrenim için kurumunuz. Bu bilgi, ADA'nın hangi bölümlerinin önünüze çıkarılacağını belirlemek için düşünülmüştür; çünkü yeni gelmiş birinin ihtiyaçlarıyla on yıldır burada yaşayan birinin ihtiyaçları aynı değildir. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
 • Üniversite bilgileri (eklerseniz) — hâlen ya da daha önce okuduğunuz üniversiteler (şu anda öğrenci olmanız gerekmez), bölümünüz, başlama ve mezuniyet yıllarınız; ayrıca üniversitenizin öğrenci listesinde görünmeyi seçip seçmediğiniz. Bu ayar siz açmadıkça kapalıdır.
 • Tercih ettiğiniz dil — uygulamayı ve size gönderdiğimiz bildirimleri kendi dilinizde gösterebilmek için.
@@ -49,7 +49,7 @@ Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını ve sorduğu
 
 Yazdığınız değerlendirmeler, sorular ve cevaplar.
 
-• Gönderdiğiniz mesajlar — diğer öğrencilere gönderdiğiniz mesajların içeriği ve kime gönderdiğiniz. Sildiğiniz bir mesaj iki taraftan da gizlenir, ancak bir şikâyetin incelenebilmesi için bir süre saklanır. Bir mesaj şikâyet edilirse, yönetici yalnızca o mesajı okuyabilir, konuşmanın geri kalanını göremez.
+• Gönderdiğiniz mesajlar — diğer öğrencilere gönderdiğiniz mesajların içeriği ve kime gönderdiğiniz. Sildiğiniz bir mesaj iki taraftan da gizlenir, ancak bir şikâyetin incelenebilmesi için 30 gün saklanır, sonra kalıcı olarak silinir. Bir mesaj şikâyet edilirse, yönetici yalnızca o mesajı okuyabilir, konuşmanın geri kalanını göremez.
 • Konuşma başlatma denemeleri — birine mesaj göndermeye çalıştığınızda, iletilip iletilmediğinden bağımsız olarak bu denemenin gerçekleştiğini kaydederiz. Bunu yalnızca yöneticiler görebilir ve 30 gün sonra silinir.
 
 Moderasyon verileri: bildirdiğiniz içerikler ve engellediğiniz kullanıcılar. Engelleme listeniz özeldir ve engellediğiniz kullanıcıya asla gösterilmez.
@@ -57,6 +57,14 @@ Moderasyon verileri: bildirdiğiniz içerikler ve engellediğiniz kullanıcılar
 Reddedilen gönderimler: gönderdiğiniz bir metin içerik filtremiz tarafından reddedilirse, bu kaydı hesabınıza bağlı olarak 30 gün süreyle saklarız. 7. bölümde ayrıntılı olarak açıklanmıştır.
 
 Onay kayıtları: Kullanım Koşulları'nın ve Gizlilik Politikası'nın hangi sürümünü, hangi dilde ve ne zaman kabul ettiğiniz. Pazarlama iletilerine onay verirseniz, onayı verdiğiniz tarihi ve daha sonra geri alırsanız geri aldığınız tarihi kaydederiz.
+
+Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bunu istediğiniz zaman cihaz ayarlarınızdan kapatabilirsiniz. Uygulama konum olmadan da çalışır. Konumunuzu satmıyoruz ve reklam için kullanmıyoruz.
+• Telefonunuzda — ADA konumunuzu, listeleri uzaklığa göre sıralamak, haritada nerede olduğunuzu göstermek, Ana Sayfa'da şehrinizi seçmek ve bir yürüyüş rotasını takip etmek için kullanır. Bu işlemler telefonunuzda gerçekleşir ve konumunuz bunlar için bize gönderilmez.
+• Arama — arama yaptığınızda konumunuz telefonunuzdan çıkmadan önce yaklaşık 1 km'ye yuvarlanır ve yalnızca yakındaki sonuçları öne almak için sunucularımıza gönderilir. Saklamıyoruz.
+• Hava durumu — Ana Sayfa'da hava durumunu göstermek için konumunuz yaklaşık 10 km'ye yuvarlanır ve sunucumuza gönderilir; sunucumuz o bölgenin tahminini MET Norway'den (Oslo'daki Norveç Meteoroloji Enstitüsü) ister. MET Norway yalnızca sunucumuzu görür, telefonunuzu asla görmez. Bölgenin tahminini kısa bir süre tutarız ve kimin istediğini kaydetmeyiz.
+• Yürüyüş rotaları — konumunuz açıkken bir yürüyüş rotasını takip ettiğinizde konumunuz ve sıradaki durak sunucumuza gönderilir; sunucumuz yürüyüş yolunu openrouteservice'ten (Heidelberg, Almanya'daki HeiGIT tarafından işletilir) ister. HeiGIT yalnızca sunucumuzu görür, telefonunuzu asla görmez ve istek koordinatlarını kayıtlarında yaklaşık 1 km'ye yuvarlanmış olarak tutar. Konumunuzu saklamayız.
+• İletişim dokunuşları — listelenen bir işletme veya iş ortağı için arama, WhatsApp, web sitesi ya da yol tarifi düğmesine dokunduğunuzda, dokunuşun gerçekleştiğini, hangi işletme için olduğunu ve ilgili olduğu KKTC'nin yedi geniş bölgesinden birini (örneğin Girne veya Lefke) kaydederiz: konumunuzun sizi yerleştirdiği bölge ya da uygulamada seçtiğiniz bölge. Bununla birlikte hesabınızı, cihazınızı veya tam konumunuzu asla kaydetmeyiz; bu nedenle size geri izlenemez. Bu sayıları, işletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini bildirmek için kullanırız.
+• Gönderdiğiniz yerler — bir yer gönderip işaretçisi için mevcut konumunuzu kullanırsanız, bu konum yerin konumu olarak kaydedilir ve yer onaylandıktan sonra herkese açık olarak gösterilir.
 
 Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları kullanmıyoruz. Uygulamada reklam etkinleştirildiğinde geçerli olacak sınırlı istisna 5. bölümde açıklanmıştır.
 
@@ -71,6 +79,8 @@ Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları ku
 • Reklam göstermek ve 18 yaş altı için kişiselleştirmeyi sınırlamak — Hizmeti finanse etmek ve küçükleri korumak için. Hukuki dayanak: Meşru menfaatimiz ve hukuki yükümlülüğe uyum
 • Size pazarlama iletileri göndermek — Yalnızca siz istediyseniz. Hukuki dayanak: Açık rızanız
 • Hangi koşulları kabul ettiğinizin kaydını tutmak — Neyin kabul edildiğini gösterebilmek için. Hukuki dayanak: Meşru menfaatimiz ve hukuki yükümlülüğe uyum
+• Yakınınızdakileri göstermek için konumunuzu kullanmak: uzaklık sırası, harita, arama sırası ve yerel hava durumu — İstediğiniz hizmeti sunabilmek için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
+• İşletmelerin iletişim düğmelerine yapılan dokunuşları bölgeyle birlikte saymak — İşletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini gösterebilmek için. Hukuki dayanak: Hizmeti yürütme ve finanse etmeye ilişkin meşru menfaatimiz
 
 Kişisel verilerinizi satmayız, kiralamayız ve üçüncü tarafların kendi pazarlama faaliyetleri için paylaşmayız.
 
@@ -130,6 +140,7 @@ Farklı veriler farklı sürelerle saklanır.
 
 • Hesabınız: hesabınızdaki verileri hesabınız etkin olduğu sürece saklarız. Hesabınızın silinmesini talep ederseniz, ilgili mevzuatın saklamayı zorunlu kıldığı hâller dışında kişisel verilerinizi 30 gün içinde sileriz.
 • Reddedilen gönderimler — 30 gün: bir gönderim içerik filtremiz tarafından reddedilirse, hatalı reddetmeleri bulup düzeltebilmek ve filtreyi iyileştirebilmek için reddedilen metni, reddetmeyi tetikleyen terimi ve gerçekleşme zamanını saklarız. Bu kayıtlar hesabınıza bağlıdır, yalnızca yöneticilerimize görünür, 30 gün sonra otomatik olarak silinir ve başka hiçbir amaçla kullanılmaz.
+• Sildiğiniz içerikler — 30 gün: sildiğiniz değerlendirmeler, sorular ve mesajlar hemen gizlenir ve 30 gün sonra kalıcı olarak kaldırılır. Hâlâ açık bir şikâyetin parçasıysa, şikâyet sonuçlandığında kaldırılır. Bir soruyu silmek, ona verilen yanıtları da kaldırır.
 • Kaldırdığımız içerikler: topluluk kurallarımızı ihlal ettiği için kaldırılan içerikler, aynı hesabın tekrarlayan ihlallerini tespit edebilmemiz için dâhilî olarak saklanır. Diğer kullanıcılara artık görünmez.
 • Onay kayıtları: hesabınızı elinizde tuttuğunuz sürece ve sonrasında makul bir süre boyunca saklanır; çünkü bu kayıtlar neyi kabul ettiğinizin kanıtıdır.
 
@@ -149,7 +160,7 @@ Hesabınızdaki verileri istediğiniz zaman profil ayarlarınızdan görebilir v
 
 • Erişim — hakkınızda tuttuğumuz kişisel verilerin bir kopyasını talep etmek.
 • Düzeltme — hatalı verilerin düzeltilmesini istemek.
-• Silme — hesabınızın ve ilgili tüm verilerin silinmesini talep etmek. Silme işlemini 30 gün içinde gerçekleştiririz.
+• Silme — hesabınızın ve ilgili tüm verilerin ya da hesabınızı silmeden belirli verilerin silinmesini talep etmek. Silme işlemini 30 gün içinde gerçekleştiririz. Kendi değerlendirmelerinizi, sorularınızı ve mesajlarınızı silmek ve telefon numaranızı kaldırmak için uygulamayı kendiniz de kullanabilirsiniz.
 • Taşınabilirlik — bize verdiğiniz verileri yapılandırılmış, yaygın olarak kullanılan ve makine tarafından okunabilir bir biçimde almak.
 • İtiraz — meşru menfaatimize dayanarak yürüttüğümüz işlemelere, reklam kişiselleştirmesi dâhil, itiraz etmek.
 • Kısıtlama — verinizle ilgili bir uyuşmazlık çözülene kadar kullanımını sınırlamamızı istemek.

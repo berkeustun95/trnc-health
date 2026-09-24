@@ -39,6 +39,19 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-map-sources
   exit 1
 }
 
+# Policy-update notice: who is told (and that new installs are not).
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-policy-notice.mjs || {
+  echo "pre-push: policy notice rules failed — see above." >&2
+  exit 1
+}
+
+# Weather (MET Norway): the normaliser's local-day grouping and the symbol → icon/label map.
+# Neither is visible on a device until the weather happens to be that weather.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-weather-normalize.mjs || {
+  echo "pre-push: weather normaliser check failed — see above." >&2
+  exit 1
+}
+
 # i18n coverage. Blocks a push where a locale silently renders ENGLISH — which is what
 # happens when a key is missing, because t() falls back to English BEFORE it falls back
 # to the key. No existence check can see that; only a value comparison can.

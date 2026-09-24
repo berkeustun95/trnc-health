@@ -15,8 +15,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
-  ActivityIndicator, ScrollView, useWindowDimensions,
+  ActivityIndicator, ScrollView, useWindowDimensions, Alert, Linking,
 } from 'react-native'
+import * as Location from 'expo-location'
 import MapView, { Marker } from 'react-native-maps'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import Supercluster from 'supercluster'
@@ -29,10 +30,31 @@ import {
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
-import { colors, shadow } from '../constants/theme'
+import { colors, shadow, ellipsizeSlack } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { EXPLORE_ROUTES_LIVE } from '../constants/flags'
+import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
+import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance, legKey } from '../constants/walkingRoutes'
+import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useLocationGranted, useHeading, fitRoute } from '../components/WalkingRoutes'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
+
+// ─── RETURN-TO-MAP MEMORY ───────────────────────────────────────────────────
+// Opening a place or facility from this map UNMOUNTS it: App.js's content selector renders
+// the profile INSTEAD of the tab shell (and instead of the admin review preview). So on back
+// — the in-screen button or Android back, both of which just clear App state — the map
+// mounted fresh: chips reset, route closed, camera back at the island.
+//
+// The view is written here at the moment of HANDOFF and read ONCE on the next mount. Ids,
+// never objects: routes and pins are rebuilt from fresh fetches after the remount. Written
+// only on handoff, so switching tabs still starts the map fresh, exactly as before.
+// Module-level on purpose: it has to outlive the component.
+let returnSnapshot = null
+
+// NO LOCATION PERMISSION IS REQUESTED ON OPEN — still true. With EXPLORE_ROUTES_LIVE the map
+// shows the dot when permission is ALREADY granted, and asks only when the user taps
+// "locate me" (or starts a walk). Every watch is foreground-only and ends with the screen.
+const FOLLOW_ZOOM = 17, FOLLOW_ALTITUDE = 600   // zoom for Google (Android), altitude (m) for Apple (iOS)
 
 // Supercluster's radius/extent are tile-space pixels; the zoom we feed it is computed
 // below at Google's 256px tile scale. minPoints 3 keeps a lone pair of neighbours as two
@@ -95,14 +117,16 @@ function ClusterMarker({ cluster, onPress }) {
 // thing. Counts are shown because "Kültürel Miras 38" is the single most useful fact on
 // this screen for someone deciding where to look.
 
-function Chip({ label, count, color, colorBg, active, icon, onPress }) {
+function Chip({ label, count, color, colorBg, active, icon, ionicon, onPress }) {
   return (
     <TouchableOpacity
       style={[ch.chip, active && { backgroundColor: colorBg, borderColor: color }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      {icon
+      {ionicon
+        ? <Ionicons name={ionicon} size={14} color={active ? color : colors.textSecondary} />
+        : icon
         ? <Feather name={icon} size={13} color={active ? color : colors.textSecondary} />
         : color ? <View style={[ch.dot, { backgroundColor: color }]} /> : null}
       <Text style={[ch.label, active && { color }]} numberOfLines={1}>{label}</Text>
@@ -113,7 +137,7 @@ function Chip({ label, count, color, colorBg, active, icon, onPress }) {
   )
 }
 
-function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, onOpenNow, lang }) {
+function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, onOpenNow, showRoutes, routesMode, onRoutes, lang }) {
   return (
     <ScrollView
       horizontal
@@ -123,17 +147,29 @@ function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, 
     >
       <Chip
         label={t('all', lang)}
-        active={selectedKeys.size === 0}
+        active={!routesMode && selectedKeys.size === 0}
         color={colors.primary}
         colorBg={colors.primaryLight}
         onPress={onAll}
       />
+      {/* A MODE, not a filter: routes replace the pins while it is on, and any other chip
+          leaves it. Numbered stops under a layer of clustered pins would be unreadable. */}
+      {showRoutes && (
+        <Chip
+          label={t('routesChip', lang)}
+          ionicon="walk"
+          active={routesMode}
+          color={ROUTE_COLOR}
+          colorBg="#E0F2F1"
+          onPress={onRoutes}
+        />
+      )}
       {/* Hidden while no facility has parseable hours — see openNowApplicable(). */}
       {canOpenNow && (
         <Chip
           label={t('openNow', lang)}
           icon="clock"
-          active={openNow}
+          active={!routesMode && openNow}
           color={colors.success}
           colorBg={colors.successLight}
           onPress={onOpenNow}
@@ -146,7 +182,7 @@ function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, 
           count={src.pins.length}
           color={src.color}
           colorBg={src.colorBg}
-          active={selectedKeys.has(src.key)}
+          active={!routesMode && selectedKeys.has(src.key)}
           onPress={() => onToggle(src.key)}
         />
       ))}
@@ -242,6 +278,12 @@ export default function ExploreMapScreen({
 }) {
   const { width, height } = useWindowDimensions()
   const mapRef = useRef(null)
+  // Consumed once per mount. Pending ids resolve in effects below, once routes/pins exist.
+  const [snap] = useState(() => { const v = returnSnapshot; returnSnapshot = null; return v })
+  const pendingRouteId = useRef(snap?.routeId ?? null)
+  const pendingPinId   = useRef(snap?.pinId ?? null)
+  const panelScrollY   = useRef(snap?.panelScrollY ?? 0)
+  const pendingWalk    = useRef(snap?.walkNext ?? null)
 
   const [places, setPlaces]   = useState([])
   const [loading, setLoading] = useState(true)
@@ -249,15 +291,67 @@ export default function ExploreMapScreen({
   // Empty set = "All". See selectedPins(): All is the UNION OF VISIBLE SOURCES, never a
   // bypass of the gate — the default path is the one nearly every user takes, so it is
   // the path that most needs the gate on it.
-  const [selectedKeys, setSelectedKeys] = useState(() => new Set())
-  const [openNow, setOpenNow] = useState(false)
+  const [selectedKeys, setSelectedKeys] = useState(() => new Set(snap?.selectedKeys ?? []))
+  const [openNow, setOpenNow] = useState(snap?.openNow ?? false)
 
-  const initialRegion = useMemo(() => (
+  const review   = EXPLORE_REVIEW && isAdmin
+  const routesOn = routesLayerVisible({ routesLive: EXPLORE_ROUTES_LIVE, review: EXPLORE_REVIEW, isAdmin })
+  const [routeRows, setRouteRows]         = useState([])
+  const [legRows, setLegRows]             = useState([])
+  const [routesError, setRoutesError]     = useState(false)
+  const [routesMode, setRoutesMode]       = useState(snap?.routesMode ?? false)
+  const [selectedRoute, setSelectedRoute] = useState(null)
+  // Walk mode ("Başla"): null, or { next, armed } — see walkAdvance() in constants/walkingRoutes.
+  const [walk, setWalk] = useState(null)
+  const { pos: walkPos, status: walkStatus } = useWalkPosition(!!walk && !!selectedRoute)
+
+  // "My location" — gated with the routes layer, so production keeps today's behaviour
+  // (dot only when App.js already holds a location) until the flag flips.
+  const locateOn = routesOn
+  const [locGranted, setLocGranted] = useLocationGranted(locateOn)
+  const [locating, setLocating] = useState(false)
+  // Follow mode (walk only): the camera tracks and turns with the walker; a pan pauses it.
+  const [follow, setFollow] = useState(snap?.follow ?? true)
+  const [followReady, setFollowReady] = useState(snap?.walkNext != null)
+  const firstFollow = useRef(true)
+  const followTimer = useRef(null)
+  useEffect(() => () => clearTimeout(followTimer.current), [])
+  const walking = !!walk
+
+  // ─── The live leg: my position → the next stop, on OUR map ────────────────────
+  // Fetched from the walk-leg Edge Function when a walk starts (first fix) and whenever the
+  // next stop changes — never on every GPS fix: ORS allows 2,000 a day for the whole app.
+  // A reply that lands after the target moved on is dropped (request counter). No path
+  // (offline, quota, too far) → no line; Yol tarifi to Google Maps is still there.
+  const [liveLeg, setLiveLeg] = useState(null)          // { toId, coords | null }
+  const liveReq = useRef(0)
+  const lastPos = useRef(null)
+  useEffect(() => { lastPos.current = walkPos }, [walkPos])
+  const liveTarget = walk && selectedRoute && walk.next < selectedRoute.stops.length
+    ? selectedRoute.stops[walk.next] : null
+  const havePos = !!walkPos
+  useEffect(() => {
+    if (!liveTarget || !havePos) { if (!liveTarget) setLiveLeg(null); return }
+    const id = ++liveReq.current
+    const from = lastPos.current
+    supabase.functions.invoke('walk-leg', {
+      body: { from: { lat: from.latitude, lon: from.longitude }, to_place_id: liveTarget.id },
+    }).then(({ data }) => {
+      if (id !== liveReq.current) return
+      setLiveLeg({
+        toId: liveTarget.id,
+        coords: Array.isArray(data?.path) ? data.path.map(([lng, lat]) => ({ latitude: lat, longitude: lng })) : null,
+      })
+    }).catch(() => { if (id === liveReq.current) setLiveLeg({ toId: liveTarget.id, coords: null }) })
+  }, [liveTarget?.id, havePos])
+  const heading = useHeading(walking && follow && walkStatus === 'granted')
+
+  const initialRegion = useMemo(() => snap?.region ?? (
     userLocation
       ? { latitude: userLocation.latitude, longitude: userLocation.longitude,
           latitudeDelta: 0.5, longitudeDelta: 0.5 }
       : TRNC_CENTER
-  ), [userLocation])
+  ), [userLocation, snap])
 
   const [region, setRegion] = useState(initialRegion)
 
@@ -271,7 +365,8 @@ export default function ExploreMapScreen({
       //
       // `places` ONLY. beaches and landmarks are frozen legacy mirrors of these same 42
       // rows; querying them too would double every pin.
-      let q = supabase.from('places').select(BROWSE_COLS).eq('status', 'active')
+      let q = supabase.from('places').select(review ? `${BROWSE_COLS}, status` : BROWSE_COLS)
+        .in('status', reviewStatuses(review))
       const cats = mapFetchCategories(isAdmin)
       if (cats) q = q.in('category', cats)
       const { data } = await q
@@ -280,7 +375,148 @@ export default function ExploreMapScreen({
       setLoading(false)
     })()
     return () => { active = false }
-  }, [isAdmin])
+  }, [isAdmin, review])
+
+  // Five rows, fetched only when the layer is on — with EXPLORE_ROUTES_LIVE false and no
+  // review mode this effect never queries. is_active is filtered HERE as well as by RLS,
+  // because RLS opens inactive routes to admins and an admin in production is a user.
+  useEffect(() => {
+    if (!routesOn) return
+    let active = true
+    ;(async () => {
+      let q = supabase.from('walking_routes')
+        .select('id, region, name_i18n, sort_order, is_active, walking_route_stops(position, place_id)')
+      if (!review) q = q.eq('is_active', true)
+      // Real walking paths (walking_legs, 20261049). RLS shows a leg only while both of its
+      // places are visible, so pending stops keep theirs dark. A failed read is not an error
+      // state: every leg simply falls back to its straight connector.
+      const [{ data, error }, legsRes] = await Promise.all([
+        q,
+        supabase.from('walking_legs').select('from_place_id, to_place_id, path, metres'),
+      ])
+      if (!active) return
+      setRoutesError(!!error)
+      setRouteRows(error ? [] : (data || []))
+      setLegRows(legsRes.error ? [] : (legsRes.data || []))
+    })()
+    return () => { active = false }
+  }, [routesOn, review])
+
+  // Stops resolve against the places this screen ALREADY loaded — RLS- and status-filtered —
+  // so a stop that is not live is skipped and the rest renumbered (resolveRoutes).
+  const routes = useMemo(
+    () => resolveRoutes(routeRows, new Map(places.map(p => [p.id, p])), {
+      review, legsByPair: new Map(legRows.map(l => [legKey(l.from_place_id, l.to_place_id), l])),
+    }),
+    [routeRows, places, review, legRows]
+  )
+  const showRoutesChip = routesOn && (routeRows.length > 0 || routesError)
+
+  // Restore, NOT open: openRoute() would fitTo and fight the restored camera.
+  useEffect(() => {
+    const id = pendingRouteId.current
+    if (!id || routes.length === 0) return
+    pendingRouteId.current = null
+    const r = routes.find(x => x.id === id)
+    if (!r) return
+    setSelectedRoute(r)
+    if (pendingWalk.current != null) setWalk(walkStep(r.stops, pendingWalk.current, null))
+    pendingWalk.current = null
+  }, [routes])
+
+  // Auto-advance on every fix. Functional update: the fix may land between renders.
+  useEffect(() => {
+    if (!walkPos || !selectedRoute) return
+    setWalk(w => (w ? walkAdvance(selectedRoute.stops, w, walkPos) : w))
+  }, [walkPos, selectedRoute])
+
+  // Follow: centre on each fix and turn to the compass. Waits `followReady` (1.5 s after Başla)
+  // so the route overview is seen first. Zoom is set only on the first move after (re)engaging,
+  // so a pinch while following is kept. Only center/heading otherwise — a partial camera.
+  useEffect(() => {
+    if (!walking || !follow || !followReady || !walkPos) return
+    const cam = { center: walkPos, pitch: 0 }
+    if (heading != null) cam.heading = heading
+    if (firstFollow.current) { cam.zoom = FOLLOW_ZOOM; cam.altitude = FOLLOW_ALTITUDE; firstFollow.current = false }
+    mapRef.current?.animateCamera(cam, { duration: 600 })
+  }, [walking, follow, followReady, walkPos, heading])
+
+  const recenter = useCallback(() => { firstFollow.current = true; setFollow(true); setFollowReady(true) }, [])
+
+  const locateMe = useCallback(async () => {
+    if (walking) { recenter(); return }
+    if (locating) return
+    setLocating(true)
+    try {
+      let { status, canAskAgain } = await Location.getForegroundPermissionsAsync()
+      let justAsked = false
+      if (status !== 'granted' && canAskAgain) {
+        justAsked = true
+        ;({ status } = await Location.requestForegroundPermissionsAsync())
+      }
+      if (status !== 'granted') {
+        // Only point at Settings when the OS will no longer ask — never right after a "No".
+        if (!justAsked) Alert.alert(t('locationOffTitle', lang), t('locationOffBody', lang), [
+          { text: t('cancel', lang), style: 'cancel' },
+          { text: t('openSettings', lang), onPress: () => Linking.openSettings().catch(() => {}) },
+        ])
+        return
+      }
+      setLocGranted(true)
+      const loc = (await Location.getLastKnownPositionAsync({ maxAge: 60000 }))
+        ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }))
+      if (loc) mapRef.current?.animateCamera(
+        { center: { latitude: loc.coords.latitude, longitude: loc.coords.longitude }, zoom: 16, altitude: 1500 },
+        { duration: 600 })
+    } catch { /* no fix: the dot, if any, is still the answer */ } finally {
+      setLocating(false)
+    }
+  }, [walking, recenter, locating, lang, setLocGranted])
+
+  const endWalk  = useCallback(() => {
+    setWalk(null)
+    clearTimeout(followTimer.current)
+    mapRef.current?.animateCamera({ heading: 0, pitch: 0 }, { duration: 400 })   // north-up again
+  }, [])
+  const stepWalk = useCallback(d => setWalk(w => w && walkStep(selectedRoute.stops, w.next + d, walkPos)),
+    [selectedRoute, walkPos])
+
+  const fitTo = useCallback((coords, bottomShare) => {
+    if (!coords.length) return
+    mapRef.current?.fitToCoordinates(coords, {
+      edgePadding: { top: 110, right: 40, bottom: Math.round(height * bottomShare), left: 40 },
+      animated: true,
+    })
+  }, [height])
+
+  const enterRoutes = useCallback(() => {
+    setSelected(null)
+    setSelectedRoute(null)
+    setRoutesMode(true)
+    fitTo(routes.flatMap(fitRoute), 0.3)
+  }, [routes, fitTo])
+  const leaveRoutes = useCallback(() => { setRoutesMode(false); setSelectedRoute(null); setWalk(null) }, [])
+
+  const startWalk = useCallback(() => {
+    if (!selectedRoute) return
+    setWalk(walkStep(selectedRoute.stops, 0, walkPos))
+    fitTo(fitRoute(selectedRoute), 0.42)
+    firstFollow.current = true
+    setFollow(true)
+    setFollowReady(false)
+    clearTimeout(followTimer.current)
+    followTimer.current = setTimeout(() => setFollowReady(true), 1500)
+  }, [selectedRoute, walkPos, fitTo])
+  const openRoute = useCallback(r => {
+    panelScrollY.current = 0
+    setSelectedRoute(r)
+    fitTo(fitRoute(r), 0.55)
+  }, [fitTo])
+  const closeRoute = useCallback(() => {
+    setWalk(null)
+    setSelectedRoute(null)
+    fitTo(routes.flatMap(fitRoute), 0.3)
+  }, [routes, fitTo])
 
   const sources = useMemo(
     () => buildMapSources({ facilities, places, dutyFacilityId, isAdmin }),
@@ -301,13 +537,32 @@ export default function ExploreMapScreen({
 
   const toggleSource = useCallback(key => {
     setSelected(null)
+    leaveRoutes()
     setSelectedKeys(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
       return next
     })
-  }, [])
+  }, [leaveRoutes])
+
+  useEffect(() => {
+    const id = pendingPinId.current
+    if (!id || pins.length === 0) return
+    pendingPinId.current = null
+    const pin = pins.find(x => x.id === id)
+    if (pin) setSelected(pin)
+  }, [pins])
+
+  // Every handoff off this map goes through here, so every one of them comes back to it.
+  const handOff = useCallback((go, pinId = null) => {
+    returnSnapshot = {
+      region, selectedKeys: [...selectedKeys], openNow, routesMode,
+      routeId: selectedRoute?.id ?? null, panelScrollY: panelScrollY.current, pinId,
+      walkNext: walk ? walk.next : null, follow,
+    }
+    go()
+  }, [region, selectedKeys, openNow, routesMode, selectedRoute, walk, follow])
 
   const index = useMemo(() => {
     const idx = new Supercluster(CLUSTER_OPTS)
@@ -375,11 +630,26 @@ export default function ExploreMapScreen({
         ref={mapRef}
         style={s.map}
         initialRegion={initialRegion}
-        showsUserLocation={!!userLocation}
+        // In walk mode the dot follows the walk's own permission, never asks for it: on iOS
+        // showsUserLocation alone would raise the permission prompt.
+        showsUserLocation={locateOn ? (locGranted || walkStatus === 'granted') : (!!userLocation || (!!walk && walkStatus === 'granted'))}
+        showsMyLocationButton={false}
+        onPanDrag={walking && follow ? () => setFollow(false) : undefined}
         onRegionChangeComplete={setRegion}
         onPress={() => setSelected(null)}
       >
-        {clusters.map(c => {
+        {routesMode && (
+          <RouteOverlay
+            routes={routes}
+            selected={selectedRoute}
+            lang={lang}
+            walkNext={walk ? walk.next : null}
+            liveLeg={walk && liveLeg?.toId === liveTarget?.id ? liveLeg.coords : null}
+            onSelectRoute={openRoute}
+            onSelectStop={p => handOff(() => onSelectPlace?.(p))}
+          />
+        )}
+        {!routesMode && clusters.map(c => {
           if (c.properties.cluster) {
             return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} onPress={expandCluster} />
           }
@@ -400,12 +670,61 @@ export default function ExploreMapScreen({
         sources={sources}
         selectedKeys={selectedKeys}
         onToggle={toggleSource}
-        onAll={() => { setSelected(null); setSelectedKeys(new Set()) }}
+        onAll={() => { setSelected(null); leaveRoutes(); setSelectedKeys(new Set()) }}
         openNow={openNow}
         canOpenNow={canOpenNow}
-        onOpenNow={() => { setSelected(null); setOpenNow(v => !v) }}
+        onOpenNow={() => { setSelected(null); leaveRoutes(); setOpenNow(v => !v) }}
+        showRoutes={showRoutesChip}
+        routesMode={routesMode}
+        onRoutes={() => (routesMode ? leaveRoutes() : enterRoutes())}
         lang={lang}
       />
+
+      {locateOn && (
+        <View style={s.locateWrap} pointerEvents="box-none">
+          {walking && !follow && walkStatus === 'granted' && (
+            <TouchableOpacity style={s.recenterPill} onPress={recenter} activeOpacity={0.85}>
+              <Ionicons name="navigate" size={14} color="#fff" />
+              <Text style={s.recenterText}>{t('locateRecenter', lang)}</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[s.locateBtn, walking && follow && s.locateBtnOn]} onPress={locateMe}
+            activeOpacity={0.85} accessibilityRole="button"
+            accessibilityLabel={walking ? t('locateRecenter', lang) : t('locateMe', lang)}>
+            {locating
+              ? <ActivityIndicator size="small" color={ROUTE_COLOR} />
+              : <Ionicons name={walking ? 'navigate' : 'locate'} size={20} color={walking && follow ? '#fff' : ROUTE_COLOR} />}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {routesMode && (selectedRoute && walk
+        ? <WalkPanel
+            route={selectedRoute}
+            lang={lang}
+            walk={walk}
+            pos={walkPos}
+            status={walkStatus}
+            onPrev={() => stepWalk(-1)}
+            onNext={() => stepWalk(1)}
+            onEnd={endWalk}
+            onSelectStop={p => handOff(() => onSelectPlace?.(p))}
+          />
+        : selectedRoute
+        ? <RoutePanel
+            key={selectedRoute.id}
+            route={selectedRoute}
+            lang={lang}
+            maxHeight={Math.round(height * 0.55)}
+            review={review}
+            onClose={closeRoute}
+            onSelectStop={p => handOff(() => onSelectPlace?.(p))}
+            onStart={startWalk}
+            initialScrollY={panelScrollY.current}
+            onScrollY={y => { panelScrollY.current = y }}
+          />
+        : <RoutePicker routes={routes} lang={lang} error={routesError} onSelectRoute={openRoute} />
+      )}
 
       {loading && (
         <View style={s.loading} pointerEvents="none">
@@ -421,12 +740,12 @@ export default function ExploreMapScreen({
           onViewProfile={() => {
             const pin = selected
             setSelected(null)
-            if (pin.kind === 'place') { onSelectPlace?.(pin.row); return }
-            if (pin.kind === 'pethotel') { onSelectPetHotel?.(pin.row); return }
+            if (pin.kind === 'place') { handOff(() => onSelectPlace?.(pin.row), pin.id); return }
+            if (pin.kind === 'pethotel') { handOff(() => onSelectPetHotel?.(pin.row), pin.id); return }
             // Health keeps the claimed / unclaimed split the tab has always had: an
             // unclaimed facility has no provider and opens the unclaimed sheet instead.
-            if (pin.row.provider_id) onSelectFacility?.(pin.row)
-            else onSelectUnclaimed?.(pin.row)
+            if (pin.row.provider_id) handOff(() => onSelectFacility?.(pin.row), pin.id)
+            else handOff(() => onSelectUnclaimed?.(pin.row), pin.id)
           }}
         />
       )}
@@ -439,7 +758,9 @@ const ch = StyleSheet.create({
   barContent: { paddingHorizontal: 12, gap: 8, flexDirection: 'row', alignItems: 'center' },
   chip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1.5, borderColor: colors.border, ...shadow },
   dot:        { width: 8, height: 8, borderRadius: 4 },
-  label:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
+  // ellipsizeSlack: RN ellipsizes on EQUALITY — 'Kültürel Miras' needed exactly its box
+  // (89.6dp) and painted 'Kültürel Mir…' (dev text audit, 2026-09-24). See constants/theme.js.
+  label:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, ...ellipsizeSlack },
   count:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 })
 
@@ -466,6 +787,14 @@ const s = StyleSheet.create({
   segTextActive: { color: '#fff' },
 
   container:     { flex: 1 },
+  // Below the chip bar and the map/list control, clear of every bottom panel.
+  locateWrap:    { position: 'absolute', top: 100, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 6 },
+  locateBtn:     { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.cardBg,
+                   alignItems: 'center', justifyContent: 'center', ...shadow },
+  locateBtnOn:   { backgroundColor: ROUTE_COLOR },
+  recenterPill:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 36,
+                   borderRadius: 18, backgroundColor: ROUTE_COLOR, ...shadow },
+  recenterText:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
   map:           { flex: 1 },
   loading:       { position: 'absolute', top: 66, alignSelf: 'center', backgroundColor: colors.cardBg, borderRadius: 20, padding: 10, ...shadow },
   card:          { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: colors.cardBg, borderRadius: 20, padding: 16, ...shadow },

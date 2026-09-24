@@ -44,31 +44,38 @@ export function uvLevel(index) {
   return           { key: 'uvExtreme',  color: '#9333EA', warn: true  }
 }
 
-export function weatherIcon(code) {
-  if (code === 0)  return '☀️'
-  if (code <= 2)   return '🌤️'
-  if (code === 3)  return '☁️'
-  if (code <= 48)  return '🌫️'
-  if (code <= 55)  return '🌦️'
-  if (code <= 65)  return '🌧️'
-  if (code <= 75)  return '❄️'
-  if (code <= 82)  return '🌦️'
-  if (code <= 99)  return '⛈️'
-  return '🌡️'
+// ─── Weather: MET Norway symbol → our icon and label ────────────────────────
+// The weather Edge Function returns MET's BASE symbol code (the _day/_night suffix is
+// stripped server-side). Every one of MET's 41 codes lands in one of the nine groups the
+// app always showed. Labels are i18n KEYS, looked up through WEATHER_LABEL_KEY — until
+// 2026-09-24 they were hardcoded English in every locale, invisible to the i18n scan.
+// MET has no drizzle class; its lightest rain maps to the drizzle group.
+export function weatherGroup(symbol) {
+  const s = typeof symbol === 'string' ? symbol : ''
+  if (!s) return 'unknown'
+  if (s.includes('thunder')) return 'thunder'
+  if (s.includes('snow') || s.includes('sleet')) return 'snow'
+  if (s.includes('rainshowers')) return 'showers'
+  if (s === 'lightrain') return 'drizzle'
+  if (s.includes('rain')) return 'rain'
+  if (s === 'fog') return 'fog'
+  if (s === 'cloudy') return 'overcast'
+  if (s === 'fair' || s === 'partlycloudy') return 'partlyCloudy'
+  if (s === 'clearsky') return 'clear'
+  return 'unknown'
 }
 
-export function weatherDesc(code) {
-  if (code === 0)  return 'Clear sky'
-  if (code <= 2)   return 'Partly cloudy'
-  if (code === 3)  return 'Overcast'
-  if (code <= 48)  return 'Foggy'
-  if (code <= 55)  return 'Drizzle'
-  if (code <= 65)  return 'Rainy'
-  if (code <= 75)  return 'Snow'
-  if (code <= 82)  return 'Rain showers'
-  if (code <= 99)  return 'Thunderstorm'
-  return 'Unknown'
+const WEATHER_ICON = {
+  clear: '☀️', partlyCloudy: '🌤️', overcast: '☁️', fog: '🌫️', drizzle: '🌦️',
+  rain: '🌧️', snow: '❄️', showers: '🌦️', thunder: '⛈️', unknown: '🌡️',
 }
+export const WEATHER_LABEL_KEY = {
+  clear: 'weatherClear', partlyCloudy: 'weatherPartlyCloudy', overcast: 'weatherOvercast',
+  fog: 'weatherFog', drizzle: 'weatherDrizzle', rain: 'weatherRain', snow: 'weatherSnow',
+  showers: 'weatherShowers', thunder: 'weatherThunder', unknown: 'weatherUnknown',
+}
+export const weatherIcon = symbol => WEATHER_ICON[weatherGroup(symbol)]
+export const weatherLabelKey = symbol => WEATHER_LABEL_KEY[weatherGroup(symbol)]
 
 export function isAvailableToday(availability) {
   if (!availability?.schedule) return false

@@ -1,0 +1,247 @@
+{
+ "_readme": "MapHub feature id -> OUR place_id, for the 22 Visit NCY stops we already had. The importer NEVER writes to these rows (not even source/source_id); Slice 2 links route stops through this file. reviewed_place_ids = the 42 places recon adjudicated on 2026-09-23. The importer refuses to insert a new stop within 150 m of any place NOT in this list, because nobody has looked at that pair.",
+ "matches": [
+  {
+   "maphub_id": 66248032,
+   "place_id": "1100ad4c-a412-4528-b96d-c2543fd23b25",
+   "maphub_title": "The Büyük (Great) Khan / Büyük Han",
+   "place_name": "Büyük Han (Great Inn)",
+   "dist_m": 30.4,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 257701315,
+   "place_id": "8b00fc3e-bb46-4827-b52d-b1b85e692025",
+   "maphub_title": "The Cyprus House & Carob Warehouse / Kıbrıs Evi & Harnup Deposu",
+   "place_name": "Cyprus House & Carob Store Museum",
+   "dist_m": 30.7,
+   "name_sim": 0.71,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 280998293,
+   "place_id": "e78e6e44-c9d0-4090-ab15-02cb63b9d36c",
+   "maphub_title": "Namık Kemal Dungeon/Zindanı",
+   "place_name": "Namık Kemal Museum & Dungeon",
+   "dist_m": 5.5,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 1086507139,
+   "place_id": "9abee5c9-0d44-4a34-abef-04e3260151d1",
+   "maphub_title": "Othello Castle/Kalesi",
+   "place_name": "Othello Castle",
+   "dist_m": 2.7,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 1114957797,
+   "place_id": "927c7f65-1fd4-43b0-b87c-b77206435e4d",
+   "maphub_title": "Bedesten (St. Nicholas Church) & Museum of Cyprus Turkish and Islamic Art / Bedesten  (St. Nicholas Kilisesi) & Kıbrıs Türk&İslam Eserleri Müzesi",
+   "place_name": "Bedesten",
+   "dist_m": 7.5,
+   "name_sim": 0.9,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 1480259603,
+   "place_id": "8283f858-f93f-4419-9f8d-a88fc99602cd",
+   "maphub_title": "Canbulat Tomb and Museum/Türbesi ve Müzesi - Arsenal Bastion/Tabyası",
+   "place_name": "Canbulat Museum",
+   "dist_m": 16.0,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 1713021986,
+   "place_id": "7c4b6683-85aa-4449-b066-bae7ad7306d2",
+   "maphub_title": "Girne (Kyrenia) Gate / Girne Kapısı",
+   "place_name": "Kyrenia Gate",
+   "dist_m": 17.7,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 1777502683,
+   "place_id": "bba0d5cb-001a-405f-ab9d-9913d83e10a3",
+   "maphub_title": "The Museum of Barbarism / Barbarlık Müzesi",
+   "place_name": "Museum of Barbarism",
+   "dist_m": 9.0,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 1791251074,
+   "place_id": "fe916273-78d3-4280-ae1d-8a72eb5cd09c",
+   "maphub_title": "The National Struggle Museum / Milli Mücadele Müzesi",
+   "place_name": "National Struggle Museum",
+   "dist_m": 17.5,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 2012144406,
+   "place_id": "8a90025d-70ce-4cb4-baa8-31c40a131f44",
+   "maphub_title": "The Eaved House / Saçaklı Ev",
+   "place_name": "Saçaklı House",
+   "dist_m": 20.2,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 2349481603,
+   "place_id": "5c0d21e5-2f1b-4ea9-8a3d-3c9f67dd7d57",
+   "maphub_title": "Lapidary Museum / Ortaçağ Taş Eserler Müzesi",
+   "place_name": "Lapidary Museum",
+   "dist_m": 13.4,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 2489439470,
+   "place_id": "2c20f82e-1ee1-4c9b-9fdc-f59be72da470",
+   "maphub_title": "Panaghia Theodokou Church & Icon Museum/Kilisesi ve İkon Müzesi",
+   "place_name": "İskele Icon Museum (Panagia Theotokos)",
+   "dist_m": 5,
+   "name_sim": 0.9,
+   "method": "OSM way 412174829; our pin was 1174 m off, corrected by 20261045"
+  },
+  {
+   "maphub_id": 2520244132,
+   "place_id": "2532c8db-14ec-4aa7-a949-abfa7c49e735",
+   "maphub_title": "Ravelin(Akkule)/Rivettina Tabyası",
+   "place_name": "Akkule (Ravelin Bastion)",
+   "dist_m": 49.8,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 2548866694,
+   "place_id": "d2403dda-2a30-4e96-bb3a-b1f90249284b",
+   "maphub_title": "Iskele Archaeology Museum / Arkeoloji Müzesi",
+   "place_name": "İskele Archaeological Museum",
+   "dist_m": 27.6,
+   "name_sim": 0.9,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 2638718206,
+   "place_id": "a95ec495-c1a0-4732-b3dd-55dee1d73351",
+   "maphub_title": "Archangelos Michael Church and Icon Museum/Kilisesi ve İkon Müzesi",
+   "place_name": "Archangelos Michael Icon Museum",
+   "dist_m": 11.1,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 2677132290,
+   "place_id": "af3e1e9d-8563-4087-a00e-58a8905a631c",
+   "maphub_title": "The Dervis Pasha Mansion / Derviş Paşa Konağı",
+   "place_name": "Dervish Pasha Mansion",
+   "dist_m": 15.3,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 2842229211,
+   "place_id": "e4b80e27-45fc-47e1-85d5-97da373cfd11",
+   "maphub_title": "Mevlevi Tekke Museum/Müzesi",
+   "place_name": "Mevlevi Tekke Museum",
+   "dist_m": 17.2,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 3007565083,
+   "place_id": "9f14da0c-e9a2-4489-81e2-20973b662942",
+   "maphub_title": "St. Mamas Monastery & Icon Museum / St. Mamas Manastırı & İkon Müzesi",
+   "place_name": "St. Mamas Church & Güzelyurt Museum",
+   "dist_m": 102.0,
+   "name_sim": 0.9,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 3627103014,
+   "place_id": "7ecf2c84-2192-45c9-b075-a2ce115f842c",
+   "maphub_title": "Kyrenia Castle & Shipwreck Museum/Girne Kalesi ve Batık Gemi Müzesi",
+   "place_name": "Kyrenia Castle",
+   "dist_m": 17,
+   "name_sim": 0.9,
+   "method": "OSM way 154898919; our pin was 438 m off, corrected by 20261045"
+  },
+  {
+   "maphub_id": 3800750551,
+   "place_id": "6bcd83da-4b7d-43f1-9629-98ebd2bc6bf2",
+   "maphub_title": "Lusignan House / Lüzinyan Evi",
+   "place_name": "Lusignan House",
+   "dist_m": 12.4,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 4142776868,
+   "place_id": "aa7c1674-fd80-4d41-b242-ff41da225990",
+   "maphub_title": "The Selimiye Mosque (St. Sophia Cathedral) / Selimiye Camii (St. Sophia Katedrali)",
+   "place_name": "Selimiye Mosque",
+   "dist_m": 5.1,
+   "name_sim": 1.0,
+   "method": "recon-v5 (name + distance)"
+  },
+  {
+   "maphub_id": 4291375664,
+   "place_id": "6169028b-2497-4d86-8ed1-7b4598af0122",
+   "maphub_title": "Railway Museum / Tren İstasyonu Müzesi",
+   "place_name": "Güzelyurt Railway Station Museum",
+   "dist_m": 19.9,
+   "name_sim": 0.9,
+   "method": "recon-v5 (name + distance)"
+  }
+ ],
+ "reviewed_place_ids": [
+  "1100ad4c-a412-4528-b96d-c2543fd23b25",
+  "1ed9139d-453c-4eba-948b-b8431487c9f0",
+  "204d484c-8297-46e3-8306-38bfe0beb3c2",
+  "2392247c-9cd3-446a-8eeb-588fdd9ea50a",
+  "2532c8db-14ec-4aa7-a949-abfa7c49e735",
+  "28f69a7c-48f1-4a51-b84e-37beda5e29b8",
+  "2c20f82e-1ee1-4c9b-9fdc-f59be72da470",
+  "328fad9c-9da7-4273-a638-1682de89da39",
+  "39e93795-834b-4ced-bc6d-7890ad96a6a5",
+  "4a29cce8-8c3a-4541-8a07-fc7ceda6a4ff",
+  "4c340455-f0af-4d1a-88c6-e6cfdc41c978",
+  "527a51da-a39e-49ff-a2d3-ac07ca3591ad",
+  "5c0d21e5-2f1b-4ea9-8a3d-3c9f67dd7d57",
+  "6169028b-2497-4d86-8ed1-7b4598af0122",
+  "6bcd83da-4b7d-43f1-9629-98ebd2bc6bf2",
+  "7c4b6683-85aa-4449-b066-bae7ad7306d2",
+  "7ecf2c84-2192-45c9-b075-a2ce115f842c",
+  "7edf6c7d-9bd2-4617-afdc-af1a3443d3e6",
+  "8283f858-f93f-4419-9f8d-a88fc99602cd",
+  "88def13a-3ee3-4c3b-bb7b-56bf15f27f33",
+  "8934e983-8eb2-4aa8-9a63-cf0db461dfa6",
+  "8a90025d-70ce-4cb4-baa8-31c40a131f44",
+  "8b00fc3e-bb46-4827-b52d-b1b85e692025",
+  "8cd3a581-7980-4011-b55e-60ab7cf66daa",
+  "927c7f65-1fd4-43b0-b87c-b77206435e4d",
+  "95b6d924-e3c0-40e4-a2bd-b55ca1a105ef",
+  "975f0204-4007-421a-9dce-d85d7ad9b5be",
+  "9abee5c9-0d44-4a34-abef-04e3260151d1",
+  "9f14da0c-e9a2-4489-81e2-20973b662942",
+  "a95ec495-c1a0-4732-b3dd-55dee1d73351",
+  "aa7c1674-fd80-4d41-b242-ff41da225990",
+  "af3e1e9d-8563-4087-a00e-58a8905a631c",
+  "b52cdf3a-ce3f-4e6f-88b8-57afb95f2e67",
+  "bba0d5cb-001a-405f-ab9d-9913d83e10a3",
+  "c83ed380-27a9-4c3d-abf0-859e09a0a5bf",
+  "d1d9761c-a9e8-4f62-8b3b-4c0b6b8fdf7c",
+  "d2403dda-2a30-4e96-bb3a-b1f90249284b",
+  "d773e658-95ac-48ba-ae53-5936374a976f",
+  "e4b80e27-45fc-47e1-85d5-97da373cfd11",
+  "e78e6e44-c9d0-4090-ab15-02cb63b9d36c",
+  "fa39492b-57e6-4ebd-b22c-89a9cf20ffe2",
+  "fe916273-78d3-4280-ae1d-8a72eb5cd09c"
+ ]
+}

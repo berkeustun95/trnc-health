@@ -1,8 +1,8 @@
-import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, Modal, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
-import { uvLevel, weatherIcon, weatherDesc } from '../../utils/facilityUtils'
+import { uvLevel, weatherIcon, weatherLabelKey } from '../../utils/facilityUtils'
 
 // Everything the V1 weather card showed when expanded, moved behind the hero's
 // temperature pill.
@@ -35,7 +35,7 @@ export default function WeatherSheet({ visible, weatherData, lang, locale, onClo
           </View>
 
           {/* No `cur` is a normal state, not an error: App.js swallows a failed
-              open-meteo fetch and leaves weatherData null. The hero hides its
+              weather call and leaves weatherData null. The hero hides its
               temperature pill in that case, so this sheet is unreachable — but it
               renders a truthful empty rather than crashing if it is ever opened
               another way. */}
@@ -44,9 +44,9 @@ export default function WeatherSheet({ visible, weatherData, lang, locale, onClo
           ) : (
             <>
               <View style={s.nowRow}>
-                <Text style={s.nowEmoji}>{weatherIcon(cur.weather_code)}</Text>
+                <Text style={s.nowEmoji}>{weatherIcon(cur.symbol)}</Text>
                 <Text style={s.nowTemp}>{Math.round(cur.temperature_2m)}°C</Text>
-                <Text style={s.nowDesc} numberOfLines={1}>{weatherDesc(cur.weather_code)}</Text>
+                <Text style={s.nowDesc} numberOfLines={1}>{t(weatherLabelKey(cur.symbol), lang)}</Text>
                 <View style={{ flex: 1 }} />
                 {uv && (
                   <View style={[s.uvBadge, { backgroundColor: uv.color }]}>
@@ -73,7 +73,7 @@ export default function WeatherSheet({ visible, weatherData, lang, locale, onClo
                     return (
                       <View key={date} style={s.day}>
                         <Text style={s.dayLabel}>{label}</Text>
-                        <Text style={s.dayIcon}>{weatherIcon(daily.weather_code[i])}</Text>
+                        <Text style={s.dayIcon}>{weatherIcon(daily.symbol[i])}</Text>
                         <Text style={s.dayMax}>{Math.round(daily.temperature_2m_max[i])}°</Text>
                         <Text style={s.dayMin}>{Math.round(daily.temperature_2m_min[i])}°</Text>
                       </View>
@@ -81,6 +81,7 @@ export default function WeatherSheet({ visible, weatherData, lang, locale, onClo
                   })}
                 </View>
               )}
+              <WeatherCredit lang={lang} style={{ marginTop: 16 }} />
             </>
           )}
         </View>
@@ -89,7 +90,23 @@ export default function WeatherSheet({ visible, weatherData, lang, locale, onClo
   )
 }
 
+// MET Norway's data is CC BY 4.0 / NLOD: credit, a link to the licence, and a note that we
+// changed it (the timeseries is aggregated into "now" and four days). Wherever weather is
+// shown in full; the hero's temperature pill opens this sheet, so it is one tap from there.
+const MET_LICENCE_URL = 'https://api.met.no/doc/License'
+export function WeatherCredit({ lang, style }) {
+  return (
+    <TouchableOpacity onPress={() => Linking.openURL(MET_LICENCE_URL).catch(() => {})}
+      activeOpacity={0.7} accessibilityRole="link" style={[s.credit, style]}>
+      <Text style={s.creditText}>{t('weatherCredit', lang)}</Text>
+      <Ionicons name="open-outline" size={11} color={colors.textSecondary} />
+    </TouchableOpacity>
+  )
+}
+
 const s = StyleSheet.create({
+  credit:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  creditText: { flexShrink: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   backdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:      { backgroundColor: colors.cardBg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, paddingBottom: 34 },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },

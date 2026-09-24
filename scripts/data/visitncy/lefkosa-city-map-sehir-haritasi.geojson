@@ -1,0 +1,622 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": 906744549,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.36092,
+     35.18121
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "fryqruvkqhna0flm",
+     "w": 555,
+     "h": 400,
+     "tip_color": "#222427",
+     "avg_color": "#666f6b",
+     "caption": null
+    },
+    "title": "Venetian City Walls / Venedik Surları",
+    "description": "Direction\nhttps://goo.gl/maps/seSsp4n4tU7bdZ147\n\nThe Venetian city walls which surround the Old City of Lefkoşa today are a beautiful historic site to see. Built in the Lusignan period, the structure of the Lefkoşa city walls was thinner and longer than they are at present. The stones from that period were used by the Venetians in the construction of the present city walls in order to protect the inhabitants from an expected Ottoman conquest. The city walls have 3 entrance gates and 11 bastions, the latter named after the Venetian commanders who defended the city against Ottomans.\n\n...\n\nBugün Eski Lefkoşa şehrini çevreleyen Venedik surları, görülmesi gereken güzel bir tarihi eserdir. Lüzinyanlar döneminde inşa edilen Lefkoşa surlarının yapısı günümüze göre daha ince ve uzundu. O döneme ait taşlar, Venedikliler tarafından şehri olası bir Osmanlı fethinden korumak için mevcut surların yapımında kullanılmıştır. Surların 3 giriş kapısı ve adını şehri Osmanlılara karşı savunan Venedikli komutanlardan alan 11 burcu bulunmaktadır.\n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/eski-sehir-surlari/",
+    "url": "https://www.visitncy.com/tr/kesfet/eski-sehir-surlari/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 1713021986,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.361802,
+     35.181641
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "eekcmmcd4xeotwje",
+     "w": 555,
+     "h": 400,
+     "tip_color": "#726970",
+     "avg_color": "#908874",
+     "caption": null
+    },
+    "title": "Girne (Kyrenia) Gate / Girne Kapısı",
+    "description": "Direction\nhttps://goo.gl/maps/ruXxyfdr8MbPoQx9A\n\nGirne Gate is one of the three original gates in the North part of the city walls built in the Venetian period, allowing entrance into Lefkoşa. The gate was built in 1562 and named the Porta Del Proveditore after the Venetian military engineer Proveditore Francesco Barbaro. A small domed watchtower was added to the top of the gate in 1821. The gate has inscriptions from the Venetian and Ottoman periods on its walls. In 1931, during the British colonial period, sections of the wall on both sides were removed to allow for traffic movement.\n\n...\n\nGirne Kapısı, Venedik döneminde inşa edilen surların kuzey kısmında yer alan ve Lefkoşa'ya girişi sağlayan üç ana kapıdan biridir. Kapı 1562 yılında inşa edilmiş ve Venedikli askeri mühendis Proveditore Francesco Barbaro'dan esinlenerek Porta Del Proveditore adını almıştır. Kapının üzerine 1821 yılında kubbeli küçük bir gözetleme kulesi eklenmiştir. Kapının duvarlarında Venedik ve Osmanlı dönemlerine ait kitabeler bulunmaktadır. 1931 İngiliz sömürge döneminde, trafiği kolaylaştırmak amacıyla kapının  her iki tarafındaki bölümleri kaldırıldı.\n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/girne-kapisi/",
+    "url": "https://www.visitncy.com/tr/kesfet/girne-kapisi/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2842229211,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.361888,
+     35.180844
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/xPftU9yVwKrzhX3i6\n\nIn Ottoman times, the Mevlevi Tekke was the meeting place of the important social and cultural order - the Mevlevi - founded by the poet Mevlana Celaleddin Rumi. The Order came to Cyprus with Anatolian people when the island was conquered by the Ottomans in 1571. The lodge was built in the early years of the 17th century as the Arap Ahmet Pasha and Ferhat Pasha Lodges. Originally there was a semahane (place for the whirling dervishes or semazen) where devotees constantly whirled and meditated, getting closer to God. There was also a tomb room, rooms for the dervishes, a kitchen and guest rooms. Now only the semahane and the tomb room survive, and the lodge is now an ethnographic museum.\n\n...\n\nOsmanlı döneminde kurulan Mevlevi Tekkesi, sosyal ve kültürel düzenin yani Mevleviliğin bir araya gelme yeriydi. Şair Mevlâna Celaleddin Rumi tarafından oluşturulan Mevlevilik, Kıbrıs’ın 1571 yılında fethedilmesiyle Anadolu’dan gelen tarikat üyeleri tarafından adaya getirilmiştir.  Tekke 17. yüzyılın ilk yıllarında Arap Ahmet Paşa ve Ferhat Paşa tekkeleri olarak inşa edilmiştir. Başlangıçta tekkede Mevlevilerin sürekli dönerek Tanrı’ya yaklaştıkları bir semahane, bir türbe odası, dervişler için odalar, mutfak ve misafir odaları bulunmaktaydı. Günümüzde geriye sadece semahane ve türbe odası kalmış olup, yapı etnografya müzesi olarak hizmet vermektedir.\n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/mevlevi-tekke-muzesi/",
+    "image": {
+     "id": "8abgu01uz7frbh5a",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#e4ddcc",
+     "avg_color": "#8c897f",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "Mevlevi Tekke Museum/Müzesi"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2440853315,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.361626,
+     35.180134
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/RKuUSAySy7RHh1wc6\n\nDr. Fazıl Kücük was the leader of the Turkish Cypriots during their struggle for independence. He was born in Nicosia in 1906 and died on 15 January 1984. The house where he used to live, has been transformed into the first private museum in North Cyprus. The two storey building, built in the 1920s from cut stone, was both Dr. Küçük's home but also his Clinic. The museum exhibits both photos of Dr. Küçük as well as his belongings.\n\n...\n\nDr. Fazıl Küçük, Kıbrıs Türklerinin bağımsızlık mücadelesi sırasındaki lideriydi. 1906'da Lefkoşa'da doğdu, 15 Ocak 1984'te öldü. Eskiden yaşadığı ev, Kuzey Kıbrıs'ın ilk özel müzesine dönüştürüldü. 1920'li yıllarda kesme taştan yapılan iki katlı bina Dr. Küçük'ün hem evi hem de Kliniği idi. Müzede Dr. Küçük'ün hem fotoğrafları hem de kişisel eşyaları sergileniyor.",
+    "image": {
+     "id": "dkitltz7txx02wir",
+     "w": 640,
+     "h": 418,
+     "tip_color": "#d4d8db",
+     "avg_color": "#7c7766",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "Dr. Fazıl Küçük Museum / Müzesi"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2025036881,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.360756,
+     35.180032
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/Smtkgrm4hvxJotVo9\n\nThe first social housing project in Cyprus, located in the Samanbahce Quarter, were built on land owned by the Şaban Pasha Foundation between 1918 and 1925. The project consists of 70 terraced houses, and were built in nine groups on rubble stone foundation, bonded with mud walls. The door numbers of the houses are written in old Turkish language. The hexagonal fountain located in the centre of the quarter used to be its water supply.\n\n...\n\nKıbrıs'ın ilk toplu konut projesi olarak, 1918-1925 yılları arasında Samanbahçe Mahallesi'nde, Şaban Paşa Vakfı'na ait arazi üzerine  inşa edilmiştir. 70 teraslı evden oluşan proje, kerpiç duvarlarla örülmüş moloz taş temel üzerine dokuz grup halinde inşa edilmiştir. Evlerin kapı numaraları eski Türkçe ile yazılmıştır. Mahallenin merkezinde yer alan altıgen şadırvan ise mahallenin su kaynağıydı.",
+    "image": {
+     "id": "alk8skxnlda8g3vv",
+     "w": 1024,
+     "h": 768,
+     "tip_color": "#6e5946",
+     "avg_color": "#716b60",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "The Samanbahce Quarter / Evleri"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3885869001,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.360524,
+     35.178465
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/FQxoz9EsmPRakDm5A\n\nThe buildings used as public offices in Atatürk Square (Sarayönü) were built in 1901, on the site of the last Lusignan Palace, during the British Colonial period. They were made of cut yellow sandstone. There is a platform next to the fountain on the corner of the buildings looking to the east side that carries the British Royal coat of arms, which was built in memory of the Coronation of Queen Elizabeth II in 1953.\n\n...\n\nAtatürk Meydanı'nda (Sarayönü) devlet dairesi olarak kullanılan binalar, 1901 İngiliz Sömürge döneminde, son Lüzinyan Sarayı'nın yerine inşa edilmiş ve  kesilmiş sarı kumtaşından inşa edilmiştir. Binaların doğuya bakan köşesinde, 1953 yılında Kraliçe II. Elizabeth'in taç giyme töreni anısına inşa edilmiş İngiliz Kraliyet armasını taşıyan bir platform var.",
+    "image": {
+     "id": "f7jet4qfeuu9dnxl",
+     "w": 680,
+     "h": 463,
+     "tip_color": "#4b4756",
+     "avg_color": "#6d6c7a",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "The British Colonial Law Courts / İngiliz Koloni Dönemi Mahkemeleri"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3075399680,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.360944,
+     35.178107
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "mpde47wfyfc3knt2",
+     "w": 2000,
+     "h": 1333,
+     "tip_color": "#59626e",
+     "avg_color": "#56778b",
+     "caption": null
+    },
+    "title": "Venetian Column / Venedik Sütunu",
+    "description": "Direction\nhttps://goo.gl/maps/8X7gTPVZJcHUu2Ht6\n\nThe granite Venetian Column, as it is called, is located in the centre of Atatürk square, locally known as Sarayönü. During the Ottoman period, it was called Konak Square after the governor's mansion, more popularly known as the saray (palace), which stood in the southwest. In 1489, the column was moved from Salamis to Nicosia as a tribute to Venetian rule in Cyprus. On top of the granite column was a carving of the lion of St. Mark, and at the bottom were the coats of arms of noble Venation families. The Ottomans removed the lion and toppled the column in 1570. They left it in the courtyard of the Sarayönü Mosque (Carmelite Church). In 1915, while at war with the Ottoman Empire, the column was re-erected by the British by replacing the lost St. Mark lion with a bronze orb. \n\n...\n\nVenedik Sütunu, yerel olarak Sarayönü meydanı olarak bilinen Atatürk meydanının merkezinde yer almaktadır. Sarayönü meydanı Osmanlı döneminde meydanın güneybatısında bulunan vali konağından dolayı Konak Meydanı olarak anılmaktaydı. 1489'da sütun, Kıbrıs'taki Venedik hakimiyetinin bir sembolü olarak Salamis'ten Lefkoşa'ya taşındı. Granit sütunun üzerinde Aziz Mark aslanı ve altta Venedik soylu ailelerinin armaları bulunmaktaydı. Osmanlılar 1570'de Aziz Mark aslanı sütün üzerinden alıp, sütunu Sarayönü meydanından kaldırdılar. Onu Sarayönü camiinin (Karmelit kilisesi) avlusuna bıraktılar. Sütun, 1915'te Osmanlı İmparatorluğu ile savaş halinde olan İngilizler tarafından kaybolan St.Mark aslanının yerine bronz bir küre yerleştirerek yeniden dikildi.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/the-venetian-column/",
+    "url": "https://www.visitncy.com/tr/kesfet/the-venetian-column/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 756507278,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.358027,
+     35.177061
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "cndfmjuttuegvxdc",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#181916",
+     "avg_color": "#646f6c",
+     "caption": null
+    },
+    "title": "The Arabahmet Mosque / Arabahmet Camii",
+    "description": "Direction\nhttps://goo.gl/maps/LRQZUb7G6QFJEuQQA\n\nBuilt in 1845, the Arabahmet Mosque, in the Arabahmed Quarter of Lefkoşa, is a fine example of well-preserved classical Ottoman architecture. It is named after one of the conquerors of Cyprus, Arap Ahmet Pasha. The mosque reflects the style of the 16th century. It was built of cut stone, has a rectangular main hall covered with a hemisphere shaped dome and three smaller domes over the congregation area. Some of the important Ottoman Pashas like Cypriot Kamil Pasha and Ishak Pasha are buried in the graveyard of the Mosque.\n\n...\n\nLefkoşa'nın Arabahmet semtinde 1845 yılında yaptırılan Arabahmet cami, iyi korunmuş klasik Osmanlı mimarisinin güzel bir örneğidir. Adını Kıbrıs fatihi Arap Ahmet Paşa'dan almıştır. Cami 16. yüzyıl tarzını yansıtmaktadır. Kesme taştan yapılmış binada, yarım küre biçimli bir kubbe ile örtülü dikdörtgen bir ana salon ve cemaatin toplanma alanı üzerinde daha küçük üç kubbe bulunuyor. Kıbrıslı Kamil Paşa ve İshak Paşa gibi önemli Osmanlı paşalarından bazıları caminin mezarlığına defnedilmiştir.\n\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/arabahmet-camii/",
+    "url": "https://www.visitncy.com/tr/kesfet/arabahmet-camii/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2677132290,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.358578,
+     35.176418
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "9wesll4ihjkh9rd9",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#a1968b",
+     "avg_color": "#74765b",
+     "caption": null
+    },
+    "title": "The Dervis Pasha Mansion / Derviş Paşa Konağı",
+    "description": "Direction\nhttps://goo.gl/maps/5SHFf9qvCihRhQEy9\n\nThe two-storied building was built in the 19th century and was home to Derviş Pasha, the publisher of 'Zaman' newspaper, the first Turkish newspaper in Cyprus. Although the mansion's exact construction date is not known, but on the keystone above the main entrance door is inscribed, as building date, the year 1216 H ('H' means the muslim calendar and date is equivalent to 1801-1802) on the ornamented ceiling of the principal chamber, which is clearly an addition to the original house, we find date 1869. Now an Ethnographic Museum, the mansion which is located in the Arabahmet Quarter, was built as an 'L'shape with the downstairs made of stone and the upstairs from mud brick.\n\n...\n\n19. yüzyılda inşa edilen iki katlı bina, Kıbrıs'ın ilk Türkçe gazetesi olan \"Zaman\" gazetesinin yayıncısı Derviş Paşa'nın eviydi. Konağın yapım tarihi kesin olarak bilinmemekle birlikte, ana giriş kapısının üzerindeki kemer taşında yapım tarihi olarak 1216 H (H, hicri takvime göre 1801-1802 tarihine denk gelmektedir) tarihi olarak yazılmakta, orijinal eve ek olan ana odanın süslemeli tavanında ise 1869 tarihini görüyoruz. Şimdi bir etnografya müzesi olan Arabahmet Mahallesi'nde yer alan konak, alt katı taş, üst katı kerpiçten olmak üzere \"L\" planlı olarak inşa edilmiştir.\n\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/dervis-pasa-konagi/",
+    "url": "https://www.visitncy.com/tr/kesfet/dervis-pasa-konagi/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2567252249,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.357134,
+     35.175368
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/mSLAPxbhoDkkSRXXA\n\n This historic quarter takes its name from Arap Ahmet Pasha who was a commander in the Ottoman force and served as the Governor of Cyprus between 1584 and 1587. With its narrow streets, its houses with bay windows, its doorways with low archways and wooden entablatures, the quarter attracts much attention from tourists. Most of the well-preserved houses were built in the late 19th and early 20th centuries.\n\n...\n\nBu tarihi semt, adını 1584-1587 yılları arasında Osmanlı ordusunda komutan olan ve Kıbrıs Valisi olarak görev yapan Arap Ahmet Paşa'dan alıyor. Dar sokakları, cumbalı evleri, basık kemerli kapıları ve ahşap saçaklarıyla, mahalle turistler tarafından yoğun ilgi görüyor. İyi korunmuş evlerin çoğu 19. yüzyılın sonlarında ve 20. yüzyılın başlarında inşa edilmiştir.",
+    "image": {
+     "id": "wvbad44pqfbtscvj",
+     "w": 1536,
+     "h": 2048,
+     "tip_color": "#5b5a60",
+     "avg_color": "#5e7184",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "The Arabahmet Quarter / Arabahmet Mahallesi"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 4124164353,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.358272,
+     35.174982
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/KY2Un5cbryxJaDQV6\n\nThe Nunnery located in the Arabahmet district of Lefkoşa, was built in Gothic style in the 18th and 19th centuries. While it is called the Benediction Nunnery, the church inside the Nunnery is known as the St. Mary of Tartosa-Our Lady of Tartosa. It was given to Armenians to be used as a house of worship before the Ottoman Period. After the Ottoman conquest it was used as salt storage facility. Following a request by the Armenians for its return, Sultan Selim returned it giving the church the privilege to use the title 5-15 May 1571.\n\n...\n\nLefkoşa'nın Arabahmet semtinde bulunan Rahibe Manastırı, 18. ve 19. yüzyıllarda Gotik tarzda inşa edilmiştir. Adı Benediction Rahibe Manastırı olarak anılırken, Rahibe Manastırı'nın içindeki kilise St. Mary of Tartosa- Our Lady of Tartosa olarak bilinmektedir. Osmanlı Dönemi'nden önce Ermenilere ibadethane olarak kullanılmak üzere verilmiştir. Osmanlı fethinden sonra tuz deposu olarak kullanılmıştır. Ermenilerin geri verilmesi talebi üzerine Sultan Selim, Mayıs 1571 tarihli fermanı ile  yapının kullanımını kiliseye iade etti.",
+    "image": {
+     "id": "u1kwnttnanjykbiv",
+     "w": 1280,
+     "h": 853,
+     "tip_color": "#56574d",
+     "avg_color": "#6c6c64",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "Armenian Church and Monastery / Ermeni Kilisesi ve Manastırı"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2629370949,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.361729,
+     35.176778
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "f6y5qav9stwfetbr",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#33322a",
+     "avg_color": "#757976",
+     "caption": null
+    },
+    "title": "The Büyük (Great) Hamam / Büyük Hamam",
+    "description": "Direction\nhttps://goo.gl/maps/SG2w1uNNRz9UXFCs6\n\nIt is ashlar stone built authentic ottoman period structure which was built in order to generate income for the Lala Mustafa Pasha trust. It is generally accepted that the bath was built partly with the material taken from the ruins of the Lusignan period church of St. George de Poulains. Due to the fact that road level has been raised the entrance portal and the rooms of the baths remain at a lower level than the road. The square shaped changing rooms entered from Lusignan arched portal on the northern side. The tiled wooden roof of the changing room is supported by two arches which have built on equally spaced out bases on the walls leading from east to west. \n\n...\n\nKesme taştan yapılmış otantik Osmanlı dönemi yapısı, Lala Mustafa Paşa vakfına gelir sağlamak amacıyla inşa edilmiştir. Hamamın kısmen Lüzinyan döneminden kalma St George de Poulains kilisesinin kalıntılarından alınan malzemeyle yapıldığı genel kabul görmektedir. Yolun yükseltilmesi nedeniyle hamamın giriş ve odaları yoldan daha alçakta kalmıştır. Kuzeydeki Lüzinyan kemerli portalden kare planlı soyunma odalarına girilmektedir. Soyunma odalarının kiremitli ahşap çatısı, doğudan batıya uzanan duvarlar üzerinde eşit aralıklı temeller üzerine inşa edilmiş iki kemerle desteklenmektedir.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/discover/buyuk-hamam/",
+    "url": "https://www.visitncy.com/discover/buyuk-hamam/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3684470489,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.362538,
+     35.177025
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "wsuzvs8yyutxoalb",
+     "w": 1500,
+     "h": 1000,
+     "tip_color": "#333d46",
+     "avg_color": "#5b625f",
+     "caption": null
+    },
+    "title": "The Kumarcılar (Gamblers) Khan / Kumarcılar Hanı",
+    "description": "Direction\nhttps://goo.gl/maps/2X79qRipd9ivXdjG8\n\nThe khan was built in the first quarter of the 18th century by Fuat Tüccarbaşı is also known as Himarcılar (the khan for merchant donkeys) or Gezginci Calgicilar Khan (the travelling musicians khan). The Gothic arch in the entrance gate is believed to have previously belonged to an earlier building. The two-storey building was built on a square plan and only 44 of its original 56 rooms remain. The rooms upstairs were used as bedrooms while the rooms downstairs were used as animal shelters and storage rooms.\n\n...\n\n18. yüzyılın ilk çeyreğinde Fuat Tüccarbaşı tarafından yaptırılan han, hımarcılar (Eşekli tüccarlar hanı) veya Gezginci çalgıcılar Hanı olarak da bilinir. Giriş kapısındaki gotik kemerin daha eski bir yapıya ait olduğuna inanılmaktadır. Iki katlı bina kare plan üzerine inşa edilmiş ve orijinal 56 odasından sadece 44'ü kalmıştır. Üst kattaki odalar yatak odası, alt kattaki odalar ise hayvan barınağı ve depo olarak kullanılmıştır.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/kumarcilar-hani/",
+    "url": "https://www.visitncy.com/tr/kesfet/kumarcilar-hani/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 66248032,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.362834,
+     35.176281
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "varhgmfj1cxufwwp",
+     "w": 1500,
+     "h": 1000,
+     "tip_color": "#85796a",
+     "avg_color": "#71786e",
+     "caption": null
+    },
+    "title": "The Büyük (Great) Khan / Büyük Han",
+    "description": "Direction\nhttps://goo.gl/maps/j9wxoCCktcTzMNbj9\n\nNow, home to amazing craft shops, art galleries with traditional folk an and more modem pieces, as well as cultural performances, the traditional style khan was built between 1576 and 1577 by Sinan Pasha-the 6oYemor of Cyprus (1572-1579) by demolishing the shops which Sultan Sam had built as a trust for Selimiye Mosque. It is similar to the Koza Khan in Bursa-Turkey. Built of cut yellow stone, it is the biggest Khan of this period in Cyprus. The two-storied khan contains 66 rooms and 10 shops, and was constructed on a square plan. The rooms downstairs were used as shops, storage rooms and stables, while the rooms upstairs with fireplaces were used as bedrooms. The khan has a sadiron (water tank with a fountain) placed on the columns at the center of the inner court, a mescit (a room for praying) with a small dome on top of the sadiryan and a water tank at the bottom of the sadirvan.\n\n...\n\nGünümüzde muhteşem el sanatları dükkanlarına, geleneksel halk sanatı ve modern eserler içeren sanat galerilerine ve kültürel performanslara ev sahipliği yapan geleneksel tarzdaki han, 1576-1577 yılları arasında Kıbrıs Valisi Sinan Paşa (1572-1579) tarafından Sultan Selim'in Selimiye Camii'ne vakıf olarak yaptırdığı dükkânları yıktırarak yaptırılmıştır. Yapı, Türkiye’nin Bursa şehrindeki  Koza Han’ına benzemektedir. Kesme sarı taştan inşa edilmiş, bu dönemin Kıbrıs'taki en büyük hanıdır. Kare planlı olarak inşa edilen han, 68 oda ve 10 dükkândan oluşmaktadır. Alt kattaki odalar dükkân, depo ve ahır olarak kullanılırken, üst kattaki şömineli odalar yatak odası olarak kullanılmıştır. Hanın iç avlusunun ortasında sütunlar üzerine yerleştirilmiş bir şadırvan, şadırvanın üzerinde küçük bir mescit (ibadet odası) ve şadırvanın alt kısmında bir su deposu bulunmaktadır.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/buyuk-han/",
+    "url": "https://www.visitncy.com/tr/kesfet/buyuk-han/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 4142776868,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.364556,
+     35.176496
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "3wzdc27b1t2tmhtg",
+     "w": 2000,
+     "h": 1333,
+     "tip_color": "#8b7b6e",
+     "avg_color": "#92704a",
+     "caption": null
+    },
+    "title": "The Selimiye Mosque (St. Sophia Cathedral) / Selimiye Camii (St. Sophia Katedrali)",
+    "description": "Direction\nhttps://goo.gl/maps/zZukQSdWufvrY4BdA\n\nThe Cathedral was built in the Gothic style in the Lusignan Period between 1208 and 1326. The coronations of the Lusignan kings used to be held in this church as it used to be the most important church in Cyprus. The building, which is one of the most beautiful examples of French architecture of the Middle Ages, has a monumental gate. The windows made of carved stone are unique examples of gothic art. The Ottomans built minarets on the unfinished belfries placed on the two sides of the entrance and transformed the building into a mosque. Several Lusignan Kings and nobles are buried here with the marble gravestones forming the floor. The writing and pictures on the gravestones are well preserved as they remain under the mats and rugs and the wearing of shoes is not allowed.\n\n...\n\nKatedral, Luzinyan döneminde 1208-1326 yılları arasında gotik tarzda inşa edilmiştir. Kıbrıs'ın en önemli kilisesi olduğundan dolayı  Lüzinyan krallarının taç giyme törenleri bu kilisede yapılırdı. Orta çağ Fransız mimarisinin en güzel örneklerinden biri olan yapının anıtsal bir kapısı vardır. Oyulmuş taştan yapılmış pencereler gotik sanatın eşsiz örneklerindendir. Osmanlılar, girişin iki yanında bulunan yarım kalmış çan kulelerine minareler yaptırmış ve yapıyı camiye dönüştürmüşlerdir. Birkaç Lüzinyan Kralı ve soylusu, zemini oluşturan mermer mezar taşı ile burada gömülüdür. Mezar taşındaki yazı ve resimler hasır ve kilimlerin altında kaldığı için iyi korunmuştur ve içeriye ayakkabı ile girilmesine izin verilmemektedir.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/selimiye-camii/",
+    "url": "https://www.visitncy.com/tr/kesfet/selimiye-camii/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 1114957797,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.364266,
+     35.176176
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "ggkwpc0dtyjg0jge",
+     "w": 2000,
+     "h": 1333,
+     "tip_color": "#000000",
+     "avg_color": "#5c3c1f",
+     "caption": null
+    },
+    "title": "Bedesten (St. Nicholas Church) & Museum of Cyprus Turkish and Islamic Art / Bedesten  (St. Nicholas Kilisesi) & Kıbrıs Türk&İslam Eserleri Müzesi",
+    "description": "Direction\nhttps://goo.gl/maps/uaawKJKSxHFhdZq98\n\nThe bedestan is a 14th century gothic styled building built of ashlar stone blocks upon the ruins of a Byzantine building. It was used as a church in the Lusignan period, as a Metropolitan building under the name of St. Nicholas Church by the Orthodox community in the Venetian period. Following the Ottoman conquest, its name changed to the bedestan, after which it was used as a textile market, a food market, a flour market and a wheat store before falling into disuse. The Museum of Cyprus Turkish and Islamic Art is situated adjacent to the Bedestan (St. Nicholas Church). The building was constructed as an annex to the Bedestan and known as the Old Cameleer's Khan. The objects on display are from the Ottoman Rule of the Island between 1571-1878. Medallion Ushak Carpet of giant size from 17th century, collosal tombak (gilt copper) candlesticks and various firmans of the Ottoman Sultans are on display together with various items.\n\n...\n\n14. yüzyıldan kalma gotik tarzda bir yapıya sahip Bedesten, Bizans dönemine ait bir yapı kalıntısı üzerine kesme taş bloklardan inşa edilmiştir. Lüzinyan döneminde kilise, Venedik döneminde ise Ortodoks cemaati tarafından St. Nicolas Kilisesi adı altında Metropolit binası olarak kullanılmıştır. Osmanlı'nın fethinden sonra adı bedesten olarak değişmiş ve kullanılmayacak duruma gelene kadar tekstil pazarı, yiyecek pazarı, un pazarı ve buğday deposu olarak kullanılmıştır. \nKıbrıs Türk ve İslam Eserleri Müzesi, Bedesten'ın (St. Nicolas kilisesi) bitişiğinde yer almaktadır. Bina, Bedesten'e ek olarak inşa edilmiş ve eski Deveciler Hanı olarak bilinmektedir. Binada, 1571-1878 yılları arasında adanın Osmanlı hakimiyetinden kalma objeler sergilenmektedir. 17. yüzyıldan kalma dev boyutlu Madalyonlu Uşak Halısı, devasa tombak (yaldızlı bakır) şamdanlar ve Osmanlı padişahlarının çeşitli fermanları çeşitli eşyalarla birlikte sergilenmekte.\n\nFor more  info / Daha fazlası içi;\nhttps://www.visitncy.com/tr/kesfet/bedesten/",
+    "url": "https://www.visitncy.com/tr/kesfet/bedesten/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 841647903,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.364569,
+     35.175413
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "yvb3yert422s3xh8",
+     "w": 1500,
+     "h": 1000,
+     "tip_color": "#0e0f14",
+     "avg_color": "#3c3e42",
+     "caption": null
+    },
+    "title": "Municipal Market (Bandabulya) / Belediye Pazarı (Bandabulya)",
+    "description": "Direction\nhttps://goo.gl/maps/CYgKngLkApTBTPbMA\n\nDuring the Ottoman period there was an open air bazaar where the Bandabulya building is today. During 1881, stores were built around the bazaar area and today's retail section was built between 1931 and 1932. It was opened for public use on 01/10/1932 during an impressive official ceremony. In time, the market needed to be expanded to be able to host all of the vendors, so in 1940 the wholesale market was built enlarging the market as a whole. The Bandabulya currently has cafes and small restaurants, with some retail shops as well.\n\n...\n\nOsmanlı döneminde bugünkü Bandabulya binasının olduğu yerde bir açık hava çarşısı bulunuyordu. 1881 yılında çarşı bölgesinin çevresine dükkânlar, 1931-1932 yılları arasında ise bugünkü perakende bölümü yapılmıştır. 01/10/1932 tarihinde etkileyici bir resmî törenle halkın kullanımına açılmıştır. Zamanla, tüm satıcıları barındırabilmek için pazarın genişletilmesi gerekti, bu nedenle 1940 yılında toptancı pazarı inşa edildi ve pazar bir bütün olarak genişletilmiş oldu. Bandabulya'da günümüzde kafeler,  küçük restoranlar ve bazı perakende mağazaları bulunmaktadır. \n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/bandabulya-lefkosa/",
+    "url": "https://www.visitncy.com/tr/kesfet/bandabulya-lefkosa/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2012144406,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.365376,
+     35.176329
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/JnwVjZQ3H1gQP5BV6\n\nThe building is called the 'Eaved House' because of its unusually wide eaves supported by inclined pillars. The unique two storey 'L'shaped house was built around a square inner yard; the downstairs was built in the Lusignan period and upstairs was been built in the Ottoman period. Its original build date is unknown.\n\n...\n\nBina, eğimli sütunlarla desteklenen alışılmadık derecede geniş saçakları nedeniyle \"saçaklı Ev\" olarak adlandırılır. Eşsiz iki katlı \"L\" şeklindeki ev, kare bir iç avlu etrafında inşa edilmiştir. Alt katı Lüzinyan döneminde, üst katı ise Osmanlı döneminde yapılmıştır. Orijinal yapım tarihi bilinmemektedir.",
+    "image": {
+     "id": "bocnnlankptl0gcy",
+     "w": 1024,
+     "h": 768,
+     "tip_color": "#cac4b6",
+     "avg_color": "#716f66",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "The Eaved House / Saçaklı Ev"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2349481603,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.365672,
+     35.176651
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "qjrxwgbh00mxbvog",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#f4f0e9",
+     "avg_color": "#a09178",
+     "caption": null
+    },
+    "title": "Lapidary Museum / Ortaçağ Taş Eserler Müzesi",
+    "description": "Direction\nhttps://goo.gl/maps/CkdUts444kQcLqyp8\n\nThe Museum is housed in a 15th century Venetian building containing many stone works remaining from the Middle Ages, including coats of arms, marble works, sarcophagus and columns. A unique, magnificent stone window now stands opposite the entrance gate having been brough from the Lusignan Palace in the Sarayonu Quarter, which was destroyed in the British Colonial period.\n\n...\n\nMüze, armalar, mermer eserler, lahitler ve sütunlar dahil olmak üzere Orta Çağ'dan kalma birçok taş eseri içeren 15. yüzyıldan kalma bir Venedik binasında yer almaktadır. Giriş kapısının karşısında, ingiliz sömürge döneminde yıkılan Sarayönü Meydanındaki Lüzinyan Sarayından getirilen  görkemli bir taş pencere bulunuyor.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/discover/lapidary-museum/",
+    "url": "https://www.visitncy.com/discover/lapidary-museum/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 1498683813,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.366148,
+     35.177431
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "49t3yto57irx9naa",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#785b3b",
+     "avg_color": "#7a8995",
+     "caption": null
+    },
+    "title": "Haydarpasha Mosque / Haydarpaşa Camii",
+    "description": "Direction\nhttps://goo.gl/maps/nrVAgc2MYQYunBds8\n\nThis flamboyant, Gothic-style church was built by the Lusignans in the 14th century. Following the Ottoman conquest, it became a mosque through the addition of a minaret, a mihrab (a wall niche facing Mecca), and a mimbar (pulpit with steps where the imam gives speech to the community). It was built from cut stone and the top of the windows were decorated with geometric figures made of plaster. The south and west entrances were built in the Gothic style with detailed stone work, the Lusignan coat of arms, and rose and dragon motives on their top. The north entrance gate is simpler, and its corners are decorated with women holding fishes and dragons.\n\n...\n\nGotik tarzdaki gösterişli kilise, 14. yüzyılda Lüzinyanlar tarafından inşa edilmiştir. Osmanlı fethinden sonra minare, mihrap (Mekke'ye bakan duvar nişi) ve minber (imamın cemaate hitap ettiği basamaklı kürsü) eklenerek cami haline gelmiştir. Yapı kesme taştan inşa edilmiş ve üst pencereleri alçıdan geometrik figürlerle süslenmiştir. Güney ve batı girişleri detaylı taş işçiliği, Lüzinyan arması ve üstlerinde gül ve ejderha motifleri ile gotik mimaride inşa edilmiştir. Kuzey giriş kapısı daha sadedir ve köşeleri balıklar ve ejderhalar tutan kadın figürü ile süslenmiştir. \n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/haydarpasa-camii/",
+    "url": "https://www.visitncy.com/tr/kesfet/haydarpasa-camii/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3800750551,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.366451,
+     35.178215
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/Q2oBt4A5ec9gf1vj8\n\nThe House is one of the unique buildings reflecting the characteristics of both Lusignan and Ottoman architecture. The building dates back to the 15th century and is a source of attention now because of its gothic arched entrance door, its Lusignan coat of arms and its decorated Ottoman period wooden ceiling. The two storied building has a well and a water tank in its yard. \n\n...\n\nHem Lüzinyan hem de Osmanlı mimarisinin özelliklerini yansıtan ev, ender yapılar arasındadır. Yapı 15. yüzyıla dayanıyor ve günümüzde gotik kemerli giriş kapısı, Lüzinyan arması ve Osmanlı dönemi süslemeli ahşap tavanıyla dikkatleri üzerine çekiyor. İki katlı binanın bahçesinde kuyu ve su deposu bulunmaktadır.",
+    "image": {
+     "id": "glncmhxlujuaocio",
+     "w": 4378,
+     "h": 2918,
+     "tip_color": "#e3dfdc",
+     "avg_color": "#908781",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "Lusignan House / Lüzinyan Evi"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 1180061556,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.366267,
+     35.178583
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "u57vh0czbo3qcmfw",
+     "w": 1200,
+     "h": 800,
+     "tip_color": "#a5aa80",
+     "avg_color": "#6e7c83",
+     "caption": null
+    },
+    "title": "Yenicami Mosque / Camii",
+    "description": "Direction\nhttps://goo.gl/maps/FJeAwryZrcNRNzjq6\n\nThis monument was built as a church in the Middle Ages, probably in the 14th century. In 1571, following the Ottoman conquest of Cyprus, it was converted into a mosque and used until its collapse in the 18th century. Only the minaret at the south-western side of the building, survives. The new mosque, built 20 metres away from the old one, attracts attention with its narthex, portico and different minaret.\n\n...\n\nBu anıt, Orta Çağ'da, muhtemelen 14. yüzyılda bir kilise olarak inşa edilmiştir. 1571’de Kıbrıs'ın Osmanlılar tarafından fethinden sonra camiye çevrilmiş ve 18. yüzyılda yıkılana kadar kullanılmıştır. Sadece yapının güneybatısındaki minaresi günümüze ulaşmıştır. Eskisinden 20 metre uzağa inşa edilen yeni cami, narteksi, sütunlu girişi ve farklı minaresiyle dikkat çekiyor.\n\nFor more info / Daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/yeni-cami/",
+    "url": "https://www.visitncy.com/tr/kesfet/yeni-cami/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 1791251074,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.363715,
+     35.182173
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/xZmFpAQUHcdR2fKU9\n\nThe National Struggle Museum was built on the historical bastion known as Barbaro in the Venetian period, Musalla in the Ottoman period and Barbaros at the present time. The Museum has been arranged to exhibit the documents of the national struggle of Turkish Cypriots since 1955 and passes on to the following generations the causes and conditions of the struggle. The history of the Turkish Cypriot struggle is exhibited in four different time frames, including the period from 1955 to 1958, from 1958 to 1963, from 1963 to 1974 and from 1974 to the present.\n\n...\n\nMilli Mücadele Müzesi, Venedik döneminde Barbaro, Osmanlı döneminde Musalla ve günümüzde Barbaros olarak bilinen tarihi burç üzerine inşa edilmiştir. Müze, 1955 yılından bu yana Kıbrıs Türklerinin milli mücadelesinin belgelerini sergilemek ve mücadelenin sebeplerini ve koşullarını gelecek nesillere aktarmak üzere düzenlenmiş. Kıbrıs Türk mücadelesinin tarihi 1955'ten 1958'e, 1958'den 1963'e, 1963'ten 1974'e ve 1974'ten günümüze olmak üzere dört farklı zaman diliminde sergileniyor.",
+    "image": {
+     "id": "0yy5dml3yk55p2y5",
+     "w": 1024,
+     "h": 768,
+     "tip_color": "#737572",
+     "avg_color": "#919391",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "The National Struggle Museum / Milli Mücadele Müzesi"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 1777502683,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.349191,
+     35.190511
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/GSD2sKdXQ4SNSogH7\n\nThis house was lived in by Dr. Nihat Ilhan and his family. He was assigned to the regiment sent by the Turkish army as part of the guarantee agreement made when the new Cyprus Republic was established in 1960. On 24 December 1963, while Dr. Nihat Ilhan was on duty, his wife, his three children, Kutsi, Tecer and Hakan along with the house owner Hasan Gudum's wife, Feride Gudum were killed by Greek Cypriots. Following the barbaric act of murder the house was turned into a museum to commemorate the martyred with photos exhibited showing the scene of the crime.\n\n...\n\nBu evde Dr. Nihat İlhan ve ailesi yaşıyordu. Nihat İlhan, 1960 yılında yeni Kıbrıs Cumhuriyeti kurulurken yapılan garanti anlaşması kapsamında Türk ordusunun gönderdiği alaya atanmıştı. 24 Aralık 1963'te Dr. Nihat İlhan görevdeyken eşi, üç çocuğu Kutsi, Tecer ve Hakan ile ev sahibi Hasan Gudum'ün eşi Feride Gudum Kıbrıslı Rumlar tarafından öldürüldü. Barbarca cinayetin ardından ev, şehitleri anmak için olay mahallini gösteren fotoğrafların sergilendiği bir müzeye dönüştürüldü.",
+    "image": {
+     "id": "w5mhgp04r56f1clg",
+     "w": 3264,
+     "h": 2448,
+     "tip_color": "#9b9782",
+     "avg_color": "#676c67",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "The Museum of Barbarism / Barbarlık Müzesi"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 1392119489,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.357791,
+     35.193386
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/KyPntEmfkt1eSLGV7\n\nIt is the first private ethnographic establishment in Northern Cyprus. The aim set by the museum is, together with you, to build a bridge towards our past by displaying the beautiful works of arts and crafts used daily by Cypriot communities within the last 150 years.\n\n...\n\n\nKuzey Kıbrıs’ın ilk özel etnografik kuruluşudur. Müzenin amacı, Kıbrıs toplumlarının son 150 yılda günlük olarak kullandıkları güzel sanat ve zanaat eserlerini sergileyerek, sizlerle birlikte geçmişimize doğru bir köprü kurmaktır.",
+    "image": {
+     "id": "nyktk3fhrmcvsooa",
+     "w": 1600,
+     "h": 900,
+     "tip_color": "#6f3b12",
+     "avg_color": "#836747",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "The Private Ethnographic Museum of Cyprus / Kıbrıs  Özel Etnografya Müzesi"
+   }
+  }
+ ],
+ "groups": [],
+ "markers": [],
+ "properties": {}
+}

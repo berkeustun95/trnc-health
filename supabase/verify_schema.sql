@@ -81,6 +81,8 @@ WITH report AS (
     -- Visit NCY walking routes (1048). Dark until go-live: is_active DEFAULT false.
     ('1048_walking_routes','walking_routes'),
     ('1048_walking_routes','walking_route_stops'),
+    -- Real walking paths per place pair (1049). ORS/OSM share-alike data, kept apart from route order.
+    ('1049_walking_legs','walking_legs'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -386,7 +388,9 @@ WITH report AS (
     -- be banned on, and the admin queue says the content no longer exists.
     ('1033_reviews_author_not_public','get_my_review'),
     ('1033_reviews_author_not_public','admin_content_author'),
-    ('1045_places_source','places_guard_source')
+    ('1045_places_source','places_guard_source'),
+    -- 1050: the nightly purge behind the policy's "removed 30 days later". Not an RPC.
+    ('1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc')
   ) e(m,o)
 
   UNION ALL
@@ -638,7 +642,15 @@ WITH report AS (
     ('1048_walking_routes','walking_route_stops_route_id_fkey'),
     ('1048_walking_routes','walking_route_stops_place_id_fkey'),
     ('1048_walking_routes','walking_route_stops_position_check'),
-    ('1048_walking_routes','walking_route_stops_leg_check')
+    ('1048_walking_routes','walking_route_stops_leg_check'),
+    ('1049_walking_legs','walking_legs_pkey'),
+    ('1049_walking_legs','walking_legs_from_place_id_fkey'),
+    ('1049_walking_legs','walking_legs_to_place_id_fkey'),
+    ('1049_walking_legs','walking_legs_not_self_check'),
+    ('1049_walking_legs','walking_legs_path_check'),
+    ('1049_walking_legs','walking_legs_metres_check'),
+    ('1049_walking_legs','walking_legs_seconds_check'),
+    ('1049_walking_legs','walking_legs_source_check')
 
   ) e(m,o)
 
@@ -724,7 +736,9 @@ WITH report AS (
     -- already records twice what a known-stale row does to the reader's attention.
     ('1009_ad_position_module','idx_ad_banners_position_module_live'),
     -- 1048: the RESTRICT check on a places delete looks stops up by place_id.
-    ('1048_walking_routes','idx_walking_route_stops_place_id')
+    ('1048_walking_routes','idx_walking_route_stops_place_id'),
+    -- 1049: the CASCADE on a places delete looks legs up by to_place_id (the PK covers from).
+    ('1049_walking_legs','idx_walking_legs_to_place_id')
 
   ) e(m,o)
 
@@ -3221,6 +3235,39 @@ WITH report AS (
       (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
         WHERE conrelid = to_regclass('public.walking_route_stops') AND contype = 'f')
       IS NOT DISTINCT FROM 'walking_route_stops_place_id_fkey=r,walking_route_stops_route_id_fkey=c'
+    -- ── 1049: walking legs ───────────────────────────────────────────────────────
+    -- (1) Read-only to clients and readable exactly when both places are: ONE permissive SELECT
+    --     policy (a second would widen it — permissive-OR), and it must name the place status rule
+    --     for BOTH ends. RLS on; no client write privilege (inherited grants resolved).
+    UNION ALL SELECT '1049_walking_legs','walking_legs: RLS on, 1 SELECT policy gated on both places, no client writes',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.walking_legs')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='walking_legs') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='walking_legs'
+                  AND cmd='SELECT' AND permissive='PERMISSIVE'
+                  AND qual LIKE '%from_place_id%' AND qual LIKE '%to_place_id%' AND qual LIKE '%''active''%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.walking_legs'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.walking_legs'), 'INSERT,UPDATE,DELETE,TRUNCATE'), false)
+    -- (2) Both foreign keys CASCADE ('c'): a leg without its place is meaningless. Section E sees
+    --     the names, which survive a change of delete action.
+    UNION ALL SELECT '1049_walking_legs','walking_legs: both place FKs ON DELETE CASCADE',
+      (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.walking_legs') AND contype = 'f')
+      IS NOT DISTINCT FROM 'walking_legs_from_place_id_fkey=c,walking_legs_to_place_id_fkey=c'
+    -- ── 1050: purge of soft-deleted UGC ─────────────────────────────────────────
+    -- The policy promises removal 30 days after deletion, held while a report is OPEN. Section C
+    -- sees the name only. Body anchored on code shapes (all three DELETEs, the pending hold,
+    -- the answers hold) and nobody but postgres may call it.
+    UNION ALL SELECT '1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc: deletes all 3 kinds, holds open reports (incl. on answers), not client-callable',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%DELETE FROM reviews r%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%DELETE FROM questions q%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%DELETE FROM messages m%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%cr.status = ''pending''%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%JOIN answers a%', false)
+      AND EXISTS(SELECT 1 FROM pg_proc WHERE oid = to_regprocedure('public.purge_soft_deleted_ugc(interval)') AND proacl IS NOT NULL)
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+                      LEFT JOIN pg_roles r ON r.oid = a.grantee
+                      WHERE p.oid = to_regprocedure('public.purge_soft_deleted_ugc(interval)')
+                        AND a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated')))
   ) z
 
   UNION ALL
@@ -3312,7 +3359,10 @@ SELECT e.m migration, e.o job,
 FROM (VALUES
   ('0705_job_postings_auto_expire','expire-job-postings'),
   ('0809_featured_expiry_reminder','featured-expiry-reminder'),
-  ('0926_moderation_rejection_log','purge-moderation-rejections')
+  ('0926_moderation_rejection_log','purge-moderation-rejections'),
+  -- Backs "permanently removed 30 days later" in the policy. INACTIVE here is a broken
+  -- written commitment, same as purge-moderation-rejections.
+  ('1050_purge_soft_deleted_ugc','purge-soft-deleted-ugc')
 ) e(m,o)
 ORDER BY status ASC, migration;
 

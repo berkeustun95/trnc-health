@@ -791,7 +791,9 @@ in this sequence. Deviations that look harmless are how modules ship half-launch
    — for THEM, not only for people who sign up afterwards. The published policy is now
    `2026-09-20`, which says the opposite. Nobody has been re-asked.
    They are findable, and the number is still small:
-   `SELECT id, terms_accepted_at FROM profiles WHERE terms_version IS DISTINCT FROM '2026-09-20';`
+   `SELECT id, terms_accepted_at FROM profiles WHERE terms_version IS NULL OR terms_version < '2026-09-20';`
+   (Not `<> current`: the 2026-09-24 bump did not change the student-list promise, so
+   accounts on 2026-09-20 already accepted it.)
    Not re-asking was the right call while the module was dark, because nothing about
    their data had changed yet. This step is where that stops being true. Decide it here,
    with the query in front of you, rather than discovering the question later.
@@ -881,6 +883,12 @@ thread — not on Home, and not on a spinner.
   above) where English never did.
 
 ## Android Gotchas
+- **App.js `content` may only read values defined ABOVE the content selector.** Hermes does
+  not enforce the temporal dead zone, so a `const` declared below the selector reads
+  `undefined` inside it — no error. And RN's `Modal` treats `visible={undefined}` as SHOWN.
+  Together they shipped (2026-09-24) a policy notice every user saw and nobody could close.
+  Overlays whose state is computed after the selector go in App's FINAL return (like
+  OliGuide); pass Modals `visible={x === true}`. `check-policy-notice.mjs` guards the notice.
 - Views with `borderRadius` + `borderWidth` on Android may render an opaque background unless `backgroundColor: 'transparent'` is set explicitly.
 - Never cache element positions in `onLayout` for later use — layout can shift (e.g. async data loading) and the cached value goes stale. Always measure with `measureRef()` at the moment you need the position.
 - **A REINSTALL DOES NOT RESET FIRST-RUN STATE ON ANDROID — Auto Backup restores it.**

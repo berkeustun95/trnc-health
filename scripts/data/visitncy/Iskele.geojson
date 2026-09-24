@@ -1,0 +1,82 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": 2489439470,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.889272,
+     35.283434
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "bote4jufzd5xccvk",
+     "w": 1192,
+     "h": 1008,
+     "tip_color": "#979c85",
+     "avg_color": "#98a39e",
+     "caption": null
+    },
+    "title": "Panaghia Theodokou Church & Icon Museum/Kilisesi ve İkon Müzesi",
+    "description": "Direction\nhttps://goo.gl/maps/7SNzTP7PzB7REahTA\n\nDating back to the beginning of the 12th century, this is the main İskele village church. Its original communion style fresco on the walls alsı dates back to 12th century. It has arched niches on the side walls, and there is a campanile on the North east side. Renovations were made in the 15th and 16th centuries when a second nave was built in the north part of the church and some additions were made on the west side. In 1804, the church was completely renovated and repaired. Following the renovatin and repair works conducted by the depatment of Antiquities and Museums, the church was open for visitors on 23 May 1991 as the Iskele Icon Museum.\n\n...\n\nTarihsel olarak 12. yüzyılın başlarına dayanan yapı,  İskele köyünün ana kilisesiydi. Duvarlarda, tarihi 12. yüzyıla kadar uzanan duvar resimleri bulunmaktadır. Yan duvarlarında kemerli nişler bulunan yapının, kuzey doğusunda bir çan kulesi bulunmaktadır. 15. ve 16. yüzyıllarda kilisenin kuzeyine ikinci bir nef inşa edilmiş, batı tarafına ise bazı eklemeler yapılarak, tadilat yapılmıştır. 1804 yılında kilise tamamen yenilenmiş  ve onarılmıştır. Eski Eserler ve Müzeler Dairesi tarafından yapılan yenileme ve onarım çalışmalarının ardından kilise, İskele İkon Müzesi olarak 23 Mayıs 1991 tarihinde ziyarete açılmıştır.\n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/island/iskele/",
+    "url": "https://www.visitncy.com/tr/island/iskele/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2342288153,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.892917,
+     35.283888
+    ]
+   },
+   "properties": {
+    "marker-symbol": "trail",
+    "image": {
+     "id": "kkosromgqztbw7uk",
+     "w": 1237,
+     "h": 1024,
+     "tip_color": "#51432c",
+     "avg_color": "#7f806e",
+     "caption": null
+    },
+    "title": "St. James Church/Kilise",
+    "description": "Direction\nhttps://goo.gl/maps/eLLUf3EakhLwQibs5\n\nLocated in the village centre of İskele is one of the most interesting miniature churches in Cyprus built in the 14th and 15th centuries. When the Romanian Queen Maria saw the Church in 1928 she liked it so much that she had a replica built in her palace on the shores of the Black Sea. The church is in the shape of the cross covered by a dome. The inside walls are plastered and the walls are decorated with plates in harmony with the Cypriot tradition.\n\n…\n\nYapı, 14. ve 15. yüzyıllarda inşa edilmiştir.  İskele köy merkezinde bulunan yapı, Kıbrıs'ın en ilginç minyatür kiliselerinden biridir. Romanya Kraliçesi Maria 1928'de Kilise'yi görünce o kadar beğenmiş ki, Karadeniz kıyısındaki sarayına birebir aynisini yaptırmıştır. Kilise kubbe ile örtülü haç planında olup, iç duvarları sıvalı ve Kıbrıs geleneğine uygun porselen tabaklarla dekore edilmiştir.\n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/island/iskele/",
+    "url": "https://www.visitncy.com/tr/island/iskele/"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 2548866694,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     33.891144,
+     35.284837
+    ]
+   },
+   "properties": {
+    "description": "Direction\nhttps://goo.gl/maps/Qie3PhMLJyHWkWfF6\n\nThe cultural heritage of many civilisations has been carried through to this new gallery displaying over ten thousand years of priceless history.\n\nThe artefacts on show here have been collected, preserved and brought together from various local excavations.\n\nModern as it is, this museum has been planned to serve all ages, with relics and delicate pieces alike parading visitors throughout the tour.\n\nFrom delicate items including jewellery and works of fine pottery to large sculptures and antiques, the Iskele Archaeology Museum is a worthy visit when in town.\n\n…\n\nİngiliz Sömürge Dönemi'nde inşa edilen ve 'Bandabuliya' olarak bilinen çarşı binası, İskele Arkeoloji Müzesi'ne dönüştürülmüştür. Müzede Kıbrıs’ın  10.000 yılı aşkın zengin kültürel mirası sergilenmektedir.  Müzede, Neolitik dönemden, Roma dönemine kadar uzanan ve Kıbrıslılara ait tarihi kalıntılar, bilgilendirici tablolarla birlikte sergilenmektedir.  \n\nFor more info / daha fazlası için;\nhttps://www.visitncy.com/tr/kesfet/iskele-arkeoloji-muzesi/",
+    "image": {
+     "id": "ozzj5nkbrcly0zoj",
+     "w": 555,
+     "h": 400,
+     "tip_color": "#040503",
+     "avg_color": "#6f6a5d",
+     "caption": null
+    },
+    "marker-symbol": "trail",
+    "title": "Iskele Archaeology Museum / Arkeoloji Müzesi"
+   }
+  }
+ ],
+ "groups": [],
+ "markers": [],
+ "properties": {}
+}
