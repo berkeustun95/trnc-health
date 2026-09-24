@@ -8,7 +8,9 @@ import { t } from '../constants/i18n'
 // only mark it seen; neither records acceptance.
 export default function PolicyUpdateNotice({ visible, lang, onRead, onDismiss }) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
+    // `=== true`, never truthiness or the raw prop: RN's Modal treats a missing `visible` as
+    // SHOWN, so an undefined here would be a notice nobody can close.
+    <Modal visible={visible === true} transparent animationType="fade" onRequestClose={onDismiss}>
       <View style={s.backdrop}>
         <View style={s.card}>
           <Ionicons name="shield-checkmark-outline" size={28} color={colors.primary} />

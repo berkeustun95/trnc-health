@@ -2177,13 +2177,6 @@ export default function App() {
           </TouchableOpacity>
         </Modal>
 
-        <PolicyUpdateNotice
-          visible={policyNoticeVisible}
-          lang={lang}
-          onRead={() => dismissPolicyNotice(true)}
-          onDismiss={() => dismissPolicyNotice(false)}
-        />
-
         <TutorialCoachMarks
           steps={coachSteps}
           visible={showCoachMarks}
@@ -2270,10 +2263,16 @@ export default function App() {
     shouldShowPolicyNotice({ seen: policySeen, termsVersion: profile?.terms_version ?? null,
                              current: LEGAL_VERSION, returning: returningDevice })
   // Seen, NOT accepted: nothing is written to profiles.
+  // The notice closes on the STATE change, before and regardless of the storage write — a
+  // failed write can never keep it on screen. The write is retried so it also stays closed
+  // on the next launch; if every attempt fails it could return once after a relaunch, and
+  // closes again the same way.
   const dismissPolicyNotice = (openPolicy) => {
-    AsyncStorage.setItem('@trnc_policy_seen', LEGAL_VERSION).catch(() => {})
     setPolicySeen(LEGAL_VERSION)
     if (openPolicy) setShowLegal(true)
+    const save = (left) => AsyncStorage.setItem('@trnc_policy_seen', LEGAL_VERSION)
+      .catch(() => { if (left > 0) setTimeout(() => save(left - 1), 1500) })
+    save(3)
   }
 
   // Explicit answer -> asked=true, and city welcome goes live. 'visiting' is a
@@ -2293,6 +2292,17 @@ export default function App() {
       <View style={styles.rootFill} importantForAccessibility={oliSheetOpen ? 'no-hide-descendants' : 'auto'}>
         {content}
       </View>
+      {/* ⚠ RENDERED HERE, in the final return, never inside `content`. The content selector
+          runs BEFORE policyNoticeVisible / dismissPolicyNotice are assigned below it; Hermes
+          does not enforce the temporal dead zone, so inside `content` they read UNDEFINED —
+          and a Modal with visible={undefined} is SHOWN (RN defaults visible to true). That
+          shipped on 2026-09-24 as a notice every user saw and nobody could close. */}
+      <PolicyUpdateNotice
+        visible={policyNoticeVisible}
+        lang={lang}
+        onRead={() => dismissPolicyNotice(true)}
+        onDismiss={() => dismissPolicyNotice(false)}
+      />
       {oliVisible && (
         <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} hideFab={HOME_V2_LIVE} />
       )}
