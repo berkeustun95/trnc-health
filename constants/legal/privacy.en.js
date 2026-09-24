@@ -13,7 +13,7 @@
 //
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
 export default `Version: 2026-09-20
-Last updated: September 22, 2026
+Last updated: September 24, 2026
 
 WHO WE ARE
 
@@ -58,6 +58,13 @@ Rejected submissions: if text you submit is rejected by our content filter, we k
 
 Consent records: which version of our Terms of Service and Privacy Policy you accepted, in which language, and when. If you opt in to marketing messages, we record when you did so, and when you withdrew it if you later do.
 
+Location: ADA uses your device's location only if you allow it, and you can turn it off at any time in your device settings. The app works without it. We do not sell your location and we do not use it for advertising.
+• On your phone — ADA uses your location to sort listings by distance, show where you are on the map, choose your city on the Home screen, and follow a walking route. This happens on your phone and your location is not sent to us for it.
+• Search — when you search, your position is rounded to about 1 km before it leaves your phone and is sent to our servers only to put nearby results first. We do not store it.
+• Weather — to show the weather on the Home screen, your position is rounded to about 10 km and sent to Open-Meteo, a weather service based in Switzerland. Open-Meteo may keep it in its server logs for up to 90 days.
+• Contact taps — when you tap a call, WhatsApp, website or directions button for a listed business or partner, we record that the tap happened, for which business, and one of the seven broad districts of the TRNC it relates to (for example Girne or Lefke): the district your location places you in, or the one you chose in the app. We never record your account, your device or your exact position with it, so it cannot be traced back to you. We use these counts to tell businesses how many people contacted them through ADA.
+• Places you submit — if you submit a place and use your current location for its pin, that position is saved as the place's location and shown publicly once the place is approved.
+
 Usage data: we do not use analytics SDKs or third-party trackers. Section 5 describes the limited exception that applies if and when advertising is enabled in the app.
 
 2. WHY WE PROCESS YOUR DATA, AND ON WHAT LEGAL BASIS
@@ -71,6 +78,8 @@ Usage data: we do not use analytics SDKs or third-party trackers. Section 5 desc
 • Show advertising, and restrict personalisation for under-18s — To fund the service, and to protect minors. Legal basis: Our legitimate interest, and compliance with a legal obligation
 • Send you marketing messages — Only if you ask us to. Legal basis: Your consent
 • Keep a record of which terms you accepted — To show what was agreed. Legal basis: Our legitimate interest, and compliance with a legal obligation
+• Use your location to show what is near you: distance order, the map, search order and local weather — To give you the service you asked for. Legal basis: Performance of a contract with you
+• Count taps on businesses' contact buttons, with the district — To show businesses how many people contact them through ADA. Legal basis: Our legitimate interest in running and funding the service
 
 We do not sell or rent your personal data, and we do not share it with third parties for their own marketing.
 

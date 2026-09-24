@@ -13,7 +13,7 @@
 //
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
 export default `Sürüm: 2026-09-20
-Son güncelleme: 22 Eylül 2026
+Son güncelleme: 24 Eylül 2026
 
 KİM OLDUĞUMUZ
 
@@ -58,6 +58,13 @@ Reddedilen gönderimler: gönderdiğiniz bir metin içerik filtremiz tarafından
 
 Onay kayıtları: Kullanım Koşulları'nın ve Gizlilik Politikası'nın hangi sürümünü, hangi dilde ve ne zaman kabul ettiğiniz. Pazarlama iletilerine onay verirseniz, onayı verdiğiniz tarihi ve daha sonra geri alırsanız geri aldığınız tarihi kaydederiz.
 
+Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bunu istediğiniz zaman cihaz ayarlarınızdan kapatabilirsiniz. Uygulama konum olmadan da çalışır. Konumunuzu satmıyoruz ve reklam için kullanmıyoruz.
+• Telefonunuzda — ADA konumunuzu, listeleri uzaklığa göre sıralamak, haritada nerede olduğunuzu göstermek, Ana Sayfa'da şehrinizi seçmek ve bir yürüyüş rotasını takip etmek için kullanır. Bu işlemler telefonunuzda gerçekleşir ve konumunuz bunlar için bize gönderilmez.
+• Arama — arama yaptığınızda konumunuz telefonunuzdan çıkmadan önce yaklaşık 1 km'ye yuvarlanır ve yalnızca yakındaki sonuçları öne almak için sunucularımıza gönderilir. Saklamıyoruz.
+• Hava durumu — Ana Sayfa'da hava durumunu göstermek için konumunuz yaklaşık 10 km'ye yuvarlanır ve İsviçre merkezli bir hava durumu hizmeti olan Open-Meteo'ya gönderilir. Open-Meteo bu bilgiyi sunucu kayıtlarında 90 güne kadar tutabilir.
+• İletişim dokunuşları — listelenen bir işletme veya iş ortağı için arama, WhatsApp, web sitesi ya da yol tarifi düğmesine dokunduğunuzda, dokunuşun gerçekleştiğini, hangi işletme için olduğunu ve ilgili olduğu KKTC'nin yedi geniş bölgesinden birini (örneğin Girne veya Lefke) kaydederiz: konumunuzun sizi yerleştirdiği bölge ya da uygulamada seçtiğiniz bölge. Bununla birlikte hesabınızı, cihazınızı veya tam konumunuzu asla kaydetmeyiz; bu nedenle size geri izlenemez. Bu sayıları, işletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini bildirmek için kullanırız.
+• Gönderdiğiniz yerler — bir yer gönderip işaretçisi için mevcut konumunuzu kullanırsanız, bu konum yerin konumu olarak kaydedilir ve yer onaylandıktan sonra herkese açık olarak gösterilir.
+
 Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları kullanmıyoruz. Uygulamada reklam etkinleştirildiğinde geçerli olacak sınırlı istisna 5. bölümde açıklanmıştır.
 
 2. VERİLERİNİZİ NEDEN VE HANGİ HUKUKİ DAYANAKLA İŞLİYORUZ
@@ -71,6 +78,8 @@ Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları ku
 • Reklam göstermek ve 18 yaş altı için kişiselleştirmeyi sınırlamak — Hizmeti finanse etmek ve küçükleri korumak için. Hukuki dayanak: Meşru menfaatimiz ve hukuki yükümlülüğe uyum
 • Size pazarlama iletileri göndermek — Yalnızca siz istediyseniz. Hukuki dayanak: Açık rızanız
 • Hangi koşulları kabul ettiğinizin kaydını tutmak — Neyin kabul edildiğini gösterebilmek için. Hukuki dayanak: Meşru menfaatimiz ve hukuki yükümlülüğe uyum
+• Yakınınızdakileri göstermek için konumunuzu kullanmak: uzaklık sırası, harita, arama sırası ve yerel hava durumu — İstediğiniz hizmeti sunabilmek için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
+• İşletmelerin iletişim düğmelerine yapılan dokunuşları bölgeyle birlikte saymak — İşletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini gösterebilmek için. Hukuki dayanak: Hizmeti yürütme ve finanse etmeye ilişkin meşru menfaatimiz
 
 Kişisel verilerinizi satmayız, kiralamayız ve üçüncü tarafların kendi pazarlama faaliyetleri için paylaşmayız.
 
