@@ -68,9 +68,19 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      # ─── Actions are pinned to COMMIT SHAs, not to @v4 ───────────────────
+      # @v4 is a MOVING tag: whoever controls it can change what runs here
+      # without a commit in this repo. That matters more than usual because this
+      # repo is PUBLIC and this job holds SUPABASE_SERVICE_ROLE_KEY, which
+      # bypasses RLS entirely — a compromised action would be reading it.
+      # (The other half of that surface is already closed: this workflow has no
+      # `pull_request` trigger, so a fork can never obtain these secrets.)
+      # The trailing comment is the version, because a bare SHA tells the next
+      # reader nothing about what they are on or whether it is current.
+      # Resolved 2026-09-25 from refs/tags/v4 on each repo.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: '20'
           cache: npm
@@ -154,10 +164,10 @@ jobs:
         id: day
         run: echo "monday=$([ "$(date -u +%u)" = "1" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
         if: steps.day.outputs.monday == 'yes'
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         if: steps.day.outputs.monday == 'yes'
         with:
           node-version: '20'
