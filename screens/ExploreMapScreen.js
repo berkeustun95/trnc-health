@@ -37,6 +37,18 @@ import { RouteOverlay, RoutePicker, RoutePanel, fitRoute } from '../components/W
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
+// ─── RETURN-TO-MAP MEMORY ───────────────────────────────────────────────────
+// Opening a place or facility from this map UNMOUNTS it: App.js's content selector renders
+// the profile INSTEAD of the tab shell (and instead of the admin review preview). So on back
+// — the in-screen button or Android back, both of which just clear App state — the map
+// mounted fresh: chips reset, route closed, camera back at the island.
+//
+// The view is written here at the moment of HANDOFF and read ONCE on the next mount. Ids,
+// never objects: routes and pins are rebuilt from fresh fetches after the remount. Written
+// only on handoff, so switching tabs still starts the map fresh, exactly as before.
+// Module-level on purpose: it has to outlive the component.
+let returnSnapshot = null
+
 // Supercluster's radius/extent are tile-space pixels; the zoom we feed it is computed
 // below at Google's 256px tile scale. minPoints 3 keeps a lone pair of neighbours as two
 // real pins — at this dataset size a bubble reading "2" is noise, not a summary.
@@ -237,6 +249,11 @@ export default function ExploreMapScreen({
 }) {
   const { width, height } = useWindowDimensions()
   const mapRef = useRef(null)
+  // Consumed once per mount. Pending ids resolve in effects below, once routes/pins exist.
+  const [snap] = useState(() => { const v = returnSnapshot; returnSnapshot = null; return v })
+  const pendingRouteId = useRef(snap?.routeId ?? null)
+  const pendingPinId   = useRef(snap?.pinId ?? null)
+  const panelScrollY   = useRef(snap?.panelScrollY ?? 0)
 
   const [places, setPlaces]   = useState([])
   const [loading, setLoading] = useState(true)
@@ -244,22 +261,22 @@ export default function ExploreMapScreen({
   // Empty set = "All". See selectedPins(): All is the UNION OF VISIBLE SOURCES, never a
   // bypass of the gate — the default path is the one nearly every user takes, so it is
   // the path that most needs the gate on it.
-  const [selectedKeys, setSelectedKeys] = useState(() => new Set())
-  const [openNow, setOpenNow] = useState(false)
+  const [selectedKeys, setSelectedKeys] = useState(() => new Set(snap?.selectedKeys ?? []))
+  const [openNow, setOpenNow] = useState(snap?.openNow ?? false)
 
   const review   = EXPLORE_REVIEW && isAdmin
   const routesOn = routesLayerVisible({ routesLive: EXPLORE_ROUTES_LIVE, review: EXPLORE_REVIEW, isAdmin })
   const [routeRows, setRouteRows]         = useState([])
   const [routesError, setRoutesError]     = useState(false)
-  const [routesMode, setRoutesMode]       = useState(false)
+  const [routesMode, setRoutesMode]       = useState(snap?.routesMode ?? false)
   const [selectedRoute, setSelectedRoute] = useState(null)
 
-  const initialRegion = useMemo(() => (
+  const initialRegion = useMemo(() => snap?.region ?? (
     userLocation
       ? { latitude: userLocation.latitude, longitude: userLocation.longitude,
           latitudeDelta: 0.5, longitudeDelta: 0.5 }
       : TRNC_CENTER
-  ), [userLocation])
+  ), [userLocation, snap])
 
   const [region, setRegion] = useState(initialRegion)
 
@@ -311,6 +328,15 @@ export default function ExploreMapScreen({
   )
   const showRoutesChip = routesOn && (routeRows.length > 0 || routesError)
 
+  // Restore, NOT open: openRoute() would fitTo and fight the restored camera.
+  useEffect(() => {
+    const id = pendingRouteId.current
+    if (!id || routes.length === 0) return
+    pendingRouteId.current = null
+    const r = routes.find(x => x.id === id)
+    if (r) setSelectedRoute(r)
+  }, [routes])
+
   const fitTo = useCallback((coords, bottomShare) => {
     if (!coords.length) return
     mapRef.current?.fitToCoordinates(coords, {
@@ -328,6 +354,7 @@ export default function ExploreMapScreen({
   const leaveRoutes = useCallback(() => { setRoutesMode(false); setSelectedRoute(null) }, [])
 
   const openRoute = useCallback(r => {
+    panelScrollY.current = 0
     setSelectedRoute(r)
     fitTo(fitRoute(r), 0.55)
   }, [fitTo])
@@ -363,6 +390,23 @@ export default function ExploreMapScreen({
       return next
     })
   }, [leaveRoutes])
+
+  useEffect(() => {
+    const id = pendingPinId.current
+    if (!id || pins.length === 0) return
+    pendingPinId.current = null
+    const pin = pins.find(x => x.id === id)
+    if (pin) setSelected(pin)
+  }, [pins])
+
+  // Every handoff off this map goes through here, so every one of them comes back to it.
+  const handOff = useCallback((go, pinId = null) => {
+    returnSnapshot = {
+      region, selectedKeys: [...selectedKeys], openNow, routesMode,
+      routeId: selectedRoute?.id ?? null, panelScrollY: panelScrollY.current, pinId,
+    }
+    go()
+  }, [region, selectedKeys, openNow, routesMode, selectedRoute])
 
   const index = useMemo(() => {
     const idx = new Supercluster(CLUSTER_OPTS)
@@ -439,7 +483,7 @@ export default function ExploreMapScreen({
             routes={routes}
             selected={selectedRoute}
             onSelectRoute={openRoute}
-            onSelectStop={p => onSelectPlace?.(p)}
+            onSelectStop={p => handOff(() => onSelectPlace?.(p))}
           />
         )}
         {!routesMode && clusters.map(c => {
@@ -475,12 +519,15 @@ export default function ExploreMapScreen({
 
       {routesMode && (selectedRoute
         ? <RoutePanel
+            key={selectedRoute.id}
             route={selectedRoute}
             lang={lang}
             maxHeight={Math.round(height * 0.55)}
             review={review}
             onClose={closeRoute}
-            onSelectStop={p => onSelectPlace?.(p)}
+            onSelectStop={p => handOff(() => onSelectPlace?.(p))}
+            initialScrollY={panelScrollY.current}
+            onScrollY={y => { panelScrollY.current = y }}
           />
         : <RoutePicker routes={routes} lang={lang} error={routesError} onSelectRoute={openRoute} />
       )}
@@ -499,11 +546,11 @@ export default function ExploreMapScreen({
           onViewProfile={() => {
             const pin = selected
             setSelected(null)
-            if (pin.kind === 'place') { onSelectPlace?.(pin.row); return }
+            if (pin.kind === 'place') { handOff(() => onSelectPlace?.(pin.row), pin.id); return }
             // Health keeps the claimed / unclaimed split the tab has always had: an
             // unclaimed facility has no provider and opens the unclaimed sheet instead.
-            if (pin.row.provider_id) onSelectFacility?.(pin.row)
-            else onSelectUnclaimed?.(pin.row)
+            if (pin.row.provider_id) handOff(() => onSelectFacility?.(pin.row), pin.id)
+            else handOff(() => onSelectUnclaimed?.(pin.row), pin.id)
           }}
         />
       )}

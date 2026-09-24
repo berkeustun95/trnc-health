@@ -6,7 +6,7 @@
 // it describes. Android back is therefore handled here (OliGuide's pattern) — App.js's
 // handler knows nothing about local panel state and would leave the tab instead.
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, BackHandler } from 'react-native'
 import { Marker, Polyline } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
@@ -124,7 +124,9 @@ export function RoutePicker({ routes, lang, error, onSelectRoute }) {
   )
 }
 
-export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectStop }) {
+export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectStop, initialScrollY = 0, onScrollY }) {
+  const scrollRef = useRef(null)
+  const restored  = useRef(initialScrollY === 0)
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true })
     return () => sub.remove()
@@ -154,7 +156,20 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
       <Text style={p.summary}>{routeSummary(route, lang)}</Text>
       <Text style={p.note}>{t('routeEstimateNote', lang)}</Text>
 
-      <ScrollView style={p.stops} contentContainerStyle={{ paddingVertical: 4 }}>
+      {/* Scroll offset survives the stop → place → back round trip (ExploreMapScreen's
+          return memory). Restored once the list has laid out, on both platforms. */}
+      <ScrollView
+        ref={scrollRef}
+        style={p.stops}
+        contentContainerStyle={{ paddingVertical: 4 }}
+        scrollEventThrottle={64}
+        onScroll={e => onScrollY?.(e.nativeEvent.contentOffset.y)}
+        onContentSizeChange={() => {
+          if (restored.current) return
+          restored.current = true
+          scrollRef.current?.scrollTo({ y: initialScrollY, animated: false })
+        }}
+      >
         {route.stops.map((s, i) => (
           <TouchableOpacity key={s.id} style={p.stop} onPress={() => onSelectStop(s)} activeOpacity={0.7}>
             <View style={m.num}><Text style={m.numText}>{i + 1}</Text></View>
