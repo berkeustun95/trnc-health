@@ -26,8 +26,8 @@ import { logContactEvent } from '../../utils/logContactEvent'
 //   beyond tidiness: a screen-side `&&` chain cannot be tested without rendering, and it
 //   gets copied wrong when the second partner arrives.
 //
-//   TODAY THAT MEANS FOUR SECTIONS RENDER, NOT SEVEN. `about` is a pending key, and
-//   `practical` and `pricing` are wholly pending — so the page is hero → services →
+//   TODAY THAT MEANS FIVE SECTIONS RENDER, NOT SEVEN. `about` is a pending key and
+//   `pricing` is declined by the partner, so the page is hero → services → practical →
 //   location → contact. That is the FINISHED page for what Shiny Paw has told us, not a
 //   degraded one: no empty rows, no "bilgi yok", no greyed placeholders. A greyed row tells
 //   the user the app is broken; an absent section tells them nothing, which is the honest
@@ -262,14 +262,14 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
             </Block>
           )
 
-          // Pending today, so absent today. Written as a real branch rather than left out,
-          // because the day one of these fields arrives it must render with no screen edit.
+          // Each value is an i18n key (petPartnerSections), so a value renders in the
+          // reader's language like its label does.
           if (id === 'practical' && !!sec.practical) return (
             <Block key={id} title={t('petHotelPractical', lang)}>
               {sec.practical.map(r => (
                 <View key={r.id} style={s.row}>
                   <Text style={s.rowLabel}>{t(r.labelKey, lang)}</Text>
-                  <Text style={s.rowValue}>{r.value}</Text>
+                  <Text style={s.rowValue}>{t(r.value, lang)}</Text>
                 </View>
               ))}
             </Block>
@@ -397,7 +397,10 @@ const s = StyleSheet.create({
   row:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                   paddingVertical: 7, gap: 12 },
   rowLabel:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, flexShrink: 0 },
-  rowValue:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flexShrink: 1 },
+  // textAlign right: a practical value that wraps (ru/el/es/fr/ar/fa at 320dp, measured
+  // 2026-09-24) must hug the right edge like the single-line values above and below it,
+  // not start mid-row. Contact-row values are single-line, so they are unchanged.
+  rowValue:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },
   rowValueLink: { color: colors.primary },
   rowRight:     { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
 

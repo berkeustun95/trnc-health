@@ -38,9 +38,10 @@
 // Data, not JSX position, so the order can change without a component edit — the same
 // reason dorms.js keeps SECTION_ORDER out of its screen.
 //
-// ⚠ `practical` AND `pricing` ARE BOTH WHOLLY PENDING TODAY, so with the config as it
-//   stands this list renders as hero → services → location → contact. That is not a
-//   degraded page; it is the finished page for what Shiny Paw has actually told us.
+// With the config as it stands (2026-09-24) this renders as hero → services → practical →
+//   location → contact. `about` is a pending key; `pricing` never renders, because the
+//   partner declined to publish prices (DECLINED_FIELDS). The branch stays so a future
+//   partner who does publish needs no screen edit.
 export const SECTION_ORDER = ['hero', 'about', 'services', 'practical', 'pricing', 'location', 'contact']
 
 // ─── WHAT WE DO NOT KNOW, DECLARED RATHER THAN GUESSED ──────────────────────
@@ -54,18 +55,20 @@ export const SECTION_ORDER = ['hero', 'about', 'services', 'practical', 'pricing
 // these (fetched 2026-09-14), so there is no source to copy from either.
 export const PENDING_FIELDS = {
   address:                 'Site says "Lefkoşa" and no more. A district is not a street address.',
-  prices:                  'Not published. A boarding rate depends on nights, size and season — there is no single number to quote and guessing one is a promise we cannot keep.',
-  openingHours:            'Not published.',
-  dropOffPickUpHours:      'Not published, and NOT the same question as opening hours — boarding facilities routinely restrict handover to narrower windows. Two fields, so a later answer to one cannot be silently read as an answer to both.',
-  capacity:                'Not published.',
-  acceptedSizes:           'Not published.',
-  breedRestrictions:       'Not published. Note the TRNC banned-breed list already surfaces in BringingPetScreen; that is IMPORT law and says nothing about what this business accepts. Do not cross-wire them.',
-  vaccinationRequirements: 'Not published. OwningPetScreen carries a general TRNC vaccination schedule; that is not this facility\'s intake policy and must not be presented as it.',
-  acceptsCats:             'Not published. Everything they publish is dog-only, which is why displayType is dog_boarding — but "no cats mentioned" is not "cats refused", and stating either would be inventing their policy.',
-  cameraAccess:            'PENDING ON PURPOSE, AND THE DISTINCTION IS THE POINT. Their 7/24 İzleme copy says THEY monitor with a camera system. It does NOT say the owner gets a feed. Those are different products and merging them promises something the partner never offered.',
   logoOnDark:              'No inverted wordmark. The partner sent a JPEG on white; shinypaw/logo.png keys that white out, which is clean on light grounds but NOT on dark: the white strokes inside the mark vanish, a light halo remains, and the brown wordmark loses contrast. Ask the partner for a vector or a transparent PNG. partnerLogo() falls back to `logo`, and no surface that renders a pet partner is dark today.',
   accent:                  'No brand colour agreed. The screen falls back to colors.primary, which check-pet-partners.mjs proves is readable; an unvetted hex could ship unreadable text.',
   photoPermission:         'WRITTEN PERMISSION NOT YET HELD for the five partner-supplied photos below — the partner sent the files, not a written permission. Tracked as a field so it is owed rather than remembered.',
+}
+
+// ─── DECLINED: A DECISION, NOT A GAP ────────────────────────────────────────
+//
+// Not pending. Nobody is waiting on these, so they are not in PENDING_FIELDS, and the
+// partner entry carries NO key for them (null would mean "asked, not yet known").
+// scripts/check-pet-partners.mjs fails if a declined field's key appears on the entry or
+// in PENDING_FIELDS, or if one reaches the rendered sections.
+export const DECLINED_FIELDS = {
+  email:  'Not shown, by decision (2026-09-24). Contact is WhatsApp, call, website and Maps only.',
+  prices: 'The partner declined to publish prices (2026-09-24). The pricing section never renders; a rate is agreed over WhatsApp.',
 }
 
 // ─── THE PARTNERS ───────────────────────────────────────────────────────────
@@ -100,8 +103,8 @@ export const PET_PARTNERS = [
     // from "dog boarding" to "pet hotel" costs nothing to make and misleads somebody with
     // a cat at the moment they most need a straight answer.
     //
-    // acceptsCats is PENDING and must stay that way. This field says what they advertise;
-    // it does not say what they refuse.
+    // It says what they advertise. That they REFUSE cats is a separate fact, confirmed by
+    // the partner 2026-09-24 and held in `acceptsCats` below.
     displayType: 'dog_boarding',
 
     website:  'https://www.shinypawhotel.com',
@@ -247,20 +250,35 @@ export const PET_PARTNERS = [
     // Written out in full rather than omitted. An absent key and a null one read the same
     // to `?.`, but only the null one tells the next person the question was ASKED.
     //
-    // ⚠ NO `email` KEY, DELIBERATELY OMITTED (decided 2026-09-24). Contact is WhatsApp,
-    //   call, website and Maps only. Not pending, so not in PENDING_FIELDS, and not null,
-    //   because null means "asked, not yet known". check-pet-partners.mjs fails if an
-    //   `email` key appears or 'email' reaches the contact actions.
+    // ⚠ NO `email` OR `prices` KEY. Both are DECLINED (see DECLINED_FIELDS), which is a
+    //   decision rather than a gap, so neither is null here.
     address:                 null,
-    prices:                  null,
-    openingHours:            null,
-    dropOffPickUpHours:      null,
-    capacity:                null,
-    acceptedSizes:           null,
-    breedRestrictions:       null,
-    vaccinationRequirements: null,
-    acceptsCats:             null,
-    cameraAccess:            null,
+
+    // ─── OPERATIONAL DETAILS, SUPPLIED BY THE PARTNER 2026-09-24 ────────────
+    //
+    // Every displayed value is an i18n KEY, in all nine locales, like every other string in
+    // this config. The two that are partner-specific facts (hours, capacity) carry their own
+    // petHotelShinyPaw* key, so changing one is a nine-locale edit in constants/i18n.js.
+    //
+    // ⚠ vaccinationRequirements: they said a vaccination card (aşı karnesi) is mandatory and
+    //   named NO vaccines. Do not add any: OwningPetScreen's TRNC schedule is general advice,
+    //   not this facility's intake policy.
+    //
+    // ⚠ cameraAccess: true means the OWNER can watch the 24/7 cameras. That is not the same
+    //   claim as the monitoring service (THEY watch), and the value copy in every locale says
+    //   the owner watches. Kept a boolean; petPartnerSections() maps true to its key.
+    //
+    // acceptsCats: false is stored and NOT rendered as a row. The "Dog boarding" pill in the
+    // hero already answers it, and the practical list never had a cats row.
+    openingHours:            'petHotelShinyPawHours',
+    dropOffPickUpHours:      'petHotelValHandoverFlexible',
+    capacity:                'petHotelShinyPawCapacity',
+    acceptedSizes:           'petHotelValSizesAll',
+    breedRestrictions:       'petHotelValBreedsNone',
+    vaccinationRequirements: 'petHotelValVaccinationCard',
+    acceptsCats:             false,
+    cameraAccess:            true,
+
     logo:                    'shinypaw/logo',
     logoOnDark:              null,
     accent:                  null,
@@ -310,10 +328,9 @@ export function petPartnerSections(partner, { resolveAsset = () => undefined } =
     }))
     .filter(p => p.source)
 
-  // Every practical field is pending today, so `practical` is null and the section is
-  // absent. Built as a filtered list rather than an object so ONE answered question is
-  // enough to render the section with exactly that one row — and so adding a field later
-  // needs no change here.
+  // Every `value` is an i18n KEY; the screen renders t(value). Built as a filtered list
+  // rather than an object so a pending field drops its row, a single answered field is
+  // enough to render the section, and adding a field later needs no change here.
   const practical = [
     { id: 'openingHours',            labelKey: 'petHotelHours',        value: val(partner?.openingHours) },
     { id: 'dropOffPickUpHours',      labelKey: 'petHotelHandover',     value: val(partner?.dropOffPickUpHours) },
@@ -321,7 +338,9 @@ export function petPartnerSections(partner, { resolveAsset = () => undefined } =
     { id: 'acceptedSizes',           labelKey: 'petHotelSizes',        value: val(partner?.acceptedSizes) },
     { id: 'breedRestrictions',       labelKey: 'petHotelBreeds',       value: val(partner?.breedRestrictions) },
     { id: 'vaccinationRequirements', labelKey: 'petHotelVaccination',  value: val(partner?.vaccinationRequirements) },
-    { id: 'cameraAccess',            labelKey: 'petHotelCameraAccess', value: val(partner?.cameraAccess) },
+    // A boolean, mapped here: true is the owner-watches key. false has no row: we would be
+    // stating a negative nobody asked about, and no partner has said it.
+    { id: 'cameraAccess',            labelKey: 'petHotelCameraAccess', value: partner?.cameraAccess === true ? 'petHotelValCameraOwners' : null },
   ].filter(r => r.value !== null)
 
   // Location renders on EITHER half. Address is pending and mapsUrl is known, so today

@@ -35,7 +35,7 @@ import { readFileSync, statSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  PET_PARTNERS, PET_PARTNER_IDS, PENDING_FIELDS, PENDING_KEYS, SECTION_ORDER,
+  PET_PARTNERS, PET_PARTNER_IDS, PENDING_FIELDS, DECLINED_FIELDS, PENDING_KEYS, SECTION_ORDER,
   petPartner, petPartnerBySlug, petPartnerSections,
   petWaLocale, petWaCode, petWaMessage, petWaUrl, petPartnerWebsiteUrl,
 } from '../constants/petPartners.js'
@@ -148,8 +148,19 @@ for (const p of PET_PARTNERS) {
     + `do not widen this one to 'pets'.`)
 
   check(!p.website || /^https:\/\//.test(p.website), `${who}: website must be https, got ${p.website}`)
-  // Email is deliberately omitted (2026-09-24): the KEY must be absent, not merely null.
-  check(!('email' in p), `${who}: has an \`email\` key (${JSON.stringify(p.email)}). Email is omitted by decision — contact is WhatsApp, call, website and Maps only`)
+  // ─── DECLINED ≠ PENDING ─────────────────────────────────────────────────
+  // A declined field (email, prices) is a decision, not a gap: the KEY must be absent from
+  // the entry (null would mean "asked, not yet known") and it must not also sit in
+  // PENDING_FIELDS. Iterated from DECLINED_FIELDS, never a remembered name list.
+  for (const f of Object.keys(DECLINED_FIELDS)) {
+    check(!(f in p), `${who}: has a \`${f}\` key (${JSON.stringify(p[f])}), but ${f} is DECLINED: ${DECLINED_FIELDS[f]}`)
+    check(!(f in PENDING_FIELDS), `${who}: ${f} is in both DECLINED_FIELDS and PENDING_FIELDS — it is one or the other`)
+    check(typeof DECLINED_FIELDS[f] === 'string' && DECLINED_FIELDS[f].trim().length > 0,
+      `${who}: DECLINED_FIELDS.${f} has no reason written against it`)
+  }
+  // Coherence: a partner that takes cats cannot be labelled dog boarding.
+  check(!(p.acceptsCats === true && p.displayType === 'dog_boarding'),
+    `${who}: acceptsCats is true but displayType is dog_boarding — the hero pill would tell a cat owner no`)
   check(!p.mapsUrl || /^https:\/\//.test(p.mapsUrl), `${who}: mapsUrl must be https, got ${p.mapsUrl}`)
 
   // Phone/WhatsApp reach a real business. A malformed number fails at the moment somebody
@@ -308,9 +319,10 @@ for (const p of PET_PARTNERS) {
   check(badAspect.photos?.[0]?.aspect === 1,
     `${who}: a zero aspect was not replaced by the square fallback — got ${JSON.stringify(badAspect.photos?.[0]?.aspect)}`)
 
-  // THE CLAIM THAT MATTERS. Every practical field is pending, so the section must be null —
-  // not [], not an object of nulls. A screen that receives [] renders a heading with
-  // nothing under it.
+  // THE CLAIM THAT MATTERS: a section with no answered field must be null — not [], not an
+  // object of nulls. A screen that receives [] renders a heading with nothing under it.
+  // And with answered fields, EVERY one must reach a row: `!== null` alone cannot see a
+  // value that silently dropped out of the list.
   const anyPractical = ['openingHours', 'dropOffPickUpHours', 'capacity', 'acceptedSizes',
                         'breedRestrictions', 'vaccinationRequirements', 'cameraAccess']
                         .some(f => p[f] !== null && p[f] !== undefined && p[f] !== '')
@@ -318,8 +330,18 @@ for (const p of PET_PARTNERS) {
     `${who}: sections.practical is ${JSON.stringify(sec.practical)} while the underlying fields are `
     + `${anyPractical ? 'partly answered' : 'all pending'} — a pending section must be null so the screen omits it entirely`)
 
-  check(p.prices === null ? sec.pricing === null : sec.pricing !== null,
-    `${who}: sections.pricing disagrees with p.prices`)
+  const answeredPractical = ['openingHours', 'dropOffPickUpHours', 'capacity', 'acceptedSizes',
+    'breedRestrictions', 'vaccinationRequirements'].filter(f => p[f] !== null && p[f] !== undefined && p[f] !== '').length
+    + (p.cameraAccess === true ? 1 : 0)
+  check((sec.practical || []).length === answeredPractical,
+    `${who}: ${answeredPractical} practical field(s) are answered but ${(sec.practical || []).length} row(s) rendered: `
+    + `[${(sec.practical || []).map(r => r.id).join(', ')}]`)
+  // Every rendered value is an i18n KEY. Registered here so the English-resolve check below
+  // catches a typo'd value key, which would otherwise render as raw key text.
+  for (const r of sec.practical || []) { referencedKeys.add(r.labelKey); referencedKeys.add(r.value) }
+
+  // Prices are DECLINED, so the key is absent and pricing must never render.
+  check(sec.pricing === null, `${who}: sections.pricing is ${JSON.stringify(sec.pricing)} — prices are declined and must never render`)
 
   // Location renders on EITHER half. With address pending and mapsUrl known, it must
   // render — a directions button is a real affordance even with no street line.
