@@ -38,7 +38,7 @@ Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listele
 • Doğum tarihi — 13 yaşında veya daha büyük olduğunuzu doğrulamak için. Girdiğiniz anda kontrol edilir ve bu bilgi olmadan hesap tamamlanamaz. Ayrıca 18 yaşından küçük olup olmadığınızı belirlemek için kullanılır; bu da size gösterilen reklamları etkiler (5. bölüme bakınız).
 • Uyruk — hangi ikamet, izin ve evrak bilgilerinin sizin için geçerli olduğunu ve öncelikle hangi dilleri sunmamız gerektiğini belirleyebilmek için. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
 • Telefon numarası — isteğe bağlıdır. Verirseniz, hesabınızla ilgili konularda sizinle iletişime geçebilmemiz için hesabınızda saklanır. Diğer kullanıcılara gösterilmez ve hizmet sağlayıcılara verilmez. Telefon numarası vermeden ADA'yı eksiksiz kullanabilirsiniz.
-• KKTC içindeki bölgeniz — listelerin, nöbetçi eczane çizelgelerinin ve arama sonuçlarının yalnızca telefonunuzun o anda bulunduğu yere göre değil, yaşadığınız yere göre sıralanabilmesi için. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
+• KKTC içindeki bölgeniz — listelerin, nöbetçi eczane çizelgelerinin ve arama sonuçlarının yalnızca telefonunuzun o anda bulunduğu yere göre değil, yaşadığınız yere göre sıralanabilmesi için. Bugün Ana Sayfa'nın üstündeki bölge adını ve fotoğrafını seçer; uygulamada bu veriyi okuyan başka bir bölüm henüz yok.
 • İkamet durumu — öğrenci, burada çalışıyor, ikamet ediyor veya ziyaretçi — ve öğrenciyseniz öğrenim düzeyiniz ile üniversite ve lisansüstü öğrenim için kurumunuz. Bu bilgi, ADA'nın hangi bölümlerinin önünüze çıkarılacağını belirlemek için düşünülmüştür; çünkü yeni gelmiş birinin ihtiyaçlarıyla on yıldır burada yaşayan birinin ihtiyaçları aynı değildir. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
 • Üniversite bilgileri (eklerseniz) — hâlen ya da daha önce okuduğunuz üniversiteler (şu anda öğrenci olmanız gerekmez), bölümünüz, başlama ve mezuniyet yıllarınız; ayrıca üniversitenizin öğrenci listesinde görünmeyi seçip seçmediğiniz. Bu ayar siz açmadıkça kapalıdır.
 • Tercih ettiğiniz dil — uygulamayı ve size gönderdiğimiz bildirimleri kendi dilinizde gösterebilmek için.
@@ -158,7 +158,7 @@ Hesabınızdaki verileri istediğiniz zaman profil ayarlarınızdan görebilir v
 
 • Erişim — hakkınızda tuttuğumuz kişisel verilerin bir kopyasını talep etmek.
 • Düzeltme — hatalı verilerin düzeltilmesini istemek.
-• Silme — hesabınızın ve ilgili tüm verilerin silinmesini talep etmek. Silme işlemini 30 gün içinde gerçekleştiririz.
+• Silme — hesabınızın ve ilgili tüm verilerin ya da hesabınızı silmeden belirli verilerin silinmesini talep etmek. Silme işlemini 30 gün içinde gerçekleştiririz. Kendi değerlendirmelerinizi, sorularınızı ve mesajlarınızı silmek ve telefon numaranızı kaldırmak için uygulamayı kendiniz de kullanabilirsiniz.
 • Taşınabilirlik — bize verdiğiniz verileri yapılandırılmış, yaygın olarak kullanılan ve makine tarafından okunabilir bir biçimde almak.
 • İtiraz — meşru menfaatimize dayanarak yürüttüğümüz işlemelere, reklam kişiselleştirmesi dâhil, itiraz etmek.
 • Kısıtlama — verinizle ilgili bir uyuşmazlık çözülene kadar kullanımını sınırlamamızı istemek.

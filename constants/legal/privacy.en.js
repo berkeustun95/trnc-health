@@ -38,7 +38,7 @@ Profile data. Each field is listed with what it is for. Where a field is marked 
 • Date of birth — to confirm you are 13 or over. This is checked when you enter it and the account cannot be completed without it. It is also used to determine whether you are under 18, which affects the advertising you are shown (see section 5).
 • Nationality — so that we can tell which residency, permit and paperwork information applies to you, and which languages to offer first. Not used yet — nothing in the app reads it.
 • Phone number — optional. If you provide it, it is held on your account so that we can contact you about your account. It is not shown to other users and is not given to providers. You can use ADA fully without giving us a phone number.
-• Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Not used yet — nothing in the app reads it.
+• Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Today it chooses the district name and photo at the top of the Home screen; nothing else in the app reads it yet.
 • Resident status — student, working here, resident, or visiting — and, if you are a student, your study level and, for university and postgraduate study, your institution. This is intended to decide which parts of ADA are put in front of you, because someone who has just arrived needs different things from someone who has lived here ten years. Not used yet — nothing in the app reads it.
 • University details, if you add them — the universities you study at now or studied at before (you do not need to be a student now), your field of study, the years you started and graduated, and whether you have chosen to appear in your university's student list. That setting is off unless you turn it on.
 • Preferred language — to show the app, and the notifications we send you, in your language.
@@ -158,7 +158,7 @@ You can see and correct the data on your account in your profile settings at any
 
 • Access — ask us for a copy of the personal data we hold about you.
 • Rectification — have inaccurate data corrected.
-• Erasure — request deletion of your account and all associated data. We will process deletion within 30 days.
+• Erasure — request deletion of your account and all associated data, or of particular data without deleting your account. We will process deletion within 30 days. You can delete your own reviews, questions and messages, and clear your phone number, in the app yourself.
 • Portability — receive the data you gave us in a structured, commonly used, machine-readable format.
 • Objection — object to processing we carry out on the basis of our legitimate interests, including advertising personalisation.
 • Restriction — ask us to limit how we use your data while a dispute about it is resolved.
