@@ -38,6 +38,13 @@ import { install as installTextAudit, AuditControls } from './devTextAudit'
 //                              errors anywhere in this app, it just matches nothing, so it
 //                              is validated here and refused loudly.
 //   EXPO_PUBLIC_DEV_ONBOARDED  'true' to skip the onboarding carousel on a fresh install.
+//   EXPO_PUBLIC_DEV_POLICY_NOTICE_RESET
+//                              any token (e.g. a timestamp). Clears `@trnc_policy_seen` ONCE
+//                              per token, so the policy-update notice shows again on a device
+//                              that already dismissed it. One-shot on purpose: later launches
+//                              with the same token leave it alone, so kill-and-reopen really
+//                              tests that the notice STAYS closed. "Seen" is device-only
+//                              (never on the account), which is why this is the only reset.
 
 const VALID_LANGS = new Set(LANGUAGES.map(l => l.key))
 
@@ -53,6 +60,18 @@ async function seedLaunchArgs() {
       console.warn(`[ada-dev] EXPO_PUBLIC_DEV_LANG='${lang}' is not a language this app has.\n` +
                    `          Expected one of: ${[...VALID_LANGS].join(', ')}\n` +
                    `          (full English names — 'tr' and 'el' match nothing here). Ignored.`)
+    }
+  }
+
+  const policyReset = process.env.EXPO_PUBLIC_DEV_POLICY_NOTICE_RESET
+  if (policyReset) {
+    const done = await AsyncStorage.getItem('@trnc_dev_policy_reset')
+    if (done !== policyReset) {
+      await AsyncStorage.removeItem('@trnc_policy_seen')
+      await AsyncStorage.setItem('@trnc_dev_policy_reset', policyReset)
+      console.log(`[ada-dev] @trnc_policy_seen cleared (token ${policyReset}) — the policy notice shows once.`)
+    } else {
+      console.log(`[ada-dev] policy-notice reset already used for token ${policyReset} — not clearing again.`)
     }
   }
 
