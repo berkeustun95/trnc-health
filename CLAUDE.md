@@ -883,6 +883,12 @@ thread — not on Home, and not on a spinner.
   above) where English never did.
 
 ## Android Gotchas
+- **App.js `content` may only read values defined ABOVE the content selector.** Hermes does
+  not enforce the temporal dead zone, so a `const` declared below the selector reads
+  `undefined` inside it — no error. And RN's `Modal` treats `visible={undefined}` as SHOWN.
+  Together they shipped (2026-09-24) a policy notice every user saw and nobody could close.
+  Overlays whose state is computed after the selector go in App's FINAL return (like
+  OliGuide); pass Modals `visible={x === true}`. `check-policy-notice.mjs` guards the notice.
 - Views with `borderRadius` + `borderWidth` on Android may render an opaque background unless `backgroundColor: 'transparent'` is set explicitly.
 - Never cache element positions in `onLayout` for later use — layout can shift (e.g. async data loading) and the cached value goes stale. Always measure with `measureRef()` at the moment you need the position.
 - **A REINSTALL DOES NOT RESET FIRST-RUN STATE ON ANDROID — Auto Backup restores it.**
