@@ -369,8 +369,13 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //   and most of its steps have no referent here: there are no rows to seed inactive, no
 //   window in which content is searchable but gated, and no waitlist to notify.
 //
-// ⚠ A REAL DEVICE PASS IS A HARD GATE BEFORE THIS FLIPS, AND IT HAS NOT HAPPENED. The
-//   build was verified with a font-metric overflow probe instead — real Inter advances,
+// ✓ DEVICE PASS: DONE AND APPROVED — Berke, 2026-09-24, Expo Go, guest account, the flag
+//   flipped locally and uncommitted, feat/shinypaw-assets at ccaa55d. It covered every
+//   surface listed below. The hard gate this paragraph describes is SATISFIED.
+//   Still separate: the post-OTA check on the Play Store build (two open → kill → reopen
+//   cycles), which Expo Go cannot stand in for.
+//
+//   Before the device pass, the build was verified with a font-metric overflow probe — real Inter advances,
 //   all nine locales at 320dp — which caught one genuine Turkish clip: the cross-link
 //   title and the partner badge shared a row, and "Seyahate mi çıkıyorsunuz?" plus
 //   "ADA İş Ortağı" came to 257.8pt in a 190.0pt box.
