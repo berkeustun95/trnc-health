@@ -1,3 +1,5 @@
+ADA is an independent app. ADA is not affiliated with, endorsed by, or acting on behalf of any government entity or public authority and does not provide or facilitate government services.
+
 ADA is the all-in-one city guide for residents, students and newcomers in North Cyprus (TRNC / KKTC). Everything you need in Nicosia (Lefkoşa), Kyrenia (Girne), Famagusta (Gazimağusa), Güzelyurt, İskele and Lefke, in one app.
 
 - Explore map – places, cafés, restaurants, beaches and city walking routes
@@ -7,5 +9,17 @@ ADA is the all-in-one city guide for residents, students and newcomers in North 
 - Pets – vets and pet hotels
 
 Available in 9 languages, including English, Turkish, Russian, Arabic and Persian. Whether you've lived here for years or just arrived for university, ADA makes everyday life in Northern Cyprus easier.
+
+INFORMATION SOURCES
+
+ADA displays publicly available information published by the organisations below. ADA is not the origin of this information. Please confirm details with the official source before acting on them.
+
+Exchange rates — Central Bank of the TRNC: https://mb.gov.ct.tr/tr/veriler/doviz_kurlari/kur_sorgulama
+
+Embassies and consular information — TRNC Ministry of Foreign Affairs: https://mfa.gov.ct.tr/tr
+
+Border crossings, driving rules and traffic information — TRNC Police General Directorate: https://www.polis.gov.ct.tr/
+
+Inside the app, every listing taken from an official source links back to that source.
 
 Download free and explore Cyprus.

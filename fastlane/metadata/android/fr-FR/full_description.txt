@@ -1,3 +1,5 @@
+ADA est une application indépendante. ADA n'est affiliée à aucune entité gouvernementale ni autorité publique, n'est approuvée par aucune d'elles, n'agit pas en leur nom et ne fournit ni ne facilite aucun service gouvernemental.
+
 ADA est le guide tout-en-un pour les résidents, étudiants et nouveaux arrivants à Chypre du Nord. Tout ce dont vous avez besoin à Nicosie (Lefkoşa), Kyrenia (Girne), Famagouste (Gazimağusa), Güzelyurt, İskele et Lefke, dans une seule application.
 
 - Carte Explorer – lieux, cafés, restaurants, plages et itinéraires de promenade en ville
@@ -7,5 +9,17 @@ ADA est le guide tout-en-un pour les résidents, étudiants et nouveaux arrivant
 - Animaux – vétérinaires et pensions pour animaux
 
 Disponible en 9 langues, dont le français, l'anglais, le turc, le russe et l'allemand. Que vous viviez ici depuis des années ou que vous veniez d'arriver pour vos études, ADA simplifie votre quotidien à Chypre du Nord.
+
+SOURCES D'INFORMATION
+
+ADA affiche des informations publiques publiées par les organismes ci-dessous. ADA n'est pas à l'origine de ces informations. Veuillez vérifier les détails auprès de la source officielle avant d'agir.
+
+Taux de change — Banque centrale de la RTCN : https://mb.gov.ct.tr/tr/veriler/doviz_kurlari/kur_sorgulama
+
+Ambassades et informations consulaires — Ministère des Affaires étrangères de la RTCN : https://mfa.gov.ct.tr/tr
+
+Passages frontaliers, code de la route et informations sur la circulation — Direction générale de la police de la RTCN : https://www.polis.gov.ct.tr/
+
+Dans l'application, chaque fiche issue d'une source officielle renvoie vers cette source.
 
 Téléchargez gratuitement et explorez Chypre.

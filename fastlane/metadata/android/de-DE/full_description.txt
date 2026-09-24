@@ -1,3 +1,5 @@
+ADA ist eine unabhängige App. ADA ist mit keiner Regierungsstelle oder Behörde verbunden, wird von keiner unterstützt, handelt nicht in deren Auftrag und bietet oder vermittelt keine staatlichen Dienstleistungen.
+
 ADA ist der All-in-one-Stadtführer für Einwohner, Studierende und Neuankömmlinge in Nordzypern. Alles, was du in Nikosia (Lefkoşa), Kyrenia (Girne), Famagusta (Gazimağusa), Güzelyurt, İskele und Lefke brauchst – in einer App.
 
 - Entdecken-Karte – Orte, Cafés, Restaurants, Strände und Stadtspaziergänge
@@ -7,5 +9,17 @@ ADA ist der All-in-one-Stadtführer für Einwohner, Studierende und Neuankömmli
 - Haustiere – Tierärzte und Tierpensionen
 
 Verfügbar in 9 Sprachen, darunter Deutsch, Englisch, Türkisch, Russisch und Französisch. Ob du schon Jahre hier lebst oder gerade zum Studium angekommen bist – ADA macht deinen Alltag in Nordzypern einfacher.
+
+INFORMATIONSQUELLEN
+
+ADA zeigt öffentlich zugängliche Informationen an, die von den unten genannten Stellen veröffentlicht werden. ADA ist nicht der Ursprung dieser Informationen. Bitte prüfe die Angaben bei der offiziellen Quelle, bevor du danach handelst.
+
+Wechselkurse — Zentralbank der TRNZ: https://mb.gov.ct.tr/tr/veriler/doviz_kurlari/kur_sorgulama
+
+Botschaften und konsularische Informationen — Außenministerium der TRNZ: https://mfa.gov.ct.tr/tr
+
+Grenzübergänge, Verkehrsregeln und Verkehrsinformationen — Generaldirektion der Polizei der TRNZ: https://www.polis.gov.ct.tr/
+
+In der App verweist jeder Eintrag aus einer offiziellen Quelle auf diese Quelle.
 
 Kostenlos herunterladen und Zypern entdecken.

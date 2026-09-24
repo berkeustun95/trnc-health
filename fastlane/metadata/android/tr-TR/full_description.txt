@@ -1,3 +1,5 @@
+ADA bağımsız bir uygulamadır. ADA herhangi bir devlet kurumu veya kamu otoritesiyle bağlantılı değildir, onlar tarafından onaylanmamıştır, onlar adına hareket etmez ve devlet hizmeti sunmaz ya da bu hizmetlere aracılık etmez.
+
 ADA, Kuzey Kıbrıs'ta (KKTC) yaşayanlar, öğrenciler ve yeni gelenler için hepsi bir arada şehir rehberi. Lefkoşa, Girne, Gazimağusa, Güzelyurt, İskele ve Lefke'de ihtiyacın olan her şey tek uygulamada.
 
 - Keşfet haritası – mekanlar, kafeler, restoranlar, plajlar ve şehir yürüyüş rotaları
@@ -7,5 +9,17 @@ ADA, Kuzey Kıbrıs'ta (KKTC) yaşayanlar, öğrenciler ve yeni gelenler için h
 - Evcil hayvanlar – veterinerler ve pet otelleri
 
 9 dil desteği: Türkçe, İngilizce, Rusça, Arapça, Farsça ve daha fazlası. İster KKTC'de doğmuş ol, ister üniversite için Kıbrıs'a yeni gelmiş bir öğrenci – ADA Kuzey Kıbrıs'taki günlük yaşamını kolaylaştırır.
+
+BİLGİ KAYNAKLARI
+
+ADA, aşağıdaki kurumların yayımladığı kamuya açık bilgileri gösterir. Bu bilgilerin kaynağı ADA değildir. Bu bilgilere göre hareket etmeden önce lütfen ayrıntıları resmi kaynaktan teyit edin.
+
+Döviz kurları — KKTC Merkez Bankası: https://mb.gov.ct.tr/tr/veriler/doviz_kurlari/kur_sorgulama
+
+Büyükelçilikler ve konsolosluk bilgileri — KKTC Dışişleri Bakanlığı: https://mfa.gov.ct.tr/tr
+
+Sınır kapıları, sürüş kuralları ve trafik bilgileri — KKTC Polis Genel Müdürlüğü: https://www.polis.gov.ct.tr/
+
+Uygulamada, resmi bir kaynaktan alınan her kayıt o kaynağa bağlantı verir.
 
 Ücretsiz indir, Kıbrıs'ı keşfet.

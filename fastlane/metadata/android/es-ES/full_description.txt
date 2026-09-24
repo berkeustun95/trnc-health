@@ -1,3 +1,5 @@
+ADA es una aplicación independiente. ADA no está afiliada a ninguna entidad gubernamental ni autoridad pública, no cuenta con su respaldo, no actúa en su nombre y no presta ni facilita servicios gubernamentales.
+
 ADA es la guía todo en uno para residentes, estudiantes y recién llegados al norte de Chipre. Todo lo que necesitas en Nicosia (Lefkoşa), Kyrenia (Girne), Famagusta (Gazimağusa), Güzelyurt, İskele y Lefke, en una sola app.
 
 - Mapa Explorar – lugares, cafés, restaurantes, playas y rutas a pie por la ciudad
@@ -7,5 +9,17 @@ ADA es la guía todo en uno para residentes, estudiantes y recién llegados al n
 - Mascotas – veterinarios y hoteles para mascotas
 
 Disponible en 9 idiomas, entre ellos español, inglés, turco, ruso y alemán. Tanto si llevas años aquí como si acabas de llegar para estudiar, ADA te facilita el día a día en el norte de Chipre.
+
+FUENTES DE INFORMACIÓN
+
+ADA muestra información pública publicada por los organismos que se indican a continuación. ADA no es el origen de esta información. Confirma los detalles con la fuente oficial antes de actuar en consecuencia.
+
+Tipos de cambio — Banco Central de la RTNC: https://mb.gov.ct.tr/tr/veriler/doviz_kurlari/kur_sorgulama
+
+Embajadas e información consular — Ministerio de Asuntos Exteriores de la RTNC: https://mfa.gov.ct.tr/tr
+
+Pasos fronterizos, normas de conducción e información de tráfico — Dirección General de Policía de la RTNC: https://www.polis.gov.ct.tr/
+
+En la app, cada ficha tomada de una fuente oficial enlaza a esa fuente.
 
 Descárgala gratis y descubre Chipre.

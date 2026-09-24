@@ -4,7 +4,7 @@
 //   npm run store:check     # exit 1 if a listing would be refused or break policy
 //   npm run store:listing   # this check, then fastlane supply (text only)
 //
-// Two things it refuses:
+// Three things it refuses:
 //
 // 1. Play's length limits — title ≤ 30, short ≤ 80, full ≤ 4000, counted in code points.
 //
@@ -14,6 +14,11 @@
 //    (CLAUDE.md → Compliance). The duty roster stays in the app; the listing never names
 //    it. eSIM is here because CONNECTIVITY_LIVE is false, so the listing must not promise it
 //    — drop that word from this list on the day the module goes live, not before.
+//
+// 3. A description WITHOUT the independence disclaimer or the official source links. Both are
+//    the fix for the 2026-08-14 Misleading Claims rejection ("Missing Source Link for
+//    Government Information"). The disclaimer must be the FIRST paragraph; the URLs are read
+//    from the live snapshot (fastlane/metadata-backup/android/en-GB), not typed here.
 //
 // A word list that stops matching is a check that passes on everything. So every run
 // first puts the bullets that were REMOVED from the 2026-09-24 draft through the same
@@ -25,6 +30,21 @@ import { join } from 'node:path'
 const ROOT = 'fastlane/metadata/android'
 const LANGS = ['tr-TR', 'en-GB', 'ru-RU', 'ar', 'el-GR', 'fr-FR', 'es-ES', 'de-DE', 'fa']
 const LIMITS = { 'title.txt': 30, 'short_description.txt': 80, 'full_description.txt': 4000 }
+
+// The non-affiliation clause of the disclaimer, per language — must sit in paragraph 1.
+const DISCLAIMER = {
+  'en-GB': 'ADA is not affiliated with, endorsed by, or acting on behalf of any government entity',
+  'tr-TR': 'ADA herhangi bir devlet kurumu veya kamu otoritesiyle bağlantılı değildir',
+  'ru-RU': 'ADA не связано с какими-либо государственными органами',
+  'ar': 'لا يتبع ADA أي جهة حكومية أو سلطة عامة',
+  'el-GR': 'Το ADA δεν συνδέεται με καμία κρατική υπηρεσία ή δημόσια αρχή',
+  'fr-FR': "ADA n'est affiliée à aucune entité gouvernementale ni autorité publique",
+  'es-ES': 'ADA no está afiliada a ninguna entidad gubernamental ni autoridad pública',
+  'de-DE': 'ADA ist mit keiner Regierungsstelle oder Behörde verbunden',
+  'fa': 'ADA به هیچ نهاد دولتی یا مرجع عمومی وابسته نیست',
+}
+const SNAPSHOT = 'fastlane/metadata-backup/android/en-GB/full_description.txt'
+const SOURCE_URLS = existsSync(SNAPSHOT) ? [...new Set(readFileSync(SNAPSHOT, 'utf8').match(/https:\/\/\S+/g) ?? [])] : []
 
 // Vets are not health content: the lookbehinds keep Tierärzte / دامپزشکان / أطباء بيطريون.
 const FORBIDDEN = [
@@ -58,6 +78,7 @@ const MUST_PASS = ['Haustiere – Tierärzte und Tierpensionen', 'حیوانات
 const hit = s => FORBIDDEN.find(re => re.test(s.replaceAll('İ', 'i')))
 
 const fails = []
+if (SOURCE_URLS.length < 3) fails.push(`read ${SOURCE_URLS.length} source URL(s) from ${SNAPSHOT}, expected ≥ 3 — the snapshot is missing or changed`)
 for (const s of MUST_CATCH) if (!hit(s)) fails.push(`self-test: pattern list no longer catches "${s}"`)
 for (const s of MUST_PASS) if (hit(s)) fails.push(`self-test: "${s}" is a false positive (${hit(s)})`)
 
@@ -79,6 +100,12 @@ for (const l of present) {
     checked++
     if (n === 0) fails.push(`${l}/${file}: empty`)
     if (n > max) fails.push(`${l}/${file}: ${n} > ${max}`)
+    if (file === 'full_description.txt') {
+      const first = txt.split('\n\n')[0]
+      if (!DISCLAIMER[l]) fails.push(`${l}: no disclaimer marker defined for this language`)
+      else if (!first.includes(DISCLAIMER[l])) fails.push(`${l}/${file}: paragraph 1 is not the disclaimer → "${first.slice(0, 70)}…"`)
+      for (const u of SOURCE_URLS) if (!txt.includes(u)) fails.push(`${l}/${file}: missing source URL ${u}`)
+    }
     txt.split('\n').forEach((line, i) => {
       const re = hit(line)
       if (re) fails.push(`${l}/${file}:${i + 1} matches ${re} → "${line.trim()}"`)
@@ -93,4 +120,4 @@ if (fails.length) {
   console.error(`\n✗ store listing check FAILED (${fails.length}):\n  ` + fails.join('\n  '))
   process.exit(1)
 }
-console.log(`✓ store listing OK — ${present.length} languages, no health/pharmacy/eSIM words (self-test: ${MUST_CATCH.length} caught, ${MUST_PASS.length} look-alikes allowed)`)
+console.log(`✓ store listing OK — ${present.length} languages, disclaimer + ${SOURCE_URLS.length} source URLs in each, no health/pharmacy/eSIM words (self-test: ${MUST_CATCH.length} caught, ${MUST_PASS.length} look-alikes allowed)`)
