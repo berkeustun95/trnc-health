@@ -13,7 +13,7 @@
 //
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
 export default `Version: 2026-09-20
-Last updated: September 20, 2026
+Last updated: September 24, 2026
 
 WHO WE ARE
 
@@ -29,14 +29,16 @@ ADA is a directory and services app for residents of and newcomers to Northern C
 
 Account data: email address, password (hashed by Supabase Auth — we never see it), and your account role.
 
+Sign in with Google or Apple: if you use one of these instead of an email and password, Google or Apple sends us your name, your email address and an identifier for your account with them. Apple lets you edit the name it shares and hide your email address — if you hide it, we receive a private relay address that Apple forwards to you. Google may also send a link to your Google profile photo; we keep it with your sign-in details and do not show it anywhere. We never see your Google or Apple password. When you delete your ADA account, we also ask Google or Apple to disconnect ADA from your account with them, and you can remove ADA yourself at any time in your Google Account or Apple Account settings.
+
 Profile data. Each field is listed with what it is for. Where a field is marked "not used yet", that is literal: we collect it for the stated purpose and nothing in the app reads it today. Those markers are accurate as of the "Last updated" date above.
 
 • First and last name — your real name. Held on your account; see section 3 for who can see it.
-• Display name — a name you choose, 3 to 20 characters. It does not have to be your real name. This is the name shown next to reviews, questions and answers you post, and it is the only name other users see.
+• Display name (labelled “Username” in the app) — a name you choose, 3 to 20 characters. It does not have to be your real name. This is the name shown next to reviews, questions and answers you post, and it is the only name other users see.
 • Date of birth — to confirm you are 13 or over. This is checked when you enter it and the account cannot be completed without it. It is also used to determine whether you are under 18, which affects the advertising you are shown (see section 5).
 • Nationality — so that we can tell which residency, permit and paperwork information applies to you, and which languages to offer first. Not used yet — nothing in the app reads it.
 • Phone number — optional. If you provide it, it is held on your account so that we can contact you about your account. It is not shown to other users and is not given to providers. You can use ADA fully without giving us a phone number.
-• Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Not used yet — nothing in the app reads it.
+• Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Today it chooses the district name and photo at the top of the Home screen; nothing else in the app reads it yet.
 • Resident status — student, working here, resident, or visiting — and, if you are a student, your study level and, for university and postgraduate study, your institution. This is intended to decide which parts of ADA are put in front of you, because someone who has just arrived needs different things from someone who has lived here ten years. Not used yet — nothing in the app reads it.
 • University details, if you add them — the universities you study at now or studied at before (you do not need to be a student now), your field of study, the years you started and graduated, and whether you have chosen to appear in your university's student list. That setting is off unless you turn it on.
 • Preferred language — to show the app, and the notifications we send you, in your language.
@@ -56,6 +58,14 @@ Rejected submissions: if text you submit is rejected by our content filter, we k
 
 Consent records: which version of our Terms of Service and Privacy Policy you accepted, in which language, and when. If you opt in to marketing messages, we record when you did so, and when you withdrew it if you later do.
 
+Location: ADA uses your device's location only if you allow it, and you can turn it off at any time in your device settings. The app works without it. We do not sell your location and we do not use it for advertising.
+• On your phone — ADA uses your location to sort listings by distance, show where you are on the map, choose your city on the Home screen, and follow a walking route. This happens on your phone and your location is not sent to us for it.
+• Search — when you search, your position is rounded to about 1 km before it leaves your phone and is sent to our servers only to put nearby results first. We do not store it.
+• Weather — to show the weather on the Home screen, your position is rounded to about 10 km and sent to our server, which asks MET Norway (the Norwegian Meteorological Institute, in Oslo) for the forecast for that area. MET Norway only ever sees our server, never your phone. We keep the forecast for the area for a short time and do not record who asked.
+• Walking routes — when you follow a walking route with location on, your position and the next stop are sent to our server, which asks openrouteservice (run by HeiGIT in Heidelberg, Germany) for the walking path. HeiGIT only sees our server, never your phone, and keeps request coordinates rounded to about 1 km in its logs. We do not store your position.
+• Contact taps — when you tap a call, WhatsApp, website or directions button for a listed business or partner, we record that the tap happened, for which business, and one of the seven broad districts of the TRNC it relates to (for example Girne or Lefke): the district your location places you in, or the one you chose in the app. We never record your account, your device or your exact position with it, so it cannot be traced back to you. We use these counts to tell businesses how many people contacted them through ADA.
+• Places you submit — if you submit a place and use your current location for its pin, that position is saved as the place's location and shown publicly once the place is approved.
+
 Usage data: we do not use analytics SDKs or third-party trackers. Section 5 describes the limited exception that applies if and when advertising is enabled in the app.
 
 2. WHY WE PROCESS YOUR DATA, AND ON WHAT LEGAL BASIS
@@ -69,6 +79,8 @@ Usage data: we do not use analytics SDKs or third-party trackers. Section 5 desc
 • Show advertising, and restrict personalisation for under-18s — To fund the service, and to protect minors. Legal basis: Our legitimate interest, and compliance with a legal obligation
 • Send you marketing messages — Only if you ask us to. Legal basis: Your consent
 • Keep a record of which terms you accepted — To show what was agreed. Legal basis: Our legitimate interest, and compliance with a legal obligation
+• Use your location to show what is near you: distance order, the map, search order and local weather — To give you the service you asked for. Legal basis: Performance of a contract with you
+• Count taps on businesses' contact buttons, with the district — To show businesses how many people contact them through ADA. Legal basis: Our legitimate interest in running and funding the service
 
 We do not sell or rent your personal data, and we do not share it with third parties for their own marketing.
 
@@ -147,7 +159,7 @@ You can see and correct the data on your account in your profile settings at any
 
 • Access — ask us for a copy of the personal data we hold about you.
 • Rectification — have inaccurate data corrected.
-• Erasure — request deletion of your account and all associated data. We will process deletion within 30 days.
+• Erasure — request deletion of your account and all associated data, or of particular data without deleting your account. We will process deletion within 30 days. You can delete your own reviews, questions and messages, and clear your phone number, in the app yourself.
 • Portability — receive the data you gave us in a structured, commonly used, machine-readable format.
 • Objection — object to processing we carry out on the basis of our legitimate interests, including advertising personalisation.
 • Restriction — ask us to limit how we use your data while a dispute about it is resolved.

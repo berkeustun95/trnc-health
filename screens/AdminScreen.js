@@ -4406,7 +4406,7 @@ function ModerationTab() {
   )
 }
 
-export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub }) {
+export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview }) {
   const [tab, setTab] = useState('Dashboard')
   const navigateTo = t => setTab(t)
 
@@ -4430,6 +4430,15 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowExplore} activeOpacity={0.85}>
             <Ionicons name="map-outline" size={16} color={colors.primary} />
             <Text style={s.explorePreviewText}>Open Explore (preview)</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Dev-only (utils/exploreReview.js): App.js passes this only when EXPLORE_REVIEW,
+            which a release bundle folds to false. */}
+        {onShowExploreReview && (
+          <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowExploreReview} activeOpacity={0.85}>
+            <Ionicons name="walk-outline" size={16} color={colors.primary} />
+            <Text style={s.explorePreviewText}>Keşfet map (review mode)</Text>
           </TouchableOpacity>
         )}
 

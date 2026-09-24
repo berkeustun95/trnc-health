@@ -229,7 +229,7 @@ export default function HomeHero({
     : t('homeHeroFallbackTitle', lang)
 
   const temp = weatherData?.current?.temperature_2m
-  const code = weatherData?.current?.weather_code
+  const code = weatherData?.current?.symbol
 
   // Tappability comes from resolveHero, never from a local condition — the rule is that
   // a GENERIC hero is inert, and deriving it in each caller is how half of them end up
