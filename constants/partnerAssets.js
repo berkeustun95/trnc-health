@@ -118,14 +118,16 @@ export const PARTNER_ASSETS = {
   //   cropped to 4:5, and all were saved as JPEG q85. The footprint is printed by
   //   `npm run pethotel:check`; trust that figure, not this sentence.
   //
-  // ⚠ The logo is the partner's JPEG on white, with the white keyed out to transparency
-  //   (min channel >= 250 is clear, <= 230 is opaque, RGB untouched). It is clean on light
-  //   grounds only, so there is deliberately no `shinypaw/logo-onDark`. See
-  //   PENDING_FIELDS.logoOnDark.
+  // ⚠ Both logos are the partner's JPEGs with the ground keyed out, RGB untouched: `logo`
+  //   from white (min channel >= 250 clear, <= 230 opaque), `logo-onDark` from solid black
+  //   (max channel <= 5 clear, >= 25 opaque), 2026-09-24. Each is clean only on its own
+  //   kind of ground. The thin light edge around the dark version's letters is in the
+  //   partner's file, not introduced by the cut.
   //
   // ⚠ DO NOT ADD A KEY HERE WITHOUT LOOKING AT THE IMAGE. Three files from the same batch
   //   were rejected for AI anatomy or layout, and a filename proves nothing.
   'shinypaw/logo':            require('../assets/partners/shinypaw/logo.png'),
+  'shinypaw/logo-onDark':     require('../assets/partners/shinypaw/logo-onDark.png'),
   'shinypaw/kennel-row':      require('../assets/partners/shinypaw/kennel-row.jpg'),
   // 192x192 = PetHotelPartnerCard's 64pt thumb at 3x. Resized from the same source as
   // kennel-row.jpg, not from the 900 px file, so it is one resample rather than two.

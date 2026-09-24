@@ -286,9 +286,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
 
           if (id === 'location' && !!sec.location) return (
             <Block key={id} title={t('petHotelLocation', lang)}>
-              {/* Address is pending. When it arrives it renders here with no screen edit;
-                  until then this block is the directions button alone, which is a real
-                  affordance rather than a placeholder for one. */}
+              {/* The partner's address, then the directions button (their maps link). */}
               {!!sec.location.address && <Text style={s.about}>{sec.location.address}</Text>}
               {!!sec.location.mapsUrl && (
                 <TouchableOpacity style={s.mapsBtn} onPress={openMaps} activeOpacity={0.85}>

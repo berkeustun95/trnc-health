@@ -41,7 +41,7 @@ import { brandInk, colors } from './theme.js'
 // reason dorms.js keeps SECTION_ORDER out of its screen.
 //
 // With the config as it stands (2026-09-24) this renders as hero → services → practical →
-//   location → contact. `about` is a pending key; `pricing` never renders, because the
+//   location → contact, with about between hero and services. `pricing` never renders, because the
 //   partner declined to publish prices (DECLINED_FIELDS). The branch stays so a future
 //   partner who does publish needs no screen edit.
 export const SECTION_ORDER = ['hero', 'about', 'services', 'practical', 'pricing', 'location', 'contact']
@@ -53,13 +53,12 @@ export const SECTION_ORDER = ['hero', 'about', 'services', 'practical', 'pricing
 // supplies the value. The point is that filling one in is a reviewed act.
 //
 // This is the "never invent a price, address, coordinate, phone number, or capacity" rule
-// turned into a data structure. Independently corroborated: their own site states none of
-// these (fetched 2026-09-14), so there is no source to copy from either.
-export const PENDING_FIELDS = {
-  address:                 'Site says "Lefkoşa" and no more. A district is not a street address.',
-  logoOnDark:              'No inverted wordmark. The partner sent a JPEG on white; shinypaw/logo.png keys that white out, which is clean on light grounds but NOT on dark: the white strokes inside the mark vanish, a light halo remains, and the brown wordmark loses contrast. Ask the partner for a vector or a transparent PNG. partnerLogo() falls back to `logo`, and no surface that renders a pet partner is dark today.',
-  photoPermission:         'WRITTEN PERMISSION NOT YET HELD for the five partner-supplied photos below — the partner sent the files, not a written permission. Tracked as a field so it is owed rather than remembered.',
-}
+// turned into a data structure. Every value on the entry below came from the partner.
+// Empty since 2026-09-24: every question on the list has been answered or declined. It
+// stays exported, and check-pet-partners.mjs proves its null-assertion still WORKS against a
+// synthetic entry, so an empty map is a finished state and not a check that stopped
+// looking. A new unknown goes back in here, with its reason, and its key goes null.
+export const PENDING_FIELDS = {}
 
 // ─── DECLINED: A DECISION, NOT A GAP ────────────────────────────────────────
 //
@@ -137,7 +136,10 @@ export const PET_PARTNERS = [
     // district at all. A silent blank, which is why the guard asserts the slug resolves.
     district: 'nicosia',
 
-    // ─── COORDINATES: PARTNER-CONFIRMED 2026-09-23 ──────────────────────────
+    // ─── COORDINATES: PARTNER-CORRECTED 2026-09-24 ──────────────────────────
+    //
+    // Replaces the 2026-09-23 pin (35.23028092013417, 33.38629301540769), 311 m off; the
+    // partner corrected it. Still `nicosia` by resolveRegion().
     //
     // VERBATIM AS SUPPLIED, not rounded, for the reason the phone number is: every
     // transformation is a chance to lose a digit. Shiny Paw chose this point; we did not
@@ -145,8 +147,8 @@ export const PET_PARTNERS = [
     //
     // It feeds ONE surface: the Explore map pin (constants/mapSources.js, gated on
     // PET_HOTEL_LIVE). The partner screen has no embedded map, and directions still go
-    // through `mapsUrl`, their own link. The street address is still pending, and must not
-    // be reverse-geocoded from this point: a street name read off a pin is our guess.
+    // through `mapsUrl`, their own link. The street address below is the partner's own; it
+    // was never reverse-geocoded from this point, and must not be.
     //
     // ─── WHY THIS IS NOT A `places` ROW (decided 2026-09-23) ────────────────
     // A `pet_boarding` category plus a places row was scoped and dropped, for two reasons:
@@ -159,14 +161,14 @@ export const PET_PARTNERS = [
     //   category (EXPLORE_GROUPS, CATEGORY_LABEL_KEY, resubmit_place()'s list,
     //   CLAIMABLE_CATEGORIES, nine locales) starts to earn its keep: search, claims, a
     //   directory. Until then this entry is the only boarding business, and it lives here.
-    coords:   { latitude: 35.23028092013417, longitude: 33.38629301540769 },
+    coords:   { latitude: 35.23305418505912, longitude: 33.38586962917792 },
     // No neighbourhood published. Deliberately not guessed from the maps link: an area
     // name read off a pin is our inference, not their address.
     area:     null,
 
-    // Referenced and deliberately UNWRITTEN — see PENDING_KEYS at the foot of this file.
-    // Shiny Paw has supplied no about copy, and writing nine locales of marketing prose
-    // about a real business is fabrication with their name on it.
+    // The partner's own Turkish copy, supplied 2026-09-24 and used verbatim as tr; the other
+    // eight locales are translations of it. Their SEO heading ("Kıbrıs Köpek Oteli ve Dog
+    // Boarding Hizmetleri") is deliberately not used: the screen has its own section title.
     aboutKey: 'petHotelShinyPawAbout',
 
     // ─── THE SIX SERVICES ───────────────────────────────────────────────────
@@ -206,7 +208,7 @@ export const PET_PARTNERS = [
     // neighbours. The kennel row stays square and comes FIRST: PetHotelPartnerCard's
     // 64pt thumb is a square `cover` of the first photo.
     //
-    // photoPermission is still PENDING: we hold the files, not written permission.
+    // photoPermission: granted, confirmed by Berke 2026-09-24 (logo and photos).
     //
     // ⚠ JUDGE THE PIXELS, NEVER THE PATH. Every file below was looked at before wiring.
     //   Rejected, and deliberately not stored in the repo:
@@ -246,14 +248,17 @@ export const PET_PARTNERS = [
     // decoded 900x900 (3.2 MB) to fill 192x192 px. check-pet-partners.mjs caps its size.
     thumb: 'shinypaw/kennel-row-thumb',
 
-    // ─── PENDING (see PENDING_FIELDS above for the reason on each) ──────────
+    // ─── ANSWERED FIELDS (PENDING_FIELDS is empty since 2026-09-24) ─────────
     //
-    // Written out in full rather than omitted. An absent key and a null one read the same
-    // to `?.`, but only the null one tells the next person the question was ASKED.
+    // A future unknown is written as null AND listed in PENDING_FIELDS, never omitted: an
+    // absent key and a null one read the same to `?.`, but only null says it was ASKED.
     //
     // ⚠ NO `email` OR `prices` KEY. Both are DECLINED (see DECLINED_FIELDS), which is a
     //   decision rather than a gap, so neither is null here.
-    address:                 null,
+    //
+    // The partner's address, supplied 2026-09-24. A proper noun, rendered as-is in every
+    // locale (like the phone number), under Konum above the directions button.
+    address:                 'Lefkoşa Kuzey Çevreyolu, Lefkoşa',
 
     // ─── OPERATIONAL DETAILS, SUPPLIED BY THE PARTNER 2026-09-24 ────────────
     //
@@ -282,7 +287,9 @@ export const PET_PARTNERS = [
     cameraAccess:            true,
 
     logo:                    'shinypaw/logo',
-    logoOnDark:              null,
+    // The partner's JPEG on solid black, black keyed to transparency (max channel <= 5 clear,
+    // >= 25 opaque) and trimmed like `logo`. Future-proofing: the app is light-only.
+    logoOnDark:              'shinypaw/logo-onDark',
     // ─── ACCENT: SAMPLED FROM THE PARTNER'S LOGO, NOT SUPPLIED (2026-09-24) ──
     // The ring and the "TRAIL HOTEL" line of their logo, core pixels only: ring #1AB2C3,
     // wordmark #18B5C6. The partner did not send a brand colour; this is our reading of theirs.
@@ -292,11 +299,11 @@ export const PET_PARTNERS = [
     //   accentText #127D88 is the same hue (186 deg) darkened until it clears 4.5 on every
     //   ground: 4.87:1 on white/cardBg, 4.58:1 on colors.bg. check-pet-partners.mjs recomputes
     //   all of these on every run; trust its output over this comment.
-    // Not read by any pet surface today: the badges use ADA's own colors.accent.
+    // Read ONLY by PetHotelPartnerScreen's hero, through petHeroTheme() below.
     accent:                  '#1AB2C3',
     accentText:              '#127D88',
     accentSource:            'sampled from partner logo',
-    photoPermission:         null,
+    photoPermission:         'granted, confirmed by Berke 2026-09-24',
   },
 ]
 
@@ -384,9 +391,8 @@ export function petPartnerSections(partner, { resolveAsset = () => undefined } =
     { id: 'cameraAccess',            labelKey: 'petHotelCameraAccess', value: partner?.cameraAccess === true ? 'petHotelValCameraOwners' : null },
   ].filter(r => r.value !== null)
 
-  // Location renders on EITHER half. Address is pending and mapsUrl is known, so today
-  // this is a directions button with no street line above it — which is correct: their
-  // pin is a fact and their street address is not one we hold.
+  // Location renders on EITHER half: a street line (the partner's address) above a
+  // directions button (their maps link). Either alone is still a real section.
   const address = val(partner?.address)
   const mapsUrl = val(partner?.mapsUrl)
 
@@ -471,6 +477,6 @@ export function petPartnerWebsiteUrl(partner) {
 // deliberate act somebody reviews, not something that happens because a translator filled
 // a gap they found empty.
 //
-// petHotelShinyPawAbout: Shiny Paw has supplied no about copy. When they do, write the
-// nine locales and delete this entry in the same commit.
-export const PENDING_KEYS = ['petHotelShinyPawAbout']
+// Empty since 2026-09-24, when the partner supplied the about copy. The guard proves its
+// "must not resolve" direction still works against a synthetic key.
+export const PENDING_KEYS = []

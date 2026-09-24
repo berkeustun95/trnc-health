@@ -319,6 +319,13 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // ─── Shiny Paw opening hours, 2026-09-24 ──────────────────────────────────
+  'petHotelShinyPawHours': {
+                          Turkish: 'a 24-hour time range; Turkish, Russian, Greek and Spanish write it exactly as English does (fr/de/ar/fa differ and are translated)',
+                          Russian: 'a 24-hour time range; Turkish, Russian, Greek and Spanish write it exactly as English does (fr/de/ar/fa differ and are translated)',
+                          Greek:   'a 24-hour time range; Turkish, Russian, Greek and Spanish write it exactly as English does (fr/de/ar/fa differ and are translated)',
+                          Spanish: 'a 24-hour time range; Turkish, Russian, Greek and Spanish write it exactly as English does (fr/de/ar/fa differ and are translated)',
+  },
   // ─── Pets module proper nouns, 2026-09-14 ─────────────────────────────────
   //
   // These surfaced the moment the pets screens entered SURFACES. None of them is an
@@ -508,10 +515,25 @@ const PET_PARTNER_KEYS = (() => {
     // The practical rows are FILTERED OUT of petPartnerSections() while their values are
     // pending, so driving it with a probe is the only way to see their labels. Every field
     // is stubbed truthy; nothing here reaches the app.
+    // Stubs must match each field's TYPE: capacity is a positive integer and cameraAccess a
+    // boolean (2026-09-24). A string stub drops those two rows silently, and their labels with
+    // them, which is how this list lost petHotelCapacity/petHotelCameraAccess for a slice.
     const probe = { ...p }
-    for (const f of ['openingHours', 'dropOffPickUpHours', 'capacity', 'acceptedSizes',
-                     'breedRestrictions', 'vaccinationRequirements', 'cameraAccess']) probe[f] = 'ZZ'
+    for (const f of ['openingHours', 'dropOffPickUpHours', 'acceptedSizes',
+                     'breedRestrictions', 'vaccinationRequirements']) probe[f] = 'ZZ'
+    probe.capacity = 1
+    probe.cameraAccess = true
     for (const r of petPartnerSections(probe).practical || []) out.add(r.labelKey)
+    // And the VALUES of the real config's rows: they are keys reached through a variable too.
+    // A counted row resolves `${value}_${category}`, so its forms are added as they exist in
+    // English; per-locale category completeness is check-pet-partners.mjs's job.
+    for (const r of petPartnerSections(p).practical || []) {
+      if (r.count == null) { out.add(r.value); continue }
+      for (const cat of ['zero', 'one', 'two', 'few', 'many', 'other']) {
+        const k = `${r.value}_${cat}`
+        if (t(k, 'English') !== k) out.add(k)
+      }
+    }
   }
   return [...out].filter(k => k && !pending.has(k))
 })()

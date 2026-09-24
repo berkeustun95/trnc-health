@@ -61,7 +61,35 @@ if (t('zzNotARealKeyForThePetGuard', 'Turkish') !== 'zzNotARealKeyForThePetGuard
   problems.push('CONTROL: t() no longer returns the key name on a miss — the PENDING_KEYS direction cannot work')
 }
 if (!PET_PARTNERS.length) problems.push('CONTROL: PET_PARTNERS is empty — this guard would pass by checking nothing')
-if (!Object.keys(PENDING_FIELDS).length) problems.push('CONTROL: PENDING_FIELDS is empty — the null assertions below would be a no-op')
+// ⚠ AN EMPTY PENDING_FIELDS / PENDING_KEYS IS VALID (Shiny Paw, 2026-09-24): every question
+//   answered or declined. Being empty does NOT excuse the checks from proving they work: each
+//   is a function, and section 4 / section 9 run it against a SYNTHETIC entry that must fail.
+//   If either control passes, the check is dead and this guard fails, empty list or not.
+function pendingFieldProblems(p, pendingMap, who) {
+  const out = []
+  for (const f of Object.keys(pendingMap)) {
+    if (!(f in p)) out.push(`${who}: PENDING_FIELDS names '${f}' but the entry has no such key — an absent key and a null one read the same to ?., but only null records that the question was asked`)
+    if (p[f] !== null) out.push(`${who}: ${f} is ${JSON.stringify(p[f])} but is still listed in PENDING_FIELDS. `
+      + `If the partner supplied it, DELETE the PENDING_FIELDS entry in the same commit. `
+      + `If nobody supplied it, this is an invented value — remove it. Reason on record: ${pendingMap[f]}`)
+    // ⚠ NON-EMPTY, NOT A LENGTH THRESHOLD. The first draft demanded > 20 characters and went
+    //   red on `openingHours: 'Not published.'` — the complete and honest reason. A
+    //   prose-length gate measures word count, not thought.
+    if (!(typeof pendingMap[f] === 'string' && pendingMap[f].trim().length > 0))
+      out.push(`${who}: PENDING_FIELDS.${f} has no reason written against it — "owed" with no why rots into "nobody knows"`)
+  }
+  return out
+}
+function pendingKeyProblems(keys, referenced, langs) {
+  const out = []
+  for (const k of keys) {
+    if (!referenced.has(k)) out.push(`PENDING_KEYS lists ${k} but nothing in the config references it — a pending key nobody uses is dead weight, and it hides the fact that the section is gone`)
+    for (const lang of langs) if (t(k, lang) !== k)
+      out.push(`i18n: ${k} RESOLVES in ${lang} — it is in PENDING_KEYS, which asserts the copy is deliberately unwritten. `
+        + `If the partner supplied it, write all nine locales and DELETE it from PENDING_KEYS in the same commit.`)
+  }
+  return out
+}
 
 // ─── 1. Import safety — a Node guard must be able to load the config ────────
 //
@@ -301,6 +329,8 @@ for (const p of PET_PARTNERS) {
 
   // photoPermission is owed while ANY photo is wired. Asserted as a pair so the day the
   // permission lands, removing it from PENDING_FIELDS is what this notices.
+  check(!((p.photos || []).length > 0 && p.photoPermission !== null && !(typeof p.photoPermission === 'string' && p.photoPermission.trim())),
+    `${who}: photoPermission is ${JSON.stringify(p.photoPermission)} — when granted it must say by whom and when`)
   if ((p.photos || []).length > 0 && p.photoPermission === null) {
     check('photoPermission' in PENDING_FIELDS,
       `${who}: photos are wired, photoPermission is null, and it is NOT in PENDING_FIELDS — `
@@ -316,21 +346,13 @@ for (const p of PET_PARTNERS) {
   // The third direction. A value typed in without removing the entry here is a fabricated
   // fact shipping under a partner's name, and it is the single most likely way this
   // surface goes wrong.
-  for (const f of Object.keys(PENDING_FIELDS)) {
-    check(f in p, `${who}: PENDING_FIELDS names '${f}' but the entry has no such key — an absent key and a null one read the same to ?., but only null records that the question was asked`)
-    check(p[f] === null,
-      `${who}: ${f} is ${JSON.stringify(p[f])} but is still listed in PENDING_FIELDS. `
-      + `If the partner supplied it, DELETE the PENDING_FIELDS entry in the same commit. `
-      + `If nobody supplied it, this is an invented value — remove it. Reason on record: ${PENDING_FIELDS[f]}`)
-    // ⚠ NON-EMPTY, NOT A LENGTH THRESHOLD. The first draft demanded > 20 characters and
-    //   went red on `openingHours: 'Not published.'` — which is the complete and honest
-    //   reason. A prose-length gate measures word count, not thought: it fails a true
-    //   fourteen-character answer and passes a lazy twenty-one-character one, so it cannot
-    //   fail correctly on the thing it exists to catch. The fix was to delete the
-    //   threshold, not to pad the reason until the linter went quiet.
-    check(typeof PENDING_FIELDS[f] === 'string' && PENDING_FIELDS[f].trim().length > 0,
-      `${who}: PENDING_FIELDS.${f} has no reason written against it — "owed" with no why rots into "nobody knows"`)
-  }
+  for (const pr of pendingFieldProblems(p, PENDING_FIELDS, who)) problems.push(pr)
+  // CONTROL: the same function, handed a pending field that has a value, must object.
+  // Without it an empty PENDING_FIELDS would pass on a check that no longer checks anything.
+  check(pendingFieldProblems({ ...p, zzPendingProbe: 'a value nobody supplied' }, { zzPendingProbe: 'probe' }, who).length > 0,
+    `CONTROL: pendingFieldProblems() accepted a pending field carrying a value — the PENDING_FIELDS check is dead`)
+  check(pendingFieldProblems({ ...p, zzPendingProbe: null }, { zzPendingProbe: 'probe' }, who).length === 0,
+    `CONTROL: pendingFieldProblems() rejected a correctly-null pending field — it would fail every real entry`)
 
   // ─── 5. The section contract: pending means ABSENT, not empty ───────────
   const sec = petPartnerSections(p, { resolveAsset: k => (k ? `ASSET:${k}` : undefined) })
@@ -490,16 +512,12 @@ for (const k of mustResolve) {
   check(t(k, 'English') !== k, `i18n: ${k} has no ENGLISH value (t() returned the key name)`)
 }
 
-// The opposite direction. Writing this copy turns the guard RED, which is the design.
-for (const k of PENDING_KEYS) {
-  check(referencedKeys.has(k),
-    `PENDING_KEYS lists ${k} but nothing in the config references it — a pending key nobody uses is dead weight, and it hides the fact that the section is gone`)
-  for (const lang of LANGS) {
-    check(t(k, lang) === k,
-      `i18n: ${k} RESOLVES in ${lang} — it is in PENDING_KEYS, which asserts the copy is deliberately unwritten. `
-      + `If Shiny Paw supplied about copy, write all nine locales and DELETE it from PENDING_KEYS in the same commit.`)
-  }
-}
+// The opposite direction. Writing pending copy turns the guard RED, which is the design.
+for (const pr of pendingKeyProblems(PENDING_KEYS, referencedKeys, LANGS)) problems.push(pr)
+// CONTROL: a key that DOES resolve, listed as pending, must be caught. Otherwise an empty
+// PENDING_KEYS passes on a check that cannot fire.
+check(pendingKeyProblems(['petHotelBadge'], new Set(['petHotelBadge']), LANGS).length > 0,
+  `CONTROL: pendingKeyProblems() accepted a resolving key as unwritten — the PENDING_KEYS check is dead`)
 
 // ─── 10. Assets: wired, or declared owed ────────────────────────────────────
 //
