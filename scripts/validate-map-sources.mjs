@@ -44,7 +44,7 @@ import {
   TRNC_CENTER,
 } from '../constants/mapSources.js'
 import { MODULE_FLAGS, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
-import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots, walkStep, walkAdvance, walkDistance } from '../constants/walkingRoutes.js'
+import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots, walkStep, walkAdvance, walkDistance, routeLegs, legKey } from '../constants/walkingRoutes.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
          NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES } from '../constants/exploreCategories.js'
@@ -323,6 +323,19 @@ const M = 0.000009   // ≈ 1 m of latitude
 check('a 1 m pair is split into two slots', overlapSlots([at(35, 33), at(35 + M, 33)]), [-0.5, 0.5])
 check('stops 40 m apart stay on their point', overlapSlots([at(35, 33), at(35 + 40 * M, 33)]), [0, 0])
 check('a 20 m + 20 m chain spreads as one group of three', overlapSlots([at(35, 33), at(35 + 20 * M, 33), at(35 + 40 * M, 33)]), [-1, 0, 1])
+
+// Real paths (walking_legs). A leg is drawn only while it still joins the places as they are
+// now; a moved pin or no row falls back to the straight connector, leg by leg.
+const LA = { id: 'la', latitude: 35.17, longitude: 33.36 }, LB = { id: 'lb', latitude: 35.171, longitude: 33.362 }
+const LC = { id: 'lc', latitude: 35.172, longitude: 33.364 }
+const routed = new Map([[legKey('la', 'lb'), { metres: 260, path: [[33.36001, 35.17001], [33.361, 35.1712], [33.36199, 35.17099]] }]])
+const lg = routeLegs([LA, LB, LC], routed)
+check('a fresh stored leg is drawn from its path', [lg[0].routed, lg[0].coords.length, lg[0].metres], [true, 3, 260])
+check('a pair with no stored leg falls back to straight ×1.3', [lg[1].routed, lg[1].coords.length], [false, 2])
+const moved = routeLegs([LA, { ...LB, latitude: 35.1725 }], routed)
+check('a leg whose place moved > 50 m falls back (stale)', moved[0].routed, false)
+check('the reverse direction is a different leg', routeLegs([LB, LA], routed)[0].routed, false)
+check('≈ distance uses the routed metres where they exist', walkEstimate([LA, LB, LC], lg).km, Math.max(1, Math.round((260 + lg[1].metres) / 1000)))
 
 // Walk mode. The case that matters is the manual Previous: you are standing at the stop you
 // stepped back to, and a naive "within 30 m → advance" bounces you forward again at once.

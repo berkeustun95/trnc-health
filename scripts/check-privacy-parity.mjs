@@ -137,6 +137,8 @@ const MARKERS = [
     why: 'contact_events stores a district with no account, device or position' },
   { key: 'weather processor',      re: /rounded to about 10 km and sent to our server, which asks MET Norway/i,
     why: 'names the provider, the proxy and the precision App.js actually sends' },
+  { key: 'walking-path processor', re: /sent to our server, which asks openrouteservice \(run by HeiGIT/i,
+    why: 'the live walking leg: HeiGIT sees our server only, and keeps ~1 km in its logs' },
 ]
 
 // ── The field list is DERIVED from App.js PROFILE_COLUMNS, not typed here. A column

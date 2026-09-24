@@ -79,22 +79,30 @@ function RouteMarker({ coordinate, onPress, title, onCalloutPress, slot = 0, zIn
 
 // With no route selected: every route's line plus one start marker each. With one selected:
 // only that route, every stop numbered.
-export function RouteOverlay({ routes, selected, lang, walkNext = null, onSelectRoute, onSelectStop }) {
+export function RouteOverlay({ routes, selected, lang, walkNext = null, liveLeg = null, onSelectRoute, onSelectStop }) {
   const shown = selected ? [selected] : routes
   const slots = selected ? overlapSlots(selected.stops) : []
   return (
     <>
-      {shown.map(r => (
+      {/* One polyline per leg: the real walking path where walking_legs has a fresh one
+          (solid), the straight connector where it does not (dashed) — so a dash always
+          means "we do not know the way on the ground here". */}
+      {shown.flatMap(r => (r.legs ?? []).map((leg, i) => (
         <Polyline
-          key={`l:${r.id}`}
-          coordinates={coordsOf(r)}
+          key={`l:${r.id}:${i}`}
+          coordinates={leg.coords}
           strokeColor={ROUTE_COLOR}
           strokeWidth={selected ? 4 : 3}
-          lineDashPattern={DASH}
+          lineDashPattern={leg.routed ? undefined : DASH}
           tappable
           onPress={() => onSelectRoute(r)}
         />
-      ))}
+      )))}
+      {/* The live leg (walk mode): from the walker to the next stop, in the accent colour and
+          drawn over the route so "the way from here" reads apart from "the route". */}
+      {liveLeg && liveLeg.length >= 2 && (
+        <Polyline key="live" coordinates={liveLeg} strokeColor={colors.accent} strokeWidth={5} zIndex={5} />
+      )}
       {selected
         ? selected.stops.map((p, i) => {
             // Walk mode: stops already passed go grey, the one being walked to is ringed and
@@ -120,7 +128,8 @@ export function RouteOverlay({ routes, selected, lang, walkNext = null, onSelect
   )
 }
 
-export const fitRoute = route => coordsOf(route)
+// Frames what is DRAWN: the real paths bulge beyond the stops (the harbour quay in Girne).
+export const fitRoute = route => (route.legs?.length ? route.legs.flatMap(l => l.coords) : coordsOf(route))
 
 // Bottom row of route cards — the reliable way in. A dashed line at island zoom is too thin
 // to hit, and on iOS (Apple Maps) polyline taps are not guaranteed at all.
@@ -145,6 +154,20 @@ export function RoutePicker({ routes, lang, error, onSelectRoute }) {
         </TouchableOpacity>
       ))}
     </ScrollView>
+  )
+}
+
+// Attribution for the real paths: ORS results are CC-BY-SA 4.0 and require
+// "© openrouteservice by HeiGIT" + OpenStreetMap; OSMF requires routing apps to credit
+// OpenStreetMap with the ODbL made clear (the link). Shown only while a routed leg is drawn.
+const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright'
+function PathsCredit({ route, lang }) {
+  if (!route.legs?.some(l => l.routed)) return null
+  return (
+    <TouchableOpacity onPress={() => Linking.openURL(OSM_COPYRIGHT_URL).catch(() => {})}
+      activeOpacity={0.7} accessibilityRole="link" style={[p.credit, { marginTop: 6 }]}>
+      <Text style={p.pathsCredit}>{t('routePathsCredit', lang)}</Text>
+    </TouchableOpacity>
   )
 }
 
@@ -208,6 +231,7 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
         ))}
       </ScrollView>
 
+      <PathsCredit route={route} lang={lang} />
       <TouchableOpacity style={p.credit} onPress={openCredit} activeOpacity={0.7}
         hitSlop={{ top: 8, bottom: 8 }} accessibilityRole="link">
         <Ionicons name="ribbon-outline" size={13} color={ROUTE_COLOR} />
@@ -356,6 +380,7 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
             <Text style={p.note}>{t('walkNoLocation', lang)}</Text>
           ) : null}
 
+          <PathsCredit route={route} lang={lang} />
           <View style={w.controls}>
             <TouchableOpacity style={[w.step, walk.next === 0 && w.stepOff]} onPress={onPrev}
               disabled={walk.next === 0} activeOpacity={0.8} accessibilityLabel={t('walkPrev', lang)}>
@@ -425,6 +450,7 @@ const p = StyleSheet.create({
   stopName:   { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   stopCat:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 1 },
   credit:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, flexShrink: 0 },
+  pathsCredit: { flexShrink: 1, fontSize: 10, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   creditText: { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: ROUTE_COLOR },
   startBtn:   { flexShrink: 0, marginTop: 12, backgroundColor: ROUTE_COLOR, borderRadius: 12, paddingVertical: 13,
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },

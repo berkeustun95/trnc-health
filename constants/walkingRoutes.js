@@ -39,7 +39,7 @@ export function metresBetween(a, b) {
 // RENUMBERED, so the line, the numbers and the ≈ figures all describe the same walk. The
 // distance is recomputed from the drawn stops rather than read from straight_line_km, which
 // describes the full route and would disagree with a line that has a stop missing.
-export function resolveRoutes(rows, placesById, { review = false } = {}) {
+export function resolveRoutes(rows, placesById, { review = false, legsByPair = null } = {}) {
   const out = []
   for (const r of rows || []) {
     if (!r.is_active && !review) continue
@@ -48,16 +48,45 @@ export function resolveRoutes(rows, placesById, { review = false } = {}) {
       .map(s => placesById.get(s.place_id))
       .filter(p => p && p.latitude != null && p.longitude != null)
     if (stops.length < 2) continue
-    out.push({ ...r, stops, estimate: walkEstimate(stops) })
+    const legs = routeLegs(stops, legsByPair)
+    out.push({ ...r, stops, legs, estimate: walkEstimate(stops, legs) })
   }
   return out.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 }
 
+// ─── Real walking paths (walking_legs, 20261049) ────────────────────────────
+// A stored leg is used only while it still joins the two places as they are NOW: its path
+// must start and end within STALE_M of their current coordinates (the router snapped within
+// 22 m on the old-town legs). A pin moved further than that — or no leg at all — falls back
+// to the straight dashed connector and the ×1.3 estimate, leg by leg. Keyed "from>to":
+// legs are directed, and a stop's leg is the one ARRIVING from the stop before it.
+export const STALE_M = 50
+export const legKey = (fromId, toId) => `${fromId}>${toId}`
+
+export function routeLegs(stops, legsByPair) {
+  const legs = []
+  for (let i = 1; i < stops.length; i++) {
+    const a = stops[i - 1], b = stops[i]
+    const row = legsByPair?.get(legKey(a.id, b.id))
+    const path = Array.isArray(row?.path) && row.path.length >= 2 ? row.path : null
+    const fresh = path
+      && metresBetween({ latitude: path[0][1], longitude: path[0][0] }, a) <= STALE_M
+      && metresBetween({ latitude: path[path.length - 1][1], longitude: path[path.length - 1][0] }, b) <= STALE_M
+    legs.push(fresh
+      ? { routed: true,  metres: row.metres, coords: path.map(([lng, lat]) => ({ latitude: lat, longitude: lng })) }
+      : { routed: false, metres: metresBetween(a, b) * DETOUR_FACTOR, coords: [a, b].map(p => ({ latitude: p.latitude, longitude: p.longitude })) })
+  }
+  return legs
+}
+
 // Rounded for display: whole km (never below 1), minutes to the nearest 5 (never below 5).
-export function walkEstimate(stops) {
-  let m = 0
-  for (let i = 1; i < stops.length; i++) m += metresBetween(stops[i - 1], stops[i])
-  const walkedKm = (m / 1000) * DETOUR_FACTOR
+// Routed legs count their real length; the rest their straight line ×1.3. The UI keeps "≈"
+// either way — it is honest for both.
+export function walkEstimate(stops, legs = null) {
+  let walked = 0
+  if (legs) for (const l of legs) walked += l.metres
+  else for (let i = 1; i < stops.length; i++) walked += metresBetween(stops[i - 1], stops[i]) * DETOUR_FACTOR
+  const walkedKm = walked / 1000
   const rawMin = (walkedKm / WALK_KMH) * 60
   return {
     km:  Math.max(1, Math.round(walkedKm)),

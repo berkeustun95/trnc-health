@@ -33,7 +33,7 @@ import { colors, shadow, ellipsizeSlack } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { EXPLORE_ROUTES_LIVE } from '../constants/flags'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
-import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance } from '../constants/walkingRoutes'
+import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance, legKey } from '../constants/walkingRoutes'
 import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useLocationGranted, useHeading, fitRoute } from '../components/WalkingRoutes'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
@@ -274,6 +274,7 @@ export default function ExploreMapScreen({
   const review   = EXPLORE_REVIEW && isAdmin
   const routesOn = routesLayerVisible({ routesLive: EXPLORE_ROUTES_LIVE, review: EXPLORE_REVIEW, isAdmin })
   const [routeRows, setRouteRows]         = useState([])
+  const [legRows, setLegRows]             = useState([])
   const [routesError, setRoutesError]     = useState(false)
   const [routesMode, setRoutesMode]       = useState(snap?.routesMode ?? false)
   const [selectedRoute, setSelectedRoute] = useState(null)
@@ -293,6 +294,33 @@ export default function ExploreMapScreen({
   const followTimer = useRef(null)
   useEffect(() => () => clearTimeout(followTimer.current), [])
   const walking = !!walk
+
+  // ─── The live leg: my position → the next stop, on OUR map ────────────────────
+  // Fetched from the walk-leg Edge Function when a walk starts (first fix) and whenever the
+  // next stop changes — never on every GPS fix: ORS allows 2,000 a day for the whole app.
+  // A reply that lands after the target moved on is dropped (request counter). No path
+  // (offline, quota, too far) → no line; Yol tarifi to Google Maps is still there.
+  const [liveLeg, setLiveLeg] = useState(null)          // { toId, coords | null }
+  const liveReq = useRef(0)
+  const lastPos = useRef(null)
+  useEffect(() => { lastPos.current = walkPos }, [walkPos])
+  const liveTarget = walk && selectedRoute && walk.next < selectedRoute.stops.length
+    ? selectedRoute.stops[walk.next] : null
+  const havePos = !!walkPos
+  useEffect(() => {
+    if (!liveTarget || !havePos) { if (!liveTarget) setLiveLeg(null); return }
+    const id = ++liveReq.current
+    const from = lastPos.current
+    supabase.functions.invoke('walk-leg', {
+      body: { from: { lat: from.latitude, lon: from.longitude }, to_place_id: liveTarget.id },
+    }).then(({ data }) => {
+      if (id !== liveReq.current) return
+      setLiveLeg({
+        toId: liveTarget.id,
+        coords: Array.isArray(data?.path) ? data.path.map(([lng, lat]) => ({ latitude: lat, longitude: lng })) : null,
+      })
+    }).catch(() => { if (id === liveReq.current) setLiveLeg({ toId: liveTarget.id, coords: null }) })
+  }, [liveTarget?.id, havePos])
   const heading = useHeading(walking && follow && walkStatus === 'granted')
 
   const initialRegion = useMemo(() => snap?.region ?? (
@@ -336,10 +364,17 @@ export default function ExploreMapScreen({
       let q = supabase.from('walking_routes')
         .select('id, region, name_i18n, sort_order, is_active, walking_route_stops(position, place_id)')
       if (!review) q = q.eq('is_active', true)
-      const { data, error } = await q
+      // Real walking paths (walking_legs, 20261049). RLS shows a leg only while both of its
+      // places are visible, so pending stops keep theirs dark. A failed read is not an error
+      // state: every leg simply falls back to its straight connector.
+      const [{ data, error }, legsRes] = await Promise.all([
+        q,
+        supabase.from('walking_legs').select('from_place_id, to_place_id, path, metres'),
+      ])
       if (!active) return
       setRoutesError(!!error)
       setRouteRows(error ? [] : (data || []))
+      setLegRows(legsRes.error ? [] : (legsRes.data || []))
     })()
     return () => { active = false }
   }, [routesOn, review])
@@ -347,8 +382,10 @@ export default function ExploreMapScreen({
   // Stops resolve against the places this screen ALREADY loaded — RLS- and status-filtered —
   // so a stop that is not live is skipped and the rest renumbered (resolveRoutes).
   const routes = useMemo(
-    () => resolveRoutes(routeRows, new Map(places.map(p => [p.id, p])), { review }),
-    [routeRows, places, review]
+    () => resolveRoutes(routeRows, new Map(places.map(p => [p.id, p])), {
+      review, legsByPair: new Map(legRows.map(l => [legKey(l.from_place_id, l.to_place_id), l])),
+    }),
+    [routeRows, places, review, legRows]
   )
   const showRoutesChip = routesOn && (routeRows.length > 0 || routesError)
 
@@ -584,6 +621,7 @@ export default function ExploreMapScreen({
             selected={selectedRoute}
             lang={lang}
             walkNext={walk ? walk.next : null}
+            liveLeg={walk && liveLeg?.toId === liveTarget?.id ? liveLeg.coords : null}
             onSelectRoute={openRoute}
             onSelectStop={p => handOff(() => onSelectPlace?.(p))}
           />
