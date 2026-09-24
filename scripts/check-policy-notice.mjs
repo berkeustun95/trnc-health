@@ -17,5 +17,25 @@ for (const [label, input, want] of cases) {
   if (got !== want) bad++
   console.log(`  ${got === want ? '✓' : '✗'} ${label}${got === want ? '' : `  → got ${got}`}`)
 }
+// STRUCTURE (the 2026-09-24 incident): the notice must be rendered AFTER the lines that
+// define its visibility and its handler, in the same render — i.e. in App's final return,
+// not inside the content selector that runs before them. Hermes has no TDZ: earlier use
+// reads undefined, and Modal visible={undefined} is SHOWN.
+import { readFileSync } from 'node:fs'
+{
+  const app = readFileSync(new URL('../App.js', import.meta.url), 'utf8')
+  const use = app.indexOf('<PolicyUpdateNotice')
+  const defVisible = app.indexOf('const policyNoticeVisible')
+  const defDismiss = app.indexOf('const dismissPolicyNotice')
+  const finalReturn = app.indexOf('  return (\n    <SafeAreaProvider>')
+  const ok = use > 0 && defVisible > 0 && defDismiss > 0 && finalReturn > 0 && use > defVisible && use > defDismiss && use > finalReturn
+  if (!ok) bad++
+  console.log(`  ${ok ? '✓' : '✗'} App.js renders <PolicyUpdateNotice> in the final return, after its visibility and handler are defined` +
+    (ok ? '' : `  → use@${use} visible@${defVisible} dismiss@${defDismiss} return@${finalReturn}`))
+  const comp = readFileSync(new URL('../components/PolicyUpdateNotice.js', import.meta.url), 'utf8')
+  const strict = /<Modal visible=\{visible === true\}/.test(comp)
+  if (!strict) bad++
+  console.log(`  ${strict ? '✓' : '✗'} the Modal is shown only for visible === true (RN treats undefined as shown)`)
+}
 if (bad) { console.error(`\n  POLICY NOTICE CHECK FAILED — ${bad}\n`); process.exit(1) }
 console.log('\npolicy notice rules: OK\n')
