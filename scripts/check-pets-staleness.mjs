@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // ─── Pets content staleness + the wrapper/regulatory split ──────────────────
 //
-//   npm run pets:health          hard fail past the threshold (used by npm run ota)
-//   npm run pets:health -- --warn   print and exit 0 (used by .githooks/pre-push)
+//   npm run pets:health          (also run by npm run ota and, with --warn, by pre-push)
+//   Staleness WARNS everywhere and never blocks. The other checks below still exit 1.
 //
 // ─── WHY THIS EXISTS, AND WHY IT IS A CONTENT CHECK ─────────────────────────
 //
@@ -16,14 +16,26 @@
 // border. `LAST_VERIFIED = 'June 2026'` was hardcoded in three separate files and nothing
 // anywhere could ask how old it was. This is that question, asked out loud.
 //
-// ─── WHY --warn EXISTS, AND WHY pre-push USES IT ────────────────────────────
+// ─── STALENESS WARNS, IN npm run ota TOO (changed 2026-09-24) ───────────────
 //
-// CLAUDE.md's own rule, learned from check-duty-staleness and check-novest-staleness:
-// "a push must not be blocked because a roster is running low; that is data operations,
-// and a guard that blocks unrelated work gets disabled." A disabled guard protects
-// nobody. So this WARNS on push — visible every time, blocking nothing — and FAILS inside
-// `npm run ota`, which is where stale content would actually reach a user. Same split
-// check-privacy-parity.mjs already uses, for the same reason.
+// Until 2026-09-24 this WARNED on push and FAILED inside `npm run ota`, on the theory that
+// the OTA is where stale content reaches a user. That theory was wrong for this content:
+// the pets copy is bundled JS that is ALREADY on every device. An OTA that leaves it
+// unchanged ships nothing new about pets, so blocking it protects no user; it only holds
+// back unrelated work (it held back a partner launch with a Vet Dept reply outstanding),
+// and CLAUDE.md's rule is that a guard which blocks unrelated work gets disabled.
+//
+// The REAL user protection is untouched: the in-app "may be out of date" notice at
+// USER_NOTICE_AFTER_DAYS (PetsStaleNotice, showUserStaleNotice). That is what tells a
+// reader the rules may have moved, and it fires whether or not anybody publishes.
+//
+// Still HARD failures, unchanged: a PENDING value filled in while still listed as pending
+// (an invented attribution), and a verifiedOn that does not parse (a corrupted stamp).
+// Those are wrong DATA, not old data. The staleness warning is printed on every run, in
+// every mode, as loudly as the old block was; `--warn` is still accepted, and is now a no-op.
+//
+// Verified red-first on 2026-09-24 with verifiedOn '2026-06' (115 days): exit 1 before the
+// change, exit 0 with the warning after; the two hard failures still exit 1.
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -37,7 +49,6 @@ import {
 import { LANG_CODES } from '../constants/i18n.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const WARN_ONLY = process.argv.includes('--warn')
 const problems = []
 let assertions = 0
 const check = (cond, msg) => { assertions++; if (!cond) problems.push(msg) }
@@ -171,18 +182,12 @@ if (stale) {
       ? `⚠ PAST ${USER_NOTICE_AFTER_DAYS} DAYS: users are now being shown the "may be out of date" notice in-app.`
       : `Users are NOT yet being warned — that starts at ${USER_NOTICE_AFTER_DAYS} days (${USER_NOTICE_AFTER_DAYS - days} days away).`,
   ]
-  if (WARN_ONLY) {
-    console.error(c.y('  ┌─ pets content is STALE (warning only) ─────────────────────────┐'))
-    for (const l of lines) console.error(c.y('  │ ') + l)
-    console.error(c.y('  └────────────────────────────────────────────────────────────────┘'))
-    console.error(c.d('  Not blocking: a push must not be stopped because content needs a phone call.'))
-    console.error(c.d('  `npm run ota` DOES block on this — that is where stale content reaches users.\n'))
-    process.exit(0)
-  }
-  console.error(c.r('\n  ┌─ pets content is STALE — publish blocked ──────────────────────┐'))
-  for (const l of lines) console.error(c.r('  │ ') + l)
-  console.error(c.r('  └────────────────────────────────────────────────────────────────┘\n'))
-  process.exit(1)
+  console.error(c.y('  ┌─ pets content is STALE — NOT blocking ─────────────────────────┐'))
+  for (const l of lines) console.error(c.y('  │ ') + l)
+  console.error(c.y('  └────────────────────────────────────────────────────────────────┘'))
+  console.error(c.d('  Warning only, in every mode: the content is already on every device, so blocking'))
+  console.error(c.d(`  a publish protects nobody. Users are protected by the in-app notice at ${USER_NOTICE_AFTER_DAYS} days.\n`))
+  process.exit(0)
 }
 
 console.log(c.g(`  OK — verified ${days} days ago\n`))

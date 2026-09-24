@@ -139,10 +139,9 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-schema-drift.m
 # blocked because a roster is running low; that is data operations, and a guard that
 # blocks unrelated work gets disabled." A disabled guard protects nobody.
 #
-# It FAILS (exit 1) inside `npm run ota`, which is where stale content actually reaches a
-# user. Same split as the privacy-parity line below, for the same reason — except that one
-# has a NORMAL stale state (a committed-but-unshipped copy) and this one does not: the
-# content really is out of date, and the fix really is one phone call.
+# Since 2026-09-24 it WARNS inside `npm run ota` too: the pets content is already on every
+# device, so blocking a publish protected nobody (see the header of check-pets-staleness.mjs).
+# Users are protected by the in-app notice at 180 days. `--warn` is kept and is a no-op.
 #
 # The pets module is live to every user and tells people what paperwork to bring to a
 # border. Every other check in this repo asks whether a column EXISTS; this asks whether
