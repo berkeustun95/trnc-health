@@ -39,6 +39,12 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-map-sources
   exit 1
 }
 
+# Policy-update notice: who is told (and that new installs are not).
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-policy-notice.mjs || {
+  echo "pre-push: policy notice rules failed — see above." >&2
+  exit 1
+}
+
 # Weather (MET Norway): the normaliser's local-day grouping and the symbol → icon/label map.
 # Neither is visible on a device until the weather happens to be that weather.
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-weather-normalize.mjs || {

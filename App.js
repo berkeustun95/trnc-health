@@ -27,6 +27,7 @@ import {
 } from './constants/profileGate'
 import { REGIONS } from './constants/regions'
 import { LEGAL_VERSION } from './constants/legal'
+import { shouldShowPolicyNotice } from './utils/policyNoticeRules'
 import { readPendingConsent, clearPendingConsent } from './utils/pendingConsent'
 import { decidePendingConsent } from './utils/pendingConsentRules'
 import { resolveRegion } from './utils/resolveRegion'
@@ -73,6 +74,7 @@ import TravelWithPetScreen from './screens/pets/TravelWithPetScreen'
 import OwningPetScreen from './screens/pets/OwningPetScreen'
 import PetHotelPartnerScreen from './screens/pets/PetHotelPartnerScreen'
 import TutorialCoachMarks from './screens/TutorialCoachMarks'
+import PolicyUpdateNotice from './components/PolicyUpdateNotice'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
@@ -470,6 +472,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home')
   const [showDutyList, setShowDutyList] = useState(false)
   const [onboarded, setOnboarded] = useState(null)
+  // Policy-update notice (utils/policyNoticeRules.js). `policySeen` is undefined until read.
+  const [policySeen, setPolicySeen] = useState(undefined)
+  const [returningDevice, setReturningDevice] = useState(false)
   const [pendingLang, setPendingLang] = useState('English')
   const [facilityRatings, setFacilityRatings] = useState({})
   const [notifications, setNotifications] = useState([])
@@ -840,9 +845,12 @@ export default function App() {
     Promise.all([
       AsyncStorage.getItem('@trnc_onboarded'),
       AsyncStorage.getItem('@trnc_lang'),
-    ]).then(([onboardedVal, langVal]) => {
+      AsyncStorage.getItem('@trnc_policy_seen'),
+    ]).then(([onboardedVal, langVal, policySeenVal]) => {
       if (langVal) setPendingLang(langVal)
       setOnboarded(onboardedVal === 'true')
+      setReturningDevice(onboardedVal === 'true')
+      setPolicySeen(policySeenVal ?? null)
     })
   }, [])
 
@@ -865,7 +873,9 @@ export default function App() {
   }
 
   async function completeOnboarding(selectedLang) {
-    await AsyncStorage.multiSet([['@trnc_onboarded', 'true'], ['@trnc_lang', selectedLang]])
+    // A new install meets the CURRENT policy at signup — it must never be told it "changed".
+    await AsyncStorage.multiSet([['@trnc_onboarded', 'true'], ['@trnc_lang', selectedLang], ['@trnc_policy_seen', LEGAL_VERSION]])
+    setPolicySeen(LEGAL_VERSION)
     setPendingLang(selectedLang)
     setOnboarded(true)
   }
@@ -2167,6 +2177,13 @@ export default function App() {
           </TouchableOpacity>
         </Modal>
 
+        <PolicyUpdateNotice
+          visible={policyNoticeVisible}
+          lang={lang}
+          onRead={() => dismissPolicyNotice(true)}
+          onDismiss={() => dismissPolicyNotice(false)}
+        />
+
         <TutorialCoachMarks
           steps={coachSteps}
           visible={showCoachMarks}
@@ -2243,6 +2260,21 @@ export default function App() {
   const oliVisible =
     inTabShell && activeTab === 'home' &&
     inCustomerHub && !cityWelcomeVisible && !homeCityAskVisible
+
+  // The policy promises to tell users in the app when it changes. On Home only, never on
+  // top of the tutorial or a city prompt, and only once the profile has loaded (an account
+  // that already accepted this version must not see it flash).
+  const policyNoticeVisible =
+    inTabShell && activeTab === 'home' && policySeen !== undefined && (!session || profile !== null) &&
+    !showCoachMarks && !cityWelcomeVisible && !homeCityAskVisible &&
+    shouldShowPolicyNotice({ seen: policySeen, termsVersion: profile?.terms_version ?? null,
+                             current: LEGAL_VERSION, returning: returningDevice })
+  // Seen, NOT accepted: nothing is written to profiles.
+  const dismissPolicyNotice = (openPolicy) => {
+    AsyncStorage.setItem('@trnc_policy_seen', LEGAL_VERSION).catch(() => {})
+    setPolicySeen(LEGAL_VERSION)
+    if (openPolicy) setShowLegal(true)
+  }
 
   // Explicit answer -> asked=true, and city welcome goes live. 'visiting' is a
   // real answer, not an absence of one: it means every city is welcome-eligible.
