@@ -85,7 +85,7 @@ import XoxGameScreen from './screens/games/XoxGameScreen'
 import MemoryMatchScreen from './screens/games/MemoryMatchScreen'
 import Game2048Screen from './screens/games/Game2048Screen'
 import SudokuScreen from './screens/games/SudokuScreen'
-import { haversineKm, parseIsOpen, coarseCoord } from './utils/facilityUtils'
+import { haversineKm, parseIsOpen } from './utils/facilityUtils'
 import { dutyStatus, localDateKey, DUTY_FRESH } from './utils/dutyStatus'
 import {
   evaluateCityWelcome, markWelcomeShown, setCityWelcomeEnabled,
@@ -1123,8 +1123,12 @@ export default function App() {
       }
 
       try {
-        const wLat = coarseCoord(resolvedCoords.latitude)
-        const wLon = coarseCoord(resolvedCoords.longitude)
+        // Rounded to 0.1° (~10 km), NOT coarseCoord's 0.01° (~1 km): Open-Meteo keeps request
+        // coordinates in its server logs for up to 90 days, and at ~1 km² that is PRECISE
+        // location under Google Play's Data safety definition (< 3 km²). Weather does not need
+        // it. The privacy policy's Location section states this figure — change both together.
+        const wLat = Math.round(resolvedCoords.latitude * 10) / 10
+        const wLon = Math.round(resolvedCoords.longitude * 10) / 10
         const weatherRes = await fetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${wLat}&longitude=${wLon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,uv_index&daily=temperature_2m_max,temperature_2m_min,weather_code,uv_index_max&timezone=auto&forecast_days=4`
         )

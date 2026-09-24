@@ -130,6 +130,13 @@ const MARKERS = [
     why: 'inverted 20261004 — the old text promised providers your full name' },
   { key: 'question attribution',  re: /sees the question and your display name/i,
     why: 'what a provider CAN see now, and the only thing they can' },
+  // Location section, 2026-09-24. Two promises that each copy must make identically: the
+  // contact-tap district is anonymous, and the weather request goes to a named third party
+  // at a stated precision (tied to App.js below).
+  { key: 'contact taps anonymous', re: /cannot be traced back to you/i,
+    why: 'contact_events stores a district with no account, device or position' },
+  { key: 'weather processor',      re: /rounded to about 10 km and sent to Open-Meteo/i,
+    why: 'names the third party and the precision App.js actually sends' },
 ]
 
 // ── The field list is DERIVED from App.js PROFILE_COLUMNS, not typed here. A column
@@ -472,6 +479,16 @@ if (isSelf) {
 let problems
 try { problems = check(loadCopies(), readColumns()) }
 catch (e) { console.error(`\n  FAIL — ${e.message}`); process.exit(warnOnly ? 0 : 1) }
+
+// The policy's "about 10 km" is a promise about CODE: App.js rounds the weather request to
+// 0.1°. If the rounding changes, the published sentence is false — so they fail together.
+{
+  const app = readFileSync(join(ROOT, 'App.js'), 'utf8')
+  const ok = /Math\.round\(resolvedCoords\.latitude \* 10\) \/ 10/.test(app)
+    && /Math\.round\(resolvedCoords\.longitude \* 10\) \/ 10/.test(app)
+  if (!ok) problems.push('App.js no longer rounds the weather request to 0.1° — the Location section promises "about 10 km". Change the code and all copies together.')
+  console.log(`\n  weather precision (App.js ↔ policy)\n    ${ok ? '✓ App.js rounds to 0.1° (~10 km), as the policy says' : '✗ App.js rounding no longer matches "about 10 km"'}`)
+}
 
 if (!problems.length) {
   console.log('\n  PASS — the three FILES agree.')
