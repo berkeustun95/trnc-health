@@ -57,3 +57,8 @@ hand-place-queue*.csv
 # Generated solid-colour PNGs, never real photographs, never committed. The config edits
 # the fixture makes are caught by scripts/check-dorms.mjs and .githooks/pre-commit.
 assets/partners/_fixture/
+
+# Transient fetch artifact from scripts/fetch-gisekibris-feed.mjs. The COMMITTED
+# record is supabase/seed/gisekibris-events-clean.json, which is derived from it —
+# committing both would keep two copies of one drop that can disagree.
+supabase/seed/gisekibris-feed-raw.json

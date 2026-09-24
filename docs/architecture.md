@@ -175,12 +175,68 @@ Rows that vanish are reported and **never deleted** by the importer. Retiring on
 deliberate act — `status = 'cancelled'` (`20261038`), which keeps the row, its images and
 its `ticket_url` intact so a reinstatement is a flip back to `approved` and not a re-import.
 
-**PENDING, NOT PLANNED — partner automation.** Gişe Kıbrıs said on 2026-09-20 that their
-automation is built and will be shared with us soon: *"hazırlandı her şey, yakında sizinle
-paylaşırlar."* **No endpoint, no auth method and no schema have been supplied**, so there is
-nothing to design against yet. Recorded here so the next person knows it is coming and does
-not start building a poller against a contract that does not exist; the manual drop above
-remains the only supported path until they send something concrete.
+**THE LIVE PARTNER FEED SHIPPED ON 2026-09-23 — it supersedes the "pending automation" note
+that stood here.** One HTTPS endpoint returning the same JSON the file drops carried. A file
+path is still a first-class input: `prepare-gisekibris-feed.mjs <file>` is unchanged, and
+`fetch-gisekibris-feed.mjs` only obtains a file the same shape.
+
+```
+scripts/fetch-gisekibris-feed.mjs        GISEKIBRIS_FEED_URL -> supabase/seed/gisekibris-feed-raw.json
+  └─ prepare-gisekibris-feed.mjs <raw>   (unchanged contract; a file drop still works here)
+```
+
+**THE TOKEN IN THE FEED URL IS OUR PARTNER KEY.** It is a path segment, it lives in `.env`
+(gitignored, untracked) as `GISEKIBRIS_FEED_URL`, and it is **deliberately not named
+`EXPO_PUBLIC_*`** — Expo inlines every variable with that prefix into the client bundle, which
+would publish the key to every user. `fetch-gisekibris-feed.mjs` masks it in every log line,
+errors included, because an error message is exactly where a secret gets pasted into a chat.
+
+**THE FETCH STEP IS THE WIPE GUARD, and that is why it is a separate step.** The feed is a
+ROLLING FULL CATALOGUE — the partner confirmed it (see above) — so the importer treats "in the
+DB, absent from the feed" as a row to report. An empty or truncated response is therefore
+indistinguishable downstream from *"everything was cancelled"*: prepare would write a 0-event
+seed and the import would report every stored row as vanished. Nothing after the fetch can tell
+those apart, so it refuses there — non-200, non-JSON, a payload that is not a **non-empty**
+array, or rows missing any field the pipeline reads. It writes nothing on refusal and has no
+best-effort path. `--selftest` exercises every one of those rejections.
+
+**Four things the live feed changed, all verified against the response rather than assumed:**
+
+- **The image host SPLIT, it did not move.** Measured 2026-09-24 over 37 rows: 32 on
+  `img-cdn.gisekibris.com/event/<ID>/`, **4 still on Firebase** `.../o/events-v2%2F<ID>%2F`.
+  `idFromImage` accepts both. ⚠ `fetchableImageUrl()` appends `?alt=media` when there is no
+  query string — **keep it**: measured, the CDN ignores it (identical bytes either way) and
+  Firebase still *requires* it (bare returns 572 bytes of JSON metadata, not an image).
+- **Category casing changed** — `ELEKTRONİK MÜZİK` where the drops sent `Elektronik Müzik`. The
+  map is now folded, and **not with `toLowerCase()`**: Turkish dotted capital İ lowercases to
+  `i` + U+0307 COMBINING DOT ABOVE, so the naive fold yields `elektroni̇k müzi̇k` and still
+  misses. `trFold` maps İ→i and I→ı first. It does **not** fold accents, for the reason
+  `utils/moderationNormalize.js` gives. Scope is category keys only.
+- **One row's url carries no id**, and the url the feed sends for it **404s**:
+  `ŞENER ŞEN - ZENGİN MUTFAĞI` arrives as `/etkinlikler/sener-sen-zengin-mutfagi?code=…`.
+  Its canonical form `…--cmrxgkhys00006dpe19d8kiuh` returns 200 with `isCancelled=false`, and
+  that id is already this row's `external_id` in the database — the drops' url did carry it.
+  So: **the image path is the identity fallback** (it reproduces the stored id byte-for-byte,
+  so the row updates instead of duplicating), and `canonicalTicketUrl()` re-appends the id to a
+  slug-only url. Storing what the partner sent would have put a dead link on a live event and
+  then had `check-gisekibris-urls.mjs` null it — losing a Buy Ticket link the row has today.
+  Reconstruction is never trusted alone: the url probe runs afterwards and nulls anything that
+  does not resolve.
+- **Venues get renamed, and matching is byte-for-byte.** `LEO Club` → `Lions Garden`,
+  `Mısırlızade Sahnesi` → `Rauf Denktaş Üniversitesi Kültür Merkezi (eski Mısırlızade
+  Sineması)`. A renamed venue would import unpinned, silently undoing hand-supplied
+  coordinates. `gisekibris-venues.json` entries now take an **`aliases`** list of former names;
+  an entry with no pin of its own inherits the pin of an alias that has one, so a pin has
+  exactly ONE owner and the two can never drift. Old entries stay — older `events` rows hold
+  the old name in `organizer_name`.
+
+**The affiliate code is the partner's, and nothing of ours touches it.** Every ticket url now
+ends `?code=AF1727004770915`. `buildTicketUrl()` (`utils/events.js`) is a pass-through returning
+`event?.ticket_url || null`, so the code reaches the browser unmodified and **no client change
+was needed**. `canonicalTicketUrl()` preserves the query string when it re-appends an id.
+⚠ Rows that predate the live feed do **not** carry it and were **not** backfilled — a decision,
+not an oversight. Running the import writes the code onto any row present in the feed, because
+that is the feed's own value flowing through `MUTABLE.ticket_url`; that is not a backfill.
 
 **Identity — `external_id` = `gk-` + the partner's own event id.** Their id appears in
 two independent places and the prepare script cross-checks them on every row:

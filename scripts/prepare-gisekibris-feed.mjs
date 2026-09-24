@@ -88,6 +88,7 @@ const MAX_DESC = 3000
 const MAX_I18N_JSON = 6000
 
 const args = process.argv.slice(2)
+const selftest = args.includes('--selftest')
 const rawPath = args.find(a => !a.startsWith('--'))
 const outIdx = args.indexOf('--out')
 const outPath = outIdx !== -1 ? resolve(args[outIdx + 1]) : DEFAULT_OUT
@@ -97,8 +98,8 @@ function fail(...lines) {
   process.exit(1)
 }
 
-if (!rawPath) fail('Usage: node scripts/prepare-gisekibris-feed.mjs <raw-feed.json> [--out <path>]')
-if (!existsSync(rawPath)) fail(`Raw feed not found: ${rawPath}`)
+if (!rawPath && !selftest) fail('Usage: node scripts/prepare-gisekibris-feed.mjs <raw-feed.json> [--out <path>]')
+if (rawPath && !existsSync(rawPath)) fail(`Raw feed not found: ${rawPath}`)
 
 // ─── Field transforms ────────────────────────────────────────────────────────
 
@@ -137,17 +138,136 @@ function idFromUrl(url) {
   return slug.slice(i + 2) || null
 }
 
-// The same ID from the other direction: events-v2/<ID>/banner.png inside the
-// percent-encoded Firebase object path.
+// The same ID from the other direction, from EITHER image host.
+//
+// ⚠ THE HOST DID NOT MOVE, IT SPLIT — both shapes are live in one response.
+//   Measured on the 2026-09-24 live feed, 36 rows:
+//     32  img-cdn.gisekibris.com/event/<ID>/banner.jpg          (the new CDN)
+//      4  firebasestorage.../o/events-v2%2F<ID>%2Fbanner.png    (the original)
+//   A regex matching only the new shape loses the cross-check on those 4; only the
+//   old one loses it on 32. Accept both, and keep decodeURIComponent for the
+//   Firebase form, whose separators are percent-encoded.
 function idFromImage(url) {
   if (typeof url !== 'string' || !url) return null
   let pathname
   try { pathname = decodeURIComponent(new URL(url).pathname) } catch { return null }
-  const m = pathname.match(/events-v2\/([^/]+)\//)
+  const m = pathname.match(/\/(?:event|events-v2)\/([^/]+)\//)
   return m ? m[1] : null
 }
 
 const stripToken = url => (typeof url === 'string' ? url.split('?')[0] : null)
+
+// ─── Rebuild a ticket url the feed sent WITHOUT its id ──────────────────────
+//
+// The live feed emits one row whose url is slug-only, and THAT URL 404s:
+//   feed sends  /etkinlikler/sener-sen-zengin-mutfagi?code=AF1727004770915   -> 404
+//   canonical   /etkinlikler/sener-sen-zengin-mutfagi--cmrxgkhys00006dpe19d8kiuh
+//                                                                            -> 200
+// Measured 2026-09-24, both forms, with and without the affiliate code.
+//
+// Storing what the partner sent would put a DEAD link on a LIVE event: the page
+// resolves fine by its canonical url and reports isCancelled=false. The next step
+// in the pipeline would then null it, and the row would LOSE a Buy Ticket link it
+// has today — a regression produced by trusting a field we can see is broken.
+//
+// So when the url carries no id and we have one from the image path, the id is
+// appended in the partner's own canonical form. This is reconstruction, not
+// invention: the slug and the id are both theirs, and only the id half routes on
+// their site (a wrong slug still resolves), which is the same property that makes
+// a stored link survive a title edit.
+//
+// The query string is preserved — that is where the affiliate code lives.
+//
+// ⚠ Nothing here is trusted on its own: check-gisekibris-urls.mjs probes every url
+//   afterwards and nulls whatever does not resolve, so a reconstruction that
+//   guessed wrong is caught rather than shipped.
+function canonicalTicketUrl(rawUrl, id) {
+  if (typeof rawUrl !== 'string' || !rawUrl || !id) return rawUrl ?? null
+  let u
+  try { u = new URL(rawUrl) } catch { return rawUrl }
+  const seg = u.pathname.replace(/\/+$/, '').split('/').pop() ?? ''
+  if (seg.includes('--')) return rawUrl                       // already canonical
+  u.pathname = `${u.pathname.replace(/\/+$/, '')}--${id}`
+  return u.toString()
+}
+
+// ─── Turkish-aware case fold, for the CATEGORY lookup only ──────────────────
+//
+// The live feed sends 'ELEKTRONİK MÜZİK' where the file drops sent 'Elektronik
+// Müzik', so the map had to stop being case-sensitive. It cannot become a naive
+// toLowerCase(): Turkish dotted capital İ (U+0130) lowercases to 'i' + U+0307
+// COMBINING DOT ABOVE, so 'ELEKTRONİK MÜZİK'.toLowerCase() is 'elektroni̇k müzi̇k'
+// — a different string from 'elektronik müzik', and it would still miss. Measured,
+// not assumed: see `--selftest`, which folds the literal string from the feed.
+//
+// Scope is deliberately narrow. This maps İ→i and I→ı (Turkish's two i's are
+// different letters, not a case pair) and does NOT fold accents — the same line
+// utils/moderationNormalize.js holds, and for the same reason: folding ö→o makes
+// unrelated words collide. It is applied ONLY to category keys, never to titles,
+// descriptions or venue names, which are stored as the partner sends them.
+const trFold = s => String(s ?? '').replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase().trim()
+
+// Built from CATEGORY so the two can never drift; a collision would silently merge
+// two of their categories into one of ours, so it is an error, not a warning.
+const CATEGORY_FOLDED = (() => {
+  const m = new Map()
+  for (const [k, v] of Object.entries(CATEGORY)) {
+    const f = trFold(k)
+    if (m.has(f)) fail(`CATEGORY has two keys that fold to ${JSON.stringify(f)} — they would merge silently.`)
+    m.set(f, v)
+  }
+  return m
+})()
+
+// ─── Self-test ───────────────────────────────────────────────────────────────
+//
+// Both halves have been WATCHED RED (break the fold, break the regex) — a check
+// nobody has seen fail is a decoration. The category cases use the LITERAL strings
+// from the live feed and the file drops, not paraphrases of them.
+if (selftest) {
+  let bad = 0
+  const t = (label, got, want) => {
+    const ok = got === want
+    if (!ok) bad++
+    console.log(`    ${ok ? '✓' : '✗'} ${label.padEnd(46)} ${JSON.stringify(got)}${ok ? '' : `  wanted ${JSON.stringify(want)}`}`)
+  }
+  console.log('\n  Turkish category fold')
+  t("'ELEKTRONİK MÜZİK' (live feed)", CATEGORY_FOLDED.get(trFold('ELEKTRONİK MÜZİK')), 'nightlife')
+  t("'Elektronik Müzik' (file drops)", CATEGORY_FOLDED.get(trFold('Elektronik Müzik')), 'nightlife')
+  t("'Club & Lounge & Bar'",          CATEGORY_FOLDED.get(trFold('Club & Lounge & Bar')), 'nightlife')
+  t("'KONSER' upper",                 CATEGORY_FOLDED.get(trFold('KONSER')), 'music')
+  t("'Hotel Konseri'",                CATEGORY_FOLDED.get(trFold('Hotel Konseri')), 'music')
+  t('unknown stays unmapped',         CATEGORY_FOLDED.get(trFold('Tiyatro Gecesi')), undefined)
+  // The trap itself: a naive lowercase leaves a combining dot and must NOT match.
+  t('naive toLowerCase would MISS',   'ELEKTRONİK MÜZİK'.toLowerCase() === 'elektronik müzik', false)
+
+  console.log('\n  id extraction — both image hosts, and the url fallback')
+  t('CDN  /event/<id>/',      idFromImage('https://img-cdn.gisekibris.com/event/uewOPw8E9YKvoDpt793t/banner.jpg'), 'uewOPw8E9YKvoDpt793t')
+  t('Firebase events-v2%2F',  idFromImage('https://firebasestorage.googleapis.com/v0/b/x/o/events-v2%2FKuUoVfqsF3pXjQNzYszB%2Fbanner.png?alt=media'), 'KuUoVfqsF3pXjQNzYszB')
+  t('url with --ID and ?code', idFromUrl('https://www.gisekibris.com/etkinlikler/x--AbC123?code=AF1'), 'AbC123')
+  t('url WITHOUT an id (ŞENER ŞEN)', idFromUrl('https://www.gisekibris.com/etkinlikler/sener-sen-zengin-mutfagi?code=AF1727004770915'), null)
+  // The row that forced the fallback must land on its EXISTING external_id.
+  t('ŞENER ŞEN falls back to the stored id',
+    'gk-' + idFromImage('https://img-cdn.gisekibris.com/event/cmrxgkhys00006dpe19d8kiuh/banner.jpg'),
+    'gk-cmrxgkhys00006dpe19d8kiuh')
+
+  console.log('\n  ticket url reconstruction')
+  t('slug-only url gains the id, keeps ?code',
+    canonicalTicketUrl('https://www.gisekibris.com/etkinlikler/sener-sen-zengin-mutfagi?code=AF1727004770915', 'cmrxgkhys00006dpe19d8kiuh'),
+    'https://www.gisekibris.com/etkinlikler/sener-sen-zengin-mutfagi--cmrxgkhys00006dpe19d8kiuh?code=AF1727004770915')
+  t('a url that already has an id is untouched',
+    canonicalTicketUrl('https://www.gisekibris.com/etkinlikler/x--AbC123?code=AF1', 'AbC123'),
+    'https://www.gisekibris.com/etkinlikler/x--AbC123?code=AF1')
+  t('affiliate code survives reconstruction',
+    canonicalTicketUrl('https://www.gisekibris.com/etkinlikler/y?code=AF1727004770915', 'ZZZ').includes('code=AF1727004770915'), true)
+
+  console.log('\n  whitespace')
+  t('six trailing tabs are trimmed', nfc('Grand Opera Hotel Girne\t\t\t\t\t\t').trim(), 'Grand Opera Hotel Girne')
+  t('internal runs collapse in titles', cleanTitle('RUSS MILLIONS  X  CHAMADA CLUB'), 'RUSS MILLIONS X CHAMADA CLUB')
+
+  console.log(bad ? `\n  ${bad} self-test failure(s).\n` : '\n  Self-test clean.\n')
+  process.exit(bad ? 1 : 0)
+}
 
 // ─── Transform ───────────────────────────────────────────────────────────────
 
@@ -162,6 +282,7 @@ if (!Array.isArray(feed) || !feed.length) {
 
 const errors = []
 const events = []
+const idSources = []
 const seenId = new Map()
 
 feed.forEach((ev, i) => {
@@ -170,34 +291,56 @@ feed.forEach((ev, i) => {
   const urlId = idFromUrl(ev.url)
   const imgId = idFromImage(ev.image)
 
-  // Fail loudly, per requirement — never silently fall back to a synthetic key.
-  if (!urlId) {
-    errors.push(`${where}: could not extract an id from url: ${JSON.stringify(ev.url)}`)
-    return
-  }
+  // ── IDENTITY, AND THE ONE ROW THAT FORCED A FALLBACK ──────────────────────
+  //
+  // The image path is now the AUTHORITY and the url is the corroboration, because
+  // the live feed has a row whose url carries no id at all:
+  //
+  //   ŞENER ŞEN - ZENGİN MUTFAĞI
+  //     url   .../etkinlikler/sener-sen-zengin-mutfagi?code=AF1727004770915
+  //     image .../event/cmrxgkhys00006dpe19d8kiuh/banner.jpg
+  //
+  // WHY THE IMAGE PATH IS THE RIGHT FALLBACK, AND HOW THAT WAS VERIFIED RATHER
+  // THAN ASSUMED: that row already exists in the database as
+  // `gk-cmrxgkhys00006dpe19d8kiuh`, because the FILE DROP's url did carry
+  // `--cmrxgkhys00006dpe19d8kiuh`. The partner dropped the suffix from the url and
+  // kept the same object id in the image path, so deriving from the image
+  // reproduces the stored external_id byte-for-byte and the row UPDATES.
+  //
+  // An id invented for this row — a slug, a hash, a counter — would mint a NEW
+  // external_id, insert a duplicate alongside the original, and (for anything
+  // derived from mutable content) mint a different one again on the next fetch.
+  // That is the content-hash identity 20260831 removed; it is not coming back.
+  //
+  // The cross-check is UNCHANGED where both sources exist: a disagreement is still
+  // a hard error. Only its absence is new, and the run prints the per-row source so
+  // a silent drift to image-only across many rows is visible rather than inferred.
   if (!imgId) {
     errors.push(`${where}: could not extract an id from image path: ${JSON.stringify(ev.image)}`)
     return
   }
-  if (urlId !== imgId) {
+  if (urlId && urlId !== imgId) {
     errors.push(`${where}: id disagreement — url says "${urlId}", image path says "${imgId}"`)
     return
   }
-  if (!/^[A-Za-z0-9]+$/.test(urlId)) {
-    errors.push(`${where}: id is not alphanumeric: ${JSON.stringify(urlId)}`)
+  const rawId = urlId ?? imgId
+  const idSource = urlId ? 'url+image' : 'image-only'
+  if (!/^[A-Za-z0-9]+$/.test(rawId)) {
+    errors.push(`${where}: id is not alphanumeric: ${JSON.stringify(rawId)}`)
     return
   }
 
-  const externalId = `gk-${urlId}`
+  const externalId = `gk-${rawId}`
   if (seenId.has(externalId)) {
     errors.push(`${where}: duplicate id ${externalId} — also used by "${seenId.get(externalId)}"`)
     return
   }
   seenId.set(externalId, cleanTitle(ev.name))
 
-  const category = CATEGORY[ev.category]
+  const category = CATEGORY_FOLDED.get(trFold(ev.category))
   if (!category) {
-    errors.push(`${where}: unmapped category ${JSON.stringify(ev.category)} — add it to CATEGORY in this script.`)
+    errors.push(`${where}: unmapped category ${JSON.stringify(ev.category)} ` +
+      `(folded to ${JSON.stringify(trFold(ev.category))}) — add it to CATEGORY in this script.`)
     return
   }
 
@@ -232,6 +375,7 @@ feed.forEach((ev, i) => {
     errors.push(`${where}: description_i18n would serialise to ${i18nLen} bytes, cap is ${MAX_I18N_JSON}`)
   }
 
+  idSources.push({ external_id: externalId, title: cleanTitle(ev.name), source: idSource })
   events.push({
     external_id:      externalId,
     title,
@@ -248,7 +392,7 @@ feed.forEach((ev, i) => {
     // The full URL. Only the id half after '--' routes on their site — a wrong slug
     // still resolves — so a later title edit on their side cannot break this link.
     // check-gisekibris-urls.mjs probes every one of these and NULLs any that fail.
-    ticket_url:       ev.url,
+    ticket_url:       canonicalTicketUrl(ev.url, rawId),
     latitude:         null,   // filled at import from scripts/gisekibris-venues.json
     longitude:        null,
     source:           SOURCE,
@@ -306,6 +450,15 @@ console.log(`  ${String(events.length - bilingual).padStart(4)}  tr only (en ide
 console.log(`  ${String(events.filter(e => e.is_tba).length).padStart(4)}  TBA`)
 console.log(`  range: ${seed.meta.date_range.join('  →  ')}`)
 console.log(`  categories: ${Object.entries(catCount).map(([k, v]) => `${k} ${v}`).join(', ')}`)
+
+// PRINTED EVERY RUN, deliberately. `image-only` is a correct and supported state,
+// but it is also what a partner-side url change looks like in bulk — so the count
+// is shown rather than inferred, and the rows are named while there are few enough
+// to name. A jump here means the url stopped carrying ids, which is worth knowing
+// before it is the whole feed.
+const imageOnly = idSources.filter(r => r.source === 'image-only')
+console.log(`  external_id source: ${idSources.length - imageOnly.length} url+image (cross-checked), ${imageOnly.length} image-only`)
+for (const r of imageOnly) console.log(`      image-only: ${r.external_id}  ${r.title}`)
 console.log('')
 console.log('  Next: node scripts/check-gisekibris-urls.mjs --apply')
 console.log('')

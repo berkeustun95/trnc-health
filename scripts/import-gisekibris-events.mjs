@@ -153,7 +153,7 @@ function descriptionI18n(ev) {
 }
 
 function toRow(ev, venues) {
-  const coords = venues.get(ev.venue) ?? {}
+  const coords = resolveVenue(ev.venue) ?? {}
   return {
     external_id:      ev.external_id,
     source:           SOURCE,
@@ -241,6 +241,38 @@ const venueList = JSON.parse(readFileSync(VENUES_PATH, 'utf8')).venues ?? []
 if (!Array.isArray(venueList)) fail(`${VENUES_PATH}: "venues" must be an array.`)
 const venues = new Map(venueList.map(v => [v.venue, v]))
 
+// ─── Venue rename: a new name INHERITS the old name's pin ───────────────────
+//
+// Matching is byte-for-byte, so a venue the partner renames arrives as a stranger
+// and would import unpinned — silently undoing coordinates somebody supplied by
+// hand. Two of them renamed between the 2026-09-20 file drop and the live feed:
+//   LEO Club            -> Lions Garden                                   (4 events)
+//   Mısırlızade Sahnesi -> Rauf Denktaş Üniversitesi Kültür Merkezi (…)   (2 events)
+//
+// The new entry declares the old name in `aliases` and carries NO pin of its own;
+// it inherits through the alias. That keeps ONE owner per pin — copying the
+// coordinates onto both entries would create two values that can drift, and the
+// one that drifts is the one nobody is looking at. Old entries stay, because older
+// `events` rows still hold the old name in organizer_name.
+//
+// Resolution: exact name; then, if that entry has no pin, the first alias that
+// does; then, for a name that has no entry at all, any entry listing it as an
+// alias. Returns undefined only for a genuinely unknown venue.
+function resolveVenue(name) {
+  const direct = venues.get(name)
+  if (direct?.latitude != null) return direct
+  for (const a of direct?.aliases ?? []) {
+    const t = venues.get(a)
+    if (t?.latitude != null) return t
+  }
+  if (!direct) {
+    for (const v of venueList) {
+      if ((v.aliases ?? []).includes(name) && v.latitude != null) return v
+    }
+  }
+  return direct
+}
+
 if (!feed.length) fail('Seed file contains no events.')
 
 const supabase = createClient(SUPABASE_URL, serviceRoleKey(), {
@@ -314,11 +346,14 @@ for (const ev of feed) {
 const vanished = (existing ?? []).filter(
   r => !feed.some(ev => ev.external_id === r.external_id))
 
+// Alias-aware on both counts: a renamed venue that inherits a pin is neither
+// missing coordinates nor unknown, and reporting it as either would send somebody
+// to re-supply a pin that is already there.
 const missingCoords = [...new Set(
-  feed.filter(ev => venues.get(ev.venue)?.latitude == null).map(ev => ev.venue))].sort()
+  feed.filter(ev => resolveVenue(ev.venue)?.latitude == null).map(ev => ev.venue))].sort()
 
 const unknownVenues = [...new Set(
-  feed.filter(ev => !venues.has(ev.venue)).map(ev => ev.venue))].sort()
+  feed.filter(ev => !venues.has(ev.venue) && !resolveVenue(ev.venue)).map(ev => ev.venue))].sort()
 
 // ─── Write ───────────────────────────────────────────────────────────────────
 
