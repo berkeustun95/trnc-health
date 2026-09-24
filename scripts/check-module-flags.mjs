@@ -46,7 +46,7 @@ const EXPECTED_MODULES = {
   //   that false FOR THEM, not only for people who sign up afterwards; the published
   //   policy is 2026-09-20 and says the opposite. Nobody has been re-asked.
   //     SELECT id, terms_accepted_at FROM profiles
-  //      WHERE terms_version IS DISTINCT FROM '2026-09-20';
+  //      WHERE terms_version IS NULL OR terms_version < '2026-09-20';   -- NOT '<> current': 2026-09-24 did not change this
   //   It sits here rather than only in the SOP because this line is the one you cannot
   //   flip the module without editing. Full note: step 6 of the go-live SOP in CLAUDE.md.
   studentHub:    true,
@@ -158,6 +158,9 @@ const EXPECTED_SCALARS = {
   // others this does not gate NEW content — it replaces a surface users already have, so
   // an accidental flip is a downgrade for every user, not merely an early reveal.
   EXPLORE_MAP_LIVE:      true,
+  // Visit NCY walking routes on the Keşfet map. A working-tree flip ships a partner's
+  // routes to every user — and if their stops are still pending, ships them with holes.
+  EXPLORE_ROUTES_LIVE:   true,   // live 2026-09-24
   // The Home redesign. Like EXPLORE_MAP_LIVE this replaces a surface every user already
   // has rather than revealing new content, so a working-tree flip left over from a device
   // comparison is a whole-app visual change shipped to everyone, not an early reveal.

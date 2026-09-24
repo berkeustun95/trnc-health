@@ -44,7 +44,7 @@ import {
   TRNC_CENTER,
 } from '../constants/mapSources.js'
 import { MODULE_FLAGS, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
-import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots, walkStep, walkAdvance, walkDistance, routeLegs, legKey } from '../constants/walkingRoutes.js'
+import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots, walkStep, walkAdvance, walkDistance, routeLegs, legKey, stubsFor } from '../constants/walkingRoutes.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
          NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES } from '../constants/exploreCategories.js'
@@ -334,6 +334,14 @@ check('a fresh stored leg is drawn from its path', [lg[0].routed, lg[0].coords.l
 check('a pair with no stored leg falls back to straight ×1.3', [lg[1].routed, lg[1].coords.length], [false, 2])
 const moved = routeLegs([LA, { ...LB, latitude: 35.1725 }], routed)
 check('a leg whose place moved > 50 m falls back (stale)', moved[0].routed, false)
+// Stubs: a path that ends at the walkable point nearest a monument gets a dashed stub to the
+// pin; one that ends on the pin gets none (Gazimağusa, 2026-09-24).
+const P0 = { latitude: 35.17, longitude: 33.36 }, P1 = { latitude: 35.1703, longitude: 33.3603 }
+const onMonument = { latitude: 35.1707, longitude: 33.3603 }   // ~44 m past the path's end
+check('a path ending ~44 m from the pin gets one stub, to the pin', stubsFor(P0, [P0, P1], onMonument).length, 1)
+check('a path ending on both pins gets no stubs', stubsFor(P0, [P0, P1], P1).length, 0)
+const stubbed = routeLegs([{ id: 'sa', ...P0 }, { id: 'sb', ...onMonument }], new Map([[legKey('sa', 'sb'), { metres: 80, path: [[P0.longitude, P0.latitude], [P1.longitude, P1.latitude]] }]]))
+check('a 44 m stub is still a FRESH routed leg (stub limit < STALE_M)', [stubbed[0].routed, stubbed[0].stubs.length], [true, 1])
 check('the reverse direction is a different leg', routeLegs([LB, LA], routed)[0].routed, false)
 check('≈ distance uses the routed metres where they exist', walkEstimate([LA, LB, LC], lg).km, Math.max(1, Math.round((260 + lg[1].metres) / 1000)))
 

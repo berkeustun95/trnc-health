@@ -12,7 +12,7 @@ import * as Location from 'expo-location'
 import { Marker, Polyline } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { placeName } from '../screens/ExploreScreen'
-import { ROUTE_COLOR, walkingDirectionsUrl, creditUrl, creditBrand, overlapSlots, metresBetween, walkDistance } from '../constants/walkingRoutes'
+import { ROUTE_COLOR, walkingDirectionsUrl, creditUrl, creditBrand, overlapSlots, metresBetween, walkDistance, stubsFor } from '../constants/walkingRoutes'
 import { logContactEvent } from '../utils/logContactEvent'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
@@ -22,6 +22,7 @@ import { t, LANG_CODES } from '../constants/i18n'
 // If dashes ever render wrong on a device, this is the one line to change to `undefined`
 // (solid) — both platforms implement lineDashPattern natively in react-native-maps 1.20.
 const DASH = [10, 7]
+const STUB_DASH = [4, 5]
 
 export function routeName(route, lang) {
   const n = route.name_i18n || {}
@@ -87,7 +88,7 @@ export function RouteOverlay({ routes, selected, lang, walkNext = null, liveLeg 
       {/* One polyline per leg: the real walking path where walking_legs has a fresh one
           (solid), the straight connector where it does not (dashed) — so a dash always
           means "we do not know the way on the ground here". */}
-      {shown.flatMap(r => (r.legs ?? []).map((leg, i) => (
+      {shown.flatMap(r => (r.legs ?? []).flatMap((leg, i) => [
         <Polyline
           key={`l:${r.id}:${i}`}
           coordinates={leg.coords}
@@ -96,13 +97,25 @@ export function RouteOverlay({ routes, selected, lang, walkNext = null, liveLeg 
           lineDashPattern={leg.routed ? undefined : DASH}
           tappable
           onPress={() => onSelectRoute(r)}
-        />
-      )))}
+        />,
+        // Pin ↔ nearest walkable point (a monument the footpaths do not enter): short, dashed.
+        ...(leg.stubs ?? []).map((seg, j) => (
+          <Polyline key={`s:${r.id}:${i}:${j}`} coordinates={seg} strokeColor={ROUTE_COLOR}
+            strokeWidth={selected ? 3 : 2} lineDashPattern={STUB_DASH} />
+        )),
+      ]))}
       {/* The live leg (walk mode): from the walker to the next stop, in the accent colour and
           drawn over the route so "the way from here" reads apart from "the route". */}
       {liveLeg && liveLeg.length >= 2 && (
         <Polyline key="live" coordinates={liveLeg} strokeColor={colors.accent} strokeWidth={5} zIndex={5} />
       )}
+      {/* …and the same stub rule for the live leg: its path ends at the walkable point
+          nearest the next stop. */}
+      {liveLeg && liveLeg.length >= 2 && selected && walkNext != null && selected.stops[walkNext] &&
+        stubsFor(liveLeg[0], liveLeg, selected.stops[walkNext]).slice(-1).map((seg, j) => (
+          <Polyline key={`ls:${j}`} coordinates={seg} strokeColor={colors.accent} strokeWidth={3}
+            lineDashPattern={STUB_DASH} zIndex={5} />
+        ))}
       {selected
         ? selected.stops.map((p, i) => {
             // Walk mode: stops already passed go grey, the one being walked to is ringed and
@@ -129,7 +142,8 @@ export function RouteOverlay({ routes, selected, lang, walkNext = null, liveLeg 
 }
 
 // Frames what is DRAWN: the real paths bulge beyond the stops (the harbour quay in Girne).
-export const fitRoute = route => (route.legs?.length ? route.legs.flatMap(l => l.coords) : coordsOf(route))
+// …and the pins, which can sit up to 45 m past a path's end (the stubs).
+export const fitRoute = route => [...coordsOf(route), ...(route.legs ?? []).flatMap(l => l.coords)]
 
 // Bottom row of route cards — the reliable way in. A dashed line at island zoom is too thin
 // to hit, and on iOS (Apple Maps) polyline taps are not guaranteed at all.

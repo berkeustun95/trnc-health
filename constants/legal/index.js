@@ -43,7 +43,12 @@ import TERMS_TR   from './terms.tr.js'
 //   `terms_version IS DISTINCT FROM '2026-09-20'` is what finds them if that changes. It is the value written to
 // profiles.terms_version, so a bump means every future acceptance records the new one —
 // it does NOT re-ask anyone who already accepted. Re-asking is a separate decision.
-export const LEGAL_VERSION = '2026-09-20'
+// Bumped 2026-09-20 -> 2026-09-24 at the Visit NCY routes go-live: the Location section
+// (on-device use, search, MET Norway weather via our server, contact-tap districts, place
+// pins, openrouteservice/HeiGIT walking paths), deletion of particular data, the 30-day
+// purge of deleted content, and region's real use. Terms unchanged; the pair moves together.
+// This bump is what raises the in-app notice (utils/policyNoticeRules.js).
+export const LEGAL_VERSION = '2026-09-24'
 
 // Locales with a translated body. NOT a hand-kept list — derived from what is actually
 // imported, so adding a body is one import and one map entry and this follows.

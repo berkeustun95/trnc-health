@@ -54,6 +54,7 @@
   },
   "routes": [
     { "pattern": "getadaapp.com/support", "zone_name": "getadaapp.com" },
-    { "pattern": "getadaapp.com/privacy", "zone_name": "getadaapp.com" }
+    { "pattern": "getadaapp.com/privacy", "zone_name": "getadaapp.com" },
+    { "pattern": "getadaapp.com/delete-account", "zone_name": "getadaapp.com" }
   ]
 }

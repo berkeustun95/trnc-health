@@ -12,7 +12,7 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
-export default `Version: 2026-09-20
+export default `Version: 2026-09-24
 Last updated: September 24, 2026
 
 WHO WE ARE
@@ -49,7 +49,7 @@ Push notification token: stored to send you duty pharmacy alerts and replies to 
 
 Reviews, questions and answers you submit.
 
-• Messages you send — the text of your messages to other students and who you sent them to. A message you delete is hidden from both of you but kept for a period so a report can be reviewed. If someone reports a message, an administrator can read that message and nothing else from the conversation.
+• Messages you send — the text of your messages to other students and who you sent them to. A message you delete is hidden from both of you but kept for 30 days so a report can be reviewed, then removed permanently. If someone reports a message, an administrator can read that message and nothing else from the conversation.
 • Attempts to start a conversation — when you try to message someone, we record that the attempt happened, whether or not it went through. Only administrators can see this, and it is deleted after 30 days.
 
 Moderation data: content you report, and users you block. Your block list is private and is never shown to the user you blocked.
@@ -140,6 +140,7 @@ Different data is kept for different lengths of time.
 
 • Your account: we retain the data on your account for as long as your account is active. If you request account deletion, we will delete your personal data within 30 days, except where retention is required by applicable law.
 • Rejected submissions — 30 days: if a submission is rejected by our content filter, we keep the rejected text, the term that triggered the rejection, and the time it happened, so that we can find and correct rejections that were wrong and improve the filter. These records are linked to your account, are visible only to our administrators, are deleted automatically after 30 days, and are not used for any other purpose.
+• Content you delete — 30 days: reviews, questions and messages you delete are hidden at once and permanently removed 30 days later. If one is part of a report that is still open, it is removed once the report has been dealt with. Deleting a question also removes the answers to it.
 • Content we have removed: content removed for breaching our community standards is retained internally so that we can identify repeat breaches by the same account. It is no longer visible to other users.
 • Consent records: retained for as long as you hold an account, and for a reasonable period afterwards, because they are the record of what you agreed to.
 
