@@ -33,6 +33,8 @@
 // constants/partnerAssets.js — the same split, for the same reason, that partners.js,
 // dorms.js and ads.js carry.
 
+import { brandInk, colors } from './theme.js'
+
 // ─── SECTION ORDER ──────────────────────────────────────────────────────────
 //
 // Data, not JSX position, so the order can change without a component edit — the same
@@ -305,6 +307,29 @@ export const petPartner = id => BY_ID[id]
 
 const BY_SLUG = Object.fromEntries(PET_PARTNERS.map(p => [p.slug, p]))
 export const petPartnerBySlug = slug => BY_SLUG[slug]
+
+// ─── THE HERO ACCENT: THE PARTNER'S COLOUR, IN THE HERO ONLY ────────────────
+//
+// Pure, derived from the config, so a second partner brings its own and the screen holds
+// no hex. Everything outside PetHotelPartnerScreen's hero stays ADA orange (card, cross-link,
+// contact bar); scripts/check-pet-partners.mjs fails if this theme is read anywhere else.
+//
+// The raw accent is exposed as `rule`, never as `accent`, so a text use of it reads as wrong
+// at the call site: `rule` is for borders and lines only. `text` is accentText, the AA-safe
+// shade, and the only value that may colour text or an icon beside text. `fill` is what text
+// sits on.
+//
+// ⚠ OUTLINED, NOT TINTED. A 12% teal tint measured #E4F6F8, and #127D88 on it is under 4.5:1
+//   (brandInk fell back to ink, 2026-09-24), while a tint light enough to pass is invisible
+//   on colors.bg. So badges are white with a `rule` border: 4.87:1. Following DormPartnerScreen,
+//   the foreground is guarded at runtime: brandInk() falls back to ink below 4.5:1 on `fill`.
+//
+// null when a partner has no accent: the hero then keeps ADA's own colours.
+export function petHeroTheme(partner) {
+  if (!partner?.accent || !partner?.accentText) return null
+  const fill = colors.cardBg
+  return { text: brandInk(partner.accentText, { on: fill }), rule: partner.accent, fill }
+}
 
 // ─── EMPTINESS IS DECIDED HERE, ONCE, AND NEVER IN THE SCREEN ───────────────
 //

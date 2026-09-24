@@ -31,12 +31,12 @@
 // The day any of those three changes, the guard goes RED and graduating the placeholder
 // becomes a deliberate act somebody reviews — which is the whole point.
 import { resolveRegion } from '../utils/resolveRegion.js'
-import { readFileSync, statSync } from 'node:fs'
+import { readFileSync, statSync, readdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   PET_PARTNERS, PET_PARTNER_IDS, PENDING_FIELDS, DECLINED_FIELDS, PENDING_KEYS, SECTION_ORDER,
-  petPartner, petPartnerBySlug, petPartnerSections,
+  petPartner, petPartnerBySlug, petPartnerSections, petHeroTheme,
   petWaLocale, petWaCode, petWaMessage, petWaUrl, petPartnerWebsiteUrl,
 } from '../constants/petPartners.js'
 import { t, tCount, pluralCategory, hasOwnTranslation, LANG_CODES } from '../constants/i18n.js'
@@ -226,6 +226,19 @@ for (const p of PET_PARTNERS) {
     }
     accentReport = `accent ${p.accent} (text on white ${contrastRatio(p.accent, '#FFFFFF').toFixed(2)}:1, decoration only) · `
       + `accentText ${p.accentText || '—'} (${Object.entries(grounds).map(([k, g]) => `${k} ${p.accentText ? contrastRatio(p.accentText, g).toFixed(2) : '—'}`).join(', ')})`
+  }
+
+  // ─── THE HERO THEME: text-safe, and the raw accent is never the text ───
+  const ht = petHeroTheme(p)
+  if (p.accent) {
+    check(ht !== null, `${who}: accent is set but petHeroTheme() returned null — the hero would silently use ADA colours`)
+    if (ht) {
+      check(ht.text === p.accentText,
+        `${who}: hero text is ${ht.text}, not accentText ${p.accentText} — brandInk fell back, so accentText fails 4.5:1 on the hero fill ${ht.fill}`)
+      check(ht.text !== p.accent, `${who}: hero text IS the raw accent ${p.accent} — raw is decoration only`)
+      check(contrastRatio(ht.text, ht.fill) >= 4.5,
+        `${who}: hero text ${ht.text} on fill ${ht.fill} is ${contrastRatio(ht.text, ht.fill)?.toFixed(2)}:1`)
+    }
   }
 
   // ─── Services ───────────────────────────────────────────────────────────
@@ -557,6 +570,60 @@ for (const key of referencedAssets) {
 }
 const MB = n => (n / 1048576).toFixed(2) + ' MB'
 
+// ─── THE PARTNER ACCENT LIVES IN THE HERO ONLY — read from source ────────────
+//
+// Everything outside PetHotelPartnerScreen's hero stays ADA orange. Pet surfaces are DERIVED
+// (every file that mentions PET_PARTNERS, petPartner or PetHotel), never listed, so a new pet
+// surface is covered the day it is written. Within them:
+//   • the partner accent (petHeroTheme / accentText / accentSource / <partner>.accent) may
+//     appear only in the screen, and there only inside the hero branch;
+//   • heroTheme.rule, the RAW accent, may only be a border colour: never text, never an icon;
+//   • no pet surface may hardcode the partner's hex values: they come from the config.
+const walkJs = d => readdirSync(resolve(ROOT, d), { withFileTypes: true }).flatMap(e =>
+  e.isDirectory() ? walkJs(`${d}/${e.name}`) : e.name.endsWith('.js') ? [`${d}/${e.name}`] : [])
+const petSurfaces = ['App.js', ...['screens', 'components', 'constants', 'utils'].flatMap(walkJs)]
+  .filter(f => f !== 'constants/petPartners.js' && f !== 'constants/i18n.js')
+  .filter(f => /PET_PARTNERS|petPartner|PetHotel/.test(readFileSync(resolve(ROOT, f), 'utf8')))
+const SCREEN = 'screens/pets/PetHotelPartnerScreen.js'
+check(petSurfaces.includes(SCREEN), `CONTROL: the pet-surface scan did not find ${SCREEN}, so it proves nothing`)
+const ACCENT_REF = /petHeroTheme|heroTheme|accentText|accentSource|\b(?:partner|p|petHotel|row|item)\??\.accent\b/g
+const hexes = PET_PARTNERS.flatMap(pp => [pp.accent, pp.accentText]).filter(Boolean).map(h => h.toLowerCase())
+let accentRefsInHero = 0
+for (const f of petSurfaces) {
+  const raw = readFileSync(resolve(ROOT, f), 'utf8')
+  // CODE ONLY. Comments are blanked to same-length whitespace (offsets and line numbers
+  // survive), because a comment explaining heroTheme.rule is not a use of it: matching
+  // prose is the frame-of-reference trap CLAUDE.md records. `//` counts only when it does
+  // not follow a ':' (so 'https://' in a string is not treated as a comment).
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, c => c.replace(/[^\n]/g, ' '))
+                 .replace(/(^|[^:])\/\/[^\n]*/g, (c, pre) => pre + ' '.repeat(c.length - pre.length))
+  const lineOf = i => src.slice(0, i).split('\n').length
+  for (const h of hexes) if (src.toLowerCase().includes(h)) problems.push(`${f}: hardcodes the partner colour ${h} — read it from the partner config`)
+  let heroFrom = -1, heroTo = -1, decl = -1
+  if (f === SCREEN) {
+    heroFrom = src.indexOf("if (id === 'hero') return (")
+    heroTo   = src.indexOf("if (id === 'about'", heroFrom)
+    decl     = src.indexOf('const heroTheme = petHeroTheme(partner)')
+    if (heroFrom < 0 || heroTo < 0 || decl < 0) problems.push(`${SCREEN}: could not locate the hero branch or the heroTheme declaration — the hero-only check cannot run`)
+  }
+  for (const m of src.matchAll(ACCENT_REF)) {
+    const at = m.index
+    const lineStart = src.lastIndexOf('\n', at) + 1
+    const inDecl = decl >= 0 && at >= src.lastIndexOf('\n', decl) && at < src.indexOf('\n', decl)
+    const isImport = /^import\b/.test(src.slice(lineStart, src.indexOf('\n', at)))
+    const inHero = heroFrom >= 0 && at > heroFrom && at < heroTo
+    if (inHero) accentRefsInHero++
+    if (!(inHero || inDecl || isImport))
+      problems.push(`${f}:${lineOf(at)}: partner accent '${m[0]}' outside PetHotelPartnerScreen's hero — only the hero may use it`)
+  }
+  for (const m of src.matchAll(/heroTheme\??\.rule/g)) {
+    const before = src.slice(src.lastIndexOf('\n', m.index) + 1, m.index)
+    if (!/border\w*Color\s*:\s*$/.test(before))
+      problems.push(`${f}:${lineOf(m.index)}: heroTheme.rule (the RAW accent) used as '${before.trim().slice(-40)}…' — raw is for borders only, never text or icons`)
+  }
+}
+check(accentRefsInHero > 0, `CONTROL: no partner-accent reference found inside the hero — the scan's hero window is wrong, so "outside the hero" proves nothing`)
+
 // ─── REPORT ─────────────────────────────────────────────────────────────────
 //
 // The counts are the point. "No problems" from a guard that matched nothing looks exactly
@@ -579,6 +646,7 @@ console.log(`  pending fields      ${Object.keys(PENDING_FIELDS).length}  ${c.d(
 console.log(`  i18n keys           ${mustResolve.length} with an English value  ${c.d(`+ ${PENDING_KEYS.length} asserted UNWRITTEN in all ${LANGS.length}`)}`)
 console.log(c.d(`                      per-locale coverage belongs to npm run i18n:validate, not here`))
 console.log(`  accent              ${accentReport}`)
+console.log(`  hero-only accent    ${accentRefsInHero} use(s) inside the hero · ${petSurfaces.length} pet surface(s) scanned: ${petSurfaces.join(', ')}`)
 console.log(`  asset keys          ${referencedAssets.size}`)
 console.log(`  asset footprint     ${MB(diskBytes)} on disk · ${MB(decodeBytes)} decoded (ARGB8888)`
   + (unsized ? c.r(`  [${unsized} unmeasured]`) : ''))

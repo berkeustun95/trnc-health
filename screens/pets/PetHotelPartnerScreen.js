@@ -7,7 +7,7 @@ import { colors, shadow, radius } from '../../constants/theme'
 import { t, tCount, LANG_CODES } from '../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../constants/regions'
 import { partnerAsset, partnerLogo } from '../../constants/partnerAssets'
-import { petPartnerSections, petWaUrl, petPartnerWebsiteUrl, SECTION_ORDER } from '../../constants/petPartners'
+import { petPartnerSections, petHeroTheme, petWaUrl, petPartnerWebsiteUrl, SECTION_ORDER } from '../../constants/petPartners'
 import { logContactEvent } from '../../utils/logContactEvent'
 
 // The pet hotel partner screen. Structure mirrors DormPartnerScreen and
@@ -90,6 +90,9 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
   const langCode = LANG_CODES[lang] || 'en'
 
   const sec = petPartnerSections(partner, { resolveAsset: partnerAsset })
+  // The partner's colours, HERO ONLY (see petHeroTheme). null = ADA's own colours.
+  // heroTheme.rule is decoration (borders, lines); only heroTheme.text may colour text or icons.
+  const heroTheme = petHeroTheme(partner)
 
   // t() returns the KEY when a string is missing, so a pending or withdrawn about block
   // must be compared against its own key name — otherwise the screen renders
@@ -167,10 +170,10 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
             file's JSX position — so the order can change without a component edit. */}
         {SECTION_ORDER.map(id => {
           if (id === 'hero') return (
-            <View key={id} style={s.hero}>
-              <View style={s.badge}>
-                <Ionicons name="ribbon-outline" size={12} color={colors.accent} />
-                <Text style={s.badgeText}>{t('petHotelBadge', lang)}</Text>
+            <View key={id} style={[s.hero, heroTheme && { borderBottomColor: heroTheme.rule }]}>
+              <View style={[s.badge, heroTheme && { backgroundColor: heroTheme.fill, borderWidth: 1, borderColor: heroTheme.rule }]}>
+                <Ionicons name="ribbon-outline" size={12} color={heroTheme ? heroTheme.text : colors.accent} />
+                <Text style={[s.badgeText, heroTheme && { color: heroTheme.text }]}>{t('petHotelBadge', lang)}</Text>
               </View>
 
               {/* ⚠ LIGHT ONLY. The app has no dark theme (app.config.js userInterfaceStyle
@@ -192,9 +195,9 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
                   it is a config edit the guard refuses. */}
               <Text style={s.heroName}>{partner.name}</Text>
               <View style={s.heroMetaRow}>
-                <View style={s.typePill}>
-                  <Ionicons name="paw" size={11} color={colors.primary} />
-                  <Text style={s.typePillText}>{t('petHotelDogBoarding', lang)}</Text>
+                <View style={[s.typePill, heroTheme && { backgroundColor: heroTheme.fill, borderWidth: 1, borderColor: heroTheme.rule }]}>
+                  <Ionicons name="paw" size={11} color={heroTheme ? heroTheme.text : colors.primary} />
+                  <Text style={[s.typePillText, heroTheme && { color: heroTheme.text }]}>{t('petHotelDogBoarding', lang)}</Text>
                 </View>
                 {!!districtKey && (
                   <View style={s.metaItem}>
