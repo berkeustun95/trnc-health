@@ -44,7 +44,7 @@ import {
   TRNC_CENTER,
 } from '../constants/mapSources.js'
 import { MODULE_FLAGS, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
-import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots } from '../constants/walkingRoutes.js'
+import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots, walkStep, walkAdvance, walkDistance } from '../constants/walkingRoutes.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
          NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES } from '../constants/exploreCategories.js'
@@ -323,6 +323,21 @@ const M = 0.000009   // ≈ 1 m of latitude
 check('a 1 m pair is split into two slots', overlapSlots([at(35, 33), at(35 + M, 33)]), [-0.5, 0.5])
 check('stops 40 m apart stay on their point', overlapSlots([at(35, 33), at(35 + 40 * M, 33)]), [0, 0])
 check('a 20 m + 20 m chain spreads as one group of three', overlapSlots([at(35, 33), at(35 + 20 * M, 33), at(35 + 40 * M, 33)]), [-1, 0, 1])
+
+// Walk mode. The case that matters is the manual Previous: you are standing at the stop you
+// stepped back to, and a naive "within 30 m → advance" bounces you forward again at once.
+const W = [at(35, 33), at(35 + 100 * M, 33), at(35 + 300 * M, 33)]
+let ws = walkStep(W, 0, at(35 - 200 * M, 33))
+check('walk: starting far away arms stop 1', ws, { next: 0, armed: true })
+ws = walkAdvance(W, ws, at(35 - 5 * M, 33))
+check('walk: arriving within 30 m advances', ws.next, 1)
+ws = walkStep(W, 0, at(35 + 2 * M, 33))
+check('walk: manual Previous onto the stop you stand at is NOT armed', ws, { next: 0, armed: false })
+check('walk: …and the next fix there does not bounce you forward', walkAdvance(W, ws, at(35 + 2 * M, 33)).next, 0)
+ws = walkAdvance(W, walkAdvance(W, ws, at(35 + 60 * M, 33)), at(35 + 1 * M, 33))
+check('walk: walking away (>30 m) and back re-arms and advances', ws.next, 1)
+check('walk: nothing happens after the last stop', walkAdvance(W, { next: 3, armed: true }, at(35, 33)), { next: 3, armed: true })
+check('walk: distances are rounded, never raw', [walkDistance(123), walkDistance(2600)], [{ unit: 'm', n: 120 }, { unit: 'km', n: 3 }])
 
 // The gate above is only worth something if the screen USES it. Code-shape checks, anchored
 // to code (not prose), with the raw value printed on failure.

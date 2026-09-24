@@ -32,8 +32,8 @@ import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { EXPLORE_ROUTES_LIVE } from '../constants/flags'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
-import { routesLayerVisible, resolveRoutes, ROUTE_COLOR } from '../constants/walkingRoutes'
-import { RouteOverlay, RoutePicker, RoutePanel, fitRoute } from '../components/WalkingRoutes'
+import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance } from '../constants/walkingRoutes'
+import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, fitRoute } from '../components/WalkingRoutes'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
@@ -254,6 +254,7 @@ export default function ExploreMapScreen({
   const pendingRouteId = useRef(snap?.routeId ?? null)
   const pendingPinId   = useRef(snap?.pinId ?? null)
   const panelScrollY   = useRef(snap?.panelScrollY ?? 0)
+  const pendingWalk    = useRef(snap?.walkNext ?? null)
 
   const [places, setPlaces]   = useState([])
   const [loading, setLoading] = useState(true)
@@ -270,6 +271,9 @@ export default function ExploreMapScreen({
   const [routesError, setRoutesError]     = useState(false)
   const [routesMode, setRoutesMode]       = useState(snap?.routesMode ?? false)
   const [selectedRoute, setSelectedRoute] = useState(null)
+  // Walk mode ("Başla"): null, or { next, armed } — see walkAdvance() in constants/walkingRoutes.
+  const [walk, setWalk] = useState(null)
+  const { pos: walkPos, status: walkStatus } = useWalkPosition(!!walk && !!selectedRoute)
 
   const initialRegion = useMemo(() => snap?.region ?? (
     userLocation
@@ -334,8 +338,21 @@ export default function ExploreMapScreen({
     if (!id || routes.length === 0) return
     pendingRouteId.current = null
     const r = routes.find(x => x.id === id)
-    if (r) setSelectedRoute(r)
+    if (!r) return
+    setSelectedRoute(r)
+    if (pendingWalk.current != null) setWalk(walkStep(r.stops, pendingWalk.current, null))
+    pendingWalk.current = null
   }, [routes])
+
+  // Auto-advance on every fix. Functional update: the fix may land between renders.
+  useEffect(() => {
+    if (!walkPos || !selectedRoute) return
+    setWalk(w => (w ? walkAdvance(selectedRoute.stops, w, walkPos) : w))
+  }, [walkPos, selectedRoute])
+
+  const endWalk  = useCallback(() => setWalk(null), [])
+  const stepWalk = useCallback(d => setWalk(w => w && walkStep(selectedRoute.stops, w.next + d, walkPos)),
+    [selectedRoute, walkPos])
 
   const fitTo = useCallback((coords, bottomShare) => {
     if (!coords.length) return
@@ -351,14 +368,20 @@ export default function ExploreMapScreen({
     setRoutesMode(true)
     fitTo(routes.flatMap(fitRoute), 0.3)
   }, [routes, fitTo])
-  const leaveRoutes = useCallback(() => { setRoutesMode(false); setSelectedRoute(null) }, [])
+  const leaveRoutes = useCallback(() => { setRoutesMode(false); setSelectedRoute(null); setWalk(null) }, [])
 
+  const startWalk = useCallback(() => {
+    if (!selectedRoute) return
+    setWalk(walkStep(selectedRoute.stops, 0, walkPos))
+    fitTo(fitRoute(selectedRoute), 0.42)
+  }, [selectedRoute, walkPos, fitTo])
   const openRoute = useCallback(r => {
     panelScrollY.current = 0
     setSelectedRoute(r)
     fitTo(fitRoute(r), 0.55)
   }, [fitTo])
   const closeRoute = useCallback(() => {
+    setWalk(null)
     setSelectedRoute(null)
     fitTo(routes.flatMap(fitRoute), 0.3)
   }, [routes, fitTo])
@@ -404,9 +427,10 @@ export default function ExploreMapScreen({
     returnSnapshot = {
       region, selectedKeys: [...selectedKeys], openNow, routesMode,
       routeId: selectedRoute?.id ?? null, panelScrollY: panelScrollY.current, pinId,
+      walkNext: walk ? walk.next : null,
     }
     go()
-  }, [region, selectedKeys, openNow, routesMode, selectedRoute])
+  }, [region, selectedKeys, openNow, routesMode, selectedRoute, walk])
 
   const index = useMemo(() => {
     const idx = new Supercluster(CLUSTER_OPTS)
@@ -474,7 +498,9 @@ export default function ExploreMapScreen({
         ref={mapRef}
         style={s.map}
         initialRegion={initialRegion}
-        showsUserLocation={!!userLocation}
+        // In walk mode the dot follows the walk's own permission, never asks for it: on iOS
+        // showsUserLocation alone would raise the permission prompt.
+        showsUserLocation={!!userLocation || (!!walk && walkStatus === 'granted')}
         onRegionChangeComplete={setRegion}
         onPress={() => setSelected(null)}
       >
@@ -483,6 +509,7 @@ export default function ExploreMapScreen({
             routes={routes}
             selected={selectedRoute}
             lang={lang}
+            walkNext={walk ? walk.next : null}
             onSelectRoute={openRoute}
             onSelectStop={p => handOff(() => onSelectPlace?.(p))}
           />
@@ -518,7 +545,19 @@ export default function ExploreMapScreen({
         lang={lang}
       />
 
-      {routesMode && (selectedRoute
+      {routesMode && (selectedRoute && walk
+        ? <WalkPanel
+            route={selectedRoute}
+            lang={lang}
+            walk={walk}
+            pos={walkPos}
+            status={walkStatus}
+            onPrev={() => stepWalk(-1)}
+            onNext={() => stepWalk(1)}
+            onEnd={endWalk}
+            onSelectStop={p => handOff(() => onSelectPlace?.(p))}
+          />
+        : selectedRoute
         ? <RoutePanel
             key={selectedRoute.id}
             route={selectedRoute}
@@ -527,6 +566,7 @@ export default function ExploreMapScreen({
             review={review}
             onClose={closeRoute}
             onSelectStop={p => handOff(() => onSelectPlace?.(p))}
+            onStart={startWalk}
             initialScrollY={panelScrollY.current}
             onScrollY={y => { panelScrollY.current = y }}
           />

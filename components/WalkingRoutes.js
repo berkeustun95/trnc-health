@@ -7,11 +7,12 @@
 // handler knows nothing about local panel state and would leave the tab instead.
 
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, BackHandler } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, BackHandler, AppState } from 'react-native'
+import * as Location from 'expo-location'
 import { Marker, Polyline } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { placeName } from '../screens/ExploreScreen'
-import { ROUTE_COLOR, walkingDirectionsUrl, creditUrl, creditBrand, overlapSlots } from '../constants/walkingRoutes'
+import { ROUTE_COLOR, walkingDirectionsUrl, creditUrl, creditBrand, overlapSlots, metresBetween, walkDistance } from '../constants/walkingRoutes'
 import { logContactEvent } from '../utils/logContactEvent'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
@@ -56,12 +57,15 @@ const coordsOf = route => route.stops.map(p => ({ latitude: p.latitude, longitud
 // child: an Android callout is a bitmap, and a child's own onPress is unreliable there.
 const MARKER_W = 26
 const SLOT_SHIFT = 1.2   // × marker width per slot: a pair lands ~31 pt apart, centre to centre
-function RouteMarker({ coordinate, onPress, title, onCalloutPress, slot = 0, zIndex, children }) {
+function RouteMarker({ coordinate, onPress, title, onCalloutPress, slot = 0, zIndex, variant, children }) {
+  // Re-snapshot whenever the look changes (walk mode restyles a stop as it becomes next,
+  // then done) — Android would otherwise keep drawing the old bitmap.
   const [tracks, setTracks] = useState(true)
   useEffect(() => {
+    setTracks(true)
     const id = setTimeout(() => setTracks(false), 300)
     return () => clearTimeout(id)
-  }, [])
+  }, [variant])
   const shift = slot * SLOT_SHIFT
   return (
     <Marker coordinate={coordinate} tracksViewChanges={tracks}
@@ -75,7 +79,7 @@ function RouteMarker({ coordinate, onPress, title, onCalloutPress, slot = 0, zIn
 
 // With no route selected: every route's line plus one start marker each. With one selected:
 // only that route, every stop numbered.
-export function RouteOverlay({ routes, selected, lang, onSelectRoute, onSelectStop }) {
+export function RouteOverlay({ routes, selected, lang, walkNext = null, onSelectRoute, onSelectStop }) {
   const shown = selected ? [selected] : routes
   const slots = selected ? overlapSlots(selected.stops) : []
   return (
@@ -92,12 +96,20 @@ export function RouteOverlay({ routes, selected, lang, onSelectRoute, onSelectSt
         />
       ))}
       {selected
-        ? selected.stops.map((p, i) => (
-            <RouteMarker key={`s:${selected.id}:${p.id}`} coordinate={{ latitude: p.latitude, longitude: p.longitude }}
-              slot={slots[i]} title={`${i + 1}. ${placeName(p, lang)}`} onCalloutPress={() => onSelectStop(p)}>
-              <View style={m.num}><Text style={m.numText}>{i + 1}</Text></View>
-            </RouteMarker>
-          ))
+        ? selected.stops.map((p, i) => {
+            // Walk mode: stops already passed go grey, the one being walked to is ringed and
+            // drawn on top; outside walk mode every stop looks the same.
+            const variant = walkNext == null ? 'plain' : i < walkNext ? 'done' : i === walkNext ? 'next' : 'plain'
+            return (
+              <RouteMarker key={`s:${selected.id}:${p.id}`} coordinate={{ latitude: p.latitude, longitude: p.longitude }}
+                slot={slots[i]} title={`${i + 1}. ${placeName(p, lang)}`} onCalloutPress={() => onSelectStop(p)}
+                variant={variant} zIndex={variant === 'next' ? 10 : 1}>
+                <View style={[m.num, variant === 'done' && m.numDone, variant === 'next' && m.numNext]}>
+                  <Text style={m.numText}>{i + 1}</Text>
+                </View>
+              </RouteMarker>
+            )
+          })
         : routes.map(r => (
             <RouteMarker key={`h:${r.id}`} coordinate={{ latitude: r.stops[0].latitude, longitude: r.stops[0].longitude }}
               onPress={() => onSelectRoute(r)}>
@@ -136,7 +148,7 @@ export function RoutePicker({ routes, lang, error, onSelectRoute }) {
   )
 }
 
-export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectStop, initialScrollY = 0, onScrollY }) {
+export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectStop, onStart, initialScrollY = 0, onScrollY }) {
   const scrollRef = useRef(null)
   const restored  = useRef(initialScrollY === 0)
   useEffect(() => {
@@ -145,7 +157,6 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
   }, [onClose])
 
   const city = REGION_LABEL_KEY[route.region] ? t(REGION_LABEL_KEY[route.region], lang) : route.region
-  const start = () => Linking.openURL(walkingDirectionsUrl(route.stops[0])).catch(() => {})
   // Logged BEFORE opening, fire-and-forget (utils/logContactEvent.js): the Ministry's
   // click-through figure. module 'explore' + action 'website' — both admitted by the live
   // CHECKs (probed 2026-09-24, no row written).
@@ -203,7 +214,7 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
         <Text style={p.creditText}>{t('routeCredit', lang).replace('{brand}', creditBrand(lang))}</Text>
         <Ionicons name="open-outline" size={12} color={ROUTE_COLOR} />
       </TouchableOpacity>
-      <TouchableOpacity style={p.startBtn} onPress={start} activeOpacity={0.85}>
+      <TouchableOpacity style={p.startBtn} onPress={onStart} activeOpacity={0.85}>
         <Ionicons name="navigate" size={16} color="#fff" />
         <Text style={p.startText}>{t('routeStart', lang)}</Text>
       </TouchableOpacity>
@@ -211,10 +222,136 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
   )
 }
 
+// ─── Walk mode ──────────────────────────────────────────────────────────────
+// FOREGROUND location only, and only while walk mode is on: the watch starts when `active`
+// turns true and is removed on exit, on unmount (a stop tap hands off to the place page,
+// which unmounts the map) and whenever the app leaves the foreground. Permission is asked at
+// most once per walk, and only if the OS still allows asking — App.js normally asked at
+// launch already. Refused or unavailable → status 'denied' and the walk is manual-only.
+export function useWalkPosition(active) {
+  const [pos, setPos] = useState(null)
+  const [status, setStatus] = useState('pending')   // 'pending' | 'granted' | 'denied'
+  useEffect(() => {
+    if (!active) { setPos(null); setStatus('pending'); return }
+    let sub = null, starting = false, asked = false, gone = false
+    const stop = () => { sub?.remove(); sub = null }
+    const start = async () => {
+      if (sub || starting) return
+      starting = true
+      try {
+        let { status: st, canAskAgain } = await Location.getForegroundPermissionsAsync()
+        if (st !== 'granted' && canAskAgain && !asked) {
+          asked = true
+          ;({ status: st } = await Location.requestForegroundPermissionsAsync())
+        }
+        if (gone) return
+        setStatus(st === 'granted' ? 'granted' : 'denied')
+        if (st !== 'granted') return
+        const s = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, distanceInterval: 5, timeInterval: 3000 },
+          l => setPos({ latitude: l.coords.latitude, longitude: l.coords.longitude })
+        )
+        if (gone || AppState.currentState !== 'active') s.remove()
+        else sub = s
+      } catch {
+        if (!gone) setStatus('denied')
+      } finally {
+        starting = false
+      }
+    }
+    start()
+    const app = AppState.addEventListener('change', st => (st === 'active' ? start() : stop()))
+    return () => { gone = true; stop(); app.remove() }
+  }, [active])
+  return { pos, status }
+}
+
+export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEnd, onSelectStop }) {
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { onEnd(); return true })
+    return () => sub.remove()
+  }, [onEnd])
+
+  const n = route.stops.length
+  const done = walk.next >= n
+  const stop = done ? null : route.stops[walk.next]
+  const dist = stop && pos ? walkDistance(metresBetween(pos, stop)) : null
+  const directions = () => stop && Linking.openURL(walkingDirectionsUrl(stop)).catch(() => {})
+
+  return (
+    <View style={[p.card, p.panel]}>
+      <View style={p.head}>
+        <Text style={[p.city, { flex: 1 }]}>
+          {done ? routeName(route, lang) : t('walkStopOf', lang).replace('{i}', String(walk.next + 1)).replace('{n}', String(n))}
+        </Text>
+        <TouchableOpacity onPress={onEnd} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
+      {done ? (
+        <>
+          <Text style={p.name}>{t('walkDone', lang)}</Text>
+          <TouchableOpacity style={p.startBtn} onPress={onEnd} activeOpacity={0.85}>
+            <Text style={p.startText}>{t('walkEnd', lang)}</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <>
+          <Text style={w.label}>{t('walkNextStop', lang)}</Text>
+          <TouchableOpacity onPress={() => onSelectStop(stop)} activeOpacity={0.7} style={w.nameRow}>
+            <Text style={[p.name, { flexShrink: 1 }]}>{placeName(stop, lang)}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+          {dist ? (
+            <Text style={p.summary}>
+              {(dist.unit === 'm' ? t('walkAwayM', lang) : t('walkAwayKm', lang)).replace('{n}', String(dist.n))}
+            </Text>
+          ) : status === 'denied' ? (
+            <Text style={p.note}>{t('walkNoLocation', lang)}</Text>
+          ) : null}
+
+          <View style={w.controls}>
+            <TouchableOpacity style={[w.step, walk.next === 0 && w.stepOff]} onPress={onPrev}
+              disabled={walk.next === 0} activeOpacity={0.8} accessibilityLabel={t('walkPrev', lang)}>
+              <Ionicons name="chevron-back" size={18} color={ROUTE_COLOR} />
+              <Text style={w.stepText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{t('walkPrev', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={w.go} onPress={directions} activeOpacity={0.85}>
+              <Ionicons name="navigate" size={16} color="#fff" />
+              <Text style={w.goText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{t('walkDirections', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={w.step} onPress={onNext} activeOpacity={0.8} accessibilityLabel={t('walkNext', lang)}>
+              <Text style={w.stepText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{t('walkNext', lang)}</Text>
+              <Ionicons name="chevron-forward" size={18} color={ROUTE_COLOR} />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+    </View>
+  )
+}
+
+const w = StyleSheet.create({
+  label:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 6 },
+  nameRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  controls: { flexDirection: 'row', alignItems: 'stretch', gap: 8, marginTop: 14 },
+  step:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2,
+              paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: ROUTE_COLOR,
+              backgroundColor: 'transparent' },
+  stepOff:  { opacity: 0.35 },
+  stepText: { flexShrink: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold', color: ROUTE_COLOR },
+  goText:   { flexShrink: 1, fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+  go:       { flex: 1.3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+              paddingVertical: 12, borderRadius: 12, backgroundColor: ROUTE_COLOR },
+})
+
 const m = StyleSheet.create({
   num:     { width: 26, height: 26, borderRadius: 13, backgroundColor: ROUTE_COLOR, borderWidth: 2, borderColor: '#fff',
              alignItems: 'center', justifyContent: 'center' },
   numText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#fff' },
+  numDone: { backgroundColor: '#94A3B8' },
+  numNext: { width: 32, height: 32, borderRadius: 16, borderWidth: 3, borderColor: colors.accent },
   start:   { width: 30, height: 30, borderRadius: 15, backgroundColor: ROUTE_COLOR, borderWidth: 2, borderColor: '#fff',
              alignItems: 'center', justifyContent: 'center' },
 })

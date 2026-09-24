@@ -87,6 +87,39 @@ export function overlapSlots(stops) {
   return slots
 }
 
+// ─── Walk mode ("Başla") ────────────────────────────────────────────────────
+// State is { next, armed }: `next` is the index of the stop being walked to (== stops.length
+// once the route is complete); `armed` says an ARRIVAL may count.
+//
+// THE TRAP `armed` EXISTS FOR: after a manual Previous from 4 to 3 you are usually standing
+// at 3, so a naive "within ARRIVE_M of next → advance" would bounce you straight back to 4.
+// After a MANUAL step, the target arms only once you are farther than ARRIVE_M from it. After
+// an AUTOMATIC arrival the next target is armed at once, so stops a few metres apart (Lefke
+// 1–2–3) are ticked together as you reach them rather than stranding you on the middle one.
+// 30 m is a GPS-error-sized radius, not a precise one: in a walled old town the fix can be
+// 10–20 m off. The screen always offers manual Next/Previous for that reason.
+export const ARRIVE_M = 30
+
+export function walkStep(stops, next, pos) {
+  const n = Math.max(0, Math.min(next, stops.length))
+  const armed = !!pos && n < stops.length && metresBetween(pos, stops[n]) > ARRIVE_M
+  return { next: n, armed }
+}
+
+export function walkAdvance(stops, state, pos) {
+  if (!pos || state.next >= stops.length) return state
+  const d = metresBetween(pos, stops[state.next])
+  if (d > ARRIVE_M) return state.armed ? state : { ...state, armed: true }
+  if (!state.armed) return state
+  return { next: state.next + 1, armed: true }
+}
+
+// Rounded for display, never raw: tens of metres below 1 km, whole km above (no decimals, so
+// no locale decimal separator to get wrong).
+export function walkDistance(m) {
+  return m < 1000 ? { unit: 'm', n: Math.max(10, Math.round(m / 10) * 10) } : { unit: 'km', n: Math.round(m / 1000) }
+}
+
 // The partner credit names the Ministry of Tourism and links to its site in the reader's
 // language: the Turkish portal for Turkish, the English one for everyone else. `lang` is
 // a LANGUAGES key ('Turkish'), never an ISO code — see CLAUDE.md.
