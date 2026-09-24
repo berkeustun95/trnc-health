@@ -139,7 +139,7 @@ branch in App.js, which carries the identical warning for the identical reason.
 ## Play listing
 
 The Play store listing TEXT lives in `fastlane/metadata/android/<lang>/` — `title.txt`,
-`short_description.txt`, `full_description.txt` — for tr-TR, en-US, ru-RU, ar, el-GR, fr-FR,
+`short_description.txt`, `full_description.txt` — for tr-TR, en-GB, ru-RU, ar, el-GR, fr-FR,
 es-ES, de-DE, fa. Editing the listing is a commit plus a push; there are no images, screenshots,
 changelogs or binaries in that folder, and pushing it involves no build and no OTA.
 - **Limits: title ≤ 30, short ≤ 80, full ≤ 4000 characters.** es-ES's title is exactly 30.

@@ -23,7 +23,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = 'fastlane/metadata/android'
-const LANGS = ['tr-TR', 'en-US', 'ru-RU', 'ar', 'el-GR', 'fr-FR', 'es-ES', 'de-DE', 'fa']
+const LANGS = ['tr-TR', 'en-GB', 'ru-RU', 'ar', 'el-GR', 'fr-FR', 'es-ES', 'de-DE', 'fa']
 const LIMITS = { 'title.txt': 30, 'short_description.txt': 80, 'full_description.txt': 4000 }
 
 // Vets are not health content: the lookbehinds keep Tierärzte / دامپزشکان / أطباء بيطريون.
