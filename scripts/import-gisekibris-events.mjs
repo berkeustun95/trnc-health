@@ -88,22 +88,33 @@ function loadEnv() {
 // Fails loudly. Never falls back to a hardcoded value, an env var, or a prompt —
 // a silent fallback here would either fail confusingly or use the wrong key.
 function serviceRoleKey() {
+  // The Keychain is the source on this laptop and stays the preferred one — it is
+  // not readable by another process without the user's consent, which an
+  // environment variable is. SUPABASE_SERVICE_ROLE_KEY is the CI fallback, where
+  // there is no Keychain: the scheduled workflow supplies it as a repository
+  // secret. Order matters — a developer with both should get the Keychain.
   let out
   try {
     out = execFileSync('security',
       ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-w'],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
   } catch {
-    fail(
-      `Keychain entry "${KEYCHAIN_SERVICE}" not found.`,
-      '',
-      'Create it with:',
-      `  security add-generic-password -a "$USER" -s ${KEYCHAIN_SERVICE} -w`,
-      '(paste the Supabase service_role key at the prompt — it is not echoed)',
-    )
+    out = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+    if (!out) {
+      fail(
+        `No service-role key: Keychain entry "${KEYCHAIN_SERVICE}" not found and`,
+        'SUPABASE_SERVICE_ROLE_KEY is unset.',
+        '',
+        'On this machine, create the Keychain entry:',
+        `  security add-generic-password -a "$USER" -s ${KEYCHAIN_SERVICE} -w`,
+        '(paste the Supabase service_role key at the prompt — it is not echoed)',
+        '',
+        'In CI, set SUPABASE_SERVICE_ROLE_KEY as a repository secret.',
+      )
+    }
   }
   const key = out.trim()
-  if (!key) fail(`Keychain entry "${KEYCHAIN_SERVICE}" is empty.`)
+  if (!key) fail(`The service-role key resolved to an empty string.`)
 
   // Reject ONLY what is unambiguously the wrong key, and let the server diagnose
   // everything else — whether a legacy JWT still works is a project setting this

@@ -230,6 +230,94 @@ best-effort path. `--selftest` exercises every one of those rejections.
   exactly ONE owner and the two can never drift. Old entries stay — older `events` rows hold
   the old name in `organizer_name`.
 
+**THE DAILY SCHEDULE.** `.github/workflows/gisekibris-feed.yml`, 04:15 UTC (07:15 TRNC),
+plus `workflow_dispatch` for a manual run. Not `pg_cron`: the repo's other crons are SQL
+doing SQL, and this needs Node, `sharp` and outbound HTTPS to two hosts. Secrets:
+`GISEKIBRIS_FEED_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `EXPO_PUBLIC_SUPABASE_URL`,
+`EXPO_PUBLIC_SUPABASE_ANON_KEY`. **The workflow commits nothing** — prepare rewrites the
+clean seed and check-urls may null a dead url in it, but the checkout is thrown away; the
+database is the live record and the committed seed is a snapshot a human refreshes.
+It runs every guard's `--selftest` before touching the network, so a broken guard is caught
+rather than discovered by its silence.
+
+**A HALTED RUN IS A DELIBERATE OUTCOME.** `check-gisekibris-urls.mjs` exits non-zero if a row
+*in* the feed reads `isCancelled=TRUE` — the partner asserting a row is both active and
+cancelled is a contradiction that wants a human — so the import does not run that day and the
+data stays as it was. The sweep's cap behaves the same way. Both fail the job, which is what
+makes GitHub send the email.
+
+### The unattended cancellation sweep
+
+`scripts/sweep-gisekibris-cancellations.mjs`, run LAST, after the import it depends on.
+
+Because the feed is a rolling full catalogue, a row we hold that is absent from a fresh feed
+is past-dated or cancelled — and the importer only ever *reports* those, which is right while
+a human reads the report and useless unattended. **Absence is necessary, not sufficient: the
+only thing that cancels a row is the partner's own flag reading literally `TRUE` on that row's
+own page.**
+
+That asymmetry is the design. A false cancel hides a real event from every user and nothing in
+the app would report it; a missed cancel leaves one stale card the 24h cutoff eventually eats.
+Those costs are not comparable, so the tie breaks the same way every time.
+
+- **Scope** — `source='gisekibris'` AND `status='approved'` AND `start_date >= now()` AND
+  absent from the feed just imported. Nothing else is looked at.
+- **It never un-cancels.** The write filters on `status='approved'`, so a cancelled row is
+  unreachable whatever a later fetch says. Reinstatement is a human decision, permanently.
+- **A probe failure is not a verdict.** Network error, timeout, non-200, absent flag, two
+  contradictory flags — all reported, none acted on.
+- ⚠ **ABSENT IS UNKNOWN, AND UNKNOWN IS NOT CANCELLED.** About a quarter of the partner's
+  pages are a seat-map render carrying no `isCancelled` key. On 2026-09-24 `FAMUSIC X CHILL`
+  was absent from the feed, future-dated, and sat between two rows that both read TRUE — and
+  it stayed `approved`, because its own page says nothing. Do not relax this because the
+  neighbours were cancelled; that is the reasoning that turns a probe into a guess.
+- **THE CAP — 5 rows absolute, and 25% of eligible rows, both must pass.** Exceeding either
+  is a STOP that writes nothing and names every candidate. The failure it exists for is a
+  PARTIALLY truncated feed: 5 rows where 37 were expected passes every guard upstream and
+  makes 32 healthy rows look absent, which without a cap is 32 live events cancelled
+  overnight with a tidy log. The absolute number alone is not enough when the catalogue is
+  small (5 of 8 is a catastrophe that 5 permits), which is why the share exists too. The real
+  batch on 2026-09-24 was 2.
+- Every decision is printed with the evidence it was made on, and unknowns are listed by name
+  rather than folded into either bucket. `--dry` decides and writes nothing; `--selftest`
+  drives the pure `decide()` function through every scope and probe case, including a `TRUE`
+  that must not fire and an absent flag that must not fire.
+
+### Finding out it broke
+
+A manual run fails loudly because someone is watching. A cron fails silently, and this is the
+part that matters.
+
+1. **Actions' failure email** covers the crash — any non-zero exit.
+2. **`npm run gisekibris:health`** (`check-gisekibris-staleness.mjs`) covers what an exit code
+   cannot: the newest `updated_at` on `source='gisekibris'` must be inside 48h (not 24h — one
+   missed daily run is not yet a fault, and paging on it trains the reader to ignore this),
+   **and** a guest session must see at least one event in the `now − 24h` window. That second
+   half is the duty-roster lesson: a catalogue can be perfectly fresh and still show nobody
+   anything. It uses `signInAnonymously()`, because `read approved events` is `TO
+   authenticated` and a bare anon key reads zero by design — the wrong instrument.
+3. **A weekly "it ran and it was boring" line**, Mondays, carrying the live numbers. Not
+   decoration: GitHub emails on failure only, so silence means either "healthy" or
+   "unscheduled, renamed or disabled", and nothing distinguishes those from outside.
+   ⚠ **Residual gap, stated rather than papered over:** the heartbeat lives inside the same
+   Actions it reports on. If Actions stops running the workflow, the heartbeat stops too and
+   no email is sent, because nothing failed. Closing that needs a dead-man's switch OUTSIDE
+   this repo. Until then: if a Monday passes with no heartbeat, run `npm run gisekibris:health`
+   by hand.
+
+### Partner-side quirks we absorb rather than report
+
+Both are handled in code and are **deliberately not raised with Gişe Kıbrıs** — the pipeline
+already degrades correctly, and the cost of the conversation is higher than the cost of the
+quirk. Recorded so the next reader does not "discover" them and open a ticket.
+
+- **`ŞENER ŞEN - ZENGİN MUTFAĞI` ships a slug-only url that 404s.** `canonicalTicketUrl()`
+  re-appends the id from the image path, which returns 200. See the identity note above.
+- **`ASLAR & LESSIO KONSERİ` 404s even with its id** — a genuinely unpublished page on their
+  side. `check-gisekibris-urls.mjs` nulls it and `EventsScreen` hides the Buy Ticket button,
+  which is exactly the degradation that was designed for. If a row like this ever becomes
+  common rather than occasional, that is when it is worth a conversation.
+
 **The affiliate code is the partner's, and nothing of ours touches it.** Every ticket url now
 ends `?code=AF1727004770915`. `buildTicketUrl()` (`utils/events.js`) is a pass-through returning
 `event?.ticket_url || null`, so the code reaches the browser unmodified and **no client change

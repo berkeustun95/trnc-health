@@ -1,0 +1,187 @@
+# ─── Gişe Kıbrıs daily feed sync ─────────────────────────────────────────────
+#
+# Replaces the manual weekly run of the same four scripts, plus the cancellation
+# sweep. The partner shipped their automation on 2026-09-23; this consumes it.
+#
+# ─── WHY ACTIONS AND NOT pg_cron ────────────────────────────────────────────
+# The repo's existing crons (duty notifications, featured-expiry, job auto-expire)
+# are SQL doing SQL. This pipeline needs Node, `sharp` for image re-encoding, and
+# outbound HTTPS to two different hosts. None of that lives in Postgres.
+#
+# ─── SECRETS (repository settings → Secrets and variables → Actions) ────────
+#   GISEKIBRIS_FEED_URL          the partner feed. THE PATH TOKEN IS OUR KEY.
+#   SUPABASE_SERVICE_ROLE_KEY    bypasses RLS; required to write status='approved'
+#                                and to upload mirrored images
+#   EXPO_PUBLIC_SUPABASE_URL     project url
+#   EXPO_PUBLIC_SUPABASE_ANON_KEY  for the guest-session health check
+#
+# The feed url is a secret because its path token is the partner key. It is NOT
+# named EXPO_PUBLIC_* anywhere — that prefix is inlined into the client bundle by
+# Expo, which would publish the key to every user. fetch-gisekibris-feed.mjs masks
+# it in every line it prints, errors included.
+#
+# ─── WHY A BAD FEED CANNOT WIPE THE CATALOGUE ───────────────────────────────
+# Three independent reasons, none of which relies on this file being careful:
+#   1. fetch- refuses a non-200, non-JSON, non-array, EMPTY array, or a row missing
+#      a required field, and writes nothing. prepare never sees a bad file.
+#   2. The importer NEVER DELETES. A row absent from the feed is reported, not
+#      removed, so the worst case of a partial feed is a stale catalogue.
+#   3. The sweep is capped (5 rows absolute, 25% of eligible) and stops rather than
+#      applying a large batch — a truncated feed that passes (1) would otherwise
+#      arrive here as dozens of silent cancellations.
+#
+# ─── THIS WORKFLOW DOES NOT COMMIT ANYTHING ─────────────────────────────────
+# prepare rewrites supabase/seed/gisekibris-events-clean.json and check-urls may
+# null a dead ticket_url in it. Both are ephemeral here: the checkout is thrown
+# away. The database is the live record; the committed seed is a snapshot a human
+# refreshes. Nothing bot-commits, so nothing can churn the repo or race a push.
+#
+# ─── A HALTED RUN IS A DELIBERATE OUTCOME, NOT A BUG ────────────────────────
+# check-gisekibris-urls.mjs exits non-zero if a row IN the feed reads
+# isCancelled=TRUE — the partner asserting a row is both active and cancelled is a
+# contradiction that wants a human, so the import does not run that day and the
+# data simply stays as it was. Same for the sweep's cap. Both fail the job, which
+# is what makes GitHub send the email.
+
+name: gisekibris-feed
+
+on:
+  schedule:
+    # 04:15 UTC = 07:15 in TRNC (UTC+3). After the partner's overnight edits and
+    # before anyone is using the app. Cron here is always UTC.
+    - cron: '15 4 * * *'
+  workflow_dispatch: {}      # manual trigger, so a human can force a sync
+
+concurrency:
+  # Two overlapping runs would both upsert and both mirror images. Harmless but
+  # wasteful, and it makes the logs ambiguous about which run wrote what.
+  group: gisekibris-feed
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GISEKIBRIS_FEED_URL: ${{ secrets.GISEKIBRIS_FEED_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # `npm ci` and not `npm install`: the lockfile is authoritative and this repo
+      # is pinned to Expo SDK 54. CI must never resolve a different tree.
+      - name: Install
+        run: npm ci
+
+      # The guards run before anything touches the network or the database, so a
+      # broken guard is caught here rather than discovered by its silence.
+      - name: Self-test the guards
+        run: |
+          node scripts/fetch-gisekibris-feed.mjs --selftest
+          node scripts/prepare-gisekibris-feed.mjs --selftest
+          node scripts/check-gisekibris-urls.mjs --selftest
+          node scripts/sweep-gisekibris-cancellations.mjs --selftest
+
+      - name: Fetch the live feed
+        run: node scripts/fetch-gisekibris-feed.mjs
+
+      - name: Transform to the clean seed
+        run: node scripts/prepare-gisekibris-feed.mjs supabase/seed/gisekibris-feed-raw.json
+
+      # --apply nulls any ticket_url that no longer resolves. Exits non-zero if a
+      # row in the feed is cancelled, which halts the job on purpose.
+      - name: Probe ticket URLs and cancellation flags
+        run: node scripts/check-gisekibris-urls.mjs --apply
+
+      - name: Import
+        run: node scripts/import-gisekibris-events.mjs
+
+      # Runs LAST: it decides on absence from the feed just imported.
+      - name: Sweep cancellations
+        run: node scripts/sweep-gisekibris-cancellations.mjs
+
+      # The content question the exit codes above cannot answer.
+      - name: Content health
+        run: node scripts/check-gisekibris-staleness.mjs
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Gişe Kıbrıs sync — \`${{ job.status }}\`"
+            echo ""
+            echo "Ran at $(date -u '+%Y-%m-%d %H:%M UTC'). Step logs above carry every"
+            echo "decision and the evidence it was made on."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ─── The weekly "it ran and it was boring" line ───────────────────────────
+  #
+  # NOT optional, and not decoration. CLAUDE.md records why: the duty roster
+  # passed every schema check for two months while empty, and a monitor that only
+  # ever speaks on failure is indistinguishable from a monitor that has stopped.
+  # GitHub emails on failure only — so silence from the job above means EITHER
+  # "healthy" OR "unscheduled, renamed, or disabled", and nothing distinguishes
+  # those from the outside.
+  #
+  # This job's only purpose is to produce a POSITIVE artifact on a predictable
+  # day, carrying the live numbers, so "nothing arrived this week" is a signal
+  # rather than an absence.
+  #
+  # ⚠ RESIDUAL GAP, STATED RATHER THAN PAPERED OVER: this heartbeat lives inside
+  #   the same GitHub Actions that it reports on. If Actions itself stops running
+  #   the workflow, the heartbeat stops too and no email is sent, because nothing
+  #   failed. Closing that properly needs a dead-man's switch OUTSIDE this repo
+  #   (a service that alerts when it has NOT heard from us). Until then the honest
+  #   statement is: run `npm run gisekibris:health` by hand if a Monday goes by
+  #   without this appearing.
+  weekly-heartbeat:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Is it Monday?
+        id: day
+        run: echo "monday=$([ "$(date -u +%u)" = "1" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.day.outputs.monday == 'yes'
+
+      - uses: actions/setup-node@v4
+        if: steps.day.outputs.monday == 'yes'
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install
+        if: steps.day.outputs.monday == 'yes'
+        run: npm ci
+
+      - name: It ran and it was boring
+        if: steps.day.outputs.monday == 'yes'
+        run: |
+          {
+            echo "## Gişe Kıbrıs — weekly heartbeat"
+            echo ""
+            echo "It ran and it was boring. Numbers as of $(date -u '+%Y-%m-%d %H:%M UTC'):"
+            echo ""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          node scripts/check-gisekibris-staleness.mjs --warn 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          {
+            echo '```'
+            echo ""
+            echo "If you are reading this, the scheduler is alive. If a Monday passes with"
+            echo "no heartbeat, run \`npm run gisekibris:health\` locally — silence from"
+            echo "Actions is not evidence of health."
+          } >> "$GITHUB_STEP_SUMMARY"
