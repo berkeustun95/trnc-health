@@ -217,7 +217,7 @@ const EXPECTED_SCALARS = {
   // on PetsHomeScreen, which every user of a LIVE module reaches. `eas update` bundles the
   // WORKING TREE, so a flag left flipped after a device pass is a partnership announced
   // early — to everyone, with no way to take it back except another OTA.
-  PET_HOTEL_LIVE:        false,
+  PET_HOTEL_LIVE:        true,    // live 2026-09-24
   // The pets import timeline calculator. Baselined for the usual `eas update` reason, and
   // with a sharper one of its own: the screen was UNREACHABLE before this flag existed, so
   // flipping it does not restore something — it publishes a calculator whose waiting

@@ -334,6 +334,12 @@ export const HS_SELF_REGISTRATION = false
 export const DORMS_LIVE = true   // live 2026-09-13
 
 // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar.
+//
+// ✓ LIVE 2026-09-24. Device pass done 2026-09-24 (Berke, Expo Go, guest). Pets content is
+//   still verified June 2026 (constants/petsContent.js verifiedOn '2026-06'); the Vet Dept
+//   has been contacted and has not replied. When it does, set verifiedOn to the real month
+//   and reviewedBy to the real name and role. check-pets-staleness only WARNS on this.
+//
 // false = the partner card does not render on PetsHomeScreen, the cross-links on
 // TravelWithPetScreen and OwningPetScreen do not render, the Explore map draws no pet hotel
 // pin and no pet hotel chip, and petsSubScreen='pethotel' falls through to the module root.
@@ -406,7 +412,7 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //   And the clean-tree stash check before any OTA, as always.
 //
 // Reverting is this one boolean, and so is the emergency direction.
-export const PET_HOTEL_LIVE = false
+export const PET_HOTEL_LIVE = true   // live 2026-09-24
 
 // The pets import TIMELINE CALCULATOR (screens/pets/TimelineCalculatorScreen.js).
 // false = the entry point inside BringingPetScreen does not render and the route falls
