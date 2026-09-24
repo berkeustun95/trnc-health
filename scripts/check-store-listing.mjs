@@ -28,7 +28,7 @@ const LIMITS = { 'title.txt': 30, 'short_description.txt': 80, 'full_description
 
 // Vets are not health content: the lookbehinds keep Tierärzte / دامپزشکان / أطباء بيطريون.
 const FORBIDDEN = [
-  /e-?sim/iu,
+  /\be-?sim\b/iu,   // bounded: Turkish resim / kesim contain 'esim'
   /pharma|health|hospital|clinic|medic|doctor|duty/iu,
   /eczane|nöbetçi|sağlık|hastane|klinik|doktor|ilaç/iu,
   /аптек|дежурн|здоров|больниц|клиник|врач|лекарств/iu,
@@ -52,7 +52,7 @@ const MUST_CATCH = [
   'Notdienst-Apotheken – welche Apotheke heute geöffnet hat',
   'داروخانه‌های کشیک – امروز کدام داروخانه باز است',
 ]
-const MUST_PASS = ['Haustiere – Tierärzte und Tierpensionen', 'حیوانات خانگی – دامپزشکان', 'أطباء بيطريون']
+const MUST_PASS = ['Haustiere – Tierärzte und Tierpensionen', 'حیوانات خانگی – دامپزشکان', 'أطباء بيطريون', 'resimler ve kesim']
 
 // İ lowercases to i + U+0307 and would slip past /i; fold it before matching.
 const hit = s => FORBIDDEN.find(re => re.test(s.replaceAll('İ', 'i')))
@@ -63,10 +63,12 @@ for (const s of MUST_PASS) if (hit(s)) fails.push(`self-test: "${s}" is a false 
 
 const present = existsSync(ROOT) ? readdirSync(ROOT).filter(d => !d.startsWith('.')) : []
 for (const l of LANGS) if (!present.includes(l)) fails.push(`${l}: folder missing`)
+// supply uploads EVERY folder here, so every folder is checked — not just the nine we expect.
+for (const l of present) if (!LANGS.includes(l)) console.log(`note: ${l} is not one of the nine — checked and uploaded anyway`)
 
 console.log('lang     title  short   full')
 let checked = 0
-for (const l of LANGS.filter(l => present.includes(l))) {
+for (const l of present) {
   const counts = []
   for (const [file, max] of Object.entries(LIMITS)) {
     const p = join(ROOT, l, file)
@@ -86,9 +88,9 @@ for (const l of LANGS.filter(l => present.includes(l))) {
 }
 console.log(`limits: title ≤${LIMITS['title.txt']}, short ≤${LIMITS['short_description.txt']}, full ≤${LIMITS['full_description.txt']} · ${checked} files read`)
 
-if (checked !== LANGS.length * 3) fails.push(`read ${checked} files, expected ${LANGS.length * 3}`)
+if (checked !== present.length * 3) fails.push(`read ${checked} files, expected ${present.length * 3}`)
 if (fails.length) {
   console.error(`\n✗ store listing check FAILED (${fails.length}):\n  ` + fails.join('\n  '))
   process.exit(1)
 }
-console.log(`✓ store listing OK — ${LANGS.length} languages, no health/pharmacy/eSIM words (self-test: ${MUST_CATCH.length} caught, ${MUST_PASS.length} vets allowed)`)
+console.log(`✓ store listing OK — ${present.length} languages, no health/pharmacy/eSIM words (self-test: ${MUST_CATCH.length} caught, ${MUST_PASS.length} look-alikes allowed)`)

@@ -152,6 +152,10 @@ changelogs or binaries in that folder, and pushing it involves no build and no O
 - Needs `./google-play-service-account.json` (gitignored, never committed) with Play Console
   "Manage store presence". **As of 2026-09-24 it does not exist on this machine**, so nothing
   has been pushed yet.
+- ⚠ **A real push adds a change to whatever Play is reviewing.** `--validate_only` is safe at any
+  time; the real push waits until any pending review resolves (2026-09-23's 8-change submission
+  was IN REVIEW on 2026-09-24). If Play refuses the commit asking for `changesNotSentForReview`,
+  that is `--changes_not_sent_for_review true` — and the change then has to be sent from Console.
 - ⚠ **`fastlane supply init` OVERWRITES this folder** with the live listing. To snapshot the
   live listing, init into `fastlane/metadata-backup/android`, never into `fastlane/metadata/android`.
 - Ruby is the system 2.6; gems install into `vendor/bundle` (`.bundle/config`, gitignored install).
