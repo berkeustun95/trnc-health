@@ -39,7 +39,7 @@ import {
   petPartner, petPartnerBySlug, petPartnerSections,
   petWaLocale, petWaCode, petWaMessage, petWaUrl, petPartnerWebsiteUrl,
 } from '../constants/petPartners.js'
-import { t, LANG_CODES } from '../constants/i18n.js'
+import { t, tCount, pluralCategory, hasOwnTranslation, LANG_CODES } from '../constants/i18n.js'
 import { REGION_LABEL_KEY } from '../constants/regions.js'
 import { colors, readableOn, contrastRatio } from '../constants/theme.js'
 
@@ -110,6 +110,7 @@ const seenSlugs = new Set()
 const referencedKeys = new Set()
 const referencedAssets = new Set()
 let placeholderPhotos = 0
+let accentReport = 'none'
 const thumbKeys = []
 const disputedPhotos = []
 const PROVENANCE = new Set(['photograph', 'partner-edited', 'disputed'])
@@ -206,6 +207,25 @@ for (const p of PET_PARTNERS) {
     check(cr >= 4.5,
       `${who}: accent ${acc} gives at best ${cr.toFixed(2)}:1 with ${fg} — under the 4.5:1 body-text minimum. `
       + `NEITHER white nor ink is readable on it. Ask the partner for a darker or lighter brand colour.`)
+  }
+
+  // ─── A SAMPLED accent is text-unsafe until proven otherwise ─────────────
+  // accent is decoration; accentText is what goes on text. Both measured here against every
+  // ground this page uses, so the comment in petPartners.js is checked, not trusted.
+  if (p.accent) {
+    check(typeof p.accentSource === 'string' && p.accentSource.trim().length > 0,
+      `${who}: accent ${p.accent} has no accentSource — say whether the partner supplied it or we sampled it`)
+    const grounds = { white: '#FFFFFF', bg: colors.bg, cardBg: colors.cardBg }
+    const rawFails = Object.entries(grounds).filter(([, g]) => contrastRatio(p.accent, g) < 4.5)
+    check(!rawFails.length || !!p.accentText,
+      `${who}: accent ${p.accent} fails AA as text on ${rawFails.map(([k]) => k).join(', ')} and there is no accentText`)
+    for (const [k, g] of Object.entries(grounds)) {
+      if (!p.accentText) break
+      const cr = contrastRatio(p.accentText, g)
+      check(cr >= 4.5, `${who}: accentText ${p.accentText} is ${cr?.toFixed(2)}:1 on ${k} ${g} — under AA 4.5`)
+    }
+    accentReport = `accent ${p.accent} (text on white ${contrastRatio(p.accent, '#FFFFFF').toFixed(2)}:1, decoration only) · `
+      + `accentText ${p.accentText || '—'} (${Object.entries(grounds).map(([k, g]) => `${k} ${p.accentText ? contrastRatio(p.accentText, g).toFixed(2) : '—'}`).join(', ')})`
   }
 
   // ─── Services ───────────────────────────────────────────────────────────
@@ -338,7 +358,27 @@ for (const p of PET_PARTNERS) {
     + `[${(sec.practical || []).map(r => r.id).join(', ')}]`)
   // Every rendered value is an i18n KEY. Registered here so the English-resolve check below
   // catches a typo'd value key, which would otherwise render as raw key text.
-  for (const r of sec.practical || []) { referencedKeys.add(r.labelKey); referencedKeys.add(r.value) }
+  for (const r of sec.practical || []) {
+    referencedKeys.add(r.labelKey)
+    if (r.count == null) { referencedKeys.add(r.value); continue }
+    // A COUNTED row resolves `${value}_${category}`. Every category the locale's rule can
+    // return must exist IN THAT LOCALE (no English fallback), derived by running the rule,
+    // never from a remembered list: a missing Russian `_few` renders "22 собак".
+    for (const L of Object.keys(LANG_CODES)) {
+      const code = LANG_CODES[L]
+      const cats = new Set([...Array.from({ length: 1201 }, (_, n) => n), 1000000, 2000000].map(n => pluralCategory(code, n)))
+      for (const cat of cats) {
+        const k = `${r.value}_${cat}`
+        check(hasOwnTranslation(k, L), `${who}: ${L} has no ${k} — its plural rule returns '${cat}' (e.g. for ${[0,1,2,3,5,11,21,22,100,1000000].find(n => pluralCategory(code, n) === cat)})`)
+        // Arabic names 1 and 2 without a numeral (كلب واحد, كلبان), by convention.
+        const own = hasOwnTranslation(k, L) ? tCount(r.value, [0,1,2,3,5,11,21,22,100,1000000].find(n => pluralCategory(code, n) === cat), L) : ''
+        if (!(code === 'ar' && (cat === 'one' || cat === 'two')))
+          check(/[0-9٠-٩۰-۹]/.test(own), `${who}: ${L} ${k} renders "${own}" — no number in it`)
+      }
+    }
+  }
+  check(p.capacity === null || (Number.isInteger(p.capacity) && p.capacity > 0),
+    `${who}: capacity is ${JSON.stringify(p.capacity)} — must be a positive integer (it is rendered through plural forms), or null`)
 
   // Prices are DECLINED, so the key is absent and pricing must never render.
   check(sec.pricing === null, `${who}: sections.pricing is ${JSON.stringify(sec.pricing)} — prices are declined and must never render`)
@@ -363,11 +403,11 @@ for (const p of PET_PARTNERS) {
   // And the positive control for the same function: a supplied value MUST appear. Without
   // this, a petPartnerSections() that returned null for everything would pass every
   // assertion above.
-  const filled = petPartnerSections({ ...p, capacity: 'ZZ_PROBE_CAPACITY', prices: 'ZZ_PROBE_PRICE' })
+  const filled = petPartnerSections({ ...p, capacity: 7, prices: 'ZZ_PROBE_PRICE' })
   check(filled.pricing === 'ZZ_PROBE_PRICE',
     `${who}: CONTROL FAILED — a supplied price did not reach sections.pricing. Every "pending is hidden" `
     + `assertion above is meaningless if the function hides everything.`)
-  check((filled.practical || []).some(r => r.id === 'capacity' && r.value === 'ZZ_PROBE_CAPACITY'),
+  check((filled.practical || []).some(r => r.id === 'capacity' && r.count === 7),
     `${who}: CONTROL FAILED — a supplied capacity did not reach sections.practical`)
   for (const r of filled.practical || []) referencedKeys.add(r.labelKey)
 
@@ -538,6 +578,7 @@ for (const d of disputedPhotos) console.log(c.d(`                      ! ${d}`))
 console.log(`  pending fields      ${Object.keys(PENDING_FIELDS).length}  ${c.d(`(${Object.keys(PENDING_FIELDS).join(', ')})`)}`)
 console.log(`  i18n keys           ${mustResolve.length} with an English value  ${c.d(`+ ${PENDING_KEYS.length} asserted UNWRITTEN in all ${LANGS.length}`)}`)
 console.log(c.d(`                      per-locale coverage belongs to npm run i18n:validate, not here`))
+console.log(`  accent              ${accentReport}`)
 console.log(`  asset keys          ${referencedAssets.size}`)
 console.log(`  asset footprint     ${MB(diskBytes)} on disk · ${MB(decodeBytes)} decoded (ARGB8888)`
   + (unsized ? c.r(`  [${unsized} unmeasured]`) : ''))

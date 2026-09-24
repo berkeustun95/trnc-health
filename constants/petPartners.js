@@ -56,7 +56,6 @@ export const SECTION_ORDER = ['hero', 'about', 'services', 'practical', 'pricing
 export const PENDING_FIELDS = {
   address:                 'Site says "Lefkoşa" and no more. A district is not a street address.',
   logoOnDark:              'No inverted wordmark. The partner sent a JPEG on white; shinypaw/logo.png keys that white out, which is clean on light grounds but NOT on dark: the white strokes inside the mark vanish, a light halo remains, and the brown wordmark loses contrast. Ask the partner for a vector or a transparent PNG. partnerLogo() falls back to `logo`, and no surface that renders a pet partner is dark today.',
-  accent:                  'No brand colour agreed. The screen falls back to colors.primary, which check-pet-partners.mjs proves is readable; an unvetted hex could ship unreadable text.',
   photoPermission:         'WRITTEN PERMISSION NOT YET HELD for the five partner-supplied photos below — the partner sent the files, not a written permission. Tracked as a field so it is owed rather than remembered.',
 }
 
@@ -257,8 +256,9 @@ export const PET_PARTNERS = [
     // ─── OPERATIONAL DETAILS, SUPPLIED BY THE PARTNER 2026-09-24 ────────────
     //
     // Every displayed value is an i18n KEY, in all nine locales, like every other string in
-    // this config. The two that are partner-specific facts (hours, capacity) carry their own
-    // petHotelShinyPaw* key, so changing one is a nine-locale edit in constants/i18n.js.
+    // this config. Opening hours is a partner-specific key (petHotelShinyPawHours). Capacity
+    // is a NUMBER, rendered through the generic plural key petHotelValDogs_* by tCount(), so
+    // changing it is editing one number, never nine strings.
     //
     // ⚠ vaccinationRequirements: they said a vaccination card (aşı karnesi) is mandatory and
     //   named NO vaccines. Do not add any: OwningPetScreen's TRNC schedule is general advice,
@@ -272,7 +272,7 @@ export const PET_PARTNERS = [
     // hero already answers it, and the practical list never had a cats row.
     openingHours:            'petHotelShinyPawHours',
     dropOffPickUpHours:      'petHotelValHandoverFlexible',
-    capacity:                'petHotelShinyPawCapacity',
+    capacity:                20,
     acceptedSizes:           'petHotelValSizesAll',
     breedRestrictions:       'petHotelValBreedsNone',
     vaccinationRequirements: 'petHotelValVaccinationCard',
@@ -281,7 +281,19 @@ export const PET_PARTNERS = [
 
     logo:                    'shinypaw/logo',
     logoOnDark:              null,
-    accent:                  null,
+    // ─── ACCENT: SAMPLED FROM THE PARTNER'S LOGO, NOT SUPPLIED (2026-09-24) ──
+    // The ring and the "TRAIL HOTEL" line of their logo, core pixels only: ring #1AB2C3,
+    // wordmark #18B5C6. The partner did not send a brand colour; this is our reading of theirs.
+    //
+    // ⚠ #1AB2C3 FAILS AS TEXT: 2.56:1 on white, 2.41:1 on colors.bg (AA needs 4.5). It is for
+    //   NON-TEXT DECORATION ONLY. As a fill it can carry ink text (5.71:1), never white (2.56:1).
+    //   accentText #127D88 is the same hue (186 deg) darkened until it clears 4.5 on every
+    //   ground: 4.87:1 on white/cardBg, 4.58:1 on colors.bg. check-pet-partners.mjs recomputes
+    //   all of these on every run; trust its output over this comment.
+    // Not read by any pet surface today: the badges use ADA's own colors.accent.
+    accent:                  '#1AB2C3',
+    accentText:              '#127D88',
+    accentSource:            'sampled from partner logo',
     photoPermission:         null,
   },
 ]
@@ -334,7 +346,11 @@ export function petPartnerSections(partner, { resolveAsset = () => undefined } =
   const practical = [
     { id: 'openingHours',            labelKey: 'petHotelHours',        value: val(partner?.openingHours) },
     { id: 'dropOffPickUpHours',      labelKey: 'petHotelHandover',     value: val(partner?.dropOffPickUpHours) },
-    { id: 'capacity',                labelKey: 'petHotelCapacity',     value: val(partner?.capacity) },
+    // A count, not a key: rendered with tCount(value, count) so plural forms follow the
+    // number. Anything but a positive integer is treated as unanswered.
+    { id: 'capacity',                labelKey: 'petHotelCapacity',
+      value: Number.isInteger(partner?.capacity) && partner.capacity > 0 ? 'petHotelValDogs' : null,
+      count: Number.isInteger(partner?.capacity) && partner.capacity > 0 ? partner.capacity : undefined },
     { id: 'acceptedSizes',           labelKey: 'petHotelSizes',        value: val(partner?.acceptedSizes) },
     { id: 'breedRestrictions',       labelKey: 'petHotelBreeds',       value: val(partner?.breedRestrictions) },
     { id: 'vaccinationRequirements', labelKey: 'petHotelVaccination',  value: val(partner?.vaccinationRequirements) },

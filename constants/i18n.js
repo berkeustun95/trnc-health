@@ -1055,7 +1055,8 @@ const translations = {
     petHotelVaccination: 'Vaccination requirements',
     petHotelCameraAccess: 'Camera access',
     petHotelShinyPawHours: '06:00–19:00',
-    petHotelShinyPawCapacity: '20 dogs',
+    petHotelValDogs_one: '{count} dog',
+    petHotelValDogs_other: '{count} dogs',
     petHotelValHandoverFlexible: 'Flexible',
     petHotelValSizesAll: 'All sizes',
     petHotelValBreedsNone: 'None',
@@ -2604,7 +2605,8 @@ const translations = {
     petHotelVaccination: 'Aşı şartları',
     petHotelCameraAccess: 'Kamera erişimi',
     petHotelShinyPawHours: '06:00–19:00',
-    petHotelShinyPawCapacity: '20 köpek',
+    petHotelValDogs_one: '{count} köpek',
+    petHotelValDogs_other: '{count} köpek',
     petHotelValHandoverFlexible: 'Esnek',
     petHotelValSizesAll: 'Tüm boyutlar',
     petHotelValBreedsNone: 'Yok',
@@ -4256,7 +4258,12 @@ const translations = {
     petHotelVaccination: 'متطلبات التطعيم',
     petHotelCameraAccess: 'الوصول إلى الكاميرا',
     petHotelShinyPawHours: '٠٦:٠٠–١٩:٠٠',
-    petHotelShinyPawCapacity: '٢٠ كلبًا',
+    petHotelValDogs_zero: '{count} كلب',
+    petHotelValDogs_one: 'كلب واحد',
+    petHotelValDogs_two: 'كلبان',
+    petHotelValDogs_few: '{count} كلاب',
+    petHotelValDogs_many: '{count} كلبًا',
+    petHotelValDogs_other: '{count} كلب',
     petHotelValHandoverFlexible: 'مرن',
     petHotelValSizesAll: 'جميع الأحجام',
     petHotelValBreedsNone: 'لا توجد',
@@ -5721,7 +5728,10 @@ const translations = {
     petHotelVaccination: 'Требования к прививкам',
     petHotelCameraAccess: 'Доступ к камерам',
     petHotelShinyPawHours: '06:00–19:00',
-    petHotelShinyPawCapacity: '20 собак',
+    petHotelValDogs_one: '{count} собака',
+    petHotelValDogs_few: '{count} собаки',
+    petHotelValDogs_many: '{count} собак',
+    petHotelValDogs_other: '{count} собаки',
     petHotelValHandoverFlexible: 'Гибкий график',
     petHotelValSizesAll: 'Любой размер',
     petHotelValBreedsNone: 'Нет',
@@ -7185,7 +7195,8 @@ const translations = {
     petHotelVaccination: 'Απαιτήσεις εμβολιασμού',
     petHotelCameraAccess: 'Πρόσβαση σε κάμερα',
     petHotelShinyPawHours: '06:00–19:00',
-    petHotelShinyPawCapacity: '20 σκύλοι',
+    petHotelValDogs_one: '{count} σκύλος',
+    petHotelValDogs_other: '{count} σκύλοι',
     petHotelValHandoverFlexible: 'Ευέλικτο ωράριο',
     petHotelValSizesAll: 'Όλα τα μεγέθη',
     petHotelValBreedsNone: 'Κανένας',
@@ -8651,7 +8662,9 @@ const translations = {
     petHotelVaccination: 'Vaccins exigés',
     petHotelCameraAccess: 'Accès aux caméras',
     petHotelShinyPawHours: '6 h – 19 h',
-    petHotelShinyPawCapacity: '20 chiens',
+    petHotelValDogs_one: '{count} chien',
+    petHotelValDogs_many: '{count} de chiens',
+    petHotelValDogs_other: '{count} chiens',
     petHotelValHandoverFlexible: 'Horaires flexibles',
     petHotelValSizesAll: 'Toutes tailles',
     petHotelValBreedsNone: 'Aucune',
@@ -10116,7 +10129,9 @@ const translations = {
     petHotelVaccination: 'Requisitos de vacunación',
     petHotelCameraAccess: 'Acceso a cámaras',
     petHotelShinyPawHours: '06:00–19:00',
-    petHotelShinyPawCapacity: '20 perros',
+    petHotelValDogs_one: '{count} perro',
+    petHotelValDogs_many: '{count} de perros',
+    petHotelValDogs_other: '{count} perros',
     petHotelValHandoverFlexible: 'Horario flexible',
     petHotelValSizesAll: 'Todos los tamaños',
     petHotelValBreedsNone: 'Ninguna',
@@ -11580,7 +11595,8 @@ const translations = {
     petHotelVaccination: 'Impfvorgaben',
     petHotelCameraAccess: 'Kamerazugang',
     petHotelShinyPawHours: '06:00–19:00 Uhr',
-    petHotelShinyPawCapacity: '20 Hunde',
+    petHotelValDogs_one: '{count} Hund',
+    petHotelValDogs_other: '{count} Hunde',
     petHotelValHandoverFlexible: 'Flexibel',
     petHotelValSizesAll: 'Alle Größen',
     petHotelValBreedsNone: 'Keine',
@@ -13045,7 +13061,8 @@ const translations = {
     petHotelVaccination: 'الزامات واکسیناسیون',
     petHotelCameraAccess: 'دسترسی به دوربین',
     petHotelShinyPawHours: '۰۶:۰۰–۱۹:۰۰',
-    petHotelShinyPawCapacity: '۲۰ سگ',
+    petHotelValDogs_one: '{count} سگ',
+    petHotelValDogs_other: '{count} سگ',
     petHotelValHandoverFlexible: 'انعطاف‌پذیر',
     petHotelValSizesAll: 'همه اندازه‌ها',
     petHotelValBreedsNone: 'ندارد',
@@ -13704,6 +13721,63 @@ const translations = {
 export function t(key, lang) {
   const code = LANG_CODES[lang] || 'en'
   return translations[code]?.[key] ?? translations.en[key] ?? key
+}
+
+// ─── Counted strings: `${key}_${category}`, CLDR plural categories ───────────
+//
+// One key per plural FORM, not per number: 'petHotelValDogs_one' / '_few' / '_many' /
+// '_other' …, each holding '{count}'. So a count changes in config, never in nine strings.
+//
+// Written out rather than Intl.PluralRules: whether Hermes ships PluralRules for every
+// locale here is not something this repo has verified, and a missing implementation would
+// not throw, it would pick 'other' for everything, which is exactly the Russian/Arabic bug
+// this exists to prevent. These rules are CLDR's for INTEGERS, which is all a count is,
+// and scripts/check-pet-partners.mjs asserts every locale defines every category its rule
+// can return. A category a locale does not define falls back to its own `_other`.
+export function pluralCategory(code, n) {
+  const i = Math.abs(Math.trunc(n)), m10 = i % 10, m100 = i % 100
+  switch (code) {
+    case 'ar':
+      if (i === 0) return 'zero'
+      if (i === 1) return 'one'
+      if (i === 2) return 'two'
+      if (m100 >= 3 && m100 <= 10) return 'few'
+      if (m100 >= 11 && m100 <= 99) return 'many'
+      return 'other'
+    case 'ru':
+      if (m10 === 1 && m100 !== 11) return 'one'
+      if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'few'
+      return 'many'
+    case 'fr':
+      if (i === 0 || i === 1) return 'one'
+      return i !== 0 && i % 1000000 === 0 ? 'many' : 'other'
+    case 'es':
+      if (i === 1) return 'one'
+      return i !== 0 && i % 1000000 === 0 ? 'many' : 'other'
+    case 'fa':
+      return i === 0 || i === 1 ? 'one' : 'other'
+    default:            // en, tr, el, de
+      return i === 1 ? 'one' : 'other'
+  }
+}
+
+// ar and fa prose in this file writes numbers in native digits (٢٠, ۲۰); so does this.
+const NATIVE_DIGITS = { ar: '٠١٢٣٤٥٦٧٨٩', fa: '۰۱۲۳۴۵۶۷۸۹' }
+
+export function tCount(key, n, lang) {
+  const code = LANG_CODES[lang] || 'en'
+  const cat = pluralCategory(code, n)
+  const str = translations[code]?.[`${key}_${cat}`] ?? translations[code]?.[`${key}_other`]
+    ?? translations.en[`${key}_${pluralCategory('en', n)}`] ?? translations.en[`${key}_other`] ?? key
+  const d = NATIVE_DIGITS[code]
+  const num = d ? String(n).replace(/[0-9]/g, c => d[c]) : String(n)
+  return str.replace('{count}', num)
+}
+
+// True when `lang` itself defines `key`, with no English fallback. For guards only.
+export function hasOwnTranslation(key, lang) {
+  const code = LANG_CODES[lang] || 'en'
+  return translations[code]?.[key] !== undefined
 }
 
 // ─── Reverse lookup: a rendered string → the key(s) that produce it ─────────

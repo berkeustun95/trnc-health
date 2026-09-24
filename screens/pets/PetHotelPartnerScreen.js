@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import BackButton from '../../components/BackButton'
 import PartnerLogoStrip from '../../components/PartnerLogoStrip'
 import { colors, shadow, radius } from '../../constants/theme'
-import { t, LANG_CODES } from '../../constants/i18n'
+import { t, tCount, LANG_CODES } from '../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../constants/regions'
 import { partnerAsset, partnerLogo } from '../../constants/partnerAssets'
 import { petPartnerSections, petWaUrl, petPartnerWebsiteUrl, SECTION_ORDER } from '../../constants/petPartners'
@@ -269,7 +269,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
               {sec.practical.map(r => (
                 <View key={r.id} style={s.row}>
                   <Text style={s.rowLabel}>{t(r.labelKey, lang)}</Text>
-                  <Text style={s.rowValue}>{t(r.value, lang)}</Text>
+                  <Text style={s.rowValue}>{r.count != null ? tCount(r.value, r.count, lang) : t(r.value, lang)}</Text>
                 </View>
               ))}
             </Block>
