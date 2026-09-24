@@ -65,6 +65,13 @@ export function walkEstimate(stops) {
   }
 }
 
+// The partner credit names the Ministry of Tourism and links to its site in the reader's
+// language: the Turkish portal for Turkish, the English one for everyone else. `lang` is
+// a LANGUAGES key ('Turkish'), never an ISO code — see CLAUDE.md.
+export function creditUrl(lang) {
+  return lang === 'Turkish' ? 'https://www.adakibrisim.com' : 'https://www.visitncy.com'
+}
+
 export function walkingDirectionsUrl(stop) {
   return `https://www.google.com/maps/dir/?api=1&destination=${stop.latitude},${stop.longitude}&travelmode=walking`
 }

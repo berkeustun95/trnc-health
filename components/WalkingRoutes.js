@@ -11,7 +11,8 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, BackHand
 import { Marker, Polyline } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { placeName } from '../screens/ExploreScreen'
-import { ROUTE_COLOR, walkingDirectionsUrl } from '../constants/walkingRoutes'
+import { ROUTE_COLOR, walkingDirectionsUrl, creditUrl } from '../constants/walkingRoutes'
+import { logContactEvent } from '../utils/logContactEvent'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { colors, shadow, radius } from '../constants/theme'
@@ -123,6 +124,13 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
 
   const city = REGION_LABEL_KEY[route.region] ? t(REGION_LABEL_KEY[route.region], lang) : route.region
   const start = () => Linking.openURL(walkingDirectionsUrl(route.stops[0])).catch(() => {})
+  // Logged BEFORE opening, fire-and-forget (utils/logContactEvent.js): the Ministry's
+  // click-through figure. module 'explore' + action 'website' — both admitted by the live
+  // CHECKs (probed 2026-09-24, no row written).
+  const openCredit = () => {
+    logContactEvent('explore', route.id, 'website', route.region)
+    Linking.openURL(creditUrl(lang)).catch(() => {})
+  }
 
   return (
     <View style={[p.card, p.panel, { maxHeight }]}>
@@ -154,10 +162,12 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
         ))}
       </ScrollView>
 
-      <View style={p.credit}>
-        <Ionicons name="ribbon-outline" size={13} color={colors.textSecondary} />
+      <TouchableOpacity style={p.credit} onPress={openCredit} activeOpacity={0.7}
+        hitSlop={{ top: 8, bottom: 8 }} accessibilityRole="link">
+        <Ionicons name="ribbon-outline" size={13} color={ROUTE_COLOR} />
         <Text style={p.creditText}>{t('routeCredit', lang)}</Text>
-      </View>
+        <Ionicons name="open-outline" size={12} color={ROUTE_COLOR} />
+      </TouchableOpacity>
       <TouchableOpacity style={p.startBtn} onPress={start} activeOpacity={0.85}>
         <Ionicons name="navigate" size={16} color="#fff" />
         <Text style={p.startText}>{t('routeStart', lang)}</Text>
@@ -198,7 +208,7 @@ const p = StyleSheet.create({
   stopName:   { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   stopCat:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 1 },
   credit:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, flexShrink: 0 },
-  creditText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  creditText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: ROUTE_COLOR },
   startBtn:   { flexShrink: 0, marginTop: 12, backgroundColor: ROUTE_COLOR, borderRadius: 12, paddingVertical: 13,
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   startText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
