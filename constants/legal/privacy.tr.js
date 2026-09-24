@@ -49,7 +49,7 @@ Anlık bildirim jetonu (push token): nöbetçi eczane uyarılarını ve sorduğu
 
 Yazdığınız değerlendirmeler, sorular ve cevaplar.
 
-• Gönderdiğiniz mesajlar — diğer öğrencilere gönderdiğiniz mesajların içeriği ve kime gönderdiğiniz. Sildiğiniz bir mesaj iki taraftan da gizlenir, ancak bir şikâyetin incelenebilmesi için bir süre saklanır. Bir mesaj şikâyet edilirse, yönetici yalnızca o mesajı okuyabilir, konuşmanın geri kalanını göremez.
+• Gönderdiğiniz mesajlar — diğer öğrencilere gönderdiğiniz mesajların içeriği ve kime gönderdiğiniz. Sildiğiniz bir mesaj iki taraftan da gizlenir, ancak bir şikâyetin incelenebilmesi için 30 gün saklanır, sonra kalıcı olarak silinir. Bir mesaj şikâyet edilirse, yönetici yalnızca o mesajı okuyabilir, konuşmanın geri kalanını göremez.
 • Konuşma başlatma denemeleri — birine mesaj göndermeye çalıştığınızda, iletilip iletilmediğinden bağımsız olarak bu denemenin gerçekleştiğini kaydederiz. Bunu yalnızca yöneticiler görebilir ve 30 gün sonra silinir.
 
 Moderasyon verileri: bildirdiğiniz içerikler ve engellediğiniz kullanıcılar. Engelleme listeniz özeldir ve engellediğiniz kullanıcıya asla gösterilmez.
@@ -140,6 +140,7 @@ Farklı veriler farklı sürelerle saklanır.
 
 • Hesabınız: hesabınızdaki verileri hesabınız etkin olduğu sürece saklarız. Hesabınızın silinmesini talep ederseniz, ilgili mevzuatın saklamayı zorunlu kıldığı hâller dışında kişisel verilerinizi 30 gün içinde sileriz.
 • Reddedilen gönderimler — 30 gün: bir gönderim içerik filtremiz tarafından reddedilirse, hatalı reddetmeleri bulup düzeltebilmek ve filtreyi iyileştirebilmek için reddedilen metni, reddetmeyi tetikleyen terimi ve gerçekleşme zamanını saklarız. Bu kayıtlar hesabınıza bağlıdır, yalnızca yöneticilerimize görünür, 30 gün sonra otomatik olarak silinir ve başka hiçbir amaçla kullanılmaz.
+• Sildiğiniz içerikler — 30 gün: sildiğiniz değerlendirmeler, sorular ve mesajlar hemen gizlenir ve 30 gün sonra kalıcı olarak kaldırılır. Hâlâ açık bir şikâyetin parçasıysa, şikâyet sonuçlandığında kaldırılır. Bir soruyu silmek, ona verilen yanıtları da kaldırır.
 • Kaldırdığımız içerikler: topluluk kurallarımızı ihlal ettiği için kaldırılan içerikler, aynı hesabın tekrarlayan ihlallerini tespit edebilmemiz için dâhilî olarak saklanır. Diğer kullanıcılara artık görünmez.
 • Onay kayıtları: hesabınızı elinizde tuttuğunuz sürece ve sonrasında makul bir süre boyunca saklanır; çünkü bu kayıtlar neyi kabul ettiğinizin kanıtıdır.
 

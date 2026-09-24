@@ -388,7 +388,9 @@ WITH report AS (
     -- be banned on, and the admin queue says the content no longer exists.
     ('1033_reviews_author_not_public','get_my_review'),
     ('1033_reviews_author_not_public','admin_content_author'),
-    ('1045_places_source','places_guard_source')
+    ('1045_places_source','places_guard_source'),
+    -- 1050: the nightly purge behind the policy's "removed 30 days later". Not an RPC.
+    ('1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc')
   ) e(m,o)
 
   UNION ALL
@@ -3251,6 +3253,21 @@ WITH report AS (
       (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
         WHERE conrelid = to_regclass('public.walking_legs') AND contype = 'f')
       IS NOT DISTINCT FROM 'walking_legs_from_place_id_fkey=c,walking_legs_to_place_id_fkey=c'
+    -- ── 1050: purge of soft-deleted UGC ─────────────────────────────────────────
+    -- The policy promises removal 30 days after deletion, held while a report is OPEN. Section C
+    -- sees the name only. Body anchored on code shapes (all three DELETEs, the pending hold,
+    -- the answers hold) and nobody but postgres may call it.
+    UNION ALL SELECT '1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc: deletes all 3 kinds, holds open reports (incl. on answers), not client-callable',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%DELETE FROM reviews r%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%DELETE FROM questions q%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%DELETE FROM messages m%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%cr.status = ''pending''%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%JOIN answers a%', false)
+      AND EXISTS(SELECT 1 FROM pg_proc WHERE oid = to_regprocedure('public.purge_soft_deleted_ugc(interval)') AND proacl IS NOT NULL)
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+                      LEFT JOIN pg_roles r ON r.oid = a.grantee
+                      WHERE p.oid = to_regprocedure('public.purge_soft_deleted_ugc(interval)')
+                        AND a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated')))
   ) z
 
   UNION ALL
@@ -3342,7 +3359,10 @@ SELECT e.m migration, e.o job,
 FROM (VALUES
   ('0705_job_postings_auto_expire','expire-job-postings'),
   ('0809_featured_expiry_reminder','featured-expiry-reminder'),
-  ('0926_moderation_rejection_log','purge-moderation-rejections')
+  ('0926_moderation_rejection_log','purge-moderation-rejections'),
+  -- Backs "permanently removed 30 days later" in the policy. INACTIVE here is a broken
+  -- written commitment, same as purge-moderation-rejections.
+  ('1050_purge_soft_deleted_ugc','purge-soft-deleted-ugc')
 ) e(m,o)
 ORDER BY status ASC, migration;
 
