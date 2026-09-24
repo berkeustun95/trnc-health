@@ -133,7 +133,7 @@ async function main() {
 
 // ─── --self: every failure path, offline, on the real inspect() ─────────────
 function self() {
-  const V = '2026-09-20'
+  const V = '2026-09-24'
   const good = `<p class="updated">Version ${V} · Last updated: September 20, 2026</p><p>All data is stored on Supabase.</p>`
   const cases = [
     [true,  'current page, no stale sentence',  good, 200],

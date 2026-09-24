@@ -52,7 +52,7 @@ export const EXPLORE_MAP_LIVE = true
 // Go-live order (the order is the point): the routes' STOPS go status='active' first —
 // anon RLS hides pending places, so a route flipped on early draws with holes in it —
 // then walking_routes.is_active, then this flag, then the go-live SOP's OTA steps.
-export const EXPLORE_ROUTES_LIVE = false
+export const EXPLORE_ROUTES_LIVE = true   // live 2026-09-24
 
 // Profile completion gate (Slice 2). false = the gate never fires and the wizard is
 // unreachable; the schema, the lookup tables and the availability RPC from Slice 1 are
