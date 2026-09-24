@@ -11,7 +11,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, BackHand
 import { Marker, Polyline } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { placeName } from '../screens/ExploreScreen'
-import { ROUTE_COLOR, walkingDirectionsUrl, creditUrl, creditBrand } from '../constants/walkingRoutes'
+import { ROUTE_COLOR, walkingDirectionsUrl, creditUrl, creditBrand, overlapSlots } from '../constants/walkingRoutes'
 import { logContactEvent } from '../utils/logContactEvent'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
@@ -48,15 +48,26 @@ const coordsOf = route => route.stops.map(p => ({ latitude: p.latitude, longitud
 // Android snapshots a custom-child Marker on first layout; tracksViewChanges false from the
 // first frame can ship a blank bubble, true forever stutters. Track briefly, then stop —
 // ExploreMapScreen's ClusterMarker, same reason.
-function RouteMarker({ coordinate, onPress, children }) {
+//
+// `slot` shifts the VIEW sideways for near-overlapping stops (overlapSlots): `anchor` on
+// Android, `centerOffset` (points) on iOS — both needed, each platform reads one.
+// A stop marker does not navigate on first tap: it shows its name (the native callout, from
+// `title`), and tapping THAT opens the place. onCalloutPress on the Marker, not a <Callout>
+// child: an Android callout is a bitmap, and a child's own onPress is unreliable there.
+const MARKER_W = 26
+const SLOT_SHIFT = 1.2   // × marker width per slot: a pair lands ~31 pt apart, centre to centre
+function RouteMarker({ coordinate, onPress, title, onCalloutPress, slot = 0, zIndex, children }) {
   const [tracks, setTracks] = useState(true)
   useEffect(() => {
     const id = setTimeout(() => setTracks(false), 300)
     return () => clearTimeout(id)
   }, [])
+  const shift = slot * SLOT_SHIFT
   return (
-    <Marker coordinate={coordinate} tracksViewChanges={tracks} anchor={{ x: 0.5, y: 0.5 }}
-      onPress={e => { e.stopPropagation(); onPress() }}>
+    <Marker coordinate={coordinate} tracksViewChanges={tracks}
+      anchor={{ x: 0.5 - shift, y: 0.5 }} centerOffset={{ x: shift * MARKER_W, y: 0 }}
+      title={title} onCalloutPress={onCalloutPress} zIndex={zIndex}
+      onPress={e => { e.stopPropagation(); onPress?.() }}>
       {children}
     </Marker>
   )
@@ -64,8 +75,9 @@ function RouteMarker({ coordinate, onPress, children }) {
 
 // With no route selected: every route's line plus one start marker each. With one selected:
 // only that route, every stop numbered.
-export function RouteOverlay({ routes, selected, onSelectRoute, onSelectStop }) {
+export function RouteOverlay({ routes, selected, lang, onSelectRoute, onSelectStop }) {
   const shown = selected ? [selected] : routes
+  const slots = selected ? overlapSlots(selected.stops) : []
   return (
     <>
       {shown.map(r => (
@@ -82,7 +94,7 @@ export function RouteOverlay({ routes, selected, onSelectRoute, onSelectStop }) 
       {selected
         ? selected.stops.map((p, i) => (
             <RouteMarker key={`s:${selected.id}:${p.id}`} coordinate={{ latitude: p.latitude, longitude: p.longitude }}
-              onPress={() => onSelectStop(p)}>
+              slot={slots[i]} title={`${i + 1}. ${placeName(p, lang)}`} onCalloutPress={() => onSelectStop(p)}>
               <View style={m.num}><Text style={m.numText}>{i + 1}</Text></View>
             </RouteMarker>
           ))

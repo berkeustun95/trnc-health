@@ -65,6 +65,28 @@ export function walkEstimate(stops) {
   }
 }
 
+// ─── Near-overlapping stops ─────────────────────────────────────────────────
+// Some stops sit metres apart (Lefke 2–3 is 1 m: a türbe in a mosque courtyard), so at any
+// zoom their numbered markers stack and only the top one can be tapped. Stops within
+// OVERLAP_M of each other form a group, and each member gets a horizontal SLOT, spread
+// around 0: a pair gets -0.5 / +0.5, a trio -1 / 0 / +1. The screen offsets the marker
+// VIEW by slot × its width — the coordinate stays true, so the line is still drawn through
+// the real point. Chained: A–B 20 m and B–C 20 m put all three in one group.
+export const OVERLAP_M = 25
+export function overlapSlots(stops) {
+  const group = stops.map((_, i) => i)
+  const root = i => (group[i] === i ? i : (group[i] = root(group[i])))
+  for (let i = 0; i < stops.length; i++)
+    for (let j = 0; j < i; j++)
+      if (metresBetween(stops[i], stops[j]) < OVERLAP_M) group[root(i)] = root(j)
+  const members = new Map()
+  stops.forEach((_, i) => { const r = root(i); (members.get(r) ?? members.set(r, []).get(r)).push(i) })
+  const slots = new Array(stops.length).fill(0)
+  for (const idx of members.values())
+    idx.forEach((i, k) => { slots[i] = idx.length > 1 ? k - (idx.length - 1) / 2 : 0 })
+  return slots
+}
+
 // The partner credit names the Ministry of Tourism and links to its site in the reader's
 // language: the Turkish portal for Turkish, the English one for everyone else. `lang` is
 // a LANGUAGES key ('Turkish'), never an ISO code — see CLAUDE.md.

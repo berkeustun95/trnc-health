@@ -482,6 +482,7 @@ export default function ExploreMapScreen({
           <RouteOverlay
             routes={routes}
             selected={selectedRoute}
+            lang={lang}
             onSelectRoute={openRoute}
             onSelectStop={p => handOff(() => onSelectPlace?.(p))}
           />

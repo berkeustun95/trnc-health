@@ -44,7 +44,7 @@ import {
   TRNC_CENTER,
 } from '../constants/mapSources.js'
 import { MODULE_FLAGS, EXPLORE_ROUTES_LIVE } from '../constants/flags.js'
-import { routesLayerVisible, resolveRoutes, walkEstimate } from '../constants/walkingRoutes.js'
+import { routesLayerVisible, resolveRoutes, walkEstimate, overlapSlots } from '../constants/walkingRoutes.js'
 import { HEALTH_TYPES } from '../constants/facilityTypes.js'
 import { GROUP_META, EXPLORE_GROUPS,
          NON_CLAIMABLE_CATEGORIES, CLAIMABLE_CATEGORIES } from '../constants/exploreCategories.js'
@@ -315,6 +315,14 @@ check('a route left with < 2 drawable stops is dropped', resolved.some(r => r.id
 const est = walkEstimate(resolved[0]?.stops ?? [])
 check('≈ figures are rounded: whole km, minutes in 5s', [Number.isInteger(est.km), est.min % 5], [true, 0])
 check('≈ figures use ×1.3 at 4.5 km/h (~1.5 km straight → ≈2 km, ≈25 min)', est, { km: 2, min: 25 })
+
+// Near-overlapping stops must each get their own slot (Lefke 2–3 is 1 m apart), and stops
+// that are comfortably apart must stay exactly on their point (slot 0).
+const at = (lat, lng) => ({ latitude: lat, longitude: lng })
+const M = 0.000009   // ≈ 1 m of latitude
+check('a 1 m pair is split into two slots', overlapSlots([at(35, 33), at(35 + M, 33)]), [-0.5, 0.5])
+check('stops 40 m apart stay on their point', overlapSlots([at(35, 33), at(35 + 40 * M, 33)]), [0, 0])
+check('a 20 m + 20 m chain spreads as one group of three', overlapSlots([at(35, 33), at(35 + 20 * M, 33), at(35 + 40 * M, 33)]), [-1, 0, 1])
 
 // The gate above is only worth something if the screen USES it. Code-shape checks, anchored
 // to code (not prose), with the raw value printed on failure.
