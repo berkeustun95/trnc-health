@@ -68,8 +68,8 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
     steps:
-      # ─── Actions are pinned to COMMIT SHAs, not to @v4 ───────────────────
-      # @v4 is a MOVING tag: whoever controls it can change what runs here
+      # ─── Actions are pinned to COMMIT SHAs, not to a moving tag ─────────
+      # A major tag is MUTABLE: whoever controls it can change what runs here
       # without a commit in this repo. That matters more than usual because this
       # repo is PUBLIC and this job holds SUPABASE_SERVICE_ROLE_KEY, which
       # bypasses RLS entirely — a compromised action would be reading it.
@@ -77,12 +77,40 @@ jobs:
       # `pull_request` trigger, so a fork can never obtain these secrets.)
       # The trailing comment is the version, because a bare SHA tells the next
       # reader nothing about what they are on or whether it is current.
-      # Resolved 2026-09-25 from refs/tags/v4 on each repo.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+      #
+      # ⚠ PINNED AT v7, HAVING FIRST PINNED v4 ON 2026-09-25 AND MOVED THE SAME
+      #   DAY. The original argument was "do not smuggle a major bump into a
+      #   hardening pass", which was right about bumps and wrong about this one:
+      #   v4 actions declare `runs.using: node20`, and the runner now executes
+      #   them on Node 24 anyway. A pin whose declared runtime is not the runtime
+      #   it runs on documents something that is not happening — the pin was
+      #   lying, which is worse than moving it. checkout v5 is the release that
+      #   moved to node24; v7 also blocks fork-PR checkout under
+      #   pull_request_target / workflow_run, which we do not use but which is one
+      #   less footgun for whoever edits this next.
+      #   Both setup-node breaking changes are inert here, checked rather than
+      #   assumed: v5 auto-caches only when package.json has a `packageManager`
+      #   field (ours has none) and v6 limits that to npm (we pass `cache: npm`
+      #   explicitly anyway).
+      # Resolved 2026-09-25 from refs/tags/v7 on each repo.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+      # ⚠ NODE 24, AND 20 IS NOT AN OPTION. Run #1 died here:
+      #     Error: Node.js 20 detected without native WebSocket support.
+      #       at SupabaseClient._initRealtimeClient
+      #   createClient() constructs a RealtimeClient eagerly, and realtime-js needs
+      #   a native WebSocket, which Node 20 does not have. This pipeline never uses
+      #   realtime — but the client is built before anyone asks.
+      #
+      #   The fix is the RUNTIME, not a dependency: adding `ws` would pull a package
+      #   in to satisfy a feature we do not use. 24 rather than 22 because this
+      #   laptop is on v24.15.0, and the whole failure class here was CI differing
+      #   from local in a way that could not reproduce locally. Checked, not assumed:
+      #   no pipeline script uses a version-sensitive API, and sharp declares
+      #   engines >=20.9.0, so nothing needs a lower runtime.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       # `npm ci` and not `npm install`: the lockfile is authoritative and this repo
@@ -92,8 +120,18 @@ jobs:
 
       # The guards run before anything touches the network or the database, so a
       # broken guard is caught here rather than discovered by its silence.
+      # FIRST, before the guards and before any network call. Run #1 spent four
+      # minutes on real work and then failed at the first step needing Supabase
+      # credentials. The cause was a Node version rather than a secret, but a
+      # missing secret would have looked identical and been found in the same
+      # expensive place — so the credentials are asserted here, by name, and the
+      # step prints shapes only (length + scheme prefix), never values.
+      - name: Pre-flight — are the four secrets present?
+        run: node scripts/check-feed-secrets.mjs
+
       - name: Self-test the guards
         run: |
+          node scripts/check-feed-secrets.mjs --selftest
           node scripts/fetch-gisekibris-feed.mjs --selftest
           node scripts/prepare-gisekibris-feed.mjs --selftest
           node scripts/check-gisekibris-urls.mjs --selftest
@@ -164,13 +202,13 @@ jobs:
         id: day
         run: echo "monday=$([ "$(date -u +%u)" = "1" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
         if: steps.day.outputs.monday == 'yes'
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         if: steps.day.outputs.monday == 'yes'
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       - name: Install
