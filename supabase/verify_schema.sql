@@ -9,11 +9,12 @@
 --   "k PROBLEM(S) of n", derived from the report itself. Anything else — a count of
 --   rows that changed state, a scan by eye — is not the assertion.
 --
--- ▶ HOW TO RUN — the SQL editor shows only the LAST result set, so run the four
+-- ▶ HOW TO RUN — the SQL editor shows only the LAST result set, so run the five
 --   queries ONE AT A TIME. Each is a standalone statement under a
---   `═══ QUERY n / 4 ═══` banner: select from a banner down to the next banner
+--   `═══ QUERY n / 5 ═══` banner: select from a banner down to the next banner
 --   (or end of file) and run just that block.  1 = main report · 2 = cron ·
---   3 = RLS policy counts · 4 = storage.objects policies.
+--   3 = RLS policy counts · 4 = storage.objects policies ·
+--   5 = store-update blocking gate.
 --
 -- CONVENTION (keep this file the source of truth for schema drift):
 --   • Every new migration MUST register the objects it creates into the relevant
@@ -29,7 +30,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- ═══ QUERY 1 / 4 — MAIN REPORT — run alone (select down to the QUERY 2 banner) ═══
+-- ═══ QUERY 1 / 5 — MAIN REPORT — run alone (select down to the QUERY 2 banner) ═══
 -- ═══════════════════════════════════════════════════════════════════════════
 -- tables · columns · functions · triggers · constraints · indexes · grants ·
 -- behavior/version tokens · RLS-enabled. One big statement.
@@ -3395,7 +3396,7 @@ ORDER BY ord, (status IN ('OK','ON')) ASC, section, migration, object;  -- probl
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- ═══ QUERY 2 / 4 — CRON JOBS — run alone ═══
+-- ═══ QUERY 2 / 5 — CRON JOBS — run alone ═══
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Errors if pg_cron isn't installed (itself the finding). Expect 5 rows present.
 -- Existence is NOT enough: cron.job.active can be false, and a disabled job looks
@@ -3418,7 +3419,7 @@ ORDER BY status ASC, migration;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- ═══ QUERY 3 / 4 — RLS POLICY COUNT per table — run alone ═══
+-- ═══ QUERY 3 / 5 — RLS POLICY COUNT per table — run alone ═══
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Sanity vs capture_5's 172 policies. A table that should be locked down but
 -- shows 0 = a gap.
@@ -3428,7 +3429,7 @@ GROUP BY tablename ORDER BY tablename;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- ═══ QUERY 4 / 4 — STORAGE.OBJECTS POLICIES — run alone (to end of file) ═══
+-- ═══ QUERY 4 / 5 — STORAGE.OBJECTS POLICIES — run alone (down to the QUERY 5 banner) ═══
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Bucket ACLs live OUTSIDE migrations/ (dashboard / Slices 1-2), so nothing else
 -- catches drift on them. Listing, not pass/fail — eyeball each policy's
@@ -3493,3 +3494,38 @@ SELECT policyname, cmd, roles, qual, with_check
 FROM pg_policies
 WHERE schemaname='storage' AND tablename='objects'
 ORDER BY policyname;
+
+
+-- ═══ QUERY 5 / 5 — STORE-UPDATE BLOCKING GATE — run alone (to end of file) ═══
+--
+-- ⚠ THIS IS A POLICY GATE, NOT A DRIFT CHECK, AND IT IS DELIBERATELY NOT IN QUERY 1.
+--
+-- It reads ROW DATA from app_versions, which only exists once 20261051 is applied. A bare
+-- reference to a missing relation is resolved at PARSE time, so putting it in QUERY 1 would
+-- make the whole main report die with 42P01 on any database that has not applied 20261051 —
+-- and the likeliest run order is exactly "run verify_schema, see what is missing, then apply
+-- it". Same trap the 0923 notify_owner_text token documents. Out here it can only fail
+-- itself.
+--
+-- WHAT IT GUARDS: min_supported_version BLOCKS the app. '1.0.0' blocks nobody — 1.0.0
+-- binaries carry no expo-updates and can never receive the OTA, so no reachable install sits
+-- below it. Raising it on either row switches blocking ON for real users.
+--
+-- Before that happens, an iOS build containing the popup must pass the force-tier checks on
+-- a device: the native Modal against the emergency ROOT OVERLAY, no hardware back, and the
+-- itms-apps:// link. See "Store-update popup" in CLAUDE.md for why none of those can be
+-- answered by Android, and why the 2026-09-25 release shipped soft-only.
+--
+-- A 'BLOCKING ON' verdict is not automatically wrong — it is a question. Answer it by
+-- doing the device pass and saying so in the commit that raises the value.
+SELECT
+  CASE
+    WHEN count(*) FILTER (WHERE platform IN ('ios','android')) <> 2
+      THEN 'INCOMPLETE — expected one ios and one android row; found ' || count(*)::text
+    WHEN bool_and(min_supported_version = '1.0.0')
+      THEN 'OK — blocking OFF on both platforms (min_supported_version = 1.0.0)'
+    ELSE 'BLOCKING ON ← iOS force-tier device pass required (CLAUDE.md: Store-update popup)'
+  END AS verdict,
+  string_agg(platform || ': latest=' || latest_version || ' min=' || min_supported_version,
+             ' · ' ORDER BY platform) AS rows_read
+FROM public.app_versions;
