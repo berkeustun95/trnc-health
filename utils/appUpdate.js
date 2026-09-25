@@ -68,6 +68,9 @@ const SNOOZE_DAYS = 3
 // a phone number and back does not re-run a network call or re-open a dismissed popup.
 export const FOREGROUND_RECHECK_MS = 30 * 60 * 1000
 
+// Matches utils/logContactEvent.js. A metric is never worth holding a socket open for.
+const LOG_TIMEOUT_MS = 4000
+
 const IOS_APP_ID = '6783996527'
 // Hardcoded, and NOT read from expo-constants. It is the value of `android.package` in
 // app.config.js and cannot drift from it in any way that matters: changing an app's store
@@ -96,6 +99,61 @@ export async function openStore() {
     await Linking.openURL(deep)
   } catch {
     try { await Linking.openURL(web) } catch { /* nothing left to try; leave the modal up */ }
+  }
+}
+
+// ─── The backup signal: one row each time a popup is SHOWN ──────────────────
+//
+// Without this, "the popup never appeared" and "the popup works and this binary is current"
+// look identical from the outside — every path in evaluateAppUpdate() fails OPEN, so silence
+// is both the healthy and the broken state. Schema, RLS and the two rules this obeys:
+// supabase/migrations/20261051_app_versions.sql.
+//
+// Same contract as utils/logContactEvent.js, which this is modelled on:
+//   • NOTHING IS AWAITED AND NOTHING CAN THROW. A blocked user must never wait on an
+//     analytics round-trip before [Update] works.
+//   • NO IDENTIFIER, EVER. No user, device or install id. The question is a COUNT.
+//
+// Both version columns are sent because they come from different sources and the interesting
+// row is the one where they DISAGREE — that is expo-application missing from a binary and the
+// Updates.runtimeVersion fallback carrying the read. See installedNativeVersion() above.
+//
+// In __DEV__ the installed version is the EXPO_PUBLIC_DEV_APP_VERSION override, so device-pass
+// rows land with whatever was typed (0.9.0, 1.1.0 …). That is deliberate — it is how the
+// device pass proves the write path works at all — and those values are self-identifying,
+// since no such build exists. Filter them out when reading real numbers.
+export function logAppUpdateEvent(tier) {
+  try {
+    const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : null
+    if (!tier || !platform) return
+
+    let signal
+    let done = () => {}
+    if (typeof AbortController === 'function') {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), LOG_TIMEOUT_MS)
+      signal = controller.signal
+      done = () => clearTimeout(timer)
+    }
+
+    let q = supabase.from('app_update_events').insert({
+      tier,
+      platform,
+      installed_version: installedNativeVersion(),
+      runtime_version: Updates.runtimeVersion ?? null,
+    })
+    if (signal) q = q.abortSignal(signal)
+
+    // BOTH handlers, and no .select(). The client holds no SELECT privilege on this table,
+    // so asking for the row back would turn every successful write into a visible error.
+    // The second handler is what makes an aborted or failed write a no-op rather than an
+    // unhandled rejection.
+    q.then(
+      res => { done(); if (__DEV__ && res?.error) console.warn('[logAppUpdateEvent] insert failed:', res.error.message) },
+      err => { done(); if (__DEV__ && err?.name !== 'AbortError') console.warn('[logAppUpdateEvent] insert threw:', err?.message || err) },
+    )
+  } catch (e) {
+    if (__DEV__) console.warn('[logAppUpdateEvent] threw synchronously:', e?.message || e)
   }
 }
 

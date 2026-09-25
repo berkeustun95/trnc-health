@@ -85,6 +85,8 @@ WITH report AS (
     ('1049_walking_legs','walking_legs'),
     -- Store-update popup thresholds (1051). Public read, no client writes, hand-seeded.
     ('1051_app_versions','app_versions'),
+    -- The popup's backup signal: one row per popup SHOWN. Insert-only, no client SELECT.
+    ('1051_app_versions','app_update_events'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -660,7 +662,12 @@ WITH report AS (
     ('1051_app_versions','app_versions_platform_check'),
     ('1051_app_versions','app_versions_latest_format_check'),
     ('1051_app_versions','app_versions_min_format_check'),
-    ('1051_app_versions','app_versions_order_check')
+    ('1051_app_versions','app_versions_order_check'),
+    ('1051_app_versions','app_update_events_pkey'),
+    ('1051_app_versions','app_update_events_tier_check'),
+    ('1051_app_versions','app_update_events_platform_check'),
+    ('1051_app_versions','app_update_events_installed_len_check'),
+    ('1051_app_versions','app_update_events_runtime_len_check')
 
   ) e(m,o)
 
@@ -748,7 +755,8 @@ WITH report AS (
     -- 1048: the RESTRICT check on a places delete looks stops up by place_id.
     ('1048_walking_routes','idx_walking_route_stops_place_id'),
     -- 1049: the CASCADE on a places delete looks legs up by to_place_id (the PK covers from).
-    ('1049_walking_legs','idx_walking_legs_to_place_id')
+    ('1049_walking_legs','idx_walking_legs_to_place_id'),
+    ('1051_app_versions','idx_app_update_events_created_at')
 
   ) e(m,o)
 
@@ -3255,6 +3263,22 @@ WITH report AS (
       -- token scores full marks on a table the popup can never evaluate.
       AND COALESCE(has_table_privilege('anon', to_regclass('public.app_versions'), 'SELECT')
                AND has_table_privilege('authenticated', to_regclass('public.app_versions'), 'SELECT'), false)
+    -- app_update_events: insert-only to clients and NOT readable by them. The column grant is
+    -- the load-bearing half — only has_column_privilege can see it, and a whole-table INSERT
+    -- grant would let a device write id/created_at and backdate a row. Paired with the
+    -- POSITIVE control (the payload columns must still be insertable), because a signal
+    -- nothing can write to is silently empty forever, which is the failure this table exists
+    -- to detect in the first place.
+    UNION ALL SELECT '1051_app_versions','app_update_events: insert-only, no client SELECT, column-scoped grant',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.app_update_events')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='app_update_events') = 3
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.app_update_events'), 'SELECT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.app_update_events'), 'SELECT,UPDATE,DELETE,TRUNCATE'), false)
+      AND COALESCE(has_column_privilege('anon', to_regclass('public.app_update_events'), 'tier', 'INSERT')
+               AND has_column_privilege('authenticated', to_regclass('public.app_update_events'), 'tier', 'INSERT')
+               AND has_column_privilege('authenticated', to_regclass('public.app_update_events'), 'runtime_version', 'INSERT'), false)
+      AND COALESCE(NOT has_column_privilege('anon', to_regclass('public.app_update_events'), 'created_at', 'INSERT')
+               AND NOT has_column_privilege('authenticated', to_regclass('public.app_update_events'), 'created_at', 'INSERT'), false)
     -- (3) A place on a route cannot be deleted silently: place_id RESTRICT ('r'), route_id CASCADE ('c').
     --     Section E sees the constraint NAMES, which survive a change of delete action.
     UNION ALL SELECT '1048_walking_routes','walking_route_stops: place_id ON DELETE RESTRICT, route_id ON DELETE CASCADE',
