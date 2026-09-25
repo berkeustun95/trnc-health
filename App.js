@@ -2481,7 +2481,13 @@ export default function App() {
         </SheetOverlay>
       )}
 
-      {showMunicipalModal && (
+      {/* Gated on the force tier, unlike the emergency sheet above, which is the ESCAPE and
+          is meant to be reachable. The menu drawer, coach marks and Oli's sheet all sit
+          behind `inTabShell` (or a derived form of it) and so are already excluded by the
+          force block short-circuiting the selector — this one is not, so it says so itself.
+          Closing the hole by construction rather than by reasoning about which deep links
+          can still fire, which is the same argument the force allow-list is built on. */}
+      {showMunicipalModal && updateTier !== 'force' && (
         <SheetOverlay onDismiss={() => setShowMunicipalModal(false)}>
           <View style={[styles.emergencySheet, { maxHeight: Dimensions.get('window').height * 0.75 }]}>
             <View style={styles.emergencyHeader}>
@@ -2602,7 +2608,7 @@ export default function App() {
           without the repeat it would cover the carousel a new user is still reading. */}
       <AppUpdateNotice
         visible={session !== undefined && fontsLoaded && onboarded === true &&
-                 (forceBlocking || updateTier === 'soft')}
+                 (forceBlocking || (updateTier === 'soft' && !policyNoticeVisible && !showCoachMarks))}
         tier={updateTier}
         lang={lang}
         onUpdate={openStore}
