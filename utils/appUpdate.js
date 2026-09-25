@@ -17,46 +17,38 @@ import { compareVersions } from './semver'
 // app.config.js says 1.3.0 would make every 1.1.0 install report 1.3.0 and see nothing. It
 // is the obvious-looking API and it is the wrong one.
 //
-// `Application.nativeApplicationVersion` is the right one. It reads the INSTALLED binary:
-// CFBundleShortVersionString on iOS (expo-application/ios/ApplicationModule.swift:19) and
-// PackageInfo.versionName on Android (…/ApplicationModule.kt:36). A JS bundle cannot change
-// either.
+// `Updates.runtimeVersion` is the one used instead. It is read from the NATIVE build
+// configuration, baked at build time, and EAS serves an update only to an IDENTICAL runtime —
+// so a JS bundle cannot change it.
 //
-// expo-application is NOT in package.json — it arrives as a hard dependency of
-// expo-notifications@0.32.17 and is autolinked (it ships expo-module.config.json declaring
-// native modules for apple and android). Verified 2026-09-25 that it is in the lockfile at
-// BOTH shipped build commits: 1.1.0 (23a04b2) and 1.2.0 (e58f23b). So the native module
-// exists on every binary this OTA can reach.
+// ─── WHY NOT expo-application, WHICH IS THE PURPOSE-BUILT API ──────────────
 //
-// ─── WHY IT IS STILL require()d INSIDE THE FUNCTION ────────────────────────
+// `Application.nativeApplicationVersion` reads the installed binary directly and was the
+// first choice here. It is genuinely available (expo-application@7.0.8 arrives with
+// expo-notifications and is autolinked; verified present in the lockfile at both shipped
+// build commits, 1.1.0 23a04b2 and 1.2.0 e58f23b). It was dropped anyway, on Berke's call,
+// because it buys nothing this app can use:
 //
-// check-native-import-safety.mjs does not guard expo-application, and by that guard's own
-// criterion it does not need to — it predates both builds. But this code's entire purpose is
-// to land by OTA on OLD binaries, and a top-level import of a native module that turned out
-// to be missing kills the app at launch on exactly the population being targeted. A deferred
-// require in a try/catch costs nothing and makes the worst case "no popup" instead of "app
-// dies on the splash screen". Do not hoist it.
+//   runtimeVersion.policy is 'appVersion', and check-ota-preflight.mjs:69 REFUSES the
+//   publish unless that policy is exactly 'appVersion'.
 //
-// Falls back to Updates.runtimeVersion, which is also native and also un-fakeable by an OTA
-// (EAS serves an update only to an identical runtime). It is the FALLBACK rather than the
-// primary because it only equals the app version while runtimeVersion.policy is 'appVersion';
-// a later switch to a fingerprint policy would silently turn it into a hash.
+// So on every build that can ever run this code, Updates.runtimeVersion IS the app version,
+// by a guard rather than by convention. The one theoretical gap — somebody switching to a
+// fingerprint policy, after which runtimeVersion would be a hash — is the case that guard
+// already refuses to publish.
+//
+// What dropping it buys: no native module in the OTA-shipped path at all. expo-application
+// was a TRANSITIVE dependency, present only because expo-notifications pulls it in, and this
+// module ships by OTA onto binaries built months ago. A version read that cannot touch a
+// native module cannot crash one.
 function installedNativeVersion() {
-  // In Expo Go, nativeApplicationVersion is EXPO GO'S OWN version (e.g. '2.33.x'), not this
-  // app's — a real-looking string that would compare as nonsense. So in __DEV__ the only
-  // accepted source is the explicit override, and without it the feature is simply off.
-  // That is what makes the Turkish spot-check possible at all:
+  // In __DEV__ the only accepted source is the explicit override. Expo Go has no meaningful
+  // runtimeVersion of its own, and without this the feature simply cannot be exercised on a
+  // dev client:
   //   EXPO_PUBLIC_DEV_APP_VERSION=1.0.0 npx expo start -c
-  // Metro strips this branch from a production bundle (__DEV__ is false there), so it
-  // cannot ship enabled. Same precedent as EXPO_PUBLIC_DEV_ONBOARDED in utils/devRoot.js.
+  // Metro strips this branch from a production bundle (__DEV__ is false there), so it cannot
+  // ship enabled. Same precedent as EXPO_PUBLIC_DEV_ONBOARDED in utils/devRoot.js.
   if (__DEV__) return process.env.EXPO_PUBLIC_DEV_APP_VERSION || null
-
-  try {
-    const v = require('expo-application').nativeApplicationVersion
-    if (v) return v
-  } catch {
-    // The module is not on this binary. Fall through — never throw out of here.
-  }
   return Updates.runtimeVersion || null
 }
 
@@ -114,9 +106,13 @@ export async function openStore() {
 //     analytics round-trip before [Update] works.
 //   • NO IDENTIFIER, EVER. No user, device or install id. The question is a COUNT.
 //
-// Both version columns are sent because they come from different sources and the interesting
-// row is the one where they DISAGREE — that is expo-application missing from a binary and the
-// Updates.runtimeVersion fallback carrying the read. See installedNativeVersion() above.
+// ONE version column. runtimeVersion.policy is 'appVersion' and check-ota-preflight.mjs
+// refuses a publish under any other policy, so the runtime IS the app version on every build
+// that can run this — a second column would have stored the same string twice.
+//
+// It logs installedNativeVersion(), NOT Updates.runtimeVersion directly: the value recorded
+// should be the one the tier decision was actually made on. In production they are the same
+// call; in __DEV__ this records the override, which is what makes a device pass verifiable.
 //
 // In __DEV__ the installed version is the EXPO_PUBLIC_DEV_APP_VERSION override, so device-pass
 // rows land with whatever was typed (0.9.0, 1.1.0 …). That is deliberate — it is how the
@@ -139,8 +135,7 @@ export function logAppUpdateEvent(tier) {
     let q = supabase.from('app_update_events').insert({
       tier,
       platform,
-      installed_version: installedNativeVersion(),
-      runtime_version: Updates.runtimeVersion ?? null,
+      runtime_version: installedNativeVersion(),
     })
     if (signal) q = q.abortSignal(signal)
 
