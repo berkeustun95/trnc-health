@@ -83,6 +83,8 @@ WITH report AS (
     ('1048_walking_routes','walking_route_stops'),
     -- Real walking paths per place pair (1049). ORS/OSM share-alike data, kept apart from route order.
     ('1049_walking_legs','walking_legs'),
+    -- Store-update popup thresholds (1051). Public read, no client writes, hand-seeded.
+    ('1051_app_versions','app_versions'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -650,7 +652,15 @@ WITH report AS (
     ('1049_walking_legs','walking_legs_path_check'),
     ('1049_walking_legs','walking_legs_metres_check'),
     ('1049_walking_legs','walking_legs_seconds_check'),
-    ('1049_walking_legs','walking_legs_source_check')
+    ('1049_walking_legs','walking_legs_source_check'),
+    -- 1051. The three format/order CHECKs are not decoration: compareVersions() returns NULL
+    -- for an unparseable string and every caller treats NULL as "no popup", so a seed typo
+    -- would disable the feature silently. These make it fail at the SQL editor instead.
+    ('1051_app_versions','app_versions_pkey'),
+    ('1051_app_versions','app_versions_platform_check'),
+    ('1051_app_versions','app_versions_latest_format_check'),
+    ('1051_app_versions','app_versions_min_format_check'),
+    ('1051_app_versions','app_versions_order_check')
 
   ) e(m,o)
 
@@ -3229,6 +3239,22 @@ WITH report AS (
                AND NOT has_table_privilege('authenticated', to_regclass('public.walking_routes'), 'INSERT,UPDATE,DELETE,TRUNCATE')
                AND NOT has_table_privilege('anon', to_regclass('public.walking_route_stops'), 'INSERT,UPDATE,DELETE,TRUNCATE')
                AND NOT has_table_privilege('authenticated', to_regclass('public.walking_route_stops'), 'INSERT,UPDATE,DELETE,TRUNCATE'), false)
+    -- ── 1051: app_versions ───────────────────────────────────────────────────────
+    -- Read-only to clients, DERIVED: exactly one permissive SELECT policy (RLS is permissive-OR,
+    -- so a second could only widen it), RLS on, and no client write privilege —
+    -- has_table_privilege resolves inherited grants, which a grantee-filtered count cannot see.
+    -- Through to_regclass so an absent table reads false rather than raising.
+    UNION ALL SELECT '1051_app_versions','app_versions: 1 SELECT policy, RLS on, clients hold no write privilege',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.app_versions')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='app_versions') = 1
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
+        AND tablename='app_versions' AND (cmd <> 'SELECT' OR permissive <> 'PERMISSIVE'))
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.app_versions'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.app_versions'), 'INSERT,UPDATE,DELETE,TRUNCATE'), false)
+      -- The positive control beside the denials: the public read must still WORK, or this
+      -- token scores full marks on a table the popup can never evaluate.
+      AND COALESCE(has_table_privilege('anon', to_regclass('public.app_versions'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.app_versions'), 'SELECT'), false)
     -- (3) A place on a route cannot be deleted silently: place_id RESTRICT ('r'), route_id CASCADE ('c').
     --     Section E sees the constraint NAMES, which survive a change of delete action.
     UNION ALL SELECT '1048_walking_routes','walking_route_stops: place_id ON DELETE RESTRICT, route_id ON DELETE CASCADE',

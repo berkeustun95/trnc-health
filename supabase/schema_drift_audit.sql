@@ -646,7 +646,11 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('walking_legs', 'metres', true, NULL, 'integer'),
     ('walking_legs', 'seconds', true, NULL, 'integer'),
     ('walking_legs', 'source', true, NULL, 'text'),
-    ('walking_legs', 'fetched_at', true, 'now()', 'timestamp with time zone')
+    ('walking_legs', 'fetched_at', true, 'now()', 'timestamp with time zone'),
+    ('app_versions', 'platform', true, NULL, 'text'),
+    ('app_versions', 'latest_version', true, NULL, 'text'),
+    ('app_versions', 'min_supported_version', true, NULL, 'text'),
+    ('app_versions', 'updated_at', true, 'now()', 'timestamp with time zone')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -664,6 +668,11 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('answers_pkey', '', 'id'),
     ('answers_provider_id_fkey', '', 'id|provider_id'),
     ('answers_question_id_fkey', '', 'id|question_id'),
+    ('app_versions_latest_format_check', '0|9|^[0-9]+\.[0-9]+\.[0-9]+$', 'latest_version'),
+    ('app_versions_min_format_check', '0|9|^[0-9]+\.[0-9]+\.[0-9]+$', 'min_supported_version'),
+    ('app_versions_order_check', '.', 'latest_version|min_supported_version'),
+    ('app_versions_pkey', '', 'platform'),
+    ('app_versions_platform_check', 'android|ios', 'platform'),
     ('apple_refresh_tokens_pkey', '', ''),
     ('apple_refresh_tokens_user_id_fkey', '', ''),
     ('beaches_access_type_check', 'private|public', 'access_type'),
