@@ -3558,19 +3558,21 @@ ORDER BY policyname;
 -- below it. Raising it on either row switches blocking ON for real users.
 --
 -- Before that happens, an iOS build containing the popup must pass the force-tier checks on
--- a device: the native Modal against the emergency ROOT OVERLAY, no hardware back, and the
--- itms-apps:// link. See "Store-update popup" in CLAUDE.md for why none of those can be
--- answered by Android, and why the 2026-09-25 release shipped soft-only.
+-- a device, on BOTH platforms. Android: the modal blocks, both escapes open and return, and
+-- hardware back cannot escape. iOS adds the native Modal against the emergency ROOT OVERLAY,
+-- the absence of hardware back, and the itms-apps:// link. See "Store-update popup" in
+-- CLAUDE.md; the 2026-09-25 release shipped soft-only and exercised neither force path.
 --
 -- A 'BLOCKING ON' verdict is not automatically wrong — it is a question. Answer it by
--- doing the device pass and saying so in the commit that raises the value.
+-- doing the device pass on BOTH Android and iOS, and saying so in the commit that raises
+-- the value. The 2026-09-25 pass was soft-tier only; nothing about blocking was exercised.
 SELECT
   CASE
     WHEN count(*) FILTER (WHERE platform IN ('ios','android')) <> 2
       THEN 'INCOMPLETE — expected one ios and one android row; found ' || count(*)::text
     WHEN bool_and(min_supported_version = '1.0.0')
       THEN 'OK — blocking OFF on both platforms (min_supported_version = 1.0.0)'
-    ELSE 'BLOCKING ON ← iOS force-tier device pass required (CLAUDE.md: Store-update popup)'
+    ELSE 'BLOCKING ON ← force-tier device pass required on BOTH Android and iOS (CLAUDE.md: Store-update popup)'
   END AS verdict,
   string_agg(platform || ': latest=' || latest_version || ' min=' || min_supported_version,
              ' · ' ORDER BY platform) AS rows_read
