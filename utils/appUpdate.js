@@ -1,6 +1,5 @@
 import { Platform, Linking } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import Constants from 'expo-constants'
 import * as Updates from 'expo-updates'
 import { supabase } from '../lib/supabase'
 import { compareVersions } from './semver'
@@ -70,10 +69,12 @@ const SNOOZE_DAYS = 3
 export const FOREGROUND_RECHECK_MS = 30 * 60 * 1000
 
 const IOS_APP_ID = '6783996527'
-// The package is read from the manifest so it cannot drift from app.config.js, with the
-// literal as a fallback. Safe to take from the bundle, unlike the VERSION: an app's store
-// identity is fixed for the life of the listing — changing it would be a new app.
-const ANDROID_PACKAGE = Constants.expoConfig?.android?.package || 'com.berkeustun95.ada'
+// Hardcoded, and NOT read from expo-constants. It is the value of `android.package` in
+// app.config.js and cannot drift from it in any way that matters: changing an app's store
+// identity makes it a DIFFERENT LISTING, which is not an edit anyone makes by accident.
+// Reading it from the manifest would mean a top-level native import in a module that ships
+// by OTA onto old binaries — a real launch-crash risk bought for a value that never changes.
+const ANDROID_PACKAGE = 'com.berkeustun95.ada'
 
 // [deep link, https fallback]. Tried in order by openStore().
 function storeUrls() {
