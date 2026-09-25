@@ -114,6 +114,43 @@ branch in App.js, which carries the identical warning for the identical reason.
 
 **facility_change_requests.proposed_changes:** The `languages` field is stored as a comma-separated string (e.g. `"English, Turkish"`). When approving and writing to `facilities.languages` (which is `text[]`), split it first: `changes.languages.split(',').map(l => l.trim())`.
 
+## Store-update popup — BLOCKING IS GATED ON AN iOS DEVICE PASS
+
+`app_versions` (20261051) drives a two-tier store-update popup. `latest_version`
+gives a dismissible "new version available"; **`min_supported_version` BLOCKS the app.**
+
+⚠ **BEFORE `min_supported_version` IS EVER RAISED ABOVE `'1.0.0'` ON EITHER PLATFORM —
+i.e. before blocking is switched on for anyone — AN iOS BUILD CONTAINING THE POPUP MUST
+PASS THE FORCE-TIER CHECKS ON A REAL DEVICE.** Three things, none of which Android can
+answer for iOS:
+
+  1. **The native `<Modal>` against the emergency sheet.** The escape sheet is a ROOT
+     OVERLAY (`App.js`, `SheetOverlay`, zIndex 100) and a native Modal opens its own
+     window above the whole React root — so the force modal must HIDE for the sheet to
+     be visible at all. That is what `forceBlocking` deriving from `showEmergencyModal`
+     is for, and it has only ever been proven on Android.
+  2. **No hardware back.** Android's back button rescues a stuck state; iOS has none. If
+     a close path fails to clear the flag the modal is derived from, an iOS user is
+     trapped behind a blocking modal with no way out and no way to reach the emergency
+     numbers. This is the failure the derived-state design exists to prevent, and iOS is
+     the only platform where it is unrecoverable.
+  3. **`itms-apps://`** opens the App Store. There is no `canOpenURL` probe (that needs
+     `LSApplicationQueriesSchemes`, which is a native build), so the fallback to the
+     https URL is untested until somebody taps it on a phone.
+
+Why this rule exists: the 1.1.0 and 1.2.0 TestFlight builds predate the popup and embed
+their own bundles, so neither could run the pass; and an iOS build from `release/1.1`
+was refused because that branch has no `usesAppleSignIn` and building it would
+regenerate a provisioning profile for the live bundle id — the same class of failure
+that killed 1.2.0 build 9. The 2026-09-25 release therefore shipped **soft-only**
+(`min_supported_version = '1.0.0'`, which blocks nobody) on Berke's decision, with iOS
+covered by Android because no user could reach the force tier.
+
+**Raising it is what makes that reasoning expire.** `supabase/verify_schema.sql` carries
+a token asserting both rows are still `'1.0.0'`; raising the value makes the drift report
+go red until the token is edited, and that edit is the review moment this rule needs.
+Do not bump the token without the device pass.
+
 ## How I want you to work
 - Make MINIMAL changes. Do not refactor unrelated code.
 - Make the changes according to the prompt then say its done and explain shortly. so dont ask to proceed everytime
