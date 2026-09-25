@@ -26,10 +26,17 @@ const REGION_TO_BL_KEY = {
   'İskele':     'blDistrictIskele',
   'Lefke':      'blDistrictLefke',
   'Karpaz':     'blDistrictKarpaz',
+  'Üst Mesarya': 'dutyRegionUstMesarya',
+  'Alt Mesarya': 'dutyRegionAltMesarya',
 }
 
-// Canonical TRNC district display order for section headers
-const DISTRICT_ORDER = ['Lefkoşa', 'Gazimağusa', 'Girne', 'Güzelyurt', 'İskele', 'Lefke', 'Karpaz', 'Mesarya']
+// KTEB's nine duty regions, in display order.
+const DISTRICT_ORDER = ['Lefkoşa', 'Gazimağusa', 'Girne', 'Güzelyurt', 'İskele', 'Lefke', 'Karpaz', 'Üst Mesarya', 'Alt Mesarya']
+
+// The only regions where NO duty row is a normal state: KTEB rota Mesarya on weekends and
+// holidays only, because on weekdays every pharmacy there is open 08:00–19:00. Everywhere
+// else an empty region is our missing data, and stays an error.
+const MESARYA_REGIONS = ['Üst Mesarya', 'Alt Mesarya']
 
 function regionBLKey(region) {
   if (!region) return null
@@ -69,6 +76,15 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+
+function MesaryaNote({ lang }) {
+  return (
+    <View style={s.mesaryaNote}>
+      <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+      <Text style={s.mesaryaNoteText}>{t('dutyMesaryaWeekdayNote', lang)}</Text>
+    </View>
+  )
+}
 
 function PharmacyCard({ item, showRegionBadge, lang }) {
   return (
@@ -225,6 +241,8 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
     const sorted = [
       ...DISTRICT_ORDER.filter(d => map[d]).map(d => ({ title: d, data: map[d] })),
       ...Object.entries(map).filter(([k]) => !knownSet.has(k)).map(([k, v]) => ({ title: k, data: v })),
+      // Empty Mesarya sections render the weekday note as their footer.
+      ...MESARYA_REGIONS.filter(d => !map[d]).map(d => ({ title: d, data: [] })),
     ]
     // Arrived from a city-welcome card: float that city's sections to the top,
     // keeping DISTRICT_ORDER within each group so the rest of the list is
@@ -244,6 +262,11 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
     if (b._dist == null) return -1
     return a._dist - b._dist
   }), [decorated])
+
+  const mesaryaMissing = useMemo(
+    () => MESARYA_REGIONS.some(r => !decorated.some(row => row.region === r)),
+    [decorated],
+  )
 
   const d = new Date()
   const dateLabel = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -340,6 +363,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
             renderItem={({ item }) => (
               <PharmacyCard item={item} showRegionBadge lang={lang} />
             )}
+            ListFooterComponent={mesaryaMissing ? <MesaryaNote lang={lang} /> : null}
           />
         ) : (
           <SectionList
@@ -351,10 +375,15 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
             renderSectionHeader={({ section }) => (
               <View style={s.regionHeader}>
                 <Text style={s.regionName}>{regionLabel(section.title, lang)}</Text>
-                <View style={s.regionBadge}>
-                  <Text style={s.regionCount}>{section.data.length}</Text>
-                </View>
+                {section.data.length > 0 ? (
+                  <View style={s.regionBadge}>
+                    <Text style={s.regionCount}>{section.data.length}</Text>
+                  </View>
+                ) : null}
               </View>
+            )}
+            renderSectionFooter={({ section }) => (
+              section.data.length === 0 ? <MesaryaNote lang={lang} /> : null
             )}
             renderItem={({ item }) => (
               <PharmacyCard item={item} showRegionBadge={false} lang={lang} />
@@ -387,6 +416,8 @@ const s = StyleSheet.create({
   regionBadge:  { backgroundColor: colors.border, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
   regionCount:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 
+  mesaryaNote:       { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: colors.primaryLight, borderRadius: 14, padding: 14, marginBottom: 8 },
+  mesaryaNoteText:   { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 18 },
   metaRow:           { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' },
   partialNotice:     { flexShrink: 0, backgroundColor: colors.dangerLight, borderRadius: 14, padding: 14, marginBottom: 12 },
   partialRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },

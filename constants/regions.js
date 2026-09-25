@@ -11,10 +11,10 @@
 // "I'm going to Karpaz", not "I'm going to northern İskele". DO NOT "correct"
 // this back to six — it is a product decision, not a data error.
 //
-// MESARYA IS NOT IN THIS SET. `duty_list.region` carries an 8th value,
-// 'Mesarya', which is a pharmacists'-chamber duty-rota zone, not a district —
-// the central plain, split into Üst (upper) and Alt (lower). Those coordinates
-// fold into `nicosia` / `famagusta` by geography via the anchors below.
+// MESARYA IS NOT IN THIS SET. `duty_list.region` carries two more values,
+// 'Üst Mesarya' and 'Alt Mesarya' — KTEB duty-rota zones, not districts, on the
+// central plain. They fold into `nicosia` / `famagusta` by geography via the
+// anchors below, and into the same slugs in REGION_TO_DUTY.
 
 export const REGIONS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
 
@@ -29,13 +29,13 @@ export const REGION_LABEL_KEY = {
   karpaz:    'blDistrictKarpaz',
 }
 
-// Slug -> the Turkish strings `duty_list.region` uses. Both Mesarya values are
-// listed under the district that contains them, so a duty-pharmacy filter by
-// slug picks up the rota zone too.
+// Slug -> the Turkish strings `duty_list.region` uses. Each Mesarya zone is
+// listed under the district most of it sits in (the same fold as ANCHORS), so a
+// duty-pharmacy filter by slug picks up the rota zone too.
 export const REGION_TO_DUTY = {
-  nicosia:   ['Lefkoşa', 'Mesarya'],
+  nicosia:   ['Lefkoşa', 'Üst Mesarya'],
   kyrenia:   ['Girne'],
-  famagusta: ['Gazimağusa', 'Mesarya'],
+  famagusta: ['Gazimağusa', 'Alt Mesarya'],
   morphou:   ['Güzelyurt'],
   iskele:    ['İskele'],
   lefke:     ['Lefke'],
