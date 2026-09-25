@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { View, Text, Image, Modal, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, radius, shadow } from '../constants/theme'
+import { logAppUpdateEvent } from '../utils/appUpdate'
 import { t } from '../constants/i18n'
 
 // ─── "A new version is available" / "Please update ADA" ─────────────────────
@@ -36,6 +37,25 @@ export default function AppUpdateNotice({
 }) {
   const [escapeOpen, setEscapeOpen] = useState(false)
   const force = tier === 'force'
+
+  // ─── The backup signal, fired HERE and not from App.js ─────────────────────
+  //
+  // This component is the only place that knows the popup is actually ON SCREEN. App.js
+  // computes `visible`, but a tier resolving is not the same event as a modal appearing —
+  // the soft tier yields to the policy notice and the coach marks, so a resolve can happen
+  // with nothing shown. Logging the resolve would count popups nobody saw, which is worse
+  // than not logging: it would read as "the feature works" on a binary where it does not.
+  //
+  // Once per (tier) per app session. The ref, not state: re-rendering because we logged
+  // would be a loop, and a user who dismisses a soft popup and is shown it again after a
+  // foreground re-check is the same appearance for counting purposes.
+  const loggedRef = useRef(null)
+  useEffect(() => {
+    if (visible !== true || !tier) return
+    if (loggedRef.current === tier) return
+    loggedRef.current = tier
+    logAppUpdateEvent(tier)
+  }, [visible, tier])
 
   function close() {
     setEscapeOpen(false)
