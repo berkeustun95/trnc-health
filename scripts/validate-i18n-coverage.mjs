@@ -89,6 +89,10 @@ const SURFACES = [
   'components/ComingSoonScreen.js',
   // The policy-update notice: shown to every existing user once per policy version.
   'components/PolicyUpdateNotice.js',
+  // The store-update popup. Its FORCE tier is the only surface in the app that can hide
+  // everything else, so an untranslated string there is a user locked out in a language
+  // they cannot read — guarded from the commit that creates it, not after the first report.
+  'components/AppUpdateNotice.js',
   // Widened 2026-08-26 for the duty-roster error state. Measured before widening: these
   // two add 34 keys and ZERO new allowlist entries — both were already fully translated.
   // Free coverage on the highest-stakes copy in the app.

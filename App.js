@@ -75,6 +75,8 @@ import OwningPetScreen from './screens/pets/OwningPetScreen'
 import PetHotelPartnerScreen from './screens/pets/PetHotelPartnerScreen'
 import TutorialCoachMarks from './screens/TutorialCoachMarks'
 import PolicyUpdateNotice from './components/PolicyUpdateNotice'
+import AppUpdateNotice from './components/AppUpdateNotice'
+import { evaluateAppUpdate, snoozeSoftUpdate, openStore, FOREGROUND_RECHECK_MS } from './utils/appUpdate'
 import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
@@ -497,6 +499,11 @@ export default function App() {
   const [weatherData, setWeatherData] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showEmergencyModal, setShowEmergencyModal] = useState(false)
+  // Store-update popup. DECLARED HERE, with the other useState calls, because the content
+  // selector reads updateTier — and a const declared BELOW the selector reads `undefined`
+  // inside it under Hermes, with no error. See the Android gotcha in CLAUDE.md.
+  const [updateTier, setUpdateTier] = useState(null)
+  const [updateLatestVersion, setUpdateLatestVersion] = useState(null)
   const [showMunicipalModal, setShowMunicipalModal] = useState(false)
   const [expandedMuni, setExpandedMuni] = useState(null)
   const [showEvents, setShowEvents] = useState(false)
@@ -768,6 +775,16 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS !== 'android') return
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      // FIRST, above everything: a force-update block. Back must never reach the app from
+      // here. From either escape screen it returns to the modal (the state it clears is what
+      // forceBlocking is derived from, so the modal comes back on its own); on the modal
+      // itself it is swallowed. The Modal's own onRequestClose is also a no-op — both exist
+      // because which of the two wins the event is not worth depending on.
+      if (updateTier === 'force') {
+        if (showEmergencyModal) { setShowEmergencyModal(false); return true }
+        if (showDutyList) { setShowDutyList(false); setDutyRegion(null); return true }
+        return true
+      }
       // These are root overlays, not <Modal>s, so there is no onRequestClose to catch
       // the hardware back button. They are topmost, so they go first — Oli's sheet above
       // the other two. OliGuide registers its own handler while open (which wins, being
@@ -824,7 +841,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -1176,6 +1193,46 @@ export default function App() {
     return () => { cancelled = true }
   }, [retryCount, session?.user?.id])
 
+  // Store-update check — cold start, and foreground after >30 min away.
+  //
+  // Mirrors the city-welcome trigger below, with one difference: that one has to tell a REAL
+  // background -> active apart from an iOS control-centre pull-down, because a stray 'active'
+  // would burn a 30-day cooldown. Here the elapsed-time gate does that work — a pull-down is
+  // seconds, never 30 minutes — so the clock is the guard rather than the state machine.
+  //
+  // A re-check that comes back null CLEARS a force block. That is the fail-open requirement,
+  // not an oversight: if the server is unreachable on the second look, the user gets their app
+  // back. A client-side force-update is a prompt, never a security boundary.
+  useEffect(() => {
+    let cancelled = false
+    const prevState = { current: AppState.currentState }
+    const backgroundedAt = { current: null }
+
+    const check = async () => {
+      const { tier, latestVersion } = await evaluateAppUpdate()
+      if (cancelled) return
+      setUpdateTier(tier)
+      setUpdateLatestVersion(latestVersion)
+    }
+
+    check()
+
+    const sub = AppState.addEventListener('change', next => {
+      const wasAway = prevState.current.match(/inactive|background/)
+      if (next.match(/inactive|background/) && backgroundedAt.current === null) {
+        backgroundedAt.current = Date.now()
+      }
+      prevState.current = next
+      if (wasAway && next === 'active') {
+        const awayFor = backgroundedAt.current === null ? 0 : Date.now() - backgroundedAt.current
+        backgroundedAt.current = null
+        if (awayFor > FOREGROUND_RECHECK_MS) check()
+      }
+    })
+
+    return () => { cancelled = true; sub.remove() }
+  }, [])
+
   // City welcome — foreground trigger.
   //
   // Fires on cold start and on every background -> active transition. iOS also
@@ -1327,6 +1384,20 @@ export default function App() {
   // short-circuits first — and it stays on purpose. It is the second of two independent
   // reasons the wizard cannot render for an ineligible account, so reordering the
   // content chain cannot quietly undo this fix.
+  // ─── The store-update force block ──────────────────────────────────────────
+  //
+  // DERIVED from the two flags that already exist, NOT stored. A third `updateEscape` state
+  // dead-ends iOS: tapping the emergency sheet's BACKDROP fires SheetOverlay.onDismiss ->
+  // setShowEmergencyModal(false), while the separate escape state stays 'emergency' — so the
+  // modal stays hidden, the selector renders the neutral backdrop, and the user is on a blank
+  // screen. Android back rescues it; iOS has no hardware back. Derived, every close path
+  // (backdrop, X, onBack, hardware back) re-shows the modal for free.
+  //
+  // Note it is `updateTier === 'force'` that gates the SELECTOR block, not this — when the
+  // escape is open we must still be inside that block, rendering the duty screen, rather than
+  // falling through to the rest of the app. This gates only the MODAL.
+  const forceBlocking = updateTier === 'force' && !showEmergencyModal && !showDutyList
+
   const gateActive =
     PROFILE_GATE_LIVE &&
     !!session && !isGuest(session) && !!profile &&
@@ -1339,6 +1410,33 @@ export default function App() {
     content = <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   } else if (onboarded === false) {
     content = <OnboardingScreen onComplete={completeOnboarding} />
+  // ─── FORCE UPDATE: position 3, and the position is the design ──────────────
+  //
+  // Below the splash and the carousel (so a genuinely new install still sees the carousel,
+  // and nothing renders before fonts are ready), and ABOVE EVERYTHING ELSE — including the
+  // welcome and auth branches immediately below. That last part is not a preference: a
+  // signed-out user tapping the emergency escape would otherwise land on WelcomeScreen
+  // behind a hidden modal.
+  //
+  // ONE READABLE ALLOW-LIST, exactly like the gateActive block below and for the reason its
+  // comment gives: if this fell through to the ~25-branch chain, "what is reachable while
+  // force-blocked" would be an emergent property of 25 conditions spread over 350 lines, and
+  // a module added later could widen it by accident. Tabs, deep links and every module are
+  // simply not rendered. A duty push deep link while blocked lands on the roster, which is
+  // the exempt screen anyway.
+  //
+  // The emergency numbers are NOT here: they are a root overlay in the final return
+  // (showEmergencyModal) and render over whatever this produces, so they need no branch.
+  //
+  // The neutral backdrop is deliberate — the modal's scrim is translucent, and rendering the
+  // real app underneath would show a user their tabs through a block they cannot dismiss.
+  //
+  // inTabShell is only set in the final else, so short-circuiting here also keeps the Ask Oli
+  // FAB and PolicyUpdateNotice off the screen.
+  } else if (updateTier === 'force') {
+    content = showDutyList
+      ? <DutyListScreen onBack={() => { setShowDutyList(false); setDutyRegion(null) }} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+      : <View style={styles.center} />
   } else if (!session && showWelcome) {
     content = (
       <WelcomeScreen
@@ -1387,6 +1485,16 @@ export default function App() {
     // That is a change from the old in-session block only in that it now survives a
     // relaunch — the old screen returned early inside the wizard and reached none of
     // them either.
+    //
+    // ⚠ ONE EXCEPTION, ADDED DELIBERATELY 2026-09-25: the force-update block sits ABOVE
+    // this branch, so an ineligible account on an unsupported binary DOES reach the
+    // emergency numbers and the duty roster — through the force modal's escape link, on
+    // the same terms as everybody else. "Reaches nothing else" is therefore true of this
+    // branch and no longer true of the app as a whole.
+    // Berke's call, and the reasoning is that an emergency number is not a feature you
+    // withhold from a 12-year-old: age eligibility governs holding an ACCOUNT, not seeing
+    // a phone number for an ambulance. The exception is scoped to the force-blocked case
+    // only — nothing about the ordinary ineligible path changed.
     content = <AgeIneligibleScreen lang={lang} />
   } else if (gateActive) {
     // ONE READABLE ALLOW-LIST of what a gated user may reach. This block renders the
@@ -2337,7 +2445,11 @@ export default function App() {
         </SheetOverlay>
       )}
 
-      {showMunicipalModal && (
+      {/* Gated on the force tier, unlike the emergency sheet above, which is the ESCAPE and
+          is meant to be reachable. The menu drawer, coach marks and Oli's sheet all sit
+          behind `inTabShell` (or a derived form of it) and so are already excluded by the
+          force block short-circuiting the selector — this one is not, so it says so itself. */}
+      {showMunicipalModal && updateTier !== 'force' && (
         <SheetOverlay onDismiss={() => setShowMunicipalModal(false)}>
           <View style={[styles.emergencySheet, { maxHeight: Dimensions.get('window').height * 0.75 }]}>
             <View style={styles.emergencyHeader}>
@@ -2449,6 +2561,25 @@ export default function App() {
         lang={lang}
         onSignUp={gateSignUp}
         onClose={() => setGateKey(null)}
+      />
+
+      {/* In the FINAL return, next to PolicyUpdateNotice — never in the content selector.
+          `visible` repeats the splash/carousel conditions of selector branches 1 and 2 on
+          purpose: the SELECTOR cannot render the force block over the carousel (branch 2 is
+          above it), but this Modal lives out here and knows nothing about onboarding.
+          Soft yields to the policy notice and the coach marks — two native Modals visible at
+          once is the iOS footgun, and policyNoticeVisible fires for most of the very users
+          who get the soft popup. Force cannot collide with it: it short-circuits the selector
+          before inTabShell is set, which is what policyNoticeVisible depends on. */}
+      <AppUpdateNotice
+        visible={session !== undefined && fontsLoaded && onboarded === true &&
+                 (forceBlocking || (updateTier === 'soft' && !policyNoticeVisible && !showCoachMarks))}
+        tier={updateTier}
+        lang={lang}
+        onUpdate={openStore}
+        onLater={() => { snoozeSoftUpdate(updateLatestVersion); setUpdateTier(null) }}
+        onEmergency={() => setShowEmergencyModal(true)}
+        onDuty={() => setShowDutyList(true)}
       />
     </SafeAreaProvider>
   )
