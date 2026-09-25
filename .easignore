@@ -1,1 +1,12 @@
 google-play-service-account.json
+
+# Local 62 MB scratch directory, untracked. `.easignore` is what governs the EAS upload
+# (it takes precedence over `.gitignore` when present), so without this line vendor/ was
+# being packed and shipped on every build — the 2026-09-25 APKs uploaded 116 MB.
+# Nothing imports it, so Metro never bundled it into an update; this is upload weight only.
+#
+# NOTE it does NOT clear the `*` dirty-tree marker EAS prints after the commit hash. That
+# comes from `git status` seeing vendor/ as untracked, so only a `.gitignore` entry would
+# silence it. Left alone deliberately: an untracked 62 MB directory SHOULD show up in
+# `git status`, and a marker that says "the tree is not clean" is telling the truth.
+vendor/
