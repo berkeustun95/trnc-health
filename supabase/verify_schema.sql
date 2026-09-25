@@ -396,7 +396,8 @@ WITH report AS (
     ('1045_places_source','places_guard_source'),
     -- 1050: the nightly purge behind the policy's "removed 30 days later". Not an RPC.
     ('1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc'),
-    ('1051_app_versions','purge_app_update_events')
+    ('1051_app_versions','purge_app_update_events'),
+    ('1052_purge_status_reporter','app_update_events_purge_status')
   ) e(m,o)
 
   UNION ALL
@@ -3280,6 +3281,22 @@ WITH report AS (
                AND has_column_privilege('authenticated', to_regclass('public.app_update_events'), 'runtime_version', 'INSERT'), false)
       AND COALESCE(NOT has_column_privilege('anon', to_regclass('public.app_update_events'), 'created_at', 'INSERT')
                AND NOT has_column_privilege('authenticated', to_regclass('public.app_update_events'), 'created_at', 'INSERT'), false)
+    -- The purge REPORTER's security properties, all from pg_proc, so QUERY 1 stays free of
+    -- any cron reference — pg_cron lives in another schema and QUERY 2 is where that
+    -- dependency belongs. The "reports only its own job" half needs cron.job and is asserted
+    -- THERE, in QUERY 2, for the same reason.
+    --
+    -- pronargs = 0 is the security property, not a style point: with nothing to pass, no
+    -- caller can steer it at another job however the body is later edited. LIMIT 5 is
+    -- asserted on the definition because the in-migration behaviour probe cannot see it —
+    -- at apply time the job has never run, so there are 0 rows and no cap to exceed.
+    UNION ALL SELECT '1052_purge_status_reporter','app_update_events_purge_status: no args, SECURITY DEFINER, search_path set, anon-only, LIMIT 5',
+      COALESCE((SELECT p.pronargs = 0 AND p.prosecdef
+                   AND EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) c WHERE c LIKE 'search_path=%')
+                   AND pg_get_functiondef(p.oid) ILIKE '%limit 5%'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.app_update_events_purge_status()')), false)
+      AND COALESCE(has_function_privilege('anon', to_regprocedure('public.app_update_events_purge_status()'), 'EXECUTE'), false)
+      AND COALESCE(NOT has_function_privilege('authenticated', to_regprocedure('public.app_update_events_purge_status()'), 'EXECUTE'), false)
     -- The retention function exists and NO client can call it. A purge a device can trigger
     -- is a counter any device can wipe. The JOB itself is checked in QUERY 2.
     UNION ALL SELECT '1051_app_versions','purge_app_update_events exists and is not client-callable',
@@ -3425,6 +3442,25 @@ FROM (VALUES
   -- clear of the three purges above it.
   ('1051_app_versions','purge-app-update-events')
 ) e(m,o)
+
+UNION ALL
+-- ─── 1052: the reporter must be able to report on NOTHING BUT its own job ───
+-- DERIVED FROM cron.job, never from a list written here: a remembered list goes green on
+-- the one job somebody forgot to name. Every jobname on this server except its own is
+-- checked against the function's definition.
+-- ⚠ pg_get_functiondef() returns the COMMENTS too, so a comment inside that function that
+-- mentioned a neighbouring job BY NAME would fail this — and the tempting fix would be to
+-- delete the comment rather than the reference. The function's own header warns about it.
+SELECT '1052_purge_status_reporter', 'app_update_events_purge_status: reports ONLY its own job',
+       CASE
+         WHEN to_regprocedure('public.app_update_events_purge_status()') IS NULL THEN 'MISSING'
+         WHEN EXISTS (SELECT 1 FROM cron.job j
+                       WHERE j.jobname IS DISTINCT FROM 'purge-app-update-events'
+                         AND position(j.jobname in pg_get_functiondef(to_regprocedure('public.app_update_events_purge_status()'))) > 0)
+           THEN 'LEAKS OTHER JOBS ← FIX'
+         WHEN position('purge-app-update-events' in pg_get_functiondef(to_regprocedure('public.app_update_events_purge_status()'))) = 0
+           THEN 'NAMES NO JOB ← FIX'
+         ELSE 'OK' END
 ORDER BY status ASC, migration;
 
 
