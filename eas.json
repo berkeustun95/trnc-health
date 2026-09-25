@@ -18,6 +18,15 @@
         "simulator": false
       }
     },
+    "production-apk": {
+      "extends": "production",
+      "autoIncrement": false,
+      "channel": "production",
+      "android": {
+        "buildType": "apk",
+        "credentialsSource": "remote"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "ios": {
