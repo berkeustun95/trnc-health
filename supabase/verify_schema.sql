@@ -395,7 +395,8 @@ WITH report AS (
     ('1033_reviews_author_not_public','admin_content_author'),
     ('1045_places_source','places_guard_source'),
     -- 1050: the nightly purge behind the policy's "removed 30 days later". Not an RPC.
-    ('1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc')
+    ('1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc'),
+    ('1051_app_versions','purge_app_update_events')
   ) e(m,o)
 
   UNION ALL
@@ -667,7 +668,6 @@ WITH report AS (
     ('1051_app_versions','app_update_events_pkey'),
     ('1051_app_versions','app_update_events_tier_check'),
     ('1051_app_versions','app_update_events_platform_check'),
-    ('1051_app_versions','app_update_events_installed_len_check'),
     ('1051_app_versions','app_update_events_runtime_len_check')
 
   ) e(m,o)
@@ -3280,6 +3280,12 @@ WITH report AS (
                AND has_column_privilege('authenticated', to_regclass('public.app_update_events'), 'runtime_version', 'INSERT'), false)
       AND COALESCE(NOT has_column_privilege('anon', to_regclass('public.app_update_events'), 'created_at', 'INSERT')
                AND NOT has_column_privilege('authenticated', to_regclass('public.app_update_events'), 'created_at', 'INSERT'), false)
+    -- The retention function exists and NO client can call it. A purge a device can trigger
+    -- is a counter any device can wipe. The JOB itself is checked in QUERY 2.
+    UNION ALL SELECT '1051_app_versions','purge_app_update_events exists and is not client-callable',
+      to_regprocedure('public.purge_app_update_events(interval)') IS NOT NULL
+      AND COALESCE(NOT has_function_privilege('anon', to_regprocedure('public.purge_app_update_events(interval)'), 'EXECUTE')
+               AND NOT has_function_privilege('authenticated', to_regprocedure('public.purge_app_update_events(interval)'), 'EXECUTE'), false)
     -- (3) A place on a route cannot be deleted silently: place_id RESTRICT ('r'), route_id CASCADE ('c').
     --     Section E sees the constraint NAMES, which survive a change of delete action.
     UNION ALL SELECT '1048_walking_routes','walking_route_stops: place_id ON DELETE RESTRICT, route_id ON DELETE CASCADE',
@@ -3413,7 +3419,11 @@ FROM (VALUES
   ('0926_moderation_rejection_log','purge-moderation-rejections'),
   -- Backs "permanently removed 30 days later" in the policy. INACTIVE here is a broken
   -- written commitment, same as purge-moderation-rejections.
-  ('1050_purge_soft_deleted_ugc','purge-soft-deleted-ugc')
+  ('1050_purge_soft_deleted_ugc','purge-soft-deleted-ugc'),
+  -- 90-day retention on app_update_events. The table is a launch counter, not a permanent
+  -- record; without this job it grows forever and quietly becomes a usage log. 03:33 UTC,
+  -- clear of the three purges above it.
+  ('1051_app_versions','purge-app-update-events')
 ) e(m,o)
 ORDER BY status ASC, migration;
 

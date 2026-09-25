@@ -169,7 +169,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261048_walking_routes.sql', '67eb944a009bb7d19d2c47207ca114b304c551510c067c6d007e72efc44e9fba'),
   ('20261049_walking_legs.sql', 'c5da9f99041e73f3a03fc4fd3058efe0585bd097d02eb9d2dcab36c45b4cced0'),
   ('20261050_purge_soft_deleted_ugc.sql', '51cfacbc105537ecfe057431637aa76407978fe278a18b7c9cb50f1e8411719d'),
-  ('20261051_app_versions.sql', 'a57a5701747dd9d587f857fea6f9067b3646afe2d29f0196039c1455d311e89f')
+  ('20261051_app_versions.sql', '79dbc33c76b785e0b9d1fd3d18333f9bc943fcb3b9e23f056e916750e9edb138')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

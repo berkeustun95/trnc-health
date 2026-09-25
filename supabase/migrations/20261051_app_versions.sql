@@ -105,16 +105,15 @@ CREATE POLICY app_versions_select ON public.app_versions
 --   "are popups being shown, and to which versions", which is a COUNT. Anything that lets two
 --   rows be recognised as the same phone turns a counter into a behavioural log.
 --
--- ─── WHY BOTH VERSION COLUMNS, WHEN THEY SHOULD BE THE SAME STRING ──────────
+-- ─── ONE VERSION COLUMN, NOT TWO ───────────────────────────────────────────
 --
--- runtimeVersion.policy is 'appVersion', so runtime_version OUGHT to equal installed_version
--- on every row. They are stored separately because they come from DIFFERENT SOURCES —
--- installed_version from Application.nativeApplicationVersion (the binary's Info.plist /
--- PackageInfo), runtime_version from Updates.runtimeVersion (the native build config) — and
--- utils/appUpdate.js falls back from the first to the second. A row where they DISAGREE, or
--- where installed_version is null, is the fallback firing or expo-application missing from a
--- binary. That is the single most useful diagnostic this table can carry, and it only exists
--- because the two columns are kept apart.
+-- An earlier draft stored installed_version (Application.nativeApplicationVersion) beside
+-- runtime_version (Updates.runtimeVersion) to catch the two disagreeing. Both are gone bar
+-- one: runtimeVersion.policy is 'appVersion', and check-ota-preflight.mjs:69 REFUSES the
+-- publish unless that policy is exactly 'appVersion' — so on every build that can reach this
+-- code the two strings are the same by construction, and a second column stored the same
+-- value twice. utils/appUpdate.js now reads Updates.runtimeVersion only and does not touch
+-- expo-application at all, which also removes a native module from the OTA-shipped path.
 --
 -- ─── THE VERSION COLUMNS ARE DELIBERATELY UNCONSTRAINED ─────────────────────
 --
@@ -126,14 +125,12 @@ CREATE TABLE IF NOT EXISTS public.app_update_events (
   id                bigint      GENERATED ALWAYS AS IDENTITY,
   tier              text        NOT NULL,
   platform          text        NOT NULL,
-  installed_version text,
   runtime_version   text,
   created_at        timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT app_update_events_pkey           PRIMARY KEY (id),
   CONSTRAINT app_update_events_tier_check     CHECK (tier = ANY (ARRAY['soft','force']::text[])),
   CONSTRAINT app_update_events_platform_check CHECK (platform = ANY (ARRAY['ios','android']::text[])),
-  CONSTRAINT app_update_events_installed_len_check CHECK (installed_version IS NULL OR length(installed_version) <= 64),
-  CONSTRAINT app_update_events_runtime_len_check   CHECK (runtime_version   IS NULL OR length(runtime_version)   <= 64)
+  CONSTRAINT app_update_events_runtime_len_check CHECK (runtime_version IS NULL OR length(runtime_version) <= 64)
 );
 
 COMMENT ON TABLE public.app_update_events IS
@@ -154,7 +151,7 @@ ALTER TABLE public.app_update_events ENABLE ROW LEVEL SECURITY;
 -- in. An "anon-insert-only" grant would drop nearly every event on the floor while looking
 -- perfectly correct, which is the failure this table exists to detect.
 REVOKE ALL ON public.app_update_events FROM anon, authenticated;
-GRANT INSERT (tier, platform, installed_version, runtime_version) ON public.app_update_events TO anon, authenticated;
+GRANT INSERT (tier, platform, runtime_version) ON public.app_update_events TO anon, authenticated;
 
 DROP POLICY IF EXISTS aue_insert_public ON public.app_update_events;
 CREATE POLICY aue_insert_public ON public.app_update_events
@@ -172,6 +169,49 @@ DROP POLICY IF EXISTS aue_no_delete ON public.app_update_events;
 CREATE POLICY aue_no_delete ON public.app_update_events
   FOR DELETE TO anon, authenticated
   USING (false);
+
+-- ─── RETENTION: 90 days, on pg_cron, the mechanism this repo already uses ──
+--
+-- This table answers a LAUNCH question — "are popups appearing, on which runtime" — not a
+-- permanent one, so rows do not need to outlive the answer. Without a purge it grows forever
+-- and quietly becomes a long-lived record of app usage, which is not what anybody agreed to
+-- when the table was justified as a counter.
+--
+-- Same shape as purge_soft_deleted_ugc (20261050): a plain function plus a pg_cron job, not
+-- a trigger and not an edge function. 03:33 UTC is chosen to clear the three purges already
+-- in that cluster — purge-moderation-rejections 03:17, purge-conversation-attempts 03:23,
+-- purge-soft-deleted-ugc 03:27 — following the convention 20261050's own comment sets.
+--
+-- Interval is a DEFAULTED PARAMETER rather than a literal so the retention can be exercised
+-- by calling it with a different window, without editing the function.
+--
+-- SECURITY INVOKER (the default), like purge_soft_deleted_ugc: cron runs it as the job owner
+-- (postgres), and EXECUTE is revoked from clients, so no app role can trigger a purge.
+CREATE OR REPLACE FUNCTION public.purge_app_update_events(p_older_than interval DEFAULT interval '90 days')
+RETURNS jsonb
+LANGUAGE plpgsql
+SET search_path = public
+AS $function$
+DECLARE
+  v_cut timestamptz := now() - p_older_than;
+  n int;
+BEGIN
+  DELETE FROM app_update_events WHERE created_at < v_cut;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN jsonb_build_object('deleted', n, 'cutoff', v_cut);
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.purge_app_update_events(interval) FROM PUBLIC, anon, authenticated;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-app-update-events') THEN
+    PERFORM cron.unschedule('purge-app-update-events');
+  END IF;
+END $$;
+-- 03:33 UTC: after purge-soft-deleted-ugc (03:27), so no two purges overlap.
+SELECT cron.schedule('purge-app-update-events', '33 3 * * *', $$ SELECT public.purge_app_update_events() $$);
 
 -- ─── Assertions. Each derives what it checks and prints what it read. ───────
 DO $$
@@ -191,6 +231,12 @@ DECLARE
   v_e_read     text := 'unset';
   v_e_update   text := 'unset';
   v_e_ident    text := 'unset';
+  v_purge_fn   regprocedure := to_regprocedure('public.purge_app_update_events(interval)');
+  v_jobs       int;
+  v_cmd        text;
+  v_sched      text;
+  v_kept       int := -1;
+  v_purged     int := -1;
 BEGIN
   IF v_t IS NULL THEN
     RAISE EXCEPTION 'app_versions is not visible to this DO block. Nothing committed; re-run the file as one paste.';
@@ -321,7 +367,6 @@ BEGIN
     -- ones no. has_column_privilege is the only thing that can see a column-level grant.
     IF NOT has_column_privilege(v_role, v_e, 'tier', 'INSERT')
        OR NOT has_column_privilege(v_role, v_e, 'platform', 'INSERT')
-       OR NOT has_column_privilege(v_role, v_e, 'installed_version', 'INSERT')
        OR NOT has_column_privilege(v_role, v_e, 'runtime_version', 'INSERT') THEN
       RAISE EXCEPTION '% cannot INSERT a payload column — every event would be dropped silently', v_role;
     END IF;
@@ -334,8 +379,8 @@ BEGIN
   BEGIN
     SET LOCAL ROLE authenticated;
     BEGIN
-      INSERT INTO public.app_update_events (tier, platform, installed_version, runtime_version)
-      VALUES ('force', 'ios', '1.1.0', '1.1.0');
+      INSERT INTO public.app_update_events (tier, platform, runtime_version)
+      VALUES ('force', 'ios', '1.1.0');
       v_e_insert := 'allowed';
     EXCEPTION WHEN OTHERS THEN v_e_insert := 'DENIED: ' || SQLERRM;
     END;
@@ -371,6 +416,46 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.app_update_events) THEN
     RAISE EXCEPTION 'app_update_events probe rows survived the rollback';
   END IF;
+
+  -- ── retention ────────────────────────────────────────────────────────────
+  IF v_purge_fn IS NULL THEN
+    RAISE EXCEPTION 'purge_app_update_events(interval) does not exist — the 90-day retention would never run';
+  END IF;
+  FOREACH v_role IN ARRAY ARRAY['anon','authenticated'] LOOP
+    IF has_function_privilege(v_role, v_purge_fn, 'EXECUTE') THEN
+      RAISE EXCEPTION '% can EXECUTE purge_app_update_events — a client could wipe the counter', v_role;
+    END IF;
+  END LOOP;
+
+  -- The JOB, derived from cron.job and PRINTED. A function nothing schedules is a retention
+  -- policy that exists only on paper — which is exactly how a table quietly grows forever.
+  SELECT count(*), max(command), max(schedule) INTO v_jobs, v_cmd, v_sched
+    FROM cron.job WHERE jobname = 'purge-app-update-events';
+  IF v_jobs IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'expected exactly 1 cron job named purge-app-update-events; found %', v_jobs;
+  END IF;
+  IF v_cmd NOT LIKE '%purge_app_update_events%' THEN
+    RAISE EXCEPTION 'the cron job does not call purge_app_update_events; command is: %', v_cmd;
+  END IF;
+  IF v_sched IS DISTINCT FROM '33 3 * * *' THEN
+    RAISE EXCEPTION 'purge-app-update-events schedule is %, expected 33 3 * * * (clear of the 03:17/03:23/03:27 purges)', v_sched;
+  END IF;
+
+  -- BEHAVIOUR: it must delete what is OLD and keep what is NOT. A purge asserted only by
+  -- "it deleted something" passes just as well when it deletes everything.
+  BEGIN
+    INSERT INTO public.app_update_events (tier, platform, runtime_version) VALUES ('soft','ios','1.1.0');
+    UPDATE public.app_update_events SET created_at = now() - interval '91 days';
+    INSERT INTO public.app_update_events (tier, platform, runtime_version) VALUES ('soft','android','1.2.0');
+    PERFORM public.purge_app_update_events();
+    SELECT count(*) INTO v_kept   FROM public.app_update_events WHERE created_at > now() - interval '1 day';
+    SELECT count(*) INTO v_purged FROM public.app_update_events WHERE created_at < now() - interval '90 days';
+    RAISE EXCEPTION 'ZZ_PROBE_ROLLBACK';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM IS DISTINCT FROM 'ZZ_PROBE_ROLLBACK' THEN RAISE; END IF;
+  END;
+  IF v_purged IS DISTINCT FROM 0 THEN RAISE EXCEPTION 'a 91-day-old row survived the purge (% left)', v_purged; END IF;
+  IF v_kept   IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'the purge also deleted a FRESH row (% kept, expected 1) — retention is destroying live data', v_kept; END IF;
 END $$;
 
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
@@ -384,7 +469,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261051_app_versions.sql', 'a57a5701747dd9d587f857fea6f9067b3646afe2d29f0196039c1455d311e89f')
+VALUES ('20261051_app_versions.sql', '79dbc33c76b785e0b9d1fd3d18333f9bc943fcb3b9e23f056e916750e9edb138')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

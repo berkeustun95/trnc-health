@@ -654,7 +654,6 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('app_update_events', 'id', false, NULL, 'bigint'),
     ('app_update_events', 'tier', true, NULL, 'text'),
     ('app_update_events', 'platform', true, NULL, 'text'),
-    ('app_update_events', 'installed_version', false, NULL, 'text'),
     ('app_update_events', 'runtime_version', false, NULL, 'text'),
     ('app_update_events', 'created_at', true, 'now()', 'timestamp with time zone')
 ),
@@ -674,7 +673,6 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('answers_pkey', '', 'id'),
     ('answers_provider_id_fkey', '', 'id|provider_id'),
     ('answers_question_id_fkey', '', 'id|question_id'),
-    ('app_update_events_installed_len_check', '64', 'installed_version'),
     ('app_update_events_pkey', '', 'id'),
     ('app_update_events_platform_check', 'android|ios', 'platform'),
     ('app_update_events_runtime_len_check', '64', 'runtime_version'),
