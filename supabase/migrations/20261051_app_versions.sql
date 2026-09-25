@@ -118,12 +118,17 @@ BEGIN
 
   -- The FULL constraint set, derived and printed, for the same reason.
   --
-  -- contype IS FILTERED TO 'p','c' ON PURPOSE, and the filter is load-bearing. From PG 17
-  -- a NOT NULL constraint gets its OWN pg_constraint row (contype 'n'); on 15 and 16 it
-  -- does not. An unfiltered count is therefore 9 on the PGlite harness (PG 18.3) and 5 on
-  -- prod's major — the same file, two different answers, neither of them wrong. Counting
-  -- only the primary key and the CHECKs is the same number on every version in range.
-  -- (Found by the harness on the first run of this file, 2026-09-25.)
+  -- contype IS FILTERED TO 'p','c' ON PURPOSE. From PG 17 a NOT NULL constraint gets its
+  -- OWN pg_constraint row (contype 'n'); on 15 and 16 it does not. An unfiltered count of
+  -- this table is 9 on the PGlite harness (PG 18.3), which is how the filter was found.
+  --
+  -- ⚠ The first version of this comment said prod would answer 5 to the same query. That
+  -- was wrong: prod is **PostgreSQL 17.6** (supabase/.temp/postgres-version, cached by the
+  -- CLI at link time — confirm with SELECT version() when you have a session), so prod
+  -- counts the NOT NULL rows too and would also have said 9. The filter is still the right
+  -- shape, for a better reason than the one first written: it counts exactly what THIS FILE
+  -- declares — one primary key and four CHECKs — so it neither drifts with the server
+  -- version nor moves if somebody later adds or drops a NOT NULL.
   SELECT count(*), coalesce(string_agg(conname || ':' || contype::text, ', ' ORDER BY conname), '(none)')
     INTO v_n, v_cons
     FROM pg_constraint WHERE conrelid = v_t AND contype IN ('p','c');
@@ -204,7 +209,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261051_app_versions.sql', '54adab1bab98ff1f22aa6dc1a3985625335cd4172ff62362760375699a012469')
+VALUES ('20261051_app_versions.sql', '8025902ebb578e4d5df239033e56d3ba02637c9d89576312f070f42f4f30161b')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
