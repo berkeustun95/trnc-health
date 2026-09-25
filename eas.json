@@ -21,6 +21,7 @@
     "production-apk": {
       "extends": "production",
       "autoIncrement": false,
+      "channel": "production",
       "android": {
         "buildType": "apk",
         "credentialsSource": "remote"
