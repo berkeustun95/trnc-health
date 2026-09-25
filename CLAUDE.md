@@ -120,9 +120,21 @@ branch in App.js, which carries the identical warning for the identical reason.
 gives a dismissible "new version available"; **`min_supported_version` BLOCKS the app.**
 
 ⚠ **BEFORE `min_supported_version` IS EVER RAISED ABOVE `'1.0.0'` ON EITHER PLATFORM —
-i.e. before blocking is switched on for anyone — AN iOS BUILD CONTAINING THE POPUP MUST
-PASS THE FORCE-TIER CHECKS ON A REAL DEVICE.** Three things, none of which Android can
-answer for iOS:
+i.e. before blocking is switched on for anyone — THE FORCE TIER MUST PASS A DEVICE TEST ON
+BOTH ANDROID AND iOS**, on a build that actually contains the popup.
+
+**BOTH, because the force tier has never run on either.** The 2026-09-25 device pass was
+deliberately a LIGHT one — soft tier only, on the two production-channel APKs — since with
+`min_supported_version = '1.0.0'` no user can reach the force tier at all. So nothing about
+blocking has been exercised anywhere, and "Android already covers it" is not available as
+an argument.
+
+On Android the force pass is: the modal blocks the app · the escape link opens the emergency
+sheet · the duty link opens the roster · closing either returns to the modal · hardware back
+cannot escape, from the modal or from either escape screen (that last one is what catches a
+stale `updateTier` in the BackHandler dependency array).
+
+iOS repeats all of that minus hardware back, and adds three things Android can never answer:
 
   1. **The native `<Modal>` against the emergency sheet.** The escape sheet is a ROOT
      OVERLAY (`App.js`, `SheetOverlay`, zIndex 100) and a native Modal opens its own
@@ -138,13 +150,12 @@ answer for iOS:
      `LSApplicationQueriesSchemes`, which is a native build), so the fallback to the
      https URL is untested until somebody taps it on a phone.
 
-Why this rule exists: the 1.1.0 and 1.2.0 TestFlight builds predate the popup and embed
-their own bundles, so neither could run the pass; and an iOS build from `release/1.1`
-was refused because that branch has no `usesAppleSignIn` and building it would
-regenerate a provisioning profile for the live bundle id — the same class of failure
-that killed 1.2.0 build 9. The 2026-09-25 release therefore shipped **soft-only**
-(`min_supported_version = '1.0.0'`, which blocks nobody) on Berke's decision, with iOS
-covered by Android because no user could reach the force tier.
+Why no iOS build exists to test with: the 1.1.0 and 1.2.0 TestFlight builds predate the
+popup and embed their own bundles, so neither can show it; and an iOS build from
+`release/1.1` was refused because that branch has no `usesAppleSignIn` and building it
+would regenerate a provisioning profile for the live bundle id — the same class of failure
+that killed 1.2.0 build 9. Getting an iOS force test therefore costs a new iOS build from
+**main**, whose config matches the live release. Budget for that before planning to block.
 
 **Raising it is what makes that reasoning expire.** `supabase/verify_schema.sql` carries
 a token asserting both rows are still `'1.0.0'`; raising the value makes the drift report
