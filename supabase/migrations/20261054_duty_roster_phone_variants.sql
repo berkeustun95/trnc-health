@@ -11,16 +11,18 @@
 --   10 digits, 3…   → 0392 landline   3923301919 → (0392) 330 19 19
 --   10 digits, 5…   → mobile          5338552077 → (0533) 855 20 77
 --
--- ADDRESSES. Eleven come from the Gazette (the ten new names, and HÜSEYİN SAKALLI). The other
--- eight were respelled by KTEB and the Gazette supplied their phone only, so their address
--- is taken from that pharmacy's most recent pre-2026-09-28 duty_list row IN THE SAME REGION,
--- under its earlier spelling (the `earlier` column).
+-- ADDRESSES. Fourteen come from the Gazette: the ten new names, HÜSEYİN SAKALLI, and the three
+-- respelled names whose phone changed (below). The other five respelled names — whose earlier
+-- phone matched the Gazette's — take the address of that pharmacy's most recent
+-- pre-2026-09-28 duty_list row IN THE SAME REGION, under its earlier spelling (the `earlier`
+-- column).
 --
 -- WHERE THE GAZETTE PHONE DIFFERS FROM THE EARLIER ROW, THE GAZETTE WINS:
 --   AYDIN LİFE          Gazette (0392) 815 73 50   earlier (0533) 888 56 66
 --   KAPTANCAN           Gazette (0392) 224 06 66   earlier (0548) 853 54 78
 --   MEHMET GAZİ KÖYLÜ   Gazette (0533) 843 18 99   earlier (0392) 816 01 23
--- Their ADDRESS is still the earlier row's.
+-- A changed phone means the earlier row cannot be trusted for these three, so their ADDRESS
+-- is the Gazette's too.
 --
 -- HÜSEYİN SAKALLI is kept as HÜSEYİN KERİM SAKALLI's pharmacy because the Gazette phone
 -- (228 46 00) equals the earlier row's and both addresses are Ortaköy. Its address here is
@@ -62,13 +64,14 @@ BEGIN
 
   FOR r IN
     WITH g(name, region, raw, address, earlier) AS (VALUES
-      -- respelled by KTEB: Gazette phone, address from the earlier-spelling row
-      ('AYDIN LİFE ECZANESİ',          'Girne',       '8157350',    NULL, 'AYDIN LIFE ECZANESİ'),
+      -- respelled by KTEB. Phone from the Gazette. Address from the earlier-spelling row where
+      -- the phone matched it; from the Gazette for the three whose phone changed.
+      ('AYDIN LİFE ECZANESİ',          'Girne',       '8157350',    'Kurtuluş Cad., Minimal Plaza No:6, Bellapais yolu, Starling Market ve Camii karşısı, Doğanköy, Girne', NULL),
       ('AYDINLİFE ALSANCAK ECZANESİ',  'Girne',       '8213361',    NULL, 'AYDIN LIFE ALSANCAK ECZANESİ'),
       ('GÖKÇEN İLKTAÇ ECZANESİ',       'Gazimağusa',  '3656820',    NULL, 'GÖKCEN İLKTAÇ ECZANESİ'),
       ('ILGEN ECZANESİ',               'Girne',       '8158118',    NULL, 'İLGEN ECZANESİ'),
-      ('KAPTANCAN ECZANESİ',           'Lefkoşa',     '2240666',    NULL, 'KAPTAN CAN ECZANESİ'),
-      ('MEHMET GAZİ KÖYLÜ ECZANESİ',   'Girne',       '5338431899', NULL, 'MEHMET GAZİKÖYLÜ ECZANESİ'),
+      ('KAPTANCAN ECZANESİ',           'Lefkoşa',     '2240666',    'Yavuz Konnolu Sok., Dış Kapı No:11B, Ortaköy, Lefkoşa', NULL),
+      ('MEHMET GAZİ KÖYLÜ ECZANESİ',   'Girne',       '5338431899', 'Uğur Mumcu Cad., Karakum, Girne', NULL),
       ('SAKINER ECZANESİ',             'Karpaz',      '3744356',    NULL, 'SAKİNER ECZANESİ'),
       ('ŞİFA BİLDİR ECZANESİ',         'Lefke',       '5338419578', NULL, 'ŞİFA BILDIR ECZANESİ'),
       -- Gazette phone AND address
@@ -159,7 +162,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261054_duty_roster_phone_variants.sql', '77f27b2f80073ccc80463fb22c71ab2fc6caeec61ca153bba6a3925f2b93b757')
+VALUES ('20261054_duty_roster_phone_variants.sql', '21829c4bf3a296388c7ddda6ed60b03d217968e47e0de73757be8370beae8b5f')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
