@@ -52,6 +52,13 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-weather-normal
   exit 1
 }
 
+# Duty roster name aliases: each respelled name reaches its pharmacy in its own region and
+# nowhere else. A wrong-region match puts a distance to the wrong town on a duty card.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duty-aliases.mjs || {
+  echo "pre-push: duty alias check failed — see above." >&2
+  exit 1
+}
+
 # i18n coverage. Blocks a push where a locale silently renders ENGLISH — which is what
 # happens when a key is missing, because t() falls back to English BEFORE it falls back
 # to the key. No existence check can see that; only a value comparison can.

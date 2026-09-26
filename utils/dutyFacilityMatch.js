@@ -43,6 +43,20 @@ const ALIASES = [
   //   Any other region falls through to no match, so the row renders with no distance.
   //   Absent is the safe failure; wrong is not.
   { from: 'YUSUF TANDOĞAN ECZANESİ', to: 'YUSUF TANDOĞAN ECZANESİ (LEFKOŞA)', region: 'Lefkoşa' },
+
+  // KTEB 2026-27 respellings (20261054 filled their phones from the Gazette). Region-gated
+  // like the entry above: the name alone is the old spelling of ONE pharmacy in ONE region.
+  // HÜSEYİN SAKALLI is the one inference — same Gazette phone (228 46 00) and Ortaköy.
+  // scripts/check-duty-aliases.mjs asserts each resolves, and that a wrong region does not.
+  { from: 'AYDIN LİFE ECZANESİ',         to: 'AYDIN LIFE ECZANESİ',            region: 'Girne' },
+  { from: 'AYDINLİFE ALSANCAK ECZANESİ', to: 'AYDIN LIFE ALSANCAK ECZANESİ',   region: 'Girne' },
+  { from: 'GÖKÇEN İLKTAÇ ECZANESİ',      to: 'GÖKCEN İLKTAÇ ECZANESİ',         region: 'Gazimağusa' },
+  { from: 'ILGEN ECZANESİ',              to: 'İLGEN ECZANESİ',                 region: 'Girne' },
+  { from: 'KAPTANCAN ECZANESİ',          to: 'KAPTAN CAN ECZANESİ',            region: 'Lefkoşa' },
+  { from: 'MEHMET GAZİ KÖYLÜ ECZANESİ',  to: 'MEHMET GAZİKÖYLÜ ECZANESİ',      region: 'Girne' },
+  { from: 'SAKINER ECZANESİ',            to: 'SAKİNER ECZANESİ',               region: 'Karpaz' },
+  { from: 'ŞİFA BİLDİR ECZANESİ',        to: 'ŞİFA BILDIR ECZANESİ',           region: 'Lefke' },
+  { from: 'HÜSEYİN SAKALLI ECZANESİ',    to: 'HÜSEYİN KERİM SAKALLI ECZANESİ', region: 'Lefkoşa' },
 ]
 
 /** name-key -> facility, built once per load. First row wins; a duplicate name in

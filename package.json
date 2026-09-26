@@ -78,6 +78,7 @@
     "gisekibris:sweep": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/sweep-gisekibris-cancellations.mjs",
     "gisekibris:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-gisekibris-staleness.mjs",
     "legal:live": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-legal-live.mjs",
+    "duty:aliases": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duty-aliases.mjs",
     "duty:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-duty-staleness.mjs",
     "institutions:links": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-institution-links.mjs",
     "notify:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-notify-health.mjs",
