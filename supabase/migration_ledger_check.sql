@@ -172,7 +172,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261051_app_versions.sql', '79dbc33c76b785e0b9d1fd3d18333f9bc943fcb3b9e23f056e916750e9edb138'),
   ('20261052_purge_status_reporter.sql', '6aa6be043e4c87646e206fddb1570fd034296c06cf600a909ec94db456034782'),
   ('20261053_duty_roster_2026_27.sql', 'a4ecef12ec8b765d2dccc744a41898032cda57c0c5b53cc715611f4c7f1240e6'),
-  ('20261054_duty_roster_phone_variants.sql', 'f4c94d6221d46876e0574f600758b2eb66c5b866676091d44e925c60d44a7882')
+  ('20261054_duty_roster_phone_variants.sql', '77f27b2f80073ccc80463fb22c71ab2fc6caeec61ca153bba6a3925f2b93b757')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
