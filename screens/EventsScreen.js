@@ -514,11 +514,13 @@ export { EventDetailScreen }
 // city-welcome card. The events table has no district column — only lat/lng — so
 // the district is derived from the coordinates with resolveRegion. An event with
 // no coordinates cannot be placed, so it drops out while a district filter is on.
-export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistrict = null }) {
+// selectedEvent / onOpenEvent / onCloseEvent are App.js state (openedEvent), like Accommodation's
+// openedProperty: the detail is an overlay over the still-mounted list, and App's hardware-back
+// chain closes the overlay first — one close function for the button and Android back.
+export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistrict = null, selectedEvent = null, onOpenEvent, onCloseEvent }) {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState(null)
   const [category, setCategory] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
   const [pickedDate, setPickedDate] = useState(null)
@@ -706,7 +708,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
           renderItem={({ item, index }) => (
             // list_inline — ONCE, after the 8th card. A point, not a modulus.
             <>
-              <EventCard event={item} lang={lang} onPress={() => setSelectedEvent(item)} />
+              <EventCard event={item} lang={lang} onPress={() => onOpenEvent?.(item)} />
               {index === 7 && <EventsListInlineSlot lang={lang} onNavigate={onAdNavigate} />}
             </>
           )}
@@ -751,7 +753,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
         offset survives the round trip. */}
     {selectedEvent && (
       <View style={s.detailOverlay}>
-        <EventDetailScreen event={selectedEvent} lang={lang} onBack={() => setSelectedEvent(null)} onAdNavigate={onAdNavigate} />
+        <EventDetailScreen event={selectedEvent} lang={lang} onBack={() => onCloseEvent?.()} onAdNavigate={onAdNavigate} />
       </View>
     )}
     </View>
