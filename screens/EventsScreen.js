@@ -17,7 +17,9 @@ import ScreenHeader from '../components/ScreenHeader'
 import MascotIntroCard from '../components/MascotIntroCard'
 import { colors, shadow, ellipsizeSlack } from '../constants/theme'
 import { t, tCity, LANG_CODES } from '../constants/i18n'
-import { resolveRegion } from '../utils/resolveRegion'
+import { eventRegion } from '../utils/regionFromText'
+import FilterDropdown from '../components/FilterDropdown'
+import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { openTicketUrl } from '../utils/events'
 import BackButton from '../components/BackButton'
 
@@ -511,9 +513,10 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
 export { EventDetailScreen }
 
 // `initialDistrict` is a canonical region slug, set when the user arrives from a
-// city-welcome card. The events table has no district column — only lat/lng — so
-// the district is derived from the coordinates with resolveRegion. An event with
-// no coordinates cannot be placed, so it drops out while a district filter is on.
+// city-welcome card; it pre-selects the İlçe dropdown. The events table has no district
+// column: an event's district is eventRegion() — its coordinates (resolveRegion), else the
+// town at the end of its location text (utils/regionFromText.js), so imports without
+// coordinates are placed too (36/36 upcoming events resolved on 2026-09-28).
 // selectedEvent / onOpenEvent / onCloseEvent are App.js state (openedEvent), like Accommodation's
 // openedProperty: the detail is an overlay over the still-mounted list, and App's hardware-back
 // chain closes the overlay first — one close function for the button and Android back.
@@ -543,9 +546,22 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
   const filtered = events
     .filter(e => matchesCategory(e, category))
     .filter(e => matchesDate(e, dateFilter, pickedDate))
-    .filter(e => !district || resolveRegion(e.latitude, e.longitude) === district)
+    .filter(e => !district || eventRegion(e) === district)
 
   useEffect(() => { load() }, [load])
+
+  // İlçe lists only districts that have events, counted under the OTHER active filters, so
+  // no choice leads to an empty list. A selected district stays listed even at 0.
+  // eventRegion: coordinates first, else the town at the end of the location text.
+  const districtCounts = {}
+  for (const e of events) {
+    if (!matchesCategory(e, category) || !matchesDate(e, dateFilter, pickedDate)) continue
+    const r = eventRegion(e)
+    if (r) districtCounts[r] = (districtCounts[r] ?? 0) + 1
+  }
+  const districtOptions = REGIONS
+    .filter(r => districtCounts[r] || r === district)
+    .map(r => ({ value: r, label: t(REGION_LABEL_KEY[r], lang), count: districtCounts[r] ?? 0 }))
 
   // Single date step only — unlike the organizer form, filtering to a day has no
   // time component, so there is no date→time chain here. Android keeps the
@@ -593,92 +609,38 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
                 subtitle={t('eventsSubtitle', lang)}
                 style={s.introCard}
               />
-              {district ? (
-                <TouchableOpacity
-                  style={s.districtPill}
-                  onPress={() => setDistrict(null)}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                >
-                  <Feather name="map-pin" size={13} color={colors.primary} />
-                  <Text style={s.districtPillText}>{tCity('cwEventsFiltered', district, lang)}</Text>
-                  <Text style={s.districtPillClear}>{t('cwClearFilter', lang)}</Text>
-                  <Feather name="x" size={13} color={colors.textSecondary} />
-                </TouchableOpacity>
-              ) : null}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={s.filterScroll}
-                contentContainerStyle={s.filterRow}
-              >
-                {/* Tapping the active chip clears it. 'all' is the cleared value, not a
-                    seventh category — matchesCategory short-circuits on it — so
-                    deselecting lands on the All chip rather than an empty state, and
-                    tapping All itself stays the no-op it already was. */}
-                {CATEGORIES.map(c => (
-                  <TouchableOpacity
-                    key={c.key}
-                    style={[s.chip, category === c.key && s.chipActive]}
-                    onPress={() => setCategory(category === c.key ? 'all' : c.key)}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[s.chipText, category === c.key && s.chipTextActive]}
-                      numberOfLines={1}
-                    >
-                      {t(c.labelKey, lang)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={s.filterScrollSecond}
-                contentContainerStyle={s.filterRow}
-              >
-                {/* Same toggle-off as the category row. The picked-date chip below this
-                    map is deliberately NOT toggled: tapping it while active re-opens
-                    the picker, because changing the date is the likelier intent there
-                    and All already clears it in one tap. */}
-                {DATE_FILTERS.map(d => (
-                  <TouchableOpacity
-                    key={d.key}
-                    style={[s.chip, dateFilter === d.key && s.chipActive]}
-                    onPress={() => setDateFilter(dateFilter === d.key ? 'all' : d.key)}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[s.chipText, dateFilter === d.key && s.chipTextActive]}
-                      numberOfLines={1}
-                    >
-                      {t(d.labelKey, lang)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-
-                <TouchableOpacity
-                  style={[s.chip, s.chipWithIcon, dateFilter === 'picked' && s.chipActive]}
-                  onPress={openDatePicker}
-                  activeOpacity={0.8}
-                >
-                  <Feather
-                    name="calendar"
-                    size={12}
-                    color={dateFilter === 'picked' ? colors.primary : colors.textSecondary}
-                  />
-                  <Text
-                    style={[s.chipText, dateFilter === 'picked' && s.chipTextActive]}
-                    numberOfLines={1}
-                  >
-                    {dateFilter === 'picked' && pickedDate
-                      ? pickedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-                      : t('datePickDate', lang)}
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
+              {/* Three dropdowns side by side (replacing the chip rows and the City Welcome
+                  district pill — that entry now simply pre-selects İlçe). Selections are screen
+                  state, so they survive opening an event and coming back (overlay). */}
+              <View style={s.ddRow}>
+                <FilterDropdown
+                  style={s.ddItem}
+                  label={t('ddCategory', lang)}
+                  lang={lang}
+                  options={CATEGORIES.filter(c => c.key !== 'all').map(c => ({ value: c.key, label: t(c.labelKey, lang) }))}
+                  value={category === 'all' ? null : category}
+                  onChange={v => setCategory(v ?? 'all')}
+                />
+                <FilterDropdown
+                  style={s.ddItem}
+                  label={t('ddDate', lang)}
+                  lang={lang}
+                  options={DATE_FILTERS.filter(d => d.key !== 'all').map(d => ({ value: d.key, label: t(d.labelKey, lang) }))}
+                  value={dateFilter === 'all' || dateFilter === 'picked' ? null : dateFilter}
+                  selectedLabel={dateFilter === 'picked' && pickedDate
+                    ? pickedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : null}
+                  onChange={v => { setDateFilter(v ?? 'all'); if (v == null) setPickedDate(null) }}
+                  extraAction={{ label: t('datePickDate', lang), icon: 'calendar', onPress: openDatePicker }}
+                />
+                <FilterDropdown
+                  style={s.ddItem}
+                  label={t('ddDistrict', lang)}
+                  lang={lang}
+                  options={districtOptions}
+                  value={district}
+                  onChange={setDistrict}
+                />
+              </View>
               {/* list_top, INSIDE the existing header so it scrolls with the chips.
                   ⚠ GATED ON A NON-EMPTY FEED, and that is not a nicety. `filtered` goes
                     to zero two ways here — a category/date filter that matches nothing,
@@ -773,6 +735,8 @@ const s = StyleSheet.create({
 
   // Filter chips
   introCard:          { marginBottom: 16 },
+  ddRow:              { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 },
+  ddItem:             { flex: 1 },
   districtPill:       { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
                         backgroundColor: colors.primaryLight, borderRadius: 20,
                         paddingHorizontal: 12, paddingVertical: 7, marginBottom: 10 },

@@ -258,6 +258,10 @@ const SURFACES = [
   'components/SocialSignInButtons.js',
   // Route medals (ROUTE_MEDALS_LIVE), added with the component.
   'components/RouteBadges.js',
+  // The shared filter dropdown (chip rows → dropdowns), added with the component.
+  'components/FilterDropdown.js',
+  // Events, added with its dropdowns (its filter labels are now read through them).
+  'screens/EventsScreen.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
@@ -325,6 +329,11 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // Events dropdowns, 2026-09-28 — genuinely the same word in French.
+  'ddDate':               { French: 'Date is French' },
+  'ddDistrict':           { French: 'District is French' },
+  'catArts':              { French: 'Arts is French' },
+  'eventDate':            { French: 'Date is French' },
   // ─── Shiny Paw opening hours, 2026-09-24 ──────────────────────────────────
   'petHotelShinyPawHours': {
                           Turkish: 'a 24-hour time range; Turkish, Russian, Greek and Spanish write it exactly as English does (fr/de/ar/fa differ and are translated)',
