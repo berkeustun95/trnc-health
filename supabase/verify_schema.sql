@@ -3403,6 +3403,10 @@ WITH report AS (
                @> ARRAY['security_invoker=true'], false)
       AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.route_completions_monthly'), 'SELECT'), false)
       AND COALESCE(pg_get_viewdef(to_regclass('public.route_completions_monthly')) LIKE '%>= 5%', false)
+    -- (7) Completions must not inflate the click-through figure: the monthly contact view
+    --     filters them out (a code shape in the view definition).
+    UNION ALL SELECT '1056_route_medals','contact_events_monthly excludes route_complete',
+      COALESCE(pg_get_viewdef(to_regclass('public.contact_events_monthly')) LIKE '%<> ''route_complete''%', false)
   ) z
 
   UNION ALL

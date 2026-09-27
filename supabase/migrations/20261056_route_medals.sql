@@ -168,6 +168,30 @@ ALTER TABLE public.contact_events DROP CONSTRAINT IF EXISTS contact_events_actio
 ALTER TABLE public.contact_events ADD CONSTRAINT contact_events_action_check
   CHECK (action IN ('call','whatsapp','call_secondary','website','maps','route_complete'));
 
+-- ─── 5b. Keep completions OUT of the click-through figure ──────────────────
+-- contact_events_monthly (20260910, never redefined since) groups by (module, entity,
+-- month) over EVERY action, and the credit tap already logs explore/<route id>/'website'.
+-- Without this filter each completion would inflate that route's `taps` — the number the
+-- view's own COMMENT calls sellable. Same columns, same order, so CREATE OR REPLACE keeps
+-- the grants; security_invoker is restated because it is part of the definition here.
+CREATE OR REPLACE VIEW public.contact_events_monthly
+  WITH (security_invoker = true) AS
+SELECT
+  e.module,
+  e.entity_id,
+  date_trunc('month', l.local_ts)                  AS month,
+  count(*)                                         AS taps,
+  count(DISTINCT date_trunc('minute', l.local_ts)) AS tap_minutes,
+  count(*) FILTER (WHERE e.action = 'call')           AS calls,
+  count(*) FILTER (WHERE e.action = 'whatsapp')       AS whatsapps,
+  count(*) FILTER (WHERE e.action = 'call_secondary') AS calls_secondary,
+  array_agg(DISTINCT e.region ORDER BY e.region) FILTER (WHERE e.region IS NOT NULL) AS regions,
+  count(*) FILTER (WHERE e.region IS NULL)            AS taps_region_unknown
+FROM public.contact_events e
+CROSS JOIN LATERAL (SELECT e.created_at AT TIME ZONE 'Europe/Istanbul' AS local_ts) l
+WHERE e.action <> 'route_complete'
+GROUP BY e.module, e.entity_id, date_trunc('month', l.local_ts);
+
 -- ─── 6. The Ministry report ─────────────────────────────────────────────────
 -- security_invoker: contact_events' own RLS (admin read) applies to whoever queries this.
 -- The threshold lives in the VIEW so it cannot be forgotten in a hand-written query.
@@ -326,6 +350,17 @@ BEGIN
   IF has_table_privilege('anon', 'public.route_completions_monthly', 'SELECT') THEN
     RAISE EXCEPTION 'anon holds SELECT on route_completions_monthly';
   END IF;
+
+  -- (i) Completions stay out of the click-through view, which keeps its invoker rights.
+  SELECT pg_get_viewdef('public.contact_events_monthly'::regclass) INTO v_def;
+  IF position('route_complete' in v_def) = 0 THEN
+    RAISE EXCEPTION 'contact_events_monthly does not exclude route_complete: %', v_def;
+  END IF;
+  SELECT coalesce(array_to_string(c.reloptions, ','), '') INTO v_def
+    FROM pg_class c WHERE c.oid = 'public.contact_events_monthly'::regclass;
+  IF v_def NOT LIKE '%security_invoker=true%' THEN
+    RAISE EXCEPTION 'contact_events_monthly lost security_invoker (reloptions=%)', v_def;
+  END IF;
 END $$;
 
 -- ─── ledger:stamp:begin ──────────────────────────────────────────────
@@ -339,7 +374,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261056_route_medals.sql', '3b66d4eee70b765cdb90b30ea036ae028a623fb950bd81bd186ad87c12b6a6ff')
+VALUES ('20261056_route_medals.sql', 'ebf78a5345f4d5a61dc5850bcd747dfbe43915d42c39cf791d3deae7b81b7fde')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
@@ -358,6 +393,7 @@ NOTIFY pgrst, 'reload schema';
 --   SET ROLE postgres;
 --   BEGIN;
 --     DROP VIEW IF EXISTS public.route_completions_monthly;
+--     -- and re-run 20260910's CREATE VIEW contact_events_monthly (no action filter)
 --     ALTER TABLE public.contact_events DROP CONSTRAINT IF EXISTS contact_events_action_check;
 --     ALTER TABLE public.contact_events ADD CONSTRAINT contact_events_action_check
 --       CHECK (action IN ('call','whatsapp','call_secondary','website','maps'));   -- fails if route_complete rows exist: correct
