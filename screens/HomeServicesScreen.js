@@ -326,16 +326,11 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
     ? cards.filter(({ row }) => (row.coverage_districts || []).includes(selectedDistrict))
     : cards
 
-  // ⚠ ONE PREDICATE, TWO READERS, AND THEY MUST NOT DRIFT. `rowCovers` decides both
-  //   whether the WhatsApp draft may name the category and whether the context card
-  //   above says nobody covers it. Written as a named function rather than inlined twice
-  //   so the card cannot claim "no partner here" while the draft simultaneously tells the
-  //   firm the user wants exactly this job.
+  // Whether the WhatsApp draft may name the category (the firm lists it as a service).
+  // The "no ADA partner for {category}" banner this also drove was REMOVED (2026-09-28,
+  // Berke): it sat above TadilArt's own card on 8 of the 12 categories and read as a bug.
+  // A card on screen now ends the question; only a truly empty list says anything.
   const rowCovers = row => (row.service_types || []).includes(selectedCategory)
-  // LIST-LEVEL. "No ADA partner in this category" is a statement about the whole list,
-  // not about one card — per-card it would repeat N times and each copy would be a
-  // weaker claim than the one the reader needs.
-  const anyCovers = visible.some(({ row }) => rowCovers(row))
 
   return withPartner(
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -365,49 +360,6 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
           <ActivityIndicator size="large" color={colors.primary} style={s.spinner} />
         ) : (
           <>
-            {/* ─── CONTEXT, ABOVE THE CARD AND ON A READABLE SURFACE ──────────────
-                The first version of this was a grey line BELOW the card, and it failed
-                twice over on a real device:
-
-                  • it rendered over the hero background photo — a busy mid-tone workshop
-                    image — in secondary grey, which made it effectively invisible;
-                  • it listed what TadilArt DOES, which is exactly what the four service
-                    chips one line above it already said. A duplicate, rendered worse.
-
-                What a reader on the Tesisatçı page actually needs is not what this firm
-                does — the chips have that covered — but that NOBODY covers the category
-                they tapped. That is the fact the screen was missing.
-
-                So it moved above the card, onto s.emptyCard: the same white bordered
-                surface the module landing already uses for its empty state, which is
-                known readable over the same photo because it is already shipping there.
-                No third surface invented for this. */}
-            {!anyCovers && (
-              <View style={s.contextWrap}>
-                {/* ⚠ THE CATEGORY NAME COMES FROM activeCat.labelKey — the SAME
-                    expression the ScreenHeader above renders. Not a second string: a
-                    banner naming a category the header spells differently is worse than
-                    the unscoped version it replaces.
-
-                    Scoping the negation is the whole point. "No ADA partner in this
-                    category" sat directly above a card badged "ADA partner" and read as
-                    a bug in the app — it was reported as one. Naming the category makes
-                    the two sentences obviously about different things.
-
-                    activeCat is guarded exactly as the ScreenHeader guards it: hsCategory()
-                    returns undefined for a key it does not know, and an unguarded
-                    activeCat.labelKey would throw rather than degrade. Unreachable today —
-                    selectedCategory is only ever set from HS_CATEGORIES — but the header
-                    does not assume that either. */}
-                <EmptyNote
-                  title={t('hsCatNoPartnerTitle', lang)
-                    .replace('{category}', activeCat ? t(activeCat.labelKey, lang) : '')}
-                  bodyKey="hsCatNoPartnerBody"
-                  lang={lang}
-                />
-              </View>
-            )}
-
             {visible.map(({ partner, row }) => {
               // ⚠ COVERED-ONLY, and this is the honesty hinge of the whole promotion.
               // The context goes into the WhatsApp draft the user sends the firm. Passing
@@ -472,7 +424,6 @@ const s = StyleSheet.create({
   introCard:    { marginBottom: 20 },
   spinner:      { marginTop: 32 },
   partnerWrap:  { marginBottom: 16 },
-  contextWrap:  { marginBottom: 16 },
 
   grid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
   catTile:      { width: '47%', backgroundColor: colors.cardBg, borderRadius: radius.card,
