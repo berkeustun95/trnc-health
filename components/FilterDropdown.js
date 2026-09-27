@@ -24,6 +24,7 @@ export default function FilterDropdown({
   value = null, values = null, multi = false, onChange,
   selectedLabel = null,          // overrides the trigger text (e.g. a picked date)
   extraAction = null,            // { label, icon, onPress }
+  allowAll = true,               // false: a required choice — no "Tümü" row (Towing's region)
   style,
 }) {
   const insets = useSafeAreaInsets()
@@ -86,7 +87,7 @@ export default function FilterDropdown({
             </View>
           )}
           <ScrollView style={st.list} keyboardShouldPersistTaps="handled">
-            <Row label={t('filterAll', lang)} selected={picked.length === 0 && !selectedLabel} onPress={() => choose(null)} />
+            {allowAll && <Row label={t('filterAll', lang)} selected={picked.length === 0 && !selectedLabel} onPress={() => choose(null)} />}
             {shown.map(o => (
               <Row key={String(o.value)} label={o.label} count={o.count} color={o.color}
                 selected={picked.includes(o.value)} multi={multi} onPress={() => choose(o.value)} />

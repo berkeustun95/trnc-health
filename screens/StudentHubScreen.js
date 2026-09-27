@@ -1,4 +1,5 @@
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
+import FilterDropdown from '../components/FilterDropdown'
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, ActivityIndicator,
@@ -326,23 +327,20 @@ function UniversitiesTab({ lang, universities, failed, onRetry, onOpen, query, s
         ) : null}
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>
-        {regions.map(r => {
-          const active = r === region
-          return (
-            <TouchableOpacity
-              key={r}
-              style={[s.chip, active && s.chipActive]}
-              onPress={() => setRegion(r)}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.chipText, active && s.chipTextActive]}>
-                {t(r === 'all' ? 'filterAll' : REGION_LABEL_KEY[r], lang)}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
-      </ScrollView>
+      {/* İlçe dropdown (replacing the region chips): only regions that have universities,
+          with counts. 'all' is this tab's "Tümü" value; the dropdown speaks null. */}
+      <View style={s.ddRow}>
+        <FilterDropdown
+          label={t('ddDistrict', lang)}
+          lang={lang}
+          options={regions.filter(r => r !== 'all').map(r => ({
+            value: r, label: t(REGION_LABEL_KEY[r], lang),
+            count: universities.filter(u => u.city === r).length,
+          }))}
+          value={region === 'all' ? null : region}
+          onChange={v => setRegion(v ?? 'all')}
+        />
+      </View>
 
       {results.length === 0 ? (
         <View style={s.emptyWrap}>
@@ -876,6 +874,7 @@ export default function StudentHubScreen({
 }
 
 const s = StyleSheet.create({
+  ddRow: { flexDirection: 'row', marginBottom: 12 },
   root: { flex: 1, backgroundColor: colors.bg },
   layer: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
   tabPane: { flex: 1 },

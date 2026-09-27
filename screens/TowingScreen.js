@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
+import FilterDropdown from '../components/FilterDropdown'
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, Linking,
@@ -138,7 +139,6 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
   const [error, setError]         = useState(false)
   const [vClass, setVClass]       = useState(DEFAULT_VEHICLE_CLASS)
   const [region, setRegion]       = useState(null)      // null = could not resolve
-  const [pickingRegion, setPick]  = useState(false)
   const [selected, setSelected]   = useState(null)
   // The detail is an early return, so the list remounts behind it; its offset comes back.
   const listMem = useScrollMemory('tow:list')
@@ -242,39 +242,19 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
           list overflows and the chip text is cropped top and bottom. Invisible with a
           short list; guaranteed with a long one, and guaranteed in Turkish first. */}
       <View style={s.filters}>
-        <TouchableOpacity style={s.regionBar} onPress={() => setPick(p => !p)} activeOpacity={0.8}>
-          <View style={s.regionLeft}>
-            <Ionicons name="location" size={15} color={colors.primary} />
-            <Text style={s.regionText} numberOfLines={1}>
-              {region ? t('towingRegionPill', lang).replace('{region}', t(REGION_LABEL_KEY[region], lang))
-                      : t('towingPickRegion', lang)}
-            </Text>
-          </View>
-          <Text style={s.regionChange}>{t('towingChange', lang)}</Text>
-        </TouchableOpacity>
-
-        {pickingRegion && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.chipRow}
-          >
-            {REGIONS.map(r => {
-              const active = r === region
-              return (
-                <TouchableOpacity
-                  key={r}
-                  style={[s.chip, active && s.chipActive]}
-                  onPress={() => { setRegion(r); setPick(false) }}
-                >
-                  <Text style={[s.chipText, active && s.chipTextActive]}>
-                    {t(REGION_LABEL_KEY[r], lang)}
-                  </Text>
-                </TouchableOpacity>
-              )
-            })}
-          </ScrollView>
-        )}
+        {/* İlçe dropdown (replacing the "Change" bar + region chips). Required: no "Tümü" —
+            a deliberate "all" would show the "we don't know where you are" fallback, which
+            is not what the user said. Pre-set from the device's location as before. */}
+        <View style={s.ddRow}>
+          <FilterDropdown
+            label={t('ddDistrict', lang)}
+            lang={lang}
+            allowAll={false}
+            options={REGIONS.map(r => ({ value: r, label: t(REGION_LABEL_KEY[r], lang) }))}
+            value={region}
+            onChange={setRegion}
+          />
+        </View>
 
         {/* Vehicle class sits ABOVE the results because a firm that tows cars cannot
             tow a bus — a wrong result here is a wasted call in an emergency. */}
@@ -347,6 +327,7 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
 }
 
 const s = StyleSheet.create({
+  ddRow: { flexDirection: 'row', marginBottom: 10 },
   safe:        { flex: 1, backgroundColor: colors.bg },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
 

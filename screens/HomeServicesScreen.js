@@ -4,6 +4,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
+import FilterDropdown from '../components/FilterDropdown'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
@@ -346,35 +347,18 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
         lang={lang}
       />
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        // flexShrink: 0 is not decoration. This row is a fixed-height sibling ABOVE a
-        // scrollable body in a flex column; without it the row is vertically COMPRESSED
-        // once the body overflows and the chip text is cropped top and bottom.
-        style={{ flexGrow: 0, flexShrink: 0 }}
-        contentContainerStyle={s.districtRow}
-      >
-        <TouchableOpacity
-          style={[s.chip, !selectedDistrict && s.chipActive]}
-          onPress={() => setSelectedDistrict(null)}
-        >
-          <Text style={[s.chipText, !selectedDistrict && s.chipTextActive]}>
-            {t('hsAllDistricts', lang)}
-          </Text>
-        </TouchableOpacity>
-        {HS_DISTRICTS.map(d => (
-          <TouchableOpacity
-            key={d}
-            style={[s.chip, selectedDistrict === d && s.chipActive]}
-            onPress={() => setSelectedDistrict(selectedDistrict === d ? null : d)}
-          >
-            <Text style={[s.chipText, selectedDistrict === d && s.chipTextActive]}>
-              {districtLabel(d, lang)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* İlçe dropdown (replacing the district chip row). flexShrink 0 — a fixed row above a
+          scrolling body is otherwise compressed and its text cropped (CLAUDE.md). The district
+          sets which partner covers you, so no counts: every district is always offered. */}
+      <View style={s.ddRow}>
+        <FilterDropdown
+          label={t('ddDistrict', lang)}
+          lang={lang}
+          options={HS_DISTRICTS.map(d => ({ value: d, label: districtLabel(d, lang) }))}
+          value={selectedDistrict}
+          onChange={setSelectedDistrict}
+        />
+      </View>
 
       <ScrollView contentContainerStyle={s.catScroll} showsVerticalScrollIndicator={false}>
         {!loaded ? (
@@ -479,6 +463,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
 }
 
 const s = StyleSheet.create({
+  ddRow: { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 10, flexShrink: 0 },
   partnerOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
   safe:         { flex: 1, backgroundColor: colors.bg },
 

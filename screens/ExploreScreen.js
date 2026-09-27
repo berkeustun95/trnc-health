@@ -25,6 +25,7 @@ import {
 } from '../constants/exploreCategories'
 import { TRNC_CENTER } from '../constants/mapSources'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
+import FilterDropdown from '../components/FilterDropdown'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 
 // name_i18n[lang] if present, else fall through to the plain `name` column (never '').
@@ -394,6 +395,17 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
     )
   }, [places, activeGroup, activeCat, region])
 
+  // İlçe lists only districts that have places in this group (and the chosen category),
+  // with counts — the Events rule; the selected district stays listed even at 0.
+  const regionOptions = useMemo(() => {
+    const n = {}
+    for (const p of places) {
+      if (categoryToGroup(p.category) !== activeGroup || (activeCat && p.category !== activeCat)) continue
+      if (p.region) n[p.region] = (n[p.region] ?? 0) + 1
+    }
+    return REGIONS.filter(r => n[r] || r === region).map(r => ({ value: r, label: regionLabel(r, lang), count: n[r] ?? 0 }))
+  }, [places, activeGroup, activeCat, region, lang])
+
   // List ↔ map toggle keeps both places: the list's offset (restored once it has laid out,
   // clamped to the new height) and the map's region. A new group starts fresh.
   const listRef = useRef(null)
@@ -537,61 +549,29 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
         />
       ) : (
         <View style={{ flex: 1 }}>
-          {/* Category sub-filter (only when the group has >1 category with data).
-              Horizontal ScrollView + shared chip styles — matches the shipped
-              grooming/garages filter rows (a flex-wrap View squashes the chips). */}
-          {groupCats.length > 1 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ flexGrow: 0, flexShrink: 0 }}
-              contentContainerStyle={s.filterRow}
-            >
-              <TouchableOpacity
-                style={[s.chip, !activeCat && s.chipActive]}
-                onPress={() => setActiveCat(null)}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.chipText, !activeCat && s.chipTextActive]}>{t('blFilterAll', lang)}</Text>
-              </TouchableOpacity>
-              {groupCats.map(c => (
-                <TouchableOpacity
-                  key={c}
-                  style={[s.chip, activeCat === c && s.chipActive]}
-                  onPress={() => setActiveCat(activeCat === c ? null : c)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[s.chipText, activeCat === c && s.chipTextActive]}>
-                    {categoryLabel(c, lang)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-
-          {/* Region filter */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0, flexShrink: 0 }}
-            contentContainerStyle={s.filterRow}
-          >
-            <TouchableOpacity
-              style={[s.chip, !region && s.chipActive]}
-              onPress={() => setRegion(null)}
-            >
-              <Text style={[s.chipText, !region && s.chipTextActive]}>{t('blDistrictAll', lang)}</Text>
-            </TouchableOpacity>
-            {REGIONS.map(r => (
-              <TouchableOpacity
-                key={r}
-                style={[s.chip, region === r && s.chipActive]}
-                onPress={() => setRegion(region === r ? null : r)}
-              >
-                <Text style={[s.chipText, region === r && s.chipTextActive]}>{regionLabel(r, lang)}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {/* Dropdowns (replacing the category and region chip rows). flexShrink 0: a fixed
+              row above a scrolling list must not be squeezed (CLAUDE.md). Selections are
+              screen state, so they survive a place opened over the list and closed again. */}
+          <View style={s.ddRow}>
+            {groupCats.length > 1 && (
+              <FilterDropdown
+                style={s.ddItem}
+                label={t('ddCategory', lang)}
+                lang={lang}
+                options={groupCats.map(c => ({ value: c, label: categoryLabel(c, lang) }))}
+                value={activeCat}
+                onChange={setActiveCat}
+              />
+            )}
+            <FilterDropdown
+              style={s.ddItem}
+              label={t('ddDistrict', lang)}
+              lang={lang}
+              options={regionOptions}
+              value={region}
+              onChange={setRegion}
+            />
+          </View>
 
           {/* List */}
           <FlatList
@@ -675,6 +655,8 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
 const PHOTO_H = 160
 
 const s = StyleSheet.create({
+  ddRow:  { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 10, flexShrink: 0 },
+  ddItem: { flex: 1 },
   root:   { flex: 1, backgroundColor: colors.bg },
   placeOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
   safe:   { flex: 1, backgroundColor: colors.bg },
