@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Linking, BackHandler,
+  ActivityIndicator, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -132,7 +132,7 @@ function TowingCard({ item, lang, onPress, onCall, onCallSecondary, onWhatsApp }
   )
 }
 
-export default function TowingScreen({ lang, userLocation, onBack }) {
+export default function TowingScreen({ lang, userLocation, onBack, backRef = null }) {
   const [companies, setCompanies] = useState([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(false)
@@ -211,17 +211,15 @@ export default function TowingScreen({ lang, userLocation, onBack }) {
     Linking.openURL(`https://wa.me/${String(c.whatsapp).replace(/\D/g, '')}`)
   }, [region])
 
-  // Android hardware back closes the DETAIL first, not the whole module.
-  //
-  // App.js's global back handler only knows about `showTowing`, so without this the back
-  // button would jump straight out of the module from the detail overlay — losing the
-  // user's region and vehicle-class selection. This is the same gap left open in the
-  // events detail overlay; not repeating it here.
+  // Android hardware back closes the DETAIL first, not the whole module. Asked by App's
+  // central chain through backRef — it REPLACES a BackHandler registered here, which App's
+  // own handler out-registered whenever its deps changed (then back closed all of Towing,
+  // and inside the Garages overlay that is a live path). Slice 10.
   useEffect(() => {
-    if (!selected) return
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setSelected(null); return true })
-    return () => sub.remove()
-  }, [selected])
+    if (!backRef) return
+    backRef.current = () => { if (selected) { setSelected(null); return true } return false }
+    return () => { backRef.current = null }
+  })
 
   if (selected) {
     return (

@@ -603,6 +603,7 @@ export default function App() {
   const groomingBackRef = useRef(null)
   const garagesBackRef = useRef(null)
   const facilityBackRef = useRef(null)
+  const towingBackRef = useRef(null)
   const profileGuardRef = useRef(null)
   // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
   // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
@@ -894,7 +895,7 @@ export default function App() {
       if (showInsurance) { if (insuranceBackRef.current?.()) return true; setShowInsurance(false); return true }
       if (showGrooming) { if (groomingBackRef.current?.()) return true; setShowGrooming(false); return true }
       // Towing before Garages: Garages opens it on top of itself (slice 10).
-      if (showTowing) { setShowTowing(false); return true }
+      if (showTowing) { if (towingBackRef.current?.()) return true; setShowTowing(false); return true }
       if (showGarages) { if (garagesBackRef.current?.()) return true; setShowGarages(false); return true }
       // Walks the module one level at a time: package -> package list -> landing. A bare
       // pop to null would skip the list entirely and read as the app losing its place.
@@ -1657,7 +1658,7 @@ export default function App() {
     if (showDutyList) {
       content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
     } else if (showTowing) {
-      content = <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} />
+      content = <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} backRef={towingBackRef} />
     } else if (selectedFacility) {
       content = <FacilityProfileScreen
         facility={selectedFacility}
@@ -2191,7 +2192,7 @@ export default function App() {
           {showTowing && (
             <View style={styles.moduleOverlay}>
               {(MODULE_FLAGS.towing || isAdmin)
-                ? <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} />
+                ? <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} backRef={towingBackRef} />
                 : <ComingSoonScreen lang={lang} moduleKey="towing" titleKey="menuTowing" session={session} onBack={() => setShowTowing(false)} />}
             </View>
           )}
@@ -2200,7 +2201,7 @@ export default function App() {
       : <ComingSoonScreen lang={lang} moduleKey="garages" titleKey="menuGarages" session={session} onBack={() => setShowGarages(false)} />
   } else if (showTowing) {
     content = (MODULE_FLAGS.towing || isAdmin)
-      ? <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} />
+      ? <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} backRef={towingBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="towing" titleKey="menuTowing" session={session} onBack={() => setShowTowing(false)} />
   } else if (showStudentHub) {
     // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
