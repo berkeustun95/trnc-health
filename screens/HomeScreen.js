@@ -191,7 +191,7 @@ export default function HomeScreen({
   // ─── HOME_V2 props ────────────────────────────────────────────────────────
   // Both optional, and both unused while HOME_V2_LIVE is false — the V1 render path
   // never reads them, so old Home behaves identically whether App.js passes them or not.
-  region,      // resolved home district slug (profile.region → City Welcome → GPS), or null
+  region,      // hero district slug: live GPS district → profile.region → City Welcome home → GPS, or null
   onOpenOli,   // opens the Ask Oli sheet — OliGuide's own openSheet, reached through a ref
   // ─── Bugün ADA'da (Slice 2) ───────────────────────────────────────────────
   // Whether this user may be shown paid placement. COMPUTED IN App.js, from

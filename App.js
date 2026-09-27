@@ -493,10 +493,15 @@ export default function App() {
   const [gateHealthList, setGateHealthList] = useState(false)
   const [profileGateKey, setProfileGateKey] = useState(null)
   const [deviceRegion, setDeviceRegion] = useState(null)
+  // Where the device IS, re-read on cold start and every background -> active (the City
+  // Welcome check). Separate from detectedRegion because a check that gets NO fix must
+  // keep the last known district, while detectedRegion collapses "no fix" to null.
+  const [liveRegion, setLiveRegion] = useState(null)
   const [facilityLoadError, setFacilityLoadError] = useState(false)
   const [notifsLoading, setNotifsLoading] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
   const [weatherData, setWeatherData] = useState(null)
+  const weatherKeyRef = useRef(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showEmergencyModal, setShowEmergencyModal] = useState(false)
   // Store-update popup. DECLARED HERE, with the other useState calls, because the content
@@ -983,6 +988,29 @@ export default function App() {
     }
   }, [session])
 
+  // MET Norway, through OUR Edge Function (supabase/functions/weather): the phone never
+  // talks to a weather provider and MET only ever sees our server. Rounded to 0.1°
+  // (~10 km) here as well as on the server — our server never needs better, and the
+  // privacy policy's Location section states this figure (check-privacy-parity ties the
+  // two). POST body, never a query string: invocation logs record URLs.
+  //
+  // Called from load() AND from the City Welcome check, so the hero's temperature follows
+  // a district change on resume. The key is claimed BEFORE the await: the cold-start
+  // check and load() race, and an unchanged 0.1° cell is not worth a second request.
+  // A failed fetch releases it so the next trigger can retry.
+  async function fetchWeather(coords) {
+    const wLat = Math.round(coords.latitude * 10) / 10
+    const wLon = Math.round(coords.longitude * 10) / 10
+    const key = `${wLat},${wLon}`
+    if (weatherKeyRef.current === key) return
+    weatherKeyRef.current = key
+    try {
+      const { data: weatherJson } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon } })
+      if (weatherJson?.current) setWeatherData(weatherJson)
+      else weatherKeyRef.current = null
+    } catch { weatherKeyRef.current = null }
+  }
+
   // Which district is this device in, as far as the DEVICE knows.
   //
   // Slice 1's backfill deliberately left profiles.region NULL for everyone: the City
@@ -1136,17 +1164,7 @@ export default function App() {
         setLocationDenied(true)
       }
 
-      try {
-        // MET Norway, through OUR Edge Function (supabase/functions/weather): the phone never
-        // talks to a weather provider and MET only ever sees our server. Rounded to 0.1°
-        // (~10 km) here as well as on the server — our server never needs better, and the
-        // privacy policy's Location section states this figure (check-privacy-parity ties the
-        // two). POST body, never a query string: invocation logs record URLs.
-        const wLat = Math.round(resolvedCoords.latitude * 10) / 10
-        const wLon = Math.round(resolvedCoords.longitude * 10) / 10
-        const { data: weatherJson } = await supabase.functions.invoke('weather', { body: { lat: wLat, lon: wLon } })
-        if (weatherJson?.current) setWeatherData(weatherJson)
-      } catch {}
+      await fetchWeather(resolvedCoords)
 
       setLoading(false)
     }
@@ -1250,6 +1268,10 @@ export default function App() {
       // Kept even when the card is suppressed: the home-city question uses it to
       // say "Looks like you're in Kyrenia" as a HINT. It never pre-selects.
       setDetectedRegion(decision?.region ?? null)
+      // No fix and no forced region: keep the last live district rather than dropping the
+      // hero back to the home city. A fix OUTSIDE the TRNC does set null, and falls back.
+      if (decision?.coords || decision?.region) setLiveRegion(decision.region ?? null)
+      if (decision?.coords) fetchWeather(decision.coords)
       if (!decision?.show) return
       setCityWelcome(decision)
     }
@@ -2124,12 +2146,16 @@ export default function App() {
             onShowExchangeRates={() => setShowExchangeRates(true)}
             onShowGames={() => setShowGames(true)}
             // ─── HOME_V2 ────────────────────────────────────────────────────
-            // The hero's district: the profile's own answer first, then whatever the
-            // device knows (City Welcome home city, else a GPS classification — see
-            // deviceRegion above). null is a NORMAL outcome, not a failure — a guest
-            // with location denied and no profile — and the hero renders its
-            // country-level fallback rather than an error state.
-            region={profile?.region || deviceRegion || null}
+            // The hero's district: where the device IS (liveRegion, re-read on cold
+            // start and every resume), then the profile's own answer, then the City
+            // Welcome home city / GPS classification (deviceRegion).
+            // ⚠ LIVE FIRST, DELIBERATELY (2026-09-27). It was home-first, which pinned
+            //   the hero to Lefkoşa for a user standing in Girne while the rest of Home
+            //   moved — and only a storage wipe unstuck it. The home values are now just
+            //   the placeholder until the first fix lands.
+            // null is a NORMAL outcome, not a failure — a guest with location denied and
+            // no profile — and the hero renders its country-level fallback.
+            region={liveRegion || profile?.region || deviceRegion || null}
             onOpenOli={() => oliOpenRef.current?.()}
             /* ─── Bugün ADA'da: may this user be shown paid placement? ──────
                The ANSWER is computed here and the rule lives in one function

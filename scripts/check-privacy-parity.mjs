@@ -488,8 +488,8 @@ catch (e) { console.error(`\n  FAIL — ${e.message}`); process.exit(warnOnly ? 
 // 0.1°. If the rounding changes, the published sentence is false — so they fail together.
 {
   const app = readFileSync(join(ROOT, 'App.js'), 'utf8')
-  const ok = /Math\.round\(resolvedCoords\.latitude \* 10\) \/ 10/.test(app)
-    && /Math\.round\(resolvedCoords\.longitude \* 10\) \/ 10/.test(app)
+  const ok = /Math\.round\(coords\.latitude \* 10\) \/ 10/.test(app)
+    && /Math\.round\(coords\.longitude \* 10\) \/ 10/.test(app)
   if (!ok) problems.push('App.js no longer rounds the weather request to 0.1° — the Location section promises "about 10 km". Change the code and all copies together.')
   console.log(`\n  weather precision (App.js ↔ policy)\n    ${ok ? '✓ App.js rounds to 0.1° (~10 km), as the policy says' : '✗ App.js rounding no longer matches "about 10 km"'}`)
 }
