@@ -17,6 +17,7 @@ DECLARE
   v_day   date;
   v_n     int;
   v_err   text;
+  v_temp  boolean := false;   -- true when the viewer was made listed by THIS script
   rep     text := '';
 BEGIN
   SELECT id INTO v_route FROM walking_routes WHERE is_active ORDER BY sort_order LIMIT 1;
@@ -32,6 +33,36 @@ BEGIN
   SELECT p.id INTO v_v FROM profiles p JOIN auth.users u ON u.id = p.id
    WHERE NOT coalesce(u.is_anonymous, false) AND is_listed_student(p.id) AND p.id <> v_u
    ORDER BY p.id LIMIT 1;
+
+  -- No second listed student in prod yet: make one, TEMPORARILY. A real, named, unbanned,
+  -- non-guest account with no block either way with the holder gets a copy of the holder's
+  -- own listed enrolment (so every CHECK and the years trigger are already satisfied).
+  -- It lives only inside this transaction, which the final RAISE always aborts — as does
+  -- any failure before it. Nothing touches the viewer's profiles row.
+  IF v_v IS NULL AND is_listed_student(v_u) THEN
+    SELECT p.id INTO v_v FROM profiles p JOIN auth.users u ON u.id = p.id
+     WHERE NOT coalesce(u.is_anonymous, false) AND p.id <> v_u
+       AND p.display_name IS NOT NULL
+       AND (p.ugc_banned_until IS NULL OR p.ugc_banned_until <= now())
+       AND NOT EXISTS (SELECT 1 FROM blocks b
+                        WHERE (b.blocker_id = p.id AND b.blocked_id = v_u)
+                           OR (b.blocker_id = v_u AND b.blocked_id = p.id))
+     ORDER BY p.id LIMIT 1;
+    IF v_v IS NOT NULL THEN
+      INSERT INTO student_education (user_id, institution_id, level, subject_id,
+                                     study_start_year, study_end_year, listing_opt_in)
+      SELECT v_v, e.institution_id, e.level, e.subject_id, e.study_start_year, e.study_end_year, true
+        FROM student_education e WHERE e.user_id = v_u AND e.listing_opt_in
+       ORDER BY e.id LIMIT 1;
+      IF NOT is_listed_student(v_v) THEN
+        RAISE EXCEPTION 'VERIFY FAILED: temporary viewer % is not listed after the insert%', v_v, rep;
+      END IF;
+      v_temp := true;
+      rep := rep || format(E'\ntemporary listed viewer %s (rolled back; triggers on student_education: %s)', v_v,
+        (SELECT coalesce(string_agg(tgname, ', ' ORDER BY tgname), 'none') FROM pg_trigger
+          WHERE tgrelid = 'public.student_education'::regclass AND NOT tgisinternal));
+    END IF;
+  END IF;
   rep := rep || format(E'\nroute=%s holder=%s (listed=%s) viewer=%s', v_route, v_u, is_listed_student(v_u), coalesce(v_v::text, 'none'));
 
   -- 1. The holder earns. Perfect: today's TRNC date.
@@ -78,10 +109,19 @@ BEGIN
       UPDATE profiles SET route_badges_public = true WHERE id = v_u;
       PERFORM set_config('request.jwt.claims', json_build_object('sub', v_v, 'role', 'authenticated', 'is_anonymous', false)::text, true);
       SET LOCAL ROLE authenticated;
+      SELECT count(*) INTO v_n FROM get_student_profile(v_u);
+      RESET ROLE;
+      -- Positive control first: the viewer must see the PROFILE, or 0 badges proves nothing.
+      IF v_n = 0 THEN
+        RAISE EXCEPTION 'VERIFY FAILED: viewer cannot see the holder''s profile at all — badge checks would be vacuous%', rep;
+      END IF;
+      SET LOCAL ROLE authenticated;
       SELECT count(*) INTO v_n FROM get_profile_route_badges(v_u) b WHERE b.route_id = v_route;
       RESET ROLE;
-      -- Blocked pair or hidden profile would legitimately give 0: say so rather than fail.
-      rep := rep || format(E'\n4a viewer sees holder''s badge rows = %s (expect 1 unless blocked/unnamed/banned)', v_n);
+      IF v_n IS DISTINCT FROM 1 THEN
+        RAISE EXCEPTION 'VERIFY FAILED: switch ON, viewer sees % badge rows for the route (expected 1)%', v_n, rep;
+      END IF;
+      rep := rep || E'\n4a profile visible, switch on -> 1 badge row, route id only ✓';
       UPDATE profiles SET route_badges_public = false WHERE id = v_u;
       SET LOCAL ROLE authenticated;
       SELECT count(*) INTO v_n FROM get_profile_route_badges(v_u);
@@ -92,7 +132,7 @@ BEGIN
       rep := rep || E'\n4 SKIPPED: holder is not a listed student';
     END IF;
   ELSE
-    rep := rep || E'\n3-4 SKIPPED: no second listed student';
+    rep := rep || E'\n3-4 SKIPPED: no second listed student, and none could be made (holder not listed, or no eligible account)';
   END IF;
 
   -- 5. A guest cannot earn. Perfect: AUTH_REQUIRED.
