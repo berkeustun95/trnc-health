@@ -17,6 +17,7 @@ import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
 import { DORMS_LIVE } from '../constants/flags'
@@ -370,19 +371,6 @@ function DormCard({ item, lang, onPress }) {
   )
 }
 
-function FilterPill({ label, active, disabled, onPress }) {
-  return (
-    <TouchableOpacity
-      style={[cs.pill, active && cs.pillActive, disabled && cs.pillDisabled]}
-      onPress={onPress} disabled={disabled} activeOpacity={0.75}
-    >
-      <Text style={[cs.pillText, active && cs.pillTextActive, disabled && cs.pillTextDisabled]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  )
-}
-
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 // ─── WHY THE DETAIL IS AN OVERLAY, AND WHY ITS STATE LIVES IN App.js ─────────
@@ -623,42 +611,66 @@ export default function AccommodationScreen({
       {!isDorm && (
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={cs.pillBar} contentContainerStyle={cs.pillBarContent}>
-        <FilterPill label={district ? districtLabel(district, lang) : t('accomFilterDistrict', lang)}
-          active={!!district} onPress={() => setSheet('district')} />
+        <FilterDropdown label={t('accomFilterDistrict', lang)} lang={lang}
+          options={REGIONS.map(d => ({ value: d, label: districtLabel(d, lang) }))}
+          value={district}
+          onChange={v => {
+            if (v !== district) { setDistrict(v); setArea(null) }
+            // Chained from the area pill: hand straight over to areas rather than closing
+            // and making them tap again. The close that follows keeps 'area' (functional update).
+            if (pendingArea && v) setSheet('area')
+          }}
+          open={sheet === 'district'}
+          onOpenChange={o => {
+            if (o) { setSheet('district'); return }
+            setPendingArea(false); setSheet(cur => (cur === 'district' ? null : cur))
+          }} />
         {/* Area depends on district — but a greyed-out pill that does nothing when tapped
             reads as BROKEN, not as waiting. So it is always live: with no district chosen
             it opens the district picker and then advances straight to areas, turning a
             dead control into a two-step flow. */}
-        <FilterPill label={area ? areaName(area, district) : t('accomFilterArea', lang)}
-          active={!!area}
-          onPress={() => { if (district) { setSheet('area') } else { setPendingArea(true); setSheet('district') } }} />
-        <FilterPill label={propType ? typeLabel(propType, lang) : t('accomFilterType', lang)}
-          active={!!propType} onPress={() => setSheet('type')} />
-        <FilterPill label={beds != null ? (beds >= 4 ? '4+' : String(beds)) : t('accomFilterBeds', lang)}
-          active={beds != null} onPress={() => setSheet('beds')} />
+        <FilterDropdown label={t('accomFilterArea', lang)} lang={lang}
+          options={areaChoices.map(a => ({ value: a.value, label: areaName(a.value, district) }))}
+          value={area} onChange={setArea}
+          open={sheet === 'area'}
+          onOpenChange={o => {
+            if (!o) { setSheet(cur => (cur === 'area' ? null : cur)); return }
+            if (district) setSheet('area')
+            else { setPendingArea(true); setSheet('district') }
+          }} />
+        <FilterDropdown label={t('accomFilterType', lang)} lang={lang}
+          options={PROP_TYPES.map(tp => ({ value: tp, label: typeLabel(tp, lang) }))}
+          value={propType} onChange={setPropType} />
+        <FilterDropdown label={t('accomFilterBeds', lang)} lang={lang}
+          options={BED_OPTS.map(n => ({ value: n, label: n >= 4 ? '4+' : String(n) }))}
+          value={beds} onChange={setBeds} />
         <FilterPill
-          label={(priceMin || priceMax || currency)
+          label={t('accomFilterPrice', lang)}
+          text={(priceMin || priceMax || currency)
             ? `${currency || ''}${priceMin ? ` >${priceMin}` : ''}${priceMax ? ` <${priceMax}` : ''}`.trim()
             : t('accomFilterPrice', lang)}
           active={!!(priceMin || priceMax || currency)} onPress={() => setSheet('price')} />
 
         {/* Listing-type-aware: a control that cannot apply is not rendered at all. */}
         {isSale && (
-          <FilterPill label={plotMin ? `${t('accomFilterPlotMin', lang)} ${plotMin}` : t('accomFilterPlotMin', lang)}
+          <FilterPill label={t('accomFilterPlotMin', lang)}
+            text={plotMin ? `${t('accomFilterPlotMin', lang)} ${plotMin}` : t('accomFilterPlotMin', lang)}
             active={!!plotMin} onPress={() => setSheet('plot')} />
         )}
         {isRent && (
-          <FilterPill
-            label={furnished == null ? t('accomFilterFurnished', lang)
-              : (furnished ? t('accomFurnished', lang) : t('accomUnfurnished', lang))}
-            active={furnished != null} onPress={() => setSheet('furnished')} />
+          <FilterDropdown label={t('accomFilterFurnished', lang)} lang={lang}
+            options={[{ value: true, label: t('accomFurnished', lang) }, { value: false, label: t('accomUnfurnished', lang) }]}
+            value={furnished} onChange={setFurnished} />
         )}
         {isRent && (
-          <FilterPill label={period ? periodLabel(period, lang) : t('accomFilterPeriod', lang)}
-            active={!!period} onPress={() => setSheet('period')} />
+          <FilterDropdown label={t('accomFilterPeriod', lang)} lang={lang}
+            options={PERIODS.map(pd => ({ value: pd, label: periodLabel(pd, lang) }))}
+            value={period} onChange={setPeriod} />
         )}
 
-        <FilterPill label={sortLabel(effectiveSort)} active onPress={() => setSheet('sort')} />
+        <FilterDropdown label={t('accomFilterSort', lang)} lang={lang} allowAll={false}
+          options={sortOpts.map(o => ({ value: o, label: sortLabel(o) }))}
+          value={effectiveSort} onChange={setSort} />
 
         {activeCount > 0 && (
           <TouchableOpacity style={cs.clearPill} onPress={clearAll}>
@@ -757,51 +769,6 @@ export default function AccommodationScreen({
         />
       )}
 
-      <PickerSheet visible={sheet === 'district'} title={t('accomFilterDistrict', lang)}
-        options={REGIONS} selected={district} labelFn={d => districtLabel(d, lang)}
-        onSelect={v => {
-          const n = v === district ? null : v
-          setDistrict(n); setArea(null)
-          // Chained from the area pill: hand straight over to areas rather than closing
-          // and making them tap again.
-          const chain = pendingArea && n
-          setPendingArea(false)
-          setSheet(chain ? 'area' : null)
-        }}
-        onClose={() => { setPendingArea(false); setSheet(null) }} />
-
-      <PickerSheet visible={sheet === 'area'} title={t('accomFilterArea', lang)}
-        options={areaChoices.map(a => a.value)} selected={area}
-        labelFn={s => areaName(s, district)}
-        onSelect={v => { setArea(v === area ? null : v); setSheet(null) }}
-        onClose={() => setSheet(null)} />
-
-      <PickerSheet visible={sheet === 'type'} title={t('accomFilterType', lang)}
-        options={PROP_TYPES} selected={propType} labelFn={tp => typeLabel(tp, lang)}
-        onSelect={v => { setPropType(v === propType ? null : v); setSheet(null) }}
-        onClose={() => setSheet(null)} />
-
-      <PickerSheet visible={sheet === 'beds'} title={t('accomFilterBeds', lang)}
-        options={BED_OPTS} selected={beds} labelFn={n => (n >= 4 ? '4+' : String(n))}
-        onSelect={v => { setBeds(v === beds ? null : v); setSheet(null) }}
-        onClose={() => setSheet(null)} />
-
-      <PickerSheet visible={sheet === 'period'} title={t('accomFilterPeriod', lang)}
-        options={PERIODS} selected={period} labelFn={p => periodLabel(p, lang)}
-        onSelect={v => { setPeriod(v === period ? null : v); setSheet(null) }}
-        onClose={() => setSheet(null)} />
-
-      <PickerSheet visible={sheet === 'furnished'} title={t('accomFilterFurnished', lang)}
-        options={[true, false]} selected={furnished}
-        labelFn={b => (b ? t('accomFurnished', lang) : t('accomUnfurnished', lang))}
-        onSelect={v => { setFurnished(v === furnished ? null : v); setSheet(null) }}
-        onClose={() => setSheet(null)} />
-
-      <PickerSheet visible={sheet === 'sort'} title={t('accomFilterSort', lang)}
-        options={sortOpts} selected={effectiveSort} labelFn={sortLabel}
-        onSelect={v => { setSort(v); setSheet(null) }}
-        onClose={() => setSheet(null)} />
-
       {/* Price range + currency. Currency matters here beyond filtering: a price sort
           across currencies is not a comparison, so narrowing to one makes it real. */}
       <Modal visible={sheet === 'price'} transparent animationType="slide" onRequestClose={() => setSheet(null)}>
@@ -874,28 +841,6 @@ export default function AccommodationScreen({
   )
 }
 
-function PickerSheet({ visible, title, options, selected, labelFn, onSelect, onClose }) {
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={cs.overlay} onPress={onClose}>
-        <Pressable style={cs.sheet}>
-          <Text style={cs.sheetTitle}>{title}</Text>
-          <ScrollView style={{ maxHeight: 380 }}>
-            {options.map(opt => (
-              <TouchableOpacity key={String(opt)} style={cs.sheetOption} onPress={() => onSelect(opt)}>
-                <Text style={[cs.sheetOptionText, selected === opt && cs.sheetOptionTextActive]}>
-                  {labelFn(opt)}
-                </Text>
-                {selected === opt && <Ionicons name="checkmark" size={18} color={colors.primary} />}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  )
-}
-
 const cs = StyleSheet.create({
   safe:                { flex: 1, backgroundColor: colors.bg },
   // elevation as well as zIndex: on Android a card's own elevation (shadow, 3) can draw ABOVE
@@ -924,13 +869,7 @@ const cs = StyleSheet.create({
 
   pillBar:             { flexGrow: 0, flexShrink: 0 },
   pillBarContent:      { paddingHorizontal: 16, gap: 8, paddingBottom: 12 },
-  pill:                { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
-  pillActive:          { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  pillDisabled:        { opacity: 0.4 },
-  pillText:            { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  pillTextActive:      { fontFamily: 'Inter_700Bold', color: colors.primary },
-  pillTextDisabled:    { color: colors.textSecondary },
-  clearPill:           { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: colors.dangerLight, backgroundColor: colors.dangerLight },
+  clearPill:           { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.dangerLight, backgroundColor: colors.dangerLight },
   clearPillText:       { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
 
   listContent:         { paddingHorizontal: 16, paddingBottom: 24 },
@@ -977,9 +916,6 @@ const cs = StyleSheet.create({
   overlay:             { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:               { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40 },
   sheetTitle:          { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 },
-  sheetOption:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
-  sheetOptionText:     { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
-  sheetOptionTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   currencyChips:       { flexDirection: 'row', gap: 8, marginBottom: 16 },
   currencyChip:        { flex: 1, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center' },

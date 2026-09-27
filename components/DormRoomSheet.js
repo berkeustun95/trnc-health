@@ -8,7 +8,7 @@ import { logContactEvent } from '../utils/logContactEvent'
 
 // The room-type detail sheet, reached from the room list on DormPartnerScreen.
 //
-// A Modal, matching PickerSheet's idiom in AccommodationScreen — overlay dims and closes on
+// A Modal, matching the price sheet's idiom in AccommodationScreen — overlay dims and closes on
 // tap, the inner Pressable stops that propagating, and it slides from the bottom.
 //
 // ⚠ WHY THIS NEEDS NO App.js STATE WHILE THE SHOWCASE OVERLAY DOES. That looks inconsistent
@@ -32,7 +32,7 @@ function availabilityLabel(available, lang) {
 }
 
 // The body is split out and defined at MODULE SCOPE for two reasons. It lets the Modal stay
-// mounted with `visible={false}` — PickerSheet's idiom — so the sheet animates OUT as well
+// mounted with `visible={false}` — FilterDropdown's idiom — so the sheet animates OUT as well
 // as in, which unmounting it would lose. And a component declared inside its parent is a
 // new type on every render, which remounts its subtree.
 // A cash plan as a LEFT-TO-RIGHT PAYMENT SEQUENCE, which is what it actually is:

@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import FilterDropdown from '../components/FilterDropdown'
 import MapPinPicker from '../components/MapPinPicker'
 import BackButton from '../components/BackButton'
 
@@ -255,7 +256,10 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
 
           {/* Property type */}
           <Field label={t('accomPropType', lang)}>
-            <ChipRow options={PROP_TYPES} selected={propType} onSelect={setPropType} labelFn={tp => typeLabel(tp, lang)} />
+            <FilterDropdown variant="field" allowAll={false} lang={lang}
+              label={t('accomPropType', lang)}
+              options={PROP_TYPES.map(tp => ({ value: tp, label: typeLabel(tp, lang) }))}
+              value={propType} onChange={setPropType} />
           </Field>
 
           {/* Price */}
@@ -318,12 +322,10 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
 
           {/* District */}
           <Field label={t('accomPropDistrict', lang)}>
-            <ChipRow
-              options={DISTRICTS}
-              selected={district}
-              onSelect={setDistrict}
-              labelFn={d => districtLabel(d, lang)}
-            />
+            <FilterDropdown variant="field" allowAll={false} lang={lang}
+              label={t('accomPropDistrict', lang)}
+              options={DISTRICTS.map(d => ({ value: d, label: districtLabel(d, lang) }))}
+              value={district} onChange={setDistrict} />
           </Field>
 
           {/* Address + map pin */}

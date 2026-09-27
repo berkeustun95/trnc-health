@@ -18,6 +18,11 @@ import { t } from '../constants/i18n'
 // sheet has closed — iOS cannot present a second modal while this one is dismissing.
 // Android back closes only the sheet (onRequestClose). `null` is "Tümü" in single mode;
 // an empty array in multi mode.
+//
+// variant="field" — a full-width form field instead of a pill (forms: always with
+// allowAll={false}); an empty field reads "Seçiniz…". `open` + `onOpenChange` make the sheet
+// controlled, for a screen that chains one sheet into another (Accommodation's area → district).
+// FilterPill is exported for a pill whose sheet is not a list (Accommodation's price, plot).
 
 export default function FilterDropdown({
   label, title, options, lang,
@@ -25,18 +30,24 @@ export default function FilterDropdown({
   selectedLabel = null,          // overrides the trigger text (e.g. a picked date)
   extraAction = null,            // { label, icon, onPress }
   allowAll = true,               // false: a required choice — no "Tümü" row (Towing's region)
+  variant = 'pill',              // 'field': full-width form field
+  open: openProp, onOpenChange,  // optional controlled open state
   style,
 }) {
   const insets = useSafeAreaInsets()
-  const [open, setOpen] = useState(false)
+  const [openState, setOpenState] = useState(false)
+  const controlled = openProp !== undefined
+  const open = controlled ? openProp : openState
+  const setOpen = v => (controlled ? onOpenChange?.(v) : setOpenState(v))
   const [query, setQuery] = useState('')
   const [pending, setPending] = useState(null)
 
   const picked = multi ? (values ?? []) : (value == null ? [] : [value])
   const active = picked.length > 0 || !!selectedLabel
   const first = options.find(o => o.value === picked[0])
+  const field = variant === 'field'
   const triggerText = selectedLabel
-    ?? (picked.length === 0 ? label
+    ?? (picked.length === 0 ? (field ? t('dropdownSelect', lang) : label)
       : picked.length === 1 ? (first?.label ?? label)
       : `${first?.label ?? label} +${picked.length - 1}`)
 
@@ -57,16 +68,20 @@ export default function FilterDropdown({
 
   return (
     <>
-      <TouchableOpacity
-        style={[st.pill, active && st.pillActive, style]}
-        onPress={() => setOpen(true)}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityLabel={`${label}: ${triggerText}`}
-      >
-        <Text style={[st.pillText, active && st.pillTextActive]} numberOfLines={1}>{triggerText}</Text>
-        <Feather name="chevron-down" size={14} color={active ? colors.primary : colors.textSecondary} />
-      </TouchableOpacity>
+      {field ? (
+        <TouchableOpacity
+          style={[st.field, style]}
+          onPress={() => setOpen(true)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`${label}: ${triggerText}`}
+        >
+          <Text style={[st.fieldText, !active && st.fieldPlaceholder]} numberOfLines={1}>{triggerText}</Text>
+          <Feather name="chevron-down" size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      ) : (
+        <FilterPill label={label} text={triggerText} active={active} style={style} onPress={() => setOpen(true)} />
+      )}
 
       <Modal
         visible={open}
@@ -112,6 +127,21 @@ export default function FilterDropdown({
   )
 }
 
+export function FilterPill({ label, text, active, style, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[st.pill, active && st.pillActive, style]}
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={label && label !== text ? `${label}: ${text}` : text}
+    >
+      <Text style={[st.pillText, active && st.pillTextActive]} numberOfLines={1}>{text}</Text>
+      <Feather name="chevron-down" size={14} color={active ? colors.primary : colors.textSecondary} />
+    </TouchableOpacity>
+  )
+}
+
 function Row({ label, count, color, selected, multi, onPress }) {
   return (
     <TouchableOpacity style={st.row} onPress={onPress} activeOpacity={0.7}>
@@ -131,6 +161,11 @@ const st = StyleSheet.create({
   pillActive:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   pillText:       { flexShrink: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   pillTextActive: { color: colors.primary },
+  field:          { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardBg,
+                    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
+                    paddingHorizontal: 14, paddingVertical: 12 },
+  fieldText:      { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  fieldPlaceholder: { color: colors.textSecondary },
   backdrop:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet:          { backgroundColor: colors.cardBg, borderTopLeftRadius: 20, borderTopRightRadius: 20,
                     paddingHorizontal: 16, paddingTop: 8, maxHeight: '75%' },

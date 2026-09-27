@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import FilterDropdown from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { SUBMITTABLE_CATEGORIES, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import MapPinPicker from '../components/MapPinPicker'
@@ -227,20 +228,10 @@ export default function ExploreSubmitScreen({ session, lang, place: editPlace, o
         >
           {/* Category */}
           <SectionLabel text={t('blSubmitType', lang)} />
-          <View style={s.chipWrap}>
-            {SUBMITTABLE_CATEGORIES.map(c => (
-              <TouchableOpacity
-                key={c}
-                style={[s.chip, category === c && s.chipActive]}
-                onPress={() => setCategory(c)}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.chipText, category === c && s.chipTextActive]}>
-                  {categoryLabel(c, lang)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <FilterDropdown variant="field" allowAll={false} lang={lang}
+            label={t('blSubmitType', lang)}
+            options={SUBMITTABLE_CATEGORIES.map(c => ({ value: c, label: categoryLabel(c, lang) }))}
+            value={category} onChange={setCategory} />
 
           {/* Name */}
           <SectionLabel text={t('blSubmitName', lang)} />
@@ -254,20 +245,10 @@ export default function ExploreSubmitScreen({ session, lang, place: editPlace, o
 
           {/* Region */}
           <SectionLabel text={t('blSubmitDistrict', lang)} />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipScroll}>
-            {REGIONS.map(r => (
-              <TouchableOpacity
-                key={r}
-                style={[s.chip, region === r && s.chipActive]}
-                onPress={() => setRegion(r)}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.chipText, region === r && s.chipTextActive]}>
-                  {regionLabel(r, lang)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <FilterDropdown variant="field" allowAll={false} lang={lang}
+            label={t('blSubmitDistrict', lang)}
+            options={REGIONS.map(r => ({ value: r, label: regionLabel(r, lang) }))}
+            value={region} onChange={setRegion} />
 
           {/* Description */}
           <SectionLabel text={t('blSubmitDesc', lang)} />
@@ -407,8 +388,6 @@ const s = StyleSheet.create({
 
   // Chips
   chipRow:    { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  chipWrap:   { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  chipScroll: { gap: 8, paddingRight: 16 },
   chip:       { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20,
                 backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
   chipActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },

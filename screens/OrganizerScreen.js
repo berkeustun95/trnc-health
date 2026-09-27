@@ -11,6 +11,7 @@ import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/d
 import { supabase } from '../lib/supabase'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
+import FilterDropdown from '../components/FilterDropdown'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 const DESC_LIMIT = 500
@@ -331,23 +332,11 @@ function EventFormModal({ visible, event, session, lang, onSave, onClose }) {
               textAlignVertical="top"
             />
 
-            {/* Category — wraps rather than scrolls; this form is already inside
-                a vertical ScrollView. */}
             <Text style={s.fieldLabel}>{t('eventCategory', lang)} *</Text>
-            <View style={s.chipRow}>
-              {CATEGORIES.map(c => (
-                <TouchableOpacity
-                  key={c.key}
-                  style={[s.chip, category === c.key && s.chipActive]}
-                  onPress={() => setCategory(c.key)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[s.chipText, category === c.key && s.chipTextActive]}>
-                    {t(c.labelKey, lang)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <FilterDropdown variant="field" allowAll={false} lang={lang}
+              label={t('eventCategory', lang)}
+              options={CATEGORIES.map(c => ({ value: c.key, label: t(c.labelKey, lang) }))}
+              value={category} onChange={setCategory} />
 
             {/* Start date */}
             <Text style={s.fieldLabel}>{t('eventStart', lang)} *</Text>
@@ -628,11 +617,6 @@ const s = StyleSheet.create({
   charCount:          { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 6 },
   charCountWarn:      { color: colors.accent },
 
-  chipRow:            { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:               { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.cardBg },
-  chipActive:         { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  chipText:           { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  chipTextActive:     { fontFamily: 'Inter_700Bold', color: colors.primary },
 
   input:              { backgroundColor: colors.cardBg, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   inputMulti:         { height: 110, textAlignVertical: 'top' },
