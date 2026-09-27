@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, ActivityIndicator,
-  Alert, BackHandler, Linking, Image,
+  Alert, Linking, Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -546,12 +546,24 @@ function TaskDetail({ task, lang, progress, offline, onToggle, onReset, onBack }
   )
 }
 
+// eSIM and the Welcome Guide open ON TOP of the hub from App.js, which unmounts it. The
+// tab, the university search and the region are saved on the way out and read ONCE on the
+// next mount, so back lands on the same tab with the same search (ExploreMapScreen's
+// returnSnapshot pattern; slice 7, 2026-09-28).
+let hubReturn = null
+
 export default function StudentHubScreen({
   lang, onBack, onShowEsim, onShowNewcomerEssentials, isGuest = false, onGoToProfile,
   initialConversationId = null,   // set by a tapped push notification
   onConversationOpened,
+  backRef = null,
 }) {
-  const [tab, setTab] = useState('universities')
+  const [snap] = useState(() => { const v = hubReturn; hubReturn = null; return v })
+  const [tab, setTab] = useState(snap?.tab ?? 'universities')
+  // A tab mounts on first visit and then STAYS mounted (hidden), so switching tabs keeps
+  // each one's scroll and the inbox does not refetch with a spinner every time.
+  const [visited, setVisited] = useState(() => new Set([snap?.tab ?? 'universities']))
+  const showTab = t2 => { setVisited(v => (v.has(t2) ? v : new Set(v).add(t2))); setTab(t2) }
   const [universities, setUniversities] = useState(null)
   const [failed, setFailed] = useState(false)
   // The viewer's OWN row, read here rather than passed down from App.js. App.js caches the
@@ -576,8 +588,8 @@ export default function StudentHubScreen({
   const [openConv, setOpenConv] = useState(null)
   const [composeWith, setComposeWith] = useState(null)
   const [convKey, setConvKey] = useState(0)
-  const [uniQuery, setUniQuery] = useState('')
-  const [uniRegion, setUniRegion] = useState('all')
+  const [uniQuery, setUniQuery] = useState(snap?.uniQuery ?? '')
+  const [uniRegion, setUniRegion] = useState(snap?.uniRegion ?? 'all')
 
   // Cache first, then the network. A student with no data yet sees the last copy
   // immediately; a failed refresh keeps it on screen and says it is offline.
@@ -596,21 +608,20 @@ export default function StudentHubScreen({
   useEffect(() => { loadProgress().then(setProgress) }, [])
   useEffect(() => { if (progress) saveProgress(progress) }, [progress])
 
-  // ONE LEVEL AT A TIME. The profile page opens ON TOP of a university page, so a back
-  // press there must close the profile and leave the university page standing — clearing
-  // both would drop the user two levels for one gesture, which reads as the app losing
-  // its place. Ordered innermost-first for the same reason.
+  // ONE LEVEL AT A TIME, innermost first — a conversation sits on the profile that opened
+  // it, which sits on the university page. Asked by App's hardware-back chain (via backRef)
+  // before it closes the hub. It REPLACES a BackHandler registered here, which App's own
+  // handler out-registered whenever any of its ~40 deps changed (back then closed the hub).
   useEffect(() => {
-    if (!openSlug && !openUniId && !openStudentId && !openConv && !composeWith) return
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      // INNERMOST FIRST. A conversation sits on top of the profile that opened it, so it
-      // has to be closed before the page underneath it.
-      if (openConv || composeWith) { setOpenConv(null); setComposeWith(null); return true }
+    if (!backRef) return
+    backRef.current = () => {
+      if (openConv || composeWith) { setOpenConv(null); setComposeWith(null); setConvKey(k => k + 1); return true }
       if (openStudentId) { setOpenStudentId(null); return true }
-      setOpenSlug(null); setOpenUniId(null); return true
-    })
-    return () => sub.remove()
-  }, [openSlug, openUniId, openStudentId, openConv, composeWith])
+      if (openSlug || openUniId) { setOpenSlug(null); setOpenUniId(null); return true }
+      return false
+    }
+    return () => { backRef.current = null }
+  })
 
   // Loaded here rather than in the tab so switching tabs does not refetch.
   const load = useCallback(() => {
@@ -682,7 +693,7 @@ export default function StudentHubScreen({
     supabase.rpc('list_conversations').then(({ data }) => {
       if (cancelled) return
       const row = (data ?? []).find(r => r.conversation_id === initialConversationId)
-      setTab('messages')
+      showTab('messages')
       if (row) { setComposeWith(null); setOpenConv(row) }
       onConversationOpened?.()
     })
@@ -700,69 +711,76 @@ export default function StudentHubScreen({
     setConvKey(k => k + 1)
   }
 
-  // TOP OF THE STACK: a conversation sits above the profile page that opened it.
-  if (openConv || composeWith) {
-    return (
-      <ConversationScreen
-        conversation={openConv}
-        composeWith={composeWith}
-        myId={me?.id ?? null}
-        lang={lang}
-        onBack={() => { setOpenConv(null); setComposeWith(null); setConvKey(k => k + 1) }}
-        onChanged={result => {
-          if (result?.openWith) { openThreadWith(result.openWith); return }
-          setConvKey(k => k + 1)
-        }}
-      />
-    )
-  }
-
-  // BEFORE the university page: this is the page on top of the stack.
-  if (openStudentId) {
-    return (
-      <StudentProfileScreen
-        userId={openStudentId}
-        lang={lang}
-        isMe={openStudentId === me?.id}
-        onBack={() => setOpenStudentId(null)}
-        onMessage={person => setComposeWith(person)}
-      />
-    )
-  }
-
+  // THE STACK, AS LAYERS. Each open level draws OVER the one beneath it, which stays mounted:
+  // back lands on the same scroll with no refetch (the student list and the inbox used to
+  // reload with a spinner). Bottom → top: tabs · university page or task · profile ·
+  // conversation. Module-internal overlays only (slice 7, 2026-09-28).
   const openUni = openUniId ? universities?.find(u => u.id === openUniId) : null
-  if (openUni) {
-    return (
-      <UniversityDetail
-        uni={openUni}
-        lang={lang}
-        isGuest={isGuest}
-        listingOptIn={me ? me.canSee : null}
-        meFailed={meFailed}
-        myId={me?.id ?? null}
-        onGoToProfile={onGoToProfile}
-        onOpenStudent={setOpenStudentId}
-        onBack={() => setOpenUniId(null)}
-      />
-    )
-  }
-
   const openTask = openSlug ? tasks?.find(task => task.slug === openSlug) : null
-  if (openTask) {
-    return (
-      <TaskDetail
-        task={openTask}
-        lang={lang}
-        progress={progress}
-        offline={tasksFailed}
-        onToggle={stepId => setProgress(prev => toggleStep(prev, openTask.slug, stepId))}
-        onReset={() => setProgress(prev => resetTask(prev, openTask.slug))}
-        onBack={() => setOpenSlug(null)}
-      />
-    )
-  }
+  const overlays = (
+    <>
+      {openUni && (
+        <View style={s.layer}>
+          <UniversityDetail
+            uni={openUni}
+            lang={lang}
+            isGuest={isGuest}
+            listingOptIn={me ? me.canSee : null}
+            meFailed={meFailed}
+            myId={me?.id ?? null}
+            onGoToProfile={onGoToProfile}
+            onOpenStudent={setOpenStudentId}
+            onBack={() => setOpenUniId(null)}
+          />
+        </View>
+      )}
+      {openTask && (
+        <View style={s.layer}>
+          <TaskDetail
+            task={openTask}
+            lang={lang}
+            progress={progress}
+            offline={tasksFailed}
+            onToggle={stepId => setProgress(prev => toggleStep(prev, openTask.slug, stepId))}
+            onReset={() => setProgress(prev => resetTask(prev, openTask.slug))}
+            onBack={() => setOpenSlug(null)}
+          />
+        </View>
+      )}
+      {openStudentId && (
+        <View style={s.layer}>
+          <StudentProfileScreen
+            userId={openStudentId}
+            lang={lang}
+            isMe={openStudentId === me?.id}
+            onBack={() => setOpenStudentId(null)}
+            onMessage={person => setComposeWith(person)}
+          />
+        </View>
+      )}
+      {(openConv || composeWith) && (
+        <View style={s.layer}>
+          <ConversationScreen
+            conversation={openConv}
+            composeWith={composeWith}
+            myId={me?.id ?? null}
+            lang={lang}
+            onBack={() => { setOpenConv(null); setComposeWith(null); setConvKey(k => k + 1) }}
+            onChanged={result => {
+              if (result?.openWith) { openThreadWith(result.openWith); return }
+              setConvKey(k => k + 1)
+            }}
+          />
+        </View>
+      )}
+    </>
+  )
+
+  // Leaving for eSIM / the Welcome Guide unmounts the hub (App.js); remember where we were.
+  const leaveVia = go => () => { hubReturn = { tab, uniQuery, uniRegion }; go?.() }
 
   return (
+    <View style={s.root}>
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="newcomer_essentials" />
       <ScreenHeader onBack={onBack} lang={lang} title={t('menuStudentHub', lang)} />
@@ -778,14 +796,14 @@ export default function StudentHubScreen({
       <View style={s.segment}>
         <TouchableOpacity
           style={[s.segmentBtn, tab === 'universities' && s.segmentBtnActive]}
-          onPress={() => setTab('universities')}
+          onPress={() => showTab('universities')}
           activeOpacity={0.9}
         >
           <Text numberOfLines={2} style={[s.segmentText, tab === 'universities' && s.segmentTextActive]}>{t('studentTabUniversities', lang)}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[s.segmentBtn, tab === 'basics' && s.segmentBtnActive]}
-          onPress={() => setTab('basics')}
+          onPress={() => showTab('basics')}
           activeOpacity={0.9}
         >
           <Text numberOfLines={2} style={[s.segmentText, tab === 'basics' && s.segmentTextActive]}>{t('studentTabBasics', lang)}</Text>
@@ -796,7 +814,7 @@ export default function StudentHubScreen({
         {isGuest ? null : (
           <TouchableOpacity
             style={[s.segmentBtn, tab === 'messages' && s.segmentBtnActive]}
-            onPress={() => setTab('messages')}
+            onPress={() => showTab('messages')}
             activeOpacity={0.9}
           >
             <Text numberOfLines={2} style={[s.segmentText, tab === 'messages' && s.segmentTextActive]}>{t('studentTabMessages', lang)}</Text>
@@ -804,8 +822,8 @@ export default function StudentHubScreen({
         )}
       </View>
 
-      {tab === 'universities'
-        ? (
+      {visited.has('universities') && (
+        <View style={tab === 'universities' ? s.tabPane : s.tabHidden}>
           <UniversitiesTab
             lang={lang}
             universities={universities}
@@ -817,9 +835,10 @@ export default function StudentHubScreen({
             region={uniRegion}
             setRegion={setUniRegion}
           />
-        )
-        : tab === 'messages'
-        ? (
+        </View>
+      )}
+      {!isGuest && visited.has('messages') && (
+        <View style={tab === 'messages' ? s.tabPane : s.tabHidden}>
           <ConversationsScreen
             lang={lang}
             canSee={me ? me.canSee : (meFailed ? false : null)}
@@ -827,8 +846,10 @@ export default function StudentHubScreen({
             onOpen={setOpenConv}
             onGoToProfile={onGoToProfile}
           />
-        )
-        : (
+        </View>
+      )}
+      {visited.has('basics') && (
+        <View style={tab === 'basics' ? s.tabPane : s.tabHidden}>
           <BasicsTab
             lang={lang}
             tasks={tasks}
@@ -837,15 +858,22 @@ export default function StudentHubScreen({
             progress={progress}
             onRetryTasks={loadTasks}
             onOpenTask={setOpenSlug}
-            onShowEsim={onShowEsim}
-            onShowNewcomerEssentials={onShowNewcomerEssentials}
+            onShowEsim={leaveVia(onShowEsim)}
+            onShowNewcomerEssentials={leaveVia(onShowNewcomerEssentials)}
           />
-        )}
+        </View>
+      )}
     </SafeAreaView>
+    {overlays}
+    </View>
   )
 }
 
 const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  layer: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
+  tabPane: { flex: 1 },
+  tabHidden: { display: 'none' },
   safe: { flex: 1, backgroundColor: colors.bg },
   introWrap: { paddingHorizontal: 16, marginBottom: 16 },
 

@@ -593,6 +593,7 @@ export default function App() {
   const exploreBackRef = useRef(null)
   const placeBackRef = useRef(null)
   const homeServicesBackRef = useRef(null)
+  const studentHubBackRef = useRef(null)
   const profileGuardRef = useRef(null)
   // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
   // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
@@ -900,7 +901,7 @@ export default function App() {
       if (showExchangeRates) { setShowExchangeRates(false); return true }
       // Below eSIM, Welcome Guide and Exchange Rates: Student Hub opens those ON TOP of itself
       // (they render earlier in the content chain), so Back must pop them before the hub.
-      if (showStudentHub) { setShowStudentHub(false); return true }
+      if (showStudentHub) { if (studentHubBackRef.current?.()) return true; setShowStudentHub(false); return true }
       if (adminPreview)         { setAdminPreview(null); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
       if (showGames) { setShowGames(false); return true }
@@ -2179,7 +2180,8 @@ export default function App() {
           // Re-entering the hub re-mounts it and re-reads the row.
           initialConversationId={pendingConvId}
           onConversationOpened={() => setPendingConvId(null)}
-          onGoToProfile={() => { setShowStudentHub(false); setActiveTab('profile') }} />
+          onGoToProfile={() => { setShowStudentHub(false); setActiveTab('profile') }}
+          backRef={studentHubBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
   } else if (adminPreview === 'studentHub') {
     // After showEsim and showNewcomerEssentials, not beside the Explore preview — the
