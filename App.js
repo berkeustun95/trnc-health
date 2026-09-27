@@ -577,6 +577,10 @@ export default function App() {
   // up (to hide the app content from the a11y tree) and how to close it (hardware back).
   const [oliSheetOpen, setOliSheetOpen] = useState(false)
   const oliCloseRef = useRef(null)
+  // Tab-shell back hooks (see the hardware-back chain): Home's directory/search, Profile's
+  // Legal view + unsaved-changes guard. Set by the screens, null while they are unmounted.
+  const homeBackRef = useRef(null)
+  const profileGuardRef = useRef(null)
   // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
   // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
   // way — the sheet, its chips, its matching and its keyboard handling are untouched;
@@ -660,6 +664,20 @@ export default function App() {
       Linking.openURL('https://play.google.com/store/apps/details?id=com.berkeustun95.ada')
     )
   }
+  // ONE close function per layer, called by the screen's own back button AND by the Android
+  // back chain, so the two can never drift apart again (2026-09-27: the chain forgot the
+  // duty region, the events district, the beach region and the mark-all-read).
+  function closeNotifs() {
+    setShowNotifs(false)
+    const uid = sessionRef.current?.user?.id
+    if (!uid) return
+    supabase.from('notifications').update({ read: true }).eq('user_id', uid)
+      .then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true }))))
+  }
+  function closeDutyList()     { setShowDutyList(false); setDutyRegion(null) }
+  function closeEvents()       { setShowEvents(false); setEventsDistrict(null) }
+  function closeExploreBeach() { setShowExploreBeach(false); setExploreBeachRegion(null) }
+
   // Returns true if the action was gated (caller should stop). Guests only.
   function requireAccount(messageKey) {
     if (!isGuest(session)) return false
@@ -813,7 +831,7 @@ export default function App() {
       // because which of the two wins the event is not worth depending on.
       if (updateTier === 'force') {
         if (showEmergencyModal) { setShowEmergencyModal(false); return true }
-        if (showDutyList) { setShowDutyList(false); setDutyRegion(null); return true }
+        if (showDutyList) { closeDutyList(); return true }
         return true
       }
       // These are root overlays, not <Modal>s, so there is no onRequestClose to catch
@@ -826,15 +844,15 @@ export default function App() {
       if (showEmergencyModal) { setShowEmergencyModal(false); return true }
       if (showMenu) { closeMenu(); return true }
       if (showPasswordReset) { setShowPasswordReset(false); return true }
-      if (showNotifs) { setShowNotifs(false); return true }
-      if (showDutyList) { setShowDutyList(false); return true }
+      if (showNotifs) { closeNotifs(); return true }
+      if (showDutyList) { closeDutyList(); return true }
       // Gated read-only directory. Sits with the other exempt surfaces so back returns to
       // the wizard; on the wizard itself nothing here matches and the chain falls through
       // to `return false`, which closes the app. That is deliberate and is NOT a skip —
       // the profile is still incomplete and the gate is there again next launch. A back
       // button that does nothing at all reads as a frozen screen.
       if (gateHealthList) { setGateHealthList(false); return true }
-      if (showEvents) { setShowEvents(false); return true }
+      if (showEvents) { closeEvents(); return true }
       if (openedDorm) { setOpenedDorm(null); return true }
       if (openedProperty) { setOpenedProperty(null); return true }
       if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
@@ -858,7 +876,7 @@ export default function App() {
       if (showEsim) { setShowEsim(false); setConnectivityOperator(null); return true }
       if (showLegal) { setShowLegal(false); return true }
       if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
-      if (showExploreBeach)     { setShowExploreBeach(false); return true }
+      if (showExploreBeach)     { closeExploreBeach(); return true }
       if (showExplore)          { setShowExplore(false); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
@@ -868,6 +886,12 @@ export default function App() {
       if (adminPreview)         { setAdminPreview(null); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
       if (showGames) { setShowGames(false); return true }
+      // In-screen layers of the two tab-shell screens, asked through the same refs their own
+      // buttons use: Home's Health directory and search, Profile's Legal view and its unsaved-
+      // changes guard. Without these, back from the directory or search fell through to
+      // `return false` and EXITED THE APP, and back from Profile threw unsaved edits away.
+      if (activeTab === 'home' && homeBackRef.current?.()) return true
+      if (activeTab === 'profile' && profileGuardRef.current?.back()) return true
       if (activeTab !== 'home') { setActiveTab('home'); return true }
       if (!sessionRef.current && !showWelcome) { setShowWelcome(true); return true }
       return false
@@ -1494,7 +1518,7 @@ export default function App() {
   // FAB and PolicyUpdateNotice off the screen — the force modal can never collide with them.
   } else if (updateTier === 'force') {
     content = showDutyList
-      ? <DutyListScreen onBack={() => { setShowDutyList(false); setDutyRegion(null) }} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+      ? <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
       : <View style={styles.center} />
   } else if (ageDeletedNotice) {
     // A sign-out that failed offline would leave a session for a deleted user; retry it here.
@@ -1578,7 +1602,7 @@ export default function App() {
     // 20261004, reviews. There is no second path to close: booking was the only write
     // that did not go through onRequireAccount, and it is gone.
     if (showDutyList) {
-      content = <DutyListScreen onBack={() => { setShowDutyList(false); setDutyRegion(null) }} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+      content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
     } else if (showTowing) {
       content = <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} />
     } else if (selectedFacility) {
@@ -1739,7 +1763,7 @@ export default function App() {
       notifications={notifications}
       loading={notifsLoading}
       lang={lang}
-      onBack={() => { setShowNotifs(false); supabase.from('notifications').update({ read: true }).eq('user_id', session.user.id).then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))) }}
+      onBack={closeNotifs}
       onMarkAllRead={markAllNotifsRead}
       onClearAll={clearAllNotifs}
       onMarkRead={markNotifRead}
@@ -1749,11 +1773,11 @@ export default function App() {
       }}
     />
   } else if (showDutyList) {
-    content = <DutyListScreen onBack={() => { setShowDutyList(false); setDutyRegion(null) }} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
   } else if (showEvents) {
     content = (MODULE_FLAGS.events || isAdmin)
-      ? <EventsScreen lang={lang} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} initialDistrict={eventsDistrict} onAdNavigate={openAdRoute} />
-      : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={() => { setShowEvents(false); setEventsDistrict(null) }} />
+      ? <EventsScreen lang={lang} onBack={closeEvents} initialDistrict={eventsDistrict} onAdNavigate={openAdRoute} />
+      : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={closeEvents} />
   // PARKED, NOT DEAD. `showAgentOnboarding` is never set to true any more: the only
   // caller was the "become an agent" CTA on AccommodationScreen, removed in Slice 3c
   // because the self-serve marketplace is parked in favour of the partner feed.
@@ -1850,7 +1874,7 @@ export default function App() {
   } else if (showExploreBeach) {
     content = (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => { setShowExploreBeach(false); setExploreBeachRegion(null) }} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} onAdNavigate={openAdRoute} />
+        <ExploreScreen lang={lang} onBack={closeExploreBeach} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} onAdNavigate={openAdRoute} />
       </BLErrorBoundary>
     )
   } else if (showExplore) {
@@ -1914,73 +1938,8 @@ export default function App() {
     } else {
       content = <GamesHubScreen lang={lang} onBack={() => setShowGames(false)} onNavigate={setGamesSubScreen} />
     }
-  } else if (showPets) {
-    if (!MODULE_FLAGS.pets && !isAdmin) {
-      content = <ComingSoonScreen lang={lang} moduleKey="pets" titleKey="menuPets" session={session} onBack={() => setShowPets(false)} />
-    } else if (petsSubScreen === 'bringing') {
-      content = (
-        <BringingPetScreen
-          lang={lang}
-          onBack={() => setPetsSubScreen(null)}
-          onNavigate={dest => setPetsSubScreen(dest)}
-        />
-      )
-    } else if (petsSubScreen === 'timeline' && PETS_TIMELINE_LIVE) {
-      // ⚠ THE FLAG IS IN THE CONDITION, not only on the entry point — the same belt-to-
-      //   braces the pet hotel route carries. Dark, this branch is skipped and the state
-      //   falls through to PetsHomeScreen rather than rendering a blank screen.
-      //
-      //   Until 2026-09-14 this branch existed with NO WAY TO REACH IT: nothing anywhere
-      //   set petsSubScreen = 'timeline'. The screen and its ~24 i18n keys were dead code.
-      content = <TimelineCalculatorScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
-    } else if (petsSubScreen === 'vetdirectory') {
-      content = (
-        <VetDirectoryScreen
-          lang={lang}
-          onBack={() => setPetsSubScreen(null)}
-          onOpenVet={fac => setSelectedFacility(fac)}
-        />
-      )
-    } else if (petsSubScreen === 'travel') {
-      content = (
-        <TravelWithPetScreen
-          lang={lang}
-          onBack={() => setPetsSubScreen(null)}
-          onNavigate={dest => setPetsSubScreen(dest)}
-        />
-      )
-    } else if (petsSubScreen === 'pethotel' && PET_HOTEL_LIVE) {
-      // ⚠ THE FLAG IS IN THE CONDITION, not only on the entry points. Every way IN is
-      //   already gated, so this looks redundant — it is the belt to that braces. A route
-      //   reachable by state alone is one restored-navigation-state or one future deep
-      //   link away from rendering a dark partner surface, and the failure would be
-      //   silent. Dark, this branch is skipped and the state falls through to
-      //   PetsHomeScreen, which is the correct destination rather than a blank screen.
-      content = (
-        <PetHotelPartnerScreen
-          partner={PET_PARTNERS[0]}
-          lang={lang}
-          region={null}
-          onBack={closePetHotel}
-        />
-      )
-    } else if (petsSubScreen === 'owning') {
-      content = (
-        <OwningPetScreen
-          lang={lang}
-          onBack={() => setPetsSubScreen(null)}
-          onNavigate={dest => setPetsSubScreen(dest)}
-        />
-      )
-    } else {
-      content = (
-        <PetsHomeScreen
-          lang={lang}
-          onBack={() => setShowPets(false)}
-          onNavigate={dest => setPetsSubScreen(dest)}
-        />
-      )
-    }
+  // Facility branches sit ABOVE Pets: the Vet Directory opens a vet with setSelectedFacility,
+  // and below Pets the profile never rendered — the tap looked dead (2026-09-27, slice 0).
   } else if (unclaimedFacility) {
     content = (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -2089,6 +2048,73 @@ export default function App() {
       onRequireAccount={requireAccount}
       onBack={() => setSelectedFacility(null)}
     />
+  } else if (showPets) {
+    if (!MODULE_FLAGS.pets && !isAdmin) {
+      content = <ComingSoonScreen lang={lang} moduleKey="pets" titleKey="menuPets" session={session} onBack={() => setShowPets(false)} />
+    } else if (petsSubScreen === 'bringing') {
+      content = (
+        <BringingPetScreen
+          lang={lang}
+          onBack={() => setPetsSubScreen(null)}
+          onNavigate={dest => setPetsSubScreen(dest)}
+        />
+      )
+    } else if (petsSubScreen === 'timeline' && PETS_TIMELINE_LIVE) {
+      // ⚠ THE FLAG IS IN THE CONDITION, not only on the entry point — the same belt-to-
+      //   braces the pet hotel route carries. Dark, this branch is skipped and the state
+      //   falls through to PetsHomeScreen rather than rendering a blank screen.
+      //
+      //   Until 2026-09-14 this branch existed with NO WAY TO REACH IT: nothing anywhere
+      //   set petsSubScreen = 'timeline'. The screen and its ~24 i18n keys were dead code.
+      content = <TimelineCalculatorScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
+    } else if (petsSubScreen === 'vetdirectory') {
+      content = (
+        <VetDirectoryScreen
+          lang={lang}
+          onBack={() => setPetsSubScreen(null)}
+          onOpenVet={fac => setSelectedFacility(fac)}
+        />
+      )
+    } else if (petsSubScreen === 'travel') {
+      content = (
+        <TravelWithPetScreen
+          lang={lang}
+          onBack={() => setPetsSubScreen(null)}
+          onNavigate={dest => setPetsSubScreen(dest)}
+        />
+      )
+    } else if (petsSubScreen === 'pethotel' && PET_HOTEL_LIVE) {
+      // ⚠ THE FLAG IS IN THE CONDITION, not only on the entry points. Every way IN is
+      //   already gated, so this looks redundant — it is the belt to that braces. A route
+      //   reachable by state alone is one restored-navigation-state or one future deep
+      //   link away from rendering a dark partner surface, and the failure would be
+      //   silent. Dark, this branch is skipped and the state falls through to
+      //   PetsHomeScreen, which is the correct destination rather than a blank screen.
+      content = (
+        <PetHotelPartnerScreen
+          partner={PET_PARTNERS[0]}
+          lang={lang}
+          region={null}
+          onBack={closePetHotel}
+        />
+      )
+    } else if (petsSubScreen === 'owning') {
+      content = (
+        <OwningPetScreen
+          lang={lang}
+          onBack={() => setPetsSubScreen(null)}
+          onNavigate={dest => setPetsSubScreen(dest)}
+        />
+      )
+    } else {
+      content = (
+        <PetsHomeScreen
+          lang={lang}
+          onBack={() => setShowPets(false)}
+          onNavigate={dest => setPetsSubScreen(dest)}
+        />
+      )
+    }
   } else if (showGrooming) {
     content = (MODULE_FLAGS.grooming || isAdmin)
       ? <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGrooming(false)} onOpenFacility={setSelectedFacility} />
@@ -2146,6 +2172,7 @@ export default function App() {
 
         {activeTab === 'home' && (
           <HomeScreen
+            backRef={homeBackRef}
             lang={lang}
             facilities={facilities}
             dutyFacilityId={dutyFacilityId}
@@ -2274,6 +2301,7 @@ export default function App() {
             session={session}
             lang={lang}
             onBack={() => setActiveTab('home')}
+            guardRef={profileGuardRef}
             onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
             onAvatarChange={url => setProfile(prev => ({ ...prev, avatar_url: url }))}
           />
@@ -2281,7 +2309,14 @@ export default function App() {
 
         <BottomTabBar
           activeTab={activeTab}
-          onTabPress={tab => { if (tab === 'profile' && requireAccount('gateProfile')) return; setActiveTab(tab) }}
+          onTabPress={tab => {
+            if (tab === 'profile' && requireAccount('gateProfile')) return
+            // Leaving Profile with unsaved edits asks first — the same guard as its back button.
+            if (activeTab === 'profile' && tab !== 'profile' && profileGuardRef.current) {
+              profileGuardRef.current.leave(() => setActiveTab(tab)); return
+            }
+            setActiveTab(tab)
+          }}
           mapTabRef={mapTabRef}
           lang={lang}
         />

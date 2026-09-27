@@ -50,7 +50,7 @@ export default function MapPinPicker({ visible, initialLat, initialLng, onConfir
   }
 
   return (
-    <Modal visible={visible} animationType="slide">
+    <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
       <SafeAreaView style={s.container} edges={['top', 'bottom']}>
         <View style={s.header}>
           <TouchableOpacity onPress={onCancel} hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}>

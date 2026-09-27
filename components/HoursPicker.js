@@ -148,7 +148,7 @@ export default function HoursPicker({ value, onChange }) {
         </View>
       )}
 
-      <Modal visible={!!editing} transparent animationType="slide">
+      <Modal visible={!!editing} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
         <TouchableOpacity style={s.backdrop} onPress={() => setEditing(null)} activeOpacity={1} />
         <View style={s.sheet}>
           <View style={s.sheetHandle} />

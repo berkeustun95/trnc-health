@@ -144,6 +144,9 @@ export default function HomeScreen({
   //     was a second directory screen duplicating this one's search, distance sort,
   //     ratings and duty badge, which would drift.
   forceFacilityList = false,   // start in, and stay in, facility-list mode
+  // Set to this screen's own back step, for App's hardware-back chain: search, then the
+  // Health directory. Only the tab-shell Home passes it; the gate's directory has its own line.
+  backRef = null,
   hideHeaderActions = false,   // no menu / notifications while gated
   onExitFacilityList,          // back leaves the screen instead of revealing the hub
   lang,
@@ -428,6 +431,19 @@ export default function HomeScreen({
   function openAdRoute(route) {
     moduleHandlers[route]?.()
   }
+
+  // The exact steps the on-screen controls take (the search close button, the directory's
+  // BackButton), so Android back and the buttons cannot disagree. Without this the chain
+  // fell through to `return false` and back EXITED THE APP from either layer.
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => {
+      if (searchOpen) { setSearchOpen(false); setGlobalQuery(''); setGlobalResults([]); return true }
+      if (showFacilityList && !forceFacilityList) { setShowFacilityList(false); return true }
+      return false
+    }
+    return () => { backRef.current = null }
+  }, [backRef, searchOpen, showFacilityList, forceFacilityList])
 
   async function handleResultPress(result) {
     setGlobalQuery('')

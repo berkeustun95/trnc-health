@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, FlatList, ActivityIndicator, Platform,
-  Modal, LayoutAnimation, UIManager, Switch,
+  Modal, LayoutAnimation, UIManager, Switch, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
@@ -134,7 +134,7 @@ function draftFromRow(row) {
   }
 }
 
-export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange }) {
+export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange, guardRef = null }) {
   const [profile, setProfile]               = useState(null)
   const [form, setForm]                     = useState({
     first_name: '', last_name: '', display_name: '',
@@ -710,6 +710,32 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     Object.keys(form).some(k => form[k] !== savedForm[k]) || selectedCC !== savedCC
   )
 
+  // ─── Leaving with unsaved edits asks first ─────────────────────────────────
+  // Every way out of Profile — its back button, Android back (App's chain calls guard.back),
+  // and the bottom tab bar (guard.leave) — used to unmount it silently and throw the edits
+  // away. A half-added education row counts too. `back` also closes Legal first, which
+  // Android back used to skip straight past to Home (2026-09-27, slice 0).
+  const dirty = hasChanges || draft != null
+  const confirmLeave = proceed => {
+    if (!dirty) { proceed(); return }
+    Alert.alert(t('unsavedTitle', lang), t('unsavedBody', lang), [
+      { text: t('unsavedKeep', lang), style: 'cancel' },
+      { text: t('unsavedDiscard', lang), style: 'destructive', onPress: proceed },
+    ])
+  }
+  useEffect(() => {
+    if (!guardRef) return
+    guardRef.current = {
+      back: () => {
+        if (legalTab) { setLegalTab(null); return true }
+        if (dirty) { confirmLeave(onBack); return true }
+        return false
+      },
+      leave: proceed => confirmLeave(proceed),
+    }
+    return () => { guardRef.current = null }
+  })
+
   const isComplete = profile?.profile_completed_at != null
   const studentLevel = form.resident_status === 'student' ? form.student_level : null
   // ⚠ THIS LIST IS THE CLIENT'S COPY OF profiles_completion_requires_fields_check AND
@@ -871,7 +897,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           keyboardShouldPersistTaps="handled"
         >
           <View style={s.header}>
-            <BackButton lang={lang} onPress={onBack} style={s.backBtn} />
+            <BackButton lang={lang} onPress={() => confirmLeave(onBack)} style={s.backBtn} />
             <Text style={s.title}>{t('profile', lang)}</Text>
             {/* Counterweight for the back button so the title stays centred. Save used to
                 live here as a text link; it is a full-width footer button now. */}

@@ -642,7 +642,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
         </ScrollView>
 
         {/* Photo lightbox */}
-        <Modal visible={!!lightbox} transparent animationType="fade">
+        <Modal visible={!!lightbox} transparent animationType="fade" onRequestClose={() => setLightbox(null)}>
           <TouchableOpacity style={s.lightboxBg} onPress={() => setLightbox(null)} activeOpacity={1}>
             <TouchableOpacity style={s.lightboxClose} onPress={() => setLightbox(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color="#fff" />
