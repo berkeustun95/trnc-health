@@ -252,6 +252,8 @@ const SURFACES = [
   // same commit as the screens themselves, which is the only moment anyone remembers.
   'screens/ConversationsScreen.js',
   'screens/ConversationScreen.js',
+  // Route medals (ROUTE_MEDALS_LIVE), added with the component.
+  'components/RouteBadges.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —

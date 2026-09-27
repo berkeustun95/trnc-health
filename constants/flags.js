@@ -54,6 +54,13 @@ export const EXPLORE_MAP_LIVE = true
 // then walking_routes.is_active, then this flag, then the go-live SOP's OTA steps.
 export const EXPLORE_ROUTES_LIVE = true   // live 2026-09-24
 
+// Route medals: a badge per walking route, earned by being within ~50 m of 70% of its stops
+// during a walk. false = no visit tracking, no badges on either profile, no completion event.
+// Went live 2026-09-27 in this order: 20261056 applied + verify_route_medals.sql OK →
+// this flag in BOTH files with the 2026-09-27 policy → main (docs/) → web:deploy → OTA on
+// 1.2.0 and 1.1.0, back to back.
+export const ROUTE_MEDALS_LIVE = true   // live 2026-09-27
+
 // Profile completion gate (Slice 2). false = the gate never fires and the wizard is
 // unreachable; the schema, the lookup tables and the availability RPC from Slice 1 are
 // all live either way and harmless on their own.

@@ -31,7 +31,8 @@ import {
 } from '../utils/education'
 import { subjectOptions, studyYearOptions, studyYearCeiling } from '../utils/studyFields'
 import LegalScreen from './LegalScreen'
-import { TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
+import { TERMS_CHECKBOX_LIVE, MODULE_FLAGS, ROUTE_MEDALS_LIVE } from '../constants/flags'
+import { OwnRouteBadges } from '../components/RouteBadges'
 import { PRESET_AVATARS } from '../constants/avatars'
 import Avatar, { prefetchAvatars, invalidateAvatar } from '../components/Avatar'
 import BackButton from '../components/BackButton'
@@ -1224,6 +1225,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             </View>
           )}
 
+          {ROUTE_MEDALS_LIVE && (
+            <OwnRouteBadges session={session} lang={lang} sectionStyle={s.marketingSection}
+              titleStyle={s.sectionTitle} rowStyle={s.marketingRow} labelStyle={s.marketingLabel} hintStyle={s.fieldHint} />
+          )}
+
           {MODULE_FLAGS.studentHub && (
             <View style={s.marketingSection}>
               <Text style={s.sectionTitle}>{t('menuStudentHub', lang)}</Text>
@@ -1273,7 +1279,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                   policy itself got wrong before this. If either RETURNS TABLE changes,
                   this sentence is the other half of that edit. */}
               {hasDisplayName && enrolments?.length ? (
-                <Text style={s.fieldHint}>{t('eduListingDisclosure', lang)}</Text>
+                <Text style={s.fieldHint}>{ROUTE_MEDALS_LIVE ? t('eduListingDisclosureBadges', lang) : t('eduListingDisclosure', lang)}</Text>
               ) : null}
             </View>
           )}
