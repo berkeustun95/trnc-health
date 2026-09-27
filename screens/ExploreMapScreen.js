@@ -621,7 +621,9 @@ export default function ExploreMapScreen({
             selected={selectedRoute}
             lang={lang}
             walkNext={walk ? walk.next : null}
-            liveLeg={walk && liveLeg?.toId === liveTarget?.id ? liveLeg.coords : null}
+            // liveLeg is null once the walk is done (liveTarget null): `undefined === undefined`
+            // would then read null.coords — the 2026-09 black screen at the last Sonraki.
+            liveLeg={walk && liveLeg && liveLeg.toId === liveTarget?.id ? liveLeg.coords : null}
             onSelectRoute={openRoute}
             onSelectStop={p => handOff(() => onSelectPlace?.(p))}
           />
