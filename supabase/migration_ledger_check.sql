@@ -174,7 +174,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261053_duty_roster_2026_27.sql', 'a4ecef12ec8b765d2dccc744a41898032cda57c0c5b53cc715611f4c7f1240e6'),
   ('20261054_duty_roster_phone_variants.sql', '21829c4bf3a296388c7ddda6ed60b03d217968e47e0de73757be8370beae8b5f'),
   ('20261055_kaptan_can_coordinates.sql', '80a574b289ff649d9127d44747e059eb40b91eca62bb0bec90ee5af2fce9d21f'),
-  ('20261056_route_medals.sql', 'ebf78a5345f4d5a61dc5850bcd747dfbe43915d42c39cf791d3deae7b81b7fde')
+  ('20261056_route_medals.sql', '9d8cfd982cf34b1ccc511785c3792936df98e560f575a25fc4cd6d061ebfa021')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

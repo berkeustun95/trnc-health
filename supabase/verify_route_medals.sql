@@ -73,6 +73,9 @@ BEGIN
 
     -- 4. Through the profile path: route id only while the switch is on, zero when off.
     IF is_listed_student(v_u) THEN
+      -- A holder listed before 20261056 starts with badges OFF (option b); turn it on here,
+      -- inside the transaction this script always rolls back, to test the visible path.
+      UPDATE profiles SET route_badges_public = true WHERE id = v_u;
       PERFORM set_config('request.jwt.claims', json_build_object('sub', v_v, 'role', 'authenticated', 'is_anonymous', false)::text, true);
       SET LOCAL ROLE authenticated;
       SELECT count(*) INTO v_n FROM get_profile_route_badges(v_u) b WHERE b.route_id = v_route;

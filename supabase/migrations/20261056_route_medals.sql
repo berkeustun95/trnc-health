@@ -27,7 +27,8 @@
 --                         not blocked either way, subject named and unbanned. It is gated
 --                         BY CALLING get_student_profile, so the two cannot drift apart.
 --                         Plus the subject's own switch, profiles.route_badges_public
---                         (default ON). Every "not visible" reason is zero rows — no oracle.
+--                         (default ON; OFF for everyone already listed when this applied).
+--                         Every "not visible" reason is zero rows — no oracle.
 --   deletion            — user_id → profiles ON DELETE CASCADE (student_education's FK,
 --                         verbatim), and delete_own_account deletes the profiles row.
 --
@@ -56,8 +57,9 @@ BEGIN
   IF to_regprocedure('public.is_anonymous_session()') IS NULL THEN
     RAISE EXCEPTION 'REFUSING: is_anonymous_session() is missing. Nothing applied.';
   END IF;
-  IF to_regclass('public.walking_routes') IS NULL OR to_regclass('public.contact_events') IS NULL THEN
-    RAISE EXCEPTION 'REFUSING: walking_routes or contact_events is missing. Nothing applied.';
+  IF to_regclass('public.walking_routes') IS NULL OR to_regclass('public.contact_events') IS NULL
+     OR to_regclass('public.student_education') IS NULL THEN
+    RAISE EXCEPTION 'REFUSING: walking_routes, contact_events or student_education is missing. Nothing applied.';
   END IF;
 END $$;
 
@@ -65,6 +67,33 @@ END $$;
 -- Default ON, by product decision (2026-09-27): badges are visible to the people who can
 -- already see this profile. Read only by get_profile_route_badges (DEFINER) — strangers
 -- cannot read profiles rows at all, which is what makes a plain column safe here.
+--
+-- ⚠ EXCEPT for everyone already on a student list (decision 2026-09-27, option b). They
+--   opted in under a disclosure that did not mention badges, so theirs start OFF; new
+--   listings get default-ON together with the consent sentence that names badges.
+--   The backfill runs ONLY in the transaction that creates the column: a re-paste of this
+--   file after go-live must not switch off somebody who has since turned badges on.
+--   "On the list" = any student_education row with listing_opt_in, named or not.
+DO $$
+DECLARE v_left int;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'profiles'
+                    AND column_name = 'route_badges_public') THEN
+    ALTER TABLE public.profiles ADD COLUMN route_badges_public boolean NOT NULL DEFAULT true;
+    UPDATE public.profiles p SET route_badges_public = false
+     WHERE EXISTS (SELECT 1 FROM public.student_education e
+                    WHERE e.user_id = p.id AND e.listing_opt_in);
+    SELECT count(*) INTO v_left FROM public.profiles p
+     WHERE p.route_badges_public
+       AND EXISTS (SELECT 1 FROM public.student_education e WHERE e.user_id = p.id AND e.listing_opt_in);
+    IF v_left IS DISTINCT FROM 0 THEN
+      RAISE EXCEPTION 'backfill left % already-listed profile(s) with badges ON', v_left;
+    END IF;
+  END IF;
+END $$;
+-- The column's declaration of record — a no-op here, since the block above has just added
+-- it. Kept top-level because audit-schema-drift reads ADD COLUMN statements, not DO bodies.
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS route_badges_public boolean NOT NULL DEFAULT true;
 COMMENT ON COLUMN public.profiles.route_badges_public IS
   'Route badges shown on this person''s Student Hub profile to other listed students. '
@@ -374,7 +403,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261056_route_medals.sql', 'ebf78a5345f4d5a61dc5850bcd747dfbe43915d42c39cf791d3deae7b81b7fde')
+VALUES ('20261056_route_medals.sql', '9d8cfd982cf34b1ccc511785c3792936df98e560f575a25fc4cd6d061ebfa021')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
