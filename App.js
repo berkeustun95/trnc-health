@@ -595,6 +595,14 @@ export default function App() {
   const placeBackRef = useRef(null)
   const homeServicesBackRef = useRef(null)
   const studentHubBackRef = useRef(null)
+  const guideBackRef = useRef(null)
+  // Slice 10: the rest of the modules' inner layers, asked the same way.
+  const jobsBackRef = useRef(null)
+  const transportBackRef = useRef(null)
+  const insuranceBackRef = useRef(null)
+  const groomingBackRef = useRef(null)
+  const garagesBackRef = useRef(null)
+  const facilityBackRef = useRef(null)
   const profileGuardRef = useRef(null)
   // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
   // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
@@ -684,6 +692,7 @@ export default function App() {
   // duty region, the events district, the beach region and the mark-all-read).
   function closeNotifs() {
     setShowNotifs(false)
+    forgetScroll('notifs')
     const uid = sessionRef.current?.user?.id
     if (!uid) return
     supabase.from('notifications').update({ read: true }).eq('user_id', uid)
@@ -859,8 +868,9 @@ export default function App() {
       if (showEmergencyModal) { setShowEmergencyModal(false); return true }
       if (showMenu) { closeMenu(); return true }
       if (showPasswordReset) { setShowPasswordReset(false); return true }
-      if (showNotifs) { closeNotifs(); return true }
+      // Duty first: a notification opens the duty list ON TOP of Notifications (slice 10).
       if (showDutyList) { closeDutyList(); return true }
+      if (showNotifs) { closeNotifs(); return true }
       // Gated read-only directory. Sits with the other exempt surfaces so back returns to
       // the wizard; on the wizard itself nothing here matches and the chain falls through
       // to `return false`, which closes the app. That is deliberate and is NOT a skip —
@@ -874,17 +884,18 @@ export default function App() {
       if (showAgentOnboarding) { setShowAgentOnboarding(false); return true }
       if (showAccommodation) { setShowAccommodation(false); return true }
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
-      if (selectedFacility) { setSelectedFacility(null); return true }
+      if (selectedFacility) { if (facilityBackRef.current?.()) return true; setSelectedFacility(null); return true }
       if (petsSubScreen === 'pethotel') { closePetHotel(); return true }
       if (petsSubScreen) { petsSubBack(); return true }
       if (showPets) { setShowPets(false); return true }
       if (showHomeServices) { if (homeServicesBackRef.current?.()) return true; setShowHomeServices(false); return true }
-      if (showJobPostings)  { setShowJobPostings(false);  return true }
-      if (showTransport) { setShowTransport(false); return true }
-      if (showInsurance) { setShowInsurance(false); return true }
-      if (showGrooming) { setShowGrooming(false); return true }
-      if (showGarages) { setShowGarages(false); return true }
+      if (showJobPostings)  { if (jobsBackRef.current?.()) return true; setShowJobPostings(false);  return true }
+      if (showTransport) { if (transportBackRef.current?.()) return true; setShowTransport(false); return true }
+      if (showInsurance) { if (insuranceBackRef.current?.()) return true; setShowInsurance(false); return true }
+      if (showGrooming) { if (groomingBackRef.current?.()) return true; setShowGrooming(false); return true }
+      // Towing before Garages: Garages opens it on top of itself (slice 10).
       if (showTowing) { setShowTowing(false); return true }
+      if (showGarages) { if (garagesBackRef.current?.()) return true; setShowGarages(false); return true }
       // Walks the module one level at a time: package -> package list -> landing. A bare
       // pop to null would skip the list entirely and read as the app losing its place.
       if (connectivitySub?.view === 'package' || connectivitySub === 'stores') { setConnectivitySub('operator'); return true }
@@ -898,8 +909,8 @@ export default function App() {
       if ((showExploreBeach || showExplore) && exploreBackRef.current?.()) return true
       if (showExploreBeach)     { closeExploreBeach(); return true }
       if (showExplore)          { setShowExplore(false); return true }
-      if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
+      if (showNewcomerEssentials) { if (guideBackRef.current?.()) return true; setShowNewcomerEssentials(false); return true }
       // Below eSIM, Welcome Guide and Exchange Rates: Student Hub opens those ON TOP of itself
       // (they render earlier in the content chain), so Back must pop them before the hub.
       if (showStudentHub) { if (studentHubBackRef.current?.()) return true; setShowStudentHub(false); return true }
@@ -1418,6 +1429,7 @@ export default function App() {
       onToggleFavorite={() => toggleFavorite(selectedFacility.id)}
       onRequireAccount={requireAccount}
       onBack={() => setSelectedFacility(null)}
+      backRef={facilityBackRef}
     />
   ) : null
   const explorePlaceEl = selectedExplorePlace ? (
@@ -1799,6 +1811,10 @@ export default function App() {
     content = <HomeServiceDashboardScreen session={session} lang={lang} />
   } else if (profile.role === 'insurance_provider') {
     content = <InsuranceDashboardScreen session={session} lang={lang} />
+  // Duty list ABOVE Notifications: a notification opens it on top, and back returns to the
+  // notifications at the same scroll (slice 10).
+  } else if (showDutyList) {
+    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
   } else if (showNotifs) {
     content = <NotificationsScreen
       notifications={notifications}
@@ -1808,13 +1824,8 @@ export default function App() {
       onMarkAllRead={markAllNotifsRead}
       onClearAll={clearAllNotifs}
       onMarkRead={markNotifRead}
-      onNotifPress={() => {
-        setShowNotifs(false)
-        setShowDutyList(true)
-      }}
+      onNotifPress={() => setShowDutyList(true)}
     />
-  } else if (showDutyList) {
-    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
   } else if (showEvents) {
     content = (MODULE_FLAGS.events || isAdmin)
       ? <EventsScreen lang={lang} onBack={closeEvents} initialDistrict={eventsDistrict} onAdNavigate={openAdRoute}
@@ -1862,15 +1873,15 @@ export default function App() {
       : <ComingSoonScreen lang={lang} moduleKey="homeServices" titleKey="menuHomeServices" session={session} onBack={() => setShowHomeServices(false)} />
   } else if (showJobPostings) {
     content = (MODULE_FLAGS.jobs || isAdmin)
-      ? <JobPostingsScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowJobPostings(false)} />
+      ? <JobPostingsScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowJobPostings(false)} backRef={jobsBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="jobs" titleKey="menuJobPostings" session={session} onBack={() => setShowJobPostings(false)} />
   } else if (showTransport) {
     content = (MODULE_FLAGS.transport || isAdmin)
-      ? <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowTransport(false)} />
+      ? <TransportScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowTransport(false)}  backRef={transportBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="transport" titleKey="menuTransportation" session={session} onBack={() => setShowTransport(false)} />
   } else if (showInsurance) {
     content = (MODULE_FLAGS.insurance || isAdmin)
-      ? <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowInsurance(false)} />
+      ? <InsuranceScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowInsurance(false)}  backRef={insuranceBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="insurance" titleKey="menuInsurance" session={session} onBack={() => setShowInsurance(false)} />
   } else if (showEsim) {
     // The Home "esim" tile is UNGATED and has opened EsimScreen (waitlist) since 20260725.
@@ -1959,16 +1970,19 @@ export default function App() {
         <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     )
+  // Exchange Rates ABOVE the Welcome Guide: the guide's Currency card opens it on top, and
+  // back returns to the guide (slice 8). Opened alone (Home), it is unaffected.
+  } else if (showExchangeRates) {
+    content = <ExchangeRatesScreen lang={lang} onBack={() => setShowExchangeRates(false)} />
   } else if (showNewcomerEssentials) {
     content = (
       <NewcomerEssentialsScreen
         lang={lang}
         onBack={() => setShowNewcomerEssentials(false)}
-        onShowExchangeRates={() => { setShowNewcomerEssentials(false); setShowExchangeRates(true) }}
+        onShowExchangeRates={() => setShowExchangeRates(true)}
+        backRef={guideBackRef}
       />
     )
-  } else if (showExchangeRates) {
-    content = <ExchangeRatesScreen lang={lang} onBack={() => setShowExchangeRates(false)} />
   } else if (showGames) {
     if (gamesSubScreen === 'xox') {
       content = <XoxGameScreen lang={lang} onBack={() => setGamesSubScreen(null)} />
@@ -2081,7 +2095,7 @@ export default function App() {
         </View>
       </SafeAreaView>
     )
-  } else if (selectedFacility && !(showPets && petsSubScreen === 'vetdirectory')) {
+  } else if (selectedFacility && !(showPets && petsSubScreen === 'vetdirectory') && !showGrooming && !showGarages) {
     content = facilityProfileEl
   } else if (showPets) {
     if (!MODULE_FLAGS.pets && !isAdmin) {
@@ -2158,11 +2172,31 @@ export default function App() {
     }
   } else if (showGrooming) {
     content = (MODULE_FLAGS.grooming || isAdmin)
-      ? <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGrooming(false)} onOpenFacility={setSelectedFacility} />
+      ? (
+        // A facility opens OVER the still-mounted list (filters, scroll kept; slice 10).
+        <View style={{ flex: 1 }}>
+          <GroomingScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGrooming(false)} onOpenFacility={setSelectedFacility} backRef={groomingBackRef} />
+          {facilityProfileEl && <View style={styles.moduleOverlay}>{facilityProfileEl}</View>}
+        </View>
+      )
       : <ComingSoonScreen lang={lang} moduleKey="grooming" titleKey="menuGrooming" session={session} onBack={() => setShowGrooming(false)} />
   } else if (showGarages) {
     content = (MODULE_FLAGS.garages || isAdmin || ownsGarage)
-      ? <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} onOpenFacility={setSelectedFacility} onShowTowing={() => { setShowGarages(false); setShowTowing(true) }} isAdmin={profile?.role === 'admin'} />
+      ? (
+        // A facility and Towing open OVER the still-mounted garages list — filters, scroll and
+        // the Compare view survive, and back from Towing returns here, not Home (slice 10).
+        <View style={{ flex: 1 }}>
+          <GaragesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowGarages(false)} onOpenFacility={setSelectedFacility} onShowTowing={() => setShowTowing(true)} isAdmin={profile?.role === 'admin'} backRef={garagesBackRef} />
+          {facilityProfileEl && <View style={styles.moduleOverlay}>{facilityProfileEl}</View>}
+          {showTowing && (
+            <View style={styles.moduleOverlay}>
+              {(MODULE_FLAGS.towing || isAdmin)
+                ? <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} />
+                : <ComingSoonScreen lang={lang} moduleKey="towing" titleKey="menuTowing" session={session} onBack={() => setShowTowing(false)} />}
+            </View>
+          )}
+        </View>
+      )
       : <ComingSoonScreen lang={lang} moduleKey="garages" titleKey="menuGarages" session={session} onBack={() => setShowGarages(false)} />
   } else if (showTowing) {
     content = (MODULE_FLAGS.towing || isAdmin)

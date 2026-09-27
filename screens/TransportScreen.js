@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, ScrollView, Linking,
@@ -117,7 +118,7 @@ function ProviderCard({ item, lang, onPress }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function TransportScreen({ lang, session, onBack, onRequireAccount }) {
+export default function TransportScreen({ lang, session, onBack, onRequireAccount, backRef = null }) {
   const [selectedType,     setSelectedType]     = useState(null)
   const [selectedDistrict, setSelectedDistrict] = useState(null)
   const [selectedProvider, setSelectedProvider] = useState(null)
@@ -149,6 +150,23 @@ export default function TransportScreen({ lang, session, onBack, onRequireAccoun
     setSelectedDistrict(null)
     setSelectedType(key)
   }
+
+  const typesMem = useScrollMemory('tr:types')
+  const listMem = useScrollMemory('tr:list')
+  // App's hardware-back chain asks this before closing the module: the same steps as the
+  // on-screen backs, topmost layer first (slice 10, 2026-09-28).
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => {
+      if (showBusRoutes) { setShowBusRoutes(false); return true }
+      if (showOnboarding) { setShowOnboarding(false); return true }
+      if (selectedProvider) { setSelectedProvider(null); return true }
+      if (selectedType) { setSelectedType(null); setSelectedDistrict(null); setProviders([]); return true }
+      return false
+    }
+    return () => { backRef.current = null }
+  })
+  useEffect(() => () => forgetScroll('tr:'), [])
 
   function handleBack() {
     if (selectedProvider) { setSelectedProvider(null) }
@@ -191,7 +209,7 @@ export default function TransportScreen({ lang, session, onBack, onRequireAccoun
       <ScreenHeader onBack={handleBack} backLabel={backLabel} title={headerTitle} lang={lang} />
 
       {!selectedType ? (
-        <ScrollView contentContainerStyle={s.catScroll} showsVerticalScrollIndicator={false}>
+        <ScrollView {...typesMem} contentContainerStyle={s.catScroll} showsVerticalScrollIndicator={false}>
           <View style={s.subtitleCard}>
             <Text style={s.subtitle}>{t('trSubtitle', lang)}</Text>
           </View>
@@ -256,6 +274,7 @@ export default function TransportScreen({ lang, session, onBack, onRequireAccoun
             ? <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
             : (
               <FlatList
+                {...listMem}
                 data={providers}
                 keyExtractor={item => item.id}
                 contentContainerStyle={s.listContent}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, Linking, BackHandler,
@@ -139,6 +140,9 @@ export default function TowingScreen({ lang, userLocation, onBack }) {
   const [region, setRegion]       = useState(null)      // null = could not resolve
   const [pickingRegion, setPick]  = useState(false)
   const [selected, setSelected]   = useState(null)
+  // The detail is an early return, so the list remounts behind it; its offset comes back.
+  const listMem = useScrollMemory('tow:list')
+  useEffect(() => () => forgetScroll('tow:'), [])
 
   // Region comes from the OFFLINE resolver, never a geocoder, and it NEVER prompts for
   // permission — userLocation is whatever the app already has. If that is nothing, the
@@ -302,6 +306,7 @@ export default function TowingScreen({ lang, userLocation, onBack }) {
         </View>
       ) : (
         <FlatList
+          {...listMem}
           data={sorted}
           keyExtractor={c => c.id}
           contentContainerStyle={s.listContent}

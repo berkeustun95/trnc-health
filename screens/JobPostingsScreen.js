@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, ScrollView, Linking,
@@ -139,7 +140,7 @@ function JobCard({ item, lang, onPress }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function JobPostingsScreen({ lang, session, onBack, onRequireAccount }) {
+export default function JobPostingsScreen({ lang, session, onBack, onRequireAccount, backRef = null }) {
   const [selectedCategory,   setSelectedCategory]   = useState(null)
   const [selectedType,       setSelectedType]       = useState(null)
   const [selectedDistrict,   setSelectedDistrict]   = useState(null)
@@ -179,6 +180,23 @@ export default function JobPostingsScreen({ lang, session, onBack, onRequireAcco
     setSelectedDistrict(null)
     setSelectedCategory(key)
   }
+
+  const listMem = useScrollMemory('jobs:list')
+  const catsMem = useScrollMemory('jobs:cats')
+  // App's hardware-back chain asks this before closing the module: the same steps as the
+  // on-screen backs, topmost layer first (slice 10, 2026-09-28).
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => {
+      if (showPostForm) { setShowPostForm(false); return true }
+      if (showMyPostings) { setShowMyPostings(false); return true }
+      if (selectedJob) { setSelectedJob(null); return true }
+      if (selectedCategory !== null) { setSelectedCategory(null); setSelectedType(null); setSelectedDistrict(null); setJobs([]); return true }
+      return false
+    }
+    return () => { backRef.current = null }
+  })
+  useEffect(() => () => forgetScroll('jobs:'), [])
 
   function handleBack() {
     if (selectedJob) {
@@ -302,6 +320,7 @@ export default function JobPostingsScreen({ lang, session, onBack, onRequireAcco
           ? <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
           : (
             <FlatList
+              {...listMem}
               data={jobs}
               keyExtractor={item => item.id}
               contentContainerStyle={s.listContent}
@@ -337,6 +356,7 @@ export default function JobPostingsScreen({ lang, session, onBack, onRequireAcco
       <ScreenHeader onBack={onBack} backLabel={t('back', lang)} title={t('jobTitle', lang)} lang={lang} />
 
       <ScrollView
+        {...catsMem}
         contentContainerStyle={s.catScroll}
         showsVerticalScrollIndicator={false}
       >

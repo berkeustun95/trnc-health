@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, ScrollView, Linking,
@@ -130,7 +131,7 @@ function CompanyCard({ item, lang, onPress }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function InsuranceScreen({ lang, session, onBack, onRequireAccount }) {
+export default function InsuranceScreen({ lang, session, onBack, onRequireAccount, backRef = null }) {
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [selectedDistrict, setSelectedDistrict] = useState(null)
   const [selectedCompany,  setSelectedCompany]  = useState(null)
@@ -163,6 +164,22 @@ export default function InsuranceScreen({ lang, session, onBack, onRequireAccoun
     setSelectedDistrict(null)
     setSelectedCategory(key)
   }
+
+  const catsMem = useScrollMemory('ins:cats')
+  const listMem = useScrollMemory('ins:list')
+  // App's hardware-back chain asks this before closing the module: the same steps as the
+  // on-screen backs, topmost layer first (slice 10, 2026-09-28).
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => {
+      if (showOnboarding) { setShowOnboarding(false); return true }
+      if (selectedCompany) { setSelectedCompany(null); return true }
+      if (selectedCategory) { setSelectedCategory(null); setSelectedDistrict(null); setCompanies([]); return true }
+      return false
+    }
+    return () => { backRef.current = null }
+  })
+  useEffect(() => () => forgetScroll('ins:'), [])
 
   function handleBack() {
     if (selectedCompany) {
@@ -209,6 +226,7 @@ export default function InsuranceScreen({ lang, session, onBack, onRequireAccoun
 
       {!selectedCategory ? (
         <ScrollView
+          {...catsMem}
           contentContainerStyle={s.catScroll}
           showsVerticalScrollIndicator={false}
         >
@@ -274,6 +292,7 @@ export default function InsuranceScreen({ lang, session, onBack, onRequireAccoun
             ? <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
             : (
               <FlatList
+                {...listMem}
                 data={companies}
                 keyExtractor={item => item.id}
                 contentContainerStyle={s.listContent}

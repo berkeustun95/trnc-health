@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import { View, Text, Image, ScrollView, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Modal, StyleSheet, Linking, Dimensions, Alert } from 'react-native'
 import MapView, { Marker } from 'react-native-maps'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -26,7 +27,7 @@ const SW = Dimensions.get('window').width
 
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
-export default function FacilityProfileScreen({ facility, lang, session, isFavorite, onToggleFavorite, onBack, onRequireAccount }) {
+export default function FacilityProfileScreen({ facility, lang, session, isFavorite, onToggleFavorite, onBack, onRequireAccount, backRef = null }) {
   // Any signed-in viewer who is NOT the listing's owner may report it. Logged-out
   // taps fall through to onRequireAccount inside ContentReportMenu. Unclaimed
   // health facilities (provider_id null) are reportable by anyone signed in.
@@ -244,6 +245,16 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
     loadMyReview()
   }, [facility.id])
 
+  // All reviews is an early return: the profile's scroll comes back when it closes, and
+  // Android back closes Reviews, not the profile (App's chain asks backRef first; slice 10).
+  const profileMem = useScrollMemory('facility:' + facility.id)
+  useEffect(() => () => forgetScroll('facility:'), [])
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => { if (showAllReviews) { setShowAllReviews(false); return true } return false }
+    return () => { backRef.current = null }
+  })
+
   if (showAllReviews) {
     return <ReviewsScreen facility={facility} lang={lang} onBack={() => setShowAllReviews(false)} onRequireAccount={onRequireAccount} />
   }
@@ -260,7 +271,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView {...profileMem} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
           {/* Nav bar */}
           <View style={s.navBar}>

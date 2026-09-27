@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking,
 } from 'react-native'
@@ -103,8 +104,10 @@ function DrivingCard({ lang }) {
 }
 
 function CurrencyCard({ lang, onShowExchangeRates }) {
+  // Back from Exchange Rates lands on this card at the same scroll (the guide remounts).
+  const mem = useScrollMemory('guide:currency')
   return (
-    <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
+    <ScrollView {...mem} style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
       <ContentCard>
         <BulletRow iconName="cash-outline" iconColor={colors.primary} text={t('essCurrPrimary', lang)} />
         <BulletRow text={t('essCurrAccepted', lang)} />
@@ -389,8 +392,24 @@ function renderCardContent(cardId, lang, onShowExchangeRates) {
   }
 }
 
-export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeRates }) {
-  const [activeCard, setActiveCard] = useState(null)
+// Exchange Rates opens OVER the guide from App.js (the guide unmounts under it). The open
+// card is saved on the way out and read once on return, so back lands on the Currency card,
+// not the grid; the grid's and that card's scroll come back via scroll memory (slice 8).
+let guideReturn = null
+let guideLeavingVia = false
+
+export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeRates, backRef = null }) {
+  const [activeCard, setActiveCard] = useState(() => { const v = guideReturn; guideReturn = null; return v })
+  const hubMem = useScrollMemory('guide:hub')
+  useEffect(() => () => { if (!guideLeavingVia) forgetScroll('guide:'); guideLeavingVia = false }, [])
+  const toRates = () => { guideReturn = activeCard; guideLeavingVia = true; onShowExchangeRates?.() }
+  // App's hardware-back chain asks this before closing the guide: an open card closes first,
+  // like its header back (it used to close the whole guide).
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => { if (activeCard) { setActiveCard(null); return true } return false }
+    return () => { backRef.current = null }
+  })
 
   const card = CARDS.find(c => c.id === activeCard)
 
@@ -408,7 +427,7 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
           }
           title={t(card.labelKey, lang)}
         />
-        {renderCardContent(activeCard, lang, onShowExchangeRates)}
+        {renderCardContent(activeCard, lang, toRates)}
       </SafeAreaView>
     )
   }
@@ -417,7 +436,7 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="newcomer_essentials" />
       <ScreenHeader onBack={onBack} lang={lang} />
-      <ScrollView contentContainerStyle={s.hubContent} showsVerticalScrollIndicator={false}>
+      <ScrollView {...hubMem} contentContainerStyle={s.hubContent} showsVerticalScrollIndicator={false}>
         <MascotIntroCard
           module="welcome_guide"
           title={t('essHubTitle', lang)}

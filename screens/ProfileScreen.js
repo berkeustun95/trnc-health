@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, FlatList, ActivityIndicator, Platform,
@@ -716,6 +717,9 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
   // away. A half-added education row counts too. `back` also closes Legal first, which
   // Android back used to skip straight past to Home (2026-09-27, slice 0).
   const dirty = hasChanges || draft != null
+  // Legal is an early return: the profile's scroll comes back when it closes (slice 10).
+  const profileMem = useScrollMemory('profile:main')
+  useEffect(() => () => forgetScroll('profile:'), [])
   const confirmLeave = proceed => {
     if (!dirty) { proceed(); return }
     Alert.alert(t('unsavedTitle', lang), t('unsavedBody', lang), [
@@ -892,6 +896,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <KeyboardAwareForm>
         <ScrollView
+          {...profileMem}
           contentContainerStyle={s.container}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

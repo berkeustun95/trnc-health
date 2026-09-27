@@ -1,3 +1,4 @@
+import { useScrollMemory } from '../utils/scrollMemory'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -30,6 +31,9 @@ function timeAgo(isoString) {
 // and a decision about every notification type, not just messages.
 
 export default function NotificationsScreen({ notifications, loading, lang, onBack, onMarkAllRead, onClearAll, onNotifPress, onMarkRead }) {
+  // Back from the duty list (opened from a notification, on top of this screen) lands at the
+  // same scroll; App forgets it when notifications close (slice 10).
+  const listMem = useScrollMemory('notifs')
   const unreadCount = notifications.filter(n => !n.read).length
 
   return (
@@ -65,6 +69,7 @@ export default function NotificationsScreen({ notifications, loading, lang, onBa
         </View>
       ) : (
         <FlatList
+          {...listMem}
           data={notifications}
           keyExtractor={item => item.id}
           showsVerticalScrollIndicator={false}

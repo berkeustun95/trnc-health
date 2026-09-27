@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView,
 } from 'react-native'
@@ -104,7 +105,7 @@ function GarageCard({ item, lang, onPress, showFeatured }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function GaragesScreen({ lang, session, onBack, onRequireAccount, onOpenFacility, onShowTowing, isAdmin = false }) {
+export default function GaragesScreen({ lang, session, onBack, onRequireAccount, onOpenFacility, onShowTowing, isAdmin = false, backRef = null }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin
   // previewing the directory. Mirrors the GARAGES_LIVE tile-gate.
   const showFeatured = FEATURED_LIVE || isAdmin
@@ -119,6 +120,19 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
   const [areas, setAreas]             = useState([]) // multi-select area slugs (only when 1 region)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
+  const listMem = useScrollMemory('gar:list')
+  // App's hardware-back chain asks this before closing the module: the same steps as the
+  // on-screen backs, topmost layer first (slice 10, 2026-09-28).
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => {
+      if (showCompare) { setShowCompare(false); return true }
+      if (showOnboarding) { setShowOnboarding(false); return true }
+      return false
+    }
+    return () => { backRef.current = null }
+  })
+  useEffect(() => () => forgetScroll('gar:'), [])
   const [myGarage, setMyGarage]       = useState(null) // the caller's own garage row, if any
 
   const load = useCallback(async () => {
@@ -316,6 +330,7 @@ export default function GaragesScreen({ lang, session, onBack, onRequireAccount,
           </View>
         ) : (
           <FlatList
+            {...listMem}
             data={garages}
             keyExtractor={item => item.id}
             contentContainerStyle={s.listContent}

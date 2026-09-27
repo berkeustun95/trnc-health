@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import { searchMatch } from '../utils/searchFold'
 import {
   View, Text, Image, ImageBackground, FlatList, StyleSheet,
@@ -133,6 +134,13 @@ const RESULT_META = {
   towing:       { icon: 'car-outline',       tint: 'urgent'    },
 }
 
+// Opening any module swaps Home out of App.js's content (the tab shell unmounts; keeping it
+// mounted under pushed screens is what froze touch in slice 2). So Home's place is SAVED
+// here on every render and read once on the next mount: the Health directory with its search
+// and filters, and search with its query and results. Scroll comes back via scroll memory.
+// Only the tab-shell Home (the one given a backRef) uses it; the gate's directory does not.
+let homeState = null
+
 export default function HomeScreen({
   // ─── Profile-gate props (Slice 2). All three DEFAULT to today's behaviour, so the
   //     normal render path is byte-identical and this screen has one code path, not two.
@@ -204,18 +212,19 @@ export default function HomeScreen({
   // false, so every caller that has not thought about it gets the safe branch.
   promosEligible = false,
 }) {
-  const [showFacilityList, setShowFacilityList] = useState(forceFacilityList)
-  const [searchText, setSearchText]             = useState('')
-  const [activeType, setActiveType]             = useState(null)
-  const [activeSpecialty, setActiveSpecialty]   = useState(null)
-  const [openOnly, setOpenOnly]                 = useState(false)
-  const [langFilter, setLangFilter]             = useState(false)
+  const [snap] = useState(() => (backRef ? homeState : null))
+  const [showFacilityList, setShowFacilityList] = useState(snap?.showFacilityList ?? forceFacilityList)
+  const [searchText, setSearchText]             = useState(snap?.searchText ?? '')
+  const [activeType, setActiveType]             = useState(snap?.activeType ?? null)
+  const [activeSpecialty, setActiveSpecialty]   = useState(snap?.activeSpecialty ?? null)
+  const [openOnly, setOpenOnly]                 = useState(snap?.openOnly ?? false)
+  const [langFilter, setLangFilter]             = useState(snap?.langFilter ?? false)
   const [showFilters, setShowFilters]           = useState(false)
   const [weatherExpanded, setWeatherExpanded]   = useState(false)
 
   // HOME_V2 only. Declared unconditionally — hooks cannot sit behind a flag — and inert
   // while HOME_V2_LIVE is false: nothing in the V1 path reads either one.
-  const [searchOpen, setSearchOpen]             = useState(false)
+  const [searchOpen, setSearchOpen]             = useState(snap?.searchOpen ?? false)
   const [weatherOpen, setWeatherOpen]           = useState(false)
 
   // The live strip. `stripLoading` starts TRUE so the first paint is the fixed-height
@@ -236,8 +245,19 @@ export default function HomeScreen({
   const [favEditOpen, setFavEditOpen] = useState(false)
 
   // Global hub search
-  const [globalQuery, setGlobalQuery]       = useState('')
-  const [globalResults, setGlobalResults]   = useState([])
+  const [globalQuery, setGlobalQuery]       = useState(snap?.globalQuery ?? '')
+  const [globalResults, setGlobalResults]   = useState(snap?.globalResults ?? [])
+  const hubMem = useScrollMemory('home:hub')
+  const searchMem = useScrollMemory('home:search')
+  const listMem = useScrollMemory('home:facilities')
+  useEffect(() => {
+    if (!backRef) return
+    homeState = { showFacilityList, searchText, activeType, activeSpecialty, openOnly, langFilter,
+                  searchOpen, globalQuery, globalResults }
+  })
+  // Leaving the directory / search ON PURPOSE starts them fresh next time.
+  const closeFacilityList = () => { setShowFacilityList(false); forgetScroll('home:facilities') }
+  const closeSearch = () => { setSearchOpen(false); setGlobalQuery(''); setGlobalResults([]); forgetScroll('home:search') }
   const [isSearching, setIsSearching]       = useState(false)
 
   const runSearch = useCallback(async (q) => {
@@ -438,16 +458,16 @@ export default function HomeScreen({
   useEffect(() => {
     if (!backRef) return
     backRef.current = () => {
-      if (searchOpen) { setSearchOpen(false); setGlobalQuery(''); setGlobalResults([]); return true }
-      if (showFacilityList && !forceFacilityList) { setShowFacilityList(false); return true }
+      if (searchOpen) { closeSearch(); return true }
+      if (showFacilityList && !forceFacilityList) { closeFacilityList(); return true }
       return false
     }
     return () => { backRef.current = null }
   }, [backRef, searchOpen, showFacilityList, forceFacilityList])
 
   async function handleResultPress(result) {
-    setGlobalQuery('')
-    setGlobalResults([])
+    // The query and results are KEPT (they used to be cleared here): back from the item
+    // returns to these results, restored with Home's snapshot (slice 9).
     switch (result.module) {
       case 'medical': {
         const fac = facilities.find(f => f.id === result.id)
@@ -685,7 +705,7 @@ export default function HomeScreen({
         query={globalQuery}
         onQueryChange={setGlobalQuery}
         onOpenSearch={() => setSearchOpen(true)}
-        onCloseSearch={() => { setSearchOpen(false); setGlobalQuery(''); setGlobalResults([]) }}
+        onCloseSearch={closeSearch}
         onShowNotifs={onShowNotifs}
         onOpenMenu={onOpenMenu}
         hamburgerRef={hamburgerRef}
@@ -702,6 +722,7 @@ export default function HomeScreen({
         <>
           {topBar}
           <ScrollView
+            {...searchMem}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={s.v2SearchContent}
             keyboardShouldPersistTaps="handled"
@@ -722,6 +743,7 @@ export default function HomeScreen({
     return (
       <>
         <ScrollView
+          {...hubMem}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.v2Content}
           keyboardShouldPersistTaps="handled"
@@ -1144,6 +1166,7 @@ export default function HomeScreen({
         {locationDenied && <Text style={s.locationNote}>{t('enableLocation', lang)}</Text>}
 
         <FlatList
+          {...listMem}
           data={listed}
           keyExtractor={item => item.id}
           showsVerticalScrollIndicator={false}
@@ -1347,7 +1370,7 @@ export default function HomeScreen({
                 // Under the gate there is no hub to go back TO — revealing it would be
                 // the leak this whole arrangement exists to prevent.
                 if (forceFacilityList) onExitFacilityList?.()
-                else setShowFacilityList(false)
+                else closeFacilityList()
               }} />
             ) : (
               <View style={s.headerLogoWrap} pointerEvents="none">

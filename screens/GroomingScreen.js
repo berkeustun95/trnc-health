@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
   View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView,
 } from 'react-native'
@@ -73,7 +74,7 @@ function ProviderCard({ item, lang, onPress }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function GroomingScreen({ lang, session, onBack, onRequireAccount, onOpenFacility }) {
+export default function GroomingScreen({ lang, session, onBack, onRequireAccount, onOpenFacility, backRef = null }) {
   const [providers, setProviders]         = useState([])
   const [loading, setLoading]             = useState(true)
   const [error, setError]                 = useState(false)
@@ -81,6 +82,18 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
   const [regions, setRegions]             = useState([]) // multi-select region slugs
   const [areas, setAreas]                 = useState([]) // multi-select area slugs (only when 1 region)
   const [showOnboarding, setShowOnboarding]     = useState(false)
+  const listMem = useScrollMemory('groom:list')
+  // App's hardware-back chain asks this before closing the module: the same steps as the
+  // on-screen backs, topmost layer first (slice 10, 2026-09-28).
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => {
+      if (showOnboarding) { setShowOnboarding(false); return true }
+      return false
+    }
+    return () => { backRef.current = null }
+  })
+  useEffect(() => () => forgetScroll('groom:'), [])
   const [myFacility, setMyFacility]             = useState(null) // the caller's own grooming facility, if any
 
   const load = useCallback(async () => {
@@ -250,6 +263,7 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
           </View>
         ) : (
           <FlatList
+            {...listMem}
             data={providers}
             keyExtractor={item => item.id}
             contentContainerStyle={s.listContent}
