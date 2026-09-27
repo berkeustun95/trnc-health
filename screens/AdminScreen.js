@@ -2646,7 +2646,16 @@ function AgentsTab() {
   async function approveAgentWithSub(id, userId, days) {
     const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
     await supabase.from('estate_agents').update({ status: 'active', rejection_reason: null, subscription_expires_at: expiresAt }).eq('id', id)
-    await supabase.from('profiles').update({ role: 'estate_agent' }).eq('id', userId)
+    // Never demote an admin: estate_agent routes the account to the agent dashboard and it
+    // loses AdminScreen. If the role cannot be read, leave it unchanged rather than guess.
+    const { data: prof, error: profErr } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
+    if (profErr || !prof) {
+      Alert.alert('Role not changed', 'Could not read this account\'s role, so it was left unchanged.')
+    } else if (prof.role === 'admin') {
+      Alert.alert('Role not changed', 'This account is an admin. The agent is approved, but the role stays admin.')
+    } else {
+      await supabase.from('profiles').update({ role: 'estate_agent' }).eq('id', userId)
+    }
     setSubscribeTarget(null)
     load()
   }
