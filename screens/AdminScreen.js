@@ -56,7 +56,7 @@ async function updateOrAlert(table, patch, id, label) {
 
 const FACILITY_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
-const ROLES = ['customer', 'provider', 'organizer', 'admin']
+const ROLES = ['customer', 'provider', 'admin']
 // ─── HomeServices is UNCONDITIONAL, and it was not always ──────────────────
 //
 // It used to be spread in behind HS_SELF_REGISTRATION, on the reasoning that an approval
