@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
+import FilterDropdown from '../components/FilterDropdown'
 import { searchMatch } from '../utils/searchFold'
 import {
   View, Text, Image, ImageBackground, FlatList, StyleSheet,
@@ -1059,35 +1060,37 @@ export default function HomeScreen({
                 so the chip goes there and is labelled for what it opens rather than what
                 it would have filtered. It never takes the active/selected style: it is
                 not a filter state, so it must not look like one. */}
-            {[null, 'pharmacy', 'clinic', 'hospital', 'dentist'].map(type => {
-              const isDuty   = type === 'pharmacy'
-              const selected = !isDuty && activeType === type
-              return (
-                <TouchableOpacity
-                  key={type ?? 'all'}
-                  style={[s.typeChip, selected && s.typeChipActive]}
-                  onPress={() => {
-                    if (isDuty) { onShowDutyList?.(); return }
-                    setActiveType(activeType === type ? null : type)
-                    setActiveSpecialty(null)
-                  }}
-                >
-                  {type
-                    ? <TypeSVGIcon type={type} size={14} color={selected ? '#fff' : colors.textSecondary} />
-                    : <Ionicons name="apps-outline" size={14} color={selected ? '#fff' : colors.textSecondary} />
-                  }
-                  <Text style={[s.typeChipText, selected && s.typeChipTextActive]}>
-                    {isDuty
-                      ? t('chipDutyPharmacies', lang)
-                      : type
-                        ? t({ clinic: 'clinics', hospital: 'hospitals', dentist: 'dentists' }[type] || type, lang)
-                        : t('all', lang)
-                    }
-                  </Text>
-                  {isDuty && <Ionicons name="chevron-forward" size={12} color={colors.textSecondary} />}
-                </TouchableOpacity>
-              )
-            })}
+            {/* Tür + Uzmanlık are dropdowns (chip rows → dropdowns). The pharmacy chip still
+                NAVIGATES to the duty roster and "my language" is an on/off toggle, so both
+                stay chips (Berke, 2026-09-28). */}
+            <FilterDropdown
+              label={t('ddType', lang)}
+              lang={lang}
+              options={['clinic', 'hospital', 'dentist'].map(type => ({
+                value: type, label: t({ clinic: 'clinics', hospital: 'hospitals', dentist: 'dentists' }[type], lang),
+              }))}
+              value={activeType}
+              onChange={v => { setActiveType(v); setActiveSpecialty(null) }}
+              style={{ marginRight: 8 }}
+            />
+            {specList.length > 0 && (
+              <FilterDropdown
+                label={t('ddSpecialty', lang)}
+                lang={lang}
+                options={specList.map(sp => ({ value: sp, label: t(sp, lang) }))}
+                value={activeSpecialty}
+                onChange={setActiveSpecialty}
+                style={{ marginRight: 8 }}
+              />
+            )}
+            <TouchableOpacity
+              style={s.typeChip}
+              onPress={() => onShowDutyList?.()}
+            >
+              <TypeSVGIcon type="pharmacy" size={14} color={colors.textSecondary} />
+              <Text style={s.typeChipText}>{t('chipDutyPharmacies', lang)}</Text>
+              <Ionicons name="chevron-forward" size={12} color={colors.textSecondary} />
+            </TouchableOpacity>
             <View style={s.chipDivider} />
             <TouchableOpacity
               style={[s.toggleChip, langFilter && s.toggleChipLang]}
@@ -1096,20 +1099,6 @@ export default function HomeScreen({
               <Ionicons name="language-outline" size={12} color={langFilter ? colors.accent : colors.textSecondary} />
               <Text style={[s.toggleChipText, langFilter && { color: colors.accent }]}>{t('myLang', lang)}</Text>
             </TouchableOpacity>
-          </ScrollView>
-        )}
-
-        {specList.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow} contentContainerStyle={s.filterContent}>
-            {specList.map(sp => (
-              <TouchableOpacity
-                key={sp}
-                style={[s.filterChip, activeSpecialty === sp && s.filterChipActive]}
-                onPress={() => setActiveSpecialty(prev => prev === sp ? null : sp)}
-              >
-                <Text style={[s.filterChipText, activeSpecialty === sp && s.filterChipTextActive]}>{t(sp, lang)}</Text>
-              </TouchableOpacity>
-            ))}
           </ScrollView>
         )}
 

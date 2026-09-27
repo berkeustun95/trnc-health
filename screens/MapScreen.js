@@ -5,6 +5,7 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { parseIsOpen } from '../utils/facilityUtils'
+import FilterDropdown from '../components/FilterDropdown'
 
 const LEFKOSA    = { latitude: 35.1856, longitude: 33.3823, latitudeDelta: 0.08, longitudeDelta: 0.08 }
 const PIN_COLORS = { pharmacy: '#7C3AED', clinic: '#0E7C7B', hospital: '#D1495B', dentist: '#2E9E5B' }
@@ -49,11 +50,6 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
     }
   }
 
-  function setFilter(type) {
-    setFilterType(prev => prev === type ? null : type)
-    setSelectedPin(null)
-  }
-
   return (
     <View style={s.container}>
       <MapView
@@ -89,23 +85,15 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
             {t('openNow', lang)}
           </Text>
         </TouchableOpacity>
-        {FACILITY_TYPES.map(type => {
-          const active = filterType === type
-          const tc = typeColors[type] ?? typeColors.clinic
-          return (
-            <TouchableOpacity
-              key={type}
-              style={[s.filterChip, active && { backgroundColor: tc.bg, borderColor: tc.text }]}
-              onPress={() => setFilter(type)}
-              activeOpacity={0.8}
-            >
-              <Text style={s.filterChipEmoji}>{TYPE_ICONS[type]}</Text>
-              <Text style={[s.filterChipText, active && { color: tc.text }]}>
-                {t(type, lang)}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
+        {/* Type as a dropdown (chip rows → dropdowns); Open now stays a toggle chip.
+            Dormant screen (EXPLORE_MAP_LIVE is on), converted so both map tabs match. */}
+        <FilterDropdown
+          label={t('ddType', lang)}
+          lang={lang}
+          options={FACILITY_TYPES.map(type => ({ value: type, label: t(type, lang), color: PIN_COLORS[type] }))}
+          value={filterType}
+          onChange={v => { setFilterType(v); setSelectedPin(null) }}
+        />
       </ScrollView>
 
       {selectedPin && (

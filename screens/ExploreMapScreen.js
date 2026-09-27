@@ -13,6 +13,7 @@
 // so it ships over OTA and needs no rebuild.
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import FilterDropdown from '../components/FilterDropdown'
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
   ActivityIndicator, ScrollView, useWindowDimensions, Alert, Linking,
@@ -139,7 +140,7 @@ function Chip({ label, count, color, colorBg, active, icon, ionicon, onPress }) 
   )
 }
 
-function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, onOpenNow, showRoutes, routesMode, onRoutes, lang }) {
+function ChipRow({ sources, selectedKeys, onSetKeys, openNow, canOpenNow, onOpenNow, showRoutes, routesMode, onRoutes, lang }) {
   return (
     <ScrollView
       horizontal
@@ -147,12 +148,17 @@ function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, 
       style={ch.bar}
       contentContainerStyle={ch.barContent}
     >
-      <Chip
-        label={t('all', lang)}
-        active={!routesMode && selectedKeys.size === 0}
-        color={colors.primary}
-        colorBg={colors.primaryLight}
-        onPress={onAll}
+      {/* The pin sources as ONE multi-select dropdown (chip rows → dropdowns): colour dot
+          and pin count per source, "Tümü" first. Routes and Open now stay chips — a mode
+          and a toggle, not a choice from a list (Berke, 2026-09-28). */}
+      <FilterDropdown
+        label={t('ddCategory', lang)}
+        lang={lang}
+        multi
+        options={sources.map(src => ({ value: src.key, label: t(src.labelKey, lang), count: src.pins.length, color: src.color }))}
+        values={routesMode ? [] : [...selectedKeys]}
+        onChange={onSetKeys}
+        style={{ marginRight: 8 }}
       />
       {/* A MODE, not a filter: routes replace the pins while it is on, and any other chip
           leaves it. Numbered stops under a layer of clustered pins would be unreadable. */}
@@ -177,17 +183,6 @@ function ChipRow({ sources, selectedKeys, onToggle, onAll, openNow, canOpenNow, 
           onPress={onOpenNow}
         />
       )}
-      {sources.map(src => (
-        <Chip
-          key={src.key}
-          label={t(src.labelKey, lang)}
-          count={src.pins.length}
-          color={src.color}
-          colorBg={src.colorBg}
-          active={!routesMode && selectedKeys.has(src.key)}
-          onPress={() => onToggle(src.key)}
-        />
-      ))}
     </ScrollView>
   )
 }
@@ -548,17 +543,6 @@ export default function ExploreMapScreen({
     [sources, selectedKeys, openNow, canOpenNow]
   )
 
-  const toggleSource = useCallback(key => {
-    setSelected(null)
-    leaveRoutes()
-    setSelectedKeys(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }, [leaveRoutes])
-
   useEffect(() => {
     const id = pendingPinId.current
     if (!id || pins.length === 0) return
@@ -684,8 +668,7 @@ export default function ExploreMapScreen({
       <ChipRow
         sources={sources}
         selectedKeys={selectedKeys}
-        onToggle={toggleSource}
-        onAll={() => { setSelected(null); leaveRoutes(); setSelectedKeys(new Set()) }}
+        onSetKeys={keys => { setSelected(null); leaveRoutes(); setSelectedKeys(new Set(keys)) }}
         openNow={openNow}
         canOpenNow={canOpenNow}
         onOpenNow={() => { setSelected(null); leaveRoutes(); setOpenNow(v => !v) }}

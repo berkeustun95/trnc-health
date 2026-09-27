@@ -334,6 +334,7 @@ const SAME_AS_ENGLISH = {
   'ddDistrict':           { French: 'District is French' },
   'catArts':              { French: 'Arts is French' },
   'eventDate':            { French: 'Date is French' },
+  'ddType':               { French: 'Type is French' },
   // ─── Shiny Paw opening hours, 2026-09-24 ──────────────────────────────────
   'petHotelShinyPawHours': {
                           Turkish: 'a 24-hour time range; Turkish, Russian, Greek and Spanish write it exactly as English does (fr/de/ar/fa differ and are translated)',
