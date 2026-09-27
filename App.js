@@ -558,10 +558,16 @@ export default function App() {
   // returns to the map in one press instead of stopping on Pets home. Cleared whenever the
   // pets module closes, so a stale true can never make a later card-opened visit exit pets.
   const [petHotelFromMap, setPetHotelFromMap] = useState(false)
-  useEffect(() => { if (!showPets) setPetHotelFromMap(false) }, [showPets])
+  // Which pets page opened the current one (Owning → vet directory / pet hotel, Bringing →
+  // timeline, Travel → pet hotel), so back returns THERE instead of always to Pets home.
+  // Pages go at most two deep, so one slot is the whole stack (slice 5, 2026-09-28).
+  const [petsFrom, setPetsFrom] = useState(null)
+  useEffect(() => { if (!showPets) { setPetHotelFromMap(false); setPetsFrom(null) } }, [showPets])
+  const petsSubBack = () => { setPetsSubScreen(petsFrom); setPetsFrom(null) }
+  const petsNavFrom = from => dest => { setPetsFrom(from); setPetsSubScreen(dest) }
   const closePetHotel = () => {
-    if (petHotelFromMap) setShowPets(false)
-    setPetsSubScreen(null)
+    if (petHotelFromMap) { setShowPets(false); setPetsSubScreen(null) }
+    else petsSubBack()
   }
   const [showGames, setShowGames] = useState(false)
   const [gamesSubScreen, setGamesSubScreen] = useState(null)
@@ -867,7 +873,7 @@ export default function App() {
       if (unclaimedFacility) { setUnclaimedFacility(null); return true }
       if (selectedFacility) { setSelectedFacility(null); return true }
       if (petsSubScreen === 'pethotel') { closePetHotel(); return true }
-      if (petsSubScreen) { setPetsSubScreen(null); return true }
+      if (petsSubScreen) { petsSubBack(); return true }
       if (showPets) { setShowPets(false); return true }
       if (showHomeServices) { setShowHomeServices(false); return true }
       if (showJobPostings)  { setShowJobPostings(false);  return true }
@@ -908,7 +914,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -1398,6 +1404,19 @@ export default function App() {
   // tab shell, see slice2-diagnostic-record.md), so back keeps the list, its scroll, its
   // chips and the Saved view. From the map tab it is still a standalone screen, whose
   // place is kept by ExploreMapScreen's returnSnapshot.
+  // The facility profile, built once: a standalone screen in its own branch, and an overlay
+  // over the Pets vet directory (slice 5).
+  const facilityProfileEl = selectedFacility ? (
+    <FacilityProfileScreen
+      facility={selectedFacility}
+      lang={lang}
+      session={session}
+      isFavorite={favorites.has(selectedFacility.id)}
+      onToggleFavorite={() => toggleFavorite(selectedFacility.id)}
+      onRequireAccount={requireAccount}
+      onBack={() => setSelectedFacility(null)}
+    />
+  ) : null
   const explorePlaceEl = selectedExplorePlace ? (
     <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} isFavorite={placeFavorites.has(selectedExplorePlace.id)} onToggleFavorite={() => togglePlaceFavorite(selectedExplorePlace.id)} onAdNavigate={openAdRoute} backRef={placeBackRef} />
   ) : null
@@ -2059,16 +2078,8 @@ export default function App() {
         </View>
       </SafeAreaView>
     )
-  } else if (selectedFacility) {
-    content = <FacilityProfileScreen
-      facility={selectedFacility}
-      lang={lang}
-      session={session}
-      isFavorite={favorites.has(selectedFacility.id)}
-      onToggleFavorite={() => toggleFavorite(selectedFacility.id)}
-      onRequireAccount={requireAccount}
-      onBack={() => setSelectedFacility(null)}
-    />
+  } else if (selectedFacility && !(showPets && petsSubScreen === 'vetdirectory')) {
+    content = facilityProfileEl
   } else if (showPets) {
     if (!MODULE_FLAGS.pets && !isAdmin) {
       content = <ComingSoonScreen lang={lang} moduleKey="pets" titleKey="menuPets" session={session} onBack={() => setShowPets(false)} />
@@ -2076,8 +2087,8 @@ export default function App() {
       content = (
         <BringingPetScreen
           lang={lang}
-          onBack={() => setPetsSubScreen(null)}
-          onNavigate={dest => setPetsSubScreen(dest)}
+          onBack={petsSubBack}
+          onNavigate={petsNavFrom('bringing')}
         />
       )
     } else if (petsSubScreen === 'timeline' && PETS_TIMELINE_LIVE) {
@@ -2087,21 +2098,27 @@ export default function App() {
       //
       //   Until 2026-09-14 this branch existed with NO WAY TO REACH IT: nothing anywhere
       //   set petsSubScreen = 'timeline'. The screen and its ~24 i18n keys were dead code.
-      content = <TimelineCalculatorScreen lang={lang} onBack={() => setPetsSubScreen(null)} />
+      content = <TimelineCalculatorScreen lang={lang} onBack={petsSubBack} />
     } else if (petsSubScreen === 'vetdirectory') {
+      // A vet opens as an overlay over the still-mounted directory (module-internal), so
+      // back lands on the same scroll with no refetch. The facility branch above skips
+      // itself for exactly this case; the back chain already pops the facility first.
       content = (
-        <VetDirectoryScreen
-          lang={lang}
-          onBack={() => setPetsSubScreen(null)}
-          onOpenVet={fac => setSelectedFacility(fac)}
-        />
+        <View style={{ flex: 1 }}>
+          <VetDirectoryScreen
+            lang={lang}
+            onBack={petsSubBack}
+            onOpenVet={fac => setSelectedFacility(fac)}
+          />
+          {facilityProfileEl && <View style={styles.moduleOverlay}>{facilityProfileEl}</View>}
+        </View>
       )
     } else if (petsSubScreen === 'travel') {
       content = (
         <TravelWithPetScreen
           lang={lang}
-          onBack={() => setPetsSubScreen(null)}
-          onNavigate={dest => setPetsSubScreen(dest)}
+          onBack={petsSubBack}
+          onNavigate={petsNavFrom('travel')}
         />
       )
     } else if (petsSubScreen === 'pethotel' && PET_HOTEL_LIVE) {
@@ -2123,8 +2140,8 @@ export default function App() {
       content = (
         <OwningPetScreen
           lang={lang}
-          onBack={() => setPetsSubScreen(null)}
-          onNavigate={dest => setPetsSubScreen(dest)}
+          onBack={petsSubBack}
+          onNavigate={petsNavFrom('owning')}
         />
       )
     } else {
@@ -2132,7 +2149,7 @@ export default function App() {
         <PetsHomeScreen
           lang={lang}
           onBack={() => setShowPets(false)}
-          onNavigate={dest => setPetsSubScreen(dest)}
+          onNavigate={petsNavFrom(null)}
         />
       )
     }
@@ -2721,6 +2738,8 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safe:             { flex: 1, backgroundColor: colors.bg },
+  // A detail drawn over a still-mounted module list (vet directory → facility).
+  moduleOverlay:    { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
   rootFill:         { flex: 1 },
   container:        { flex: 1, paddingHorizontal: 16 },
   center:           { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },

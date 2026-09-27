@@ -898,7 +898,9 @@ function PickerSheet({ visible, title, options, selected, labelFn, onSelect, onC
 
 const cs = StyleSheet.create({
   safe:                { flex: 1, backgroundColor: colors.bg },
-  detailOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bg, zIndex: 20 },
+  // elevation as well as zIndex: on Android a card's own elevation (shadow, 3) can draw ABOVE
+  // a sibling that has only zIndex — Events carries elevation for this reason (slice 3).
+  detailOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bg, zIndex: 20, elevation: 20 },
 
   // ONE style now, not a style + contentContainerStyle pair: this is a plain wrapping View
   // rather than a ScrollView, so there is no inner content container to configure.

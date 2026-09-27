@@ -171,7 +171,15 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
   // ee28b42's condition, restored unchanged: distance sorting is on only when we actually
   // have a fix. locationDenied is checked separately from userLocation because a denied
   // permission leaves userLocation null too, and the two mean different things.
-  const sortByDistance = !!userLocation && !locationDenied
+  const liveSortByDistance = !!userLocation && !locationDenied
+  // Frozen once the list is on screen: a GPS fix that lands after the district-grouped list
+  // is showing used to swap it for the nearest-first list under the user's thumb, throwing
+  // their scroll away. Reopening the list picks up the fix (slice 4, 2026-09-28).
+  const [lockedSort, setLockedSort] = useState(null)
+  useEffect(() => {
+    if (!loading && lockedSort === null) setLockedSort(liveSortByDistance)
+  }, [loading])
+  const sortByDistance = lockedSort ?? liveSortByDistance
 
   useEffect(() => {
     async function load() {
