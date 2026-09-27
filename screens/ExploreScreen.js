@@ -24,6 +24,7 @@ import {
   categoryToGroup, groupVisible,
 } from '../constants/exploreCategories'
 import { TRNC_CENTER } from '../constants/mapSources'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 
 // name_i18n[lang] if present, else fall through to the plain `name` column (never '').
@@ -236,8 +237,9 @@ function PlacesMapView({ places, userLocation, lang, onSelectPlace, savedRegion 
 // ─── Group-tile landing ────────────────────────────────────────────────────────
 
 function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
+  const tilesMem = useScrollMemory('explore:tiles')
   return (
-    <ScrollView contentContainerStyle={s.tilesWrap} showsVerticalScrollIndicator={false}>
+    <ScrollView {...tilesMem} contentContainerStyle={s.tilesWrap} showsVerticalScrollIndicator={false}>
       {visibleGroups.map(g => {
         const meta = GROUP_META[g] || {}
         const pc   = meta.colorToken || placeColors.landmark
@@ -399,6 +401,11 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   const restoreList = useRef(false)
   const mapRegion = useRef(null)
   const mySubsBackRef = useRef(null)
+  // The body (tiles or list) unmounts under Saved / My submissions / Submit: coming back,
+  // the list restores its offset (listOffset, as for the map toggle) and the tiles use scroll
+  // memory. Forgotten when the module closes.
+  useEffect(() => { if (!showSaved && !showMySubs && !showSubmit) restoreList.current = true }, [showSaved, showMySubs, showSubmit])
+  useEffect(() => () => forgetScroll('explore:'), [])
   function openGroup(g) { setActiveGroup(g); setActiveCat(null); setRegion(null); setView('list'); listOffset.current = 0; mapRegion.current = null }
   function leaveGroup()  { setActiveGroup(null); setActiveCat(null); setRegion(null) }
   function toggleView()  {

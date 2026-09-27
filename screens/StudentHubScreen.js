@@ -1,3 +1,4 @@
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, ActivityIndicator,
@@ -276,6 +277,7 @@ function LoadError({ lang, onRetry }) {
 // university replaces the whole screen, which unmounts this tab, and a filter that resets
 // on every back is a filter nobody can use to compare two universities.
 function UniversitiesTab({ lang, universities, failed, onRetry, onOpen, query, setQuery, region, setRegion }) {
+  const unisMem = useScrollMemory('hub:unis')
 
   const regions = useMemo(
     () => ['all', ...REGIONS.filter(r => universities?.some(u => u.city === r))],
@@ -306,7 +308,7 @@ function UniversitiesTab({ lang, universities, failed, onRetry, onOpen, query, s
   }
 
   return (
-    <ScrollView style={s.tabScroll} contentContainerStyle={s.tabContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <ScrollView {...unisMem} style={s.tabScroll} contentContainerStyle={s.tabContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={s.searchBox}>
         <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
         <TextInput
@@ -355,8 +357,9 @@ function UniversitiesTab({ lang, universities, failed, onRetry, onOpen, query, s
 }
 
 function BasicsTab({ lang, tasks, tasksFailed, offline, progress, onRetryTasks, onOpenTask, onShowEsim, onShowNewcomerEssentials }) {
+  const basicsMem = useScrollMemory('hub:basics')
   return (
-    <ScrollView style={s.tabScroll} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
+    <ScrollView {...basicsMem} style={s.tabScroll} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
       {/* One opaque card, not five floating ones: the heading and the offline notice
           would otherwise sit straight on the PageBackground photo. */}
       {tasks === null && tasksFailed ? (
@@ -551,6 +554,8 @@ function TaskDetail({ task, lang, progress, offline, onToggle, onReset, onBack }
 // next mount, so back lands on the same tab with the same search (ExploreMapScreen's
 // returnSnapshot pattern; slice 7, 2026-09-28).
 let hubReturn = null
+// Set while leaving for eSIM / the Guide, so the unmount keeps the tabs' scroll memory.
+let hubLeavingVia = false
 
 export default function StudentHubScreen({
   lang, onBack, onShowEsim, onShowNewcomerEssentials, isGuest = false, onGoToProfile,
@@ -559,6 +564,7 @@ export default function StudentHubScreen({
   backRef = null,
 }) {
   const [snap] = useState(() => { const v = hubReturn; hubReturn = null; return v })
+  useEffect(() => () => { if (!hubLeavingVia) forgetScroll('hub:'); hubLeavingVia = false }, [])
   const [tab, setTab] = useState(snap?.tab ?? 'universities')
   // A tab mounts on first visit and then STAYS mounted (hidden), so switching tabs keeps
   // each one's scroll and the inbox does not refetch with a spinner every time.
@@ -777,7 +783,7 @@ export default function StudentHubScreen({
   )
 
   // Leaving for eSIM / the Welcome Guide unmounts the hub (App.js); remember where we were.
-  const leaveVia = go => () => { hubReturn = { tab, uniQuery, uniRegion }; go?.() }
+  const leaveVia = go => () => { hubReturn = { tab, uniQuery, uniRegion }; hubLeavingVia = true; go?.() }
 
   return (
     <View style={s.root}>

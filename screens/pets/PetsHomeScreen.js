@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useScrollMemory } from '../../utils/scrollMemory'
 import { Ionicons } from '@expo/vector-icons'
 import PageBackground from '../../components/PageBackground'
 import ScreenHeader from '../../components/ScreenHeader'
@@ -53,6 +54,9 @@ function JourneyCard({ item, lang, onPress }) {
 }
 
 export default function PetsHomeScreen({ lang, onBack, onNavigate }) {
+  // Back from a page opened here (vet directory, pet hotel, timeline) lands at the same
+  // scroll — App.js swaps whole pets pages, so this one remounts (utils/scrollMemory.js).
+  const scrollMem = useScrollMemory('pets:home')
   // Gated on PET_HOTEL_LIVE, not on the partner existing. The config ships whatever the
   // flag says, so "is there a partner" and "may users see one" are separate questions —
   // and only the second one is reversible with one boolean and an OTA.
@@ -63,6 +67,7 @@ export default function PetsHomeScreen({ lang, onBack, onNavigate }) {
       <ScreenHeader onBack={onBack} title={t('petsTitle', lang)} lang={lang} />
 
       <ScrollView
+        {...scrollMem}
         style={s.scroll}
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}

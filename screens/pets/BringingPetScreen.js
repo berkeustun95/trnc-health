@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useScrollMemory } from '../../utils/scrollMemory'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { colors, shadow, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -114,6 +115,9 @@ function PetsDisclaimer({ lang }) {
 }
 
 export default function BringingPetScreen({ lang, onBack, onNavigate }) {
+  // Back from a page opened here (vet directory, pet hotel, timeline) lands at the same
+  // scroll — App.js swaps whole pets pages, so this one remounts (utils/scrollMemory.js).
+  const scrollMem = useScrollMemory('pets:bringing')
   const [country, setCountry] = useState('UK')
 
   const steps = STEPS_BY_COUNTRY[country]
@@ -138,7 +142,7 @@ export default function BringingPetScreen({ lang, onBack, onNavigate }) {
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView {...scrollMem} style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
 
         {/* Notices FIRST: the reader meets the explanation before the English, and the
             staleness warning before any rule it might apply to. Both render nothing when

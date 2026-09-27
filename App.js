@@ -20,6 +20,7 @@ import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
+import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE } from './constants/flags'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
 import ScreenHeader from './components/ScreenHeader'
@@ -562,7 +563,7 @@ export default function App() {
   // timeline, Travel → pet hotel), so back returns THERE instead of always to Pets home.
   // Pages go at most two deep, so one slot is the whole stack (slice 5, 2026-09-28).
   const [petsFrom, setPetsFrom] = useState(null)
-  useEffect(() => { if (!showPets) { setPetHotelFromMap(false); setPetsFrom(null) } }, [showPets])
+  useEffect(() => { if (!showPets) { setPetHotelFromMap(false); setPetsFrom(null); forgetScroll('pets:') } }, [showPets])
   const petsSubBack = () => { setPetsSubScreen(petsFrom); setPetsFrom(null) }
   const petsNavFrom = from => dest => { setPetsFrom(from); setPetsSubScreen(dest) }
   const closePetHotel = () => {

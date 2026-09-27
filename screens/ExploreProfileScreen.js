@@ -20,6 +20,7 @@ import { logCreditTap } from '../components/WalkingRoutes'
 import ContentReportMenu from '../components/ContentReportMenu'
 import BackButton from '../components/BackButton'
 import ComingSoonScreen from '../components/ComingSoonScreen'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 
 const { width: W } = Dimensions.get('window')
 const GALLERY_H    = 280
@@ -97,6 +98,10 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
   const [featBusy,  setFeatBusy]  = useState(false)
   const [featSent,  setFeatSent]  = useState(false)
   const [showCheckin, setShowCheckin] = useState(false)
+  // The check-in page is an early return, so the profile's scroll view remounts behind it;
+  // its offset comes back on return. Forgotten when the profile closes.
+  const profileMem = useScrollMemory('place:' + place?.id)
+  useEffect(() => () => forgetScroll('place:'), [])
   // App's hardware-back chain asks this before closing the profile: the check-in page closes
   // first, like its own back button (it used to close the whole profile — slice 2).
   useEffect(() => {
@@ -179,7 +184,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
       {/* Back button — overlaid on gallery */}
       <BackButton variant="hero" lang={lang} onPress={onBack} style={[s.backBtn, { top: insets.top + 8 }]} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: footerH + 16 }}>
+      <ScrollView {...profileMem} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: footerH + 16 }}>
         {/* Gallery */}
         {photos.length > 0 ? (
           <View>

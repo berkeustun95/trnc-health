@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import PageBackground from '../components/PageBackground'
@@ -118,6 +119,10 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   // hand at the tap site and re-fetching it would give the screen a loading state it
   // does not need.
   const [selectedPartner,  setSelectedPartner]  = useState(null)
+  // The landing unmounts while a category is open (early return), so its offset is kept
+  // here and restored when it comes back; forgotten when the module closes.
+  const landingMem = useScrollMemory('hs:landing')
+  useEffect(() => () => forgetScroll('hs:'), [])
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [selectedDistrict, setSelectedDistrict] = useState(null)
   const [showOnboarding,   setShowOnboarding]   = useState(false)
@@ -239,7 +244,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
         <PageBackground topic="home_services" />
         <ScreenHeader onBack={handleBack} backLabel={t('back', lang)} title={t('hsTitle', lang)} lang={lang} />
 
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView {...landingMem} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           <MascotIntroCard
             module="house_services"
             subtitle={t('hsPartnersIntro', lang)}
