@@ -291,6 +291,7 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('profiles', 'terms_accepted_at', false, NULL, 'timestamp with time zone'),
     ('profiles', 'terms_locale', false, NULL, 'text'),
     ('profiles', 'marketing_opt_in_at', false, NULL, 'timestamp with time zone'),
+    ('profiles', 'route_badges_public', true, 'true', 'boolean'),
     ('facilities', 'id', true, 'gen_random_uuid()', 'uuid'),
     ('facilities', 'name', true, NULL, 'text'),
     ('facilities', 'type', true, NULL, 'text'),
@@ -655,7 +656,10 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('app_update_events', 'tier', true, NULL, 'text'),
     ('app_update_events', 'platform', true, NULL, 'text'),
     ('app_update_events', 'runtime_version', false, NULL, 'text'),
-    ('app_update_events', 'created_at', true, 'now()', 'timestamp with time zone')
+    ('app_update_events', 'created_at', true, 'now()', 'timestamp with time zone'),
+    ('route_medals', 'user_id', true, NULL, 'uuid'),
+    ('route_medals', 'route_id', true, NULL, 'uuid'),
+    ('route_medals', 'completed_on', true, NULL, 'date')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -703,7 +707,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('claim_requests_requester_id_fkey', '', 'id|requester_id'),
     ('claim_requests_status_check', 'approved|pending|rejected', 'status'),
     ('claim_requests_verified_by_fkey', '', ''),
-    ('contact_events_action_check', 'call|call_secondary|maps|website|whatsapp', 'action'),
+    ('contact_events_action_check', 'call|call_secondary|maps|route_complete|website|whatsapp', 'action'),
     ('contact_events_module_check', 'accommodation|events|explore|garages|grooming|homeServices|insurance|jobs|pets|studentHub|towing|transport', 'module'),
     ('contact_events_pkey', '', ''),
     ('contact_events_region_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'region'),
@@ -896,6 +900,9 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('reviews_facility_id_fkey', '', 'facility_id|id'),
     ('reviews_pkey', '', 'id'),
     ('reviews_rating_check', '1|5', 'rating'),
+    ('route_medals_pkey', '', 'route_id|user_id'),
+    ('route_medals_route_id_fkey', '', ''),
+    ('route_medals_user_id_fkey', '', ''),
     ('schema_migrations_applied_pkey', '', ''),
     ('student_education_end_year_range_check', '1950|2100', 'study_end_year'),
     ('student_education_institution_id_fkey', '', ''),
