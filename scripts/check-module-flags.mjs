@@ -163,7 +163,7 @@ const EXPECTED_SCALARS = {
   EXPLORE_ROUTES_LIVE:   true,   // live 2026-09-24
   // Route medals. A working-tree flip starts tracking visits and writing account data the
   // live privacy policy does not yet describe — the policy publish is part of its go-live.
-  ROUTE_MEDALS_LIVE:     false,
+  ROUTE_MEDALS_LIVE:     true,   // live 2026-09-27
   // The Home redesign. Like EXPLORE_MAP_LIVE this replaces a surface every user already
   // has rather than revealing new content, so a working-tree flip left over from a device
   // comparison is a whole-app visual change shipped to everyone, not an early reveal.

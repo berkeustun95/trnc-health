@@ -48,6 +48,10 @@ import TERMS_TR   from './terms.tr.js'
 // pins, openrouteservice/HeiGIT walking paths), deletion of particular data, the 30-day
 // purge of deleted content, and region's real use. Terms unchanged; the pair moves together.
 // This bump is what raises the in-app notice (utils/policyNoticeRules.js).
+// Bumped 2026-09-24 -> 2026-09-27 at the route-medals go-live: route badges (on-phone visit
+// check, route + date on the account, badges to other listed students with a switch, off
+// for those listed before badges), anonymous route completions reported to the Ministry of
+// Tourism as monthly totals (< 5 suppressed). Terms unchanged; the pair moves together.
 export const LEGAL_VERSION = '2026-09-27'
 
 // Locales with a translated body. NOT a hand-kept list — derived from what is actually
