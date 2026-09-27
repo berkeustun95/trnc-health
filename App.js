@@ -18,7 +18,8 @@ import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE } from './constants/flags'
+import { claimPendingMedals } from './utils/routeMedals'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE } from './constants/flags'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
 import ScreenHeader from './components/ScreenHeader'
 import { promosAllowed } from './constants/homeStrip'
@@ -1066,6 +1067,13 @@ export default function App() {
     }).catch(() => {})
     return () => { cancelled = true }
   }, [userLocation])
+
+  // Route medals earned as a guest (or whose award failed offline) land on the account at
+  // the first signed-in session. Keyed on the user id: the session object churns on refresh.
+  useEffect(() => {
+    if (!ROUTE_MEDALS_LIVE || !session || isGuest(session)) return
+    claimPendingMedals(session.user.id).catch(() => {})
+  }, [session?.user?.id])
 
   useEffect(() => {
     // Guests can't hold a push token (the profiles write is refused by RLS), so don't
@@ -2234,6 +2242,8 @@ export default function App() {
                 // makes back return here in one press (closePetHotel).
                 onSelectPetHotel={() => { setShowPets(true); setPetsSubScreen('pethotel'); setPetHotelFromMap(true) }}
                 lang={lang}
+                session={session}
+                onRequireAccount={requireAccount}
               />
               </BLErrorBoundary>
             ) : (

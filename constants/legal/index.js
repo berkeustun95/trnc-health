@@ -48,7 +48,7 @@ import TERMS_TR   from './terms.tr.js'
 // pins, openrouteservice/HeiGIT walking paths), deletion of particular data, the 30-day
 // purge of deleted content, and region's real use. Terms unchanged; the pair moves together.
 // This bump is what raises the in-app notice (utils/policyNoticeRules.js).
-export const LEGAL_VERSION = '2026-09-24'
+export const LEGAL_VERSION = '2026-09-27'
 
 // Locales with a translated body. NOT a hand-kept list — derived from what is actually
 // imported, so adding a body is one import and one map entry and this follows.

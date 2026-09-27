@@ -18,6 +18,7 @@ import { REGION_LABEL_KEY } from '../constants/regions'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { colors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
+import { medalDate } from '../utils/routeMedals'
 
 // If dashes ever render wrong on a device, this is the one line to change to `undefined`
 // (solid) — both platforms implement lineDashPattern natively in react-native-maps 1.20.
@@ -287,7 +288,7 @@ export function useWalkPosition(active) {
         if (st !== 'granted') return
         const s = await Location.watchPositionAsync(
           { accuracy: Location.Accuracy.High, distanceInterval: 5, timeInterval: 3000 },
-          l => setPos({ latitude: l.coords.latitude, longitude: l.coords.longitude })
+          l => setPos({ latitude: l.coords.latitude, longitude: l.coords.longitude, accuracy: l.coords.accuracy })
         )
         if (gone || AppState.currentState !== 'active') s.remove()
         else sub = s
@@ -349,7 +350,7 @@ export function useHeading(active) {
   return heading
 }
 
-export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEnd, onSelectStop }) {
+export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEnd, onSelectStop, medal = null, onKeepMedal }) {
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => { onEnd(); return true })
     return () => sub.remove()
@@ -379,8 +380,9 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
             <Ionicons name="checkmark-circle" size={26} color={ROUTE_COLOR} />
             <Text style={[p.name, { marginTop: 0, flexShrink: 1 }]}>{t('walkDone', lang)}</Text>
           </View>
-          <TouchableOpacity style={p.startBtn} onPress={onEnd} activeOpacity={0.85}>
-            <Text style={p.startText}>{t('walkEnd', lang)}</Text>
+          {medal && <MedalOutcome route={route} lang={lang} medal={medal} onKeepMedal={onKeepMedal} />}
+          <TouchableOpacity style={[p.startBtn, medal?.medal?.state === 'guest' && w.endQuiet]} onPress={onEnd} activeOpacity={0.85}>
+            <Text style={[p.startText, medal?.medal?.state === 'guest' && w.endQuietText]}>{t('walkEnd', lang)}</Text>
           </TouchableOpacity>
         </>
       ) : (
@@ -397,6 +399,7 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
           ) : status === 'denied' ? (
             <Text style={p.note}>{t('walkNoLocation', lang)}</Text>
           ) : null}
+          {medal && <MedalProgress lang={lang} medal={medal} />}
 
           <PathsCredit route={route} lang={lang} />
           <View style={w.controls}>
@@ -412,15 +415,60 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
             {/* At the last stop Sonraki becomes Bitir and opens the done screen — never a
                 step past the end. Filled, so it reads as the terminal action. */}
             <TouchableOpacity style={[w.step, last && w.stepFinish]} onPress={onNext} activeOpacity={0.8}
-              accessibilityLabel={t(last ? 'walkFinish' : 'walkNext', lang)}>
+              accessibilityLabel={last ? t('walkFinish', lang) : t('walkNext', lang)}>
               <Text style={[w.stepText, last && w.stepFinishText]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                {t(last ? 'walkFinish' : 'walkNext', lang)}
+                {last ? t('walkFinish', lang) : t('walkNext', lang)}
               </Text>
               <Ionicons name={last ? 'flag' : 'chevron-forward'} size={last ? 15 : 18} color={last ? '#fff' : ROUTE_COLOR} />
             </TouchableOpacity>
           </View>
         </>
       )}
+    </View>
+  )
+}
+
+// Walk-mode medal line: visits so far against the 70% the medal needs, or "earned" once met.
+// Visits only come from GPS — with location off it stays at 0, and says so.
+function MedalProgress({ lang, medal }) {
+  const earned = !!medal.medal
+  return (
+    <View style={w.medalRow}>
+      <Ionicons name={earned ? 'medal' : 'medal-outline'} size={15} color={earned ? colors.accent : colors.textSecondary} />
+      <Text style={[w.medalText, earned && w.medalTextOn]} numberOfLines={1}>
+        {earned ? t('medalEarned', lang)
+          : t('medalProgress', lang).replace('{n}', String(medal.visited.size)).replace('{need}', String(medal.need))}
+      </Text>
+    </View>
+  )
+}
+
+function MedalOutcome({ route, lang, medal, onKeepMedal }) {
+  const m = medal.medal
+  const city = REGION_LABEL_KEY[route.region] ? t(REGION_LABEL_KEY[route.region], lang) : route.region
+  if (!m) {
+    return (
+      <Text style={p.note}>
+        {t('medalNotYet', lang).replace('{need}', String(medal.need)).replace('{n}', String(medal.visited.size))}
+      </Text>
+    )
+  }
+  return (
+    <View style={w.outcome}>
+      <View style={w.bigBadge}><Ionicons name="medal" size={30} color="#fff" /></View>
+      <View style={{ flex: 1 }}>
+        <Text style={w.outcomeTitle}>{t('medalEarnedFor', lang).replace('{city}', city)}</Text>
+        <Text style={p.note}>
+          {m.state === 'saved' ? medalDate(m.date)
+            : m.state === 'guest' ? t('medalGuestNote', lang)
+            : t('medalPendingNote', lang)}
+        </Text>
+        {m.state === 'guest' && (
+          <TouchableOpacity style={w.keepBtn} onPress={onKeepMedal} activeOpacity={0.85}>
+            <Text style={w.keepText}>{t('medalGuestKeep', lang)}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   )
 }
@@ -436,6 +484,18 @@ const w = StyleSheet.create({
   stepFinish:     { backgroundColor: ROUTE_COLOR },
   stepFinishText: { color: '#fff' },
   doneRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  medalRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  medalText:   { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary },
+  medalTextOn: { color: colors.textPrimary },
+  outcome:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 12, borderRadius: 14,
+              backgroundColor: colors.bg },
+  bigBadge: { width: 52, height: 52, borderRadius: 26, backgroundColor: ROUTE_COLOR, borderWidth: 3, borderColor: colors.accent,
+              alignItems: 'center', justifyContent: 'center' },
+  outcomeTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  keepBtn:  { alignSelf: 'flex-start', marginTop: 8, backgroundColor: ROUTE_COLOR, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12 },
+  keepText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
+  endQuiet:     { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: ROUTE_COLOR },
+  endQuietText: { color: ROUTE_COLOR },
   stepText: { flexShrink: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold', color: ROUTE_COLOR },
   goText:   { flexShrink: 1, fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   go:       { flex: 1.3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,

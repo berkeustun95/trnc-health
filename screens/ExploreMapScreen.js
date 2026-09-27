@@ -21,7 +21,7 @@ import * as Location from 'expo-location'
 import MapView, { Marker } from 'react-native-maps'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import Supercluster from 'supercluster'
-import { supabase } from '../lib/supabase'
+import { supabase, isGuest } from '../lib/supabase'
 import { BROWSE_COLS, placeName } from './ExploreScreen'
 import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
@@ -32,7 +32,8 @@ import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
 import { colors, shadow, ellipsizeSlack } from '../constants/theme'
 import { t } from '../constants/i18n'
-import { EXPLORE_ROUTES_LIVE } from '../constants/flags'
+import { EXPLORE_ROUTES_LIVE, ROUTE_MEDALS_LIVE } from '../constants/flags'
+import { useRouteMedal } from '../utils/routeMedals'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance, legKey } from '../constants/walkingRoutes'
 import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useLocationGranted, useHeading, fitRoute } from '../components/WalkingRoutes'
@@ -254,6 +255,10 @@ function PinCard({ pin, lang, onClose, onViewProfile }) {
   )
 }
 
+// AccountRequiredSheet message for a guest's medal. A `…Key =` literal so the i18n coverage
+// scan sees it (a function-call argument is invisible to it).
+const medalGateKey = 'medalGuestGate'
+
 export default function ExploreMapScreen({
   facilities,
   dutyFacilityId,
@@ -275,6 +280,9 @@ export default function ExploreMapScreen({
   // This is that second entrance, and it has to ship and be checked on device BEFORE the
   // tile is hidden. Optional so the screen still renders if a caller does not pass it.
   onShowList,
+  // Route medals (ROUTE_MEDALS_LIVE): who is walking, and the guest sign-in gate.
+  session = null,
+  onRequireAccount,
 }) {
   const { width, height } = useWindowDimensions()
   const mapRef = useRef(null)
@@ -345,6 +353,10 @@ export default function ExploreMapScreen({
     }).catch(() => { if (id === liveReq.current) setLiveLeg({ toId: liveTarget.id, coords: null }) })
   }, [liveTarget?.id, havePos])
   const heading = useHeading(walking && follow && walkStatus === 'granted')
+  const medal = useRouteMedal({
+    enabled: ROUTE_MEDALS_LIVE, active: walking, route: selectedRoute, pos: walkPos,
+    userId: session?.user?.id ?? null, guest: !session || isGuest(session),
+  })
 
   const initialRegion = useMemo(() => snap?.region ?? (
     userLocation
@@ -435,7 +447,7 @@ export default function ExploreMapScreen({
   // so a pinch while following is kept. Only center/heading otherwise — a partial camera.
   useEffect(() => {
     if (!walking || !follow || !followReady || !walkPos) return
-    const cam = { center: walkPos, pitch: 0 }
+    const cam = { center: { latitude: walkPos.latitude, longitude: walkPos.longitude }, pitch: 0 }
     if (heading != null) cam.heading = heading
     if (firstFollow.current) { cam.zoom = FOLLOW_ZOOM; cam.altitude = FOLLOW_ALTITUDE; firstFollow.current = false }
     mapRef.current?.animateCamera(cam, { duration: 600 })
@@ -711,6 +723,8 @@ export default function ExploreMapScreen({
             onNext={() => stepWalk(1)}
             onEnd={endWalk}
             onSelectStop={p => handOff(() => onSelectPlace?.(p))}
+            medal={ROUTE_MEDALS_LIVE ? medal : null}
+            onKeepMedal={() => onRequireAccount?.(medalGateKey)}
           />
         : selectedRoute
         ? <RoutePanel

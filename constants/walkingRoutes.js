@@ -142,6 +142,22 @@ export function overlapSlots(stops) {
 // 10–20 m off. The screen always offers manual Next/Previous for that reason.
 export const ARRIVE_M = 30
 
+// ─── Route medals ──────────────────────────────────────────────────────────
+// A stop is VISITED when a fix lands within VISIT_M of it, widened by the fix's own reported
+// accuracy up to GPS_SLACK_M — old-town streets (Lefkoşa's walled city, Girne harbour) often
+// report 20–40 m. Order does not matter, and Önceki/Sonraki never visit anything.
+// The medal needs MEDAL_SHARE of the route's stops, rounded up: 17/23, 10/13, 19/26, 4/5, 7/9.
+export const VISIT_M = 50
+export const GPS_SLACK_M = 30
+export const MEDAL_SHARE = 0.7
+export const medalNeed = n => Math.ceil(MEDAL_SHARE * n)
+
+export function stopsVisitedAt(stops, pos) {
+  if (!pos) return []
+  const slack = Math.min(Math.max(pos.accuracy ?? 0, 0), GPS_SLACK_M)
+  return stops.filter(s => metresBetween(pos, s) <= VISIT_M + slack).map(s => s.id)
+}
+
 export function walkStep(stops, next, pos) {
   const n = Math.max(0, Math.min(next, stops.length))
   const armed = !!pos && n < stops.length && metresBetween(pos, stops[n]) > ARRIVE_M

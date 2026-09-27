@@ -11,6 +11,8 @@ import Avatar from '../components/Avatar'
 import { STUDENT_LEVEL_LABEL_KEY } from '../constants/profileGate'
 import { colors, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { ROUTE_MEDALS_LIVE } from '../constants/flags'
+import { ProfileRouteBadges } from '../components/RouteBadges'
 
 // ─── The student profile page (slice 5) ─────────────────────────────────────
 //
@@ -190,6 +192,13 @@ export default function StudentProfileScreen({ userId, lang, isMe = false, onBac
                 ))}
               </ContentCard>
             </View>
+
+            {/* Routes only, never dates — and only while this profile is visible at all
+                (the RPC is gated by get_student_profile) and its owner's switch is on. */}
+            {ROUTE_MEDALS_LIVE && (
+              <ProfileRouteBadges userId={userId} lang={lang} titleStyle={s.sectionTitle}
+                frame={c => <View style={s.historyWrap}><ContentCard>{c}</ContentCard></View>} />
+            )}
           </>
         )}
       </ScrollView>

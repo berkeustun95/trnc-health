@@ -88,6 +88,8 @@ WITH report AS (
     ('1051_app_versions','app_versions'),
     -- The popup's backup signal: one row per popup SHOWN. Insert-only, no client SELECT.
     ('1051_app_versions','app_update_events'),
+    -- Route medals (1056). Owner-only read; written only by award_route_medal().
+    ('1056_route_medals','route_medals'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -253,7 +255,9 @@ WITH report AS (
     ('1024_student_affiliation','institutions','website_url'),
     -- places provenance (1045). Written only by service_role; places_guard_source locks it.
     ('1045_places_source','places','source'),
-    ('1045_places_source','places','source_id')
+    ('1045_places_source','places','source_id'),
+    -- The owner's badge switch (1056). Read only by get_profile_route_badges (DEFINER).
+    ('1056_route_medals','profiles','route_badges_public')
 
   ) e(m,t,c)
 
@@ -397,7 +401,9 @@ WITH report AS (
     -- 1050: the nightly purge behind the policy's "removed 30 days later". Not an RPC.
     ('1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc'),
     ('1051_app_versions','purge_app_update_events'),
-    ('1052_purge_status_reporter','app_update_events_purge_status')
+    ('1052_purge_status_reporter','app_update_events_purge_status'),
+    ('1056_route_medals','award_route_medal'),
+    ('1056_route_medals','get_profile_route_badges')
   ) e(m,o)
 
   UNION ALL
@@ -669,7 +675,10 @@ WITH report AS (
     ('1051_app_versions','app_update_events_pkey'),
     ('1051_app_versions','app_update_events_tier_check'),
     ('1051_app_versions','app_update_events_platform_check'),
-    ('1051_app_versions','app_update_events_runtime_len_check')
+    ('1051_app_versions','app_update_events_runtime_len_check'),
+    ('1056_route_medals','route_medals_pkey'),
+    ('1056_route_medals','route_medals_user_id_fkey'),
+    ('1056_route_medals','route_medals_route_id_fkey')
 
   ) e(m,o)
 
@@ -828,7 +837,11 @@ WITH report AS (
     -- and the admin queue cannot resolve an author to ban. Both replaced a plain column
     -- read, so the failure looks like the app forgetting something rather than a 42501.
     ('1033_reviews_author_not_public','get_my_review'),
-    ('1033_reviews_author_not_public','admin_content_author')
+    ('1033_reviews_author_not_public','admin_content_author'),
+    -- 1056. Without these the medal is never saved and other students never see a badge;
+    -- both would read as "nobody has walked a route".
+    ('1056_route_medals','award_route_medal'),
+    ('1056_route_medals','get_profile_route_badges')
   ) e(m,o)
 
   UNION ALL
@@ -3342,6 +3355,54 @@ WITH report AS (
                       LEFT JOIN pg_roles r ON r.oid = a.grantee
                       WHERE p.oid = to_regprocedure('public.purge_soft_deleted_ugc(interval)')
                         AND a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated')))
+    -- ── 1056: route medals ───────────────────────────────────────────────────────
+    -- (1) Owner-only, DERIVED: exactly one permissive SELECT policy, guest-guarded; no client
+    --     write privilege (inherited grants resolved) — the one write path is the DEFINER RPC.
+    --     Paired with the positive control: authenticated can still SELECT, or owners see nothing.
+    UNION ALL SELECT '1056_route_medals','route_medals: RLS on, 1 guest-guarded owner SELECT, no client writes, owners can read',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.route_medals')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='route_medals') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='route_medals'
+                  AND cmd='SELECT' AND permissive='PERMISSIVE'
+                  AND qual LIKE '%auth.uid()%' AND qual LIKE '%is_anonymous_session()%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.route_medals'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.route_medals'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('authenticated', to_regclass('public.route_medals'), 'SELECT'), false)
+    -- (2) "Deleted with the account": user_id CASCADE from profiles ('c'); route_id CASCADE too.
+    UNION ALL SELECT '1056_route_medals','route_medals: user_id and route_id ON DELETE CASCADE',
+      (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.route_medals') AND contype = 'f')
+      IS NOT DISTINCT FROM 'route_medals_route_id_fkey=c,route_medals_user_id_fkey=c'
+    -- (3) Both RPCs DEFINER + search_path pinned, no anon/PUBLIC EXECUTE. The badge reader
+    --     returns route ids ONLY (never dates) and is gated by CALLING get_student_profile — a
+    --     code shape, not a word a comment could carry.
+    UNION ALL SELECT '1056_route_medals','award_route_medal / get_profile_route_badges: DEFINER, pinned, not anon, ids only, gated by get_student_profile',
+      (SELECT count(*) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.award_route_medal(uuid)'),
+                                                     to_regprocedure('public.get_profile_route_badges(uuid)'))
+          AND p.prosecdef AND p.proconfig::text ILIKE '%search_path=public%'
+          AND NOT has_function_privilege('anon', p.oid, 'EXECUTE')) = 2
+      AND COALESCE(pg_get_function_result(to_regprocedure('public.get_profile_route_badges(uuid)')) = 'TABLE(route_id uuid)', false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.get_profile_route_badges(uuid)')) LIKE '%FROM get_student_profile(p_user_id)%'
+           AND pg_get_functiondef(to_regprocedure('public.get_profile_route_badges(uuid)')) LIKE '%p.route_badges_public%', false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.award_route_medal(uuid)')) LIKE '%is_anonymous_session()%'
+           AND pg_get_functiondef(to_regprocedure('public.award_route_medal(uuid)')) LIKE '%Europe/Istanbul%', false)
+    -- (4) The switch DEFAULTs to ON (product decision). A reverted DEFAULT creates no named object.
+    UNION ALL SELECT '1056_route_medals','profiles.route_badges_public: NOT NULL DEFAULT true',
+      COALESCE((SELECT is_nullable = 'NO' AND column_default = 'true' FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='profiles' AND column_name='route_badges_public'), false)
+    -- (5) The anonymous completion event: CHECK permits it (quoted literal).
+    UNION ALL SELECT '1056_route_medals','contact_events action CHECK permits route_complete',
+      COALESCE(position('''route_complete''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_action_check')) > 0, false)
+    -- (6) The Ministry view: exists, security_invoker (else it runs as postgres and bypasses
+    --     contact_events' admin-only RLS), anon cannot read it, and the under-5 suppression is
+    --     IN the view (a code shape).
+    UNION ALL SELECT '1056_route_medals','route_completions_monthly: invoker, not anon, suppresses < 5',
+      COALESCE((SELECT reloptions FROM pg_class WHERE oid = to_regclass('public.route_completions_monthly'))
+               @> ARRAY['security_invoker=true'], false)
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.route_completions_monthly'), 'SELECT'), false)
+      AND COALESCE(pg_get_viewdef(to_regclass('public.route_completions_monthly')) LIKE '%>= 5%', false)
   ) z
 
   UNION ALL
