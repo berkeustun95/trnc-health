@@ -62,3 +62,6 @@ assets/partners/_fixture/
 # record is supabase/seed/gisekibris-events-clean.json, which is derived from it —
 # committing both would keep two copies of one drop that can disagree.
 supabase/seed/gisekibris-feed-raw.json
+
+# Bundler gems (fastlane), installed locally — never commit
+vendor/
