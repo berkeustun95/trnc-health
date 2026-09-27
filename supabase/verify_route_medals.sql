@@ -12,56 +12,75 @@
 DO $$
 DECLARE
   v_route uuid;
-  v_u     uuid;   -- the medal holder: a real, non-guest profile, preferably a listed student
-  v_v     uuid;   -- the viewer: a different real listed student (NULL if there is not one)
+  v_u     uuid;   -- the medal holder: a real, named, non-guest profile, listed (temporarily if need be)
+  v_v     uuid;   -- the viewer: a different such profile, listed the same way
   v_day   date;
   v_n     int;
   v_err   text;
-  v_temp  boolean := false;   -- true when the viewer was made listed by THIS script
+  v_temp  boolean := false;   -- true when THIS script listed someone temporarily
+  v_who   uuid;
   rep     text := '';
 BEGIN
   SELECT id INTO v_route FROM walking_routes WHERE is_active ORDER BY sort_order LIMIT 1;
   IF v_route IS NULL THEN RAISE EXCEPTION 'VERIFY FAILED: no active walking route'; END IF;
 
+  -- Why nobody may be listed: is_listed_student() needs an opted-in enrolment AND a display
+  -- name AND no active UGC ban. Printed so a "listed" account that is not is explained.
+  rep := rep || format(E'\nopted-in accounts: %s total · %s named · %s UGC-banned · %s guest · %s listed per is_listed_student()',
+    (SELECT count(DISTINCT e.user_id) FROM student_education e WHERE e.listing_opt_in),
+    (SELECT count(DISTINCT e.user_id) FROM student_education e JOIN profiles p ON p.id = e.user_id WHERE e.listing_opt_in AND p.display_name IS NOT NULL),
+    (SELECT count(DISTINCT e.user_id) FROM student_education e JOIN profiles p ON p.id = e.user_id WHERE e.listing_opt_in AND p.ugc_banned_until > now()),
+    (SELECT count(DISTINCT e.user_id) FROM student_education e JOIN auth.users u ON u.id = e.user_id WHERE e.listing_opt_in AND coalesce(u.is_anonymous, false)),
+    (SELECT count(DISTINCT e.user_id) FROM student_education e WHERE e.listing_opt_in AND is_listed_student(e.user_id)));
+
+  -- Holder: a genuinely listed student if one exists; otherwise a real, named, unbanned,
+  -- non-guest account, listed TEMPORARILY below. Viewer: a different such account with no
+  -- block either way. Listing is temporary in both cases: this transaction always aborts.
   SELECT p.id INTO v_u FROM profiles p JOIN auth.users u ON u.id = p.id
    WHERE NOT coalesce(u.is_anonymous, false) AND is_listed_student(p.id)
    ORDER BY p.id LIMIT 1;
   IF v_u IS NULL THEN
     SELECT p.id INTO v_u FROM profiles p JOIN auth.users u ON u.id = p.id
-     WHERE NOT coalesce(u.is_anonymous, false) ORDER BY p.id LIMIT 1;
-  END IF;
-  SELECT p.id INTO v_v FROM profiles p JOIN auth.users u ON u.id = p.id
-   WHERE NOT coalesce(u.is_anonymous, false) AND is_listed_student(p.id) AND p.id <> v_u
-   ORDER BY p.id LIMIT 1;
-
-  -- No second listed student in prod yet: make one, TEMPORARILY. A real, named, unbanned,
-  -- non-guest account with no block either way with the holder gets a copy of the holder's
-  -- own listed enrolment (so every CHECK and the years trigger are already satisfied).
-  -- It lives only inside this transaction, which the final RAISE always aborts — as does
-  -- any failure before it. Nothing touches the viewer's profiles row.
-  IF v_v IS NULL AND is_listed_student(v_u) THEN
-    SELECT p.id INTO v_v FROM profiles p JOIN auth.users u ON u.id = p.id
-     WHERE NOT coalesce(u.is_anonymous, false) AND p.id <> v_u
-       AND p.display_name IS NOT NULL
+     WHERE NOT coalesce(u.is_anonymous, false) AND p.display_name IS NOT NULL
        AND (p.ugc_banned_until IS NULL OR p.ugc_banned_until <= now())
-       AND NOT EXISTS (SELECT 1 FROM blocks b
-                        WHERE (b.blocker_id = p.id AND b.blocked_id = v_u)
-                           OR (b.blocker_id = v_u AND b.blocked_id = p.id))
      ORDER BY p.id LIMIT 1;
-    IF v_v IS NOT NULL THEN
-      INSERT INTO student_education (user_id, institution_id, level, subject_id,
-                                     study_start_year, study_end_year, listing_opt_in)
-      SELECT v_v, e.institution_id, e.level, e.subject_id, e.study_start_year, e.study_end_year, true
-        FROM student_education e WHERE e.user_id = v_u AND e.listing_opt_in
-       ORDER BY e.id LIMIT 1;
-      IF NOT is_listed_student(v_v) THEN
-        RAISE EXCEPTION 'VERIFY FAILED: temporary viewer % is not listed after the insert%', v_v, rep;
-      END IF;
-      v_temp := true;
-      rep := rep || format(E'\ntemporary listed viewer %s (rolled back; triggers on student_education: %s)', v_v,
-        (SELECT coalesce(string_agg(tgname, ', ' ORDER BY tgname), 'none') FROM pg_trigger
-          WHERE tgrelid = 'public.student_education'::regclass AND NOT tgisinternal));
+  END IF;
+  IF v_u IS NULL THEN RAISE EXCEPTION 'VERIFY FAILED: no named, unbanned, non-guest account to act as holder%', rep; END IF;
+
+  SELECT p.id INTO v_v FROM profiles p JOIN auth.users u ON u.id = p.id
+   WHERE NOT coalesce(u.is_anonymous, false) AND p.id <> v_u
+     AND p.display_name IS NOT NULL
+     AND (p.ugc_banned_until IS NULL OR p.ugc_banned_until <= now())
+     AND NOT EXISTS (SELECT 1 FROM blocks b
+                      WHERE (b.blocker_id = p.id AND b.blocked_id = v_u)
+                         OR (b.blocker_id = v_u AND b.blocked_id = p.id))
+   ORDER BY is_listed_student(p.id) DESC, p.id LIMIT 1;
+
+  -- Make each of the two listed if it is not. An existing enrolment is switched on (no new
+  -- row, so the unique and one-open-per-user indexes cannot fire); with none, one open row
+  -- is inserted at an active institution. Only the years trigger runs, and it rejects only
+  -- a future end year.
+  FOR v_who IN SELECT unnest(ARRAY[v_u, v_v]) LOOP
+    CONTINUE WHEN v_who IS NULL OR is_listed_student(v_who);
+    IF EXISTS (SELECT 1 FROM student_education e JOIN institutions i ON i.id = e.institution_id AND i.is_active
+                WHERE e.user_id = v_who) THEN
+      UPDATE student_education SET listing_opt_in = true
+       WHERE id = (SELECT e.id FROM student_education e JOIN institutions i ON i.id = e.institution_id AND i.is_active
+                    WHERE e.user_id = v_who ORDER BY (e.study_end_year IS NULL) DESC, e.id LIMIT 1);
+    ELSE
+      INSERT INTO student_education (user_id, institution_id, level, listing_opt_in)
+      SELECT v_who, i.id, 'university', true FROM institutions i WHERE i.is_active ORDER BY i.id LIMIT 1;
     END IF;
+    IF NOT is_listed_student(v_who) THEN
+      RAISE EXCEPTION 'VERIFY FAILED: could not list % temporarily%', v_who, rep;
+    END IF;
+    v_temp := true;
+    rep := rep || format(E'\ntemporarily listed %s (rolled back)', v_who);
+  END LOOP;
+  IF v_temp THEN
+    rep := rep || format(E'\ntriggers on student_education: %s',
+      (SELECT coalesce(string_agg(tgname, ', ' ORDER BY tgname), 'none') FROM pg_trigger
+        WHERE tgrelid = 'public.student_education'::regclass AND NOT tgisinternal));
   END IF;
   rep := rep || format(E'\nroute=%s holder=%s (listed=%s) viewer=%s', v_route, v_u, is_listed_student(v_u), coalesce(v_v::text, 'none'));
 
@@ -129,10 +148,10 @@ BEGIN
       IF v_n IS DISTINCT FROM 0 THEN RAISE EXCEPTION 'VERIFY FAILED: switch OFF still shows % badge rows%', v_n, rep; END IF;
       rep := rep || E'\n4b switch off -> 0 ✓';
     ELSE
-      rep := rep || E'\n4 SKIPPED: holder is not a listed student';
+      RAISE EXCEPTION 'VERIFY FAILED: holder is not listed after the temporary listing%', rep;
     END IF;
   ELSE
-    rep := rep || E'\n3-4 SKIPPED: no second listed student, and none could be made (holder not listed, or no eligible account)';
+    rep := rep || E'\n3-4 SKIPPED: no second named, unbanned, unblocked account exists';
   END IF;
 
   -- 5. A guest cannot earn. Perfect: AUTH_REQUIRED.
