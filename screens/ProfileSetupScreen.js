@@ -35,8 +35,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  ActivityIndicator, Modal, Platform, BackHandler, Alert,
+  ActivityIndicator, Modal, Platform, Alert,
 } from 'react-native'
+import { addBackListener } from '../utils/backHandler'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
@@ -766,7 +767,7 @@ export default function ProfileSetupScreen({
   // App.js, matches nothing on the wizard, and CLOSES THE APP with the sheet still up.
   useEffect(() => {
     if (!legalTab) return
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setLegalTab(null); return true })
+    const sub = addBackListener(() => { setLegalTab(null); return true })
     return () => sub.remove()
   }, [legalTab])
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { View, Text, Image, ImageBackground, TextInput, TouchableOpacity, StyleSheet,
-         ActivityIndicator, ScrollView, BackHandler } from 'react-native'
+         ActivityIndicator, ScrollView } from 'react-native'
+import { addBackListener } from '../utils/backHandler'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather } from '@expo/vector-icons'
@@ -115,7 +116,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
   // of dropping the half-filled signup form.
   useEffect(() => {
     if (!legalTab) return
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setLegalTab(null); return true })
+    const sub = addBackListener(() => { setLegalTab(null); return true })
     return () => sub.remove()
   }, [legalTab])
 
