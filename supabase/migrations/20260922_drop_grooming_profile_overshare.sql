@@ -93,7 +93,7 @@ DROP POLICY IF EXISTS "owner read booking customer profile" ON public.profiles;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20260922_drop_grooming_profile_overshare.sql', 'fd915cbc37b20175cba597f0d95368d4d1e40abd07382604d343975757990ea8')
+VALUES ('20260922_drop_grooming_profile_overshare.sql', 'c582a3ae15cb4ab68224ec18399d1a9416a5705a98ea2ee833f5375505c2d2a4')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
