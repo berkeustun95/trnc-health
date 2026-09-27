@@ -113,7 +113,7 @@ function EmptyNote({ titleKey, title, bodyKey, lang }) {
   )
 }
 
-export default function HomeServicesScreen({ lang, session, onBack, onRequireAccount }) {
+export default function HomeServicesScreen({ lang, session, onBack, onRequireAccount, backRef = null }) {
   // Held as a { partner, row } pair rather than an id, because the row is already in
   // hand at the tap site and re-fetching it would give the screen a loading state it
   // does not need.
@@ -172,6 +172,19 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
     }
   }
 
+  // App's hardware-back chain asks this before closing the module: handleBack's steps minus
+  // the final onBack, so Android back and the header back cannot disagree.
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => {
+      if (HS_SELF_REGISTRATION && showOnboarding) { setShowOnboarding(false); return true }
+      if (selectedPartner) { setSelectedPartner(null); return true }
+      if (selectedCategory) { setSelectedCategory(null); setSelectedDistrict(null); return true }
+      return false
+    }
+    return () => { backRef.current = null }
+  })
+
   // HS_SELF_REGISTRATION guards the RENDER, not only the button that sets the state.
   // Gating the CTA alone would leave the form one stale `showOnboarding` away — and it
   // would submit into an API that now refuses it (hs_insert_self is WITH CHECK (false)
@@ -188,18 +201,25 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
     )
   }
 
-  if (selectedPartner) {
-    return (
-      <HomeServicePartnerScreen
-        partner={selectedPartner.partner}
-        row={selectedPartner.row}
-        lang={lang}
-        serviceContext={selectedPartner.serviceContext}
-        region={selectedPartner.region}
-        onBack={() => setSelectedPartner(null)}
-      />
-    )
-  }
+  // The partner showcase draws OVER the landing or category list (still mounted), so back
+  // lands on the same scroll with the category and district intact (slice 6, 2026-09-28).
+  const withPartner = body => (
+    <View style={{ flex: 1 }}>
+      {body}
+      {selectedPartner && (
+        <View style={s.partnerOverlay}>
+          <HomeServicePartnerScreen
+            partner={selectedPartner.partner}
+            row={selectedPartner.row}
+            lang={lang}
+            serviceContext={selectedPartner.serviceContext}
+            region={selectedPartner.region}
+            onBack={() => setSelectedPartner(null)}
+          />
+        </View>
+      )}
+    </View>
+  )
 
   // ORDER COMES FROM THE CONFIG, not from the database. HS_PARTNERS is the display
   // truth — it holds the tagline, the logo and the gallery — and a partner with a row
@@ -214,7 +234,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   // ─── Landing ──────────────────────────────────────────────────────────────
 
   if (!selectedCategory) {
-    return (
+    return withPartner(
       <SafeAreaView style={s.safe} edges={['top']}>
         <PageBackground topic="home_services" />
         <ScreenHeader onBack={handleBack} backLabel={t('back', lang)} title={t('hsTitle', lang)} lang={lang} />
@@ -311,7 +331,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   // weaker claim than the one the reader needs.
   const anyCovers = visible.some(({ row }) => rowCovers(row))
 
-  return (
+  return withPartner(
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="home_services" />
       <ScreenHeader
@@ -454,6 +474,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
 }
 
 const s = StyleSheet.create({
+  partnerOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
   safe:         { flex: 1, backgroundColor: colors.bg },
 
   scroll:       { padding: 20, paddingBottom: 40 },

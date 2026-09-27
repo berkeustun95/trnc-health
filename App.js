@@ -592,6 +592,7 @@ export default function App() {
   // Explore module + place profile back steps (slice 2), asked by the chain like homeBackRef.
   const exploreBackRef = useRef(null)
   const placeBackRef = useRef(null)
+  const homeServicesBackRef = useRef(null)
   const profileGuardRef = useRef(null)
   // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
   // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
@@ -875,7 +876,7 @@ export default function App() {
       if (petsSubScreen === 'pethotel') { closePetHotel(); return true }
       if (petsSubScreen) { petsSubBack(); return true }
       if (showPets) { setShowPets(false); return true }
-      if (showHomeServices) { setShowHomeServices(false); return true }
+      if (showHomeServices) { if (homeServicesBackRef.current?.()) return true; setShowHomeServices(false); return true }
       if (showJobPostings)  { setShowJobPostings(false);  return true }
       if (showTransport) { setShowTransport(false); return true }
       if (showInsurance) { setShowInsurance(false); return true }
@@ -1855,7 +1856,7 @@ export default function App() {
     )
   } else if (showHomeServices) {
     content = (MODULE_FLAGS.homeServices || isAdmin)
-      ? <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowHomeServices(false)} />
+      ? <HomeServicesScreen lang={lang} session={session} onRequireAccount={requireAccount} onBack={() => setShowHomeServices(false)} backRef={homeServicesBackRef} />
       : <ComingSoonScreen lang={lang} moduleKey="homeServices" titleKey="menuHomeServices" session={session} onBack={() => setShowHomeServices(false)} />
   } else if (showJobPostings) {
     content = (MODULE_FLAGS.jobs || isAdmin)
