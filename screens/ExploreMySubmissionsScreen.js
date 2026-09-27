@@ -80,10 +80,16 @@ function SubmissionCard({ item, lang, onResubmit }) {
   )
 }
 
-export default function ExploreMySubmissionsScreen({ lang, session, onBack }) {
+export default function ExploreMySubmissionsScreen({ lang, session, onBack, backRef = null }) {
   const [items,   setItems]   = useState([])
   const [loading, setLoading] = useState(true)
   const [editPlace, setEditPlace] = useState(null)   // set → resubmit form (ExploreSubmitScreen edit mode)
+  // App's hardware-back chain (via ExploreScreen) closes the resubmit form first, like its button.
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => { if (editPlace) { setEditPlace(null); return true } return false }
+    return () => { backRef.current = null }
+  }, [backRef, editPlace])
 
   const load = useCallback(async () => {
     setLoading(true)

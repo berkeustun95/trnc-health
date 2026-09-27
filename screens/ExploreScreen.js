@@ -1,6 +1,6 @@
 import ExploreListTopSlot from '../components/ads/ExploreListTopSlot'
 import ExploreListInlineSlot from '../components/ads/ExploreListInlineSlot'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, ScrollView, Image,
@@ -186,13 +186,14 @@ function BottomPinCard({ item, lang, onClose, onViewProfile }) {
 // at which point delete it on purpose. Until then, deleting it as "duplicate map code"
 // silently removes the only way to filter a map by category or region.
 
-function PlacesMapView({ places, userLocation, lang, onSelectPlace }) {
+function PlacesMapView({ places, userLocation, lang, onSelectPlace, savedRegion = null, onRegionSaved }) {
   const [selectedPin, setSelectedPin] = useState(null)
 
-  const initialRegion = userLocation
+  // Back from list mode lands where the map was left (region kept by ExploreScreen).
+  const initialRegion = savedRegion || (userLocation
     ? { latitude: userLocation.latitude, longitude: userLocation.longitude,
         latitudeDelta: 0.5, longitudeDelta: 0.5 }
-    : TRNC_CENTER
+    : TRNC_CENTER)
 
   const pinnable = places.filter(p => p.latitude != null && p.longitude != null)
 
@@ -202,6 +203,7 @@ function PlacesMapView({ places, userLocation, lang, onSelectPlace }) {
         style={{ flex: 1 }}
         initialRegion={initialRegion}
         showsUserLocation={!!userLocation}
+        onRegionChangeComplete={r => onRegionSaved?.(r)}
         onPress={() => setSelectedPin(null)}
       >
         {pinnable.map(p => {
@@ -276,7 +278,7 @@ export const BROWSE_COLS =
   'id, category, name, name_i18n, description_i18n, region, latitude, longitude, ' +
   'cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until, source'
 
-export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, placeFavorites, onTogglePlaceFavorite, isAdmin = false, initialCategory = null, initialRegion = null, onAdNavigate }) {
+export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocation, session, onRequireAccount, placeFavorites, onTogglePlaceFavorite, isAdmin = false, initialCategory = null, initialRegion = null, onAdNavigate, placeOverlay = null, backRef = null }) {
   // Dark launch: featured pinning + badge show only once live, or to an admin previewing.
   // Mirrors the GaragesScreen showFeatured gate. The owner "request featured" CTA lands in Slice 5.
   const showFeatured = EXPLORE_FEATURED_LIVE || isAdmin
@@ -390,12 +392,42 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
     )
   }, [places, activeGroup, activeCat, region])
 
-  function openGroup(g) { setActiveGroup(g); setActiveCat(null); setRegion(null); setView('list') }
+  // List ↔ map toggle keeps both places: the list's offset (restored once it has laid out,
+  // clamped to the new height) and the map's region. A new group starts fresh.
+  const listRef = useRef(null)
+  const listOffset = useRef(0)
+  const restoreList = useRef(false)
+  const mapRegion = useRef(null)
+  const mySubsBackRef = useRef(null)
+  function openGroup(g) { setActiveGroup(g); setActiveCat(null); setRegion(null); setView('list'); listOffset.current = 0; mapRegion.current = null }
   function leaveGroup()  { setActiveGroup(null); setActiveCat(null); setRegion(null) }
+  function toggleView()  {
+    if (view === 'map') restoreList.current = true
+    setView(view === 'list' ? 'map' : 'list')
+  }
 
+  // App's hardware-back chain asks this before closing the module: the SAME steps as the
+  // on-screen backs below, topmost layer first. (The place overlay is App state and is
+  // closed by the chain before it gets here.)
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => {
+      if (showSubmit) { setShowSubmit(false); return true }
+      if (showMySubs) {
+        if (mySubsBackRef.current?.()) return true
+        setShowMySubs(false); load(); return true
+      }
+      if (showSaved) { setShowSaved(false); return true }
+      if (activeGroup && !rooted) { leaveGroup(); return true }
+      return false
+    }
+    return () => { backRef.current = null }
+  })
+
+  let body
   if (showSaved) {
     const saved = places.filter(p => placeFavorites?.has(p.id))
-    return (
+    body = (
       <SafeAreaView style={s.safe} edges={['top']}>
         <PageBackground topic="beaches_landmarks" />
         <ScreenHeader onBack={() => setShowSaved(false)} title={t('exploreSavedTitle', lang)} lang={lang} />
@@ -425,20 +457,17 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
         />
       </SafeAreaView>
     )
-  }
-
-  if (showMySubs) {
-    return (
+  } else if (showMySubs) {
+    body = (
       <ExploreMySubmissionsScreen
         session={session}
         lang={lang}
         onBack={() => { setShowMySubs(false); load() }}
+        backRef={mySubsBackRef}
       />
     )
-  }
-
-  if (showSubmit) {
-    return (
+  } else if (showSubmit) {
+    body = (
       <ExploreSubmitScreen
         session={session}
         lang={lang}
@@ -446,9 +475,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
         onSubmitted={() => { setShowSubmit(false); load() }}
       />
     )
-  }
-
-  return (
+  } else body = (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="beaches_landmarks" />
       <ScreenHeader
@@ -458,7 +485,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
         rightElement={activeGroup ? (
           <TouchableOpacity
             style={s.viewToggle}
-            onPress={() => setView(v => v === 'list' ? 'map' : 'list')}
+            onPress={toggleView}
             activeOpacity={0.75}
           >
             <Ionicons
@@ -498,6 +525,8 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
           userLocation={userLocation}
           lang={lang}
           onSelectPlace={onSelectPlace}
+          savedRegion={mapRegion.current}
+          onRegionSaved={r => { mapRegion.current = r }}
         />
       ) : (
         <View style={{ flex: 1 }}>
@@ -559,10 +588,18 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
 
           {/* List */}
           <FlatList
+            ref={listRef}
             data={filtered}
             keyExtractor={item => item.id}
             contentContainerStyle={s.listContent}
             showsVerticalScrollIndicator={false}
+            onScroll={e => { listOffset.current = e.nativeEvent.contentOffset.y }}
+            scrollEventThrottle={64}
+            onContentSizeChange={(w, h) => {
+              if (!restoreList.current) return
+              restoreList.current = false
+              listRef.current?.scrollToOffset({ offset: Math.min(listOffset.current, Math.max(0, h - 1)), animated: false })
+            }}
             ListHeaderComponent={
               // list_top on THE DRILLED-IN CATEGORY LIST ONLY — this FlatList and nothing
               // else on this screen. Not the group-tile landing, not the saved list, and
@@ -616,11 +653,23 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
       )}
     </SafeAreaView>
   )
+
+  // The place profile (App state) sits OVER whichever view is showing — list, map, saved —
+  // so closing it lands on exactly that view, scrolled where it was. A sibling of the body,
+  // with elevation, so no card's own elevation can punch through on Android.
+  return (
+    <View style={s.root}>
+      {body}
+      {placeOverlay && <View style={s.placeOverlay}>{placeOverlay}</View>}
+    </View>
+  )
 }
 
 const PHOTO_H = 160
 
 const s = StyleSheet.create({
+  root:   { flex: 1, backgroundColor: colors.bg },
+  placeOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
   safe:   { flex: 1, backgroundColor: colors.bg },
 
   viewToggle:   { minWidth: 70, alignItems: 'flex-end',

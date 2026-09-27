@@ -583,6 +583,9 @@ export default function App() {
   // Tab-shell back hooks (see the hardware-back chain): Home's directory/search, Profile's
   // Legal view + unsaved-changes guard. Set by the screens, null while they are unmounted.
   const homeBackRef = useRef(null)
+  // Explore module + place profile back steps (slice 2), asked by the chain like homeBackRef.
+  const exploreBackRef = useRef(null)
+  const placeBackRef = useRef(null)
   const profileGuardRef = useRef(null)
   // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
   // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
@@ -879,7 +882,11 @@ export default function App() {
       if (connectivitySub) { setConnectivitySub(null); return true }
       if (showEsim) { setShowEsim(false); setConnectivityOperator(null); return true }
       if (showLegal) { setShowLegal(false); return true }
-      if (selectedExplorePlace) { setSelectedExplorePlace(null); return true }
+      // The place profile first asks its own layer (the check-in page), then closes. Then the
+      // Explore module's layers — submit, my submissions (+ its edit form), saved, group —
+      // exactly as their buttons do, before the module itself closes.
+      if (selectedExplorePlace) { if (placeBackRef.current?.()) return true; setSelectedExplorePlace(null); return true }
+      if ((showExploreBeach || showExplore) && exploreBackRef.current?.()) return true
       if (showExploreBeach)     { closeExploreBeach(); return true }
       if (showExplore)          { setShowExplore(false); return true }
       if (showNewcomerEssentials) { setShowNewcomerEssentials(false); return true }
@@ -1386,6 +1393,14 @@ export default function App() {
     )
   }
 
+  // The Explore place profile. Inside the Explore module it renders as an OVERLAY over the
+  // still-mounted list (Events/Accommodation pattern — module-internal only; never over the
+  // tab shell, see slice2-diagnostic-record.md), so back keeps the list, its scroll, its
+  // chips and the Saved view. From the map tab it is still a standalone screen, whose
+  // place is kept by ExploreMapScreen's returnSnapshot.
+  const explorePlaceEl = selectedExplorePlace ? (
+    <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} isFavorite={placeFavorites.has(selectedExplorePlace.id)} onToggleFavorite={() => togglePlaceFavorite(selectedExplorePlace.id)} onAdNavigate={openAdRoute} backRef={placeBackRef} />
+  ) : null
   let content
   // True only when the tab shell (the final else of the chain below) renders.
   // Every pushed module screen short-circuits earlier in that same chain, so this
@@ -1874,12 +1889,10 @@ export default function App() {
           />
   } else if (showLegal) {
     content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
-  } else if (selectedExplorePlace) {
-    content = <ExploreProfileScreen place={selectedExplorePlace} lang={lang} session={session} onBack={() => setSelectedExplorePlace(null)} onRequireAccount={requireAccount} isFavorite={placeFavorites.has(selectedExplorePlace.id)} onToggleFavorite={() => togglePlaceFavorite(selectedExplorePlace.id)} onAdNavigate={openAdRoute} />
   } else if (showExploreBeach) {
     content = (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={closeExploreBeach} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} onAdNavigate={openAdRoute} />
+        <ExploreScreen lang={lang} onBack={closeExploreBeach} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} onAdNavigate={openAdRoute} placeOverlay={explorePlaceEl} backRef={exploreBackRef} />
       </BLErrorBoundary>
     )
   } else if (showExplore) {
@@ -1888,11 +1901,14 @@ export default function App() {
     // Notify-me upserts module='explore' into module_waitlist (shape-guard accepts it now).
     content = (MODULE_FLAGS.explore || isAdmin) ? (
       <BLErrorBoundary>
-        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} onAdNavigate={openAdRoute} />
+        <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} onAdNavigate={openAdRoute} placeOverlay={explorePlaceEl} backRef={exploreBackRef} />
       </BLErrorBoundary>
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />
     )
+  } else if (selectedExplorePlace) {
+    // Map tab (and anything else outside the Explore module): standalone, as before.
+    content = explorePlaceEl
   } else if (adminPreview === 'exploreMap') {
     // Dev-only Visit NCY review (utils/exploreReview.js): the Keşfet map with pending places
     // and the routes layer, for an admin — who otherwise never reaches the tab shell. Only

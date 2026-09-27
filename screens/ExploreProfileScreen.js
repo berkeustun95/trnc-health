@@ -1,5 +1,5 @@
 import ExploreDetailBottomSlot from '../components/ads/ExploreDetailBottomSlot'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Image, FlatList, Dimensions, Linking, Modal, TextInput, ActivityIndicator,
@@ -71,7 +71,7 @@ function PhotoAttribution({ place, url, index, lang }) {
   return <PhotoCredit a={a} lang={lang} style={s.creditWrap} />
 }
 
-export default function ExploreProfileScreen({ place, lang, session, onBack, onRequireAccount, isFavorite, onToggleFavorite, onAdNavigate }) {
+export default function ExploreProfileScreen({ place, lang, session, onBack, onRequireAccount, isFavorite, onToggleFavorite, onAdNavigate, backRef = null }) {
   const insets = useSafeAreaInsets()
   const [imgIdx, setImgIdx] = useState(0)
 
@@ -97,6 +97,13 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
   const [featBusy,  setFeatBusy]  = useState(false)
   const [featSent,  setFeatSent]  = useState(false)
   const [showCheckin, setShowCheckin] = useState(false)
+  // App's hardware-back chain asks this before closing the profile: the check-in page closes
+  // first, like its own back button (it used to close the whole profile — slice 2).
+  useEffect(() => {
+    if (!backRef) return
+    backRef.current = () => { if (showCheckin) { setShowCheckin(false); return true } return false }
+    return () => { backRef.current = null }
+  }, [backRef, showCheckin])
 
   // ─── THE SCROLL RESERVE IS MEASURED, NOT TYPED ────────────────────────────
   //
@@ -153,10 +160,8 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
   // Same shape as ExploreScreen's showSubmit branch: the sub-screen replaces this one
   // rather than stacking a modal, so it must sit AFTER every hook above.
   //
-  // ⚠ Android back closes the whole PROFILE from here, not just this screen — App.js's
-  //   BackHandler pops `selectedExplorePlace` and knows nothing about local sub-screen
-  //   state. Same known limitation as ExploreScreen's submit flow and the events detail
-  //   overlay; the in-screen back button works correctly.
+  // Android back closes only this page: App's chain asks backRef (above) before it pops
+  // `selectedExplorePlace` (slice 2, 2026-09-28).
   if (showCheckin) {
     return (
       <ComingSoonScreen
