@@ -311,7 +311,7 @@ export default function ExploreMapScreen({
   const [selectedRoute, setSelectedRoute] = useState(null)
   // Walk mode ("Başla"): null, or { next, armed } — see walkAdvance() in constants/walkingRoutes.
   const [walk, setWalk] = useState(null)
-  const { pos: walkPos, status: walkStatus } = useWalkPosition(!!walk && !!selectedRoute)
+  const { pos: walkPos, status: walkStatus, simulate: simulateFix } = useWalkPosition(!!walk && !!selectedRoute)
 
   // "My location" — gated with the routes layer, so production keeps today's behaviour
   // (dot only when App.js already holds a location) until the flag flips.
@@ -725,6 +725,7 @@ export default function ExploreMapScreen({
             onSelectStop={p => handOff(() => onSelectPlace?.(p))}
             medal={ROUTE_MEDALS_LIVE ? medal : null}
             onKeepMedal={() => onRequireAccount?.(medalGateKey)}
+            onSimulate={simulateFix}
           />
         : selectedRoute
         ? <RoutePanel

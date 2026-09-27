@@ -19,6 +19,7 @@ import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { colors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { medalDate } from '../utils/routeMedals'
+import { WALK_SIM, fakeFixNear } from '../utils/walkSim'
 
 // If dashes ever render wrong on a device, this is the one line to change to `undefined`
 // (solid) — both platforms implement lineDashPattern natively in react-native-maps 1.20.
@@ -302,7 +303,9 @@ export function useWalkPosition(active) {
     const app = AppState.addEventListener('change', st => (st === 'active' ? start() : stop()))
     return () => { gone = true; stop(); app.remove() }
   }, [active])
-  return { pos, status }
+  // Dev-only (utils/walkSim.js): the same setter the watcher uses, never a side door.
+  const simulate = WALK_SIM ? fix => { if (active) setPos(fix) } : null
+  return { pos, status, simulate }
 }
 
 // Is location ALREADY granted? Read-only: never prompts. Re-read on return to the foreground,
@@ -350,7 +353,7 @@ export function useHeading(active) {
   return heading
 }
 
-export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEnd, onSelectStop, medal = null, onKeepMedal }) {
+export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEnd, onSelectStop, medal = null, onKeepMedal, onSimulate = null }) {
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => { onEnd(); return true })
     return () => sub.remove()
@@ -400,6 +403,16 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
             <Text style={p.note}>{t('walkNoLocation', lang)}</Text>
           ) : null}
           {medal && <MedalProgress lang={lang} medal={medal} />}
+          {WALK_SIM && onSimulate && (
+            <View style={w.simRow}>
+              <TouchableOpacity style={w.simBtn} onPress={() => onSimulate(fakeFixNear(stop, 100))}>
+                <Text style={w.simText}>TEST · 100 m away</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={w.simBtn} onPress={() => onSimulate(fakeFixNear(stop, 0))}>
+                <Text style={w.simText}>TEST · at this stop</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <PathsCredit route={route} lang={lang} />
           <View style={w.controls}>
@@ -495,6 +508,10 @@ const w = StyleSheet.create({
   keepBtn:  { alignSelf: 'flex-start', marginTop: 8, backgroundColor: ROUTE_COLOR, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12 },
   keepText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
   endQuiet:     { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: ROUTE_COLOR },
+  simRow:   { flexDirection: 'row', gap: 8, marginTop: 10 },
+  simBtn:   { flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#DC2626', borderStyle: 'dashed',
+              backgroundColor: 'transparent', alignItems: 'center' },
+  simText:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#DC2626' },
   endQuietText: { color: ROUTE_COLOR },
   stepText: { flexShrink: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold', color: ROUTE_COLOR },
   goText:   { flexShrink: 1, fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
