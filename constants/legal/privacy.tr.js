@@ -12,8 +12,8 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
-export default `Sürüm: 2026-09-24
-Son güncelleme: 24 Eylül 2026
+export default `Sürüm: 2026-09-27
+Son güncelleme: 27 Eylül 2026
 
 KİM OLDUĞUMUZ
 
@@ -63,6 +63,8 @@ Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bu
 • Arama — arama yaptığınızda konumunuz telefonunuzdan çıkmadan önce yaklaşık 1 km'ye yuvarlanır ve yalnızca yakındaki sonuçları öne almak için sunucularımıza gönderilir. Saklamıyoruz.
 • Hava durumu — Ana Sayfa'da hava durumunu göstermek için konumunuz yaklaşık 10 km'ye yuvarlanır ve sunucumuza gönderilir; sunucumuz o bölgenin tahminini MET Norway'den (Oslo'daki Norveç Meteoroloji Enstitüsü) ister. MET Norway yalnızca sunucumuzu görür, telefonunuzu asla görmez. Bölgenin tahminini kısa bir süre tutarız ve kimin istediğini kaydetmeyiz.
 • Yürüyüş rotaları — konumunuz açıkken bir yürüyüş rotasını takip ettiğinizde konumunuz ve sıradaki durak sunucumuza gönderilir; sunucumuz yürüyüş yolunu openrouteservice'ten (Heidelberg, Almanya'daki HeiGIT tarafından işletilir) ister. HeiGIT yalnızca sunucumuzu görür, telefonunuzu asla görmez ve istek koordinatlarını kayıtlarında yaklaşık 1 km'ye yuvarlanmış olarak tutar. Konumunuzu saklamayız.
+• Rota rozetleri — bir yürüyüş rotasını takip ederken telefonunuz her durağa yaklaşık 50 metre yaklaşıp yaklaşmadığınızı kontrol eder. Bu kontrol telefonunuzda yapılır: konumunuz bunun için bize gönderilmez ve saklanmaz. Bir rotanın duraklarının çoğuna ulaştığınızda, hesabınızda o rotayı tamamladığınızı ve tarihini saklarız — konumunuzu ya da hangi duraklara uğradığınızı asla saklamayız. ADA'yı misafir olarak kullanıyorsanız bu bilgi yalnızca telefonunuzda, 7 gün boyunca, giriş yapıp rozeti saklayabilmeniz için tutulur. Rozetleriniz hesabınızla birlikte silinir.
+• Rota tamamlamaları — bir yürüyüş rotası tamamlandığında, tamamlandığını ve rotanın bölgesini de kaydederiz; buna hiçbir hesap, cihaz veya konum eklenmez. Bunları KKTC Turizm Bakanlığı ile yalnızca rota başına aylık toplamlar olarak paylaşırız ve kişileri değil tamamlamaları sayarız; bir ayda 5'ten az tamamlanan bir rota "5'ten az" olarak bildirilir.
 • İletişim dokunuşları — listelenen bir işletme veya iş ortağı için arama, WhatsApp, web sitesi ya da yol tarifi düğmesine dokunduğunuzda, dokunuşun gerçekleştiğini, hangi işletme için olduğunu ve ilgili olduğu KKTC'nin yedi geniş bölgesinden birini (örneğin Girne veya Lefke) kaydederiz: konumunuzun sizi yerleştirdiği bölge ya da uygulamada seçtiğiniz bölge. Bununla birlikte hesabınızı, cihazınızı veya tam konumunuzu asla kaydetmeyiz; bu nedenle size geri izlenemez. Bu sayıları, işletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini bildirmek için kullanırız.
 • Gönderdiğiniz yerler — bir yer gönderip işaretçisi için mevcut konumunuzu kullanırsanız, bu konum yerin konumu olarak kaydedilir ve yer onaylandıktan sonra herkese açık olarak gösterilir.
 
@@ -81,6 +83,8 @@ Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları ku
 • Hangi koşulları kabul ettiğinizin kaydını tutmak — Neyin kabul edildiğini gösterebilmek için. Hukuki dayanak: Meşru menfaatimiz ve hukuki yükümlülüğe uyum
 • Yakınınızdakileri göstermek için konumunuzu kullanmak: uzaklık sırası, harita, arama sırası ve yerel hava durumu — İstediğiniz hizmeti sunabilmek için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • İşletmelerin iletişim düğmelerine yapılan dokunuşları bölgeyle birlikte saymak — İşletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini gösterebilmek için. Hukuki dayanak: Hizmeti yürütme ve finanse etmeye ilişkin meşru menfaatimiz
+• Tamamladığınız yürüyüş rotalarını kaydetmek ve rota rozetlerinizi göstermek — Kullandığınız özelliği sunabilmek için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
+• Tamamlanan yürüyüş rotalarının aylık toplamlarını Turizm Bakanlığı'na bildirmek — Bakanlıkla birlikte yürüttüğümüz yürüyüş rotaları programını desteklemek için. Hukuki dayanak: Hizmeti yürütmeye ilişkin meşru menfaatimiz
 
 Kişisel verilerinizi satmayız, kiralamayız ve üçüncü tarafların kendi pazarlama faaliyetleri için paylaşmayız.
 
@@ -132,7 +136,7 @@ Onay verirseniz:
 
 7. VERİLERİN SAKLANMASI VE SAKLAMA SÜRELERİ
 
-Tüm veriler Supabase üzerinde, bir AB bölgesinde saklanır. Satır Düzeyi Güvenlik (RLS) politikaları yalnızca kendi kayıtlarınıza erişebilmenizi sağlar. Verileriniz, üniversitenizin öğrenci listesinde görünmeyi seçmediğiniz sürece diğer kullanıcılara görünmez. Bu ayarı açarsanız, listede yer alan diğer kullanıcılar görünen adınızı, profil fotoğrafınızı, üniversitelerinizi, öğrenim düzeyinizi, bölümünüzü ve öğrenim yıllarınızı görebilir ve size mesaj isteği gönderebilir. Ayarı istediğiniz zaman kapatabilirsiniz.
+Tüm veriler Supabase üzerinde, bir AB bölgesinde saklanır. Satır Düzeyi Güvenlik (RLS) politikaları yalnızca kendi kayıtlarınıza erişebilmenizi sağlar. Verileriniz, üniversitenizin öğrenci listesinde görünmeyi seçmediğiniz sürece diğer kullanıcılara görünmez. Bu ayarı açarsanız, listede yer alan diğer kullanıcılar görünen adınızı, profil fotoğrafınızı, üniversitelerinizi, öğrenim düzeyinizi, bölümünüzü ve öğrenim yıllarınızı görebilir ve size mesaj isteği gönderebilir. Rota rozeti ayarınız açıkken (ayar açık başlar; rozetler kullanıma girdiğinde zaten bir öğrenci listesinde olanlar için kapalı başlar), hangi yürüyüş rotalarını tamamladığınızı da görebilirler, ancak tarihlerini asla göremezler. Ayarı istediğiniz zaman kapatabilirsiniz.
 
 KKTC'den faaliyet gösterdiğimiz için yöneticilerimiz verilerinize AB/AEA dışından erişmektedir. Bu erişime, verilerin saklandığı ortama uyguladığımız korumaların aynısını uygularız.
 
@@ -142,6 +146,7 @@ Farklı veriler farklı sürelerle saklanır.
 • Reddedilen gönderimler — 30 gün: bir gönderim içerik filtremiz tarafından reddedilirse, hatalı reddetmeleri bulup düzeltebilmek ve filtreyi iyileştirebilmek için reddedilen metni, reddetmeyi tetikleyen terimi ve gerçekleşme zamanını saklarız. Bu kayıtlar hesabınıza bağlıdır, yalnızca yöneticilerimize görünür, 30 gün sonra otomatik olarak silinir ve başka hiçbir amaçla kullanılmaz.
 • Sildiğiniz içerikler — 30 gün: sildiğiniz değerlendirmeler, sorular ve mesajlar hemen gizlenir ve 30 gün sonra kalıcı olarak kaldırılır. Hâlâ açık bir şikâyetin parçasıysa, şikâyet sonuçlandığında kaldırılır. Bir soruyu silmek, ona verilen yanıtları da kaldırır.
 • Kaldırdığımız içerikler: topluluk kurallarımızı ihlal ettiği için kaldırılan içerikler, aynı hesabın tekrarlayan ihlallerini tespit edebilmemiz için dâhilî olarak saklanır. Diğer kullanıcılara artık görünmez.
+• Rota rozetleri: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Misafir kullanıcının rozeti yalnızca telefonda, 7 gün boyunca tutulur.
 • Onay kayıtları: hesabınızı elinizde tuttuğunuz sürece ve sonrasında makul bir süre boyunca saklanır; çünkü bu kayıtlar neyi kabul ettiğinizin kanıtıdır.
 
 8. YAŞ VE ÇOCUKLAR

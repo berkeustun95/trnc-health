@@ -256,6 +256,8 @@ const SURFACES = [
   // socialPlayServicesMissing) are reached as t(errorKey) and so are invisible to the literal
   // scan; they were checked present in all nine locales by hand when added.
   'components/SocialSignInButtons.js',
+  // Route medals (ROUTE_MEDALS_LIVE), added with the component.
+  'components/RouteBadges.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
