@@ -136,7 +136,7 @@ Onay verirseniz:
 
 7. VERİLERİN SAKLANMASI VE SAKLAMA SÜRELERİ
 
-Tüm veriler Supabase üzerinde, bir AB bölgesinde saklanır. Satır Düzeyi Güvenlik (RLS) politikaları yalnızca kendi kayıtlarınıza erişebilmenizi sağlar. Verileriniz, üniversitenizin öğrenci listesinde görünmeyi seçmediğiniz sürece diğer kullanıcılara görünmez. Bu ayarı açarsanız, listede yer alan diğer kullanıcılar görünen adınızı, profil fotoğrafınızı, üniversitelerinizi, öğrenim düzeyinizi, bölümünüzü ve öğrenim yıllarınızı görebilir ve size mesaj isteği gönderebilir. Rota rozeti ayarınız açıkken (varsayılan olarak açıktır), hangi yürüyüş rotalarını tamamladığınızı da görebilirler, ancak tarihlerini asla göremezler. Ayarı istediğiniz zaman kapatabilirsiniz.
+Tüm veriler Supabase üzerinde, bir AB bölgesinde saklanır. Satır Düzeyi Güvenlik (RLS) politikaları yalnızca kendi kayıtlarınıza erişebilmenizi sağlar. Verileriniz, üniversitenizin öğrenci listesinde görünmeyi seçmediğiniz sürece diğer kullanıcılara görünmez. Bu ayarı açarsanız, listede yer alan diğer kullanıcılar görünen adınızı, profil fotoğrafınızı, üniversitelerinizi, öğrenim düzeyinizi, bölümünüzü ve öğrenim yıllarınızı görebilir ve size mesaj isteği gönderebilir. Rota rozeti ayarınız açıkken (ayar açık başlar; rozetler kullanıma girdiğinde zaten bir öğrenci listesinde olanlar için kapalı başlar), hangi yürüyüş rotalarını tamamladığınızı da görebilirler, ancak tarihlerini asla göremezler. Ayarı istediğiniz zaman kapatabilirsiniz.
 
 KKTC'den faaliyet gösterdiğimiz için yöneticilerimiz verilerinize AB/AEA dışından erişmektedir. Bu erişime, verilerin saklandığı ortama uyguladığımız korumaların aynısını uygularız.
 

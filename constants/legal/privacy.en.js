@@ -136,7 +136,7 @@ If you opt in:
 
 7. DATA STORAGE AND RETENTION
 
-All data is stored on Supabase, in an EU region. Row-Level Security (RLS) policies ensure you can only access your own records. Your data is not visible to other users unless you choose to appear in your university's student list. If you turn that on, other listed users can see your display name, profile picture, universities, study level, field of study and study years, and can send you a message request. While your route-badge switch is on (it is on by default), they can also see which walking routes you have completed, but never the dates. You can turn it off at any time.
+All data is stored on Supabase, in an EU region. Row-Level Security (RLS) policies ensure you can only access your own records. Your data is not visible to other users unless you choose to appear in your university's student list. If you turn that on, other listed users can see your display name, profile picture, universities, study level, field of study and study years, and can send you a message request. While your route-badge switch is on (it starts on, except for people who were already in a student list when badges were introduced, for whom it starts off), they can also see which walking routes you have completed, but never the dates. You can turn it off at any time.
 
 Because we operate from the TRNC, our administrators access your data from outside the EU/EEA. We apply the same protections to that access as we do to the data at rest.
 
