@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView,
+  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -11,6 +11,7 @@ import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
+import FilterDropdown from '../components/FilterDropdown'
 import { pricedServices, formatPriceRange } from '../utils/servicePrices'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
 
@@ -87,66 +88,33 @@ export default function GaragePriceCompareScreen({ lang, onBack, onOpenFacility 
 
   useEffect(() => { load() }, [load])
 
-  // Region change clears any chosen areas (same discipline as the directory).
-  function toggleRegion(key) {
-    setRegions(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
-    setAreas([])
-  }
-  function toggleArea(key) {
-    setAreas(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
-  }
-
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <PageBackground topic="garages" />
       <ScreenHeader onBack={onBack} backLabel={t('back', lang)} title={t('priceCompareTitle', lang)} lang={lang} />
 
       <View style={{ flex: 1 }}>
-        {/* Service picker (single-select, required) */}
-        <Text style={s.pickerLabel}>{t('priceCompareService', lang)}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.filterRow}>
-          {GARAGE_CATEGORIES.map(c => {
-            const active = service === c.key
-            return (
-              <TouchableOpacity key={c.key} style={[s.chip, active && s.chipActive]} onPress={() => setService(c.key)}>
-                <Ionicons name={c.icon} size={13} color={active ? colors.primary : colors.textSecondary} />
-                <Text style={[s.chipText, active && s.chipTextActive]}>{t(c.labelKey, lang)}</Text>
-              </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
-
-        {/* Region filter (multi-select) */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.filterRow}>
-          <TouchableOpacity style={[s.chip, regions.length === 0 && s.chipActive]} onPress={() => { setRegions([]); setAreas([]) }}>
-            <Text style={[s.chipText, regions.length === 0 && s.chipTextActive]}>{t('filterAll', lang)}</Text>
-          </TouchableOpacity>
-          {REGIONS.map(r => {
-            const active = regions.includes(r)
-            return (
-              <TouchableOpacity key={r} style={[s.chip, active && s.chipActive]} onPress={() => toggleRegion(r)}>
-                <Text style={[s.chipText, active && s.chipTextActive]}>{t(REGION_LABEL_KEY[r], lang)}</Text>
-              </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
-
-        {/* Dependent area sub-row: only when EXACTLY ONE region is selected. */}
-        {regions.length === 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.filterRow}>
-            <TouchableOpacity style={[s.areaChip, areas.length === 0 && s.chipActive]} onPress={() => setAreas([])}>
-              <Text style={[s.chipText, areas.length === 0 && s.chipTextActive]}>{t('filterAll', lang)}</Text>
-            </TouchableOpacity>
-            {areaOptions(regions[0]).map(a => {
-              const active = areas.includes(a.value)
-              return (
-                <TouchableOpacity key={a.value} style={[s.areaChip, active && s.chipActive]} onPress={() => toggleArea(a.value)}>
-                  <Text style={[s.chipText, active && s.chipTextActive]}>{a.label}</Text>
-                </TouchableOpacity>
-              )
-            })}
-          </ScrollView>
-        )}
+        <View style={s.ddRow}>
+          {/* Service is required: no "Tümü" — a comparison needs exactly one service. */}
+          <FilterDropdown
+            label={t('priceCompareService', lang)}
+            options={GARAGE_CATEGORIES.map(c => ({ value: c.key, label: t(c.labelKey, lang) }))}
+            value={service} onChange={setService} allowAll={false} lang={lang}
+          />
+          <FilterDropdown
+            label={t('ddDistrict', lang)}
+            options={REGIONS.map(r => ({ value: r, label: t(REGION_LABEL_KEY[r], lang) }))}
+            multi values={regions} onChange={arr => { setRegions(arr); setAreas([]) }} lang={lang}
+          />
+          {/* Area only when EXACTLY ONE district is selected; a district change clears it. */}
+          {regions.length === 1 && (
+            <FilterDropdown
+              label={t('ddArea', lang)}
+              options={areaOptions(regions[0])}
+              multi values={areas} onChange={setAreas} lang={lang}
+            />
+          )}
+        </View>
 
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
@@ -191,17 +159,7 @@ export default function GaragePriceCompareScreen({ lang, onBack, onOpenFacility 
 const s = StyleSheet.create({
   safe:           { flex: 1, backgroundColor: colors.bg },
 
-  pickerLabel:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-                    paddingHorizontal: 16, paddingTop: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  filterRow:      { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
-  chip:           { flexDirection: 'row', alignItems: 'center', gap: 5,
-                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                    backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
-  chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
-  areaChip:       { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16,
-                    backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
+  ddRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 10, flexShrink: 0 },
 
   listContent:    { paddingHorizontal: 16, paddingBottom: 40, gap: 10 },
   intro:          { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
-  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView,
+  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -13,6 +13,7 @@ import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions } from '../constants/areas'
+import FilterDropdown from '../components/FilterDropdown'
 import GroomingOnboardingScreen from './GroomingOnboardingScreen'
 
 const CATEGORIES = [
@@ -117,21 +118,6 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
     setLoading(false)
   }, [selected, regions, areas])
 
-  function toggleCategory(key) {
-    setSelected(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
-  }
-
-  // Changing the region selection clears any chosen areas — no stale area filter
-  // survives a region change (same discipline as the onboarding city→area dropdown).
-  function toggleRegion(key) {
-    setRegions(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
-    setAreas([])
-  }
-
-  function toggleArea(key) {
-    setAreas(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
-  }
-
   useEffect(() => { load() }, [load])
 
   // Does the caller already own a grooming facility? Drives the CTA label (register vs manage).
@@ -166,88 +152,26 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
       <ScreenHeader onBack={onBack} backLabel={t('back', lang)} title={t('groomTitle', lang)} lang={lang} />
 
       <View style={{ flex: 1 }}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={s.filterRow}
-        >
-          <TouchableOpacity
-            style={[s.chip, selected.length === 0 && s.chipActive]}
-            onPress={() => setSelected([])}
-          >
-            <Text style={[s.chipText, selected.length === 0 && s.chipTextActive]}>{t('groomFilterAll', lang)}</Text>
-          </TouchableOpacity>
-          {CATEGORIES.map(c => {
-            const active = selected.includes(c.key)
-            return (
-              <TouchableOpacity
-                key={c.key}
-                style={[s.chip, active && s.chipActive]}
-                onPress={() => toggleCategory(c.key)}
-              >
-                <Text style={[s.chipText, active && s.chipTextActive]}>
-                  {t(c.labelKey, lang)}
-                </Text>
-              </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={s.filterRow}
-        >
-          <TouchableOpacity
-            style={[s.chip, regions.length === 0 && s.chipActive]}
-            onPress={() => { setRegions([]); setAreas([]) }}
-          >
-            <Text style={[s.chipText, regions.length === 0 && s.chipTextActive]}>{t('groomFilterAll', lang)}</Text>
-          </TouchableOpacity>
-          {REGIONS.map(r => {
-            const active = regions.includes(r)
-            return (
-              <TouchableOpacity
-                key={r}
-                style={[s.chip, active && s.chipActive]}
-                onPress={() => toggleRegion(r)}
-              >
-                <Text style={[s.chipText, active && s.chipTextActive]}>{t(REGION_LABEL_KEY[r], lang)}</Text>
-              </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
-
-        {/* Dependent area sub-row: only when EXACTLY ONE region is selected. */}
-        {regions.length === 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={s.filterRow}
-          >
-            <TouchableOpacity
-              style={[s.areaChip, areas.length === 0 && s.chipActive]}
-              onPress={() => setAreas([])}
-            >
-              <Text style={[s.chipText, areas.length === 0 && s.chipTextActive]}>{t('groomFilterAll', lang)}</Text>
-            </TouchableOpacity>
-            {areaOptions(regions[0]).map(a => {
-              const active = areas.includes(a.value)
-              return (
-                <TouchableOpacity
-                  key={a.value}
-                  style={[s.areaChip, active && s.chipActive]}
-                  onPress={() => toggleArea(a.value)}
-                >
-                  <Text style={[s.chipText, active && s.chipTextActive]}>{a.label}</Text>
-                </TouchableOpacity>
-              )
-            })}
-          </ScrollView>
-        )}
+        <View style={s.ddRow}>
+          <FilterDropdown
+            label={t('ddCategory', lang)}
+            options={CATEGORIES.map(c => ({ value: c.key, label: t(c.labelKey, lang) }))}
+            multi values={selected} onChange={setSelected} lang={lang}
+          />
+          <FilterDropdown
+            label={t('ddDistrict', lang)}
+            options={REGIONS.map(r => ({ value: r, label: t(REGION_LABEL_KEY[r], lang) }))}
+            multi values={regions} onChange={arr => { setRegions(arr); setAreas([]) }} lang={lang}
+          />
+          {/* Area only when EXACTLY ONE district is selected; a district change clears it. */}
+          {regions.length === 1 && (
+            <FilterDropdown
+              label={t('ddArea', lang)}
+              options={areaOptions(regions[0])}
+              multi values={areas} onChange={setAreas} lang={lang}
+            />
+          )}
+        </View>
 
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
@@ -314,16 +238,8 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
 const s = StyleSheet.create({
   safe:           { flex: 1, backgroundColor: colors.bg },
 
-  // Category filter
-  filterRow:      { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
-  chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                    backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
-  chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
-  // Area sub-row chip: slightly smaller to signal it's dependent on the region above.
-  areaChip:       { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16,
-                    backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
+  // Filters
+  ddRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 10, flexShrink: 0 },
 
   // List
   listContent:    { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },

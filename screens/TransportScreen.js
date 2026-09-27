@@ -11,6 +11,7 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import FilterDropdown from '../components/FilterDropdown'
 import TransportProfileScreen from './TransportProfileScreen'
 import TransportOnboardingScreen from './TransportOnboardingScreen'
 import BusRoutesScreen from './BusRoutesScreen'
@@ -243,32 +244,13 @@ export default function TransportScreen({ lang, session, onBack, onRequireAccoun
         </ScrollView>
       ) : (
         <View style={{ flex: 1 }}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={s.districtRow}
-          >
-            <TouchableOpacity
-              style={[s.chip, !selectedDistrict && s.chipActive]}
-              onPress={() => setSelectedDistrict(null)}
-            >
-              <Text style={[s.chipText, !selectedDistrict && s.chipTextActive]}>
-                {t('trAllDistricts', lang)}
-              </Text>
-            </TouchableOpacity>
-            {DISTRICTS.map(d => (
-              <TouchableOpacity
-                key={d}
-                style={[s.chip, selectedDistrict === d && s.chipActive]}
-                onPress={() => setSelectedDistrict(selectedDistrict === d ? null : d)}
-              >
-                <Text style={[s.chipText, selectedDistrict === d && s.chipTextActive]}>
-                  {districtLabel(d, lang)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={s.districtRow}>
+            <FilterDropdown
+              label={t('ddDistrict', lang)}
+              options={DISTRICTS.map(d => ({ value: d, label: districtLabel(d, lang) }))}
+              value={selectedDistrict} onChange={setSelectedDistrict} lang={lang}
+            />
+          </View>
 
           {loading
             ? <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
@@ -329,12 +311,7 @@ const s = StyleSheet.create({
   ctaCardSub:         { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   // District filter
-  districtRow:        { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
-  chip:               { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                        backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
-  chipActive:         { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText:           { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  chipTextActive:     { fontFamily: 'Inter_700Bold', color: colors.primary },
+  districtRow:        { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, flexShrink: 0 },
 
   // Provider list
   listContent:        { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },

@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ScrollView,
+  ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import FilterDropdown from '../components/FilterDropdown'
 import BackButton from '../components/BackButton'
 
 const DISTRICTS = ['nicosia', 'kyrenia', 'famagusta', 'morphou', 'iskele', 'lefke', 'karpaz']
@@ -96,43 +97,17 @@ export default function BusRoutesScreen({ lang, onBack }) {
       </View>
 
       <View style={s.filterSection}>
-        <Text style={s.filterLabel}>{t('trBusOrigin', lang)}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.filterRow}>
-          <TouchableOpacity
-            style={[s.chip, !origin && s.chipActive]}
-            onPress={() => setOrigin(null)}
-          >
-            <Text style={[s.chipText, !origin && s.chipTextActive]}>{t('trBusAllOrigins', lang)}</Text>
-          </TouchableOpacity>
-          {DISTRICTS.map(d => (
-            <TouchableOpacity
-              key={d}
-              style={[s.chip, origin === d && s.chipActive]}
-              onPress={() => setOrigin(origin === d ? null : d)}
-            >
-              <Text style={[s.chipText, origin === d && s.chipTextActive]}>{districtLabel(d, lang)}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <Text style={[s.filterLabel, { marginTop: 10 }]}>{t('trBusDestination', lang)}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.filterRow}>
-          <TouchableOpacity
-            style={[s.chip, !destination && s.chipActive]}
-            onPress={() => setDestination(null)}
-          >
-            <Text style={[s.chipText, !destination && s.chipTextActive]}>{t('trBusAllDestinations', lang)}</Text>
-          </TouchableOpacity>
-          {DISTRICTS.map(d => (
-            <TouchableOpacity
-              key={d}
-              style={[s.chip, destination === d && s.chipActive]}
-              onPress={() => setDestination(destination === d ? null : d)}
-            >
-              <Text style={[s.chipText, destination === d && s.chipTextActive]}>{districtLabel(d, lang)}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <FilterDropdown
+          label={t('trBusOrigin', lang)}
+          options={DISTRICTS.map(d => ({ value: d, label: districtLabel(d, lang) }))}
+          value={origin} onChange={setOrigin} lang={lang} style={{ flex: 1 }}
+        />
+        <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
+        <FilterDropdown
+          label={t('trBusDestination', lang)}
+          options={DISTRICTS.map(d => ({ value: d, label: districtLabel(d, lang) }))}
+          value={destination} onChange={setDestination} lang={lang} style={{ flex: 1 }}
+        />
       </View>
 
       {loading
@@ -167,17 +142,9 @@ const s = StyleSheet.create({
   headerTitle:    { flex: 1, textAlign: 'center', fontSize: 17, fontFamily: 'Inter_700Bold',
                     color: colors.textPrimary },
 
-  filterSection:  { backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border,
-                    paddingTop: 12, paddingBottom: 8 },
-  filterLabel:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
-                    textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16,
-                    marginBottom: 6 },
-  filterRow:      { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
-  chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                    backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.border },
-  chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
+  filterSection:  { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0,
+                    backgroundColor: colors.cardBg, borderBottomWidth: 1, borderBottomColor: colors.border,
+                    paddingHorizontal: 16, paddingVertical: 10 },
 
   listContent:    { padding: 16, paddingBottom: 40, gap: 12 },
   emptyWrap:      { alignItems: 'center', paddingTop: 60, gap: 12 },

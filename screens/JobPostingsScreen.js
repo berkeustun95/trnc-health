@@ -14,6 +14,7 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
+import FilterDropdown from '../components/FilterDropdown'
 
 const CATEGORIES = [
   { key: 'all',               icon: 'apps-outline',       labelKey: 'jobAllCategories' },
@@ -260,61 +261,18 @@ export default function JobPostingsScreen({ lang, session, onBack, onRequireAcco
         <PageBackground topic="home_services" />
         <ScreenHeader onBack={handleBack} backLabel={backLabel} title={headerTitle} lang={lang} />
 
-        {/* Employment type chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={s.filterRow}
-        >
-          <TouchableOpacity
-            style={[s.chip, !selectedType && s.chipActive]}
-            onPress={() => setSelectedType(null)}
-          >
-            <Text style={[s.chipText, !selectedType && s.chipTextActive]}>
-              {t('jobAllTypes', lang)}
-            </Text>
-          </TouchableOpacity>
-          {EMPLOYMENT_TYPES.map(et => (
-            <TouchableOpacity
-              key={et.key}
-              style={[s.chip, selectedType === et.key && s.chipActive]}
-              onPress={() => setSelectedType(selectedType === et.key ? null : et.key)}
-            >
-              <Text style={[s.chipText, selectedType === et.key && s.chipTextActive]}>
-                {t(et.labelKey, lang)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* District chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={[s.filterRow, { paddingTop: 0 }]}
-        >
-          <TouchableOpacity
-            style={[s.chip, !selectedDistrict && s.chipActive]}
-            onPress={() => setSelectedDistrict(null)}
-          >
-            <Text style={[s.chipText, !selectedDistrict && s.chipTextActive]}>
-              {t('jobAllDistricts', lang)}
-            </Text>
-          </TouchableOpacity>
-          {DISTRICTS.map(d => (
-            <TouchableOpacity
-              key={d}
-              style={[s.chip, selectedDistrict === d && s.chipActive]}
-              onPress={() => setSelectedDistrict(selectedDistrict === d ? null : d)}
-            >
-              <Text style={[s.chipText, selectedDistrict === d && s.chipTextActive]}>
-                {t(DISTRICT_KEY[d], lang)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={s.ddRow}>
+          <FilterDropdown
+            label={t('ddType', lang)}
+            options={EMPLOYMENT_TYPES.map(et => ({ value: et.key, label: t(et.labelKey, lang) }))}
+            value={selectedType} onChange={setSelectedType} lang={lang}
+          />
+          <FilterDropdown
+            label={t('ddDistrict', lang)}
+            options={DISTRICTS.map(d => ({ value: d, label: t(DISTRICT_KEY[d], lang) }))}
+            value={selectedDistrict} onChange={setSelectedDistrict} lang={lang}
+          />
+        </View>
 
         {loading
           ? <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
@@ -433,12 +391,7 @@ const s = StyleSheet.create({
   ctaSub:           { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 
   // Filter chips
-  filterRow:        { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
-  chip:             { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                      backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
-  chipActive:       { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText:         { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
-  chipTextActive:   { fontFamily: 'Inter_700Bold', color: colors.primary },
+  ddRow:            { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, flexShrink: 0 },
 
   // Job list
   listContent:      { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },
