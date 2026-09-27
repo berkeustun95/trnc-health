@@ -52,15 +52,14 @@ import HomeServiceOnboardingScreen from './HomeServiceOnboardingScreen'
 // loading state on tap, and the pin and the copy under it cannot contradict each other
 // because they are computed from the same row.
 //
-// ⚠ THE DISTRICT RULE IS NOW AN EXPLICIT PREDICATE, and Phase B's comment warned against
-//   exactly this shape ("reading a config id and pinning unconditionally would put
-//   TadilArt at the top of Girne even on a day the partnership stopped covering it").
-//   The warning still stands and the predicate still honours it — `covers()` reads
-//   coverage_districts off the row, so the pin disappears from a district the agreement
-//   does not cover, same as before. What changed is that it is now WRITTEN DOWN rather
-//   than falling out of the query. Do not "simplify" it back to an unconditional pin.
-//
-// Promotion is across CATEGORIES, never across DISTRICTS.
+// ⚠ REVERSED ON PURPOSE (Berke, 2026-09-28): promotion is now across CATEGORIES *AND*
+//   DISTRICTS. The partner card shows on every category × district, and the district no
+//   longer hides it. The old rule ("never across districts", so the card vanished where
+//   coverage_districts did not reach) left 48 of 84 pages with a "no firm in this district"
+//   note — Berke's call is TadilArt everywhere, with no "no partner / no firm" message
+//   anywhere in the module. The card still shows its own service areas (coverage row), so
+//   the reader can see where the firm works. Do NOT restore the district filter without
+//   his decision. The selected district still goes into the WhatsApp draft and the log.
 
 const PARTNER_PREVIEW = __DEV__ && PREVIEW_PENDING_PARTNERS
 
@@ -79,39 +78,6 @@ function CategoryTile({ item, lang, onPress }) {
       </View>
       <Text style={s.catLabel} numberOfLines={2}>{t(item.labelKey, lang)}</Text>
     </TouchableOpacity>
-  )
-}
-
-// ─── The two empty states, which are NOT the same statement ─────────────────
-//
-// Neither is "no providers found". That string was honest when this was a directory
-// anyone could join; under a partner-only policy it describes a search that failed,
-// when what actually happened is that we have not signed anybody. It tells the user
-// ADA cannot help with this — the opposite of true, since the pinned firm is sitting
-// right above it in the eight-category case.
-//
-// The titles differ because the CLAIMS differ, and each is false in the other's case:
-//
-//   "No OTHER listings"        false when no card rendered at all — there is nothing for
-//                              the other listings to be other THAN.
-//   "None in this district"    false when no district chip is active. That is reachable
-//                              without any partner problem at all: it is what a failed
-//                              fetch looks like, and blaming the district for a network
-//                              error would send the user chip-hunting for a list that was
-//                              never filtered.
-//
-// So the third case falls back to the landing's own copy, which is the one honest
-// statement when we have no rows and no filter to blame.
-// `title` overrides `titleKey` when the caller has already resolved it — the context
-// card interpolates the category name and the other two do not, and a component that
-// takes both a key and its substitutions would be doing i18n on behalf of one caller.
-function EmptyNote({ titleKey, title, bodyKey, lang }) {
-  return (
-    <View style={s.emptyCard}>
-      <Ionicons name="ribbon-outline" size={30} color={colors.border} style={s.emptyIcon} />
-      <Text style={s.emptyTitle}>{title ?? t(titleKey, lang)}</Text>
-      <Text style={s.emptyHint}>{t(bodyKey, lang)}</Text>
-    </View>
   )
 }
 
@@ -271,16 +237,7 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
                 />
               </View>
             ))
-          ) : (
-            // A legitimately empty state, not an error one — and it is what a failed
-            // fetch shows too, which is honest, because "we could not ask" and "there are
-            // none" are indistinguishable to someone holding the phone.
-            <View style={s.emptyCard}>
-              <Ionicons name="ribbon-outline" size={34} color={colors.border} style={s.emptyIcon} />
-              <Text style={s.emptyTitle}>{t('hsPartnersEmpty', lang)}</Text>
-              <Text style={s.emptyHint}>{t('hsPartnersEmptyHint', lang)}</Text>
-            </View>
-          )}
+          ) : null}
 
           <View style={s.grid}>
             {HS_CATEGORIES.map(cat => (
@@ -315,16 +272,11 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
 
   // ─── One category ─────────────────────────────────────────────────────────
   //
-  // `visible` applies the district rule. It reads the ROW, never the config —
-  // coverage_districts is what an admin can correct, and constants/partners.js does not
-  // carry it on purpose.
-  //
-  // There is deliberately no list-level `covered` flag any more: whether the partner
-  // covers this category no longer changes what is RENDERED, only what goes into the
-  // WhatsApp draft, which is a per-row question answered at the card below.
-  const visible = selectedDistrict
-    ? cards.filter(({ row }) => (row.coverage_districts || []).includes(selectedDistrict))
-    : cards
+  // Every partner card shows on EVERY category × district (Berke, 2026-09-28): TadilArt on
+  // all 12 categories and all 7 district choices. The district no longer hides a card; it
+  // only goes into the WhatsApp draft and the contact log. The card shows its own service
+  // areas, and no "no partner / no firm" message exists anywhere in this module.
+  const visible = cards
 
   // Whether the WhatsApp draft may name the category (the firm lists it as a service).
   // The "no ADA partner for {category}" banner this also drove was REMOVED (2026-09-28,
@@ -387,26 +339,6 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
               )
             })}
 
-            {/* ⚠ A RENDERED CARD ENDS THE QUESTION. If anything is on screen, nothing is
-                said about what is not — including in the eight categories the partner
-                does not cover. The card carries its own service chips and its ADA-partner
-                badge, so a reader can see exactly what the firm does; adding "no other
-                listings in this category" underneath tells them nothing the card has not
-                already told them, and spends the space arguing about absence instead.
-                (An earlier build showed it for the eight. Removed on the partner's read of
-                the page, and it is the better call on its own merits.)
-
-                So the copy survives ONLY where the screen would otherwise be BLANK. */}
-            {visible.length > 0 ? null
-              : selectedDistrict ? (
-                <EmptyNote titleKey="hsCatEmptyDistrictTitle" bodyKey="hsCatEmptyBody" lang={lang} />
-              ) : (
-                // No rows and no filter to blame — the partner list is empty, or the
-                // fetch failed. Same statement the landing makes, for the same reason:
-                // "we could not ask" and "there are none" are indistinguishable to
-                // someone holding the phone, and neither is the district's fault.
-                <EmptyNote titleKey="hsPartnersEmpty" bodyKey="hsPartnersEmptyHint" lang={lang} />
-              )}
           </>
         )}
       </ScrollView>
@@ -441,13 +373,6 @@ const s = StyleSheet.create({
   chipText:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 
-  emptyCard:    { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 24,
-                  alignItems: 'center', ...shadow, borderWidth: 1, borderColor: colors.border },
-  emptyIcon:    { marginBottom: 10 },
-  emptyTitle:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary,
-                  textAlign: 'center', marginBottom: 4 },
-  emptyHint:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
-                  textAlign: 'center', lineHeight: 19 },
 
   ctaCard:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20,
                   backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 16,
