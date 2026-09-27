@@ -6,6 +6,7 @@ import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
+import { passiveFix } from './utils/locationServices'
 import {
   useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
 } from '@expo-google-fonts/inter'
@@ -1156,9 +1157,11 @@ export default function App() {
         if (status !== 'granted') {
           setLocationDenied(true)
         } else {
-          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-          setUserLocation(loc.coords)
-          resolvedCoords = loc.coords
+          // Startup is not a tap: never the "turn on location" dialog (utils/locationServices.js).
+          // Device location off → treated like denied; the app works without it.
+          const loc = await passiveFix(Location.Accuracy.Balanced)
+          if (!loc) setLocationDenied(true)
+          else { setUserLocation(loc.coords); resolvedCoords = loc.coords }
         }
       } catch {
         setLocationDenied(true)
