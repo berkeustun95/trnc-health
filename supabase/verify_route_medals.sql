@@ -24,6 +24,16 @@ BEGIN
   SELECT id INTO v_route FROM walking_routes WHERE is_active ORDER BY sort_order LIMIT 1;
   IF v_route IS NULL THEN RAISE EXCEPTION 'VERIFY FAILED: no active walking route'; END IF;
 
+  -- ⚠ is_listed_student() answers FALSE for every id unless there is a signed-in, non-guest
+  --   CALLER (auth.uid() IS NOT NULL AND NOT is_anonymous_session() — 20261035/20261036, the
+  --   age-oracle fix). As postgres with no claims it is false for everyone, which is how the
+  --   third run failed. So a real signed-in caller is set first, and every later impersonation
+  --   also sets one. Claims are LOCAL to this transaction, which always aborts.
+  PERFORM set_config('request.jwt.claims', json_build_object('sub',
+    (SELECT p.id FROM profiles p JOIN auth.users u ON u.id = p.id
+      WHERE NOT coalesce(u.is_anonymous, false) ORDER BY p.id LIMIT 1),
+    'role', 'authenticated', 'is_anonymous', false)::text, true);
+
   -- Why nobody may be listed: is_listed_student() needs an opted-in enrolment AND a display
   -- name AND no active UGC ban. Printed so a "listed" account that is not is explained.
   rep := rep || format(E'\nopted-in accounts: %s total · %s named · %s UGC-banned · %s guest · %s listed per is_listed_student()',
