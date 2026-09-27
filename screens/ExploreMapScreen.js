@@ -18,6 +18,7 @@ import {
   ActivityIndicator, ScrollView, useWindowDimensions, Alert, Linking,
 } from 'react-native'
 import * as Location from 'expo-location'
+import { askedFix } from '../utils/locationServices'
 import MapView, { Marker } from 'react-native-maps'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import Supercluster from 'supercluster'
@@ -476,7 +477,7 @@ export default function ExploreMapScreen({
       }
       setLocGranted(true)
       const loc = (await Location.getLastKnownPositionAsync({ maxAge: 60000 }))
-        ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }))
+        ?? (await askedFix(Location.Accuracy.Balanced))
       if (loc) mapRef.current?.animateCamera(
         { center: { latitude: loc.coords.latitude, longitude: loc.coords.longitude }, zoom: 16, altitude: 1500 },
         { duration: 600 })

@@ -9,6 +9,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, BackHandler, AppState } from 'react-native'
 import * as Location from 'expo-location'
+import { askedWatch } from '../utils/locationServices'
 import { Marker, Polyline } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { placeName } from '../screens/ExploreScreen'
@@ -287,10 +288,13 @@ export function useWalkPosition(active) {
         if (gone) return
         setStatus(st === 'granted' ? 'granted' : 'denied')
         if (st !== 'granted') return
-        const s = await Location.watchPositionAsync(
+        // Başla is a tap, so it may ask to turn device location on — once per session
+        // (utils/locationServices.js). Declined or off → null → the walk is manual-only.
+        const s = await askedWatch(
           { accuracy: Location.Accuracy.High, distanceInterval: 5, timeInterval: 3000 },
           l => setPos({ latitude: l.coords.latitude, longitude: l.coords.longitude, accuracy: l.coords.accuracy })
         )
+        if (!s) { if (!gone) setStatus('denied'); return }
         if (gone || AppState.currentState !== 'active') s.remove()
         else sub = s
       } catch {

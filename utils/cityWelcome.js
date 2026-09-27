@@ -8,6 +8,7 @@
 // user of this feature.
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Location from 'expo-location'
+import { passiveFix } from './locationServices'
 import { resolveRegion } from './resolveRegion'
 import {
   KEY_ENABLED, KEY_HOME, KEY_SEEN, KEY_ASKED, KEY_ASK_LAST,
@@ -85,7 +86,8 @@ async function getForegroundFix() {
     const last = await Location.getLastKnownPositionAsync({ maxAge: 10 * 60 * 1000 })
     if (last?.coords) return last.coords
 
-    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+    // Never the "turn on location" dialog: this runs on every resume (locationServices.js).
+    const loc = await passiveFix(Location.Accuracy.Balanced)
     return loc?.coords ?? null
   } catch {
     return null

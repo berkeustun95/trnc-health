@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Modal, StyleSheet, ActivityIndicator } fr
 import MapView, { Marker } from 'react-native-maps'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
+import { askedFix } from '../utils/locationServices'
 import { Feather } from '@expo/vector-icons'
 import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
@@ -39,7 +40,8 @@ export default function MapPinPicker({ visible, initialLat, initialLng, onConfir
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') { setLocating(false); return }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+      const loc = await askedFix(Location.Accuracy.High)
+      if (!loc) { setLocating(false); return }
       const target = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
       setCoord(target)
       mapRef.current?.animateToRegion({ ...target, ...DELTA }, 500)
