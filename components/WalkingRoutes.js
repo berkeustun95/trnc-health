@@ -357,6 +357,7 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
 
   const n = route.stops.length
   const done = walk.next >= n
+  const last = walk.next === n - 1
   const stop = done ? null : route.stops[walk.next]
   const dist = stop && pos ? walkDistance(metresBetween(pos, stop)) : null
   const directions = () => stop && Linking.openURL(walkingDirectionsUrl(stop)).catch(() => {})
@@ -374,7 +375,10 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
 
       {done ? (
         <>
-          <Text style={p.name}>{t('walkDone', lang)}</Text>
+          <View style={w.doneRow}>
+            <Ionicons name="checkmark-circle" size={26} color={ROUTE_COLOR} />
+            <Text style={[p.name, { marginTop: 0, flexShrink: 1 }]}>{t('walkDone', lang)}</Text>
+          </View>
           <TouchableOpacity style={p.startBtn} onPress={onEnd} activeOpacity={0.85}>
             <Text style={p.startText}>{t('walkEnd', lang)}</Text>
           </TouchableOpacity>
@@ -405,9 +409,14 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
               <Ionicons name="navigate" size={16} color="#fff" />
               <Text style={w.goText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{t('walkDirections', lang)}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={w.step} onPress={onNext} activeOpacity={0.8} accessibilityLabel={t('walkNext', lang)}>
-              <Text style={w.stepText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{t('walkNext', lang)}</Text>
-              <Ionicons name="chevron-forward" size={18} color={ROUTE_COLOR} />
+            {/* At the last stop Sonraki becomes Bitir and opens the done screen — never a
+                step past the end. Filled, so it reads as the terminal action. */}
+            <TouchableOpacity style={[w.step, last && w.stepFinish]} onPress={onNext} activeOpacity={0.8}
+              accessibilityLabel={t(last ? 'walkFinish' : 'walkNext', lang)}>
+              <Text style={[w.stepText, last && w.stepFinishText]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                {t(last ? 'walkFinish' : 'walkNext', lang)}
+              </Text>
+              <Ionicons name={last ? 'flag' : 'chevron-forward'} size={last ? 15 : 18} color={last ? '#fff' : ROUTE_COLOR} />
             </TouchableOpacity>
           </View>
         </>
@@ -424,6 +433,9 @@ const w = StyleSheet.create({
               paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: ROUTE_COLOR,
               backgroundColor: 'transparent' },
   stepOff:  { opacity: 0.35 },
+  stepFinish:     { backgroundColor: ROUTE_COLOR },
+  stepFinishText: { color: '#fff' },
+  doneRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
   stepText: { flexShrink: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold', color: ROUTE_COLOR },
   goText:   { flexShrink: 1, fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   go:       { flex: 1.3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,

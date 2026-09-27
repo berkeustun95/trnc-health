@@ -2210,7 +2210,10 @@ export default function App() {
             {/* MapScreen is NOT dead code and must not be deleted — it is the committed
                 behaviour of this tab and the thing users have today. EXPLORE_MAP_LIVE
                 chooses between the two; both branches ship in every bundle. */}
+            {/* Boundary: a render throw here once unmounted the whole root — a black screen
+                with nothing to tap (walk-mode crash, 2026-09). Go Back remounts the map. */}
             {EXPLORE_MAP_LIVE ? (
+              <BLErrorBoundary>
               <ExploreMapScreen
                 // The directory's second entrance — see the prop's note in that file. It
                 // opens the SAME ExploreScreen the Home tile opens, so the tile can be
@@ -2232,6 +2235,7 @@ export default function App() {
                 onSelectPetHotel={() => { setShowPets(true); setPetsSubScreen('pethotel'); setPetHotelFromMap(true) }}
                 lang={lang}
               />
+              </BLErrorBoundary>
             ) : (
               <MapScreen
                 facilities={facilities}
