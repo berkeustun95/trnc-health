@@ -1,1021 +1,228 @@
-# TRNC Health App
+# ADA — North Cyprus assistant
 
 ## What this is
-A mobile health-access app for newcomers to North Cyprus (TRNC): find and reach
-trusted pharmacies, clinics, hospitals, dentists. Three user roles: customer,
-provider, admin. I (the project owner) am the architect; you are my fast hands.
-I review everything you produce.
+ADA is a TRNC super-app for residents and newcomers: facilities directory and duty roster,
+Explore (places, walking routes), events, accommodation, towing, home services, pets, Student
+Hub and more, each module behind `MODULE_FLAGS` (`constants/flags.js`). Expo SDK 54 + Supabase,
+9-language i18n (`constants/i18n.js`). Roles: customer, provider, admin (guests via
+`signInAnonymously()`). I am the architect, you are my fast hands; I review everything.
+Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-lessons.md`.
 
-## Stack
-- React Native + Expo, **SDK 54** (managed workflow)
-- Supabase (Postgres) for database, auth, and storage
-- Entry: index.js -> App.js
-- Supabase client lives in lib/supabase.js
+**Touching supabase/, SQL, RLS or migrations? Read supabase/CLAUDE.md first.**
 
-## CRITICAL: never change package versions
-We are pinned to Expo SDK 54 to match the Expo Go app on the test phone.
-- Do NOT upgrade expo, react, or react-native, and do NOT run `npm install <pkg>`
-  to add versions. Use `npx expo install <pkg>` so versions stay SDK-54 compatible.
-- If a task seems to need a version bump, STOP and ask me first.
+## Stack & versions
+- React Native + Expo **SDK 54** (managed). `index.js` → `App.js`. `lib/supabase.js`. Dev: `npx expo start -c`.
+- ⚠ **Never change package versions.** Pinned to SDK 54 to match the test phone's Expo Go. Never
+  upgrade expo/react/react-native; add packages with `npx expo install <pkg>`, never `npm install`.
+  If a task seems to need a version bump, STOP and ask.
 
-## Commands
-- `npx expo start -c` — start dev server with cleared cache
-- `npx expo install <pkg>` — add a package at SDK-54-compatible version
+## ⚠ Standing warnings
+- ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
+- ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
+  whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
+- ⚠ **Image messaging is blocked on a safety scope.** No attachment column, bucket or upload path
+  until `~/ObsidianVault/10-ada/2026-09-20_image-messaging-safety-scope-PARKED.md` is answered:
+  it is private between minors, `contains_blocked_term` cannot see an image, and auto-hide has no
+  messages branch. Message images must never sit in a public bucket (a guessable URL); only
+  `avatars` is private (signed URLs, `components/Avatar.js`); the other buckets are public.
+- ⚠ **Never raise `min_supported_version` above `'1.0.0'`** without the force-tier device pass. See below.
+- ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`.** Both raw tools bundle the
+  WORKING TREE and have no hook, so the wrapper is the only guard.
+- ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
+- ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
+- ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `LiveStrip.js`, rank 3b, row
+  `is_active=false` by product decision). Don't delete or repurpose it; re-enable = one
+  `UPDATE … SET is_active = true`. Same for the `showAgentOnboarding` branch in App.js.
 
-## Release & Update Flow
-**JS-only fix** (UI, logic, styles, bug fixes — anything in .js files):
-```bash
-npm run ota -- --message "description"
-```
-Never `eas update` directly — see the rule below. Stash check and clean tree first.
-Users get it on next launch. No Play Store involved.
+## Release & deploy
+- **JS-only change:** `npm run ota -- --message "…"` (note the `--`). Pre-flight: stash check, then
+  clean tree (a long-lived stash is not a blocker and stays stashed). Never `eas update` directly:
+  it bundles the WORKING TREE, so an uncommitted `MODULE_FLAGS.x: true` ships to every user. The
+  wrapper runs `check-module-flags.mjs` (also `npm run check:flags`); `git push` and `eas build` are
+  covered by `.githooks/pre-push` and `eas-build-pre-install`. Fresh clone: `npm run setup:hooks`.
+- **OTA only reaches the production build** — never a preview APK; test OTA on the Play Store install.
+- **Native build** only for `app.config.js`, native dependencies, permissions, icons, SDK version:
+  `eas build --platform android --profile production`, then upload the AAB to Play closed testing
+  by hand (the Play service-account key here is used for the store listing only).
+- **iOS:** `npm run ios:build` / `ios:submit`, no Apple login; they source `~/.appstoreconnect/ada-eas.env`
+  (outside repo) → ASC key "EAS Build" (`WYJ38BNP8L`, Admin, team MAQ8XPJ8Z6). Only a key passed via
+  `EXPO_ASC_API_KEY_PATH`/`_KEY_ID`/`_ISSUER_ID` (+ `EXPO_APPLE_TEAM_ID`/`_TYPE`) regenerates profiles;
+  an EAS-stored key never does. Never commit/print/copy the key; lost Mac → revoke in ASC → Users and Access.
+- **Never use `process.env.EAS_BUILD` in `app.config.js`.** Hardcode `checkAutomatically: 'ON_LOAD'`.
+- **Permission strings:** ONE source per usage description, its plugin option (`ios.infoPlist` is inert).
+  `RECORD_AUDIO` off, camera kept (accepted review risk), background location off. Verify with
+  `npx expo config --type introspect`, never by reading `app.config.js`.
+- **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build. Maps key set for prod.
+- **Maps key is restricted** (`com.berkeustun95.ada` + SHA-1). Blank map, no error = SHA-1 mismatch;
+  ADD the Play App Signing SHA-1 as a 2nd entry. Checklist: vault `play-console-status.md`.
+- **`web/` publishes** `getadaapp.com/privacy` and `/support` (Cloudflare Worker `getadaapp`, root
+  `wrangler.jsonc`); both URLs are registered with the stores. `npm run web:deploy`, never
+  `npx wrangler deploy`: it runs `check-web-assets.mjs`, and wrangler REPLACES the asset manifest, so
+  a missing `support.html` silently 404s. `git push` does not publish `web/` (`docs/` is GitHub Pages).
 
-**New native build required** only when changing: `app.config.js`, native dependencies, permissions, icons, SDK version.
-```bash
-eas build --platform android --profile production
-# then submit new AAB to Play Store closed testing track
-```
-
-**iOS builds and submits need no Apple login: `npm run ios:build` / `npm run ios:submit`.**
-They source `~/.appstoreconnect/ada-eas.env` (OUTSIDE the repo, mode 600), which points
-eas-cli at the App Store Connect API key "EAS Build" (`WYJ38BNP8L`, **Admin**, team
-MAQ8XPJ8Z6, Individual) in `~/.appstoreconnect/private_keys/`. eas-cli regenerates a
-provisioning profile in `--non-interactive` mode ONLY with an ASC API key, and ONLY one
-supplied through `EXPO_ASC_API_KEY_PATH` / `EXPO_ASC_KEY_ID` / `EXPO_ASC_ISSUER_ID`
-(+ `EXPO_APPLE_TEAM_ID`, `EXPO_APPLE_TEAM_TYPE`) — a key stored on EAS for submissions is
-never used by the build path (`SetUpProvisioningProfile.js`, `AppStoreApi.js`).
-⚠ **The wrappers pin `eas-cli@24.7.0` via npx, and that pin is load-bearing.** The global
-eas-cli here is 20.0.0, which in `--non-interactive` mode never authenticates before
-validating: it checks the stored profile LOCALLY (cert, bundle ID, expiry — never
-entitlements), trusts it, and ships it. That is exactly how 1.2.0 build 9 died:
-Apple had INVALIDATED profile `8GVX2BBF9V` when Sign In with Apple was enabled, 20.0.0 reused
-it anyway, and Xcode failed on the missing `com.apple.developer.applesignin` entitlement.
-24.7.0 authenticates with the ASC key first (`SetUpProvisioningProfile.js:56`) and
-regenerates an invalid profile. Do not swap the wrappers back to bare `eas`. Never
-commit the key, never print it, never copy it into the repo. If this Mac is lost, revoke it
-in App Store Connect → Users and Access → Integrations. Android AABs are uploaded to Play
-Console by hand: the Play service-account key here is used for the store listing only.
-
-⚠ **PERMISSION STRINGS: LANDED ON `feat/social-auth`, SHIP WITH THE 1.2.0 BUILD.** No OTA
-can change an OS permission dialog, so they are live only once 1.2.0 is installed. Every usage
-description now has ONE source, its plugin option: `applyPermissions` resolves
-`plugin option || ios.infoPlist || plugin default`, so a copy in `ios.infoPlist` is inert while
-it matches and ignored the moment it doesn't. Mic off (`RECORD_AUDIO` removed), camera KEPT
-with real copy for planned image messaging (a named, accepted review risk), both
-background-location keys deleted. Verify with `npx expo config --type introspect`, never by
-reading `app.config.js`. The Play health declaration is drafted **when the build is
-scheduled**. Plan: `~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md`.
-⚠ **`expo.locales` DECLARES SEVEN LEFT-TO-RIGHT LANGUAGES AND MUST NEVER GAIN `ar` OR `fa`.**
-Each entry becomes an `<lang>.lproj` in the iOS bundle, and a bundle with an Arabic or Persian
-localization is exactly what makes React Native mirror the WHOLE layout for a device in that
-language (`RCTI18nUtil`: `allowRTL` defaults YES, nothing here sets it; `allowRTL(false)` from
-JS is read at bridge init, so the first launch would still mirror). Arabic/Persian users get
-the English strings, as everyone did before. RTL support is a separate, app-wide decision.
-Android is untouched by `expo.locales` (empty `values-b+xx`), but RN Android mirrors by DEVICE
-locale with `supportsRtl="true"`, so an Arabic-locale Android phone is probably mirrored
-TODAY — unverified, on the 1.2.0 device-test list.
-
-⚠ **IMAGE MESSAGING IS BLOCKED ON A SAFETY SCOPE, AND THE SCOPE IS THE FEATURE.**
-`20261029_student_messaging.sql` already says it — *"NO IMAGES. Slice 7, and it waits on CSAM
-detection procurement… a migration and a procurement decision, in that order."* Before any
-attachment column, bucket or upload path exists, answer the questions in
-`~/ObsidianVault/10-ada/2026-09-20_image-messaging-safety-scope-PARKED.md`.
-Three things make it unlike every other UGC surface here: it is private and between MINORS
-(`may_initiate_by_age` stops an adult initiating with a minor, but two 15-year-olds are the
-declared audience), `contains_blocked_term` **cannot see an image**, and
-`auto_hide_reported_content` has no messages branch — it fires at 3 reporters and a two-person
-thread can never reach 3, so there is no automatic takedown at all.
-⚠ And **every existing bucket in this app is PUBLIC** (`avatars`, `facility-images`,
-`event-images`, `property-images` all use `getPublicUrl`). A message image in a public bucket
-is a private message with a guessable URL. The only signed-URL precedent is
-`AdminScreen.js:23`. Report and block already exist; **image filtering is the whole gap.**
-
-**Never use** `process.env.EAS_BUILD` conditionals in `app.config.js` — it caused `checkAutomatically: 'NEVER'` to bake into a production build, breaking OTA entirely. Always hardcode `'ON_LOAD'`.
-
-**Publish OTA with `npm run ota`, NEVER `eas update` directly.** The wrapper runs
-`scripts/check-module-flags.mjs` first, which blocks the publish if a dark-launch flag is
-flipped. This matters because **`eas update` bundles the WORKING TREE, not git HEAD** — an
-uncommitted `MODULE_FLAGS.x: true` left over from previewing a gated screen ships to every
-user immediately, and no git hook can see it. EAS Update has no lifecycle hook, so the
-wrapper plus `npm run check:flags` is the only guard that exists. `git push` and
-`eas build` are covered automatically (`.githooks/pre-push`, `eas-build-pre-install`).
-Fresh clone: `npm run setup:hooks` once.
-
-**`web/` PUBLISHES NOW. This reversed on 2026-08-30 — do not trust an older note.**
-`web/privacy.html` and `web/support.html` are the LIVE assets behind
-`getadaapp.com/privacy` and `getadaapp.com/support`, served by the Cloudflare
-static-assets Worker `getadaapp` (root `wrangler.jsonc`). **Both URLs are registered with
-the app stores** — /privacy is the Privacy URL, /support is the Support URL.
-Publish with **`npm run web:deploy`, never `npx wrangler deploy`**: the wrapper runs
-`scripts/check-web-assets.mjs` first, and like `eas update`, `wrangler deploy` bundles the
-WORKING TREE and has no lifecycle hook, so the wrapper is the only place a guard can stand.
-It is worse than the OTA case in one respect — **`wrangler deploy` REPLACES the asset
-manifest rather than merging it**, so deploying a `web/` that is missing `support.html`
-silently drops that page, and `not_found_handling: "none"` makes it fall through to Vercel
-and 404. A store-listing outage that looks like an ordinary 404.
-Until 2026-08-30 this folder deployed nothing and was documented as inert; it lived in
-`~/ada-worker-support`, on one laptop, with no git — which is how it became unfindable.
-`git push` does NOT publish it (that is `docs/`, via GitHub Pages).
-
-⚠ **THE LIVE-STRIP NOTICE CARD IS DORMANT, NOT DEAD — LEAVE IT.** `kind = 'notice'`
-(`20261043`, applied), the `NOTICE_FALLBACK` route→image map in `LiveStrip.js`, rank 3b in
-`homeStripResolver.js`, `stripNoticeTitle` in nine locales, and `utils/stripDismissals.js`
-all ship and all work. The one production row was switched OFF (`is_active = false`) on
-2026-09-21 after the device pass: **"Bugün ADA'da" carries events + duty and no
-announcements.** That is a product decision about the strip, not a defect in the mechanism.
-So: **do not delete the notice code, and do not repurpose it to put an announcement back in
-that strip.** Re-enabling is one `UPDATE … SET is_active = true` on an existing row, and
-deleting the path would turn that into a rebuild. Same reasoning as the `showAgentOnboarding`
-branch in App.js, which carries the identical warning for the identical reason.
-
-**OTA only reaches the production build.** A preview APK (`eas build --profile preview`) does not have `channel: "production"` baked in and will never receive OTA updates. Always test OTA on the Play Store install, not a sideloaded APK.
-
-**EAS environment variables:** Use `eas env:create` (not `eas secret:create` — deprecated). `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is set for the production environment. Changes to env vars require a new native build to take effect.
-
-**Google Maps key is RESTRICTED in Cloud Console** (Android apps: `com.berkeustun95.ada` + upload SHA-1; API: Maps SDK for Android only), so a blank Android map with **no error** = a SHA-1 mismatch. After the first Play release, the **Play App Signing SHA-1 must be ADDED** as a 2nd entry (keep the upload one). Detail + checklist: `~/ObsidianVault/10-ada/play-console-status.md`.
-
-**facility_change_requests.proposed_changes:** The `languages` field is stored as a comma-separated string (e.g. `"English, Turkish"`). When approving and writing to `facilities.languages` (which is `text[]`), split it first: `changes.languages.split(',').map(l => l.trim())`.
-
-## Store-update popup — BLOCKING IS GATED ON AN iOS DEVICE PASS
-
-`app_versions` (20261051) drives a two-tier store-update popup. `latest_version`
-gives a dismissible "new version available"; **`min_supported_version` BLOCKS the app.**
-
-⚠ **BEFORE `min_supported_version` IS EVER RAISED ABOVE `'1.0.0'` ON EITHER PLATFORM —
-i.e. before blocking is switched on for anyone — THE FORCE TIER MUST PASS A DEVICE TEST ON
-BOTH ANDROID AND iOS**, on a build that actually contains the popup.
-
-**BOTH, because the force tier has never run on either.** The 2026-09-25 device pass was
-deliberately a LIGHT one — soft tier only, on the two production-channel APKs — since with
-`min_supported_version = '1.0.0'` no user can reach the force tier at all. So nothing about
-blocking has been exercised anywhere, and "Android already covers it" is not available as
-an argument.
-
-On Android the force pass is: the modal blocks the app · the escape link opens the emergency
-sheet · the duty link opens the roster · closing either returns to the modal · hardware back
-cannot escape, from the modal or from either escape screen (that last one is what catches a
-stale `updateTier` in the BackHandler dependency array).
-
-iOS repeats all of that minus hardware back, and adds three things Android can never answer:
-
-  1. **The native `<Modal>` against the emergency sheet.** The escape sheet is a ROOT
-     OVERLAY (`App.js`, `SheetOverlay`, zIndex 100) and a native Modal opens its own
-     window above the whole React root — so the force modal must HIDE for the sheet to
-     be visible at all. That is what `forceBlocking` deriving from `showEmergencyModal`
-     is for, and it has only ever been proven on Android.
-  2. **No hardware back.** Android's back button rescues a stuck state; iOS has none. If
-     a close path fails to clear the flag the modal is derived from, an iOS user is
-     trapped behind a blocking modal with no way out and no way to reach the emergency
-     numbers. This is the failure the derived-state design exists to prevent, and iOS is
-     the only platform where it is unrecoverable.
-  3. **`itms-apps://`** opens the App Store. There is no `canOpenURL` probe (that needs
-     `LSApplicationQueriesSchemes`, which is a native build), so the fallback to the
-     https URL is untested until somebody taps it on a phone.
-
-Why no iOS build exists to test with: the 1.1.0 and 1.2.0 TestFlight builds predate the
-popup and embed their own bundles, so neither can show it; and an iOS build from
-`release/1.1` was refused because that branch has no `usesAppleSignIn` and building it
-would regenerate a provisioning profile for the live bundle id — the same class of failure
-that killed 1.2.0 build 9. Getting an iOS force test therefore costs a new iOS build from
-**main**, whose config matches the live release. Budget for that before planning to block.
-
-**Raising it is what makes that reasoning expire.** `supabase/verify_schema.sql` carries
-a token asserting both rows are still `'1.0.0'`; raising the value makes the drift report
-go red until the token is edited, and that edit is the review moment this rule needs.
-Do not bump the token without the device pass.
+## Store-update popup
+`app_versions` (20261051): `latest_version` = dismissible, `min_supported_version` BLOCKS. Raising it
+above `'1.0.0'` on either platform needs a force-tier device pass on BOTH Android and iOS first (never
+run on either; iOS alone tests the native Modal vs the emergency root overlay, no hardware back, and
+`itms-apps://`). iOS test = new build from **main**, never `release/1.1`. `verify_schema.sql` QUERY 5
+goes red when raised; that is the review moment. Pass criteria: vault "Store-update popup force tier".
 
 ## Play listing
+- Text lives in `fastlane/metadata/android/<lang>/` (tr-TR, en-GB default, ru-RU, ar, el-GR, fr-FR,
+  es-ES, de-DE, fa). Play is downstream: Console hand edits are overwritten. No images/binaries there.
+- Titles match the ad: `ADA – North Cyprus Assistant` / `ADA – Kuzey Kıbrıs Asistanı`, "ADA" first
+  in all; es-ES uses `ADA: …` (length). Never "Guide". Paragraph 2 says "assistant" once.
+- Limits: title ≤ 30, short ≤ 80, full ≤ 4000 code points. Title files have NO trailing newline.
+- No health, pharmacy, duty, clinic or doctor wording in any language; no "eSIM" while
+  `CONNECTIVITY_LIVE` is false (remove that guard pattern the day Connectivity goes live).
+- Paragraph 1 = independence disclaimer; description carries official source links. The guard reads
+  URLs from `fastlane/metadata-backup/android/en-GB`. el-GR names no state. Bullets name LIVE modules only.
+- `npm run store:check` enforces all of the above on every folder. `npm run store:listing` = check +
+  text-only `fastlane supply`; dry run `-- --validate_only true`. Needs
+  `./google-play-service-account.json` (gitignored, mode 600, never committed or printed).
+- ⚠ A real push joins whatever Play is reviewing: wait for pending reviews; if refused, use
+  `--changes_not_sent_for_review true` and send from Console.
+- ⚠ `fastlane supply init` overwrites the folder; snapshot into `fastlane/metadata-backup/android` only.
+- System Ruby 2.6, gems in `vendor/bundle`; `bundle install` once. Ruby compares of listing files
+  need `encoding: "UTF-8"` or `LC_ALL=en_US.UTF-8`, else every language falsely "differs".
 
-**Pushed to Play 2026-09-28.** Listing changes go through Play review, so check Console for the
-verdict. The Play store listing TEXT lives in `fastlane/metadata/android/<lang>/`
-(`title.txt`, `short_description.txt`, `full_description.txt`) for tr-TR, en-GB (Play's default
-language), ru-RU, ar, el-GR, fr-FR, es-ES, de-DE and fa. Play is downstream of this folder, so a
-hand edit in Play Console is overwritten by the next push. Editing the listing is a commit plus a
-push. The folder holds no images, screenshots, changelogs or binaries, and pushing it needs no
-build and no OTA.
-- **Titles match the ad name, "ADA North Cyprus Assistant".** People search the name they saw in
-  the ad. en-GB is `ADA – North Cyprus Assistant` and tr-TR is `ADA – Kuzey Kıbrıs Asistanı`;
-  the other seven are translations that keep "ADA" first. es-ES is `ADA: …` because `ADA – …`
-  is 31 characters. Do not drift back to "Guide". Each full description's intro paragraph
-  (paragraph 2) says "assistant" once.
-- **Limits: title ≤ 30, short ≤ 80, full ≤ 4000 code points.** es-ES, fr-FR and ru-RU titles
-  are exactly 30. The title files carry NO trailing newline, and a newline would count.
-- **No health, pharmacy, duty, clinic or doctor wording in any language, and no "eSIM"** while
-  `CONNECTIVITY_LIVE` is false (Compliance, below). Remove the eSIM pattern from the guard on
-  the day Connectivity goes live.
-- **Paragraph 1 of every full description is the independence disclaimer, and the description
-  carries the official source links.** Together they fixed the 2026-08-14 Misleading Claims
-  rejection. The guard reads the URLs from the live snapshot
-  (`fastlane/metadata-backup/android/en-GB`), not from a list typed into it.
-- **el-GR names no state.** Institutions are "(Βόρεια Κύπρος)", never ΤΔΒΚ or "Τουρκική
-  Δημοκρατία…".
-- **Feature bullets name LIVE modules only.** A bullet for a gated module promises a Coming Soon
-  screen.
-- **`npm run store:check`** runs `scripts/check-store-listing.mjs`. It enforces every rule above
-  (limits, forbidden words with a self-test, disclaimer in paragraph 1, source URLs, el-GR) on
-  EVERY folder, not only the nine.
-  **`npm run store:listing`** runs that check, then `fastlane supply` with text only (APK, AAB,
-  images, screenshots and changelogs are all skipped). Dry run:
-  `npm run store:listing -- --validate_only true`. It is safe at any time.
-- Needs `./google-play-service-account.json` (gitignored, mode 600, never committed, never
-  printed), with Play Console "Manage store presence".
-- ⚠ **A real push adds a change to whatever Play is reviewing.** Wait until any pending review
-  resolves. If Play refuses the commit asking for `changesNotSentForReview`, use
-  `--changes_not_sent_for_review true`, then send the change from Console.
-- ⚠ **`fastlane supply init` OVERWRITES this folder** with the live listing. To snapshot the
-  live listing, init into `fastlane/metadata-backup/android`, never into `fastlane/metadata/android`.
-- Ruby is the system 2.6, and gems install into `vendor/bundle` (`.bundle/config`, gitignored
-  install). A fresh clone runs `bundle install` once. When a Ruby script compares listing files,
-  read them with `encoding: "UTF-8"`, or run it under `LC_ALL=en_US.UTF-8` as `store:listing`
-  does. Without either, every language reports a false "differs".
+## Compliance (Google Play, declared mixed-audience app)
+- ⚠ **Category Travel & Local, Health declaration "no health features" — do not re-tick it,** even
+  though Google's category text reads otherwise. Declaring health forces an Organization account; ADA
+  is individual (the 2026-07-06 rejection). Directory + duty roster stay as a local directory. The
+  unlock is an Organization account. Record: vault `play-console-status.md`.
+- Target ages 13-15 / 16-17 / 18+: under-18s (`date_of_birth`) get NON-PERSONALIZED ads from day one of any ad SDK.
+- Never add an SDK disqualified under Play Families policy without flagging it (one bad SDK makes
+  the whole app ineligible — analytics included).
+- Account age and content visibility are separate: the future kids module runs as guest or under a
+  parent account; no coupling beyond `GATE_EXEMPT_MODULES`.
+- `MIN_SIGNUP_AGE` lives in `constants/profileGate.js`, mirrored as `interval '13 years'` in the
+  20261001 trigger (cannot be a CHECK); `npm run profile:check` compares them. Never inline it.
+- The DOB screen is a neutral age screen (no stated minimum, no preset date, free entry; year list
+  stops at `currentYear - MIN_SIGNUP_AGE`). Settled — do not re-litigate.
 
 ## How I want you to work
-- Make MINIMAL changes. Do not refactor unrelated code.
-- Make the changes according to the prompt then say its done and explain shortly. so dont ask to proceed everytime
+- Make MINIMAL changes; don't refactor unrelated code. Say it's done, explain shortly — don't ask to proceed.
 - One bounded task at a time. If scope is unclear, ask.
-- Match the existing data-fetch pattern: query Supabase -> useState -> render.
-- **Ask for ONE item per message.** When you need something from me (an ID, a query result,
-  a decision), ask for exactly one and wait. A list of asks gets partial answers.
-- **Push the working branch after EVERY slice**, feature branches included — not only when I
-  say "push to git" (that one still means main). On 2026-09-21 the code production was
-  running (OTA `53e92f02`, commit `95c6a9f`) existed on this laptop and nowhere else.
-- **Device tests are ALWAYS served from `~/trnc-health-swipe`, never from `~/trnc-health`.**
-  It is the permanent device-test worktree: `git -C ~/trnc-health-swipe checkout <branch>`,
-  then `NODE_PATH=~/.npm-global/lib/node_modules npx expo start -c --tunnel` there (ngrok
-  lives in `~/.npm-global`; the URL comes from `curl 127.0.0.1:4040/api/tunnels`). Metro
-  bundles the WORKING TREE of the folder it runs in, and `~/trnc-health` is shared with
-  other sessions — on 2026-09-28 one switched it to main mid-test and the iPad silently ran
-  code with no edge swipe in it. iOS devices open it in the TestFlight "My Expo Go"
-  (SDK 54); the App Store Expo Go is a newer SDK and cannot load ADA.
+- Match the data-fetch pattern: query Supabase → useState → render.
+- **Ask for ONE item per message** (an ID, a query result, a decision) and wait.
+- **Push the working branch after EVERY slice**, feature branches too ("push to git" still = main).
+- **Device tests are served from `~/trnc-health-swipe`, never `~/trnc-health`** (shared with other
+  sessions; Metro bundles its folder's working tree). `git -C ~/trnc-health-swipe checkout <branch>`,
+  then `NODE_PATH=~/.npm-global/lib/node_modules npx expo start -c --tunnel` there; URL from
+  `curl 127.0.0.1:4040/api/tunnels`. iOS uses TestFlight "My Expo Go" (SDK 54), not App Store Expo Go.
 
-## Security (non-negotiable — this is a health app)
-- Row Level Security (RLS) is the security boundary. Every table with user data
-  MUST have RLS enabled with role-appropriate policies.
-- When you write or change an RLS policy, explain in plain English exactly who
-  can read/write what, so I can verify it myself.
+## Security (non-negotiable)
+Why: profiles, reviews and messages are personal data, much of it from minors, and a name joined
+to a clinic review is a health disclosure about an identified person.
+- RLS is the security boundary. Every table with user data has RLS on with role-appropriate policies.
+- When you write or change a policy, explain in plain English who can read/write what.
 - A customer must NEVER be able to read another customer's data.
-- Never put the Supabase service_role key or the database password in app code.
-  Only the anon public key belongs in lib/supabase.js.
-- **NO RLS OR STORAGE POLICY CHANGES THROUGH THE SUPABASE DASHBOARD. Migrations only.**
-  A dashboard policy exists in production and nowhere else: no migration creates it, so a
-  rebuild from `supabase/migrations/` produces a DIFFERENT SECURITY POSTURE than the live
-  database, and `verify_schema.sql` cannot drift-check an object it has never heard of.
-  Measured 2026-09-21: **17 of ~35 `storage.objects` policies existed only in the
-  dashboard.** One of them, `"Public avatar read"`, cost a full debug cycle — check #2 of
-  the hardening script stayed red against a bucket that was already closed, and the cause
-  was a policy no file in this repo mentioned. It was a sample, not an outlier.
-- **A DO BLOCK ASSERTS THE FULL POLICY SET FOR THE OBJECT IT TOUCHES, never just its own.**
-  RLS is **PERMISSIVE-OR**: presence-of-mine can never prove absence-of-theirs. `20261040`
-  added four correct, guest-guarded avatars policies, verified that its own four existed,
-  and passed — while `"Users manage own avatar"` (ALL, authenticated, no
-  `is_anonymous_session` guard) went on granting guests exactly what the four withheld.
-  So: assert `count(*)` of every policy reaching that object, PRINT the names, and assert
-  that **no permissive policy is bucket-unscoped** — an expression that never mentions
-  `bucket_id` applies to every bucket while naming none, which makes it invisible to any
-  check that finds candidates by searching for the bucket's name.
-- **TEST THE ROLE THE CLAIM IS ABOUT.** Two wrong conclusions in one session came from
-  probing with the anon key and generalising to `authenticated`: "20261033 is applied"
-  (only `anon` was proved denied) and "avatars are broken for everyone" (anon *should*
-  fail — `avatars_read_authenticated` excludes it by design; the measurement was the
-  policy working). `authenticated` includes every signed-in user AND every guest, and
-  `TO authenticated` does not exclude guests — only `NOT is_anonymous_session()` does.
-  Where a JWT is not available, `has_column_privilege` / `has_table_privilege` answer for
-  a named role as postgres, and they resolve INHERITED grants that a grantee-filtered
-  count cannot see.
-- **A CHECK THAT PASSES HARDEST WHEN THE FEATURE IS BROKEN IS NOT A CHECK.** Every denial
-  assertion needs a matching "and the legitimate path still works" beside it, or the suite
-  is a one-way ratchet that scores full marks on a bucket nobody can read.
-  `verify-storage-hardening.sh` had four "must not be readable" checks and nothing
-  asserting that a signed URL still resolves.
-
-## Migrations (manual-apply — no CI)
-- **A SCRIPT FOR THE SUPABASE SQL EDITOR MUST NOT REFERENCE ANY OBJECT IT CREATED EARLIER
-  IN THE SAME SCRIPT.** Two incidents, and the second one disproved the explanation
-  written after the first:
-    * **2026-09-15 — `20261024`.** Created TEMP tables as top-level statements, used them
-      in a `DO` block, died on this database with **42P01** naming one of them. The same
-      file applied cleanly on stock PostgreSQL 15.18, 17.10 and PGlite. It was recorded as
-      a `pg_temp` problem.
-    * **2026-09-21 — `verify_home_strip_pin.sql`.** Created an **ORDINARY** table inside
-      `BEGIN … ROLLBACK` — written that way specifically to sidestep the `pg_temp` theory
-      — and died identically: `ERROR: 42P01: relation "_hsp_verify" does not exist`.
-  **So the schema of the object never mattered, and the first explanation was wrong.** The
-  mechanism is still unconfirmed (a pooler, or the editor not holding the script on one
-  connection or in one transaction, would both explain it) and **is not worth confirming
-  in production.** The rule is what carries.
-  Write the whole thing as **ONE statement that creates nothing**: a `DO` block that
-  accumulates a report in a variable and ends with `RAISE EXCEPTION` carrying it. The
-  exception is the only output channel that editor reliably shows — **`RAISE NOTICE` is
-  invisible there**, which is a second way to ship a check nobody can read — and the abort
-  is also the rollback, so such a script cannot leave a row behind on any path. Accept
-  that a healthy run shows red: put the verdict in the first line of the message.
-Migrations are applied by hand (SQL editor, Role → postgres), so nothing catches a
-file that was committed but never applied (this is how `facilities.area` silently
-went missing). Two mandatory rules:
-- **Register every new object in `supabase/verify_schema.sql`.** When a migration
-  adds a table/column/function/trigger/constraint/index/cron/policy, add it to the
-  matching section of that drift-check script. Behavior-only `CREATE OR REPLACE`
-  (no new named object) needs an H-section token. An unlisted object is invisible
-  to the check. Run the script after applying to confirm the DB matches the repo.
-- **Every ADD COLUMN migration ends with `NOTIFY pgrst, 'reload schema';`** (after
-  `RESET ROLE;`). Without it, a stale PostgREST cache reports 42703 "column does
-  not exist" through the REST API even though the column exists in Postgres.
-- **THE HARNESS IS NOT PROD'S POSTGRES — never let a probe depend on an error code or
-  behaviour that could differ between them.** `scripts/migration-harness.mjs` runs PGlite
-  0.5.8 = **PostgreSQL 18.3**; prod is an older major (≥15 — an applied migration uses a
-  15-only view option; exact version: `SELECT version();`). Measured 2026-09-23 on
-  20261048: an `ON DELETE RESTRICT` refusal raised **23001 `restrict_violation` in the
-  harness and 23503 `foreign_key_violation` in prod**. The probe caught only the harness's
-  code, so a CORRECT refusal aborted the prod apply (cleanly — nothing landed). So: in any
-  in-migration `EXCEPTION WHEN`, catch every SQLSTATE the behaviour can raise across
-  versions (`foreign_key_violation OR restrict_violation`), and treat a harness pass as
-  evidence about PG 18 only. Anything version-sensitive — error codes, catalog renderings
-  (`pg_get_*def` text), planner/locking behaviour — must also be checked against prod's
-  own output before a token or probe relies on it.
-- **Migration filename prefixes are SEQUENCE NUMBERS, not dates.** The next file is
-  `npm run migration:next` — the highest prefix on ANY local or origin/* branch + 1 —
-  never today's date and never `ls supabase/migrations | tail -1`, which sees one branch
-  (that is how 20261046 had to skip a 20261045 living on another). The pre-push guard
-  (`scripts/check-migration-numbers.mjs`) blocks a prefix taken by two different files.
-- **An applied migration lands on MAIN the same day, as a file** (`git checkout <branch>
-  -- <file>` onto a branch off main; never cherry-pick a commit that also carries app
-  code), with verify_schema.sql merged and the ledger check + drift audit REGENERATED.
-  Main's migrations folder must equal prod's ledger. 2026-09-23: 1045–1047 were applied
-  from two unmerged branches, so neither folder matched prod.
-  Prefixes matched the commit date through 20260801; from 20260802 they ran ahead of it,
-  almost without exception — +1 day at first, 34 days by 20261015, 35 by 20261020. So a
-  filename says nothing about when anything was written or applied; the only applied date
-  is `schema_migrations_applied.applied_at`. Re-measure rather than trust these figures:
-  compare the prefix with `git log --diff-filter=A --format=%ad --date=short -- <file>`.
-- **Changing `normalize_for_moderation()` now also changes the display-name uniqueness
-  key.** `normalize_display_name()` wraps it, and `profiles.display_name_normalized` is
-  a STORED column filled by `check_profile_name_content()` — so a redefinition leaves
-  every existing row carrying the OLD normalized value while new rows carry the new one,
-  and the unique index stops comparing like with like. Recompute in the same migration:
-  `UPDATE profiles SET display_name = display_name WHERE display_name IS NOT NULL;`
-  (the trigger recomputes on write). This coupling is the price of enforcing uniqueness
-  on the normalized form, and it was chosen over an expression index precisely because
-  this failure is VISIBLE — an expression index on an IMMUTABLE-declared function would
-  have gone silently corrupt instead, with no error at any point.
+- Never put the service_role key or DB password in app code; only the anon key in `lib/supabase.js`.
+- Policies change through migrations only, never the Supabase dashboard. `TO authenticated` includes
+  guests — only `NOT is_anonymous_session()` excludes them. Every denial check needs a positive
+  control beside it. Details: supabase/CLAUDE.md.
 
 ## Conventions
-- Functional React components with hooks.
-- Keep components small; one screen per file.
-- Facility types are limited to: pharmacy, clinic, hospital, dentist.
-- **Languages are stored as FULL ENGLISH NAMES (`'Turkish'`, `'English'`), never ISO
-  codes.** The values are the `LANGUAGES` keys in `constants/i18n.js`; they flow through
-  `profiles.preferred_language` into `lang` (App.js), `t()`, `student_task_i18n.lang` and
-  `module_notif_text(p_lang)`. Prod on 2026-09-15: 31 Turkish, 19 English, 1 French,
-  1 Persian, 190 NULL — zero `'en'`/`'tr'`. An ISO comparison never errors; it just matches
-  nothing. Two bugs so far: `lang === 'tr'` in the feat/student-hub StudentHubScreen
-  (line 78), and a probe of `module_notif_text` keyed on an ISO code.
-  `student_task_i18n_lang_check` rejects `'tr'`/`'en'` for this reason — do the same on any
-  new per-language column.
-- Admins never reach HomeScreen or the customer module chain — the App.js content
-  selector is role-first (`profile.role === 'admin'` renders AdminScreen and short-
-  circuits everything below). Any admin preview surface must be entered from
-  AdminScreen via the `adminPreview` state, never from a HomeScreen tile gated on
-  `isAdmin` (that tile is unreachable for admins and hidden for customers).
-- **NEVER use an admin account as a test identity — it is the LEAST reproducible role in
-  the app.** Admin is the tempting choice because `|| isAdmin` unlocks every dark
-  `MODULE_FLAGS` module without touching a flag, so one login reaches surfaces a customer
-  cannot. It also silently switches on behaviour no customer ever sees: `showFeatured` is
-  `FEATURED_LIVE || isAdmin` (same shape for `EXPLORE_FEATURED_LIVE`), and both flags are
-  `false`, so **a customer gets a deterministic sort while an admin gets a `Math.random()`
-  Fisher-Yates shuffle** — `utils/featured.js:14`, via `partitionFeatured()`, reached from
-  `ExploreScreen.js:320` and `GaragesScreen.js:143`. The same list is in a different order
-  every launch, for the admin only.
-  So a bug reproduced as admin may not exist for users, a bug that only appears for users
-  may be invisible as admin, and anything automated that logs in as admin is comparing a
-  shuffled list against itself. Use a **guest** (`WelcomeScreen.js:20`
-  `signInAnonymously()` — one tap from cold start, no credentials, and it bypasses the
-  profile gate) or a real completed customer. To reach a dark module, flip the flag
-  locally and uncommitted, which is what the go-live SOP already says.
-  Found 2026-09-17 while scoping UI test automation; it is a footgun for any testing work,
-  not just that.
-- A filter row (or any fixed-height View) placed as a flex sibling ABOVE a scrollable
-  list in a `flex:1` column MUST set `flexShrink: 0` — otherwise it gets vertically
-  compressed when the list overflows, cropping its text top and bottom. It only
-  reproduces once there are enough results to make the list scroll, so it is invisible
-  with short or empty lists. (Not a lineHeight/font issue — that was a wrong early guess.)
-- **`MODULE_FLAGS` does not gate search.** `search_content` returns rows straight from
-  the tables, so a module flag only hides the SCREEN — anything a module's table exposes
-  publicly is findable through global search while the module is still dark. Any content
-  seeded before launch must therefore be seeded in whatever state its own RLS treats as
-  unpublished (`is_active = false`, `status <> 'active'`), and flipped to published in
-  the same step as the flag. A user who finds a real listing and lands on Coming Soon
-  learns that ADA cannot help with that thing — which is the opposite of what a
-  pre-launch seed is for.
-- **A pre-launch table should DEFAULT to unpublished.** `towing_companies.is_active`
-  DEFAULTs to `false` (`20260907`) — a deliberate inversion of the usual `true`, so an
-  INSERT that omits the column lands invisible instead of publishing itself. Prefer this
-  for any new admin-seeded directory: a banner in a seed file protects the one path
-  somebody wrote, while the default protects every path nobody has written yet — a future
-  CRUD screen, a hand-typed row, an import script. Going live then has to be an explicit
-  act. Register the default as an H-section token in `verify_schema.sql`; a reverted
-  DEFAULT creates no named object and is otherwise undetectable.
-- **A green check is only evidence if you have seen it go red.** A check you have never
-  watched fail is not a check, it is a decoration — and it is worse than nothing, because
-  it buys confidence it has not earned. Before trusting one, break the thing it guards and
-  confirm it complains, then put it back. Three checks written for the towing module were
-  each green while checking nothing: a seed validator that reported "all 4 rows valid"
-  having parsed **zero** rows (its slice ran to a terminator that appeared earlier in the
-  file); an i18n completeness checker that matched only literal `t('key')` and silently
-  skipped every key looked up through a variable; and a clip assertion that compared a
-  coordinate against the pixel *containing* it and so fired on its own rounding.
-  That last one is the instructive case — the tempting fix was to widen the tolerance
-  until it went green, which would have left a test that cries wolf, and a test that cries
-  wolf teaches you to ignore it. Fix what the test measures, not what it reports.
-- **A verification block must DERIVE what it asserts, never hardcode a set it did not query.**
-  `20260821` dropped one of the two `profiles` over-share policies and shipped this
-  verification comment: *"Remaining SELECT policies: owner read, admin read all, admin read
-  profiles."* **There were four.** The fourth — `owner read booking customer profile`
-  (`20260726`) — has the same EXISTS predicate, lacks the `get_my_role() = 'provider'`
-  prefix so it is WIDER, and granted every facility owner the full profile row (phone,
-  nationality, push_token, strikes, ban timestamps) of anyone who booked with them. It
-  survived six weeks unnoticed and was still LIVE in production when found (confirmed via
-  `pg_policies`, 2026-08-27). Dropped by `20260922`, applied and verified the same day.
-  The list was written from what the author had in mind, not from `pg_policies`. **A check
-  that hardcodes an expected set cannot fail correctly**: it goes green when the one thing
-  it names is absent and stays silent about everything it forgot to name — so it is
-  strictly worse than no check, because it certifies the blind spot. Sibling of the green-
-  check rule above, and the sharper form of it: that rule says watch a check go red; this
-  one says a check phrased as a remembered list has no red to go to.
-  So: assert `count(*) = 3` and PRINT the rows, not `NOT EXISTS(policyname = 'the one I
-  remember')`. Register the count, not the name. If a legitimate new object takes the count
-  to 4, bump it in the same commit and say why — that edit is the review moment the name
-  list never creates. Applies to any enumerable set a migration touches: policies, triggers,
-  constraints, grants, cron jobs.
-  Corollary, learned the same day: **when you re-verify a claim, state which surfaces you
-  actually covered.** "Nothing reads it" from a client-code grep is not the same claim as
-  "nothing reads it" — RPCs, SECURITY INVOKER functions, views and edge functions each obey
-  RLS differently (DEFINER and service_role bypass it; INVOKER does not), and only the
-  INVOKER surfaces can be load-bearing for a policy. Name the surfaces or the claim is
-  unfalsifiable.
+- Functional components with hooks; small components; one screen per file. `maybeSingle()` returns
+  `{data: null, error: null}` on zero rows; it does not throw.
+- `facilities.type` is limited by `facilities_type_check`: pharmacy, clinic, hospital, dentist, vet,
+  grooming, garage (repo migrations; confirm live with `pg_get_constraintdef`).
+- **Languages are stored as FULL ENGLISH NAMES** (`'Turkish'`), never ISO codes — the `LANGUAGES`
+  keys in `constants/i18n.js`, through `preferred_language`, `lang`, `t()`, `*_i18n.lang`,
+  `module_notif_text`. An ISO comparison never errors, it matches nothing. Any new per-language
+  column gets a CHECK rejecting `'tr'`/`'en'`.
+- `facility_change_requests.proposed_changes.languages` is a comma string; split before writing
+  `facilities.languages` (`text[]`): `changes.languages.split(',').map(l => l.trim())`.
+- Admins never reach HomeScreen (selector is role-first); admin previews enter via `adminPreview`.
+- **Never use an admin as a test identity**: `|| isAdmin` unlocks dark modules and swaps the
+  deterministic featured sort for a random shuffle (`utils/featured.js`). Use a guest or a real
+  customer; reach dark modules by flipping the flag locally, uncommitted.
+- A fixed-height sibling above a scrollable list in a `flex:1` column needs `flexShrink: 0`.
+- **`MODULE_FLAGS` does not gate search** (`search_content`). Pre-launch content is seeded in its
+  table's unpublished state and published in the same step as the flag.
+- New admin-seeded directories DEFAULT to unpublished (`is_active DEFAULT false`), with an H token.
+- Content that EXPIRES ships with a staleness check (`check-*-staleness.mjs`; by hand/cron, never
+  pre-push). If a table cannot legitimately be empty, render empty as an ERROR STATE.
+- All back handlers register via `addBackListener` (`utils/backHandler.js`), never
+  `BackHandler.addEventListener` directly (iOS edge swipe skips it). `npm run backlistener:check` and
+  `npm run backchain:check` run in `npm run ota`; add a backchain case when a layer joins the chain.
+- Spot-check new UI in Turkish before declaring it done (longer strings surface layout bugs).
 
-- **A migration file is not evidence of what the database does. Assert against `pg_proc`
-  and `pg_policies`, never against the file that claims to have created them.** The rule
-  above covers derived COUNTS; this is the same rule for BEHAVIOUR, and it was learned the
-  expensive way — one investigation, three conclusions, two of them wrong:
-    * `20260821`'s verification **comment** said three SELECT policies remained on
-      `profiles`. There were four. The fourth was a live full-row over-share
-      (phone, nationality, push_token, strikes, ban timestamps) that survived six weeks.
-    * `20260726`'s **file** says branch 3 of `insert_notification` makes new appointments
-      notify their provider. I read it and repeated it as fact in an audit.
-  A migration is a statement of INTENT. Between intent and the database sit a manual paste,
-  a partial selection, a later `CREATE OR REPLACE`, and a ledger row that may only say
-  `baseline` — which asserts in bulk and verifies nothing. `pg_get_functiondef`,
-  `pg_get_constraintdef`, `pg_policies` and `information_schema` are the authority. Quote
-  them, not the file, and say which one you read.
-  **And the correction has its own failure mode, which is the third wrong conclusion:**
-  having caught the file lying twice, I then declared a code path dead on the strength of
-  **two** production rows — both at a junk test facility, one of them a self-booking. A
-  sample is only an authority when it is big enough and clean enough to be one; two rows
-  of somebody's test data is not a measurement, it is an anecdote with a timestamp.
-  **Before a sample overturns anything, look at what the rows actually ARE** — who created
-  them, at which facility, in what state. The structural proof (no policy permits this
-  read) needed no sample at all and was right the whole time; reach for that first, and use
-  data to size a problem rather than to discover one.
-  Practical test when behaviour is in question: impersonate inside a transaction and roll
-  back — `BEGIN; SET LOCAL role authenticated; SET LOCAL request.jwt.claims = '{"sub":…}';
-  <call>; ROLLBACK;`. It answers against the live database and writes nothing.
+## Verification principles
+1. A green check is evidence only once you have seen it go red. Fix what the test measures, never
+   widen a tolerance until it passes.
+2. A red-first run asserts TWO things: the break landed (`python3` `assert anchor in text`, not
+   silent `sed`) and the probe noticed. A slice between markers asserts it contains what it must.
+3. Derive, never hardcode: assert `count(*)` and PRINT the rows, never a remembered name list. If a
+   legitimate object moves the count, bump it in the same commit and say why.
+4. Before a run, ask what a PERFECT system would print. If a broken one prints the same, it is not a
+   probe. Run a positive control where it is cheap.
+5. Check and checked must be in the same frame of reference (file, URL, encoding, role). Print the raw
+   value beside the expectation, and put it in the failure message.
+6. When a check fails, the first hypothesis is the check. Ask what it would forbid a CORRECT system
+   from doing. Prefer a reading that needs no decoding.
+7. A migration file, a comment or a doc is a statement of intent. The live catalogs are the authority:
+   quote which one you read.
+8. When re-verifying, name the surfaces covered (client, RPCs, INVOKER/DEFINER, views, edge fns).
+9. When a guard goes green, say which question it answered ("the file exists" ≠ "it works in prod").
+10. Never verify a write from a role that is not allowed to read it.
+11. Use `IS DISTINCT FROM` / `IS NOT DISTINCT FROM` wherever NULL is reachable (`<>`/`=` go silent).
+12. Truncation guards compare `count: 'exact'` to what arrived; never `rows >= cap` (server
+    `max-rows` overrides the client limit).
+13. Look at what sample rows ARE before they overturn anything; structural proof first, data sizes.
+14. Group missing data along the axis the business uses (who pays, who is public) before calling it a
+    gap. Before a column becomes a denominator, ask: fact about now, or about then? Undatable =
+    "unverifiable", excluded and printed.
+15. When a retry tuning stops working, find WHICH request is rejected (verb, endpoint, header) before
+    changing numbers. An intermittent guard failure is worse than a consistent one.
+16. A comment citing a measured number is regenerated from the tool's printed figure.
 
-- **Before trusting a probe, ask what it would return if the thing under test were
-  PERFECT. If the answer is the same, it is not a probe.** Third face of the two rules
-  above: they say a check must derive what it asserts and assert against the database
-  rather than the file. This one says the check itself can be the thing that is broken —
-  and a broken instrument does not look broken, it looks like a result. Three in one night:
-    * **`overpass.osm.ch` returned `200 OK` and `total: 0` for all of Cyprus.** It is a
-      Switzerland-only extract. The headline would have been "OSM has zero TRNC coverage."
-    * **A `.limit(5000)` truncation guard testing `rows >= 5000`.** The server's `max-rows`
-      is 1000 and OVERRIDES a larger client limit, so the guard could never fire — a
-      truncation guard defeated by truncation. Fixed by asking for `count: 'exact'` and
-      comparing the total to what arrived, which works at any cap.
-    * **A write verified by a count run under the policy that forbids seeing the write.**
-      `SET LOCAL role authenticated` as the CUSTOMER, then counting a notification
-      addressed to the PROVIDER, under `users read own notifications
-      USING (user_id = auth.uid())`. Structurally pinned to 0 whether or not the insert
-      happened. It read as a silent no-op in the function; the function was fine.
-  The cheap defence is one question asked BEFORE the run, not after a surprising result:
-  *what does a healthy system print here?* Then make sure a broken one prints something
-  else. Where it costs nothing, run the positive control too — a dense-area query on a
-  new Overpass mirror, a known-good row through the same path — because a zero from a
-  working instrument and a zero from a dead one are the same character on the screen.
-  Corollary for RLS specifically: **never verify a write from inside the role that is not
-  allowed to read it.** `RESET ROLE` before counting, or count as `postgres`.
+## Android gotchas
+- App.js `content` may only read values defined ABOVE the selector (Hermes has no TDZ: below reads
+  `undefined`). Pass Modals `visible={x === true}` (RN shows `undefined`). Late-state overlays go in
+  App's final return. `check-policy-notice.mjs` guards the notice.
+- `borderRadius` + `borderWidth` may render opaque: set `backgroundColor: 'transparent'`. Never cache
+  `onLayout` positions; measure with `measureRef()` when needed.
+- Reinstall does NOT reset first-run state (Auto Backup restores AsyncStorage) — a test artifact, not
+  a bug. Use Clear storage or `adb shell pm clear com.berkeustun95.ada`; `EXPO_PUBLIC_DEV_ONBOARDED`.
 
-- **Comments that cite a measured number must be regenerated, not remembered.** A header
-  saying "207 m of headroom" goes stale silently the moment the measurement changes. Where
-  it matters, have the tool print the real figure on every run so the comment can be
-  checked against it — and correct the comment when they disagree, even by 2 m.
-- **Check whether the grouping you chose is the one the domain uses.** 387 pharmacies with
-  NULL coordinates looked like an obvious data gap, and a bulk geocoding project was
-  scoped to close it. Grouped by `type` it read as 387 missing rows. Grouped by
-  **commercial relationship** — the axis the policy was actually written on — not one row
-  contradicted it: every facility with coordinates is either public infrastructure (6
-  state hospitals) or a subscriber who placed their own pin (1 clinic, `provider_id` set),
-  and every facility without them is a private business with no relationship to ADA.
-  Nothing had drifted; the policy was working.
-  **A policy and an omission are indistinguishable until you find the axis the policy was
-  written on.** So when data looks uniformly missing along one axis, group it along a
-  different one before proposing to fill it — and prefer the axis the business uses
-  (who pays, who is public, who signed) over the one the schema happens to offer.
-  **Second instance, 2026-08-27, and it generalises past grouping to any DENOMINATOR.**
-  `check-notify-health.mjs` scored "was this provider notified?" using
-  `facilities.provider_id` — which is who owns a facility **now**. The question needed who
-  owned it **then**: `notifyProvider` returns early when `provider_id` is null, so a booking
-  at a then-unclaimed facility is CORRECTLY silent, and scoring it as a miss blames the code
-  for behaving properly. It reported 10% and nearly convicted a working code path. Of 5
-  facilities carrying a `provider_id`, only 2 had a `claim_requests` row — the rest were
-  claimed by hand, so their ownership date is unknowable and those events must be EXCLUDED
-  and the exclusion PRINTED, not scored.
-  The schema offers a current-state column; the question is almost always about state at an
-  event time. **Before a column becomes a denominator, ask whether it is a fact about now or
-  a fact about then**, and whether anything in the database dates it. If nothing does, the
-  honest answer is "unverifiable", not a percentage.
-  Related code-reading correction from the same session: **`maybeSingle()` returns
-  `{data: null, error: null}` on zero rows — it does NOT throw.** An RLS-emptied read
-  therefore does not abort the function around it; execution continues with `null`. Do not
-  reason about a control flow without checking which call actually raises.
-- **Every check here asks whether a column EXISTS. None asked whether the content is
-  CURRENT — and that is the failure that reached users.** `verify_schema.sql`,
-  `schema_drift_audit.sql` and `migration_ledger_check.sql` all verify *shape*. The duty
-  pharmacy roster (`duty_list`) ran out on 2026-06-30 and nobody noticed for two months,
-  while passing every one of them, because an empty table has a perfectly correct schema.
-  It reached users as the worst possible form: the app told people there was no duty
-  pharmacy tonight, when the truth was that we had lost the list. There is ALWAYS a duty
-  pharmacy in the TRNC, so that message was never describing the world.
-  Schema drift was the failure class we had tooling for. **Content expiry was not.**
-  So: any feature backed by content that EXPIRES — a roster, a schedule, a feed, a seasonal
-  list — needs a staleness check as a matter of course, written at the same time as the
-  feature, not after it fails. `check-novest-staleness.mjs` and `check-duty-staleness.mjs`
-  are the pattern: ask a CONTENT question, exit 1, run by hand or by cron.
-  Not in pre-push — a push must not be blocked because a roster is running low; that is
-  data operations, and a guard that blocks unrelated work gets disabled.
-  Corollary for the UI: if a table can legitimately be empty, say so; **if it cannot, an
-  empty result is an ERROR STATE and must not be rendered as a normal one.**
-- **When a retry-tuned fix stops working, check whether you are tuning the wrong verb.**
-  A number you keep raising is a number that is not the answer. `seed-explore-photos.mjs`
-  hit Wikimedia 429s five times; the spacing went 120 → 350 → 1000 ms and each raise was
-  reasoned, plausible and wrong. The measurement that ended it was free and already in the
-  output: **19 of 20 HEAD requests succeeded and one 429'd, while ALL 20 GETs of those
-  identical URLs succeeded in the same run, pulling 133 MB without a single rejection** —
-  a different URL failing each attempt. upload.wikimedia.org throttles HEAD far harder
-  than GET. The stage was being rate-limited for making CHEAP requests while the expensive
-  ones sailed through, and no amount of backoff addresses that.
-  Generalises past this script: before tuning a retry, get the measurement that says
-  *which* request is being rejected and *why*. Compare the failing call against a
-  neighbouring call that succeeds — different verb, different endpoint, different header —
-  because "it fails sometimes" and "it fails when we use HEAD" look identical from a
-  distance and only one of them tells you what to change. Related, and the reason this
-  matters at all: **an intermittent guard failure is worse than a consistent one** — it
-  teaches you to re-run until it passes, which is exactly how a genuinely dead link gets
-  waved through.
-
-- **The word filter has two halves and they must agree character-for-character.**
-  `contains_blocked_term()` in the database is the boundary; `utils/profanity.js` is an
-  inline preview that runs the SAME matcher client-side via `utils/moderationNormalize.js`.
-  Change one, change the other **in the same commit**, then run `npm run moderation:check`
-  — it puts every case through both and fails on any disagreement. Drift is not a cosmetic
-  bug: the user is told "looks fine" as they type and rejected on submit, and because the
-  error names no term (Phase B), the rejection is indistinguishable from the app being
-  broken. `20260925_moderation_normalization.sql` is the SQL half.
-  What that normalization does, and the three live defects it closed — all measured
-  through `/rpc/contains_blocked_term`, not read off a migration file:
-  Turkish capital **İ** lowercases to `i` + U+0307, a combining mark, so `SİKİK` and `PİÇ`
-  matched nothing at all — the filter was defeated by the shift key. **Zero-width and
-  format characters** (ZWNJ/ZWJ/soft hyphen) split a word into two tokens, so `f<ZWNJ>uck`
-  passed AND `the<ZWNJ>rapist` was blocked as `rapist`. **Arabic tatweel** (U+0640) is a
-  *word* character, so `كـس` was simply a different string from `كس`.
-  Two things it deliberately does NOT do, both of which are tempting and both of which
-  block ordinary words: no accent folding (NFC only — folding `ö→o` makes the Turkish term
-  `göt` match the English "got"), and no `ı→i` folding (it makes `sık sık`, "often", match
-  `sik`). Turkish's two i's are different letters, not a case pair.
-
-- **`terms:check` passing means A MIGRATION FILE EXISTS — not that it has been applied.**
-  `scripts/check-terms-commitment.mjs` scans `supabase/migrations/` as TEXT. It cannot see
-  git and it cannot see the database: only the anon key is in the repo and `pg_policies` is
-  unreachable through PostgREST as `anon`. So the guard answers *"has the fix been
-  written"*, and the moment a file with a permissive `FOR UPDATE` on all three UGC tables
-  lands on disk, exit 1 becomes exit 0 and the pre-push block lifts — applied or not,
-  committed or not, correct or not.
-  That is deliberate (a repo-side guard has nothing better to check), and it is a real gap,
-  because the thing being gated is a commitment published to users in both terms copies.
-  **`supabase/verify_schema.sql` is the only thing that closes it — and only if somebody
-  runs it.** Nothing automated bridges the two, and this repo's own history is the argument
-  for why that is not theoretical: `facilities.area` was committed and never applied, and
-  `20260802`'s `DROP COLUMN` half-applied without anything noticing.
-  So when a guard goes green, say which question it answered. "The Tier 1 migration is
-  written" and "admin Remove works in production" are different claims, and only the second
-  one is what the Terms promise. Applies to every repo-side guard here, not just this one.
-
-- **You cannot log a rejection from the transaction you are about to abort.** The obvious
-  design for "record which blocked term matched" is a table written by the trigger. It
-  cannot work: `RAISE EXCEPTION` aborts the transaction and takes the log row with it —
-  always, not usually. The result is a logger that looks correct, runs on every rejection,
-  and is empty forever, which is *worse* than having none, because an empty table reads as
-  "no false positives" rather than "no instrumentation". Same family as the green-check and
-  hardcoded-set rules: the thing reporting the answer is the thing that is broken.
-  Postgres has exactly one rollback-surviving sink without an extension — the **server
-  log** (`RAISE LOG`); a table, `pg_net`'s queue and `LISTEN/NOTIFY` are all transactional
-  and die with the abort. `dblink` would give a true autonomous transaction and on Supabase
-  needs a stored database password, which is not a price worth paying for logging.
-  So `20260926` splits it: a `RAISE LOG` breadcrumb that always fires (term + user, never
-  the text — the server log is outside RLS), plus `moderation_rejections`, **self-reported
-  by the client in a second transaction that commits**. Self-report misses evaders, and
-  that is fine — the log exists to find FALSE POSITIVES, and those happen to honest users
-  running our own client.
-  Generalises: **before designing any "record what happened when we rejected it", ask
-  which transaction the write lands in.** Audit trails for refusals, failed-validation
-  logs, quota-denial records — all have this shape, and all fail silently.
-  Corollary for verifying one: `moderation_rejections` denies SELECT to its own author, so
-  reading the row back as the submitting user returns 0 whether or not the insert worked —
-  pinned by RLS, not by truth. `check-moderation-log.mjs` proves the write through
-  `blocked_terms.hit_count` instead, a surface it is allowed to read.
-
-- **`utils/profanity.js` reads the WHOLE `blocked_terms` table, and PostgREST caps a
-  response at `max-rows` = 1000.** Past that cap the client filters against a partial list
-  and the body looks completely normal — a short, valid array, no error, no flag. The
-  count is in the `Content-Range` header and nowhere else. Both the loader and
-  `check-moderation-normalization.mjs` now ask for `count: 'exact'` and compare the total
-  against what arrived, which is the only form of the check that works **at any cap**;
-  testing `rows >= 1000` is a truncation guard defeated by truncation, and this repo has
-  already shipped that exact bug once. The table is 54 rows today and the curated
-  9-language import takes it to roughly 510, so the headroom is real but finite — and it
-  is the kind of limit that is crossed by someone adding words through an admin screen,
-  not by anyone thinking about PostgREST. The probe prints the live figure on every run;
-  trust the printed number, not this sentence.
-
-- **An assertion that cannot fail on the case it exists to detect is worse than no
-  assertion — and `<>` is how you write one by accident.** `NULL <> 'x'` evaluates to
-  NULL, and `IF NULL THEN` does not fire. So every one of these, written in the
-  `20261001` DO block and green on first draft, would have PASSED on precisely the
-  failure it was there to catch:
-    * `IF normalize_display_name('Merhaba 123') <> 'merhaba 123'` — passes if the
-      function returns NULL, i.e. if it is completely broken.
-    * `IF (SELECT display_name_normalized FROM profiles WHERE id = v_a) <> 'zzprobename'`
-      — passes if the trigger never filled the column at all, which is exactly the state
-      that would let duplicate display names through the unique index.
-  Use `IS DISTINCT FROM` in every assertion, and `IS NOT DISTINCT FROM` for the control
-  (`a = b` is NULL when both are NULL, so a "these must differ" control written with `=`
-  is silent when they are both nothing). This is the same family as the green-check and
-  hardcoded-set rules, but sharper: those checks CAN go red and nobody watched them; this
-  one has no red to go to for the one input that matters. Note it is not general — `<>`
-  is correct where the operand cannot be NULL (`SQLERRM`, a `count(*)`, a `coalesce`d
-  expression), and rewriting those adds noise. The test is whether NULL is reachable.
-
-- **A verification block that mutates real rows must pick rows it cannot damage, and
-  restore what it captured — not what it assumes.** The same DO block first took the two
-  lowest `profiles` ids, wrote probe display names onto them, and then set
-  `display_name = NULL, date_of_birth = NULL` to clean up. Correct on the first apply,
-  when every row is nameless. **Destructive on a RE-APPLY** once the wizard ships: it
-  would overwrite a real user's display name and erase a real date of birth, and the
-  file is written re-runnable (`IF NOT EXISTS` throughout) precisely so it can be
-  re-applied. Fixed by selecting only rows `WHERE display_name IS NULL`, capturing
-  `date_of_birth` into a variable and restoring THAT, and scoping the leftover check to
-  the probe's own two names rather than to "any display name anywhere" — the latter
-  reads as a leak the first time a real user has finished the wizard. Same lesson
-  `20260926` already applied when it restored `last_hit_at` captured rather than NULLed;
-  it generalises to every in-migration probe that writes.
-
-- **A scripted edit to a large SQL file needs a STRUCTURAL check, not an eyeball.** Eight
-  anchored inserts were made into `verify_schema.sql` by script; seven were checked by
-  reading the surrounding lines and one was not. That one left `)    'contact_events'`
-  in the RLS-enabled list — QUERY 1 would have died with a syntax error, and the drift
-  report is the thing you run FIRST on a database you are unsure about, so the failure
-  lands at the worst moment. The check that would have caught it costs nothing: strip
-  comments and string literals, count parens, and scan for a closing paren followed by
-  content or two adjacent tuple lines without a comma. Run it over the whole file after
-  any scripted edit, and expect one false positive per line whose trailing comment ends
-  in `)`.
-
-- **THE CHECK AND THE THING CHECKED MUST BE IN THE SAME FRAME OF REFERENCE. This is now
-  one standing hazard, not a shelf of anecdotes — five instances between 2026-08-30 and
-  2026-09-02, every one of them a check that was WRONG while the thing it checked was
-  RIGHT.**
-    * **A `sed` break that never landed.** Written against one file's indentation, run
-      against another's. The probe then printed no failure and the honest-looking
-      conclusion was "that check is dead". The check was fine; the *break* was.
-    * **A forged-term assertion that compared a value to itself.** Structurally incapable
-      of returning anything but pass.
-    * **`?cb=$(date +%s)` on `getadaapp.com/privacy`.** A query string sends that route
-      past the Worker to Vercel, so the probe reported `404` for BOTH store-registered
-      URLs against a deploy that was completely healthy. The ritual's stated pass
-      condition was "anything other than 200 and we roll back" — so the check would have
-      rolled back a good deploy, and the rollback would have "fixed" it, confirming the
-      wrong diagnosis.
-    * **`position('comment' in pg_trigger.tgargs::text)`.** `tgargs` is BYTEA holding
-      NULL-TERMINATED arguments, so `::text` renders `\x636f6d6d656e7400`. The literal
-      substring `comment` is not in a hex string and never will be. It aborted a
-      migration whose trigger was perfect.
-    * **`NOT ILIKE '%appointments%'` over `pg_get_functiondef()`.** `pg_get_functiondef`
-      returns the COMMENTS, so a token asserting three functions no longer query a
-      dropped table was in fact forbidding the WORD from their prose — and all three
-      correct bodies carry a comment saying which appointment branch they lost. The only
-      way to make it green was to delete the comments that tell the next reader not to
-      re-add a branch. **This one is the sharpest of the five, because the tempting fix
-      was to edit the SYSTEM.** The other four merely wasted time; this one would have
-      destroyed the most valuable thing in the function. And the file that carried the
-      token documents this exact trap twice, in the 0827 note and the 0924 note, which
-      is the real lesson: a hazard written down is not a hazard defended against.
-      Fixed by anchoring the negative to a code SHAPE (`FROM appointments`, which no
-      comment contains) and pairing it with a positive per function.
-  **They look like five different bugs and they are one.** In each case the check reads
-  the value in one frame and compares it in another — a different file, a different URL,
-  a different encoding, or (worst) the same value on both sides. The *system* is never
-  what these tests report on; the *instrument* is. And an instrument that is broken does
-  not look broken. It looks like a result.
-  **The defence is one question, asked BEFORE the run, not after a surprising answer:**
-  *what exactly am I reading, and is it the same kind of thing I am comparing it to?*
-  Print the raw value next to the expectation once and the mismatch is obvious. This is
-  the same question as *"what would this print if the system were perfect?"* — that rule
-  catches an instrument that cannot fail; this one catches an instrument that cannot pass.
-  **Two corollaries earned the hard way:**
-  **(1) Put the raw value in the failure message.** The `tgargs` bug was diagnosed in
-  seconds because the assertion printed `args=\x636f6d6d656e7400` — the proof it was
-  wrong was inside its own error. An assertion that fails without showing what it read is
-  a dead end, and you will suspect the system before you suspect the test.
-  **(2) When a check fails, the FIRST hypothesis is the check.** Not the system. Three of
-  the five above cost real time to a wrong first hypothesis, one of them nearly caused
-  an unnecessary production rollback, and the fifth nearly deleted a load-bearing comment
-  to satisfy an instrument. **Ask what the check would forbid a CORRECT system from
-  doing** — that question catches the whole family before it costs anything. Reach for the system only once the instrument has
-  been cleared.
-  **And prefer the reading that needs no decoding at all.** `pg_get_triggerdef()` renders
-  canonical SQL; decoding `tgargs` by hand means `encode(...,'escape')` plus stripping a
-  terminator — more encoding handling in exactly the layer that just failed. When a check
-  breaks on a representation, the fix is usually to stop handling representations, not to
-  handle them more carefully.
-  Related, and the reason this cost nothing: **the migration rolled back cleanly.** A false
-  alarm inside `BEGIN … COMMIT` is free — nothing half-applied, no cleanup, re-runnable
-  after the fix. That is the argument for wrapping every manual-apply migration in an
-  explicit transaction with its assertions INSIDE it, even when the change is one line.
-
-- **Confirm the BREAK landed before you trust the RED — a break that does not break
-  looks exactly like a dead check.** Red-first testing has its own failure mode, met
-  head-on while probing the profile gate: a `sed` written against `constants/flags.js`
-  indentation was run against `check-module-flags.mjs`, which indents differently, so it
-  changed nothing. The probe then printed no failure, and the honest-looking conclusion
-  was "that check is dead". It was not; the test was. Ten minutes went into diagnosing a
-  working check.
-  So a red-first run has TWO assertions, not one: *the file changed*, and *the probe
-  noticed*. Print evidence of the mutation (`assert old in s` before replacing, or diff
-  the file) rather than assuming `sed` matched. This is the same shape as the rule above
-  it — an instrument that reports nothing is not the same as a system with nothing to
-  report — and it argues for `python3` with an explicit `assert anchor in text` over
-  `sed`, which fails silently by design.
-  The check that survived this then gained the control it was missing: a slice between
-  two markers now asserts it contains a key it must, because a slice whose end marker
-  precedes its start returns `''` and passes on everything.
-
-- **When a migration changes a count another migration's token asserts, RETIRE that token
-  in the same commit — do not leave it to go red later, and do not bump it.** `20260927`
-  registered "reviews/questions/answers carry 6 policies each". `20260928` then added the
-  owner soft-delete policy, taking two of them to 7, and registered its own
-  "policy counts are 7 / 7 / 6". Both tokens now counted the same set; the older one went
-  STALE/MISSING against a database that was exactly right, and sat red in the drift report
-  until somebody read it carefully.
-  Bumping 6 to 7 would have been the wrong fix — **two tokens counting the same thing is
-  what created the staleness**, and the duplicate would drift again at the next policy
-  change. One count, one owner. Keep the half of the old token that is genuinely its own
-  (here: that the UPDATE policy is PERMISSIVE, which no count can see) and delete the rest.
-  This matters more than a tidy report: a drift checker carrying a known-stale row teaches
-  the reader to skim, and the next real MISSING is skimmed with it. The file already warns
-  about that twice — for `claim_requests.kteb_confirmed` and for the 0925 matcher token —
-  and it happened anyway, because those warnings were about rows somebody might ADD, not
-  about a row that goes stale on its own when a LATER migration moves the number.
-
-- **All back handlers must register via addBackListener (utils/backHandler.js), or the iOS
-  edge swipe skips them.** On Android it IS `BackHandler.addEventListener`; on iOS
-  BackHandler is a no-op stub and the edge swipe (`components/EdgeSwipeStrip.js`) walks the
-  shim's own stack. A direct call still works on Android and silently vanishes on iOS.
-  `npm run backlistener:check` fails on any `BackHandler.addEventListener` outside the shim,
-  and `npm run backchain:check` runs App's chain through 45 cases; both run in `npm run ota`.
-  Add a backchain case when a new layer joins the chain.
-
-## Social sign-in (Google + Apple, native) — from build 1.2.0
-
-Plan, decisions and evidence: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
-
-- **Runtime 1.2.0 is the fence.** `runtimeVersion` is `appVersion`; the native modules exist
-  only from 1.2.0, and EAS serves an update only to an identical runtime. Hotfixes for 1.1.0
-  installs are published from a tree whose `version` is still 1.1.0 (a `release/1.1` branch
-  once social-auth is on main), so every fix ships twice until 1.1.0 fades.
-- **Every social branch keys on `app_metadata.provider`** (`socialProvider()` in
-  `utils/socialAuth.js`) — the FIRST identity. An email account that later linked Google stays
-  `'email'`, which keeps pre-existing accounts out of the social consent tick, the hidden
-  names and the under-13 deletion.
-- **`revokeGoogle()` runs BEFORE anything signs out of Supabase.** SIGNED_OUT calls
-  `signOutGoogle()`, after which `revokeAccess()` is a silent no-op.
-- **Under 13: Google/Apple accounts are DELETED, email accounts are FLAGGED.** A social
-  identity links back to the same auth user, so a flag would lock it out forever.
-- **A name the provider gave is never asked for again** (App Store 4.0). The wizard hides a
-  name field only while it holds exactly the provider's value; a missing one is shown.
-  Apple sends the name ONCE per authorisation — only a token revocation resets that.
-- **`display_name` is labelled "Username" in all nine locales** — never "name" (4.0).
-- **The three native modules are `require()`d inside functions**, and
-  `check-native-import-safety.mjs` enforces it: google-signin calls
-  `TurboModuleRegistry.getEnforcing` at evaluation, so a top-level import kills Expo Go.
-- **Deleting an Apple user OUTSIDE the app: revoke FIRST, then delete.** Apple refresh tokens
-  live in `apple_refresh_tokens`, which is `ON DELETE CASCADE` to `auth.users` — so deleting
-  the user from the Supabase dashboard (or any SQL/admin path) destroys the only thing that
-  could revoke Apple's authorisation, and it can never be revoked afterwards: Apple keeps the
-  Apple ID linked to ADA and withholds the name on the next sign-in. Run
-  `node scripts/revoke-apple-token.mjs <user-id>` first (service role key in the environment
-  for that one command, never saved; the script lands with slice 5), confirm it reports
-  revoked, THEN delete. In-app deletions (Profile, under-13) already revoke before deleting.
-- **`handle_new_user` still reads no metadata** (0827). Names reach `profiles` from the
-  client, through `check_profile_name_content`, never from the trigger — a BLOCKED_TERM there
-  would abort the `auth.users` insert.
-
-## Compliance (Google Play — declared mixed-audience app)
-
-⚠ **ON PLAY, ADA IS NOT A HEALTH APP, AND THAT IS A DELIBERATE, TESTED POSITION — DO NOT
-"CORRECT" IT.** Category is **Travel & Local** and the Health apps declaration says **no
-health features** (both set 2026-09-23); the store description carries no pharmacy or health
-content. The reason is the account type, not the category definitions: declaring health
-features accurately forces an **Organization** developer account, ADA is on an **individual**
-one, and that is precisely what got the app rejected on 2026-07-06. The facility directory
-and the duty roster stay in the app, treated as a local/places directory — a bet that has
-survived a review cycle.
-**The rule covers `fastlane/metadata/android/` too** — that folder IS the store description
-now (see "Play listing"). No pharmacy, duty, health, clinic or doctor wording in any of the
-nine languages; `npm run store:check` refuses it before anything is pushed.
-Google's own category text pulls the other way (*"Suitable for apps connecting patients with
-healthcare providers"* — Healthcare services and management), so a reader who checks only the
-definitions will conclude the declaration is wrong and re-tick it. That conclusion costs a
-rejection. The real unlock is an Organization account, which also brings the supplement quiz
-back. Full record: `~/ObsidianVault/10-ada/play-console-status.md`.
-
-
-Target age groups were set to **13-15 / 16-17 / 18 and over** on 2026-08-29, which makes
-ADA a declared mixed-audience app. Three standing consequences:
-
-- **Users whose `date_of_birth` indicates UNDER 18 must receive NON-PERSONALIZED ADS.**
-  No ad SDK is integrated today. When one is, the age branch is a launch requirement, not
-  a follow-up — shipping personalized ads to a 15-year-old is a policy violation on day
-  one, and the DOB to make the distinction is already in `profiles`.
-- **Do not add any SDK that is disqualified under Google Play Families policy without
-  flagging it first.** Self-certification is per-SDK and ONE non-compliant SDK makes the
-  whole app ineligible. This includes anything added "just for analytics".
-- **Account-holder age and content visibility are SEPARATE CONCERNS.** The future
-  MEKB-approved kids module is served in guest mode or under a parent account, never via
-  a child-held account, and module access is not coupled to account age beyond
-  `GATE_EXEMPT_MODULES`. Keep them separate; coupling them is easy to do by accident and
-  expensive to unpick.
-
-`MIN_SIGNUP_AGE` lives in `constants/profileGate.js` and is mirrored as
-`interval '13 years'` in `20261001`'s trigger. It CANNOT be a CHECK constraint —
-`CURRENT_DATE` is STABLE and a CHECK requires IMMUTABLE — so the trigger is the only
-place it exists, and `npm run profile:check` fails if the two halves disagree. Never
-inline the number anywhere else.
-
-The DOB screen is a **neutral age screen**: no text stating a minimum, no pre-set date,
-free entry of day/month/year. The year range stops at `currentYear - MIN_SIGNUP_AGE`,
-and that tension has been considered and settled — Google's rule is about the SCREEN,
-not the picker bounds; a pre-set date or "you must be 13+" tells the user what to type,
-a bounded year list does not, and neither bound is singled out. **Do not re-litigate it.**
+## Social sign-in (Google + Apple, native, from 1.2.0)
+Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
+- Runtime 1.2.0 is the fence (`runtimeVersion` = `appVersion`). 1.1.0 fixes ship from `release/1.1`.
+- Every social branch keys on `app_metadata.provider` (`socialProvider()`, first identity only).
+- `revokeGoogle()` runs BEFORE anything signs out of Supabase (after, `revokeAccess()` no-ops).
+- Under 13: Google/Apple accounts are DELETED, email accounts are FLAGGED.
+- A name the provider gave is never asked for again (App Store 4.0); Apple sends it once.
+- `display_name` is labelled "Username" in all nine locales, never "name".
+- The three native modules are `require()`d inside functions (`check-native-import-safety.mjs`).
+- Deleting an Apple user outside the app: `node scripts/revoke-apple-token.mjs <user-id>` FIRST,
+  confirm revoked, THEN delete (`apple_refresh_tokens` cascades with `auth.users`).
+- `handle_new_user` reads no metadata; names reach `profiles` from the client only.
 
 ## Module go-live SOP (ordered — the order is the point)
-
-Flipping a module on is not one step, it is nine, and several of them are only correct
-in this sequence. Deviations that look harmless are how modules ship half-launched.
-
-1. **Seed inactive.** Rows land with the table's unpublished value (`is_active = false`).
-   Nothing is visible or searchable yet.
-2. **Verify the data while it is still invisible.** Dial every phone number. Check every
-   image URL returns bytes. This is the last moment a mistake is free.
-3. **Activate the rows.** This OPENS a window: the content is now publicly searchable
-   (`search_content` ignores `MODULE_FLAGS`) while the screen is still gated. Keep the
-   window short and never end a session inside it.
-4. **Spot-check in Turkish**, on device, with the flag flipped LOCALLY and uncommitted.
-   Turkish strings are longer than English and surface layout bugs nothing else does.
-   If you needed temporary fixtures to exercise states real data does not cover, this is
-   where they live.
-5. **Revert the fixtures.** Before anything else. Fake data outlives the session it was
-   created for otherwise.
-6. **Flip the flag in BOTH files, in ONE commit** — `constants/flags.js` and
-   `scripts/check-module-flags.mjs`. Either alone fails the guard, which is the design.
-
-   ⚠ **STUDENT HUB ONLY — DECIDE RE-ASKING AT THIS STEP, NOT AFTER IT.**
-   10 accounts hold `terms_version = '2026-09'`. That document promised their data is
-   never visible to other users, and flipping this flag is the act that makes it false
-   — for THEM, not only for people who sign up afterwards. The published policy is now
-   `2026-09-20`, which says the opposite. Nobody has been re-asked.
-   They are findable, and the number is still small:
-   `SELECT id, terms_accepted_at FROM profiles WHERE terms_version IS NULL OR terms_version < '2026-09-20';`
-   (Not `<> current`: the 2026-09-24 bump did not change the student-list promise, so
-   accounts on 2026-09-20 already accepted it.)
-   Not re-asking was the right call while the module was dark, because nothing about
-   their data had changed yet. This step is where that stops being true. Decide it here,
-   with the query in front of you, rather than discovering the question later.
-7. **Stash check, then clean tree.** `eas update` bundles the WORKING TREE, not HEAD. A
-   long-lived stash is not a blocker and must stay stashed.
-8. **`npm run ota -- --message "..."`** — never `eas update` directly, and note the `--`:
-   the wrapper takes no message of its own and EAS errors without one non-interactively.
-   Args after `--` land past the `&&`, so the flag guard still runs.
-9. **Verify the OTA on device across two full open → wait → kill → reopen cycles**, on
-   the Play Store build. A preview APK has no production channel and never receives OTA.
-10. **THEN `notify_module_waitlist('<module>')`.** Last, and only after step 9 is
-    confirmed. Notifying before the OTA has landed sends people to a screen that has not
-    updated yet — the one thing worse than not notifying them.
-
-    ⚠ **READ THE LIST BEFORE AND AFTER, BECAUSE A BURNT LIST AND AN EMPTY LIST ARE THE
-    SAME NUMBER.** The blast returns a count, and `0` means either "nobody signed up" or
-    "these rows were already stamped `notified_at` and can never be notified again". Step
-    10 cannot tell those apart on its own, and the second one is silent:
-
+1. **Seed inactive** (`is_active = false`). Nothing visible or searchable.
+2. **Verify the data while it is still invisible.** Dial every number; every image URL returns bytes.
+3. **Activate the rows.** Opens a window (searchable, screen gated): keep it short, never end a
+   session inside it.
+4. **Spot-check in Turkish** on device, flag flipped LOCALLY and uncommitted; fixtures live here.
+5. **Revert the fixtures.** Before anything else.
+6. **Flip the flag in BOTH files in ONE commit** — `constants/flags.js` and
+   `scripts/check-module-flags.mjs`. ⚠ Student Hub only: decide re-asking accounts on older terms
+   here: `SELECT id, terms_accepted_at FROM profiles WHERE terms_version IS NULL OR terms_version < '2026-09-20';`
+7. **Stash check, then clean tree.** A long-lived stash stays stashed.
+8. **`npm run ota -- --message "..."`** — never `eas update`; args after `--` keep the guard running.
+9. **Verify on device across two full open → wait → kill → reopen cycles**, on the Play Store build.
+10. **THEN `notify_module_waitlist('<module>')`.** ⚠ A burnt list and an empty list both return 0,
+    so read the list BEFORE (expect `0/n`) and AFTER (expect `n/n`, stamped today):
     ```sql
-    select module,
-           count(*) filter (where notified_at is not null) as notified,
-           count(*) as total,
-           min(notified_at) as first_stamp,
-           max(notified_at) as last_stamp
+    select module, count(*) filter (where notified_at is not null) as notified, count(*) as total,
+           min(notified_at) as first_stamp, max(notified_at) as last_stamp
     from module_waitlist group by module order by module;
     ```
-
-    Healthy looks like: every stamped module is one you actually launched, each with a
-    single tight timestamp range. Scattered stamps, or any stamp on a module that has
-    never gone live, means the list was consumed by something other than a launch. Run it
-    BEFORE the blast (the module you are about to launch should read `0/n`) and AFTER
-    (it should read `n/n`, stamped today).
-
-    Baseline taken 2026-09-20, all clean: accommodation 7/7 · events 1/1 · explore 2/2 ·
-    pets 4/4, each on its own launch date; studentHub 0/6 intact; everything else 0. Then add the module to
-    `WAITLIST_BLAST_DONE` in `scripts/check-module-flags.mjs`; the guard blocks the next
-    push until you do.
-
-Steps 6 and 10 are enforced mechanically by `check-module-flags.mjs`. The rest are not,
-and rely on this list.
-
-### ⚠ STUDENT HUB ONLY — a REQUIRED step that exists for one window and then never again
-
-**Between the Student Hub OTA and `20261027`, exercise the stale-affiliation recovery path
-on a test account. It is not optional and it cannot be deferred.**
-
-ProfileScreen and ProfileSetupScreen both carry a recovery branch that fires on a 23514
-naming `profiles_institution_coupling_check`: it CLAIMS every `student_education` row
-(`mirror_owned = false`), CLEARS the five affiliation columns, then retries the write. It
-exists for exactly one population — somebody whose `profiles` row still carries an
-institution with **no** `study_end_year`, moving their `resident_status` away from
-`'student'`.
-
-To trigger it: a test account with a stale `profiles.institution_id` and
-`study_end_year IS NULL`, then change resident status away from student in the app.
-Expect the save to succeed, the five columns to end up NULL, and **the account to still
-appear on the student list** — that last part is what the claim protects, and the whole
-reason the order is claim-then-clear rather than the reverse.
-
-**`20261027` drops those columns, which drops the CHECK, which makes the branch
-unreachable forever.** After that nobody can ever learn whether it worked — and the branch
-is the only thing standing between that population and a 23514 they cannot clear from any
-screen, or a silent de-listing nobody is told about. Test it inside the window or ship it
-untested permanently.
-
-### ⚠ STUDENT HUB ONLY — the message deep link, also testable only after the OTA
-
-**Tap a real message push on the PLAY STORE build, WARM and COLD, once the OTA has
-shipped.** Both, because they are different code paths that have never both run:
-`addNotificationResponseReceivedListener` (App.js) handles a tap while the app is running;
-`getLastNotificationResponseAsync` handles a tap that launches it. The cold one is the
-COMMON case for a message — the app is usually not open when one arrives — and until
-2026-09-19 it knew only `'duty'`, so such a tap landed on Home.
-
-It cannot be exercised before then, and the reason is not a bug: Expo Go cannot hold a push
-token on SDK 53+, so `profiles.push_token` belongs to the production build. A push sent
-during development is therefore delivered to the Play Store app, whose bundle has no
-messaging in it, and tapping it correctly does nothing.
-
-Expect: the app opens on the Student Hub's Messages tab with that thread open. A thread
-that has since been declined, left or blocked should land on the Messages tab with no
-thread — not on Home, and not on a spinner.
-
-- Always spot-check new UI in Turkish before declaring it done. Turkish labels are longer
-  than English, so they routinely push lists past the viewport (hitting bugs like the one
-  above) where English never did.
-
-## Android Gotchas
-- **App.js `content` may only read values defined ABOVE the content selector.** Hermes does
-  not enforce the temporal dead zone, so a `const` declared below the selector reads
-  `undefined` inside it — no error. And RN's `Modal` treats `visible={undefined}` as SHOWN.
-  Together they shipped (2026-09-24) a policy notice every user saw and nobody could close.
-  Overlays whose state is computed after the selector go in App's FINAL return (like
-  OliGuide); pass Modals `visible={x === true}`. `check-policy-notice.mjs` guards the notice.
-- Views with `borderRadius` + `borderWidth` on Android may render an opaque background unless `backgroundColor: 'transparent'` is set explicitly.
-- Never cache element positions in `onLayout` for later use — layout can shift (e.g. async data loading) and the cached value goes stale. Always measure with `measureRef()` at the moment you need the position.
-- **A REINSTALL DOES NOT RESET FIRST-RUN STATE ON ANDROID — Auto Backup restores it.**
-  Confirmed 2026-09-21 on the onboarding device pass: uninstall + reinstall SKIPPED the
-  carousel, because Android's Auto Backup for Apps had restored `@trnc_onboarded` (and
-  restores every other AsyncStorage key with it — `@trnc_coach_v2`, `@trnc_city_*`,
-  `@trnc_strip_dismissed`, `@trnc_module_pins`).
-  **This is NOT a user-facing bug.** A genuinely new user has no backup to restore from,
-  so they see the carousel exactly once, as designed. It is a TESTING artifact, and the
-  expensive version of it is mistaking it for a regression and "fixing" code that works.
-  To actually re-test a first run: **Settings → Apps → ADA → Storage → Clear storage**
-  (not just Clear cache), or `adb shell pm clear com.berkeustun95.ada`.
-  ⚠ A dev-only "replay onboarding" button was considered and NOT added: the flow is
-  pre-auth, so a button would have to live on a screen the gate renders, and
-  `EXPO_PUBLIC_DEV_ONBOARDED` + Clear storage already cover both directions.
+    Any stamp on a never-launched module = the list was consumed. Then add the module to
+    `WAITLIST_BLAST_DONE` in `check-module-flags.mjs`.
+Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this list.
 
 ## Advisor
 
@@ -1026,13 +233,18 @@ Consult the advisor before writing any Supabase migration, RLS policy, or module
 - Don't generate large files of placeholder/sample code — ask what's real.
 - Don't mark a provider `verified: true` in code; verification is a manual step I do.
 
-## Dev journal summaries
+## Dev journal summaries (when I ask)
+Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · "Why" (1-2 sentences)
+· "Watch out for" · an options table with tradeoffs when more than one approach existed ·
+"→ architecture.md updates needed" if structural.
 
-When I ask for a summary for the dev journal, follow this format:
-- Headline + type (OTA / native / hotfix / refactor)
-- "What changed" grouped by feature/area
-- "Why" — 1-2 sentences if not self-evident
-- "Watch out for" — gotchas, deferred TODOs, things future-me needs to remember
-- **When more than one reasonable approach existed for a decision, include an options table with tradeoffs — not just the choice.**
-- "→ architecture.md updates needed" if structural (new tables, screens, conventions)
-
+## Open windows / pending (vault = `~/ObsidianVault/10-ada/`)
+- 1.2.0 permission strings (live only once 1.2.0 installs; Play health declaration drafted when the
+  build is scheduled) + Android RTL-mirroring device check → `2026-09-20_native-permission-strings-PARKED.md`.
+- Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
+- Play listing pushed 2026-09-28: check Console for the review verdict.
+- Student Hub stale-affiliation recovery path (window: Hub OTA → `20261027`; applied? check
+  `schema_migrations_applied`) → `claude-md-lessons.md` "Student Hub recovery path".
+- Student Hub message push deep link, WARM and COLD, on the Play Store build → same file.
+- Student Hub terms re-ask (SOP step 6): `studentHub` is `true` in flags.js; decision unrecorded.
+- Image messaging safety scope → `2026-09-20_image-messaging-safety-scope-PARKED.md`.
