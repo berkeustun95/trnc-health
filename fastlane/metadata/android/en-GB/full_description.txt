@@ -1,6 +1,6 @@
 ADA is an independent app. ADA is not affiliated with, endorsed by, or acting on behalf of any government entity or public authority and does not provide or facilitate government services.
 
-ADA is the all-in-one city guide for residents, students and newcomers in North Cyprus (TRNC / KKTC). Everything you need in Nicosia (Lefkoşa), Kyrenia (Girne), Famagusta (Gazimağusa), Güzelyurt, İskele and Lefke, in one app.
+ADA is the all-in-one city guide and assistant for residents, students and newcomers in North Cyprus (TRNC / KKTC). Everything you need in Nicosia (Lefkoşa), Kyrenia (Girne), Famagusta (Gazimağusa), Güzelyurt, İskele and Lefke, in one app.
 
 - Explore map – places, cafés, restaurants, beaches and city walking routes
 - Events – concerts, festivals, theatre and ticket info

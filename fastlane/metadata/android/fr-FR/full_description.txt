@@ -1,6 +1,6 @@
 ADA est une application indépendante. ADA n'est affiliée à aucune entité gouvernementale ni autorité publique, n'est approuvée par aucune d'elles, n'agit pas en leur nom et ne fournit ni ne facilite aucun service gouvernemental.
 
-ADA est le guide tout-en-un pour les résidents, étudiants et nouveaux arrivants à Chypre du Nord. Tout ce dont vous avez besoin à Nicosie (Lefkoşa), Kyrenia (Girne), Famagouste (Gazimağusa), Güzelyurt, İskele et Lefke, dans une seule application.
+ADA est le guide et assistant tout-en-un pour les résidents, étudiants et nouveaux arrivants à Chypre du Nord. Tout ce dont vous avez besoin à Nicosie (Lefkoşa), Kyrenia (Girne), Famagouste (Gazimağusa), Güzelyurt, İskele et Lefke, dans une seule application.
 
 - Carte Explorer – lieux, cafés, restaurants, plages et itinéraires de promenade en ville
 - Événements – concerts, festivals, théâtre et infos billetterie

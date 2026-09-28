@@ -1,6 +1,6 @@
 ADA es una aplicación independiente. ADA no está afiliada a ninguna entidad gubernamental ni autoridad pública, no cuenta con su respaldo, no actúa en su nombre y no presta ni facilita servicios gubernamentales.
 
-ADA es la guía todo en uno para residentes, estudiantes y recién llegados al norte de Chipre. Todo lo que necesitas en Nicosia (Lefkoşa), Kyrenia (Girne), Famagusta (Gazimağusa), Güzelyurt, İskele y Lefke, en una sola app.
+ADA es la guía y el asistente todo en uno para residentes, estudiantes y recién llegados al norte de Chipre. Todo lo que necesitas en Nicosia (Lefkoşa), Kyrenia (Girne), Famagusta (Gazimağusa), Güzelyurt, İskele y Lefke, en una sola app.
 
 - Mapa Explorar – lugares, cafés, restaurantes, playas y rutas a pie por la ciudad
 - Eventos – conciertos, festivales, teatro e información de entradas
