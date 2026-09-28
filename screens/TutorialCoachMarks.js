@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, BackHandler } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native'
+import { addBackListener } from '../utils/backHandler'
 import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
 
@@ -16,7 +17,7 @@ export default function TutorialCoachMarks({ steps, visible, onFinish, onNext, l
 
   useEffect(() => {
     if (!visible) return
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => true)
+    const sub = addBackListener(() => true)
     return () => sub.remove()
   }, [visible])
 

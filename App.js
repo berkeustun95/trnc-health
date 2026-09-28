@@ -1,6 +1,8 @@
 import { Component, Fragment, useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Pressable, Platform, TextInput, ScrollView, Linking, BackHandler, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
+import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Pressable, Platform, TextInput, ScrollView, Linking, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
+import { addBackListener } from './utils/backHandler'
+import EdgeSwipeStrip from './components/EdgeSwipeStrip'
 import { BlurView } from 'expo-blur'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
@@ -847,8 +849,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (Platform.OS !== 'android') return
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+    const sub = addBackListener(() => {
       // FIRST, above everything: a force-update block. Back must never reach the app from
       // here. From either escape screen it returns to the modal (the state it clears is what
       // forceBlocking is derived from, so the modal comes back on its own); on the modal
@@ -2771,6 +2772,7 @@ export default function App() {
         onEmergency={() => setShowEmergencyModal(true)}
         onDuty={() => setShowDutyList(true)}
       />
+      <EdgeSwipeStrip />
     </SafeAreaProvider>
   )
 }

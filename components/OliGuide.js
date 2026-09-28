@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Text, Image, TouchableOpacity, BackHandler, TextInput, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, useWindowDimensions, Platform, Keyboard } from 'react-native'
+import { View, Text, Image, TouchableOpacity, TextInput, ScrollView, StyleSheet, Animated, PanResponder, Dimensions, useWindowDimensions, Platform, Keyboard } from 'react-native'
+import { addBackListener } from '../utils/backHandler'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -100,7 +101,7 @@ export default function OliGuide({ lang, onNavigate, onOpenChange, closeRef, ope
   // Both are scoped to `open` — the subscription goes on close, not just on unmount.
   useEffect(() => {
     if (!open) return
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { closeSheet(); return true })
+    const sub = addBackListener(() => { closeSheet(); return true })
     return () => sub.remove()
   }, [open])
 

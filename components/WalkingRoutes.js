@@ -7,7 +7,8 @@
 // handler knows nothing about local panel state and would leave the tab instead.
 
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, BackHandler, AppState } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, AppState } from 'react-native'
+import { addBackListener } from '../utils/backHandler'
 import * as Location from 'expo-location'
 import { askedWatch } from '../utils/locationServices'
 import { Marker, Polyline } from 'react-native-maps'
@@ -192,7 +193,7 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
   const scrollRef = useRef(null)
   const restored  = useRef(initialScrollY === 0)
   useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true })
+    const sub = addBackListener(() => { onClose(); return true })
     return () => sub.remove()
   }, [onClose])
 
@@ -359,7 +360,7 @@ export function useHeading(active) {
 
 export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEnd, onSelectStop, medal = null, onKeepMedal, onSimulate = null }) {
   useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { onEnd(); return true })
+    const sub = addBackListener(() => { onEnd(); return true })
     return () => sub.remove()
   }, [onEnd])
 

@@ -27,7 +27,7 @@ import { readFileSync } from 'node:fs'
   const use = app.indexOf('<PolicyUpdateNotice')
   const defVisible = app.indexOf('const policyNoticeVisible')
   const defDismiss = app.indexOf('const dismissPolicyNotice')
-  const finalReturn = app.indexOf('  return (\n    <SafeAreaProvider>')
+  const finalReturn = app.indexOf('  return (\n    <SafeAreaProvider')
   const ok = use > 0 && defVisible > 0 && defDismiss > 0 && finalReturn > 0 && use > defVisible && use > defDismiss && use > finalReturn
   if (!ok) bad++
   console.log(`  ${ok ? '✓' : '✗'} App.js renders <PolicyUpdateNotice> in the final return, after its visibility and handler are defined` +
