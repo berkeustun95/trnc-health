@@ -239,6 +239,14 @@ build and no OTA.
 - **Push the working branch after EVERY slice**, feature branches included — not only when I
   say "push to git" (that one still means main). On 2026-09-21 the code production was
   running (OTA `53e92f02`, commit `95c6a9f`) existed on this laptop and nowhere else.
+- **Device tests are ALWAYS served from `~/trnc-health-swipe`, never from `~/trnc-health`.**
+  It is the permanent device-test worktree: `git -C ~/trnc-health-swipe checkout <branch>`,
+  then `NODE_PATH=~/.npm-global/lib/node_modules npx expo start -c --tunnel` there (ngrok
+  lives in `~/.npm-global`; the URL comes from `curl 127.0.0.1:4040/api/tunnels`). Metro
+  bundles the WORKING TREE of the folder it runs in, and `~/trnc-health` is shared with
+  other sessions — on 2026-09-28 one switched it to main mid-test and the iPad silently ran
+  code with no edge swipe in it. iOS devices open it in the TestFlight "My Expo Go"
+  (SDK 54); the App Store Expo Go is a newer SDK and cannot load ADA.
 
 ## Security (non-negotiable — this is a health app)
 - Row Level Security (RLS) is the security boundary. Every table with user data
@@ -776,6 +784,14 @@ went missing). Two mandatory rules:
   about that twice — for `claim_requests.kteb_confirmed` and for the 0925 matcher token —
   and it happened anyway, because those warnings were about rows somebody might ADD, not
   about a row that goes stale on its own when a LATER migration moves the number.
+
+- **All back handlers must register via addBackListener (utils/backHandler.js), or the iOS
+  edge swipe skips them.** On Android it IS `BackHandler.addEventListener`; on iOS
+  BackHandler is a no-op stub and the edge swipe (`components/EdgeSwipeStrip.js`) walks the
+  shim's own stack. A direct call still works on Android and silently vanishes on iOS.
+  `npm run backlistener:check` fails on any `BackHandler.addEventListener` outside the shim,
+  and `npm run backchain:check` runs App's chain through 45 cases; both run in `npm run ota`.
+  Add a backchain case when a new layer joins the chain.
 
 ## Social sign-in (Google + Apple, native) — from build 1.2.0
 
