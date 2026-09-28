@@ -257,7 +257,9 @@ WITH report AS (
     ('1045_places_source','places','source'),
     ('1045_places_source','places','source_id'),
     -- The owner's badge switch (1056). Read only by get_profile_route_badges (DEFINER).
-    ('1056_route_medals','profiles','route_badges_public')
+    ('1056_route_medals','profiles','route_badges_public'),
+    -- Gişe Kıbrıs sync liveness (1058). Stamped every run; read by check-gisekibris-staleness.
+    ('1058_events_last_seen_at','events','last_seen_at')
 
   ) e(m,t,c)
 

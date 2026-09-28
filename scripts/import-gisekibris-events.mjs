@@ -441,6 +441,19 @@ if (inserts.length || updates.length) {
   }
 }
 
+// On EVERY row present in the feed — changed or not. updated_at only moves when the
+// partner edits something, so it cannot tell a quiet day from a dead scheduler;
+// check-gisekibris-staleness.mjs reads max(last_seen_at) for that. (20261058)
+let stamped = 0
+if (!dry && !writeError) {
+  const { data, error } = await supabase.from('events')
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq('source', SOURCE).in('external_id', feed.map(ev => ev.external_id))
+    .select('id')
+  if (error) writeError = error
+  else stamped = data?.length ?? 0
+}
+
 // ─── Post-write invariant ────────────────────────────────────────────────────
 //
 // The read policy is `status = 'approved'`, so a row with status NULL is not
@@ -653,6 +666,7 @@ console.log('')
 console.log(`  ${n(inserts.length)}  inserted`)
 console.log(`  ${n(updates.length)}  updated`)
 console.log(`  ${n(unchanged)}  unchanged`)
+console.log(`  ${n(stamped)}  last_seen_at stamped`)
 console.log(`  ${n(mirrored)}  images mirrored`)
 console.log(`  ${n(alreadyMirrored)}  images skipped (already mirrored)`)
 console.log(`  ${n(imageFailures.length)}  image failures`)

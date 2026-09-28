@@ -164,6 +164,7 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('events', 'updated_at', false, 'now()', 'timestamp with time zone'),
     ('events', 'source_image_url', false, NULL, 'text'),
     ('events', 'description_i18n', false, NULL, 'jsonb'),
+    ('events', 'last_seen_at', false, NULL, 'timestamp with time zone'),
     ('home_services', 'id', true, 'gen_random_uuid()', 'uuid'),
     ('home_services', 'owner_id', false, NULL, 'uuid'),
     ('home_services', 'name', true, NULL, 'text'),
