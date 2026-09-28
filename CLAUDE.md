@@ -11,7 +11,8 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 **Touching supabase/, SQL, RLS or migrations? Read supabase/CLAUDE.md first.**
 
 ## Stack & versions
-- React Native + Expo **SDK 54** (managed). `index.js` → `App.js`. `lib/supabase.js`. Dev: `npx expo start -c`.
+- React Native + Expo **SDK 54** (managed). `index.js` → `App.js`; client `lib/supabase.js`;
+  dev server `npx expo start -c`.
 - ⚠ **Never change package versions.** Pinned to SDK 54 to match the test phone's Expo Go. Never
   upgrade expo/react/react-native; add packages with `npx expo install <pkg>`, never `npm install`.
   If a task seems to need a version bump, STOP and ask.
@@ -23,9 +24,9 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - ⚠ **Image messaging is blocked on a safety scope.** No attachment column, bucket or upload path
   until `~/ObsidianVault/10-ada/2026-09-20_image-messaging-safety-scope-PARKED.md` is answered:
   it is private between minors, `contains_blocked_term` cannot see an image, and auto-hide has no
-  messages branch. Message images must never sit in a public bucket (a guessable URL); only
-  `avatars` is private (signed URLs, `components/Avatar.js`); the other buckets are public.
-- ⚠ **Never raise `min_supported_version` above `'1.0.0'`** without the force-tier device pass. See below.
+  messages branch. Message images never go in a public bucket (a guessable URL). Image buckets
+  (facility/event/property/place/towing/ad) are public; `avatars` is private (signed URLs, `Avatar.js`).
+- ⚠ **Never raise `min_supported_version` above `'1.0.0'`** without the force-tier device pass.
 - ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`.** Both raw tools bundle the
   WORKING TREE and have no hook, so the wrapper is the only guard.
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
@@ -52,7 +53,7 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - **Permission strings:** ONE source per usage description, its plugin option (`ios.infoPlist` is inert).
   `RECORD_AUDIO` off, camera kept (accepted review risk), background location off. Verify with
   `npx expo config --type introspect`, never by reading `app.config.js`.
-- **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build. Maps key set for prod.
+- **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build.
 - **Maps key is restricted** (`com.berkeustun95.ada` + SHA-1). Blank map, no error = SHA-1 mismatch;
   ADD the Play App Signing SHA-1 as a 2nd entry. Checklist: vault `play-console-status.md`.
 - **`web/` publishes** `getadaapp.com/privacy` and `/support` (Cloudflare Worker `getadaapp`, root
@@ -82,16 +83,15 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
   `./google-play-service-account.json` (gitignored, mode 600, never committed or printed).
 - ⚠ A real push joins whatever Play is reviewing: wait for pending reviews; if refused, use
   `--changes_not_sent_for_review true` and send from Console.
-- ⚠ `fastlane supply init` overwrites the folder; snapshot into `fastlane/metadata-backup/android` only.
-- System Ruby 2.6, gems in `vendor/bundle`; `bundle install` once. Ruby compares of listing files
-  need `encoding: "UTF-8"` or `LC_ALL=en_US.UTF-8`, else every language falsely "differs".
+- ⚠ `fastlane supply init` overwrites the folder: snapshot into `fastlane/metadata-backup/android`.
+- Ruby 2.6, gems in `vendor/bundle` (`bundle install` once); compare files as UTF-8 (`LC_ALL=en_US.UTF-8`).
 
 ## Compliance (Google Play, declared mixed-audience app)
 - ⚠ **Category Travel & Local, Health declaration "no health features" — do not re-tick it,** even
   though Google's category text reads otherwise. Declaring health forces an Organization account; ADA
   is individual (the 2026-07-06 rejection). Directory + duty roster stay as a local directory. The
   unlock is an Organization account. Record: vault `play-console-status.md`.
-- Target ages 13-15 / 16-17 / 18+: under-18s (`date_of_birth`) get NON-PERSONALIZED ads from day one of any ad SDK.
+- Ages 13-15 / 16-17 / 18+: under-18s (by DOB) get NON-PERSONALIZED ads from day one of any ad SDK.
 - Never add an SDK disqualified under Play Families policy without flagging it (one bad SDK makes
   the whole app ineligible — analytics included).
 - Account age and content visibility are separate: the future kids module runs as guest or under a
@@ -102,7 +102,7 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
   stops at `currentYear - MIN_SIGNUP_AGE`). Settled — do not re-litigate.
 
 ## How I want you to work
-- Make MINIMAL changes; don't refactor unrelated code. Say it's done, explain shortly — don't ask to proceed.
+- Make MINIMAL changes; no unrelated refactors. Say it's done, explain shortly — don't ask to proceed.
 - One bounded task at a time. If scope is unclear, ask.
 - Match the data-fetch pattern: query Supabase → useState → render.
 - **Ask for ONE item per message** (an ID, a query result, a decision) and wait.
@@ -113,8 +113,8 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
   `curl 127.0.0.1:4040/api/tunnels`. iOS uses TestFlight "My Expo Go" (SDK 54), not App Store Expo Go.
 
 ## Security (non-negotiable)
-Why: profiles, reviews and messages are personal data, much of it from minors, and a name joined
-to a clinic review is a health disclosure about an identified person.
+Why: profiles, reviews and messages are personal data on a declared 13+ mixed-audience app, and a
+name joined to a clinic review is a health disclosure about an identified person.
 - RLS is the security boundary. Every table with user data has RLS on with role-appropriate policies.
 - When you write or change a policy, explain in plain English who can read/write what.
 - A customer must NEVER be able to read another customer's data.
@@ -134,7 +134,8 @@ to a clinic review is a health disclosure about an identified person.
   column gets a CHECK rejecting `'tr'`/`'en'`.
 - `facility_change_requests.proposed_changes.languages` is a comma string; split before writing
   `facilities.languages` (`text[]`): `changes.languages.split(',').map(l => l.trim())`.
-- Admins never reach HomeScreen (selector is role-first); admin previews enter via `adminPreview`.
+- Admins never reach HomeScreen (selector is role-first): admin previews enter via `adminPreview`,
+  never a HomeScreen tile gated on `isAdmin`.
 - **Never use an admin as a test identity**: `|| isAdmin` unlocks dark modules and swaps the
   deterministic featured sort for a random shuffle (`utils/featured.js`). Use a guest or a real
   customer; reach dark modules by flipping the flag locally, uncommitted.
@@ -142,8 +143,8 @@ to a clinic review is a health disclosure about an identified person.
 - **`MODULE_FLAGS` does not gate search** (`search_content`). Pre-launch content is seeded in its
   table's unpublished state and published in the same step as the flag.
 - New admin-seeded directories DEFAULT to unpublished (`is_active DEFAULT false`), with an H token.
-- Content that EXPIRES ships with a staleness check (`check-*-staleness.mjs`; by hand/cron, never
-  pre-push). If a table cannot legitimately be empty, render empty as an ERROR STATE.
+- EXPIRING content ships with a staleness check (`check-*-staleness.mjs`, hand/cron, not pre-push).
+  If a table cannot legitimately be empty, render empty as an ERROR STATE.
 - All back handlers register via `addBackListener` (`utils/backHandler.js`), never
   `BackHandler.addEventListener` directly (iOS edge swipe skips it). `npm run backlistener:check` and
   `npm run backchain:check` run in `npm run ota`; add a backchain case when a layer joins the chain.
@@ -154,8 +155,8 @@ to a clinic review is a health disclosure about an identified person.
    widen a tolerance until it passes.
 2. A red-first run asserts TWO things: the break landed (`python3` `assert anchor in text`, not
    silent `sed`) and the probe noticed. A slice between markers asserts it contains what it must.
-3. Derive, never hardcode: assert `count(*)` and PRINT the rows, never a remembered name list. If a
-   legitimate object moves the count, bump it in the same commit and say why.
+3. Derive, never hardcode: assert `count(*)` and PRINT the rows, never a remembered name list
+   (policies, triggers, constraints, grants, cron). Bump a count in the same commit, saying why.
 4. Before a run, ask what a PERFECT system would print. If a broken one prints the same, it is not a
    probe. Run a positive control where it is cheap.
 5. Check and checked must be in the same frame of reference (file, URL, encoding, role). Print the raw
@@ -213,7 +214,7 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
 7. **Stash check, then clean tree.** A long-lived stash stays stashed.
 8. **`npm run ota -- --message "..."`** — never `eas update`; args after `--` keep the guard running.
 9. **Verify on device across two full open → wait → kill → reopen cycles**, on the Play Store build.
-10. **THEN `notify_module_waitlist('<module>')`.** ⚠ A burnt list and an empty list both return 0,
+10. **THEN `notify_module_waitlist('<module>')`** (earlier sends people to a stale screen). ⚠ A burnt list and an empty list both return 0,
     so read the list BEFORE (expect `0/n`) and AFTER (expect `n/n`, stamped today):
     ```sql
     select module, count(*) filter (where notified_at is not null) as notified, count(*) as total,
@@ -225,7 +226,6 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
 Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this list.
 
 ## Advisor
-
 Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.
 
 ## Don't
