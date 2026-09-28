@@ -95,7 +95,8 @@
     "logo:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-logo.mjs",
     "home:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-home-geometry.mjs",
     "hero:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-contrast.mjs",
-    "labels:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs"
+    "labels:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs",
+    "backchain:check": "node scripts/check-back-chain.cjs"
   },
   "private": true,
   "devDependencies": {
