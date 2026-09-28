@@ -186,7 +186,8 @@ Do not bump the token without the device pass.
 
 ## Play listing
 
-**LIVE since 2026-09-28.** The Play store listing TEXT lives in `fastlane/metadata/android/<lang>/`
+**Pushed to Play 2026-09-28.** Listing changes go through Play review, so check Console for the
+verdict. The Play store listing TEXT lives in `fastlane/metadata/android/<lang>/`
 (`title.txt`, `short_description.txt`, `full_description.txt`) for tr-TR, en-GB (Play's default
 language), ru-RU, ar, el-GR, fr-FR, es-ES, de-DE and fa. Play is downstream of this folder, so a
 hand edit in Play Console is overwritten by the next push. Editing the listing is a commit plus a
@@ -225,8 +226,8 @@ build and no OTA.
   live listing, init into `fastlane/metadata-backup/android`, never into `fastlane/metadata/android`.
 - Ruby is the system 2.6, and gems install into `vendor/bundle` (`.bundle/config`, gitignored
   install). A fresh clone runs `bundle install` once. When a Ruby script compares listing files,
-  read them with `encoding: "UTF-8"`. Under 2.6 a plain `File.read` never equals the API's
-  UTF-8 string, so every language reports a false "differs".
+  read them with `encoding: "UTF-8"`, or run it under `LC_ALL=en_US.UTF-8` as `store:listing`
+  does. Without either, every language reports a false "differs".
 
 ## How I want you to work
 - Make MINIMAL changes. Do not refactor unrelated code.
