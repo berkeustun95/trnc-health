@@ -54,7 +54,7 @@ it anyway, and Xcode failed on the missing `com.apple.developer.applesignin` ent
 regenerates an invalid profile. Do not swap the wrappers back to bare `eas`. Never
 commit the key, never print it, never copy it into the repo. If this Mac is lost, revoke it
 in App Store Connect → Users and Access → Integrations. Android AABs are uploaded to Play
-Console by hand: there is no Play service-account key on this machine.
+Console by hand: the Play service-account key here is used for the store listing only.
 
 ⚠ **PERMISSION STRINGS: LANDED ON `feat/social-auth`, SHIP WITH THE 1.2.0 BUILD.** No OTA
 can change an OS permission dialog, so they are live only once 1.2.0 is installed. Every usage
@@ -183,6 +183,50 @@ that killed 1.2.0 build 9. Getting an iOS force test therefore costs a new iOS b
 a token asserting both rows are still `'1.0.0'`; raising the value makes the drift report
 go red until the token is edited, and that edit is the review moment this rule needs.
 Do not bump the token without the device pass.
+
+## Play listing
+
+**LIVE since 2026-09-28.** The Play store listing TEXT lives in `fastlane/metadata/android/<lang>/`
+(`title.txt`, `short_description.txt`, `full_description.txt`) for tr-TR, en-GB (Play's default
+language), ru-RU, ar, el-GR, fr-FR, es-ES, de-DE and fa. Play is downstream of this folder, so a
+hand edit in Play Console is overwritten by the next push. Editing the listing is a commit plus a
+push. The folder holds no images, screenshots, changelogs or binaries, and pushing it needs no
+build and no OTA.
+- **Titles match the ad name, "ADA North Cyprus Assistant".** People search the name they saw in
+  the ad. en-GB is `ADA – North Cyprus Assistant` and tr-TR is `ADA – Kuzey Kıbrıs Asistanı`;
+  the other seven are translations that keep "ADA" first. es-ES is `ADA: …` because `ADA – …`
+  is 31 characters. Do not drift back to "Guide". Each full description's intro paragraph
+  (paragraph 2) says "assistant" once.
+- **Limits: title ≤ 30, short ≤ 80, full ≤ 4000 code points.** es-ES, fr-FR and ru-RU titles
+  are exactly 30. The title files carry NO trailing newline, and a newline would count.
+- **No health, pharmacy, duty, clinic or doctor wording in any language, and no "eSIM"** while
+  `CONNECTIVITY_LIVE` is false (Compliance, below). Remove the eSIM pattern from the guard on
+  the day Connectivity goes live.
+- **Paragraph 1 of every full description is the independence disclaimer, and the description
+  carries the official source links.** Together they fixed the 2026-08-14 Misleading Claims
+  rejection. The guard reads the URLs from the live snapshot
+  (`fastlane/metadata-backup/android/en-GB`), not from a list typed into it.
+- **el-GR names no state.** Institutions are "(Βόρεια Κύπρος)", never ΤΔΒΚ or "Τουρκική
+  Δημοκρατία…".
+- **Feature bullets name LIVE modules only.** A bullet for a gated module promises a Coming Soon
+  screen.
+- **`npm run store:check`** runs `scripts/check-store-listing.mjs`. It enforces every rule above
+  (limits, forbidden words with a self-test, disclaimer in paragraph 1, source URLs, el-GR) on
+  EVERY folder, not only the nine.
+  **`npm run store:listing`** runs that check, then `fastlane supply` with text only (APK, AAB,
+  images, screenshots and changelogs are all skipped). Dry run:
+  `npm run store:listing -- --validate_only true`. It is safe at any time.
+- Needs `./google-play-service-account.json` (gitignored, mode 600, never committed, never
+  printed), with Play Console "Manage store presence".
+- ⚠ **A real push adds a change to whatever Play is reviewing.** Wait until any pending review
+  resolves. If Play refuses the commit asking for `changesNotSentForReview`, use
+  `--changes_not_sent_for_review true`, then send the change from Console.
+- ⚠ **`fastlane supply init` OVERWRITES this folder** with the live listing. To snapshot the
+  live listing, init into `fastlane/metadata-backup/android`, never into `fastlane/metadata/android`.
+- Ruby is the system 2.6, and gems install into `vendor/bundle` (`.bundle/config`, gitignored
+  install). A fresh clone runs `bundle install` once. When a Ruby script compares listing files,
+  read them with `encoding: "UTF-8"`. Under 2.6 a plain `File.read` never equals the API's
+  UTF-8 string, so every language reports a false "differs".
 
 ## How I want you to work
 - Make MINIMAL changes. Do not refactor unrelated code.
@@ -777,6 +821,9 @@ features accurately forces an **Organization** developer account, ADA is on an *
 one, and that is precisely what got the app rejected on 2026-07-06. The facility directory
 and the duty roster stay in the app, treated as a local/places directory — a bet that has
 survived a review cycle.
+**The rule covers `fastlane/metadata/android/` too** — that folder IS the store description
+now (see "Play listing"). No pharmacy, duty, health, clinic or doctor wording in any of the
+nine languages; `npm run store:check` refuses it before anything is pushed.
 Google's own category text pulls the other way (*"Suitable for apps connecting patients with
 healthcare providers"* — Healthcare services and management), so a reader who checks only the
 definitions will conclude the declaration is wrong and re-tick it. That conclusion costs a
