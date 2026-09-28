@@ -1,7 +1,8 @@
 import { Component, Fragment, useEffect, useState, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Pressable, Platform, TextInput, ScrollView, Linking, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
-import { addBackListener, edgeSwipeHandlers } from './utils/backHandler'
+import { addBackListener } from './utils/backHandler'
+import EdgeSwipeStrip, { rootTouchProbe } from './components/EdgeSwipeStrip'
 import { BlurView } from 'expo-blur'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
@@ -2565,7 +2566,7 @@ export default function App() {
   const dismissHomeCityAsk = () => setShowHomeCityAsk(false)
 
   return (
-    <SafeAreaProvider {...edgeSwipeHandlers}>
+    <SafeAreaProvider {...rootTouchProbe}>
       <View style={styles.rootFill} importantForAccessibility={oliSheetOpen ? 'no-hide-descendants' : 'auto'}>
         {content}
       </View>
@@ -2771,6 +2772,7 @@ export default function App() {
         onEmergency={() => setShowEmergencyModal(true)}
         onDuty={() => setShowDutyList(true)}
       />
+      <EdgeSwipeStrip />
     </SafeAreaProvider>
   )
 }
