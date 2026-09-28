@@ -60,6 +60,11 @@ concurrency:
 
 jobs:
   sync:
+    # TODO(before 2026-10-19): GitHub moves `ubuntu-latest` to Ubuntu 26 from 19 Oct
+    # (actions/runner-images#14748; announced as a notice on run 36412513281). Either
+    # pin `ubuntu-24.04` on BOTH jobs, or do one workflow_dispatch with
+    # `runs-on: ubuntu-26.04` on a branch first. What can break: `npm ci` rebuilding
+    # sharp's native binary, and Node 24 from setup-node on the new image.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
