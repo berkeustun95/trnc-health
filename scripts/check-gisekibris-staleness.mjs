@@ -25,9 +25,12 @@
 //     stops running. Nothing fails, because nothing runs.
 //
 // So this asks two content questions instead:
-//   1. IS ANYTHING STILL ARRIVING? The newest updated_at on source='gisekibris'
-//      must be inside MAX_AGE_H. The importer stamps updated_at on every row it
-//      writes, so a healthy daily run refreshes this continuously.
+//   1. IS THE IMPORT STILL RUNNING? The newest last_seen_at on source='gisekibris'
+//      must be inside MAX_AGE_H. The importer stamps it on EVERY row in the feed on
+//      every run, changed or not (20261058). NOT updated_at: the importer skips
+//      unchanged rows, so updated_at only says when the partner last EDITED
+//      something — run 36412513281 (2026-09-28) went red on two quiet partner days
+//      with every pipeline step green. updated_at is printed, never scored.
 //   2. CAN A USER STILL SEE ANYTHING? A guest session must see at least one
 //      approved, in-window event. This is the half that would have caught the
 //      duty roster: a catalogue can be perfectly fresh and still show nobody
@@ -74,19 +77,27 @@ const admin = createClient(URL_, svc, { auth:{persistSession:false, autoRefreshT
 let problems = []
 console.log('\nGişe Kıbrıs content health')
 
-// ── 1. is anything still arriving? ─────────────────────────────────────────
-const { data: fresh, error: e1 } = await admin.from('events')
-  .select('external_id,title,updated_at').eq('source', SOURCE)
-  .order('updated_at', { ascending:false }).limit(1)
+// ── 1. is the import still running? ───────────────────────────────────────
+const { data: seen, error: e1 } = await admin.from('events')
+  .select('title,last_seen_at').eq('source', SOURCE).not('last_seen_at', 'is', null)
+  .order('last_seen_at', { ascending:false }).limit(1)
 if (e1) { console.error(`  read failed: ${e1.message}`); process.exit(1) }
-if (!fresh?.length) {
-  problems.push(`no source='${SOURCE}' rows at all`)
-  console.log(`  ⛔ zero ${SOURCE} rows`)
+if (!seen?.length) {
+  problems.push(`no source='${SOURCE}' row has ever been stamped last_seen_at — the import has not run since 20261058`)
+  console.log(`  ⛔ no last_seen_at on any ${SOURCE} row`)
 } else {
-  const ageH = (Date.now() - new Date(fresh[0].updated_at)) / 36e5
+  const ageH = (Date.now() - new Date(seen[0].last_seen_at)) / 36e5
   const ok = ageH <= MAX_AGE_H
-  if (!ok) problems.push(`newest updated_at is ${ageH.toFixed(1)}h old (cap ${MAX_AGE_H}h) — the import may have stopped running`)
-  console.log(`  ${ok ? '✓' : '⛔'} newest updated_at: ${ageH.toFixed(1)}h ago (cap ${MAX_AGE_H}h) — ${fresh[0].title.slice(0,40)}`)
+  if (!ok) problems.push(`newest last_seen_at is ${ageH.toFixed(1)}h old (cap ${MAX_AGE_H}h) — the import may have stopped running`)
+  console.log(`  ${ok ? '✓' : '⛔'} last sync (max last_seen_at): ${ageH.toFixed(1)}h ago (cap ${MAX_AGE_H}h)`)
+}
+
+const { data: fresh } = await admin.from('events')
+  .select('title,updated_at').eq('source', SOURCE)
+  .order('updated_at', { ascending:false }).limit(1)
+if (fresh?.length) {
+  const ageH = (Date.now() - new Date(fresh[0].updated_at)) / 36e5
+  console.log(`    last content change (max updated_at): ${ageH.toFixed(1)}h ago — ${fresh[0].title.slice(0,40)}  (informational)`)
 }
 
 const { count: total } = await admin.from('events').select('*', {count:'exact', head:true}).eq('source', SOURCE)
