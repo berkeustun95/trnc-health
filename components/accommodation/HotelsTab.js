@@ -8,7 +8,7 @@ import FilterDropdown from '../FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../../constants/regions'
 import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY, HOTEL_CLASS_STARS } from '../../constants/hotels'
 import { logContactEvent } from '../../utils/logContactEvent'
-import { AREAS_BY_REGION, areaSlug } from '../../constants/areas'
+import { hotelArea } from '../../utils/hotelArea'
 import OsmAttribution from '../OsmAttribution'
 
 // The Oteller tab of Emlak & Konaklama (HOTELS_LIVE). KITOB member hotels from
@@ -18,20 +18,6 @@ import OsmAttribution from '../OsmAttribution'
 // actually have a hotel behind them.
 
 const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, is_kitob_member'
-
-// hotels.address holds KITOB's village. Matched to an areas.js area WITHIN the hotel's region
-// (never across: Boğaz exists in both Girne and İskele). Hyphens are ignored so KITOB's
-// "Yeni Erenköy" meets areas.js "Yenierenköy". A village with no areas.js entry gets no area;
-// the hotel still shows under the district and in the unfiltered list.
-const AREA_ALIASES = { bellapais: 'beylerbeyi' }
-const flat = n => areaSlug(n).replace(/-/g, '')
-function hotelArea(hotel) {
-  if (!hotel.address) return null
-  const key = flat(hotel.address)
-  const want = AREA_ALIASES[key] || key
-  const name = (AREAS_BY_REGION[hotel.region] || []).find(n => flat(n) === want)
-  return name ? { value: `${hotel.region}/${areaSlug(name)}`, name } : null
-}
 
 const CLASS_RANK = Object.fromEntries(HOTEL_CLASSES.map((k, i) => [k, i]))
 const collator = new Intl.Collator('tr')
