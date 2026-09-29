@@ -261,7 +261,13 @@ WITH report AS (
     -- The owner's badge switch (1056). Read only by get_profile_route_badges (DEFINER).
     ('1056_route_medals','profiles','route_badges_public'),
     -- Gişe Kıbrıs sync liveness (1058). Stamped every run; read by check-gisekibris-staleness.
-    ('1058_events_last_seen_at','events','last_seen_at')
+    ('1058_events_last_seen_at','events','last_seen_at'),
+    -- Hotel geocode provenance (1060). HotelsTab selects none of these today; the geocoder
+    -- and the importer's coordinate rule both read them.
+    ('1060_hotels_geocode_provenance','hotels','geocode_source'),
+    ('1060_hotels_geocode_provenance','hotels','geocode_tier'),
+    ('1060_hotels_geocode_provenance','hotels','geocode_corroboration'),
+    ('1060_hotels_geocode_provenance','hotels','geocoded_at')
 
   ) e(m,t,c)
 
@@ -696,7 +702,12 @@ WITH report AS (
     ('1059_hotels','hotels_name_check'),
     ('1059_hotels','hotels_kitob_member_check'),
     ('1059_hotels','hotels_link_scheme_check'),
-    ('1059_hotels','hotels_coords_check')
+    ('1059_hotels','hotels_coords_check'),
+    -- 1060. Names only; the H tokens assert what each one permits.
+    ('1060_hotels_geocode_provenance','hotels_geocode_source_check'),
+    ('1060_hotels_geocode_provenance','hotels_geocode_tier_check'),
+    ('1060_hotels_geocode_provenance','hotels_geocode_corroboration_check'),
+    ('1060_hotels_geocode_provenance','hotels_coords_provenance_check')
 
   ) e(m,o)
 
@@ -3482,6 +3493,37 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
       IS NOT DISTINCT FROM ARRAY['accommodation','events','explore','garages','grooming','homeServices',
                                  'hotels','insurance','jobs','pets','studentHub','towing','transport']
+    -- ── 1060: hotel geocode provenance ─────────────────────────────────────────
+    -- (1) THE TWO-WAY RULE. Coordinates exist exactly when a source does (and a timestamp with
+    --     it). The half that matters most is source-without-coordinates being REFUSED: it is what
+    --     stops a KITOB list update from wiping a geocoded pin while leaving its provenance
+    --     behind. facilities' rule is one-way; loosening this one to match it would pass section
+    --     E by name and reopen exactly that clobber. Written from the live rendering.
+    UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_coords_provenance_check is two-way (lat <-> source <-> geocoded_at)',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_coords_provenance_check')
+               LIKE '%((lat IS NULL) = (geocode_source IS NULL))%((geocode_source IS NULL) = (geocoded_at IS NULL))%', false)
+    -- (2) The source vocabulary as an exact SET (a same-name widening is invisible to E).
+    UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_geocode_source_check is exactly google_places/manual/osm/partner',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_geocode_source_check')
+      IS NOT DISTINCT FROM ARRAY['google_places','manual','osm','partner']
+    -- (3) Tier 1..3, matched on the RENDERING ('>= 1' / '<= 3'), never on BETWEEN (the 0919 trap).
+    UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_geocode_tier_check is still 1..3',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.hotels')
+        AND conname = 'hotels_geocode_tier_check'
+        AND pg_get_constraintdef(oid) LIKE '%>= 1%' AND pg_get_constraintdef(oid) LIKE '%<= 3%')
+    -- (4) The corroboration vocabulary as an exact SET. Unlike facilities this is ENFORCED, so a
+    --     rewrite that drops visual_satellite (mandatory for a hand-placed pin) goes red here.
+    UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_geocode_corroboration_check is exactly the 8-term vocabulary',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_geocode_corroboration_check')
+      IS NOT DISTINCT FROM ARRAY['address_town','google_places','name_match','osm','phone_exchange',
+                                 'phone_match','region_audit','visual_satellite']
   ) z
 
   UNION ALL

@@ -230,6 +230,27 @@ export function normaliseFile(text, listDate) {
   return { rows: out, errors, warnings }
 }
 
+// ─── THE PAYLOAD, AND WHY COORDINATES ARE SPECIAL ─────────────────────────────
+// A PostgREST upsert sets every column present in the payload. KITOB's file carries no
+// coordinates, so sending lat/lng from it would write NULL over every geocoded pin on the
+// next list update (20261060's two-way CHECK would then refuse the row, failing the run).
+// So coordinates travel ONLY when the file supplies them AND the row has none yet; a file
+// coordinate never overwrites an existing pin (it is reported instead). Rows with and
+// without coordinates go in separate batches, because a bulk upsert needs uniform keys.
+// is_active is never sent: an upsert only sets the columns it is given.
+export function buildPayloads(rows, existingById, now) {
+  const plain = [], withCoords = [], notApplied = []
+  for (const { slug_id, lat, lng, ...r } of rows) {
+    const base = { ...r, delisted_at: null, last_seen_at: now }
+    const prev = existingById.get(r.external_id)
+    if (lat == null) plain.push(base)
+    else if (prev && prev.lat != null) { plain.push(base); notApplied.push(r.external_id) }
+    else withCoords.push({ ...base, lat, lng, geocode_source: 'partner', geocode_tier: null,
+                           geocode_corroboration: null, geocoded_at: now })
+  }
+  return { batches: [plain, withCoords].filter(b => b.length), notApplied }
+}
+
 // ─── --self: offline, every rule shown firing on a bad input and passing a good one ─
 function selfTest() {
   let bad = 0
@@ -279,6 +300,16 @@ function selfTest() {
   t('member no key', good.rows[0]?.external_id, 'kitob-12')
   t('slug key', good.rows[1]?.external_id, 'kitob-deniz-apart-nicosia')
   t('is_kitob_member true', good.rows.every(r => r.is_kitob_member), true)
+  // A list update never wipes a coordinate: a coordinate-free file sends no lat/lng key at all.
+  const geocoded = new Map([[good.rows[0].external_id, { lat: 35.33 }]])
+  const p1 = buildPayloads(good.rows, geocoded, 'now')
+  t('no-coordinate file: no row carries a lat key', p1.batches.flat().some(r => 'lat' in r), false)
+  t('no-coordinate file: is_active never sent', p1.batches.flat().some(r => 'is_active' in r), false)
+  const withXY = good.rows.map((r, i) => ({ ...r, lat: 35.3 + i / 100, lng: 33.3 }))
+  const p2 = buildPayloads(withXY, geocoded, 'now')
+  t('file coordinate never overwrites an existing pin', p2.notApplied, [good.rows[0].external_id])
+  t('file coordinate fills an empty row, as partner', p2.batches.flat().filter(r => 'lat' in r).map(r => r.geocode_source), ['partner'])
+  t('every batch has uniform keys', p2.batches.every(b => b.every(r => Object.keys(r).sort().join() === Object.keys(b[0]).sort().join())), true)
   const badFile = normaliseFile(`${header}\n;A;6 Yıldız;Girne;;;;;;\n;B;3 Yıldız;Baf;;;;;;\n;C;3 Yıldız;Girne;;;;;;\n;C;3 yildiz;GIRNE;;;;;;\n`, '2026-10-01')
   t('bad file: class, district, duplicate all refused', badFile.errors.length, 3)
   let threw = null
@@ -346,7 +377,7 @@ async function main() {
 
   // count: 'exact' against rows received — PostgREST max-rows can cap the page silently.
   const { data: existing, error, count } = await supabase.from('hotels')
-    .select('id,external_id,content_hash,delisted_at,is_active', { count: 'exact' }).eq('source', SOURCE)
+    .select('id,external_id,content_hash,delisted_at,is_active,lat', { count: 'exact' }).eq('source', SOURCE)
   if (error) fail(`reading hotels failed: ${error.message}`)
   if (count !== existing.length) fail(`read ${existing.length} of ${count} existing hotels — refusing to diff a partial set.`)
 
@@ -391,9 +422,9 @@ async function main() {
     const { error: e } = await supabase.from('hotels').update({ external_id: to }).eq('external_id', from)
     if (e) fail(`re-key ${from} → ${to} failed: ${e.message}`)
   }
-  // is_active is deliberately absent from the payload: an upsert only sets the columns sent.
-  const payload = [...inserts, ...updates, ...relists].map(({ slug_id, ...r }) => ({ ...r, delisted_at: null, last_seen_at: now }))
-  if (payload.length) {
+  const { batches, notApplied } = buildPayloads([...inserts, ...updates, ...relists], byId, now)
+  for (const id of notApplied) console.log(`  kept existing coordinates (file value not applied): ${id}`)
+  for (const payload of batches) {
     const { error: e, data } = await supabase.from('hotels').upsert(payload, { onConflict: 'external_id' }).select('id')
     if (e) fail(`upsert failed: ${e.message}`)
     if (data.length !== payload.length) fail(`upsert wrote ${data.length} of ${payload.length} rows.`)

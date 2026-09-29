@@ -34,14 +34,13 @@ function HotelCard({ hotel, lang, district }) {
     logContactEvent('hotels', hotel.id, 'website', district)
     Linking.openURL(hotel.website).catch(() => {})
   }
-  // Coordinates when KITOB supplied them; otherwise a name search, which lands on the
-  // hotel's own map listing far more often than on nothing.
+  // Only offered when the hotel has a corroborated coordinate (20261060 provenance). A name
+  // search was the fallback until 2026-09-29; it was dropped because an unverified search
+  // result is exactly the wrong-street pin the provenance rules exist to prevent.
+  const hasCoords = hotel.lat != null && hotel.lng != null
   function map() {
     logContactEvent('hotels', hotel.id, 'maps', district)
-    const q = hotel.lat != null
-      ? `${hotel.lat},${hotel.lng}`
-      : encodeURIComponent(`${hotel.name}, ${t(REGION_LABEL_KEY[hotel.region], 'Turkish')}, Kuzey Kıbrıs`)
-    Linking.openURL(`https://maps.google.com/?q=${q}`).catch(() => {})
+    Linking.openURL(`https://maps.google.com/?q=${hotel.lat},${hotel.lng}`).catch(() => {})
   }
 
   return (
@@ -85,10 +84,12 @@ function HotelCard({ hotel, lang, district }) {
               <Text style={hs.actionText} numberOfLines={1}>{t('hotelWebsite', lang)}</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={hs.action} onPress={map} activeOpacity={0.85}>
-            <Ionicons name="map-outline" size={16} color={colors.primary} />
-            <Text style={hs.actionText} numberOfLines={1}>{t('hotelMap', lang)}</Text>
-          </TouchableOpacity>
+          {hasCoords && (
+            <TouchableOpacity style={hs.action} onPress={map} activeOpacity={0.85}>
+              <Ionicons name="map-outline" size={16} color={colors.primary} />
+              <Text style={hs.actionText} numberOfLines={1}>{t('hotelMap', lang)}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>
