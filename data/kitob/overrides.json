@@ -24,14 +24,6 @@
       "reason": "KITOB lists doranatourism.com, which lands on a server error page. The likely site, mimozabeachhotel.com, shows 0392 378 81 68 (KITOB: 0392 444 20 50) and presents as 4 stars / 20 rooms (KITOB: 3 stars / 94 beds). Hidden until KITOB confirms the site and phone (vault: questions for KITOB).",
       "date": "2026-09-29",
       "by": "Berke"
-    },
-    {
-      "kitob_name": "THE ARKIN İSKELE HOTEL",
-      "field": "ilce",
-      "value": "İskele",
-      "reason": "KITOB lists it as 'Bafra, İSKELE' (→ Karpaz), but the Google Places cross-check matches its phone (0392 632 20 00) at Yeni İskele, Makenzi Cad., and the app's region lookup puts that point in İskele. KITOB's 'Bafra' looks wrong.",
-      "date": "2026-09-29",
-      "by": "Berke"
     }
   ],
   "geocode_waivers": [
@@ -60,6 +52,13 @@
       "external_id": "kitob-hamsa-hotel-kyrenia",
       "check": "hand_only",
       "reason": "Places returned different hotels on different runs ('Suya Boutique Hotel'); the listed site is dead. Berke places it by hand.",
+      "date": "2026-09-29",
+      "by": "Berke"
+    },
+    {
+      "external_id": "kitob-the-arkin-iskele-hotel-karpaz",
+      "check": "hand_only",
+      "reason": "Berke 2026-09-29: trust KITOB (Bafra → Karpaz, address kept). The Places result (Yeni İskele) disagrees with KITOB, so it is not used; the pin is placed by hand. The earlier İskele override was removed.",
       "date": "2026-09-29",
       "by": "Berke"
     }
