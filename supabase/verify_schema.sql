@@ -90,6 +90,8 @@ WITH report AS (
     ('1051_app_versions','app_update_events'),
     -- Route medals (1056). Owner-only read; written only by award_route_medal().
     ('1056_route_medals','route_medals'),
+    -- KITOB hotels (1059). Dark until go-live: is_active DEFAULT false; service_role writes only.
+    ('1059_hotels','hotels'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -405,7 +407,8 @@ WITH report AS (
     ('1051_app_versions','purge_app_update_events'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
     ('1056_route_medals','award_route_medal'),
-    ('1056_route_medals','get_profile_route_badges')
+    ('1056_route_medals','get_profile_route_badges'),
+    ('1059_hotels','hotels_touch_updated_at')
   ) e(m,o)
 
   UNION ALL
@@ -458,7 +461,8 @@ WITH report AS (
     ('1029_student_messaging','msg_30_ugc_screen'),
     ('1029_student_messaging','msg_40_immutable'),
     ('1029_student_messaging','msg_50_touch_conversation'),
-    ('1045_places_source','places_guard_source')
+    ('1045_places_source','places_guard_source'),
+    ('1059_hotels','hotels_touch_updated_at')
 
   ) e(m,o)
 
@@ -680,7 +684,19 @@ WITH report AS (
     ('1051_app_versions','app_update_events_runtime_len_check'),
     ('1056_route_medals','route_medals_pkey'),
     ('1056_route_medals','route_medals_user_id_fkey'),
-    ('1056_route_medals','route_medals_route_id_fkey')
+    ('1056_route_medals','route_medals_route_id_fkey'),
+    -- 1059. external_id_key is CORRECTNESS: the importer's ON CONFLICT arbiter. A plain UNIQUE,
+    -- never a partial index (the 20260830 lesson). The vocabularies are asserted as exact sets in H.
+    ('1059_hotels','hotels_pkey'),
+    ('1059_hotels','hotels_external_id_key'),
+    ('1059_hotels','hotels_external_id_check'),
+    ('1059_hotels','hotels_source_check'),
+    ('1059_hotels','hotels_kitob_class_check'),
+    ('1059_hotels','hotels_region_check'),
+    ('1059_hotels','hotels_name_check'),
+    ('1059_hotels','hotels_kitob_member_check'),
+    ('1059_hotels','hotels_link_scheme_check'),
+    ('1059_hotels','hotels_coords_check')
 
   ) e(m,o)
 
@@ -2142,12 +2158,11 @@ WITH report AS (
       COALESCE(position('''pets''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
         WHERE conrelid = to_regclass('public.contact_events')
           AND conname  = 'contact_events_module_check')) > 0, false)
-    UNION ALL SELECT '0910_contact_events','contact_events module CHECK carries exactly 12 modules',
-      COALESCE((SELECT count(*) = 12 FROM (
-        SELECT regexp_matches(d, '''([a-zA-Z]+)''::text', 'g')
-          FROM (SELECT pg_get_constraintdef(oid) d FROM pg_constraint
-                 WHERE conrelid = to_regclass('public.contact_events')
-                   AND conname  = 'contact_events_module_check') x) y), false)
+    -- ⚠ RETIRED 2026-09-29 by 20261059: "contact_events module CHECK carries exactly 12 modules".
+    --   20261059 adds 'hotels', making 13. Retired rather than bumped (one count, one owner):
+    --   the 1059 token "contact_events module vocabulary is exactly the 13-module set" owns the
+    --   module vocabulary now, as an exact SET — a count passes with a module swapped out. The
+    --   'pets' token above is 0910's own fact and stays.
     -- ── 0925 moderation normalization. Behaviour-only CREATE OR REPLACE on
     -- contains_blocked_term(), so section C sees the NAME and cannot see the CHANGE.
     -- Without these tokens a database still on the old body reads 100% OK while the
@@ -3409,6 +3424,64 @@ WITH report AS (
     --     filters them out (a code shape in the view definition).
     UNION ALL SELECT '1056_route_medals','contact_events_monthly excludes route_complete',
       COALESCE(pg_get_viewdef(to_regclass('public.contact_events_monthly')) LIKE '%<> ''route_complete''%', false)
+    -- ── 1059: KITOB hotels ───────────────────────────────────────────────────────
+    -- Every token reaches hotels through to_regclass / the catalogs: QUERY 1 is one statement
+    -- and a bare name on an unapplied database kills the whole report.
+    -- (1) The pre-launch inversion. A reverted DEFAULT creates no named object.
+    UNION ALL SELECT '1059_hotels','hotels.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='hotels'
+          AND column_name='is_active' AND column_default = 'false')
+    -- (2) Read-only to clients, DERIVED: exactly one permissive SELECT policy whose body gates on
+    --     BOTH switches (admin's is_active, the importer's delisted_at), no client write privilege
+    --     (inherited grants resolved), and the positive control — anon and authenticated can
+    --     still SELECT, or go-live shows an empty tab.
+    UNION ALL SELECT '1059_hotels','hotels: RLS on, 1 SELECT policy on is_active + delisted_at, no client writes, clients can read',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.hotels')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='hotels') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='hotels'
+                  AND cmd='SELECT' AND permissive='PERMISSIVE'
+                  AND qual LIKE '%is_active%' AND qual LIKE '%delisted_at IS NULL%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.hotels'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.hotels'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('anon', to_regclass('public.hotels'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.hotels'), 'SELECT'), false)
+    -- (3) The vocabularies as exact SETS (the 1038 form). Same-name DROP/ADD is invisible to E.
+    --     kitob_class must match HOTEL_CLASSES in constants/hotels.js, which the importer reads.
+    UNION ALL SELECT '1059_hotels','hotels_kitob_class_check is exactly the 10 KITOB classes',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z0-9_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_kitob_class_check')
+      IS NOT DISTINCT FROM ARRAY['apart','boutique','bungalow','holiday_village','special_certified',
+                                 'star1','star2','star3','star4','star5']
+    UNION ALL SELECT '1059_hotels','hotels_region_check is exactly the 7 REGIONS keys',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_region_check')
+      IS NOT DISTINCT FROM ARRAY['famagusta','iskele','karpaz','kyrenia','lefke','morphou','nicosia']
+    -- A second source is a decision (and hotels_kitob_member_check keys on 'kitob').
+    UNION ALL SELECT '1059_hotels','hotels_source_check is exactly {kitob}',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_source_check')
+      IS NOT DISTINCT FROM ARRAY['kitob']
+    -- (4) The touch trigger ignores last_seen_at (stamped on every row every run). An
+    --     unconditional body passes D while making updated_at meaningless.
+    UNION ALL SELECT '1059_hotels','hotels_touch_updated_at is conditional (ignores last_seen_at)',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.hotels_touch_updated_at()')) LIKE '%- ''last_seen_at''%', false)
+    -- (5) The contact_events MODULE vocabulary, owned here since 0910's count was retired.
+    --     An exact SET: a count of 13 would pass with a module swapped out. A new module
+    --     changes this array in the same commit, and that edit is the review moment.
+    UNION ALL SELECT '1059_hotels','contact_events module vocabulary is exactly the 13-module set (incl. hotels)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
+      IS NOT DISTINCT FROM ARRAY['accommodation','events','explore','garages','grooming','homeServices',
+                                 'hotels','insurance','jobs','pets','studentHub','towing','transport']
   ) z
 
   UNION ALL
