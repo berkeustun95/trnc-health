@@ -281,3 +281,42 @@ pharmacy;42b784ac-7fd4-4546-b548-29eae8a7989e;ZEHRA ECZANESİ;;Şht. Kemal Ünal
 pharmacy;411e03d4-4bda-4872-a4be-96fe0d61984d;ZEHRA KELEBEK ECZANESİ;;Mareşal Fevzi Çakmak Cad., Lapta, Girne;no agreeing OSM pharmacy
 pharmacy;9dbfa734-079a-4a80-a60b-7cfdf28c0794;ZERİN VOLKAN ECZANESİ;;Gazimağusa;no agreeing OSM pharmacy
 pharmacy;0e356614-b2d3-4858-a12b-55e3ae2de5ed;ZİYA SENCER ECZANESİ;;Mete Adanır Cad., Girne;no agreeing OSM pharmacy
+hotel;kitob-almond-holiday-village-kyrenia;Almond Holiday Village;kyrenia;Alsancak;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-anadol-hotel-kyrenia;Anadol Hotel;kyrenia;;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-balci-plaza-karpaz;Balcı Plaza;karpaz;Yeni Erenköy;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-bella-view-hotel-kyrenia;Bella View Hotel;kyrenia;Bellapais;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-caddem-inn-hotel-famagusta;Caddem Inn Hotel;famagusta;;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-cezar-s-airport-hotel-nicosia;Cezar's Airport Hotel;nicosia;Balıkesir;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-citrus-tree-gardens-kyrenia;Citrus Tree Gardens;kyrenia;Alsancak;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-cratos-premium-hotel-casino-spa-port-kyrenia;Cratos Premium Hotel & Casino & Spa & Port;kyrenia;Çatalköy;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-dorana-hotel-kyrenia;Dorana Hotel;kyrenia;;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-dorona-art-hotel-kyrenia;Dorana Art Hotel;kyrenia;;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-ekor-elegance-hotel-famagusta;Ekor Elegance Hotel;famagusta;;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-fairmont-cyprus-holiday-village-kyrenia;Fairmont Cyprus Holiday Village;kyrenia;Edremit;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-fian-bungalows-kyrenia;Fian Bungalows;kyrenia;Karaoğlanoğlu;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-five-fingers-holiday-bungalows-kyrenia;Five Fingers Holiday Bungalows;kyrenia;Ozanköy;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-grand-center-boutique-hotel-kyrenia;Grand Center Boutique Hotel;kyrenia;;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-grand-pasha-kyrenia-hotel-casino-spa-kyrenia;Grand Pasha Kyrenia Hotel Casino Spa;kyrenia;;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-grand-sapphire-city-hotel-famagusta;Grand Sapphire City Hotel;famagusta;;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-high-life-holiday-village-kyrenia;High Life Holiday Village;kyrenia;;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-horse-farm-hotel-kyrenia;Horse Farm Hotel;kyrenia;Karaoğlanoğlu;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-ingate-hotel-famagusta;Ingate Hotel;famagusta;;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-kasgar-court-hotel-kyrenia;Kaşgar Court Hotel;kyrenia;;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-karpaz-gate-marina-karpaz;Karpaz Gate Marina;karpaz;Yeni Erenköy;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-kocareis-bungalows-famagusta;Kocareis Bungalows;famagusta;Salamis;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-lapida-hotel-kyrenia;Lapida Hotel;kyrenia;Lapta;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-la-terrazza-hotel-lounge-bar-famagusta;La Terrazza Hotel Lounge Bar;famagusta;;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-les-ambassadeurs-hotel-casino-kyrenia;Les Ambassadeurs Hotel & Casino;kyrenia;;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-liman-casino-hotel-kyrenia;Liman Casino Hotel;kyrenia;;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-noah-s-ark-deluxe-hotel-casino-karpaz;Noah's Ark Deluxe Hotel & Casino;karpaz;Bafra;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-novel-centre-point-hotel-famagusta;Novel Centre Point Hotel;famagusta;;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-osman-aga-hotel-iskele;Osman Aga Hotel;iskele;;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-park-palace-hotel-kyrenia;Park Palace Hotel;kyrenia;;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-romatem-move-famagusta;Romatem Move;famagusta;;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-rose-gardens-holiday-village-kyrenia;Rose Gardens Holiday Village;kyrenia;Lapta;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-royal-palace-hotel-nicosia;Royal Palace Hotel;nicosia;Gönyeli;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-sammys-hotel-kyrenia;Sammys Hotel;kyrenia;;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-sky-roof-hotel-nicosia;Sky Roof Hotel;nicosia;;Google Places, corroborated: region_audit+address_town+phone_match+name_match
+hotel;kitob-sunport-hotel-kyrenia;Sunport Hotel;kyrenia;Alsancak;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-the-pine-bay-club-hotel-kyrenia;The Pine Bay Club Hotel;kyrenia;Alsancak;Google Places, corroborated: region_audit+address_town+name_match
+hotel;kitob-velmer-hotel-lefke;Velmer Hotel;lefke;Gemikonağı;Google Places, corroborated: region_audit+address_town+phone_match+name_match

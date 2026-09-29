@@ -24,16 +24,19 @@ const GOOGLE_ARG = args.includes('--google') ? args[args.indexOf('--google') + 1
 const { rows, errors } = normaliseFile(readFileSync(resolve(ROOT, 'data/kitob/kitob-2026-09-17.csv'), 'utf8'), '2026-09-17')
 if (errors.length) { console.error(errors.join('\n')); process.exit(1) }
 
+// EVERY applied OSM list, oldest first (a later apply writes only the pins IT added — the
+// 2026-09-29 Google apply wrote an empty one, and reading only the newest showed 0 OSM pins).
 const osmFiles = readdirSync(resolve(ROOT, 'data/kitob')).filter(f => /^geocode-osm-\d+\.csv$/.test(f)).sort()
 if (!osmFiles.length) { console.error('no applied data/kitob/geocode-osm-<stamp>.csv (dry runs are ignored)'); process.exit(1) }
-const osmFile = osmFiles.at(-1)
-const pins = new Map(readFileSync(resolve(ROOT, 'data/kitob', osmFile), 'utf8').trim().split('\n').slice(1)
-  .map(l => l.split(';')).map(c => [`${c[0]}|${c[1]}`, { lat: +c[5], lng: +c[6] }]))
+const osmFile = osmFiles.join(' + ')
+const pins = new Map(osmFiles.flatMap(f => readFileSync(resolve(ROOT, 'data/kitob', f), 'utf8').trim().split('\n').slice(1))
+  .filter(Boolean).map(l => l.split(';')).map(c => [`${c[0]}|${c[1]}`, { lat: +c[5], lng: +c[6] }]))
 
 // Google-sourced pins (20261062, known risk): the newest APPLIED geocode-google-<stamp>.csv.
-const gFile = GOOGLE_ARG || (() => { const f = readdirSync(resolve(ROOT, 'data/kitob')).filter(x => /^geocode-google-\d+\.csv$/.test(x)).sort().at(-1); return f && `data/kitob/${f}` })()
-const gpins = new Map(gFile ? readFileSync(resolve(ROOT, gFile), 'utf8').trim().split('\n').slice(1)
-  .map(l => l.split(';')).map(c => [`${c[0]}|${c[1]}`, { lat: +c[3], lng: +c[4], source: 'google_places' }]) : [])
+const gFiles = GOOGLE_ARG ? [GOOGLE_ARG] : readdirSync(resolve(ROOT, 'data/kitob')).filter(x => /^geocode-google-\d+\.csv$/.test(x)).sort().map(f => `data/kitob/${f}`)
+const gFile = gFiles.join(' + ')
+const gpins = new Map(gFiles.flatMap(f => readFileSync(resolve(ROOT, f), 'utf8').trim().split('\n').slice(1)).filter(Boolean)
+  .map(l => l.split(';')).map(c => [`${c[0]}|${c[1]}`, { lat: +c[3], lng: +c[4], source: 'google_places' }]))
 console.log(`Google pins from ${gFile || '(none applied yet)'}: ${gpins.size}`)
 
 // Pins placed since, through the placement tool (npm run place): progress maps hotel → OSM id,
