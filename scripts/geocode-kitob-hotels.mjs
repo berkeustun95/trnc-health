@@ -1,29 +1,27 @@
 #!/usr/bin/env node
-// ─── KITOB hotels → corroborated coordinates (20261060 provenance) ──────────
+// ─── KITOB hotels → OSM coordinates, cross-checked against Google Places ────
 //
 //   GOOGLE_PLACES_API_KEY=… npm run hotels:geocode -- --dry-run [--limit 10]
-//   GOOGLE_PLACES_API_KEY=… npm run hotels:geocode -- --apply
+//   GOOGLE_PLACES_API_KEY=… npm run hotels:geocode -- --apply        (needs 20261061)
 //
-// Same approach as scripts/geocode-pharmacies-tier2.mjs. For each hotel without coordinates:
-// Google Places Text Search → up to 3 candidates. A candidate is WRITTEN (source google_places,
-// tier 2) only when ALL of:
-//   • region_audit  resolveRegion(candidate) === the hotel's region (the app's own classifier,
-//                   constants/regions.js — the same rule the Karpaz ruling follows)
-//   • address_town  the candidate's address names the hotel's village or its district
-//   • and AT LEAST ONE of
-//       phone_match   Places' phone and KITOB's share the last 7 digits
-//       name_match    a distinctive (non-generic) word of the name matches
-//       osm           an OSM lodging within 150 m names the same distinctive word
-// Anything short of that is NOT written. It goes to data/kitob/geocode-review-*.csv — Berke's
-// review list, and the hand-placing queue (tier 3, visual_satellite mandatory). Writing a
-// coordinate nothing corroborates is the failure the provenance columns exist to prevent.
+// STORAGE POLICY (Berke 2026-09-29, CLAUDE.md "Geocoding"): Google Places is a CROSS-CHECK
+// ONLY. Its latitude/longitude, names and addresses are never stored — not in the database and
+// not in the CSVs this writes. The place ID may be stored (hotels.google_place_id).
 //
-// --dry-run reads the CSV (data/kitob/kitob-2026-09-17.csv) and never opens a database client,
-// so it is PHYSICALLY unable to write. --apply reads hotel ids from prod as service_role and
-// writes only rows that still have no coordinates (never overwrites a pin).
+// For each hotel without coordinates:
+//   1. CROSS-CHECK. Places Text Search → up to 3 candidates. A candidate is the hotel when ALL of
+//        • region_audit  resolveRegion(candidate) === the hotel's region (or a committed waiver,
+//                        data/kitob/overrides.json geocode_waivers)
+//        • address_town  the candidate's address names the village, the district, or a known
+//                        alias of either (TOWN_WORDS; accents stripped: Κερύνειας, Γαλάτεια)
+//        • and at least one of phone_match / name_match / osm.
+//   2. SOURCE. The STORED coordinate is an OSM lodging within 150 m of that candidate whose name
+//      agrees. Written as geocode_source 'osm', tier 1, with 'google_places' in the corroboration.
+//   Anything short of 1+2 is NOT written and goes on the hand-placement list (tier 3, satellite).
 //
-// The key is read from the environment only, never stored. The app's Maps key cannot be used:
-// it is restricted to the Android app, so places.googleapis.com rejects it from Node.
+// --dry-run reads the CSV and never opens a database client. --apply writes only rows that still
+// have no coordinates, and never overwrites a pin.
+// OSM data is ODbL: "© OpenStreetMap contributors" wherever these pins are shown.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -35,73 +33,92 @@ import { resolveRegion } from '../utils/resolveRegion.js'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CSV = 'data/kitob/kitob-2026-09-17.csv'
 const LIST_DATE = '2026-09-17'
+const OSM_AGREE_M = 150
 const args = process.argv.slice(2)
 const DRY = args.includes('--dry-run')
 const APPLY = args.includes('--apply')
 const LIMIT = args.includes('--limit') ? Number(args[args.indexOf('--limit') + 1]) : Infinity
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 
-// Words that say "a hotel" rather than WHICH hotel. A match on these corroborates nothing.
+// Accent-insensitive, Turkish-aware, Greek-safe comparison form.
+export const norm = s => fold(s || '').normalize('NFD').replace(/\p{M}/gu, '').replace(/['’`]/g, '')
+
+// Words that say "a hotel" rather than WHICH hotel. A match on these alone corroborates nothing.
 const GENERIC = new Set(['hotel', 'hotels', 'otel', 'resort', 'casino', 'spa', 'and', 've', 'the', 'club',
   'village', 'holiday', 'bungalow', 'bungalows', 'apart', 'beach', 'garden', 'gardens', 'palace',
   'boutique', 'butik', 'tatil', 'koyu', 'restoran', 'port', 'premium', 'deluxe', 'luxury', 'city',
   'grand', 'royal', 'park', 'center', 'centre', 'inn', 'house', 'cyprus', 'kibris', 'north', 'lounge',
   'bar', 'court', 'golf', 'marina', 'de', 'di', 'la', 'le', 'les'])
-// Apostrophes are dropped before splitting, so "Sammy's" and KITOB's "SAMMYS" agree.
-export const distinctive = name => fold(name).replace(/['’`]/g, '').split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !GENERIC.has(w))
+export const distinctive = name => norm(name).split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !GENERIC.has(w))
+const words = name => norm(name).split(/[^a-z0-9]+/).filter(Boolean)
 
-// District names as they appear in Google's formatted addresses (Turkish, English, Greek-derived).
-const DISTRICT_WORDS = {
-  kyrenia: ['girne', 'kyrenia'], nicosia: ['lefkosa', 'nicosia', 'lefkoşa'],
-  famagusta: ['gazimagusa', 'magusa', 'famagusta'], iskele: ['iskele', 'trikomo'],
-  morphou: ['guzelyurt', 'morphou'], lefke: ['lefke', 'lefka'],
-  karpaz: ['karpaz', 'karpas', 'iskele', 'bafra', 'yenierenkoy', 'yeni erenkoy', 'kaplica', 'mehmetcik', 'dipkarpaz'],
+// FULL-NAME CONTAINMENT: "Royal Palace Hotel" inside "Royal Palace Hotel North Cyprus". Needed for
+// names made only of generic words, which distinctive() cannot see. Safe ONLY because the region
+// and town gates still apply to every candidate — never use it as a match on its own.
+export function nameMatch(ours, theirs) {
+  const mine = distinctive(ours), t = new Set(distinctive(theirs))
+  if (mine.length && mine.some(w => t.has(w))) return true
+  const a = words(ours).join(' '), b = ` ${words(theirs).join(' ')} `
+  return a.length >= 6 && b.includes(` ${a} `)
+}
+
+// Town words per region, as they appear in Places addresses: Turkish, English and Greek names,
+// plus villages/suburbs that addresses use instead of the town. All compared through norm().
+export const TOWN_WORDS = {
+  kyrenia: ['girne', 'kyrenia', 'keryneias', 'κερυνειας', 'zeytinlik', 'dogankoy', 'beylerbeyi', 'bellapais',
+            'karaoglanoglu', 'alsancak', 'lapta', 'catalkoy', 'ozankoy', 'esentepe'],
+  nicosia: ['lefkosa', 'nicosia', 'ortakoy', 'ortakioi', 'gonyeli', 'balikesir'],
+  famagusta: ['gazimagusa', 'magusa', 'famagusta', 'yeni bogazici', 'yenibogazici', 'tatlisu', 'salamis'],
+  iskele: ['iskele', 'trikomo', 'yeni iskele', 'long beach', 'bogaz', 'kaplica'],
+  morphou: ['guzelyurt', 'morphou'],
+  lefke: ['lefke', 'lefka', 'gemikonagi', 'baglikoy'],
+  karpaz: ['karpaz', 'karpas', 'iskele', 'bafra', 'yenierenkoy', 'yeni erenkoy', 'mehmetcik', 'galateia',
+           'γαλατεια', 'dipkarpaz', 'αιγιαλουσα'],
 }
 
 export const last7 = p => (p || '').replace(/\D/g, '').slice(-7)
 
-export function corroborate(hotel, cand, osmNear) {
+// Step 1 — is this Places candidate the hotel? Returns the corroboration and a pass flag.
+export function crossCheck(hotel, cand, osmNear, waived = new Set()) {
   const lat = cand.location?.latitude, lng = cand.location?.longitude
-  const addr = fold(cand.formattedAddress || '')
+  const addr = ` ${norm(cand.formattedAddress)} `
   const got = []
   const regionOk = resolveRegion(lat, lng) === hotel.region
   if (regionOk) got.push('region_audit')
-  const village = hotel.address ? fold(hotel.address) : null
-  const townOk = (village && addr.includes(village))
-    || (DISTRICT_WORDS[hotel.region] || []).some(w => addr.includes(fold(w)))
+  const village = hotel.address ? norm(hotel.address) : null
+  const townOk = (village && addr.includes(village)) || (TOWN_WORDS[hotel.region] || []).some(w => addr.includes(norm(w)))
   if (townOk) got.push('address_town')
   const phone = cand.nationalPhoneNumber || cand.internationalPhoneNumber
   if (hotel.phone && phone && last7(phone) === last7(hotel.phone)) got.push('phone_match')
-  const mine = distinctive(hotel.name)
-  const theirs = new Set(distinctive(cand.displayName?.text || ''))
-  if (mine.length && mine.some(w => theirs.has(w))) got.push('name_match')
-  if (mine.length && osmNear(lat, lng).some(n => distinctive(n).some(w => mine.includes(w)))) got.push('osm')
+  if (nameMatch(hotel.name, cand.displayName?.text || '')) got.push('name_match')
+  const osm = osmNear(lat, lng).filter(o => o.names.some(n => nameMatch(hotel.name, n)))
+  if (osm.length) got.push('osm')
   const strong = got.some(g => ['phone_match', 'name_match', 'osm'].includes(g))
-  return { lat, lng, got, pass: regionOk && townOk && strong }
+  const pass = (regionOk || waived.has('region_audit')) && townOk && strong
+  return { lat, lng, got, pass, osm }
 }
 
 // ─── OSM lodging in the TRNC (relation 2514541), one Overpass query ─────────
 async function loadOsm() {
   const q = `[out:json][timeout:60];area(3602514541)->.t;(nwr["tourism"~"^(hotel|guest_house|apartment|motel|resort|chalet|hostel)$"](area.t);nwr["leisure"="resort"](area.t););out center tags;`
   // The public Overpass servers 504 under load; try each endpoint twice before giving up.
-  const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
-  let els = null, last = ''
-  for (const url of ENDPOINTS) for (let i = 0; i < 2 && !els; i++) {
-    const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'ADA-app hotel geocoder (berkeustun95)' } })
-      .catch(e => ({ ok: false, status: e.message }))
-    if (res.ok) els = (await res.json()).elements || []
-    else { last = `${url} ${res.status}`; await new Promise(r => setTimeout(r, 5000)) }
-  }
-  if (!els) fail(`Overpass unavailable (${last})`)
-  return els.map(e => ({ lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon,
-    names: [e.tags?.name, e.tags?.['name:en'], e.tags?.['name:tr']].filter(Boolean) })).filter(e => e.lat && e.names.length)
+  for (const url of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'])
+    for (let i = 0; i < 2; i++) {
+      const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'ADA-app hotel geocoder (berkeustun95)' } })
+        .catch(e => ({ ok: false, status: e.message }))
+      if (res.ok) return ((await res.json()).elements || []).map(e => ({ id: `${e.type}/${e.id}`,
+        lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon,
+        names: [e.tags?.name, e.tags?.['name:en'], e.tags?.['name:tr']].filter(Boolean) })).filter(e => e.lat && e.names.length)
+      await new Promise(r => setTimeout(r, 5000))
+    }
+  fail('Overpass unavailable')
 }
-const km = (a, b, c, d) => { const R = 6371, x = (c - a) * Math.PI / 180, y = (d - b) * Math.PI / 180
+export const km = (a, b, c, d) => { const R = 6371, x = (c - a) * Math.PI / 180, y = (d - b) * Math.PI / 180
   const h = Math.sin(x / 2) ** 2 + Math.cos(a * Math.PI / 180) * Math.cos(c * Math.PI / 180) * Math.sin(y / 2) ** 2
   return 2 * R * Math.asin(Math.sqrt(h)) }
 
-// ─── self-test: the rule refuses what it must, offline ──────────────────────
+// ─── self-test: the rules refuse what they must, offline ────────────────────
 function selfTest() {
   let bad = 0
   const t = (l, g, w) => { const ok = JSON.stringify(g) === JSON.stringify(w); if (!ok) bad++; console.log(`  ${ok ? '✓' : '✗'} ${l} -> ${JSON.stringify(g)}${ok ? '' : ` (want ${JSON.stringify(w)})`}`) }
@@ -110,21 +127,24 @@ function selfTest() {
   const c = (name, lat, lng, addr, phone) => ({ displayName: { text: name }, location: { latitude: lat, longitude: lng }, formattedAddress: addr, nationalPhoneNumber: phone })
   console.log('\n── geocode-kitob-hotels self-test ──')
   t('distinctive drops generic words', distinctive('Grand Pasha Kyrenia Hotel Casino Spa'), ['pasha', 'kyrenia'])
-  t('good: name + town + region', corroborate(h, c('Kaşgar Court', 35.337, 33.318, 'Girne', null), none).pass, true)
-  t('good: phone alone is enough', corroborate(h, c('Some Other Name', 35.337, 33.318, 'Girne', '0392 815 59 34'), none).got.includes('phone_match'), true)
-  t('refused: right name, wrong region (Famagusta)', corroborate(h, c('Kaşgar Court', 35.125, 33.94, 'Gazimağusa', null), none).pass, false)
-  t('refused: only generic words match', corroborate(h, c('Court Hotel', 35.337, 33.318, 'Girne', null), none).pass, false)
-  t('refused: address names no town', corroborate(h, c('Kaşgar Court', 35.337, 33.318, 'Unnamed Road', null), none).pass, false)
-  t('osm corroborates', corroborate(h, c('X', 35.337, 33.318, 'Girne', null), () => ['Kaşgar Court Hotel']).got.includes('osm'), true)
-  t('Bafra resort resolves to karpaz', resolveRegion(35.40, 34.07), 'karpaz')
   t("apostrophe: Sammy's matches SAMMYS", distinctive("Sammy's Hotel"), distinctive('Sammys Hotel'))
+  t('good: name + town + region', crossCheck(h, c('Kaşgar Court', 35.337, 33.318, 'Girne', null), none).pass, true)
+  t('refused: right name, wrong region', crossCheck(h, c('Kaşgar Court', 35.125, 33.94, 'Gazimağusa', null), none).pass, false)
+  t('refused: only generic words match', crossCheck(h, c('Court Hotel', 35.337, 33.318, 'Girne', null), none).pass, false)
+  t('refused: address names no town', crossCheck(h, c('Kaşgar Court', 35.337, 33.318, 'Unnamed Road', null), none).pass, false)
+  t('alias: Greek Κερύνειας counts as Girne', crossCheck({ ...h, name: 'Merit Park Hotel' }, c('Merit Park Hotel Casino', 35.3492, 33.257, 'Kervansaray Mevkii, Αγ. Γεώργιος Κερύνειας 9930', null), none).got.includes('address_town'), true)
+  t('alias: Beylerbeyi counts for Bellapais', crossCheck({ ...h, name: 'Ambelia Village', address: 'Bellapais' }, c('Ambelia Village', 35.3044, 33.3504, 'Beylerbeyi 99320', null), none).pass, true)
+  t('full name contained: Royal Palace', nameMatch('Royal Palace Hotel', 'Royal Palace Hotel North Cyprus'), true)
+  t('full name NOT contained: Park Palace vs Grand Park Palace Resort', nameMatch('Park Palace Hotel', 'Grand Park Palace Resort'), false)
+  t('waiver lets region_audit through', crossCheck(h, c('Kaşgar Court', 35.125, 33.94, 'Girne', null), none, new Set(['region_audit'])).pass, true)
+  t('Bafra resort resolves to karpaz', resolveRegion(35.3654, 34.0745), 'karpaz')
   console.log(bad ? `\n${bad} FAILED\n` : '\nall passed\n'); process.exit(bad ? 1 : 0)
 }
 
 async function places(q, key) {
   const res = await fetch('https://places.googleapis.com/v1/places:searchText', { method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key,
-      'X-Goog-FieldMask': 'places.displayName,places.location,places.formattedAddress,places.nationalPhoneNumber,places.internationalPhoneNumber,places.types' },
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.formattedAddress,places.nationalPhoneNumber,places.internationalPhoneNumber' },
     body: JSON.stringify({ textQuery: q, languageCode: 'tr', maxResultCount: 3,
       locationRestriction: { rectangle: { low: { latitude: 34.95, longitude: 32.6 }, high: { latitude: 35.75, longitude: 34.65 } } } }) })
   if (!res.ok) fail(`Places ${res.status}: ${(await res.text()).slice(0, 300)}`)
@@ -138,6 +158,9 @@ async function main() {
 
   const { rows, errors } = normaliseFile(readFileSync(resolve(ROOT, CSV), 'utf8'), LIST_DATE)
   if (errors.length) fail(...errors)
+  const waivers = new Map()
+  for (const w of JSON.parse(readFileSync(resolve(ROOT, 'data/kitob/overrides.json'), 'utf8')).geocode_waivers || [])
+    waivers.set(w.external_id, new Set([...(waivers.get(w.external_id) || []), w.check]))
 
   let sb = null, idByExt = new Map()
   if (APPLY) {
@@ -155,52 +178,74 @@ async function main() {
 
   const osm = await loadOsm()
   console.log(`OSM lodging in TRNC: ${osm.length}`)
-  const osmNear = (lat, lng) => osm.filter(o => km(lat, lng, o.lat, o.lng) <= 0.15).flatMap(o => o.names)
+  const osmNear = (lat, lng) => osm.filter(o => km(lat, lng, o.lat, o.lng) * 1000 <= OSM_AGREE_M)
 
   const todo = rows.filter(r => !APPLY || idByExt.get(r.external_id)?.lat == null).slice(0, LIMIT)
-  const written = [], review = []
   const regionTr = { kyrenia: 'Girne', nicosia: 'Lefkoşa', famagusta: 'Gazimağusa', iskele: 'İskele', morphou: 'Güzelyurt', lefke: 'Lefke', karpaz: 'Karpaz' }
+  const results = []
   for (const h of todo) {
     const q = [h.name, h.address, regionTr[h.region], 'Kuzey Kıbrıs'].filter(Boolean).join(', ')
-    const cands = await places(q, KEY)
-    const judged = cands.map(c => ({ c, ...corroborate(h, c, osmNear) }))
-    const pick = judged.find(j => j.pass)
-    if (pick) {
-      written.push({ h, pick })
-      if (APPLY) {
-        const row = idByExt.get(h.external_id)
-        const { error } = await sb.from('hotels').update({ lat: pick.lat, lng: pick.lng, geocode_source: 'google_places',
-          geocode_tier: 2, geocode_corroboration: pick.got, geocoded_at: new Date().toISOString() })
-          .eq('id', row.id).is('lat', null)
-        if (error) fail(`write ${h.name}: ${error.message}`)
-      }
-    } else {
-      const best = judged[0]
-      review.push({ name: h.name, region: h.region, adres: h.address || '', phone: h.phone || '',
-        candidate: best?.c.displayName?.text || '(no result)', candidate_address: best?.c.formattedAddress || '',
-        lat: best?.lat ?? '', lng: best?.lng ?? '', corroborated: best?.got.join('+') || '',
-        missing: best ? ['region_audit', 'address_town'].filter(g => !best.got.includes(g)).concat(
-          best.got.some(g => ['phone_match', 'name_match', 'osm'].includes(g)) ? [] : ['phone/name/osm']).join('+') : 'no candidate',
-        maps: best ? `https://maps.google.com/?q=${best.lat},${best.lng}` : '' })
-    }
+    const judged = (await places(q, KEY)).map(c => ({ c, ...crossCheck(h, c, osmNear, waivers.get(h.external_id)) }))
+    // hand_only (overrides.json): never auto-placed, whatever Places returns on this run.
+    const pick = waivers.get(h.external_id)?.has('hand_only') ? null : judged.find(j => j.pass)
+    // Nearest agreeing OSM element to the corroborated candidate supplies the coordinate.
+    const src = pick && pick.osm.map(o => ({ o, m: km(pick.lat, pick.lng, o.lat, o.lng) * 1000 })).sort((a, b) => a.m - b.m)[0]
+    results.push({ h, pick, src, best: judged[0] })
     await new Promise(r => setTimeout(r, 120))
   }
 
-  const tally = written.reduce((m, w) => { const k = w.pick.got.filter(g => ['phone_match', 'name_match', 'osm'].includes(g)).join('+'); m[k] = (m[k] || 0) + 1; return m }, {})
-  console.log(`\n${DRY ? 'DRY RUN' : 'APPLIED'} · ${todo.length} hotel(s) · ${written.length} corroborated (tier 2) · ${review.length} to review`)
-  console.log('  strong evidence among the written:', JSON.stringify(tally))
+  // Two hotels on one Place is a wrong match (hotels_google_place_id_key would refuse it anyway).
+  const byPlace = new Map()
+  for (const r of results) if (r.pick) byPlace.set(r.pick.c.id, [...(byPlace.get(r.pick.c.id) || []), r])
+  for (const [, list] of byPlace) if (list.length > 1) for (const r of list) { r.dupPlace = true }
+
+  const osmSourced = results.filter(r => r.pick && r.src && !r.dupPlace)
+  const hand = results.filter(r => !osmSourced.includes(r))
+  const why = r => waivers.get(r.h.external_id)?.has('hand_only') ? 'hand placement by decision (overrides.json)'
+    : r.dupPlace ? 'two hotels matched the same Place'
+    : r.pick ? 'Places confirms the hotel, but no agreeing OSM element within 150 m'
+    : !r.best ? 'no Places result'
+    : 'Places cross-check failed: missing ' + ['region_audit', 'address_town'].filter(g => !r.best.got.includes(g))
+        .concat(r.best.got.some(g => ['phone_match', 'name_match', 'osm'].includes(g)) ? [] : ['phone/name/osm']).join('+')
+
+  if (APPLY) {
+    for (const r of osmSourced) {
+      const row = idByExt.get(r.h.external_id)
+      const corroboration = [...new Set([...r.pick.got.filter(g => g !== 'osm'), 'google_places'])]
+      const { error } = await sb.from('hotels').update({ lat: r.src.o.lat, lng: r.src.o.lng, geocode_source: 'osm',
+        geocode_tier: 1, geocode_corroboration: corroboration, geocoded_at: new Date().toISOString(), google_place_id: r.pick.c.id })
+        .eq('id', row.id).is('lat', null)
+      if (error) fail(`write ${r.h.name}: ${error.message}`)
+    }
+    // A confirmed Place id helps the hand-placer; store it even without coordinates.
+    for (const r of hand.filter(x => x.pick && !x.dupPlace)) {
+      const { error } = await sb.from('hotels').update({ google_place_id: r.pick.c.id }).eq('id', idByExt.get(r.h.external_id).id)
+      if (error) fail(`place id ${r.h.name}: ${error.message}`)
+    }
+  }
+
+  const byRegion = list => list.reduce((m, r) => (m[r.h.region] = (m[r.h.region] || 0) + 1, m), {})
+  console.log(`\n${DRY ? 'DRY RUN' : 'APPLIED'} · ${todo.length} hotel(s)`)
+  console.log(`  OSM-sourced (tier 1, Places-confirmed): ${osmSourced.length}  ${JSON.stringify(byRegion(osmSourced))}`)
+  console.log(`  needs hand placement:                   ${hand.length}  ${JSON.stringify(byRegion(hand))}`)
+  console.log(`    of which Places confirms the hotel:   ${hand.filter(r => r.pick && !r.dupPlace).length}`)
+  const moved = osmSourced.map(r => Math.round(r.src.m)).sort((a, b) => a - b)
+  console.log(`  OSM vs Places distance: median ${moved[Math.floor(moved.length / 2)] ?? '-'} m, max ${moved.at(-1) ?? '-'} m`)
+
+  // Files hold OUR data, OSM data and the place ID only — never Places coordinates, names or addresses.
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
-  const acc = resolve(ROOT, `data/kitob/geocode-accepted-${stamp}${DRY ? '-dry' : ''}.csv`)
-  const acols = ['name', 'region', 'adres', 'candidate', 'candidate_address', 'lat', 'lng', 'corroborated']
-  writeFileSync(acc, [acols.join(';'), ...written.map(({ h, pick }) => [h.name, h.region, h.address || '',
-    pick.c.displayName?.text || '', pick.c.formattedAddress || '', pick.lat, pick.lng, pick.got.join('+')]
-    .map(v => String(v).replace(/;/g, ',')).join(';'))].join('\n') + '\n')
-  console.log(`  accepted list → ${acc.replace(ROOT + '/', '')}`)
-  const out = resolve(ROOT, `data/kitob/geocode-review-${stamp}${DRY ? '-dry' : ''}.csv`)
-  const cols = ['name', 'region', 'adres', 'phone', 'candidate', 'candidate_address', 'lat', 'lng', 'corroborated', 'missing', 'maps']
-  writeFileSync(out, [cols.join(';'), ...review.map(r => cols.map(c => String(r[c]).replace(/;/g, ',')).join(';'))].join('\n') + '\n')
-  console.log(`  review list → ${out.replace(ROOT + '/', '')}`)
-  for (const r of review) console.log(`    ${r.name} [${r.region}] — ${r.missing}; best: ${r.candidate} (${r.candidate_address})`)
+  const link = id => id ? `https://www.google.com/maps/place/?q=place_id:${id}` : ''
+  const clean = v => String(v ?? '').replace(/;/g, ',')
+  const accFile = resolve(ROOT, `data/kitob/geocode-osm-${stamp}${DRY ? '-dry' : ''}.csv`)
+  writeFileSync(accFile, ['name;region;adres;osm_id;osm_name;lat;lng;corroborated;google_place_id',
+    ...osmSourced.map(r => [r.h.name, r.h.region, r.h.address, r.src.o.id, r.src.o.names[0], r.src.o.lat, r.src.o.lng,
+      r.pick.got.filter(g => g !== 'osm').concat('google_places').join('+'), r.pick.c.id].map(clean).join(';'))].join('\n') + '\n')
+  const handFile = resolve(ROOT, `data/kitob/geocode-hand-${stamp}${DRY ? '-dry' : ''}.csv`)
+  writeFileSync(handFile, ['name;region;adres;phone;reason;google_place_id;places_link',
+    ...hand.map(r => { const id = r.pick?.c.id || r.best?.c.id
+      return [r.h.name, r.h.region, r.h.address, r.h.phone, why(r), id, link(id)].map(clean).join(';') })].join('\n') + '\n')
+  console.log(`  OSM-sourced list → ${accFile.replace(ROOT + '/', '')}`)
+  console.log(`  hand-placement list → ${handFile.replace(ROOT + '/', '')}`)
 }
 
 if (args.includes('--self')) selfTest()

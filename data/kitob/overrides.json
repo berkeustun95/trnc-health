@@ -41,6 +41,27 @@
       "reason": "Long Beach, Yeni İskele — İskele district. The app's region lookup says famagusta because the point sits on the famagusta/iskele anchor boundary; phone, name and OSM all agree it is the hotel. Region stays İskele.",
       "date": "2026-09-29",
       "by": "Berke"
+    },
+    {
+      "external_id": "kitob-mimoza-hotel-famagusta",
+      "check": "hand_only",
+      "reason": "Identity unresolved (phone/class differ from the candidate Mimoza Beach Hotel); pending KITOB. Berke places it by hand.",
+      "date": "2026-09-29",
+      "by": "Berke"
+    },
+    {
+      "external_id": "kitob-unbay-resort-hotel-kyrenia",
+      "check": "hand_only",
+      "reason": "Places returns Pine Bay Resort in Bafra — the wrong hotel. Berke places it by hand.",
+      "date": "2026-09-29",
+      "by": "Berke"
+    },
+    {
+      "external_id": "kitob-hamsa-hotel-kyrenia",
+      "check": "hand_only",
+      "reason": "Places returned different hotels on different runs ('Suya Boutique Hotel'); the listed site is dead. Berke places it by hand.",
+      "date": "2026-09-29",
+      "by": "Berke"
     }
   ]
 }
