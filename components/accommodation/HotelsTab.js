@@ -8,6 +8,8 @@ import FilterDropdown from '../FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../../constants/regions'
 import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY, HOTEL_CLASS_STARS } from '../../constants/hotels'
 import { logContactEvent } from '../../utils/logContactEvent'
+import { AREAS_BY_REGION, areaSlug } from '../../constants/areas'
+import OsmAttribution from '../OsmAttribution'
 
 // The Oteller tab of Emlak & Konaklama (HOTELS_LIVE). KITOB member hotels from
 // public.hotels (20261059): RLS returns only published, listed rows, so there is no
@@ -15,7 +17,22 @@ import { logContactEvent } from '../../utils/logContactEvent'
 // filtered on the device — the dropdowns answer instantly and only offer values that
 // actually have a hotel behind them.
 
-const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, photo_url, is_kitob_member'
+const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, is_kitob_member'
+
+// hotels.address holds KITOB's village. Matched to an areas.js area WITHIN the hotel's region
+// (never across: Boğaz exists in both Girne and İskele). Hyphens are ignored so KITOB's
+// "Yeni Erenköy" meets areas.js "Yenierenköy". A village with no areas.js entry gets no area;
+// the hotel still shows under the district and in the unfiltered list.
+const AREA_ALIASES = { bellapais: 'beylerbeyi' }
+const flat = n => areaSlug(n).replace(/-/g, '')
+function hotelArea(hotel) {
+  if (!hotel.address) return null
+  const key = flat(hotel.address)
+  const want = AREA_ALIASES[key] || key
+  const name = (AREAS_BY_REGION[hotel.region] || []).find(n => flat(n) === want)
+  return name ? { value: `${hotel.region}/${areaSlug(name)}`, name } : null
+}
+
 const CLASS_RANK = Object.fromEntries(HOTEL_CLASSES.map((k, i) => [k, i]))
 const collator = new Intl.Collator('tr')
 
@@ -91,6 +108,7 @@ function HotelCard({ hotel, lang, district }) {
             </TouchableOpacity>
           )}
         </View>
+        {hasCoords && hotel.geocode_source === 'osm' && <OsmAttribution lang={lang} style={hs.credit} />}
       </View>
     </View>
   )
@@ -119,6 +137,7 @@ export default function HotelsTab({ lang }) {
   const [failed, setFailed]     = useState(false)
   const [klass, setKlass]       = useState(null)
   const [district, setDistrict] = useState(null)
+  const [area, setArea]         = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true); setFailed(false)
@@ -140,7 +159,28 @@ export default function HotelsTab({ lang }) {
     .filter(r => hotels.some(h => h.region === r))
     .map(r => ({ value: r, label: districtLabel(r, lang) })), [hotels, lang])
 
-  const shown = sorted.filter(h => (!klass || h.kitob_class === klass) && (!district || h.region === district))
+  const areaOf = useMemo(() => new Map(hotels.map(h => [h.id, hotelArea(h)])), [hotels])
+  const areaOpts = useMemo(() => {
+    const seen = new Map()
+    for (const h of hotels) {
+      const a = areaOf.get(h.id)
+      if (a && (!district || h.region === district)) seen.set(a.value, { ...a, region: h.region })
+    }
+    const list = [...seen.values()]
+    // Same name in two districts (Boğaz) only matters when no district is chosen.
+    const dup = n => list.filter(a => a.name === n).length > 1
+    return list
+      .map(a => ({ value: a.value, label: dup(a.name) ? `${a.name} (${districtLabel(a.region, lang)})` : a.name }))
+      .sort((a, b) => collator.compare(a.label, b.label))
+  }, [hotels, areaOf, district, lang])
+
+  function pickDistrict(r) {
+    setDistrict(r)
+    if (area && r && !area.startsWith(`${r}/`)) setArea(null)
+  }
+
+  const shown = sorted.filter(h => (!klass || h.kitob_class === klass) && (!district || h.region === district)
+    && (!area || areaOf.get(h.id)?.value === area))
 
   if (loading) return <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
 
@@ -164,7 +204,11 @@ export default function HotelsTab({ lang }) {
         <FilterDropdown label={t('hotelFilterClass', lang)} lang={lang}
           options={classOpts} value={klass} onChange={setKlass} />
         <FilterDropdown label={t('accomFilterDistrict', lang)} lang={lang}
-          options={districtOpts} value={district} onChange={setDistrict} />
+          options={districtOpts} value={district} onChange={pickDistrict} />
+        {areaOpts.length > 0 && (
+          <FilterDropdown label={t('accomFilterArea', lang)} lang={lang}
+            options={areaOpts} value={area} onChange={setArea} />
+        )}
       </View>
       <FlatList
         data={shown}
@@ -178,7 +222,7 @@ export default function HotelsTab({ lang }) {
           <View style={hs.center}>
             <Ionicons name="bed-outline" size={40} color={colors.border} />
             <Text style={hs.emptyTitle}>{t('hotelsNoResults', lang)}</Text>
-            <TouchableOpacity style={hs.retry} onPress={() => { setKlass(null); setDistrict(null) }}>
+            <TouchableOpacity style={hs.retry} onPress={() => { setKlass(null); setDistrict(null); setArea(null) }}>
               <Text style={hs.retryText}>{t('accomClear', lang)}</Text>
             </TouchableOpacity>
           </View>
@@ -213,6 +257,7 @@ const hs = StyleSheet.create({
   actionPrimary: { backgroundColor: colors.primary },
   actionText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, flexShrink: 1 },
   actionTextPrimary: { color: '#fff' },
+  credit:        { alignSelf: 'flex-end', marginTop: 8 },
 
   center:        { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32, gap: 12 },
   emptyTitle:    { fontSize: 15, fontFamily: 'Inter_500Medium', color: colors.textSecondary, textAlign: 'center' },

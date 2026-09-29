@@ -717,6 +717,7 @@ const translations = {
     // Accommodation module
     menuAccomTile: 'Property · Dorms',
     accomTabProperty: 'Property',
+    osmAttribution: '© OpenStreetMap contributors',
     accomTabHotels: 'Hotels',
     hotelClassStar5: '5-star',
     hotelClassStar4: '4-star',
@@ -2983,6 +2984,7 @@ const translations = {
     // ─── Accommodation module ─────────────────────────────────────────────────
     menuAccomTile: 'Emlak · Yurt',
     accomTabProperty: 'Emlak',
+    osmAttribution: '© OpenStreetMap katkıcıları',
     accomTabHotels: 'Oteller',
     hotelClassStar5: '5 Yıldız',
     hotelClassStar4: '4 Yıldız',
@@ -4540,6 +4542,7 @@ const translations = {
     // ─── Accommodation module ─────────────────────────────────────────────────
     menuAccomTile: 'عقارات · سكن طلابي',
     accomTabProperty: 'عقارات',
+    osmAttribution: '© مساهمو OpenStreetMap',
     accomTabHotels: 'فنادق',
     hotelClassStar5: '5 نجوم',
     hotelClassStar4: '4 نجوم',
@@ -6064,6 +6067,7 @@ const translations = {
     // ─── Accommodation module ─────────────────────────────────────────────────
     menuAccomTile: 'Жильё · Общежития',
     accomTabProperty: 'Недвижимость',
+    osmAttribution: '© участники OpenStreetMap',
     accomTabHotels: 'Отели',
     hotelClassStar5: '5 звёзд',
     hotelClassStar4: '4 звезды',
@@ -7586,6 +7590,7 @@ const translations = {
     // ─── Accommodation module ─────────────────────────────────────────────────
     menuAccomTile: 'Ακίνητα · Εστίες',
     accomTabProperty: 'Ακίνητα',
+    osmAttribution: '© συντελεστές του OpenStreetMap',
     accomTabHotels: 'Ξενοδοχεία',
     hotelClassStar5: '5 αστέρων',
     hotelClassStar4: '4 αστέρων',
@@ -9112,6 +9117,7 @@ const translations = {
     // ─── Accommodation module ─────────────────────────────────────────────────
     menuAccomTile: 'Immobilier · Résidences',
     accomTabProperty: 'Immobilier',
+    osmAttribution: '© contributeurs OpenStreetMap',
     accomTabHotels: 'Hôtels',
     hotelClassStar5: '5 étoiles',
     hotelClassStar4: '4 étoiles',
@@ -10635,6 +10641,7 @@ const translations = {
     // ─── Accommodation module ─────────────────────────────────────────────────
     menuAccomTile: 'Inmuebles · Residencias',
     accomTabProperty: 'Inmuebles',
+    osmAttribution: '© colaboradores de OpenStreetMap',
     accomTabHotels: 'Hoteles',
     hotelClassStar5: '5 estrellas',
     hotelClassStar4: '4 estrellas',
@@ -12158,6 +12165,7 @@ const translations = {
     // ─── Accommodation module ─────────────────────────────────────────────────
     menuAccomTile: 'Immobilien · Wohnheime',
     accomTabProperty: 'Immobilien',
+    osmAttribution: '© OpenStreetMap-Mitwirkende',
     accomTabHotels: 'Hotels',
     hotelClassStar5: '5 Sterne',
     hotelClassStar4: '4 Sterne',
@@ -13680,6 +13688,7 @@ const translations = {
     // ─── Accommodation module ─────────────────────────────────────────────────
     menuAccomTile: 'املاک · خوابگاه',
     accomTabProperty: 'املاک',
+    osmAttribution: '© مشارکت‌کنندگان OpenStreetMap',
     accomTabHotels: 'هتل‌ها',
     hotelClassStar5: '۵ ستاره',
     hotelClassStar4: '۴ ستاره',

@@ -6,6 +6,7 @@ import { colors, typeColors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { parseIsOpen } from '../utils/facilityUtils'
 import FilterDropdown from '../components/FilterDropdown'
+import OsmAttribution from '../components/OsmAttribution'
 
 const LEFKOSA    = { latitude: 35.1856, longitude: 33.3823, latitudeDelta: 0.08, longitudeDelta: 0.08 }
 const PIN_COLORS = { pharmacy: '#7C3AED', clinic: '#0E7C7B', hospital: '#D1495B', dentist: '#2E9E5B' }
@@ -68,6 +69,8 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
           />
         ))}
       </MapView>
+      {/* Pharmacy pins are partly OSM-sourced (geocoding policy): ODbL credit. */}
+      <OsmAttribution lang={lang} overlay />
 
       <ScrollView
         horizontal
