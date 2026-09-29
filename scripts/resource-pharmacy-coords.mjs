@@ -26,6 +26,7 @@ import { execFileSync } from 'node:child_process'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fold } from './import-kitob-hotels.mjs'
+import { osmSnapshot } from './lib/osm-snapshot.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
@@ -33,7 +34,10 @@ const DRY = args.includes('--dry-run'), APPLY = args.includes('--apply')
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 if (DRY === APPLY && !args.includes('--self')) fail('Pass exactly one of --dry-run or --apply.')
 
-const AGREE_M = 150, MOVE_REPORT_M = 50
+const AGREE_M = 150, MOVE_REPORT_M = 50, SWAP_MAX_M = 50
+// Exception window for the Google pins left in place (Berke 2026-09-29: no user may lose a pin).
+// Proposed as 30 days to match the Places caching limit — Berke decides the real date.
+const REVIEW_BY = '2026-10-29'
 const GENERIC = new Set(['eczane', 'eczanesi', 'eczanesı', 'ecz', 'pharmacy', 'pharmacie', 'apotheke', 'aptieka',
   'the', 've', 'and', 'yeni', 'new', 'merkez', 'center', 'centre'])
 export const words = n => fold(n).replace(/['’`.]/g, '').split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !GENERIC.has(w))
@@ -62,18 +66,13 @@ if (args.includes('--self')) {
   process.exit(bad ? 1 : 0)
 }
 
+const OSM_ARG = args.includes('--osm') ? args[args.indexOf('--osm') + 1] : null
+if (APPLY && !OSM_ARG) fail('--apply needs --osm <snapshot> — the exact OSM data the reviewed dry run used.')
 async function loadOsm() {
   const q = `[out:json][timeout:90];area(3602514541)->.t;(nwr["amenity"="pharmacy"](area.t);nwr["healthcare"="pharmacy"](area.t););out center tags;`
-  for (const url of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'])
-    for (let i = 0; i < 2; i++) {
-      const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q),
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'ADA-app pharmacy re-source (berkeustun95)' } })
-        .catch(e => ({ ok: false, status: e.message }))
-      if (res.ok) return ((await res.json()).elements || []).map(e => ({ id: `${e.type}/${e.id}`, lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon,
-        names: [e.tags?.name, e.tags?.['name:tr'], e.tags?.['name:en']].filter(Boolean) })).filter(e => e.lat && e.names.length)
-      await new Promise(r => setTimeout(r, 5000))
-    }
-  fail('Overpass unavailable')
+  const snap = await osmSnapshot(ROOT, 'pharmacies', q, OSM_ARG).catch(e => fail(e.message))
+  return (snap.elements || []).map(e => ({ id: `${e.type}/${e.id}`, lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon,
+    names: [e.tags?.name, e.tags?.['name:tr'], e.tags?.['name:en']].filter(Boolean) })).filter(e => e.lat && e.names.length)
 }
 
 const env = Object.fromEntries(readFileSync(resolve(ROOT, '.env'), 'utf8').split('\n').map(l => l.match(/^\s*([\w.-]+)\s*=\s*(.*)$/)).filter(Boolean).map(m => [m[1], m[2].trim().replace(/^["']|["']$/g, '')]))
@@ -106,4 +105,38 @@ writeFileSync(resolve(ROOT, `data/pharmacy-hand-place-${stamp}.csv`),
   ['id;name;address;city;status', ...hand.map(p => [p.id, p.name, p.address || '', p.city || '', p.status].map(v => String(v).replace(/;/g, ',')).join(';'))].join('\n') + '\n')
 console.log(`  hand-placement list → data/pharmacy-hand-place-${stamp}.csv`)
 
-if (APPLY) fail('--apply is deliberately not implemented until the pin-removal question is decided (see the vault).')
+// ─── Berke 2026-09-29: no user may lose a pin ────────────────────────────────
+//   • swap  : OSM agrees AND moves ≤ 50 m → OSM coordinate (source osm, tier 1).
+//   • flagged: OSM agrees but moves > 50 m → pin UNCHANGED, queued for hand checking.
+//   • exception: no agreeing OSM → Google pin UNCHANGED, on the committed exception list.
+const swap = matched.filter(x => x.moved <= SWAP_MAX_M)
+const flagged = matched.filter(x => x.moved > SWAP_MAX_M)
+console.log(`\n  plan: swap ${swap.length} · keep+queue ${flagged.length} (> ${SWAP_MAX_M} m) · keep as exception ${hand.length}`)
+
+// The exception list is committed: OUR data only (id, name, city, address), never coordinates.
+const excPath = resolve(ROOT, 'data/geocode-exceptions/pharmacy-google-pins.csv')
+const excRows = [...hand.map(p => [p.id, p.name, p.city || '', p.address || '', 'no agreeing OSM pharmacy', REVIEW_BY]),
+  ...flagged.map(x => [x.ph.id, x.ph.name, x.ph.city || '', x.ph.address || '', `OSM agrees but ${x.moved} m away — hand check`, REVIEW_BY])]
+  .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+const excText = ['facility_id;name;city;address;reason;review_by', ...excRows.map(r => r.map(v => String(v).replace(/;/g, ',')).join(';'))].join('\n') + '\n'
+
+if (DRY) { console.log(`  (dry) exception list would hold ${excRows.length} rows → data/geocode-exceptions/pharmacy-google-pins.csv`); process.exit(0) }
+
+const { mkdirSync } = await import('node:fs')
+mkdirSync(dirname(excPath), { recursive: true })
+writeFileSync(excPath, excText)
+const now = new Date().toISOString()
+let written = 0
+for (const x of swap) {
+  const carried = (x.ph.geocode_corroboration || []).filter(c => ['address_town', 'phone_exchange', 'region_audit'].includes(c))
+  const { data, error } = await sb.from('facilities').update({
+    latitude: x.o.lat, longitude: x.o.lng, geocode_source: 'osm', geocode_tier: 1,
+    geocode_corroboration: [...new Set(['google_places', 'name_match', ...carried])], geocoded_at: now,
+  }).eq('id', x.ph.id).eq('geocode_source', 'google_places').select('id')
+  if (error) fail(`swap ${x.ph.name}: ${error.message}`)
+  written += data.length
+}
+const { count: left } = await sb.from('facilities').select('id', { count: 'exact', head: true }).eq('type', 'pharmacy').eq('geocode_source', 'google_places')
+const { count: osmNow } = await sb.from('facilities').select('id', { count: 'exact', head: true }).eq('type', 'pharmacy').eq('geocode_source', 'osm')
+console.log(`\nAPPLIED: ${written}/${swap.length} swapped to OSM. Pharmacies now: osm ${osmNow} · google_places ${left} (= the exception list, ${excRows.length}).`)
+if (left !== excRows.length) fail(`MISMATCH: ${left} google_places pins remain but the exception list has ${excRows.length}.`)

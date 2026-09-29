@@ -29,6 +29,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { normaliseFile, fold } from './import-kitob-hotels.mjs'
 import { resolveRegion } from '../utils/resolveRegion.js'
+import { osmSnapshot } from './lib/osm-snapshot.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CSV = 'data/kitob/kitob-2026-09-17.csv'
@@ -101,18 +102,9 @@ export function crossCheck(hotel, cand, osmNear, waived = new Set()) {
 // ─── OSM lodging in the TRNC (relation 2514541), one Overpass query ─────────
 async function loadOsm() {
   const q = `[out:json][timeout:60];area(3602514541)->.t;(nwr["tourism"~"^(hotel|guest_house|apartment|motel|resort|chalet|hostel)$"](area.t);nwr["leisure"="resort"](area.t););out center tags;`
-  // The public Overpass servers 504 under load; try each endpoint twice before giving up.
-  for (const url of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'])
-    for (let i = 0; i < 2; i++) {
-      const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q),
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'ADA-app hotel geocoder (berkeustun95)' } })
-        .catch(e => ({ ok: false, status: e.message }))
-      if (res.ok) return ((await res.json()).elements || []).map(e => ({ id: `${e.type}/${e.id}`,
-        lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon,
-        names: [e.tags?.name, e.tags?.['name:en'], e.tags?.['name:tr']].filter(Boolean) })).filter(e => e.lat && e.names.length)
-      await new Promise(r => setTimeout(r, 5000))
-    }
-  fail('Overpass unavailable')
+  const snap = await osmSnapshot(ROOT, 'lodging', q, args.includes('--osm') ? args[args.indexOf('--osm') + 1] : null).catch(e => fail(e.message))
+  return (snap.elements || []).map(e => ({ id: `${e.type}/${e.id}`, lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon,
+    names: [e.tags?.name, e.tags?.['name:en'], e.tags?.['name:tr']].filter(Boolean) })).filter(e => e.lat && e.names.length)
 }
 export const km = (a, b, c, d) => { const R = 6371, x = (c - a) * Math.PI / 180, y = (d - b) * Math.PI / 180
   const h = Math.sin(x / 2) ** 2 + Math.cos(a * Math.PI / 180) * Math.cos(c * Math.PI / 180) * Math.sin(y / 2) ** 2

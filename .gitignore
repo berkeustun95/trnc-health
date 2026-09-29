@@ -69,3 +69,4 @@ vendor/
 # Geocoder output: holds Google Places results (terms limit caching) — never committed.
 data/kitob/geocode-*.csv
 data/pharmacy-hand-place-*.csv
+data/osm/
