@@ -35,9 +35,7 @@ const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 if (DRY === APPLY && !args.includes('--self')) fail('Pass exactly one of --dry-run or --apply.')
 
 const AGREE_M = 150, MOVE_REPORT_M = 50, SWAP_MAX_M = 50
-// Exception window for the Google pins left in place (Berke 2026-09-29: no user may lose a pin).
-// 30 days, matching the Places caching limit — set by Berke 2026-09-29 ("as soon as possible").
-const REVIEW_BY = '2026-10-29'
+// Google pins left in place go on the known-risk list (Berke 2026-09-29: accepted, no deadline).
 const GENERIC = new Set(['eczane', 'eczanesi', 'eczanesı', 'ecz', 'pharmacy', 'pharmacie', 'apotheke', 'aptieka',
   'the', 've', 'and', 'yeni', 'new', 'merkez', 'center', 'centre'])
 export const words = n => fold(n).replace(/['’`.]/g, '').split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !GENERIC.has(w))
@@ -113,14 +111,19 @@ const swap = matched.filter(x => x.moved <= SWAP_MAX_M)
 const flagged = matched.filter(x => x.moved > SWAP_MAX_M)
 console.log(`\n  plan: swap ${swap.length} · keep+queue ${flagged.length} (> ${SWAP_MAX_M} m) · keep as exception ${hand.length}`)
 
-// The exception list is committed: OUR data only (id, name, city, address), never coordinates.
-const excPath = resolve(ROOT, 'data/geocode-exceptions/pharmacy-google-pins.csv')
-const excRows = [...hand.map(p => [p.id, p.name, p.city || '', p.address || '', 'no agreeing OSM pharmacy', REVIEW_BY]),
-  ...flagged.map(x => [x.ph.id, x.ph.name, x.ph.city || '', x.ph.address || '', `OSM agrees but ${x.moved} m away — hand check`, REVIEW_BY])]
-  .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
-const excText = ['facility_id;name;city;address;reason;review_by', ...excRows.map(r => r.map(v => String(v).replace(/;/g, ',')).join(';'))].join('\n') + '\n'
+// The known-risk list is committed: OUR data only (id, name, place, address), never coordinates.
+// It also holds the hotel rows (kind=hotel, written by geocode-kitob-hotels.mjs); this script
+// replaces only the pharmacy rows.
+const excPath = resolve(ROOT, 'data/geocode-exceptions/google-pins.csv')
+const EXC_HEAD = 'kind;id;name;place;address;reason'
+const excRows = [...hand.map(p => ['pharmacy', p.id, p.name, p.city || '', p.address || '', 'no agreeing OSM pharmacy']),
+  ...flagged.map(x => ['pharmacy', x.ph.id, x.ph.name, x.ph.city || '', x.ph.address || '', `OSM agrees but ${x.moved} m away`])]
+  .sort((a, b) => a[2].localeCompare(b[2], 'tr'))
+const { existsSync } = await import('node:fs')
+const others = existsSync(excPath) ? readFileSync(excPath, 'utf8').trim().split('\n').slice(1).filter(l => !l.startsWith('pharmacy;')) : []
+const excText = [EXC_HEAD, ...others, ...excRows.map(r => r.map(v => String(v).replace(/;/g, ',')).join(';'))].join('\n') + '\n'
 
-if (DRY) { console.log(`  (dry) exception list would hold ${excRows.length} rows → data/geocode-exceptions/pharmacy-google-pins.csv`); process.exit(0) }
+if (DRY) { console.log(`  (dry) exception list would hold ${excRows.length} pharmacy rows → data/geocode-exceptions/google-pins.csv`); process.exit(0) }
 
 const { mkdirSync } = await import('node:fs')
 mkdirSync(dirname(excPath), { recursive: true })

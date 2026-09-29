@@ -793,24 +793,25 @@ went missing). Two mandatory rules:
   and `npm run backchain:check` runs App's chain through 45 cases; both run in `npm run ota`.
   Add a backchain case when a new layer joins the chain.
 
-## Geocoding — storage policy (Berke, 2026-09-29)
-- **Google Places is a CROSS-CHECK ONLY.** Never store Places latitude/longitude, names or
-  addresses — not in the DB, not in a committed file. The Maps Platform terms cap caching of
-  Places content (the place ID is exempt: store it, e.g. `hotels.google_place_id`). On iOS our maps
-  are **Apple Maps** (`react-native-maps` with no `provider` = Google on Android, Apple on iOS), and
-  Places content may not be shown on a non-Google map at all.
-- **Stored coordinates come from OSM (where it agrees with Places) or hand placement**, and the
-  source is recorded: `geocode_source` `osm` (tier 1, `google_places` in `geocode_corroboration`) or
-  `manual` (tier 3, `visual_satellite` mandatory). OSM is ODbL: "© OpenStreetMap contributors"
-  wherever those pins are shown.
-- Local files holding Places data (geocoder CSVs) are gitignored and deleted within 30 days.
-- Hotels enforce it structurally (20261061: no `google_places` source). Pharmacies: 67 re-sourced
-  to OSM (≤ 50 m); 282 Google pins remain as a committed, time-limited exception
-  (`data/geocode-exceptions/pharmacy-google-pins.csv`, `review_by`) until hand-placed.
-  `geocode-pharmacies-tier2.mjs` is retired. OSM data only via `scripts/lib/osm-snapshot.mjs`.
-- Credit: `components/OsmAttribution.js` (9 locales) on every map/card showing an `osm` pin.
-- **Hand placement goes THROUGH OSM** (no imagery licenses private derivation): `npm run place`
-  (local queue → iD → re-check → `osm`, tier 3, `visual_satellite`). It never shows the Google pin.
+## Geocoding — storage policy (Berke, 2026-09-29, revised the same day)
+- **Google Places pins are ACCEPTED AS A KNOWN RISK for pharmacies and hotels.** Both break Google's
+  terms: Places coordinates may be cached for 30 days at most (the place ID is exempt), and on iOS
+  our maps are **Apple Maps** (`react-native-maps` with no `provider`), where Places content may not
+  be shown. The realistic consequence is Google suspending the Places key. Hotels are shown only
+  through a Google Maps link (Harita), so the Apple Maps half applies to pharmacies alone.
+  No deadline. Every Google pin is listed in `data/geocode-exceptions/google-pins.csv`
+  (`kind;id;name;place;address;reason`, our data only, never coordinates). A new Google pin gets a
+  row in the same commit; a pin replaced by OSM loses its row.
+- **Prefer OSM where it agrees**: `geocode_source` `osm` (tier 1, `google_places` in
+  `geocode_corroboration`). OSM is ODbL: `components/OsmAttribution.js` (9 locales) on every
+  map/card showing an `osm` pin. OSM data only via `scripts/lib/osm-snapshot.mjs` (main Overpass,
+  ≤ 72 h; a mirror served June data).
+- A Google pin is saved only when corroborated: region + address town, plus phone, name or OSM.
+  A hotel that fails gets NO pin; its Harita button searches "<name>, <town>, North Cyprus".
+- Pharmacies: 67 re-sourced to OSM (≤ 50 m); 282 Google pins on the list.
+  `geocode-pharmacies-tier2.mjs` is retired. Hotels: 58 OSM pins; the others take corroborated Google pins once
+  20261062 re-allows `google_places` on `hotels`.
+- OSM hand placement (`npm run place`) is SHELVED: no OSM editing (Berke, 2026-09-29).
 
 ## Social sign-in (Google + Apple, native) — from build 1.2.0
 

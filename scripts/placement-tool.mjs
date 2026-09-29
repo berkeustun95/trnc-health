@@ -19,7 +19,8 @@
 // Local only: binds 127.0.0.1, every write needs the per-run token embedded in the page.
 // Order: 44 hotels (Mimoza PENDING until KITOB answers) → the 3 flagged pharmacies (Meliz,
 // Cevher, Arkan Adışanlı) → the other 279. A pharmacy placed here leaves the exception list
-// (data/geocode-exceptions/pharmacy-google-pins.csv — commit it afterwards).
+// (data/geocode-exceptions/google-pins.csv — commit it afterwards).
+// ⚠ SHELVED 2026-09-29 (Berke): no OSM editing. Kept working, not in use.
 
 import http from 'node:http'
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
@@ -36,7 +37,7 @@ const DRY = process.argv.includes('--dry')
 const PORT = 8787
 const TOKEN = randomBytes(16).toString('hex')
 const OVERPASS = 'https://overpass-api.de/api/interpreter'
-const EXC = resolve(ROOT, 'data/geocode-exceptions/pharmacy-google-pins.csv')
+const EXC = resolve(ROOT, 'data/geocode-exceptions/google-pins.csv')
 const PROGRESS = resolve(ROOT, 'data/placement-progress.json')        // gitignored
 const PULLED = resolve(ROOT, 'data/osm/placement-pulled.json')        // our snapshot of placed elements
 const PENDING = { 'kitob-mimoza-hotel-famagusta': 'pending KITOB (identity of Mimoza Hotel)' }
@@ -137,9 +138,9 @@ function buildQueue() {
     return { key, kind: 'hotel', name: k.name, region: k.region, address: k.address || '', phone: k.phone || '',
       source: `KITOB list 2026-09-17 · ${k.kitob_class}`, website: k.website || '' }
   })
-  const exc = readFileSync(EXC, 'utf8').trim().split('\n').slice(1).map(l => l.split(';'))
-    .map(c => ({ key: c[0], kind: 'pharmacy', name: c[1], region: null, address: [c[3], c[2]].filter(Boolean).join(', '),
-      phone: '', source: `KTEB list · ${c[4]}`, flagged: c[4].startsWith('OSM agrees') }))
+  const exc = readFileSync(EXC, 'utf8').trim().split('\n').slice(1).map(l => l.split(';')).filter(c => c[0] === 'pharmacy')
+    .map(c => ({ key: c[1], kind: 'pharmacy', name: c[2], region: null, address: [c[4], c[3]].filter(Boolean).join(', '),
+      phone: '', source: `KTEB list · ${c[5]}`, flagged: c[5].startsWith('OSM agrees') }))
   const rank = p => { const i = FLAGGED_FIRST.findIndex(w => plain(p.name).includes(w)); return p.flagged ? (i < 0 ? 9 : i) : 99 }
   const pharm = exc.map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map(x => x.p)
   const all = [...hotels, ...pharm]
@@ -225,11 +226,12 @@ async function save(item, osm, force = false) {
     if (data.length !== 1) throw new Error(`pharmacy ${item.key}: ${data.length} rows updated (not a google_places pin any more?)`)
     // The Google pin is gone → so is its exception row.
     const [head, ...rows] = readFileSync(EXC, 'utf8').trim().split('\n')
-    const kept = rows.filter(r => !r.startsWith(`${item.key};`))
+    const kept = rows.filter(r => !r.startsWith(`pharmacy;${item.key};`))
     if (kept.length !== rows.length - 1) throw new Error(`exception list: expected to remove 1 row for ${item.key}, removed ${rows.length - kept.length}`)
     writeFileSync(EXC, [head, ...kept].join('\n') + '\n')
+    const keptPh = kept.filter(r => r.startsWith('pharmacy;')).length
     const { count } = await sb.from('facilities').select('id', { count: 'exact', head: true }).eq('type', 'pharmacy').eq('geocode_source', 'google_places')
-    if (count !== kept.length) throw new Error(`MISMATCH: ${count} google_places pharmacy pins vs ${kept.length} exception rows`)
+    if (count !== keptPh) throw new Error(`MISMATCH: ${count} google_places pharmacy pins vs ${keptPh} pharmacy rows`)
   }
   const progress = readJson(PROGRESS, {})
   progress[item.key] = { kind: item.kind, name: item.name, osm, at: now, name_match: agrees }
