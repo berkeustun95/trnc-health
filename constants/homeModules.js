@@ -122,7 +122,13 @@ export const HOME_MODULES = [
   // browsable DIRECTORY, the one thing the map tab does not offer. Icon must not be
   // compass-outline either — that is the tab's icon.
   { id: 'explore',            icon: 'albums-outline',           tint: 'standard', labelKey: 'menuPlaces' },
-  { id: 'accommodation',      icon: 'home-outline',             tint: 'standard', labelKey: 'menuAccommodations' },
+  // menuAccomTile names what is inside ("Emlak · Yurt"), NOT menuAccommodations, which stays
+  // the module's title (header, Coming Soon, V1 hub). Each '·' is bound to the word before it
+  // with U+00A0 so a wrap never starts a line with the separator. Measured 2026-09-29: fits two
+  // lines at 11pt in all nine locales (tightest Russian, 1.3pt at 320dp).
+  // ⚠ WITH HOTELS_LIVE the plan is "Emlak · Yurt · Otel", which needs THREE lines in seven
+  //   locales (max 10.2pt, Russian) — a gridLabel decision, open in the hotels plan note.
+  { id: 'accommodation',      icon: 'home-outline',             tint: 'standard', labelKey: 'menuAccomTile' },
   { id: 'pets',               icon: 'paw-outline',              tint: 'standard', labelKey: 'menuPets' },   // V2 vocabulary — screens/HomeScreen.js's V1 copy says 'lifestyle'; both are correct
   { id: 'games',              icon: 'game-controller-outline',  tint: 'standard', labelKey: 'menuGames' },
 

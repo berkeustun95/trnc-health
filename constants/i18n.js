@@ -715,6 +715,7 @@ const translations = {
     insErrorGeneric: 'Something went wrong. Please try again.',
     insTypesOffered: 'Insurance offered', insAbout: 'About', insContact: 'Contact',
     // Accommodation module
+    menuAccomTile: 'Property · Dorms',
     accomTabProperty: 'Property',
     accomTabHotels: 'Hotels',
     hotelClassStar5: '5-star',
@@ -2980,6 +2981,7 @@ const translations = {
     'Small Animals': 'Küçük Hayvanlar', 'Large Animals': 'Büyük Hayvanlar', 'Exotic Animals': 'Egzotik Hayvanlar',
     'Surgery': 'Cerrahi', 'Dentistry': 'Diş Hekimliği', 'Emergency & Critical Care': 'Acil & Yoğun Bakım',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    menuAccomTile: 'Emlak · Yurt',
     accomTabProperty: 'Emlak',
     accomTabHotels: 'Oteller',
     hotelClassStar5: '5 Yıldız',
@@ -4536,6 +4538,7 @@ const translations = {
     'Small Animals': 'الحيوانات الصغيرة', 'Large Animals': 'الحيوانات الكبيرة', 'Exotic Animals': 'الحيوانات الغريبة',
     'Surgery': 'الجراحة', 'Dentistry': 'طب الأسنان', 'Emergency & Critical Care': 'الطوارئ والرعاية الحرجة',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    menuAccomTile: 'عقارات · سكن طلابي',
     accomTabProperty: 'عقارات',
     accomTabHotels: 'فنادق',
     hotelClassStar5: '5 نجوم',
@@ -6059,6 +6062,7 @@ const translations = {
     'Small Animals': 'Мелкие животные', 'Large Animals': 'Крупные животные', 'Exotic Animals': 'Экзотические животные',
     'Surgery': 'Хирургия', 'Dentistry': 'Стоматология', 'Emergency & Critical Care': 'Неотложная помощь',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    menuAccomTile: 'Жильё · Общежития',
     accomTabProperty: 'Недвижимость',
     accomTabHotels: 'Отели',
     hotelClassStar5: '5 звёзд',
@@ -7580,6 +7584,7 @@ const translations = {
     'Small Animals': 'Μικρά Ζώα', 'Large Animals': 'Μεγάλα Ζώα', 'Exotic Animals': 'Εξωτικά Ζώα',
     'Surgery': 'Χειρουργική', 'Dentistry': 'Οδοντιατρική', 'Emergency & Critical Care': 'Επείγοντα & Εντατική Φροντίδα',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    menuAccomTile: 'Ακίνητα · Εστίες',
     accomTabProperty: 'Ακίνητα',
     accomTabHotels: 'Ξενοδοχεία',
     hotelClassStar5: '5 αστέρων',
@@ -9105,6 +9110,7 @@ const translations = {
     'Small Animals': 'Petits animaux', 'Large Animals': 'Grands animaux', 'Exotic Animals': 'Animaux exotiques',
     'Surgery': 'Chirurgie', 'Dentistry': 'Dentisterie', 'Emergency & Critical Care': 'Urgences & Soins intensifs',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    menuAccomTile: 'Immobilier · Résidences',
     accomTabProperty: 'Immobilier',
     accomTabHotels: 'Hôtels',
     hotelClassStar5: '5 étoiles',
@@ -10627,6 +10633,7 @@ const translations = {
     'Small Animals': 'Animales pequeños', 'Large Animals': 'Animales grandes', 'Exotic Animals': 'Animales exóticos',
     'Surgery': 'Cirugía', 'Dentistry': 'Odontología', 'Emergency & Critical Care': 'Urgencias & Cuidados intensivos',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    menuAccomTile: 'Inmuebles · Residencias',
     accomTabProperty: 'Inmuebles',
     accomTabHotels: 'Hoteles',
     hotelClassStar5: '5 estrellas',
@@ -12149,6 +12156,7 @@ const translations = {
     'Small Animals': 'Kleintiere', 'Large Animals': 'Großtiere', 'Exotic Animals': 'Exotische Tiere',
     'Surgery': 'Chirurgie', 'Dentistry': 'Zahnmedizin', 'Emergency & Critical Care': 'Notfall & Intensivpflege',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    menuAccomTile: 'Immobilien · Wohnheime',
     accomTabProperty: 'Immobilien',
     accomTabHotels: 'Hotels',
     hotelClassStar5: '5 Sterne',
@@ -13670,6 +13678,7 @@ const translations = {
     'Small Animals': 'حیوانات کوچک', 'Large Animals': 'حیوانات بزرگ', 'Exotic Animals': 'حیوانات اگزوتیک',
     'Surgery': 'جراحی', 'Dentistry': 'دندانپزشکی', 'Emergency & Critical Care': 'اورژانس و مراقبت ویژه',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    menuAccomTile: 'املاک · خوابگاه',
     accomTabProperty: 'املاک',
     accomTabHotels: 'هتل‌ها',
     hotelClassStar5: '۵ ستاره',

@@ -153,7 +153,10 @@ export function width(str, px) {
 
 // ─── Greedy wrap, matching RN: a word too wide for an empty line breaks mid-word ──
 export function wrap(str, px, maxW) {
-  const words = str.split(/\s+/).filter(Boolean)
+  // Break opportunities are ordinary whitespace only. JS \s also matches U+00A0, but React
+  // Native never breaks at a no-break space, and the Emlak tile binds its '·' separators
+  // to the word before them with one (menuAccomTile) so no line can START with '·'.
+  const words = str.split(/[ \t\n\r]+/).filter(Boolean)
   const lines = []
   let cur = '', midWord = false
   const push = () => { if (cur) { lines.push(cur); cur = '' } }
@@ -289,7 +292,7 @@ let tightestLatin = { spare: Infinity }
 // label on three lines at a smaller size (see `gridLabel` in constants/homeModules.js),
 // and a checker that assumed 2 would have failed that tile for needing the third line it
 // is designed to take — then been "fixed" by loosening the rule for every other label.
-function assess(label, str, px, box, where, cursive, maxLines = 2) {
+function assess(label, str, px, box, where, cursive, maxLines = 2, leadingDot = false) {
   checked++
   const { lines, midWord } = wrap(str, px, box)
   // PASS/FAIL is unchanged and has never used the slack figure — it is midWord and the
@@ -303,6 +306,9 @@ function assess(label, str, px, box, where, cursive, maxLines = 2) {
   } else if (lines.length > maxLines) {
     problems.push(`${where}: ${JSON.stringify(str)} needs ${lines.length} lines, the box holds ${maxLines} -> `
       + lines.map(l => JSON.stringify(l)).join(' / '))
+  } else if (leadingDot && lines.some(l => l.startsWith('·'))) {
+    problems.push(`${where}: ${JSON.stringify(str)} wraps a line onto a leading '·' (bind it with U+00A0) -> `
+      + lines.map(l => JSON.stringify(l)).join(' / '))
   }
 }
 
@@ -314,7 +320,9 @@ for (const W of WIDTHS) {
       // labelKey is what the FAVOURITES row and the edit sheet's picker render — they do
       // not receive the override — so it stays measured at 11pt / 2 lines for every
       // module including the one that overrides.
-      assess('tile', t(m.labelKey, L), 11, labelBox(W), `${W}dp ${L} tile:${m.id}`, CURSIVE.has(L))
+      // leadingDot: tile labels only. ⚠ KNOWN, NOT YET FIXED (2026-09-29): the Ev Hizmetleri
+      // gridLabel (hsTitle, partner copy) wraps onto a leading '·' in ru@320dp and fa@393dp.
+      assess('tile', t(m.labelKey, L), 11, labelBox(W), `${W}dp ${L} tile:${m.id}`, CURSIVE.has(L), 2, true)
       // gridLabel is what the GRID renders. Size and line count are READ FROM THE CONFIG,
       // never assumed here: if this file hardcoded 8.5 and 3 it would be a second copy of
       // a number that lives in constants/homeModules.js, and the day somebody tuned one
