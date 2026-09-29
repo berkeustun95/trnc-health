@@ -40,7 +40,7 @@ export const AREAS_BY_REGION = {
     'Aydınköy', 'Gaziveren',
   ],
   iskele: [    // İskele
-    'Merkez', 'Long Beach', 'Boğaz', 'Bafra', 'Yeni İskele',
+    'Merkez', 'Long Beach', 'Boğaz', 'Yeni İskele',
     'Ötüken', 'Kurtuluş',
   ],
   lefke: [     // Lefke
@@ -50,6 +50,12 @@ export const AREAS_BY_REGION = {
   karpaz: [    // Karpaz
     'Yenierenköy', 'Dipkarpaz', 'Büyükkonuk', 'Kaleburnu',
     'Sipahi', 'Kuruova', 'Avtepe',
+    // Moved from iskele 2026-09-29 to agree with constants/regions.js ("EAST OF BOĞAZ =
+    // KARPAZ"; the Bafra resort strip resolves to karpaz by design). 0 properties and 0
+    // facilities carried area 'bafra' at the move. ⚠ The Novest mapping still takes district
+    // from the agency's STATE (İskele), so a future Novest Bafra listing gets area NULL under
+    // iskele until that mapping learns the same rule and sync-novest is redeployed.
+    'Bafra',
   ],
 }
 
