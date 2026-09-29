@@ -234,6 +234,30 @@ export function normaliseFile(text, listDate) {
   return { rows: out, errors, warnings }
 }
 
+// ─── RE-KEYING: identity survives a member number arriving, or a region correction ─
+// external_id is kitob-<member no> or kitob-<name slug>-<region>. Two things can change it
+// without the hotel changing: KITOB adds member numbers, or ADA corrects a region (Kaplıca,
+// The Arkın İskele, 2026-09-29). Without a re-key the old row is delisted and a new dark row
+// inserted, losing coordinates. A region move is taken ONLY when exactly one existing row has
+// the same name slug in a DIFFERENT region and that row is not itself in the file — two real
+// hotels sharing a name in two districts must never merge.
+export function planRekeys(rows, existingIds) {
+  const ids = new Set(existingIds), inFile = new Set(rows.map(r => r.external_id)), out = []
+  for (const r of rows) {
+    if (ids.has(r.external_id)) continue
+    let from = null
+    if (r.external_id !== r.slug_id && ids.has(r.slug_id)) from = r.slug_id
+    else if (r.external_id === r.slug_id) {
+      const base = r.slug_id.slice(0, -(r.region.length + 1))
+      const cands = [...ids].filter(id => id.startsWith(base + '-') && REGIONS.includes(id.slice(base.length + 1))
+        && id !== r.external_id && !inFile.has(id))
+      if (cands.length === 1) from = cands[0]
+    }
+    if (from) { out.push({ from, to: r.external_id }); ids.delete(from); ids.add(r.external_id) }
+  }
+  return out
+}
+
 // ─── THE PAYLOAD, AND WHY COORDINATES ARE SPECIAL ─────────────────────────────
 // A PostgREST upsert sets every column present in the payload. KITOB's file carries no
 // coordinates, so sending lat/lng from it would write NULL over every geocoded pin on the
@@ -306,6 +330,12 @@ function selfTest() {
   const renamed = normaliseFile('kaynak_adi;otel_adi;sinif;ilce\nDorona Art Hotel;Dorana Art Hotel;2 Yıldız;Girne\n', '2026-10-01')
   t('kaynak_adi keeps identity through a name correction', [renamed.rows[0]?.external_id, renamed.rows[0]?.name], ['kitob-dorona-art-hotel-kyrenia', 'Dorana Art Hotel'])
   t('is_kitob_member true', good.rows.every(r => r.is_kitob_member), true)
+  // Region correction keeps identity; ambiguity and a still-listed twin never merge.
+  const mv = { external_id: 'kitob-skali-iskele', slug_id: 'kitob-skali-iskele', region: 'iskele' }
+  t('region move re-keys the single old row', planRekeys([mv], ['kitob-skali-karpaz', 'kitob-other-kyrenia']), [{ from: 'kitob-skali-karpaz', to: 'kitob-skali-iskele' }])
+  t('two old candidates: ambiguous, no re-key', planRekeys([mv], ['kitob-skali-karpaz', 'kitob-skali-famagusta']), [])
+  t('old row still in the file: two real hotels, no re-key', planRekeys([mv, { external_id: 'kitob-skali-karpaz', slug_id: 'kitob-skali-karpaz', region: 'karpaz' }], ['kitob-skali-karpaz']), [])
+  t('member number arrives: slug id re-keyed', planRekeys([{ external_id: 'kitob-12', slug_id: 'kitob-x-kyrenia', region: 'kyrenia' }], ['kitob-x-kyrenia']), [{ from: 'kitob-x-kyrenia', to: 'kitob-12' }])
   // A list update never wipes a coordinate: a coordinate-free file sends no lat/lng key at all.
   const geocoded = new Map([[good.rows[0].external_id, { lat: 35.33 }]])
   const p1 = buildPayloads(good.rows, geocoded, 'now')
@@ -388,13 +418,8 @@ async function main() {
   if (count !== existing.length) fail(`read ${existing.length} of ${count} existing hotels — refusing to diff a partial set.`)
 
   const byId = new Map(existing.map(r => [r.external_id, r]))
-  const rekey = []
-  for (const r of rows) {
-    if (!byId.has(r.external_id) && r.external_id !== r.slug_id && byId.has(r.slug_id)) {
-      rekey.push({ from: r.slug_id, to: r.external_id })
-      byId.set(r.external_id, byId.get(r.slug_id)); byId.delete(r.slug_id)
-    }
-  }
+  const rekey = planRekeys(rows, [...byId.keys()])
+  for (const { from, to } of rekey) { byId.set(to, byId.get(from)); byId.delete(from) }
   const present = new Set(rows.map(r => r.external_id))
   const inserts = [], updates = [], relists = []
   let unchanged = 0
@@ -412,7 +437,7 @@ async function main() {
   console.log(`  insert     ${inserts.length}   (land dark: is_active DEFAULT false)`)
   console.log(`  update     ${updates.length}`)
   console.log(`  unchanged  ${unchanged}   (content_hash match — not written)`)
-  console.log(`  re-key     ${rekey.length}   (slug id → member-number id)`)
+  console.log(`  re-key     ${rekey.length}   (identity kept: member number arrived or region corrected)`)
   console.log(`  relist     ${relists.length}   (delisted_at cleared; is_active untouched)`)
   console.log(`  delist     ${delists.length}   (delisted_at = now; row kept)`)
   for (const d of delists) console.log(`    ${d}`)

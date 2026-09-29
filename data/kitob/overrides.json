@@ -1,5 +1,5 @@
 {
-  "_readme": "ADA's corrections to KITOB's data. Applied by scripts/convert-kitob-xlsx.py on every conversion, so they survive future KITOB list imports. Keyed on KITOB's own hotel name exactly as it appears in the list (column B, website removed, whitespace collapsed). An override that matches no hotel is reported as UNUSED: KITOB may have fixed it, so review and retire it. 'field' is a template column (otel_adi, web_sitesi, telefon, eposta, adres); value null clears it. Never edit these hotels by hand in prod; change this file and re-import.",
+  "_readme": "ADA's corrections to KITOB's data. Applied by scripts/convert-kitob-xlsx.py on every conversion, so they survive future KITOB list imports. Keyed on KITOB's own hotel name exactly as it appears in the list (column B, website removed, whitespace collapsed). An override that matches no hotel is reported as UNUSED: KITOB may have fixed it, so review and retire it. 'field' is a template column (otel_adi, web_sitesi, telefon, eposta, adres, ilce); value null clears it. Never edit these hotels by hand in prod; change this file and re-import. geocode_waivers are read by scripts/geocode-kitob-hotels.mjs only (keyed on external_id).",
   "overrides": [
     {
       "kitob_name": "GRAND PASHA NICOSIA HOTEL CASINO SPA",
@@ -22,6 +22,23 @@
       "field": "web_sitesi",
       "value": null,
       "reason": "KITOB lists doranatourism.com, which lands on a server error page. The likely site, mimozabeachhotel.com, shows 0392 378 81 68 (KITOB: 0392 444 20 50) and presents as 4 stars / 20 rooms (KITOB: 3 stars / 94 beds). Hidden until KITOB confirms the site and phone (vault: questions for KITOB).",
+      "date": "2026-09-29",
+      "by": "Berke"
+    },
+    {
+      "kitob_name": "THE ARKIN İSKELE HOTEL",
+      "field": "ilce",
+      "value": "İskele",
+      "reason": "KITOB lists it as 'Bafra, İSKELE' (→ Karpaz), but the Google Places cross-check matches its phone (0392 632 20 00) at Yeni İskele, Makenzi Cad., and the app's region lookup puts that point in İskele. KITOB's 'Bafra' looks wrong.",
+      "date": "2026-09-29",
+      "by": "Berke"
+    }
+  ],
+  "geocode_waivers": [
+    {
+      "external_id": "kitob-grand-sapphire-resort-iskele",
+      "check": "region_audit",
+      "reason": "Long Beach, Yeni İskele — İskele district. The app's region lookup says famagusta because the point sits on the famagusta/iskele anchor boundary; phone, name and OSM all agree it is the hotel. Region stays İskele.",
       "date": "2026-09-29",
       "by": "Berke"
     }

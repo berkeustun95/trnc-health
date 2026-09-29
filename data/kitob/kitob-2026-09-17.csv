@@ -50,7 +50,7 @@ uye_no;kaynak_adi;otel_adi;sinif;ilce;adres;telefon;eposta;web_sitesi;enlem;boyl
 ;Ingate Hotel;Ingate Hotel;2 Yıldız;Gazimağusa;;(+90 392) 365 02 34;;https://www.ingatehotel.com;;
 ;Kaan Hotel Apart;Kaan Hotel Apart;Apart Otel;Girne;;(+90 392) 815 45 15;;https://www.kaanhotel.com;;
 ;Kaşgar Court Hotel;Kaşgar Court Hotel;2 Yıldız;Girne;;(+90 392) 815 59 34;;https://www.kasgarcourt.com;;
-;Kaplıca Hotel & Bungalow;Kaplıca Hotel & Bungalow;2 Yıldız;Karpaz;Kaplıca;(+90 392) 387 2032;;;;
+;Kaplıca Hotel & Bungalow;Kaplıca Hotel & Bungalow;2 Yıldız;İskele;Kaplıca;(+90 392) 387 2032;;;;
 ;Karpaz Gate Marina;Karpaz Gate Marina;Butik Otel;Karpaz;Yeni Erenköy;(+90 533) 833 0222;;https://www.karpazbay.com;;
 ;Kaya Artemis Resort & Casino;Kaya Artemis Resort & Casino;5 Yıldız;Karpaz;Bafra;(+90 392) 630 60 00;;https://www.kayahotels.com;;
 ;Kaya Palazzo Resort Hotel;Kaya Palazzo Resort Hotel;5 Yıldız;Girne;Karaoğlanoğlu;(+90 392) 650 80 00;;https://www.kayahotels.com;;
@@ -88,10 +88,10 @@ uye_no;kaynak_adi;otel_adi;sinif;ilce;adres;telefon;eposta;web_sitesi;enlem;boyl
 ;Royal Palace Hotel;Royal Palace Hotel;3 Yıldız;Lefkoşa;Gönyeli;(+90 533) 866 99 33;;https://royal-palace.cyprushotel.net;;
 ;Salamis Bay Conti Resort Hotel;Salamis Bay Conti Resort Hotel;5 Yıldız;Gazimağusa;Salamis;(+90 392) 378 82 01;;https://www.salamisbayconti.com;;
 ;Sammys Hotel;Sammys Hotel;2 Yıldız;Girne;;(+90 392) 815 62 79;;;;
-;Skali Restoran ve Tatil Köyü;Skali Restoran ve Tatil Köyü;1 Yıldız;Karpaz;Kaplıca;(+90) 533 863 60 63;;;;
+;Skali Restoran ve Tatil Köyü;Skali Restoran ve Tatil Köyü;1 Yıldız;İskele;Kaplıca;(+90) 533 863 60 63;;;;
 ;Sky Roof Hotel;Sky Roof Hotel;3 Yıldız;Lefkoşa;;(+90 392) 444 00 60;;https://www.skyroofhotel.com;;
 ;Sunport Hotel;Sunport Hotel;3 Yıldız;Girne;Alsancak;(+90 392) 821 82 36;;;;
-;The Arkın İskele Hotel;The Arkın İskele Hotel;5 Yıldız;Karpaz;Bafra;(+90 392) 632 20 00;;;;
+;The Arkın İskele Hotel;The Arkın İskele Hotel;5 Yıldız;İskele;Bafra;(+90 392) 632 20 00;;;;
 ;The Colony Hotel;The Colony Hotel;5 Yıldız;Girne;;(+90 392) 815 15 18;;;;
 ;The Pine Bay Club Hotel;The Pine Bay Club Hotel;2 Yıldız;Girne;Alsancak;(+90 392) 822 30 32;;;;
 ;The Ship Inn Hotel;The Ship Inn Hotel;3 Yıldız;Girne;;(+90 392) 815 67 01;;https://www.theshipinn.com;;

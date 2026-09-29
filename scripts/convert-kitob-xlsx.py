@@ -16,7 +16,7 @@ import csv, json, os, re, sys, zipfile, xml.etree.ElementTree as ET
 
 SHEET = 'Alfabetik liste'
 OVERRIDES = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'kitob', 'overrides.json')
-OVERRIDABLE = {'otel_adi', 'web_sitesi', 'telefon', 'eposta', 'adres'}
+OVERRIDABLE = {'otel_adi', 'web_sitesi', 'telefon', 'eposta', 'adres', 'ilce'}
 EXPECTED_ROWS = 102
 NS = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
       'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
@@ -31,7 +31,9 @@ CITIES = {'GİRNE': 'Girne', 'İSKELE': 'İskele', 'GAZİMAĞUSA': 'Gazimağusa'
 # Karpaz is ADA's 7th region; KITOB files these villages under İSKELE. Berke 2026-09-29: follow
 # constants/regions.js, "east of Boğaz = Karpaz" (Bafra resort strip included). Boğaz and İskele
 # centre stay İskele. Only applied when KITOB's city is İSKELE.
-KARPAZ_VILLAGES = {'Bafra', 'Yeni Erenköy', 'Kaplıca', 'Mehmetçik'}
+# Kaplıca removed 2026-09-29 (Berke): the app's region lookup puts Kaplıca (north coast, west of
+# Boğaz's longitude) in İskele, and the hotels follow the lookup.
+KARPAZ_VILLAGES = {'Bafra', 'Yeni Erenköy', 'Mehmetçik'}
 
 # Links that point at a directory or an unrelated site rather than the hotel (Berke, 2026-09-29).
 GENERIC_SITES = {'northcyprus.net'}
