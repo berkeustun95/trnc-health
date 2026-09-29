@@ -190,12 +190,15 @@ export const metaArray = (p, k) => {
 //
 // Verified against all 21 combinations present in the live feed: every one resolves,
 // and only 21853 (no terms at all) falls through.
-const TYPE_PRIORITY = [
+export const TYPE_PRIORITY = [
   ['land',       ['arsa', 'arazi', 'tarla']],
   ['studio',     ['studyo']],
   ['villa',      ['villa', 'ikiz-villa', 'bungalow']],
   ['house',      ['mustakil-ev']],
-  ['commercial', ['isyeri', 'dukkan', 'ticari', 'depo', 'magaza', 'ofis', 'otel']],
+  // komple-bina (added to their taxonomy by 2026-09-29, top-level, not under Ticari): a whole
+  // building sold as one asset — the first one (21853) is a commercial block with a shop and
+  // eight flats. An investment purchase, not a home: commercial, never 'apartment'.
+  ['commercial', ['isyeri', 'dukkan', 'ticari', 'depo', 'magaza', 'ofis', 'otel', 'komple-bina']],
   ['apartment',  ['apartman-dairesi', 'penthouse', 'zemin-kat-daire', 'apartman', 'dubleks']],
 ]
 
@@ -203,7 +206,7 @@ const TYPE_PRIORITY = [
 // listing carries nothing else, which happens on exactly 2 rows (22055, 21804). Both are
 // ground-floor flats by their own titles, so apartment is the truthful fallback and not
 // a shrug.
-const KONUT = 'konut'
+export const KONUT = 'konut'
 
 export function mapPropertyType(slugs) {
   for (const [ours, theirs] of TYPE_PRIORITY) {
@@ -225,6 +228,28 @@ export const DISTRICT_BY_STATE = {
 // Their spelling vs constants/areas.js. Three real places written two ways, NOT a
 // fuzzy matcher: a fuzzy match on Turkish place names would happily equate Girne's
 // Boğaz with İskele's Boğaz, which are 40 km apart.
+// ─── Where a listing goes: district from the agency's STATE, area from its CITY ─────────────
+// One function for both callers (scripts/import-novest-properties.mjs and
+// supabase/functions/sync-novest), so they cannot drift apart. areas.js is passed in rather
+// than imported, because the Edge Function resolves it by its own relative path.
+//
+// ⚠ KARPAZ. The agency has no Karpaz state; a Bafra / Yenierenköy / Dipkarpaz listing arrives
+//   under İskele. ADA's rule (constants/regions.js: "east of Boğaz = Karpaz"; areas.js since
+//   2026-09-29) puts those villages in karpaz. So when the state says İskele and the city is a
+//   KARPAZ area, the listing moves to karpaz WITH its area. Only that pair moves: a city that is
+//   an İskele area, or matches nothing, stays exactly as before.
+export function placeListing(stateSlug, citySlug, areasByRegion, areaSlugOf) {
+  let district = DISTRICT_BY_STATE[stateSlug] ?? null
+  let area = null
+  if (citySlug && district) {
+    const cand = AREA_ALIASES[citySlug] ?? citySlug
+    const inRegion = r => (areasByRegion[r] || []).some(n => areaSlugOf(n) === cand)
+    if (inRegion(district)) area = cand
+    else if (district === 'iskele' && inRegion('karpaz')) { district = 'karpaz'; area = cand }
+  }
+  return { district, area }
+}
+
 export const AREA_ALIASES = {
   'yeni-kent': 'yenikent',
   'yeni-sehir': 'yenisehir',

@@ -50,7 +50,7 @@ import { createClient } from '@supabase/supabase-js'
 import {
   SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, assertNoPhone,
   num, int, meta, metaArray, mapPropertyType, extractDeedType, coordsInCyprus,
-  INTENT_BY_STATUS, DISTRICT_BY_STATE, AREA_ALIASES, FEATURE_TO_COLUMN,
+  INTENT_BY_STATUS, DISTRICT_BY_STATE, AREA_ALIASES, FEATURE_TO_COLUMN, placeListing,
 } from '../supabase/functions/_shared/novest-feed.mjs'
 import { AREAS_BY_REGION, areaSlug } from '../constants/areas.js'
 
@@ -176,16 +176,11 @@ function toRow(p, ctx) {
   }
 
   const stateSlug = (p.property_state || []).map(i => ctx.states.get(i)?.slug).filter(Boolean)[0]
-  const district = DISTRICT_BY_STATE[stateSlug] ?? null
-
-  // area only when it matches constants/areas.js EXACTLY, within that district. No fuzzy
-  // matching: Girne's Boğaz and İskele's Boğaz are 40 km apart and share a name.
+  // area only when it matches constants/areas.js EXACTLY, within its district (no fuzzy
+  // matching: Girne's Boğaz and İskele's Boğaz are 40 km apart). Karpaz villages filed under
+  // İskele move to karpaz — see placeListing in novest-feed.mjs.
   const citySlug = (p.property_city || []).map(i => ctx.cities.get(i)?.slug).filter(Boolean)[0]
-  let area = null
-  if (citySlug && district) {
-    const candidate = AREA_ALIASES[citySlug] ?? citySlug
-    if ((AREAS_BY_REGION[district] || []).some(n => areaSlug(n) === candidate)) area = candidate
-  }
+  const { district, area } = placeListing(stateSlug, citySlug, AREAS_BY_REGION, areaSlug)
 
   // Features that own a column are excluded from the chip list so the same fact does not
   // render twice. Empty => NULL, never []: properties_amenities_shape_check uses

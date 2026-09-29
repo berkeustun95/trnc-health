@@ -27,7 +27,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   SOURCE, AGENCY_ID, getAll, decodeEntities, cleanDescription, assertNoPhone,
   num, int, meta, mapPropertyType, extractDeedType, coordsInCyprus,
-  INTENT_BY_STATUS, DISTRICT_BY_STATE, AREA_ALIASES, FEATURE_TO_COLUMN,
+  INTENT_BY_STATUS, DISTRICT_BY_STATE, AREA_ALIASES, FEATURE_TO_COLUMN, placeListing,
 } from '../_shared/novest-feed.mjs'
 import { AREAS_BY_REGION, areaSlug } from '../../../constants/areas.js'
 
@@ -135,14 +135,9 @@ Deno.serve(async () => {
       if (price === null || price <= 0) { skipped.push(`${p.id}: price ${JSON.stringify(meta(p, 'fave_property_price'))}`); continue }
 
       const stateSlug = (p.property_state || []).map((i: number) => ST.get(i)?.slug).filter(Boolean)[0]
-      const district = DISTRICT_BY_STATE[stateSlug] ?? null
-
       const citySlug = (p.property_city || []).map((i: number) => CI.get(i)?.slug).filter(Boolean)[0]
-      let area: string | null = null
-      if (citySlug && district) {
-        const cand = AREA_ALIASES[citySlug] ?? citySlug
-        if ((AREAS_BY_REGION[district] || []).some((n: string) => areaSlug(n) === cand)) area = cand
-      }
+      // Same function as the local importer: Karpaz villages filed under İskele move to karpaz.
+      const { district, area } = placeListing(stateSlug, citySlug, AREAS_BY_REGION, areaSlug)
 
       const featureSlugs = (p.property_feature || []).map((i: number) => F.get(i)?.slug).filter(Boolean)
       const amenityNames = (p.property_feature || [])
