@@ -18,6 +18,8 @@ import { hotelArea } from '../utils/hotelArea.js'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
 const FIXTURE = args.includes('--fixture') ? args[args.indexOf('--fixture') + 1] : null
+// --google <file>: use that Google list instead of the newest applied one (projection from a dry run).
+const GOOGLE_ARG = args.includes('--google') ? args[args.indexOf('--google') + 1] : null
 
 const { rows, errors } = normaliseFile(readFileSync(resolve(ROOT, 'data/kitob/kitob-2026-09-17.csv'), 'utf8'), '2026-09-17')
 if (errors.length) { console.error(errors.join('\n')); process.exit(1) }
@@ -27,6 +29,12 @@ if (!osmFiles.length) { console.error('no applied data/kitob/geocode-osm-<stamp>
 const osmFile = osmFiles.at(-1)
 const pins = new Map(readFileSync(resolve(ROOT, 'data/kitob', osmFile), 'utf8').trim().split('\n').slice(1)
   .map(l => l.split(';')).map(c => [`${c[0]}|${c[1]}`, { lat: +c[5], lng: +c[6] }]))
+
+// Google-sourced pins (20261062, known risk): the newest APPLIED geocode-google-<stamp>.csv.
+const gFile = GOOGLE_ARG || (() => { const f = readdirSync(resolve(ROOT, 'data/kitob')).filter(x => /^geocode-google-\d+\.csv$/.test(x)).sort().at(-1); return f && `data/kitob/${f}` })()
+const gpins = new Map(gFile ? readFileSync(resolve(ROOT, gFile), 'utf8').trim().split('\n').slice(1)
+  .map(l => l.split(';')).map(c => [`${c[0]}|${c[1]}`, { lat: +c[3], lng: +c[4], source: 'google_places' }]) : [])
+console.log(`Google pins from ${gFile || '(none applied yet)'}: ${gpins.size}`)
 
 // Pins placed since, through the placement tool (npm run place): progress maps hotel → OSM id,
 // placement-pulled.json holds that element's coordinates.
@@ -39,12 +47,15 @@ const placed = new Map(Object.entries(progress).filter(([, v]) => v.kind === 'ho
 console.log(`hotels placed through the tool: ${placed.size}`)
 
 const hotels = rows.map(r => {
-  const p = placed.get(r.external_id) || pins.get(`${r.name}|${r.region}`)
+  const g = gpins.get(`${r.name}|${r.region}`)
+  const p = placed.get(r.external_id) || pins.get(`${r.name}|${r.region}`) || g
   return { id: r.external_id, name: r.name, kitob_class: r.kitob_class, region: r.region, address: r.address,
     phone: r.phone, website: r.website, lat: p?.lat ?? null, lng: p?.lng ?? null,
-    geocode_source: p ? 'osm' : null, photo_url: null, is_kitob_member: true }
+    geocode_source: p ? (p.source || 'osm') : null, photo_url: null, is_kitob_member: true }
 })
-const matchedPins = hotels.filter(h => h.lat != null).length
+const matchedPins = hotels.filter(h => pins.has(`${h.name}|${h.region}`)).length
+const matchedG = hotels.filter(h => gpins.has(`${h.name}|${h.region}`)).length
+if (matchedG !== gpins.size) { console.error(`✗ ${gpins.size - matchedG} Google pin row(s) matched no hotel`); process.exit(1) }
 console.log(`KITOB rows ${hotels.length} · OSM pins from ${osmFile}: ${pins.size} rows, ${matchedPins} matched to a hotel`)
 if (matchedPins !== pins.size) { console.error(`✗ ${pins.size - matchedPins} pin row(s) matched no hotel — name/region keys drifted`); process.exit(1) }
 

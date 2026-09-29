@@ -37,13 +37,15 @@ function HotelCard({ hotel, lang, district }) {
     logContactEvent('hotels', hotel.id, 'website', district)
     Linking.openURL(hotel.website).catch(() => {})
   }
-  // Only offered when the hotel has a corroborated coordinate (20261060 provenance). A name
-  // search was the fallback until 2026-09-29; it was dropped because an unverified search
-  // result is exactly the wrong-street pin the provenance rules exist to prevent.
+  // A stored pin (OSM, or a corroborated Google Place) opens exactly there. A hotel whose match
+  // failed corroboration has NO pin by design (Berke 2026-09-29: Ünbay, Hamsa, Mimoza, Arkın
+  // İskele, Hotel Sun) and gets a maps SEARCH instead — never a guessed coordinate.
   const hasCoords = hotel.lat != null && hotel.lng != null
   function map() {
     logContactEvent('hotels', hotel.id, 'maps', district)
-    Linking.openURL(`https://maps.google.com/?q=${hotel.lat},${hotel.lng}`).catch(() => {})
+    const q = hasCoords ? `${hotel.lat},${hotel.lng}`
+      : encodeURIComponent([hotel.name, hotel.address || t(REGION_LABEL_KEY[hotel.region], 'Turkish'), 'North Cyprus'].join(', '))
+    Linking.openURL(`https://maps.google.com/?q=${q}`).catch(() => {})
   }
 
   return (
@@ -87,12 +89,10 @@ function HotelCard({ hotel, lang, district }) {
               <Text style={hs.actionText} numberOfLines={1}>{t('hotelWebsite', lang)}</Text>
             </TouchableOpacity>
           )}
-          {hasCoords && (
-            <TouchableOpacity style={hs.action} onPress={map} activeOpacity={0.85}>
-              <Ionicons name="map-outline" size={16} color={colors.primary} />
-              <Text style={hs.actionText} numberOfLines={1}>{t('hotelMap', lang)}</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity style={hs.action} onPress={map} activeOpacity={0.85}>
+            <Ionicons name="map-outline" size={16} color={colors.primary} />
+            <Text style={hs.actionText} numberOfLines={1}>{t('hotelMap', lang)}</Text>
+          </TouchableOpacity>
         </View>
         {hasCoords && hotel.geocode_source === 'osm' && <OsmAttribution lang={lang} style={hs.credit} />}
       </View>

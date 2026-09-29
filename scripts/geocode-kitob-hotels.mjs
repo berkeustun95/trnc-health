@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-// ─── KITOB hotels → OSM coordinates, cross-checked against Google Places ────
+// ─── KITOB hotels → a pin: OSM where it agrees, else the corroborated Google Place ─
 //
 //   GOOGLE_PLACES_API_KEY=… npm run hotels:geocode -- --dry-run [--limit 10]
-//   GOOGLE_PLACES_API_KEY=… npm run hotels:geocode -- --apply        (needs 20261061)
+//   GOOGLE_PLACES_API_KEY=… npm run hotels:geocode -- --apply        (needs 20261062)
 //
-// STORAGE POLICY (Berke 2026-09-29, CLAUDE.md "Geocoding"): Google Places is a CROSS-CHECK
-// ONLY. Its latitude/longitude, names and addresses are never stored — not in the database and
-// not in the CSVs this writes. The place ID may be stored (hotels.google_place_id).
+// POLICY (Berke 2026-09-29, revised; CLAUDE.md "Geocoding"): Google Places pins are accepted as
+// a KNOWN RISK (Places caching terms). A corroborated Places coordinate is stored when no OSM
+// element agrees: geocode_source 'google_places', tier 2, google_place_id required (20261062),
+// and a row on data/geocode-exceptions/google-pins.csv. A hotel that fails corroboration gets NO
+// pin (its Harita button searches by name instead).
 //
 // For each hotel without coordinates:
 //   1. CROSS-CHECK. Places Text Search → up to 3 candidates. A candidate is the hotel when ALL of
@@ -15,9 +17,10 @@
 //        • address_town  the candidate's address names the village, the district, or a known
 //                        alias of either (TOWN_WORDS; accents stripped: Κερύνειας, Γαλάτεια)
 //        • and at least one of phone_match / name_match / osm.
-//   2. SOURCE. The STORED coordinate is an OSM lodging within 150 m of that candidate whose name
-//      agrees. Written as geocode_source 'osm', tier 1, with 'google_places' in the corroboration.
-//   Anything short of 1+2 is NOT written and goes on the hand-placement list (tier 3, satellite).
+//   2. SOURCE. An OSM lodging within 150 m of that candidate whose name agrees → its coordinate,
+//      geocode_source 'osm', tier 1, 'google_places' in the corroboration. No such element → the
+//      Places coordinate itself, 'google_places', tier 2 (known risk).
+//   Failing 1 (or hand_only in overrides.json) → no pin; listed as a Harita-search fallback.
 //
 // --dry-run reads the CSV and never opens a database client. --apply writes only rows that still
 // have no coordinates, and never overwrites a pin.
@@ -172,7 +175,16 @@ async function main() {
   console.log(`OSM lodging in TRNC: ${osm.length}`)
   const osmNear = (lat, lng) => osm.filter(o => km(lat, lng, o.lat, o.lng) * 1000 <= OSM_AGREE_M)
 
-  const todo = rows.filter(r => !APPLY || idByExt.get(r.external_id)?.lat == null).slice(0, LIMIT)
+  // Only hotels without a pin. APPLY asks the DB; a dry run uses the newest APPLIED OSM output
+  // (the 58 pins) so it looks at the same 44 hotels an apply would.
+  let pinned = new Set()
+  if (DRY) {
+    const { readdirSync } = await import('node:fs')
+    const f = readdirSync(resolve(ROOT, 'data/kitob')).filter(x => /^geocode-osm-\d+\.csv$/.test(x)).sort().at(-1)
+    if (f) pinned = new Set(readFileSync(resolve(ROOT, 'data/kitob', f), 'utf8').trim().split('\n').slice(1).map(l => l.split(';')).map(c => `${c[0]}|${c[1]}`))
+    console.log(`dry run: skipping ${pinned.size} hotels already pinned (${f || 'no applied OSM list'})`)
+  }
+  const todo = rows.filter(r => APPLY ? idByExt.get(r.external_id)?.lat == null : !pinned.has(`${r.name}|${r.region}`)).slice(0, LIMIT)
   const regionTr = { kyrenia: 'Girne', nicosia: 'Lefkoşa', famagusta: 'Gazimağusa', iskele: 'İskele', morphou: 'Güzelyurt', lefke: 'Lefke', karpaz: 'Karpaz' }
   const results = []
   for (const h of todo) {
@@ -182,7 +194,9 @@ async function main() {
     const pick = waivers.get(h.external_id)?.has('hand_only') ? null : judged.find(j => j.pass)
     // Nearest agreeing OSM element to the corroborated candidate supplies the coordinate.
     const src = pick && pick.osm.map(o => ({ o, m: km(pick.lat, pick.lng, o.lat, o.lng) * 1000 })).sort((a, b) => a.m - b.m)[0]
-    results.push({ h, pick, src, best: judged[0] })
+    // For the report only: what a hand_only hotel's best candidate would have been.
+    const wouldPass = waivers.get(h.external_id)?.has('hand_only') ? judged.find(j => j.pass) || null : undefined
+    results.push({ h, pick, src, best: judged[0], wouldPass })
     await new Promise(r => setTimeout(r, 120))
   }
 
@@ -192,10 +206,10 @@ async function main() {
   for (const [, list] of byPlace) if (list.length > 1) for (const r of list) { r.dupPlace = true }
 
   const osmSourced = results.filter(r => r.pick && r.src && !r.dupPlace)
-  const hand = results.filter(r => !osmSourced.includes(r))
-  const why = r => waivers.get(r.h.external_id)?.has('hand_only') ? 'hand placement by decision (overrides.json)'
+  const googleSourced = results.filter(r => r.pick && !r.src && !r.dupPlace)
+  const hand = results.filter(r => !osmSourced.includes(r) && !googleSourced.includes(r))
+  const why = r => waivers.get(r.h.external_id)?.has('hand_only') ? 'no pin by decision (overrides.json hand_only)'
     : r.dupPlace ? 'two hotels matched the same Place'
-    : r.pick ? 'Places confirms the hotel, but no agreeing OSM element within 150 m'
     : !r.best ? 'no Places result'
     : 'Places cross-check failed: missing ' + ['region_audit', 'address_town'].filter(g => !r.best.got.includes(g))
         .concat(r.best.got.some(g => ['phone_match', 'name_match', 'osm'].includes(g)) ? [] : ['phone/name/osm']).join('+')
@@ -209,22 +223,29 @@ async function main() {
         .eq('id', row.id).is('lat', null)
       if (error) fail(`write ${r.h.name}: ${error.message}`)
     }
-    // A confirmed Place id helps the hand-placer; store it even without coordinates.
-    for (const r of hand.filter(x => x.pick && !x.dupPlace)) {
-      const { error } = await sb.from('hotels').update({ google_place_id: r.pick.c.id }).eq('id', idByExt.get(r.h.external_id).id)
-      if (error) fail(`place id ${r.h.name}: ${error.message}`)
+    let wrote = 0
+    for (const r of googleSourced) {
+      const { data, error } = await sb.from('hotels').update({ lat: r.pick.lat, lng: r.pick.lng, geocode_source: 'google_places',
+        geocode_tier: 2, geocode_corroboration: r.pick.got, geocoded_at: new Date().toISOString(), google_place_id: r.pick.c.id })
+        .eq('id', idByExt.get(r.h.external_id).id).is('lat', null).select('id')
+      if (error) fail(`write ${r.h.name}: ${error.message}`)
+      wrote += data.length
     }
+    if (wrote !== googleSourced.length) fail(`Google pins written ${wrote} of ${googleSourced.length} — a row gained a pin meanwhile?`)
   }
 
   const byRegion = list => list.reduce((m, r) => (m[r.h.region] = (m[r.h.region] || 0) + 1, m), {})
   console.log(`\n${DRY ? 'DRY RUN' : 'APPLIED'} · ${todo.length} hotel(s)`)
   console.log(`  OSM-sourced (tier 1, Places-confirmed): ${osmSourced.length}  ${JSON.stringify(byRegion(osmSourced))}`)
-  console.log(`  needs hand placement:                   ${hand.length}  ${JSON.stringify(byRegion(hand))}`)
-  console.log(`    of which Places confirms the hotel:   ${hand.filter(r => r.pick && !r.dupPlace).length}`)
+  console.log(`  Google-sourced (tier 2, known risk):    ${googleSourced.length}  ${JSON.stringify(byRegion(googleSourced))}`)
+  console.log(`  NO PIN (Harita searches by name):       ${hand.length}`)
+  for (const r of hand) console.log(`    · ${r.h.name} (${r.h.region}${r.h.address ? ', ' + r.h.address : ''}) — ${why(r)}${
+    r.wouldPass === undefined ? '' : r.wouldPass ? ` · Google's best WOULD pass: "${r.wouldPass.c.displayName?.text}" [${r.wouldPass.got.join('+')}]` : " · Google's best would NOT pass either"}`)
   const moved = osmSourced.map(r => Math.round(r.src.m)).sort((a, b) => a - b)
   console.log(`  OSM vs Places distance: median ${moved[Math.floor(moved.length / 2)] ?? '-'} m, max ${moved.at(-1) ?? '-'} m`)
 
-  // Files hold OUR data, OSM data and the place ID only — never Places coordinates, names or addresses.
+  // Local, gitignored (data/kitob/geocode-*.csv). The google list holds Places coordinates — the
+  // same known risk as the DB rows it mirrors.
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
   const link = id => id ? `https://www.google.com/maps/place/?q=place_id:${id}` : ''
   const clean = v => String(v ?? '').replace(/;/g, ',')
@@ -232,6 +253,22 @@ async function main() {
   writeFileSync(accFile, ['name;region;adres;osm_id;osm_name;lat;lng;corroborated;google_place_id',
     ...osmSourced.map(r => [r.h.name, r.h.region, r.h.address, r.src.o.id, r.src.o.names[0], r.src.o.lat, r.src.o.lng,
       r.pick.got.filter(g => g !== 'osm').concat('google_places').join('+'), r.pick.c.id].map(clean).join(';'))].join('\n') + '\n')
+  const gFile = resolve(ROOT, `data/kitob/geocode-google-${stamp}${DRY ? '-dry' : ''}.csv`)
+  writeFileSync(gFile, ['name;region;adres;lat;lng;corroborated;google_place_id',
+    ...googleSourced.map(r => [r.h.name, r.h.region, r.h.address, r.pick.lat, r.pick.lng, r.pick.got.join('+'), r.pick.c.id].map(clean).join(';'))].join('\n') + '\n')
+  console.log(`  Google-sourced list → ${gFile.replace(ROOT + '/', '')}`)
+  // The committed known-risk list: one row per Google hotel pin (our data only). Pharmacy rows
+  // and other hotels' rows are kept as they are.
+  if (APPLY && googleSourced.length) {
+    const excPath = resolve(ROOT, 'data/geocode-exceptions/google-pins.csv')
+    const [head, ...rest] = readFileSync(excPath, 'utf8').trim().split('\n')
+    const ids = new Set(googleSourced.map(r => r.h.external_id))
+    const kept = rest.filter(l => !(l.startsWith('hotel;') && ids.has(l.split(';')[1])))
+    const add = googleSourced.map(r => ['hotel', r.h.external_id, r.h.name, r.h.region, r.h.address || '',
+      `Google Places, corroborated: ${r.pick.got.join('+')}`].map(clean).join(';'))
+    writeFileSync(excPath, [head, ...kept, ...add].join('\n') + '\n')
+    console.log(`  known-risk list: +${add.length} hotel rows → data/geocode-exceptions/google-pins.csv`)
+  }
   const handFile = resolve(ROOT, `data/kitob/geocode-hand-${stamp}${DRY ? '-dry' : ''}.csv`)
   writeFileSync(handFile, ['name;region;adres;phone;reason;google_place_id;places_link',
     ...hand.map(r => { const id = r.pick?.c.id || r.best?.c.id
