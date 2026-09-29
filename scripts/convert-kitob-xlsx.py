@@ -12,9 +12,11 @@ Bed counts are not carried (no column for them). The output feeds scripts/import
 
 Prints a review report: totals, generic websites hidden, and every value it had to repair.
 """
-import csv, re, sys, zipfile, xml.etree.ElementTree as ET
+import csv, json, os, re, sys, zipfile, xml.etree.ElementTree as ET
 
 SHEET = 'Alfabetik liste'
+OVERRIDES = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'kitob', 'overrides.json')
+OVERRIDABLE = {'otel_adi', 'web_sitesi', 'telefon', 'eposta', 'adres'}
 EXPECTED_ROWS = 102
 NS = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
       'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
@@ -178,13 +180,29 @@ def main(src, dst):
                 site = ('http://' if host in HTTP_ONLY else 'https://') + path
         else:
             report['no_site'].append(raw_name)
-        out.append({'uye_no': '', 'otel_adi': display_name(raw_name), 'sinif': klass or '',
+        out.append({'uye_no': '', 'kaynak_adi': display_name(raw_name), 'otel_adi': display_name(raw_name), 'sinif': klass or '',
                     'ilce': city or '', 'adres': village or '', 'telefon': tel, 'eposta': '',
                     'web_sitesi': site or '', 'enlem': '', 'boylam': '', '_kitob_name': raw_name})
+    # ─── ADA's corrections (data/kitob/overrides.json). kaynak_adi keeps the pre-override name,
+    # which is what the importer keys on, so a name correction never re-keys a hotel.
+    overrides = json.load(open(OVERRIDES, encoding='utf-8'))['overrides']
+    report['overrides'] = []
+    report['UNUSED overrides'] = []
+    for o in overrides:
+        if o['field'] not in OVERRIDABLE:
+            report['errors'].append(f"override for {o['kitob_name']!r}: field {o['field']!r} is not overridable")
+            continue
+        hits = [r for r in out if r['_kitob_name'] == o['kitob_name']]
+        if not hits:
+            report['UNUSED overrides'].append(f"{o['kitob_name']} ({o['field']}) — KITOB may have fixed it; review and retire")
+            continue
+        for r in hits:
+            report['overrides'].append(f"{o['kitob_name']}: {o['field']} {r[o['field']]!r} -> {o['value']!r} ({o['date']})")
+            r[o['field']] = o['value'] or ''
     if len(out) != EXPECTED_ROWS:
         report['errors'].append(f'{len(out)} hotels read, expected {EXPECTED_ROWS}')
     with open(dst, 'w', newline='', encoding='utf-8') as f:
-        cols = ['uye_no', 'otel_adi', 'sinif', 'ilce', 'adres', 'telefon', 'eposta', 'web_sitesi', 'enlem', 'boylam']
+        cols = ['uye_no', 'kaynak_adi', 'otel_adi', 'sinif', 'ilce', 'adres', 'telefon', 'eposta', 'web_sitesi', 'enlem', 'boylam']
         w = csv.DictWriter(f, fieldnames=cols, delimiter=';', extrasaction='ignore')
         w.writeheader()
         w.writerows(out)
@@ -192,7 +210,7 @@ def main(src, dst):
     print(f'{len(out)} hotels -> {dst}')
     print('classes:', dict(Counter(o['sinif'] for o in out)))
     print('regions:', dict(Counter(o['ilce'] for o in out)))
-    for k in ('errors', 'repairs', 'second_numbers', 'hidden', 'dead', 'no_site'):
+    for k in ('errors', 'overrides', 'UNUSED overrides', 'repairs', 'second_numbers', 'hidden', 'dead', 'no_site'):
         print(f'\n{k} ({len(report[k])}):')
         for line in report[k]:
             print('  ' + line)

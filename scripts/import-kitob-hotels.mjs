@@ -44,6 +44,9 @@ const fail = (...lines) => { for (const l of lines) console.error(l); process.ex
 export const COLUMNS = {
   member_no: ['uye_no', 'uye no', 'uyelik no', 'member_no'],
   name:      ['otel_adi', 'otel adi', 'otel', 'name'],
+  // Optional, ADA-internal (not in KITOB's template): the name the hotel's identity is keyed
+  // on, so an ADA name correction (data/kitob/overrides.json) never re-keys it.
+  key_name:  ['kaynak_adi'],
   klass:     ['sinif', 'sinifi', 'class'],
   district:  ['ilce', 'bolge', 'district'],
   address:   ['adres', 'address'],
@@ -190,6 +193,7 @@ export function normaliseRow(cells, idx, listDate, line) {
   const warnings = []
   const name = get('name').replace(/\s+/g, ' ')
   if (!name) return { error: `line ${line}: otel_adi is empty` }
+  const keyName = get('key_name').replace(/\s+/g, ' ') || name
   const klass = CLASS_ALIASES[fold(get('klass'))]
   if (!klass) return { error: `line ${line} (${name}): sinif "${get('klass')}" is not one of KITOB's 10 classes` }
   const region = DISTRICT_ALIASES[fold(get('district'))]
@@ -202,8 +206,8 @@ export function normaliseRow(cells, idx, listDate, line) {
   const [lat, lng, wc] = normCoords(get('lat'), get('lng'))
   for (const w of [wp, we, ww, wc]) if (w) warnings.push(`line ${line} (${name}): ${w}`)
   const row = {
-    external_id: memberNo ? `${SOURCE}-${slug(memberNo)}` : `${SOURCE}-${slug(name)}-${region}`,
-    slug_id: `${SOURCE}-${slug(name)}-${region}`,
+    external_id: memberNo ? `${SOURCE}-${slug(memberNo)}` : `${SOURCE}-${slug(keyName)}-${region}`,
+    slug_id: `${SOURCE}-${slug(keyName)}-${region}`,
     kitob_member_no: memberNo, name, kitob_class: klass, region,
     address: get('address').replace(/\s+/g, ' ') || null, phone, email, website, lat, lng,
     is_kitob_member: true, source: SOURCE, source_list_date: listDate,
@@ -299,6 +303,8 @@ function selfTest() {
   t('good file: 2 rows, 0 errors', [good.rows.length, good.errors.length], [2, 0])
   t('member no key', good.rows[0]?.external_id, 'kitob-12')
   t('slug key', good.rows[1]?.external_id, 'kitob-deniz-apart-nicosia')
+  const renamed = normaliseFile('kaynak_adi;otel_adi;sinif;ilce\nDorona Art Hotel;Dorana Art Hotel;2 Yıldız;Girne\n', '2026-10-01')
+  t('kaynak_adi keeps identity through a name correction', [renamed.rows[0]?.external_id, renamed.rows[0]?.name], ['kitob-dorona-art-hotel-kyrenia', 'Dorana Art Hotel'])
   t('is_kitob_member true', good.rows.every(r => r.is_kitob_member), true)
   // A list update never wipes a coordinate: a coordinate-free file sends no lat/lng key at all.
   const geocoded = new Map([[good.rows[0].external_id, { lat: 35.33 }]])
