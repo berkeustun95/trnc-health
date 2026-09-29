@@ -208,7 +208,8 @@ export function headroom(str, px, box, maxLines) {
 }
 
 // ═══ THE CHECK ══════════════════════════════════════════════════════════════
-import { HOME_MODULES, GRID_COLUMNS, GRID_LABEL_HEIGHT } from '../constants/homeModules.js'
+import { HOME_MODULES, GRID_COLUMNS, GRID_LABEL_HEIGHT, ACCOM_TILE_STATES } from '../constants/homeModules.js'
+import { HOTEL_ACTIONS } from '../constants/hotels.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
 
 // Both widths that matter: a typical modern phone, and the narrowest device in the fold
@@ -314,7 +315,10 @@ function assess(label, str, px, box, where, cursive, maxLines = 2, leadingDot = 
 
 for (const W of WIDTHS) {
   for (const L of Object.keys(LANG_CODES)) {
-    for (const m of HOME_MODULES) {
+    // The accommodation tile has two label states (HOTELS_LIVE off / on). Both are measured
+    // whatever the flag is, so a green check never depends on which state the file is in.
+    const modules = [...HOME_MODULES, ...Object.entries(ACCOM_TILE_STATES).map(([k, st]) => ({ id: `accommodation[${k}]`, ...st }))]
+    for (const m of modules) {
       // BOTH labels, and dropping either would leave a real surface unmeasured.
       //
       // labelKey is what the FAVOURITES row and the edit sheet's picker render — they do
@@ -330,6 +334,15 @@ for (const W of WIDTHS) {
         assess('tile', t(m.gridLabel.key, L), m.gridLabel.size, labelBox(W),
                `${W}dp ${L} gridLabel:${m.id}`, CURSIVE.has(L), m.gridLabel.lines, true)
       }
+    }
+    // ─── The hotel card's three action buttons (Oteller) ─────────────────────
+    // ONE line each, in the box HotelsTab draws (geometry from constants/hotels.js, never
+    // retyped here). "Web sitesi" was ellipsed on every card on the 2026-09-29 device test.
+    {
+      const A = HOTEL_ACTIONS
+      const content = W - 2 * A.listPadX - 2 * A.cardPadX
+      const box = (content - 2 * A.gap) / 3 - 2 * A.buttonPadX - 2 * A.border
+      for (const k of A.labelKeys) assess('card', t(k, L), A.fontSize, box, `${W}dp ${L} hotelButton:${k}`, CURSIVE.has(L), 1)
     }
     // ─── The strip's card copy ──────────────────────────────────────────────
     // Titles at 14pt over two lines; subtitles at 11pt, which the card renders on ONE, so a

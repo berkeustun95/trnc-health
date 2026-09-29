@@ -299,7 +299,8 @@ function selfTest() {
   t('i18n: 9 locale blocks found (control)', [starts.length, Object.keys(LANG_CODES).length], [9, 9])
   const UI_KEYS = [...Object.values(HOTEL_CLASS_LABEL_KEY), 'accomTabProperty', 'accomTabHotels',
     'hotelFilterClass', 'hotelKitobMember', 'hotelCall', 'hotelWebsite', 'hotelMap',
-    'hotelsSoonTitle', 'hotelsSoonBody', 'hotelsLoadError', 'hotelsNoResults']
+    'hotelsSoonTitle', 'hotelsSoonBody', 'hotelsLoadError', 'hotelsNoResults',
+    'menuAccomTile', 'menuAccomTileHotels', 'hotelPhotoCredit', 'hotelReadMore', 'hotelReadLess', 'osmAttribution']
   const missing = starts.flatMap((m, i) => {
     const block = src.slice(m.index, starts[i + 1]?.index ?? src.length)
     return UI_KEYS.filter(k => !new RegExp(`^ {4}${k}:`, 'm').test(block)).map(k => `${m[1]}.${k}`)

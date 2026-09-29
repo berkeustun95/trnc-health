@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { View, Text, Image, TouchableOpacity, FlatList, ActivityIndicator, Linking, StyleSheet } from 'react-native'
+import { View, Text, Image, TouchableOpacity, FlatList, ActivityIndicator, Linking, StyleSheet, Platform } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { colors, shadow } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import FilterDropdown from '../FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../../constants/regions'
-import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY, HOTEL_CLASS_STARS } from '../../constants/hotels'
+import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY, HOTEL_CLASS_STARS, HOTEL_ACTIONS } from '../../constants/hotels'
 import { logContactEvent } from '../../utils/logContactEvent'
 import { hotelArea } from '../../utils/hotelArea'
 import OsmAttribution from '../OsmAttribution'
@@ -25,9 +25,30 @@ const collator = new Intl.Collator('tr')
 const classLabel = (k, lang) => t(HOTEL_CLASS_LABEL_KEY[k], lang)
 const districtLabel = (r, lang) => t(REGION_LABEL_KEY[r], lang)
 
+// Description text: the viewer's language if present, else English (the t() convention) —
+// KITOB's guide publishes English only. Keys are FULL language names, never ISO codes.
+const describe = (hotel, lang) => hotel.description_i18n?.[lang] || hotel.description_i18n?.English || null
+
+// Harita opens a pin AT OUR COORDINATE, labelled with the hotel's name — the device test found
+// a bare `?q=lat,lng` shows the nearest labelled place instead (Acapulco opened its spa).
+// Android: geo: with a (label) is drawn exactly there. iOS: Apple Maps ll + q. A hotel with no
+// pin (corroboration failed — Berke 2026-09-29) gets a maps SEARCH by name and town, never a
+// guessed point. The https Google URL is the fallback if the scheme cannot open.
+function mapUrls(hotel, lang) {
+  const town = hotel.address || t(REGION_LABEL_KEY[hotel.region], 'Turkish')
+  const search = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${hotel.name}, ${town}, North Cyprus`)}`
+  if (hotel.lat == null || hotel.lng == null) return [search]
+  const at = `${hotel.lat},${hotel.lng}`, name = encodeURIComponent(hotel.name)
+  const native = Platform.OS === 'ios' ? `maps://?ll=${at}&q=${name}` : `geo:0,0?q=${at}(${name})`
+  return [native, `https://www.google.com/maps/search/?api=1&query=${at}`]
+}
+
 function HotelCard({ hotel, lang, district }) {
+  const [expanded, setExpanded] = useState(false)
   const stars = HOTEL_CLASS_STARS[hotel.kitob_class] || 0
-  const place = [districtLabel(hotel.region, lang), hotel.address].filter(Boolean).join(' · ')
+  const place = [hotel.address, districtLabel(hotel.region, lang)].filter(Boolean).join(' · ')
+  const description = describe(hotel, lang)
+  const hasCoords = hotel.lat != null && hotel.lng != null
 
   function call() {
     logContactEvent('hotels', hotel.id, 'call', district)
@@ -37,20 +58,28 @@ function HotelCard({ hotel, lang, district }) {
     logContactEvent('hotels', hotel.id, 'website', district)
     Linking.openURL(hotel.website).catch(() => {})
   }
-  // A stored pin (OSM, or a corroborated Google Place) opens exactly there. A hotel whose match
-  // failed corroboration has NO pin by design (Berke 2026-09-29: Ünbay, Hamsa, Mimoza, Arkın
-  // İskele, Hotel Sun) and gets a maps SEARCH instead — never a guessed coordinate.
-  const hasCoords = hotel.lat != null && hotel.lng != null
-  function map() {
+  async function map() {
     logContactEvent('hotels', hotel.id, 'maps', district)
-    const q = hasCoords ? `${hotel.lat},${hotel.lng}`
-      : encodeURIComponent([hotel.name, hotel.address || t(REGION_LABEL_KEY[hotel.region], 'Turkish'), 'North Cyprus'].join(', '))
-    Linking.openURL(`https://maps.google.com/?q=${q}`).catch(() => {})
+    for (const url of mapUrls(hotel, lang)) {
+      try { await Linking.openURL(url); return } catch {}
+    }
   }
 
   return (
     <View style={hs.card}>
-      {!!hotel.photo_url && <Image source={{ uri: hotel.photo_url }} style={hs.photo} resizeMode="cover" />}
+      <View style={hs.photoWrap}>
+        {hotel.photo_url ? (
+          <Image source={{ uri: hotel.photo_url }} style={hs.photo} resizeMode="cover" accessibilityIgnoresInvertColors />
+        ) : (
+          <View style={[hs.photo, hs.photoEmpty]}>
+            <Ionicons name="bed-outline" size={40} color={colors.textSecondary} />
+          </View>
+        )}
+        {hotel.photo_url && hotel.photo_source === 'hnc' && (
+          <Text style={hs.photoCredit} numberOfLines={1}>{t('hotelPhotoCredit', lang)}</Text>
+        )}
+      </View>
+
       <View style={hs.cardBody}>
         <Text style={hs.name} numberOfLines={2}>{hotel.name}</Text>
 
@@ -76,21 +105,29 @@ function HotelCard({ hotel, lang, district }) {
           <Text style={hs.placeText} numberOfLines={2}>{place}</Text>
         </View>
 
+        {!!description && (
+          <TouchableOpacity onPress={() => setExpanded(v => !v)} activeOpacity={0.7} accessibilityRole="button"
+            accessibilityState={{ expanded }}>
+            <Text style={hs.description} numberOfLines={expanded ? undefined : 3}>{description}</Text>
+            <Text style={hs.more}>{t(expanded ? 'hotelReadLess' : 'hotelReadMore', lang)}</Text>
+          </TouchableOpacity>
+        )}
+
         <View style={hs.actions}>
           {!!hotel.phone && (
             <TouchableOpacity style={[hs.action, hs.actionPrimary]} onPress={call} activeOpacity={0.85}>
-              <Ionicons name="call-outline" size={16} color="#fff" />
+              <Ionicons name="call-outline" size={18} color="#fff" />
               <Text style={[hs.actionText, hs.actionTextPrimary]} numberOfLines={1}>{t('hotelCall', lang)}</Text>
             </TouchableOpacity>
           )}
           {!!hotel.website && (
             <TouchableOpacity style={hs.action} onPress={website} activeOpacity={0.85}>
-              <Ionicons name="globe-outline" size={16} color={colors.primary} />
+              <Ionicons name="globe-outline" size={18} color={colors.primary} />
               <Text style={hs.actionText} numberOfLines={1}>{t('hotelWebsite', lang)}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={hs.action} onPress={map} activeOpacity={0.85}>
-            <Ionicons name="map-outline" size={16} color={colors.primary} />
+            <Ionicons name={hasCoords ? 'map-outline' : 'search-outline'} size={18} color={colors.primary} />
             <Text style={hs.actionText} numberOfLines={1}>{t('hotelMap', lang)}</Text>
           </TouchableOpacity>
         </View>
@@ -221,11 +258,18 @@ export default function HotelsTab({ lang }) {
 const hs = StyleSheet.create({
   // flexShrink:0 — a fixed-height row above a scrolling list (CLAUDE.md).
   filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexShrink: 0 },
-  listContent:   { paddingHorizontal: 16, paddingBottom: 32 },
+  listContent:   { paddingHorizontal: HOTEL_ACTIONS.listPadX, paddingBottom: 32 },
 
   card:          { backgroundColor: colors.cardBg, borderRadius: 20, marginBottom: 14, overflow: 'hidden', ...shadow },
-  photo:         { width: '100%', height: 150, backgroundColor: colors.border },
-  cardBody:      { padding: 16 },
+  photoWrap:     { position: 'relative' },
+  photo:         { width: '100%', height: 170, backgroundColor: colors.border },
+  photoEmpty:    { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight },
+  photoCredit:   { position: 'absolute', right: 8, bottom: 6, maxWidth: '90%', paddingHorizontal: 6, paddingVertical: 2,
+                   borderRadius: 6, backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 10,
+                   fontFamily: 'Inter_400Regular' },
+  description:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textPrimary, lineHeight: 19, marginTop: 10 },
+  more:          { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, marginTop: 4 },
+  cardBody:      { padding: HOTEL_ACTIONS.cardPadX },
   name:          { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 22 },
   metaRow:       { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 6 },
   stars:         { flexDirection: 'row', gap: 1 },
@@ -235,13 +279,14 @@ const hs = StyleSheet.create({
   placeRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 4, marginTop: 8 },
   placeText:     { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18 },
 
-  actions:       { flexDirection: 'row', gap: 8, marginTop: 14 },
+  actions:       { flexDirection: 'row', gap: HOTEL_ACTIONS.gap, marginTop: 14 },
   // borderWidth + borderRadius needs an explicit backgroundColor on Android (CLAUDE.md).
-  action:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-                   paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1.5,
-                   borderColor: colors.primary, backgroundColor: 'transparent' },
+  // Icon ABOVE label; geometry shared with the label guard (HOTEL_ACTIONS).
+  action:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4,
+                   paddingVertical: 9, paddingHorizontal: HOTEL_ACTIONS.buttonPadX, borderRadius: 12,
+                   borderWidth: HOTEL_ACTIONS.border, borderColor: colors.primary, backgroundColor: 'transparent' },
   actionPrimary: { backgroundColor: colors.primary },
-  actionText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, flexShrink: 1 },
+  actionText:    { fontSize: HOTEL_ACTIONS.fontSize, fontFamily: 'Inter_700Bold', color: colors.primary },
   actionTextPrimary: { color: '#fff' },
   credit:        { alignSelf: 'flex-end', marginTop: 8 },
 

@@ -117,8 +117,9 @@ function tabLabel(tab, lang) {
   return t('accomTabProperty', lang)
 }
 
-// Names only the tabs this bundle shows, so it can never announce a dark one.
-const HEADER_SUBTITLE = lang => (TABS.length > 1 ? TABS.map(tab => tabLabel(tab.id, lang)).join(' · ') : undefined)
+// The title names the tabs in their order ("Konaklama · Yurt · Emlak", or "Yurt · Emlak" while
+// hotels are dark) — the same key the Home tile shows. No subtitle: it only repeated the tabs.
+const TITLE_KEY = HOTELS_LIVE ? 'menuAccomTileHotels' : 'menuAccomTile'
 
 // ─── THE TOP TABS ─────────────────────────────────────────────────────────────
 // Equal-width segments on ONE line, so every tab is visible without scrolling in every
@@ -577,7 +578,7 @@ export default function AccommodationScreen({
   return (
     <SafeAreaView style={cs.safe} edges={['top']}>
       <PageBackground topic="accommodation" />
-      <ScreenHeader onBack={onClose} title={t('accomTitle', lang)} subtitle={HEADER_SUBTITLE(lang)} lang={lang} />
+      <ScreenHeader onBack={onClose} title={t(TITLE_KEY, lang)} lang={lang} />
 
       {TABS.length > 1 && <TabBar tab={tab} onChange={changeTab} lang={lang} />}
 
