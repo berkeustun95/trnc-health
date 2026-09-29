@@ -268,7 +268,7 @@ WITH report AS (
     ('1060_hotels_geocode_provenance','hotels','geocode_tier'),
     ('1060_hotels_geocode_provenance','hotels','geocode_corroboration'),
     ('1060_hotels_geocode_provenance','hotels','geocoded_at'),
-    -- The only Places data ADA stores (1061 storage policy): a cross-check id, never coordinates.
+    -- The Places place ID (1061). Since 1062 also the trace of every google_places pin (known risk).
     ('1061_hotels_places_crosscheck','hotels','google_place_id')
 
   ) e(m,t,c)
@@ -712,7 +712,9 @@ WITH report AS (
     ('1060_hotels_geocode_provenance','hotels_coords_provenance_check'),
     -- 1061. The UNIQUE is correctness: two hotels matched to one Place is a wrong match.
     ('1061_hotels_places_crosscheck','hotels_google_place_id_check'),
-    ('1061_hotels_places_crosscheck','hotels_google_place_id_key')
+    ('1061_hotels_places_crosscheck','hotels_google_place_id_key'),
+    -- 1062. A Google pin (known risk) must stay traceable: place id + tier 2.
+    ('1062_hotels_google_places','hotels_google_places_traceable_check')
 
   ) e(m,o)
 
@@ -3510,7 +3512,8 @@ WITH report AS (
                LIKE '%((lat IS NULL) = (geocode_source IS NULL))%((geocode_source IS NULL) = (geocoded_at IS NULL))%', false)
     -- (2) ⚠ RETIRED 2026-09-29 by 20261061: "hotels_geocode_source_check is exactly
     --   google_places/manual/osm/partner". 1061 removes google_places (storage policy: Places is a
-    --   cross-check only). Retired, not bumped — one fact, one owner: the 1061 token owns the set.
+    --   cross-check only). Retired, not bumped — one fact, one owner. 1062 put google_places back;
+    --   the 1062 token owns the set now.
     -- (3) Tier 1..3, matched on the RENDERING ('>= 1' / '<= 3'), never on BETWEEN (the 0919 trap).
     UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_geocode_tier_check is still 1..3',
       EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.hotels')
@@ -3525,26 +3528,30 @@ WITH report AS (
         WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_geocode_corroboration_check')
       IS NOT DISTINCT FROM ARRAY['address_town','google_places','name_match','osm','phone_exchange',
                                  'phone_match','region_audit','visual_satellite']
-    -- ── 1061: Google Places is a cross-check only ───────────────────────────────
-    -- (1) THE POLICY, AS A VOCABULARY. google_places is gone from the hotel source set; a
-    --     same-name DROP/ADD that put it back would pass E by name. Exact set.
-    UNION ALL SELECT '1061_hotels_places_crosscheck','hotels_geocode_source_check is exactly manual/osm/partner (no google_places)',
-      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
-         FROM pg_constraint c,
-              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
-        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_geocode_source_check')
-      IS NOT DISTINCT FROM ARRAY['manual','osm','partner']
-    -- (2) No hotel row carries a stored Places coordinate — the data half of the same policy.
-    --     Reached through to_jsonb so an unapplied 1060 reads false instead of killing QUERY 1.
-    UNION ALL SELECT '1061_hotels_places_crosscheck','no hotel row has geocode_source = google_places',
-      to_regclass('public.hotels') IS NOT NULL
-      AND NOT EXISTS(SELECT 1 FROM public.hotels h WHERE to_jsonb(h)->>'geocode_source' = 'google_places')
+    -- ── 1061: google_place_id ───────────────────────────────────────────────────
+    -- (1)+(2) ⚠ RETIRED 2026-09-29 by 20261062: "source set is exactly manual/osm/partner" and
+    --   "no hotel row has geocode_source = google_places". Berke reversed the policy the same day:
+    --   hotels take corroborated Google pins as a known risk. The 1062 token owns the set.
     -- (3) google_place_id is format-checked AND unique (two hotels, one Place = a wrong match).
     UNION ALL SELECT '1061_hotels_places_crosscheck','hotels.google_place_id: format CHECK + UNIQUE',
       EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.hotels')
         AND conname = 'hotels_google_place_id_check' AND pg_get_constraintdef(oid) LIKE '%google_place_id ~%')
       AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.hotels')
         AND conname = 'hotels_google_place_id_key' AND contype = 'u')
+    -- ── 1062: Google Places pins allowed again (known risk) ─────────────────────
+    -- (1) The source vocabulary as an exact SET. A same-name DROP/ADD that dropped a value would
+    --     pass E by name.
+    UNION ALL SELECT '1062_hotels_google_places','hotels_geocode_source_check is exactly google_places/manual/osm/partner',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_geocode_source_check')
+      IS NOT DISTINCT FROM ARRAY['google_places','manual','osm','partner']
+    -- (2) The traceability rule's body, not just its name: google_places ⇒ place id AND tier 2.
+    UNION ALL SELECT '1062_hotels_google_places','hotels_google_places_traceable_check requires google_place_id and tier 2',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_google_places_traceable_check')
+               LIKE '%google_places%google_place_id IS NOT NULL%geocode_tier = 2%', false)
   ) z
 
   UNION ALL
