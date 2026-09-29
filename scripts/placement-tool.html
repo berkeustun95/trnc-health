@@ -80,15 +80,20 @@ async function load() {
       <a class="btn primary" href="${esc(cur.idUrl)}" target="_blank" rel="noopener">Open in iD here</a>
       <button id="re">Re-check OSM</button>
       <button id="skip">Skip for now</button>
+    </div>
+    <div class="row">
+      <input id="osmid" placeholder="or paste node/123 or its openstreetmap.org link" style="flex:1;min-width:220px;font:inherit;padding:10px;border-radius:10px;border:1.5px solid var(--line);background:transparent;color:inherit">
+      <button id="useid">Use this id</button>
     </div>`
   $('re').onclick = recheck
+  $('useid').onclick = () => { const v = $('osmid').value.trim(); if (v) save(v, true) }
   $('skip').onclick = async () => { await post('/api/skip', { key: it.key }); say(''); load() }
 }
 async function recheck() {
   $('re').disabled = true; say('Asking Overpass… (a fresh edit takes ~1 min to appear)')
   try {
     const r = await post('/api/recheck', { key: cur.item.key })
-    say(`OSM data as of ${r.base}`)
+    say(`OSM data as of ${r.base} · searched ${r.radius / 1000} km around the centre — not listed? paste its id below`)
     $('cands').hidden = false
     $('cands').innerHTML = `<b>Nearby in OSM</b>` + (r.cands.length ? '' : '<p>Nothing yet — save in iD, wait a minute, re-check.</p>') +
       r.cands.map(c => `<div class="cand"><div>${esc(c.name)} <span class="${c.agrees ? 'agree' : 'differs'}">${c.agrees ? 'name agrees' : 'name differs'}</span>
@@ -97,11 +102,14 @@ async function recheck() {
     for (const b of $('cands').querySelectorAll('button')) b.onclick = () => save(b.dataset.osm, b.dataset.agrees === 'true')
   } catch (e) { say(e.message, 'err') } finally { $('re').disabled = false }
 }
-async function save(osm, agrees) {
-  if (!agrees && !confirm(`The OSM name does not match "${cur.item.name}". Use ${osm} anyway?`)) return
+async function save(osm, agrees, force = false) {
+  if (!agrees && !force && !confirm(`The OSM name does not match "${cur.item.name}". Use ${osm} anyway?`)) return
   say('Saving…')
-  try { const r = await post('/api/save', { key: cur.item.key, osm }); say(r.message, 'okmsg'); await load() }
-  catch (e) { say(e.message, 'err') }
+  try {
+    const r = await post('/api/save', { key: cur.item.key, osm, force })
+    if (r.confirm) { if (confirm(r.confirm)) return save(osm, true, true); return say('Not saved.') }
+    say(r.message, 'okmsg'); await load()
+  } catch (e) { say(e.message, 'err') }
 }
 load()
 </script>

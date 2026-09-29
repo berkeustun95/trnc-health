@@ -9,7 +9,7 @@
 // The area itself is computed on the device (utils/hotelArea.js), so a moved pin moves its
 // area with no re-run; this script only reports. Re-run it after any pin change to see the
 // new coverage.
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { normaliseFile } from './import-kitob-hotels.mjs'
@@ -28,8 +28,18 @@ const osmFile = osmFiles.at(-1)
 const pins = new Map(readFileSync(resolve(ROOT, 'data/kitob', osmFile), 'utf8').trim().split('\n').slice(1)
   .map(l => l.split(';')).map(c => [`${c[0]}|${c[1]}`, { lat: +c[5], lng: +c[6] }]))
 
+// Pins placed since, through the placement tool (npm run place): progress maps hotel → OSM id,
+// placement-pulled.json holds that element's coordinates.
+const progress = existsSync(resolve(ROOT, 'data/placement-progress.json')) ? JSON.parse(readFileSync(resolve(ROOT, 'data/placement-progress.json'), 'utf8')) : {}
+const pulled = existsSync(resolve(ROOT, 'data/osm/placement-pulled.json')) ? JSON.parse(readFileSync(resolve(ROOT, 'data/osm/placement-pulled.json'), 'utf8')).elements : []
+const placed = new Map(Object.entries(progress).filter(([, v]) => v.kind === 'hotel').map(([k, v]) => {
+  const e = pulled.find(x => `${x.type}/${x.id}` === v.osm)
+  return [k, e && { lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon }]
+}).filter(([, v]) => v))
+console.log(`hotels placed through the tool: ${placed.size}`)
+
 const hotels = rows.map(r => {
-  const p = pins.get(`${r.name}|${r.region}`)
+  const p = placed.get(r.external_id) || pins.get(`${r.name}|${r.region}`)
   return { id: r.external_id, name: r.name, kitob_class: r.kitob_class, region: r.region, address: r.address,
     phone: r.phone, website: r.website, lat: p?.lat ?? null, lng: p?.lng ?? null,
     geocode_source: p ? 'osm' : null, photo_url: null, is_kitob_member: true }

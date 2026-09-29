@@ -29,6 +29,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { normaliseFile, fold } from './import-kitob-hotels.mjs'
 import { AREA_POINTS } from '../constants/areaPoints.js'
+import { resolveRegion } from '../utils/resolveRegion.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DRY = process.argv.includes('--dry')
@@ -40,11 +41,15 @@ const PROGRESS = resolve(ROOT, 'data/placement-progress.json')        // gitigno
 const PULLED = resolve(ROOT, 'data/osm/placement-pulled.json')        // our snapshot of placed elements
 const PENDING = { 'kitob-mimoza-hotel-famagusta': 'pending KITOB (identity of Mimoza Hotel)' }
 const FLAGGED_FIRST = ['meliz', 'cevher', 'arkan']
-const RECHECK_M = 2500
+const RECHECK_M = 2500, RECHECK_FALLBACK_M = 8000, PHARMACY_FAR_M = 10000
 // Organised Editing Guidelines: every changeset comment carries the hashtag AND links the page.
 const WIKI = 'https://wiki.openstreetmap.org/wiki/Organised_Editing/Activities/ADA_North_Cyprus_places'
 
 const fail = m => { console.error(m); process.exit(1) }
+// Same region audit the geocoder ran: a hotel pin must resolve to the hotel's region, unless
+// Berke waived it (overrides.json geocode_waivers, check region_audit — Grand Sapphire).
+const REGION_WAIVED = new Set((JSON.parse(readFileSync(resolve(ROOT, 'data/kitob/overrides.json'), 'utf8')).geocode_waivers || [])
+  .filter(w => w.check === 'region_audit').map(w => w.external_id))
 const readJson = (p, d) => existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : d
 
 // ─── names ──────────────────────────────────────────────────────────────────
@@ -95,20 +100,41 @@ const key = DRY ? env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 const sb = createClient(env.EXPO_PUBLIC_SUPABASE_URL, key, { auth: { persistSession: false } })
 
 // ─── the queue ──────────────────────────────────────────────────────────────
+// Hotel keys, in hand-list order: the newest APPLIED hand list if it is still on disk (its
+// Places columns are never read), else — the file is gitignored and may be cleaned up — the
+// hotels still without a pin, from the DB (read once at start; placed ones stay in the queue
+// as done, via placement-progress.json).
+async function hotelKeys() {
+  const { rows } = normaliseFile(readFileSync(resolve(ROOT, 'data/kitob/kitob-2026-09-17.csv'), 'utf8'), '2026-09-17')
+  const handFile = readdirSync(resolve(ROOT, 'data/kitob')).filter(f => /^geocode-hand-\d+\.csv$/.test(f)).sort().at(-1)
+  if (handFile) {
+    const [head, ...lines] = readFileSync(resolve(ROOT, 'data/kitob', handFile), 'utf8').trim().split('\n')
+    const col = Object.fromEntries(head.split(';').map((h, i) => [h, i]))
+    return lines.map(l => l.split(';')).map(c => {
+      const k = rows.find(r => r.name === c[col.name] && r.region === c[col.region])
+      if (!k) fail(`hand list row "${c[col.name]}" (${c[col.region]}) is not in the KITOB file — keys drifted`)
+      return k.external_id
+    })
+  }
+  if (DRY) fail('no data/kitob/geocode-hand-<stamp>.csv, and --dry cannot read unpublished hotels')
+  const { data, error, count } = await sb.from('hotels').select('external_id', { count: 'exact' }).is('lat', null).is('delisted_at', null)
+  if (error) fail(error.message)
+  if (data.length !== count) fail(`read ${data.length} of ${count} hotels`)
+  const done = Object.keys(readJson(PROGRESS, {}))
+  console.log(`hotel queue from the DB (no hand-list file): ${data.length} without a pin`)
+  return [...new Set([...done.filter(k => k.startsWith('kitob-')), ...data.map(r => r.external_id)])]
+}
+const HOTEL_KEYS = await hotelKeys()
+
 function buildQueue() {
   const progress = readJson(PROGRESS, {})
   // Hotels: the newest APPLIED hand list. Only name/region/adres/phone are kept — its Places
   // columns (place id, maps link) are dropped here and never reach the page.
-  const handFile = readdirSync(resolve(ROOT, 'data/kitob')).filter(f => /^geocode-hand-\d+\.csv$/.test(f)).sort().at(-1)
-  if (!handFile) fail('no applied data/kitob/geocode-hand-<stamp>.csv')
-  const [head, ...lines] = readFileSync(resolve(ROOT, 'data/kitob', handFile), 'utf8').trim().split('\n')
-  const col = Object.fromEntries(head.split(';').map((h, i) => [h, i]))
   const { rows } = normaliseFile(readFileSync(resolve(ROOT, 'data/kitob/kitob-2026-09-17.csv'), 'utf8'), '2026-09-17')
-  const hotels = lines.map(l => l.split(';')).map(c => {
-    const name = c[col.name], region = c[col.region]
-    const k = rows.find(r => r.name === name && r.region === region)
-    if (!k) fail(`hand list row "${name}" (${region}) is not in the KITOB file — keys drifted`)
-    return { key: k.external_id, kind: 'hotel', name, region, address: c[col.adres] || '', phone: c[col.phone] || k.phone || '',
+  const hotels = HOTEL_KEYS.map(key => {
+    const k = rows.find(r => r.external_id === key)
+    if (!k) fail(`hotel ${key} is not in the KITOB file — keys drifted`)
+    return { key, kind: 'hotel', name: k.name, region: k.region, address: k.address || '', phone: k.phone || '',
       source: `KITOB list 2026-09-17 · ${k.kitob_class}`, website: k.website || '' }
   })
   const exc = readFileSync(EXC, 'utf8').trim().split('\n').slice(1).map(l => l.split(';'))
@@ -141,20 +167,28 @@ async function overpass(q) {
   throw new Error('Overpass unavailable — try again in a minute')
 }
 const FEATURE = {
+  // Same set the hotel geocoder accepted (it also took leisure=resort — e.g. a holiday
+  // village's reception node), so a pin it wrote is never "not a hotel" here.
   hotel: '["tourism"~"^(hotel|resort|guest_house|apartment|hostel|motel|chalet)$"]',
+  hotelResort: '["leisure"="resort"]',
   pharmacy: '["amenity"="pharmacy"]',
 }
 async function recheck(item) {
   const c = centreFor(item.address, item.region)
-  const q = `[out:json][timeout:40];nwr${FEATURE[item.kind]}(around:${RECHECK_M},${c.lat},${c.lng});out center meta;`
+  // A district-centre fallback is only a rough start, so it searches wider.
+  const radius = c.zoom <= 15 ? RECHECK_FALLBACK_M : RECHECK_M
+  const around = `(around:${radius},${c.lat},${c.lng})`
+  const q = item.kind === 'hotel'
+    ? `[out:json][timeout:40];(nwr${FEATURE.hotel}${around};nwr${FEATURE.hotelResort}${around};);out center meta;`
+    : `[out:json][timeout:40];nwr${FEATURE.pharmacy}${around};out center meta;`
   const snap = await overpass(q)
-  return { base: snap.osm3s?.timestamp_osm_base, cands: snap.elements.map(e => ({
+  return { base: snap.osm3s?.timestamp_osm_base, radius, cands: snap.elements.map(e => ({
     osm: `${e.type}/${e.id}`, name: e.tags?.name || '(no name)', lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon,
     user: e.user, at: e.timestamp, agrees: nameAgrees(item.name, [e.tags?.name, e.tags?.['name:tr'], e.tags?.['name:en']].filter(Boolean).join(' ')),
   })).filter(x => x.lat != null).sort((a, b) => (b.agrees - a.agrees) || b.at.localeCompare(a.at)).slice(0, 15) }
 }
 
-async function save(item, osm) {
+async function save(item, osm, force = false) {
   // Coordinates come from OSM by id, fetched here — never from the page.
   const [type, id] = osm.split('/')
   if (!['node', 'way', 'relation'].includes(type) || !/^\d+$/.test(id)) throw new Error(`bad OSM id ${osm}`)
@@ -162,13 +196,22 @@ async function save(item, osm) {
   const e = snap.elements[0]
   if (!e) throw new Error(`${osm} not found on Overpass yet (base ${snap.osm3s?.timestamp_osm_base}) — wait a minute`)
   const lat = e.lat ?? e.center?.lat, lng = e.lon ?? e.center?.lon
-  const want = FEATURE[item.kind].includes('pharmacy') ? e.tags?.amenity === 'pharmacy' : /^(hotel|resort|guest_house|apartment|hostel|motel|chalet)$/.test(e.tags?.tourism || '')
+  const want = item.kind === 'pharmacy' ? e.tags?.amenity === 'pharmacy'
+    : /^(hotel|resort|guest_house|apartment|hostel|motel|chalet)$/.test(e.tags?.tourism || '') || e.tags?.leisure === 'resort'
   if (!want) throw new Error(`${osm} is not tagged as a ${item.kind} in OSM`)
+  if (item.kind === 'hotel') {
+    const got = resolveRegion(lat, lng)
+    if (got !== item.region && !REGION_WAIVED.has(item.key))
+      throw new Error(`${osm} lies in ${got || 'no TRNC region'}, the hotel is filed under ${item.region} — wrong hotel? (waivers: overrides.json region_audit)`)
+  } else {
+    const c = centreFor(item.address, item.region), d = metres(c.lat, c.lng, lat, lng)
+    if (d > PHARMACY_FAR_M && !force) return { confirm: `${osm} is ${(d / 1000).toFixed(1)} km from ${c.why.replace('address names ', '')}. Save anyway?` }
+  }
   const agrees = nameAgrees(item.name, [e.tags?.name, e.tags?.['name:tr'], e.tags?.['name:en']].filter(Boolean).join(' '))
   const corroboration = agrees ? ['visual_satellite', 'name_match'] : ['visual_satellite']
   const now = new Date().toISOString()
   const summary = `${item.name} ← ${osm} "${e.tags?.name || ''}" (${lat.toFixed(6)}, ${lng.toFixed(6)})`
-  if (DRY) return `DRY — would write ${summary}`
+  if (DRY) return { message: `DRY — would write ${summary}` }
   if (item.kind === 'hotel') {
     const { data, error } = await sb.from('hotels').update({ lat, lng, geocode_source: 'osm', geocode_tier: 3,
       geocode_corroboration: corroboration, geocoded_at: now }).eq('external_id', item.key).is('lat', null).select('id')
@@ -194,7 +237,7 @@ async function save(item, osm) {
   const pulled = readJson(PULLED, { note: 'OSM elements pulled by scripts/placement-tool.mjs (ODbL)', elements: [] })
   pulled.elements = [...pulled.elements.filter(x => `${x.type}/${x.id}` !== osm), e]
   writeFileSync(PULLED, JSON.stringify(pulled))
-  return `saved ${summary}`
+  return { message: `saved ${summary}` }
 }
 
 // ─── HTTP ───────────────────────────────────────────────────────────────────
@@ -223,7 +266,12 @@ http.createServer(async (req, res) => {
     const item = buildQueue().all.find(x => x.key === body.key)
     if (!item) return send(res, 404, { error: 'unknown item' })
     if (req.url === '/api/recheck') return send(res, 200, await recheck(item))
-    if (req.url === '/api/save') return send(res, 200, { message: await save(item, String(body.osm || '')) })
+    if (req.url === '/api/save') {
+      // Accepts "node/123" or an openstreetmap.org URL pasted from iD's "View on openstreetmap.org".
+      const m = String(body.osm || '').match(/(node|way|relation)[/=](\d+)/)
+      if (!m) return send(res, 400, { error: 'give an OSM id like node/123 or an openstreetmap.org link' })
+      return send(res, 200, await save(item, `${m[1]}/${m[2]}`, body.force === true))
+    }
     if (req.url === '/api/skip') { skipped.add(item.key); return send(res, 200, { ok: true }) }
     send(res, 404, { error: 'not found' })
   } catch (e) { send(res, 500, { error: e.message }) }
