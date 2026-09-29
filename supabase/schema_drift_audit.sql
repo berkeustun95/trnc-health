@@ -686,7 +686,8 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('hotels', 'geocode_source', false, NULL, 'text'),
     ('hotels', 'geocode_tier', false, NULL, 'smallint'),
     ('hotels', 'geocode_corroboration', false, NULL, 'text[]'),
-    ('hotels', 'geocoded_at', false, NULL, 'timestamp with time zone')
+    ('hotels', 'geocoded_at', false, NULL, 'timestamp with time zone'),
+    ('hotels', 'google_place_id', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -824,8 +825,10 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('hotels_external_id_check', '-%|9|^[a-z]+-[a-z0-9][a-z0-9-]*$', 'external_id|source'),
     ('hotels_external_id_key', '', 'external_id'),
     ('hotels_geocode_corroboration_check', 'address_town|google_places|name_match|osm|phone_exchange|phone_match|region_audit|visual_satellite', 'geocode_corroboration'),
-    ('hotels_geocode_source_check', 'google_places|manual|osm|partner', 'geocode_source'),
+    ('hotels_geocode_source_check', 'manual|osm|partner', 'geocode_source'),
     ('hotels_geocode_tier_check', '1|3', 'geocode_tier'),
+    ('hotels_google_place_id_check', '10|^[A-Za-z0-9_-]{10,}$', 'google_place_id'),
+    ('hotels_google_place_id_key', '', 'google_place_id'),
     ('hotels_kitob_class_check', 'apart|boutique|bungalow|holiday_village|special_certified|star1|star2|star3|star4|star5', 'kitob_class'),
     ('hotels_kitob_member_check', 'kitob', 'is_kitob_member|source'),
     ('hotels_link_scheme_check', '^https://|^https?://', 'photo_url|website'),
