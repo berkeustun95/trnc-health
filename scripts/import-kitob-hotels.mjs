@@ -445,5 +445,8 @@ async function main() {
   console.log(`\nwritten. ${listedAfter} listed · ${liveAfter} published (is_active) · last_seen_at stamped on ${present.size}\n`)
 }
 
-if (process.argv.includes('--self')) selfTest()
-else if (process.argv[1] === fileURLToPath(import.meta.url)) main()
+// Only when run directly: scripts/geocode-kitob-hotels.mjs imports normaliseFile from here.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--self')) selfTest()
+  else main()
+}
