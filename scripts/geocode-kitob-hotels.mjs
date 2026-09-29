@@ -47,7 +47,8 @@ const GENERIC = new Set(['hotel', 'hotels', 'otel', 'resort', 'casino', 'spa', '
   'boutique', 'butik', 'tatil', 'koyu', 'restoran', 'port', 'premium', 'deluxe', 'luxury', 'city',
   'grand', 'royal', 'park', 'center', 'centre', 'inn', 'house', 'cyprus', 'kibris', 'north', 'lounge',
   'bar', 'court', 'golf', 'marina', 'de', 'di', 'la', 'le', 'les'])
-export const distinctive = name => fold(name).split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !GENERIC.has(w))
+// Apostrophes are dropped before splitting, so "Sammy's" and KITOB's "SAMMYS" agree.
+export const distinctive = name => fold(name).replace(/['’`]/g, '').split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !GENERIC.has(w))
 
 // District names as they appear in Google's formatted addresses (Turkish, English, Greek-derived).
 const DISTRICT_WORDS = {
@@ -82,10 +83,17 @@ export function corroborate(hotel, cand, osmNear) {
 // ─── OSM lodging in the TRNC (relation 2514541), one Overpass query ─────────
 async function loadOsm() {
   const q = `[out:json][timeout:60];area(3602514541)->.t;(nwr["tourism"~"^(hotel|guest_house|apartment|motel|resort|chalet|hostel)$"](area.t);nwr["leisure"="resort"](area.t););out center tags;`
-  const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q),
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'ADA-app hotel geocoder (berkeustun95)' } })
-  if (!res.ok) fail(`Overpass ${res.status}`)
-  const els = (await res.json()).elements || []
+  // The public Overpass servers 504 under load; try each endpoint twice before giving up.
+  const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
+  let els = null, last = ''
+  for (const url of ENDPOINTS) for (let i = 0; i < 2 && !els; i++) {
+    const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'ADA-app hotel geocoder (berkeustun95)' } })
+      .catch(e => ({ ok: false, status: e.message }))
+    if (res.ok) els = (await res.json()).elements || []
+    else { last = `${url} ${res.status}`; await new Promise(r => setTimeout(r, 5000)) }
+  }
+  if (!els) fail(`Overpass unavailable (${last})`)
   return els.map(e => ({ lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon,
     names: [e.tags?.name, e.tags?.['name:en'], e.tags?.['name:tr']].filter(Boolean) })).filter(e => e.lat && e.names.length)
 }
@@ -109,6 +117,7 @@ function selfTest() {
   t('refused: address names no town', corroborate(h, c('Kaşgar Court', 35.337, 33.318, 'Unnamed Road', null), none).pass, false)
   t('osm corroborates', corroborate(h, c('X', 35.337, 33.318, 'Girne', null), () => ['Kaşgar Court Hotel']).got.includes('osm'), true)
   t('Bafra resort resolves to karpaz', resolveRegion(35.40, 34.07), 'karpaz')
+  t("apostrophe: Sammy's matches SAMMYS", distinctive("Sammy's Hotel"), distinctive('Sammys Hotel'))
   console.log(bad ? `\n${bad} FAILED\n` : '\nall passed\n'); process.exit(bad ? 1 : 0)
 }
 
@@ -181,6 +190,12 @@ async function main() {
   console.log(`\n${DRY ? 'DRY RUN' : 'APPLIED'} · ${todo.length} hotel(s) · ${written.length} corroborated (tier 2) · ${review.length} to review`)
   console.log('  strong evidence among the written:', JSON.stringify(tally))
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
+  const acc = resolve(ROOT, `data/kitob/geocode-accepted-${stamp}${DRY ? '-dry' : ''}.csv`)
+  const acols = ['name', 'region', 'adres', 'candidate', 'candidate_address', 'lat', 'lng', 'corroborated']
+  writeFileSync(acc, [acols.join(';'), ...written.map(({ h, pick }) => [h.name, h.region, h.address || '',
+    pick.c.displayName?.text || '', pick.c.formattedAddress || '', pick.lat, pick.lng, pick.got.join('+')]
+    .map(v => String(v).replace(/;/g, ',')).join(';'))].join('\n') + '\n')
+  console.log(`  accepted list → ${acc.replace(ROOT + '/', '')}`)
   const out = resolve(ROOT, `data/kitob/geocode-review-${stamp}${DRY ? '-dry' : ''}.csv`)
   const cols = ['name', 'region', 'adres', 'phone', 'candidate', 'candidate_address', 'lat', 'lng', 'corroborated', 'missing', 'maps']
   writeFileSync(out, [cols.join(';'), ...review.map(r => cols.map(c => String(r[c]).replace(/;/g, ',')).join(';'))].join('\n') + '\n')

@@ -65,3 +65,6 @@ supabase/seed/gisekibris-feed-raw.json
 
 # Bundler gems (fastlane), installed locally — never commit
 vendor/
+
+# Geocoder output: holds Google Places results (terms limit caching) — never committed.
+data/kitob/geocode-*.csv
