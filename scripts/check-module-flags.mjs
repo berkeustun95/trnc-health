@@ -210,6 +210,9 @@ const EXPECTED_SCALARS = {
   // Yurtlar tab, so a working-tree flip left over from a device check would ship Yurtlar
   // early to every user, or hide it from them.
   DORMS_LIVE:            true,   // live 2026-09-13
+  // Oteller (KITOB hotels). Baselined because a flip publishes a third-party
+  // association's name and badge — permission first, see the precondition list on the flag.
+  HOTELS_LIVE:           false,
   // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar. Not a
   // MODULE_FLAGS key for the same mechanical reason DORMS_LIVE is not: it gates a PARTNER
   // inside a module that is already live, so there is no Coming Soon screen, no waitlist

@@ -84,6 +84,11 @@ check(liveIds.includes('dorm'),  `live tabs are missing 'dorm': ${liveIds.join('
 check(liveIds[0] === 'property' && liveIds[1] === 'dorm', `tabs are not Emlak | Yurtlar when live: ${liveIds.join(',')}`)
 check(liveIds.length === darkIds.length + 1, `live tabs should be exactly one longer than dark (${liveIds.length} vs ${darkIds.length})`)
 
+// Oteller (HOTELS_LIVE) never appears on the dorm flag alone, and all three read in order.
+const allIds = accomTabs({ dorm: true, hotel: true }).map(s => s.id)
+check(!liveIds.includes('hotel'), `'hotel' shows without its own flag: ${liveIds.join(',')}`)
+check(allIds.join(',') === 'property,dorm,hotel', `all-live tabs are not Emlak | Yurtlar | Oteller: ${allIds.join(',')}`)
+
 // Yurtlar is a TAB now, never an intent chip: 'dorm' reaching the chip row would send
 // .eq('intent', 'dorm') to a CHECK constraint that has never heard of it.
 check(!ACCOM_SEGMENTS.some(s => s.id === 'dorm'), `'dorm' is back in the Emlak chip row: ${ACCOM_SEGMENTS.map(s => s.id).join(',')}`)

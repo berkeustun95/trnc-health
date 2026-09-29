@@ -29,7 +29,8 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
-import { HOTEL_CLASSES } from '../constants/hotels.js'
+import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY } from '../constants/hotels.js'
+import { LANG_CODES } from '../constants/i18n.js'
 import { REGIONS } from '../constants/regions.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -240,6 +241,21 @@ function selfTest() {
   console.log('\n── import-kitob-hotels self-test ──')
   // The classes the importer can produce must be exactly the DB/app vocabulary.
   t('alias targets = HOTEL_CLASSES', [...new Set(Object.values(CLASS_ALIASES))].sort(), [...HOTEL_CLASSES].sort())
+  // Every key the Oteller tab renders is PRESENT in each of the nine locale blocks. Read
+  // from the table, not through t(): t() falls back to English, so a key missing from one
+  // locale still "resolves" (the trap scripts/check-dorms.mjs records). The new keys sit one
+  // per line at four-space indent, so a per-block line match is exact for them.
+  const src = readFileSync(resolve(ROOT, 'constants/i18n.js'), 'utf8')
+  const starts = [...src.matchAll(/^ {2}([a-z]{2}): \{$/gm)]
+  t('i18n: 9 locale blocks found (control)', [starts.length, Object.keys(LANG_CODES).length], [9, 9])
+  const UI_KEYS = [...Object.values(HOTEL_CLASS_LABEL_KEY), 'accomTabProperty', 'accomTabHotels',
+    'hotelFilterClass', 'hotelKitobMember', 'hotelCall', 'hotelWebsite', 'hotelMap',
+    'hotelsSoonTitle', 'hotelsSoonBody', 'hotelsLoadError', 'hotelsNoResults']
+  const missing = starts.flatMap((m, i) => {
+    const block = src.slice(m.index, starts[i + 1]?.index ?? src.length)
+    return UI_KEYS.filter(k => !new RegExp(`^ {4}${k}:`, 'm').test(block)).map(k => `${m[1]}.${k}`)
+  })
+  t(`i18n: ${UI_KEYS.length} Oteller keys present in every locale`, missing, [])
   t('district targets = REGIONS', [...new Set(Object.values(DISTRICT_ALIASES))].sort(), [...REGIONS].sort())
   t('fold İSKELE', fold('İSKELE'), 'iskele')
   t('fold Tatil Köyü', CLASS_ALIASES[fold('Tatil Köyü')], 'holiday_village')

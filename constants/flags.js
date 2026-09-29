@@ -338,6 +338,26 @@ export const HS_SELF_REGISTRATION = false
 // Reverting is this one boolean, and so is the emergency direction.
 export const DORMS_LIVE = true   // live 2026-09-13
 
+// Oteller — the KITOB member-hotel tab of Emlak & Konaklama (plan:
+// ~/ObsidianVault/10-ada/2026-09-29_hotels-kitob-PLAN.md). false = no Oteller tab, and the
+// header subtitle does not name it. true = the third top tab, reading public.hotels.
+//
+// Not a MODULE_FLAGS key, for the DORMS_LIVE reason: a tab inside a live module has no
+// Coming Soon screen and no waitlist. Its empty state (Oli, "coming soon") shows only
+// while no hotel is published.
+//
+// ⚠ DO NOT FLIP until ALL of these hold, in this order:
+//   1. KITOB's WRITTEN permission to show their list, their name and the "KITOB üyesi"
+//      badge. The badge without it implies an endorsement.
+//   2. 20261059 applied and verify_schema.sql's 1059 rows OK. Until then contact taps
+//      with module='hotels' are rejected and swallowed (logContactEvent cannot throw).
+//   3. The KITOB file imported (npm run hotels:import), checked while dark, THEN the rows
+//      published with a reviewed UPDATE … SET is_active = true (go-live SOP steps 1-3).
+//   4. Turkish device pass with this flipped LOCALLY, then this in BOTH files in one
+//      commit (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs), then OTA.
+//   5. hotels:health green. The list on kitob.org is dated 2023.
+export const HOTELS_LIVE = false
+
 // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar.
 //
 // ✓ LIVE 2026-09-24. Device pass done 2026-09-24 (Berke, Expo Go, guest). Pets content is

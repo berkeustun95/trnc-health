@@ -28,8 +28,8 @@
 
 // ─── THE TOP TABS AND THE EMLAK CHIP ROW, AS DATA ────────────────────────────
 //
-// Emlak & Konaklama opens with top tabs — Emlak | Yurtlar (| Oteller, slice 4 of the
-// hotels plan, 2026-09-29) — and Emlak keeps its own intent chip row beneath them. Yurtlar
+// Emlak & Konaklama opens with top tabs — Emlak | Yurtlar | Oteller (hotels plan,
+// 2026-09-29) — and Emlak keeps its own intent chip row beneath them. Yurtlar
 // was a fifth chip in that row until 2026-09-29; it is a TAB now, because it is not a
 // filter on `properties` at all (no query, no filters, no sort).
 //
@@ -41,6 +41,7 @@
 export const ACCOM_TABS = [
   { id: 'property' },
   { id: 'dorm', promoted: true, gated: true },
+  { id: 'hotel', gated: true },
 ]
 
 export const accomTabs = live => ACCOM_TABS.filter(tab => !tab.gated || live[tab.id] === true)

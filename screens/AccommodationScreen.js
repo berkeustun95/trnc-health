@@ -13,6 +13,7 @@ import AccommodationListInlineSlot from '../components/ads/AccommodationListInli
 import AccommodationListBottomSlot from '../components/ads/AccommodationListBottomSlot'
 import PropertyDetailScreen from './PropertyDetailScreen'
 import DormPartnerScreen from './DormPartnerScreen'
+import HotelsTab from '../components/accommodation/HotelsTab'
 import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { colors, shadow } from '../constants/theme'
@@ -20,7 +21,7 @@ import { t } from '../constants/i18n'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
-import { DORMS_LIVE } from '../constants/flags'
+import { DORMS_LIVE, HOTELS_LIVE } from '../constants/flags'
 import { accomTabs, accomLandingTab, ACCOM_SEGMENTS, ACCOM_LANDING, DORM_PARTNERS } from '../constants/dorms'
 import { partnerLogo } from '../constants/partnerAssets'
 
@@ -68,8 +69,9 @@ const PAGE = 20
 // All config, in constants/dorms.js. Tabs are derived from the flags, never read straight
 // off the config, so a dark tab can neither render nor be landed on. Module scope is
 // correct: both are constant for a given bundle.
-const TABS           = accomTabs({ dorm: DORMS_LIVE })
-const LANDING_TAB    = accomLandingTab({ dorm: DORMS_LIVE })
+const LIVE_TABS      = { dorm: DORMS_LIVE, hotel: HOTELS_LIVE }
+const TABS           = accomTabs(LIVE_TABS)
+const LANDING_TAB    = accomLandingTab(LIVE_TABS)
 const SEGMENTS       = ACCOM_SEGMENTS
 const LANDING_INTENT = ACCOM_LANDING
 const PROP_TYPES = ['apartment', 'villa', 'studio', 'house', 'land', 'commercial']
@@ -111,6 +113,7 @@ function intentLabel(intent, lang) {
 
 function tabLabel(tab, lang) {
   if (tab === 'dorm') return t('accomDorms', lang)
+  if (tab === 'hotel') return t('accomTabHotels', lang)
   return t('accomTabProperty', lang)
 }
 
@@ -447,6 +450,11 @@ export default function AccommodationScreen({
   // pagination. Switching tabs never touches Emlak's intent or filters, so coming back to
   // Emlak finds the list exactly as it was left.
   const isDorm = tab === 'dorm'
+  const isHotel = tab === 'hotel'
+  // Oteller is mounted on first visit and then only HIDDEN when you leave it, so its
+  // filters and scroll survive a trip to Emlak and back — as Emlak's do.
+  const [hotelsMounted, setHotelsMounted] = useState(LANDING_TAB === 'hotel')
+  function changeTab(next) { if (next === 'hotel') setHotelsMounted(true); setTab(next) }
 
   // 'all' mixes intents, currencies and rent periods, so a price sort there is
   // meaningless. Offer it only on a single-intent tab.
@@ -571,7 +579,7 @@ export default function AccommodationScreen({
       <PageBackground topic="accommodation" />
       <ScreenHeader onBack={onClose} title={t('accomTitle', lang)} subtitle={HEADER_SUBTITLE(lang)} lang={lang} />
 
-      {TABS.length > 1 && <TabBar tab={tab} onChange={setTab} lang={lang} />}
+      {TABS.length > 1 && <TabBar tab={tab} onChange={changeTab} lang={lang} />}
 
       {/* ─── EMLAK'S INTENT CHIPS: A WRAPPING ROW, NOT A HORIZONTAL SCROLL ─────
           Four chips did not fit on one line in ar/ru/el/fr, and a horizontal ScrollView
@@ -581,7 +589,7 @@ export default function AccommodationScreen({
 
           flexShrink:0 — a fixed-height row above a scrolling list gets vertically
           compressed once the list overflows, cropping its text top and bottom. */}
-      {!isDorm && (
+      {tab === 'property' && (
       <View style={cs.intentBar}>
         {SEGMENTS.map(seg => (
           <TouchableOpacity key={seg.id} style={[cs.intentTab, intent === seg.id && cs.intentTabActive]}
@@ -599,7 +607,7 @@ export default function AccommodationScreen({
           period. A greyed-out bar reads as broken (the same reasoning the area pill's own
           comment gives for never being disabled), and sorting one partner is not a
           feature. */}
-      {!isDorm && (
+      {tab === 'property' && (
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={cs.pillBar} contentContainerStyle={cs.pillBarContent}>
         <FilterDropdown label={t('accomFilterDistrict', lang)} lang={lang}
@@ -672,6 +680,9 @@ export default function AccommodationScreen({
       </ScrollView>
       )}
 
+      {/* Emlak / Yurtlar list and the Oteller tab are HIDDEN, never unmounted, when you
+          switch away, so each keeps its scroll position. */}
+      <View style={[cs.pane, isHotel && cs.hidden]}>
       {loading ? (
         <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
       ) : (
@@ -758,6 +769,13 @@ export default function AccommodationScreen({
             </>
           )}
         />
+      )}
+      </View>
+
+      {hotelsMounted && (
+        <View style={[cs.pane, !isHotel && cs.hidden]}>
+          <HotelsTab lang={lang} />
+        </View>
       )}
 
       {/* Price range + currency. Currency matters here beyond filtering: a price sort
@@ -867,6 +885,8 @@ const cs = StyleSheet.create({
   intentDotOnActive:   { backgroundColor: '#FFFFFF' },
 
   pillBar:             { flexGrow: 0, flexShrink: 0 },
+  pane:                { flex: 1 },
+  hidden:              { display: 'none' },
   pillBarContent:      { paddingHorizontal: 16, gap: 8, paddingBottom: 12 },
   clearPill:           { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.dangerLight, backgroundColor: colors.dangerLight },
   clearPillText:       { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
