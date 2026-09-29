@@ -804,9 +804,11 @@ went missing). Two mandatory rules:
   `manual` (tier 3, `visual_satellite` mandatory). OSM is ODbL: "© OpenStreetMap contributors"
   wherever those pins are shown.
 - Local files holding Places data (geocoder CSVs) are gitignored and deleted within 30 days.
-- Hotels enforce it structurally (20261061: no `google_places` source). Facilities still carry 349
-  `google_places` pharmacy pins pending re-sourcing (`scripts/resource-pharmacy-coords.mjs`);
-  `geocode-pharmacies-tier2.mjs` is retired.
+- Hotels enforce it structurally (20261061: no `google_places` source). Pharmacies: 67 re-sourced
+  to OSM (≤ 50 m); 282 Google pins remain as a committed, time-limited exception
+  (`data/geocode-exceptions/pharmacy-google-pins.csv`, `review_by`) until hand-placed.
+  `geocode-pharmacies-tier2.mjs` is retired. OSM data only via `scripts/lib/osm-snapshot.mjs`.
+- Credit: `components/OsmAttribution.js` (9 locales) on every map/card showing an `osm` pin.
 
 ## Social sign-in (Google + Apple, native) — from build 1.2.0
 
