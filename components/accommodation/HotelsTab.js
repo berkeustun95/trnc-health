@@ -17,7 +17,8 @@ import OsmAttribution from '../OsmAttribution'
 // filtered on the device — the dropdowns answer instantly and only offer values that
 // actually have a hotel behind them.
 
-const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, is_kitob_member'
+// photo_source drives the KITOB credit; description_i18n the card text (both 20261063).
+const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, photo_source, description_i18n, is_kitob_member'
 
 const CLASS_RANK = Object.fromEntries(HOTEL_CLASSES.map((k, i) => [k, i]))
 const collator = new Intl.Collator('tr')
