@@ -153,12 +153,14 @@ export const HOME_MODULES = [
   // `lines` and `size` are the price of a 32-char phrase in a quarter-width box. The
   // blocker is NOT the line count — it is the longest single WORD: Russian
   // "Обслуживание" is 84.2pt at 11pt against a 68pt box at 320dp, so it breaks mid-word
-  // however many lines it is given (4 lines measures identical to 3). 8.5pt is the
-  // largest size that clears all nine locales at 320dp; the true floor is 8.88pt,
-  // Russian. ModuleTile DERIVES lineHeight as GRID_LABEL_HEIGHT / lines, so the label box
+  // however many lines it is given (4 lines measures identical to 3). 8.5pt was the
+  // largest size that cleared all nine locales at 320dp (true floor 8.88pt, Russian).
+  // 8.2pt since 2026-09-29: ru and fa bind each '·' to the word before it with U+00A0 so no
+  // line starts with the separator, and the bound Russian token "Обслуживание ·" is 69.9pt
+  // at 8.5 against the 68pt box (mid-word break); at 8.2 it is 67.5pt. Decided by Berke. ModuleTile DERIVES lineHeight as GRID_LABEL_HEIGHT / lines, so the label box
   // stays exactly 32pt and this tile cannot alter the grid's row rhythm.
   { id: 'homeServices',       icon: 'hammer-outline',           tint: 'standard', labelKey: 'menuHomeServices',
-    gridLabel: { key: 'hsTitle', lines: 3, size: 8.5 } },
+    gridLabel: { key: 'hsTitle', lines: 3, size: 8.2 } },
   { id: 'transport',          icon: 'bus-outline',              tint: 'standard', labelKey: 'menuTransportation' },
   { id: 'garages',            icon: 'car-sport-outline',        tint: 'standard', labelKey: 'menuGarages' },
   { id: 'insurance',          icon: 'shield-checkmark-outline', tint: 'standard', labelKey: 'menuInsurance' },

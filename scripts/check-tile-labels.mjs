@@ -320,8 +320,6 @@ for (const W of WIDTHS) {
       // labelKey is what the FAVOURITES row and the edit sheet's picker render — they do
       // not receive the override — so it stays measured at 11pt / 2 lines for every
       // module including the one that overrides.
-      // leadingDot: tile labels only. ⚠ KNOWN, NOT YET FIXED (2026-09-29): the Ev Hizmetleri
-      // gridLabel (hsTitle, partner copy) wraps onto a leading '·' in ru@320dp and fa@393dp.
       assess('tile', t(m.labelKey, L), 11, labelBox(W), `${W}dp ${L} tile:${m.id}`, CURSIVE.has(L), 2, true)
       // gridLabel is what the GRID renders. Size and line count are READ FROM THE CONFIG,
       // never assumed here: if this file hardcoded 8.5 and 3 it would be a second copy of
@@ -330,7 +328,7 @@ for (const W of WIDTHS) {
       // frame-of-reference hazard this file documents at length.
       if (m.gridLabel) {
         assess('tile', t(m.gridLabel.key, L), m.gridLabel.size, labelBox(W),
-               `${W}dp ${L} gridLabel:${m.id}`, CURSIVE.has(L), m.gridLabel.lines)
+               `${W}dp ${L} gridLabel:${m.id}`, CURSIVE.has(L), m.gridLabel.lines, true)
       }
     }
     // ─── The strip's card copy ──────────────────────────────────────────────
