@@ -123,6 +123,15 @@ const unknown = types.filter(t => !KNOWN.has(t.slug)).map(t => `${t.name} [${t.s
 unknown.length ? fail(`UNMAPPED type term(s) — update TYPE_PRIORITY: ${unknown.join(', ')}`)
                : ok(`all ${types.length} type terms are mapped`)
 
+// Listings the agency published with NO taxonomy at all (no type, status, state or city), so
+// no mapping can place them. Decided, not forgotten: each stays skipped and is reported once as
+// a known skip. Retire an entry when Novest tags the listing or removes it — this check says so.
+const KNOWN_UNTAGGED = new Map([
+  [21853, 'Yenikent commercial building for sale, published 2026-06-18 untagged; "Yenikent" exists in Lefkoşa and Gazimağusa, so placing it would be a guess. Left skipped by Berke 2026-09-29.'],
+])
+const untagged = p => ['property_type', 'property_status', 'property_state', 'property_city']
+  .every(k => !(p[k] || []).length)
+
 let typed = 0, untyped = [], deed = 0, phoneLeaks = [], inBox = []
 for (const p of props) {
   const slugs = (p.property_type || []).map(i => T.get(i)?.slug).filter(Boolean)
@@ -141,7 +150,15 @@ for (const p of props) {
 }
 
 ok(`${typed}/${props.length} listings resolve to a property_type`)
-untyped.length && console.log(`    untyped (will be skipped): ${untyped.join(', ')}`)
+const byId = new Map(props.map(p => [p.id, p]))
+const knownSkips = untyped.filter(id => KNOWN_UNTAGGED.has(id) && untagged(byId.get(id)))
+const newUntyped = untyped.filter(id => !knownSkips.includes(id))
+knownSkips.length && ok(`known skip — untagged in Novest's feed: ${knownSkips.join(', ')}`)
+newUntyped.length && console.log(`    ⚠ NEW untyped (will be skipped — needs a decision): ${newUntyped.join(', ')}`)
+for (const [id] of KNOWN_UNTAGGED) {
+  if (!byId.has(id)) console.log(`    ⚠ KNOWN_UNTAGGED ${id} is no longer in the feed — retire the entry`)
+  else if (!untagged(byId.get(id))) console.log(`    ⚠ KNOWN_UNTAGGED ${id} is now tagged in Novest's feed — retire the entry (it may import now)`)
+}
 
 phoneLeaks.length
   ? fail(`${phoneLeaks.length} listing(s) leak a phone after the strip:\n      ${phoneLeaks.join('\n      ')}`)
