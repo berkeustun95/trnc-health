@@ -70,3 +70,4 @@ vendor/
 data/kitob/geocode-*.csv
 data/pharmacy-hand-place-*.csv
 data/osm/
+data/placement-progress.json

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADA Placement</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#16181d; --muted:#667085; --line:#e4e7ec; --pri:#0b6bcb; --ok:#127a3a; --warn:#b54708; --bad:#b42318; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111317; --card:#1b1e24; --text:#eef0f3; --muted:#9aa3b2; --line:#2c313a; --pri:#5aa6ff; --ok:#4cc27a; --warn:#f0a44b; --bad:#ff6b5f; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 -apple-system, system-ui, sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:16px; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin:6px 0 14px; }
+  .bar > i { display:block; height:100%; background:var(--pri); }
+  .top { display:flex; justify-content:space-between; color:var(--muted); font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  h1 { font-size:20px; margin:4px 0 8px; }
+  dl { display:grid; grid-template-columns:90px 1fr; gap:4px 10px; margin:0; }
+  dt { color:var(--muted); } dd { margin:0; word-break:break-word; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+  button, a.btn { font:inherit; font-weight:600; border-radius:10px; padding:10px 14px; border:1.5px solid var(--pri); background:transparent; color:var(--pri); cursor:pointer; text-decoration:none; }
+  .primary { background:var(--pri); color:#fff; }
+  button:disabled { opacity:.5; cursor:default; }
+  .cand { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--line); }
+  .cand small { color:var(--muted); display:block; }
+  .agree { color:var(--ok); font-weight:600; } .differs { color:var(--warn); font-weight:600; }
+  #msg { min-height:1.4em; } .err { color:var(--bad); } .okmsg { color:var(--ok); }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:10px; background:var(--line); margin-left:6px; }
+  details { color:var(--muted); font-size:13px; } code { font-size:12px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><span id="stage"></span><span id="count"></span></div>
+  <div class="bar"><i id="fill" style="width:0"></i></div>
+  <div id="dry" class="card" hidden><b>DRY RUN</b> — re-check works, Save writes nothing.</div>
+  <div class="card" id="item"></div>
+  <div class="card" id="cands" hidden></div>
+  <div id="msg"></div>
+  <details class="card" id="pending"></details>
+  <details class="card">
+    <summary>Tags in iD</summary>
+    <p>Hotel: preset <b>Hotel</b> → <code>tourism=hotel</code>, <code>name=</code> as on the sign / KITOB list. Resort: <code>tourism=resort</code> is the grounds — put the <b>Hotel</b> point on the main building.</p>
+    <p>Pharmacy: preset <b>Pharmacy</b> → <code>amenity=pharmacy</code>, <code>healthcare=pharmacy</code>, <code>name=</code>, <code>dispensing=yes</code>.</p>
+    <p>Only add <code>phone</code>/<code>website</code> you know from the business itself — not copied from a list. Never look at Google Maps while editing.</p>
+    <p>Changeset comment is prefilled; keep <code>#ada-placement</code>. Imagery: Esri World Imagery (Esri grants tracing for OSM).</p>
+  </details>
+</main>
+<script>
+const TOKEN = '__TOKEN__', DRY = __DRY__
+const $ = id => document.getElementById(id)
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]))
+let cur = null
+async function post(path, body) {
+  const r = await fetch(path, { method:'POST', headers:{ 'Content-Type':'application/json', 'x-token':TOKEN }, body:JSON.stringify(body) })
+  const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j
+}
+const say = (t, cls = '') => { $('msg').className = cls; $('msg').textContent = t }
+async function load() {
+  $('dry').hidden = !DRY
+  cur = await (await fetch('/api/current')).json()
+  $('count').textContent = `${cur.done}/${cur.total} placed`
+  $('fill').style.width = `${(100 * cur.done / cur.total).toFixed(1)}%`
+  $('pending').innerHTML = `<summary>Pending (${cur.pending.length})</summary>` + cur.pending.map(p => `<p>${esc(p)}</p>`).join('')
+  $('cands').hidden = true
+  if (!cur.item) { $('stage').textContent = 'done'; $('item').innerHTML = '<h1>Queue empty</h1>'; return }
+  const it = cur.item
+  $('stage').textContent = `${cur.stage} · #${cur.position}`
+  $('item').innerHTML = `
+    <h1>${esc(it.name)}<span class="tag">${esc(it.kind)}</span></h1>
+    <dl>
+      <dt>Phone</dt><dd>${esc(it.phone) || '—'}</dd>
+      <dt>Address</dt><dd>${esc(it.address) || '—'}</dd>
+      <dt>Region</dt><dd>${esc(it.region) || '—'}</dd>
+      <dt>Source</dt><dd>${esc(it.source)}</dd>
+      ${it.website ? `<dt>Website</dt><dd><a href="${esc(it.website)}" target="_blank" rel="noopener">${esc(it.website)}</a></dd>` : ''}
+      <dt>iD opens</dt><dd>${esc(it.centreWhy)}</dd>
+    </dl>
+    <div class="row">
+      <a class="btn primary" href="${esc(cur.idUrl)}" target="_blank" rel="noopener">Open in iD here</a>
+      <button id="re">Re-check OSM</button>
+      <button id="skip">Skip for now</button>
+    </div>`
+  $('re').onclick = recheck
+  $('skip').onclick = async () => { await post('/api/skip', { key: it.key }); say(''); load() }
+}
+async function recheck() {
+  $('re').disabled = true; say('Asking Overpass… (a fresh edit takes ~1 min to appear)')
+  try {
+    const r = await post('/api/recheck', { key: cur.item.key })
+    say(`OSM data as of ${r.base}`)
+    $('cands').hidden = false
+    $('cands').innerHTML = `<b>Nearby in OSM</b>` + (r.cands.length ? '' : '<p>Nothing yet — save in iD, wait a minute, re-check.</p>') +
+      r.cands.map(c => `<div class="cand"><div>${esc(c.name)} <span class="${c.agrees ? 'agree' : 'differs'}">${c.agrees ? 'name agrees' : 'name differs'}</span>
+        <small>${esc(c.osm)} · edited ${esc(c.at)} by ${esc(c.user)}</small></div>
+        <button data-osm="${esc(c.osm)}" data-agrees="${c.agrees}">Use this</button></div>`).join('')
+    for (const b of $('cands').querySelectorAll('button')) b.onclick = () => save(b.dataset.osm, b.dataset.agrees === 'true')
+  } catch (e) { say(e.message, 'err') } finally { $('re').disabled = false }
+}
+async function save(osm, agrees) {
+  if (!agrees && !confirm(`The OSM name does not match "${cur.item.name}". Use ${osm} anyway?`)) return
+  say('Saving…')
+  try { const r = await post('/api/save', { key: cur.item.key, osm }); say(r.message, 'okmsg'); await load() }
+  catch (e) { say(e.message, 'err') }
+}
+load()
+</script>
+</body>
+</html>

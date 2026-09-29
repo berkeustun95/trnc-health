@@ -36,7 +36,7 @@ if (DRY === APPLY && !args.includes('--self')) fail('Pass exactly one of --dry-r
 
 const AGREE_M = 150, MOVE_REPORT_M = 50, SWAP_MAX_M = 50
 // Exception window for the Google pins left in place (Berke 2026-09-29: no user may lose a pin).
-// Proposed as 30 days to match the Places caching limit — Berke decides the real date.
+// 30 days, matching the Places caching limit — set by Berke 2026-09-29 ("as soon as possible").
 const REVIEW_BY = '2026-10-29'
 const GENERIC = new Set(['eczane', 'eczanesi', 'eczanesı', 'ecz', 'pharmacy', 'pharmacie', 'apotheke', 'aptieka',
   'the', 've', 'and', 'yeni', 'new', 'merkez', 'center', 'centre'])

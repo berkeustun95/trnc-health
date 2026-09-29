@@ -59,6 +59,7 @@
     "hotels:geocode": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/geocode-kitob-hotels.mjs",
     "areas:points": "node scripts/generate-area-centroids.mjs",
     "hotels:areas": "node scripts/hotel-area-coverage.mjs",
+    "place": "node scripts/placement-tool.mjs",
     "pharmacies:resource": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/resource-pharmacy-coords.mjs",
     "hotels:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hotels-staleness.mjs",
     "novest:import": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/import-novest-properties.mjs",

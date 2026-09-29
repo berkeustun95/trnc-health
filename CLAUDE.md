@@ -809,6 +809,8 @@ went missing). Two mandatory rules:
   (`data/geocode-exceptions/pharmacy-google-pins.csv`, `review_by`) until hand-placed.
   `geocode-pharmacies-tier2.mjs` is retired. OSM data only via `scripts/lib/osm-snapshot.mjs`.
 - Credit: `components/OsmAttribution.js` (9 locales) on every map/card showing an `osm` pin.
+- **Hand placement goes THROUGH OSM** (no imagery licenses private derivation): `npm run place`
+  (local queue → iD → re-check → `osm`, tier 3, `visual_satellite`). It never shows the Google pin.
 
 ## Social sign-in (Google + Apple, native) — from build 1.2.0
 
