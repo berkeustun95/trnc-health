@@ -269,7 +269,11 @@ WITH report AS (
     ('1060_hotels_geocode_provenance','hotels','geocode_corroboration'),
     ('1060_hotels_geocode_provenance','hotels','geocoded_at'),
     -- The Places place ID (1061). Since 1062 also the trace of every google_places pin (known risk).
-    ('1061_hotels_places_crosscheck','hotels','google_place_id')
+    ('1061_hotels_places_crosscheck','hotels','google_place_id'),
+    -- KITOB guide content (1063). HotelsTab selects all three once applied: MISSING = 42703 on the tab.
+    ('1063_hotels_kitob_guide','hotels','photo_source'),
+    ('1063_hotels_kitob_guide','hotels','description_i18n'),
+    ('1063_hotels_kitob_guide','hotels','kitob_page_url')
 
   ) e(m,t,c)
 
@@ -714,7 +718,11 @@ WITH report AS (
     ('1061_hotels_places_crosscheck','hotels_google_place_id_check'),
     ('1061_hotels_places_crosscheck','hotels_google_place_id_key'),
     -- 1062. A Google pin (known risk) must stay traceable: place id + tier 2.
-    ('1062_hotels_google_places','hotels_google_places_traceable_check')
+    ('1062_hotels_google_places','hotels_google_places_traceable_check'),
+    -- 1063. The H tokens assert what each permits.
+    ('1063_hotels_kitob_guide','hotels_photo_source_check'),
+    ('1063_hotels_kitob_guide','hotels_description_i18n_check'),
+    ('1063_hotels_kitob_guide','hotels_kitob_page_url_check')
 
   ) e(m,o)
 
@@ -3552,6 +3560,28 @@ WITH report AS (
       COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_google_places_traceable_check')
                LIKE '%google_places%google_place_id IS NOT NULL%geocode_tier = 2%', false)
+    -- ── 1063: KITOB guide content ───────────────────────────────────────────────
+    -- (1) THE BUCKET FLAG. Only storage.buckets.public says whether hotel photos render; a bucket
+    --     flipped private serves nothing and no named object changes. Limits asserted with it.
+    UNION ALL SELECT '1063_hotels_kitob_guide','bucket hotel-images is PUBLIC, 2 MB, jpeg/webp, and no storage policy names it',
+      COALESCE((SELECT public AND file_size_limit = 2097152 AND allowed_mime_types = ARRAY['image/jpeg','image/webp']
+                  FROM storage.buckets WHERE id = 'hotel-images'), false)
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+                      AND COALESCE(qual,'') || COALESCE(with_check,'') LIKE '%hotel-images%')
+    -- (2) Description keys are FULL language names: the allow-list carries 'English' and no ISO
+    --     code. A rewrite to 'en' keys passes E by name and matches nothing in the app, silently.
+    UNION ALL SELECT '1063_hotels_kitob_guide','hotels_description_i18n_check allows full language names only, string values',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_description_i18n_check')
+               LIKE '%''English''%''Turkish''%jsonb_path_exists%', false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_description_i18n_check')
+               NOT LIKE '%''en''%', false)
+    -- (3) A photo and its source travel together (the credit reads photo_source).
+    UNION ALL SELECT '1063_hotels_kitob_guide','hotels_photo_source_check is two-way with photo_url',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_source_check')
+               LIKE '%(photo_url IS NULL) = (photo_source IS NULL)%', false)
   ) z
 
   UNION ALL

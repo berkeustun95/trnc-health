@@ -687,7 +687,10 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('hotels', 'geocode_tier', false, NULL, 'smallint'),
     ('hotels', 'geocode_corroboration', false, NULL, 'text[]'),
     ('hotels', 'geocoded_at', false, NULL, 'timestamp with time zone'),
-    ('hotels', 'google_place_id', false, NULL, 'text')
+    ('hotels', 'google_place_id', false, NULL, 'text'),
+    ('hotels', 'photo_source', false, NULL, 'text'),
+    ('hotels', 'description_i18n', false, NULL, 'jsonb'),
+    ('hotels', 'kitob_page_url', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -822,6 +825,7 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('home_strip_pin_window_check', '', 'ends_at|starts_at'),
     ('hotels_coords_check', '32.2|34.5|34.7|35.8', 'lat|lng'),
     ('hotels_coords_provenance_check', '', 'geocode_source|geocoded_at|lat'),
+    ('hotels_description_i18n_check', '$.* ? (@.type() != "string")|12000|Arabic|English|French|German|Greek|Persian|Russian|Spanish|Turkish|object|{}', 'description_i18n'),
     ('hotels_external_id_check', '-%|9|^[a-z]+-[a-z0-9][a-z0-9-]*$', 'external_id|source'),
     ('hotels_external_id_key', '', 'external_id'),
     ('hotels_geocode_corroboration_check', 'address_town|google_places|name_match|osm|phone_exchange|phone_match|region_audit|visual_satellite', 'geocode_corroboration'),
@@ -832,8 +836,10 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('hotels_google_places_traceable_check', '2|google_places', 'geocode_source|geocode_tier|google_place_id'),
     ('hotels_kitob_class_check', 'apart|boutique|bungalow|holiday_village|special_certified|star1|star2|star3|star4|star5', 'kitob_class'),
     ('hotels_kitob_member_check', 'kitob', 'is_kitob_member|source'),
+    ('hotels_kitob_page_url_check', '9|^https://hotelsofnorthcyprus\.com/hotels/[a-z0-9-]+/$', 'kitob_page_url'),
     ('hotels_link_scheme_check', '^https://|^https?://', 'photo_url|website'),
     ('hotels_name_check', '1|200', 'name'),
+    ('hotels_photo_source_check', 'hnc', 'photo_source|photo_url'),
     ('hotels_pkey', '', 'id'),
     ('hotels_region_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'region'),
     ('hotels_source_check', 'kitob', 'source'),
