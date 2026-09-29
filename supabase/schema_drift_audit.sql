@@ -690,7 +690,8 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('hotels', 'google_place_id', false, NULL, 'text'),
     ('hotels', 'photo_source', false, NULL, 'text'),
     ('hotels', 'description_i18n', false, NULL, 'jsonb'),
-    ('hotels', 'kitob_page_url', false, NULL, 'text')
+    ('hotels', 'kitob_page_url', false, NULL, 'text'),
+    ('hotels', 'gallery_urls', false, NULL, 'text[]')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -825,9 +826,10 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('home_strip_pin_window_check', '', 'ends_at|starts_at'),
     ('hotels_coords_check', '32.2|34.5|34.7|35.8', 'lat|lng'),
     ('hotels_coords_provenance_check', '', 'geocode_source|geocoded_at|lat'),
-    ('hotels_description_i18n_check', '$.* ? (@.type() != "string")|12000|Arabic|English|French|German|Greek|Persian|Russian|Spanish|Turkish|object|{}', 'description_i18n'),
+    ('hotels_description_i18n_check', '$.* ? (@.type() != "string")|40000|Arabic|English|French|German|Greek|Persian|Russian|Spanish|Turkish|object|{}', 'description_i18n'),
     ('hotels_external_id_check', '-%|9|^[a-z]+-[a-z0-9][a-z0-9-]*$', 'external_id|source'),
     ('hotels_external_id_key', '', 'external_id'),
+    ('hotels_gallery_check', '1|6|\n|^https://[^\n]+(\nhttps://[^\n]+)*$', 'gallery_urls|photo_url'),
     ('hotels_geocode_corroboration_check', 'address_town|google_places|name_match|osm|phone_exchange|phone_match|region_audit|visual_satellite', 'geocode_corroboration'),
     ('hotels_geocode_source_check', 'google_places|manual|osm|partner', 'geocode_source'),
     ('hotels_geocode_tier_check', '1|3', 'geocode_tier'),

@@ -273,7 +273,9 @@ WITH report AS (
     -- KITOB guide content (1063). HotelsTab selects all three once applied: MISSING = 42703 on the tab.
     ('1063_hotels_kitob_guide','hotels','photo_source'),
     ('1063_hotels_kitob_guide','hotels','description_i18n'),
-    ('1063_hotels_kitob_guide','hotels','kitob_page_url')
+    ('1063_hotels_kitob_guide','hotels','kitob_page_url'),
+    -- 1064. The card's swipeable photos, cover first. HotelsTab selects it: MISSING = 42703 on the tab.
+    ('1064_hotels_gallery','hotels','gallery_urls')
 
   ) e(m,t,c)
 
@@ -722,7 +724,9 @@ WITH report AS (
     -- 1063. The H tokens assert what each permits.
     ('1063_hotels_kitob_guide','hotels_photo_source_check'),
     ('1063_hotels_kitob_guide','hotels_description_i18n_check'),
-    ('1063_hotels_kitob_guide','hotels_kitob_page_url_check')
+    ('1063_hotels_kitob_guide','hotels_kitob_page_url_check'),
+    -- 1064. The H token asserts the cover-first rule.
+    ('1064_hotels_gallery','hotels_gallery_check')
 
   ) e(m,o)
 
@@ -3582,6 +3586,23 @@ WITH report AS (
       COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_source_check')
                LIKE '%(photo_url IS NULL) = (photo_source IS NULL)%', false)
+    -- ── 1064: gallery + nine-language description cap ───────────────────────────
+    -- (1) The gallery is tied to the cover: present exactly with photo_url, element 1 IS
+    --     photo_url, and no NULL element (array_to_string skips NULLs, so the https regex alone
+    --     cannot see one). Read from the rendering.
+    UNION ALL SELECT '1064_hotels_gallery','hotels_gallery_check: two-way with photo_url, cover first, no NULL element',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_gallery_check')
+               LIKE '%(gallery_urls IS NULL) = (photo_url IS NULL)%gallery_urls[1] = photo_url%', false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_gallery_check')
+               LIKE '%array_position(gallery_urls, NULL%) IS NULL%', false)   -- renders NULL::text
+    -- (2) The description byte cap is 40000 (nine languages; 12000 refused 37 of 95). The 1063
+    --     token owns the key allow-list; this one owns the number.
+    UNION ALL SELECT '1064_hotels_gallery','hotels_description_i18n_check caps at 40000 bytes',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_description_i18n_check')
+               LIKE '%octet_length((description_i18n)::text) <= 40000%', false)
   ) z
 
   UNION ALL

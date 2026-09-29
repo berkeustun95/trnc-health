@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { View, Text, Image, TouchableOpacity, FlatList, ActivityIndicator, Linking, StyleSheet, Platform } from 'react-native'
+import { View, Text, Image, TouchableOpacity, FlatList, ActivityIndicator, Linking, StyleSheet, Platform, Dimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { colors, shadow } from '../../constants/theme'
@@ -18,7 +18,7 @@ import OsmAttribution from '../OsmAttribution'
 // actually have a hotel behind them.
 
 // photo_source drives the KITOB credit; description_i18n the card text (both 20261063).
-const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, photo_source, description_i18n, is_kitob_member'
+const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, gallery_urls, photo_source, description_i18n, is_kitob_member'
 
 const CLASS_RANK = Object.fromEntries(HOTEL_CLASSES.map((k, i) => [k, i]))
 const collator = new Intl.Collator('tr')
@@ -42,6 +42,51 @@ function mapUrls(hotel, lang) {
   const at = `${hotel.lat},${hotel.lng}`, name = encodeURIComponent(hotel.name)
   const native = Platform.OS === 'ios' ? `maps://?ll=${at}&q=${name}` : `geo:0,0?q=${at}(${name})`
   return [native, `https://www.google.com/maps/search/?api=1&query=${at}`]
+}
+
+// The card's photos, cover first (20261064: gallery_urls[1] = photo_url). The Emlak card's pager
+// idiom: paging FlatList at card width, a "1 / 6" counter rather than dots, and EVERY overlay
+// pointerEvents="none" so a swipe that starts on the credit or the counter is not swallowed.
+const PHOTO_W = Dimensions.get('window').width - 2 * HOTEL_ACTIONS.listPadX
+function HotelPhotos({ hotel, lang }) {
+  const [idx, setIdx] = useState(0)
+  const photos = hotel.gallery_urls?.length ? hotel.gallery_urls : (hotel.photo_url ? [hotel.photo_url] : [])
+  if (!photos.length) {
+    return (
+      <View style={[hs.photo, hs.photoEmpty]}>
+        <Ionicons name="bed-outline" size={40} color={colors.textSecondary} />
+      </View>
+    )
+  }
+  return (
+    <View style={hs.photoWrap}>
+      <FlatList
+        data={photos}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        directionalLockEnabled
+        keyExtractor={u => u}
+        getItemLayout={(_, i) => ({ length: PHOTO_W, offset: PHOTO_W * i, index: i })}
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        windowSize={2}
+        onMomentumScrollEnd={e => setIdx(Math.round(e.nativeEvent.contentOffset.x / PHOTO_W))}
+        renderItem={({ item }) => (
+          <Image source={{ uri: item }} style={[hs.photo, { width: PHOTO_W }]} resizeMode="cover" accessibilityIgnoresInvertColors />
+        )}
+      />
+      {photos.length > 1 && (
+        <View pointerEvents="none" style={hs.photoCount}>
+          <Ionicons name="images-outline" size={12} color="#fff" />
+          <Text style={hs.photoCountText}>{Math.min(idx + 1, photos.length)} / {photos.length}</Text>
+        </View>
+      )}
+      {hotel.photo_source === 'hnc' && (
+        <Text pointerEvents="none" style={hs.photoCredit} numberOfLines={1}>{t('hotelPhotoCredit', lang)}</Text>
+      )}
+    </View>
+  )
 }
 
 function HotelCard({ hotel, lang, district }) {
@@ -68,18 +113,7 @@ function HotelCard({ hotel, lang, district }) {
 
   return (
     <View style={hs.card}>
-      <View style={hs.photoWrap}>
-        {hotel.photo_url ? (
-          <Image source={{ uri: hotel.photo_url }} style={hs.photo} resizeMode="cover" accessibilityIgnoresInvertColors />
-        ) : (
-          <View style={[hs.photo, hs.photoEmpty]}>
-            <Ionicons name="bed-outline" size={40} color={colors.textSecondary} />
-          </View>
-        )}
-        {hotel.photo_url && hotel.photo_source === 'hnc' && (
-          <Text style={hs.photoCredit} numberOfLines={1}>{t('hotelPhotoCredit', lang)}</Text>
-        )}
-      </View>
+      <HotelPhotos hotel={hotel} lang={lang} />
 
       <View style={hs.cardBody}>
         <Text style={hs.name} numberOfLines={2}>{hotel.name}</Text>
@@ -265,6 +299,9 @@ const hs = StyleSheet.create({
   photoWrap:     { position: 'relative' },
   photo:         { width: '100%', height: 170, backgroundColor: colors.border },
   photoEmpty:    { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight },
+  photoCount:    { position: 'absolute', left: 8, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 4,
+                   paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.45)' },
+  photoCountText:{ color: '#fff', fontSize: 11, fontFamily: 'Inter_700Bold', fontVariant: ['tabular-nums'] },
   photoCredit:   { position: 'absolute', right: 8, bottom: 6, maxWidth: '90%', paddingHorizontal: 6, paddingVertical: 2,
                    borderRadius: 6, backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 10,
                    fontFamily: 'Inter_400Regular' },
