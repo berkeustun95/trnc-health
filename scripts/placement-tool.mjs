@@ -41,6 +41,8 @@ const PULLED = resolve(ROOT, 'data/osm/placement-pulled.json')        // our sna
 const PENDING = { 'kitob-mimoza-hotel-famagusta': 'pending KITOB (identity of Mimoza Hotel)' }
 const FLAGGED_FIRST = ['meliz', 'cevher', 'arkan']
 const RECHECK_M = 2500
+// Organised Editing Guidelines: every changeset comment carries the hashtag AND links the page.
+const WIKI = 'https://wiki.openstreetmap.org/wiki/Organised_Editing/Activities/ADA_North_Cyprus_places'
 
 const fail = m => { console.error(m); process.exit(1) }
 const readJson = (p, d) => existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : d
@@ -205,7 +207,7 @@ async function current() {
   const done = total - all.length + all.filter(x => progress[x.key]).length
   if (!next) return { done, total, pending, item: null }
   const c = centreFor(next.address, next.region)
-  const hash = `map=${c.zoom}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}&comment=${encodeURIComponent(`Add ${next.kind}: ${next.name} #ada-placement`)}&hashtags=ada-placement`
+  const hash = `map=${c.zoom}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}&comment=${encodeURIComponent(`Add ${next.kind}: ${next.name} #ada-placement ${WIKI}`)}&hashtags=ada-placement`
   return { done, total, pending, position: all.indexOf(next) + 1, stage: next.kind === 'hotel' ? 'hotels' : next.flagged ? 'flagged pharmacies' : 'pharmacies',
     item: { ...next, phone: await phoneFor(next), centreWhy: c.why }, idUrl: `https://www.openstreetmap.org/edit?editor=id#${hash}` }
 }
