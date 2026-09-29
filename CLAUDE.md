@@ -188,6 +188,17 @@ name joined to a clinic review is a health disclosure about an identified person
 - Reinstall does NOT reset first-run state (Auto Backup restores AsyncStorage) — a test artifact, not
   a bug. Use Clear storage or `adb shell pm clear com.berkeustun95.ada`; `EXPO_PUBLIC_DEV_ONBOARDED`.
 
+## Geocoding — storage policy (2026-09-29)
+- **Google Places is a CROSS-CHECK ONLY.** Never store its lat/lng, names or addresses (DB or
+  committed file); the place ID is exempt (`hotels.google_place_id`). iOS maps are Apple Maps.
+- Stored coordinates: `geocode_source` `osm` (tier 1, `google_places` in corroboration) or `manual`
+  (tier 3, `visual_satellite`). OSM is ODbL: `OsmAttribution` wherever those pins show.
+- OSM data via `scripts/lib/osm-snapshot.mjs` only (main Overpass, ≤72 h; mirrors served stale data).
+- Local Places-data files are gitignored, deleted within 30 days. Hotels enforce it (20261061).
+  282 pharmacy Google pins remain as a time-limited exception:
+  `data/geocode-exceptions/pharmacy-google-pins.csv` (`review_by`). No imagery is licensed for
+  deriving stored coordinates yet — Google/Esri/Bing/Mapbox tracing grants are for OSM only.
+
 ## Social sign-in (Google + Apple, native, from 1.2.0)
 Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
 - Runtime 1.2.0 is the fence (`runtimeVersion` = `appVersion`). 1.1.0 fixes ship from `release/1.1`.
