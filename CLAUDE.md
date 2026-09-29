@@ -793,6 +793,21 @@ went missing). Two mandatory rules:
   and `npm run backchain:check` runs App's chain through 45 cases; both run in `npm run ota`.
   Add a backchain case when a new layer joins the chain.
 
+## Geocoding — storage policy (Berke, 2026-09-29)
+- **Google Places is a CROSS-CHECK ONLY.** Never store Places latitude/longitude, names or
+  addresses — not in the DB, not in a committed file. The Maps Platform terms cap caching of
+  Places content (the place ID is exempt: store it, e.g. `hotels.google_place_id`). On iOS our maps
+  are **Apple Maps** (`react-native-maps` with no `provider` = Google on Android, Apple on iOS), and
+  Places content may not be shown on a non-Google map at all.
+- **Stored coordinates come from OSM (where it agrees with Places) or hand placement**, and the
+  source is recorded: `geocode_source` `osm` (tier 1, `google_places` in `geocode_corroboration`) or
+  `manual` (tier 3, `visual_satellite` mandatory). OSM is ODbL: "© OpenStreetMap contributors"
+  wherever those pins are shown.
+- Local files holding Places data (geocoder CSVs) are gitignored and deleted within 30 days.
+- Hotels enforce it structurally (20261061: no `google_places` source). Facilities still carry 349
+  `google_places` pharmacy pins pending re-sourcing (`scripts/resource-pharmacy-coords.mjs`);
+  `geocode-pharmacies-tier2.mjs` is retired.
+
 ## Social sign-in (Google + Apple, native) — from build 1.2.0
 
 Plan, decisions and evidence: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
