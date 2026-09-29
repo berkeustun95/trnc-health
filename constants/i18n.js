@@ -715,6 +715,7 @@ const translations = {
     insErrorGeneric: 'Something went wrong. Please try again.',
     insTypesOffered: 'Insurance offered', insAbout: 'About', insContact: 'Contact',
     // Accommodation module
+    accomTabProperty: 'Property',
     accomTitle: 'Property & Accommodation', accomAll: 'All', accomRent: 'Rent', accomSale: 'Sale', accomShortTerm: 'Short-term', accomDorms: 'Dormitories',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'ADA partner',
@@ -2959,6 +2960,7 @@ const translations = {
     'Small Animals': 'Küçük Hayvanlar', 'Large Animals': 'Büyük Hayvanlar', 'Exotic Animals': 'Egzotik Hayvanlar',
     'Surgery': 'Cerrahi', 'Dentistry': 'Diş Hekimliği', 'Emergency & Critical Care': 'Acil & Yoğun Bakım',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    accomTabProperty: 'Emlak',
     accomTitle: 'Emlak ve Konaklama', accomAll: 'Tümü', accomRent: 'Kiralık', accomSale: 'Satılık', accomShortTerm: 'Kısa süreli', accomDorms: 'Yurtlar',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'ADA iş ortağı',
@@ -4494,6 +4496,7 @@ const translations = {
     'Small Animals': 'الحيوانات الصغيرة', 'Large Animals': 'الحيوانات الكبيرة', 'Exotic Animals': 'الحيوانات الغريبة',
     'Surgery': 'الجراحة', 'Dentistry': 'طب الأسنان', 'Emergency & Critical Care': 'الطوارئ والرعاية الحرجة',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    accomTabProperty: 'عقارات',
     accomTitle: 'عقارات وإقامة', accomAll: 'الكل', accomRent: 'إيجار', accomSale: 'بيع', accomShortTerm: 'إيجار قصير الأمد', accomDorms: 'سكن طلابي',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'شريك ADA',
@@ -5996,6 +5999,7 @@ const translations = {
     'Small Animals': 'Мелкие животные', 'Large Animals': 'Крупные животные', 'Exotic Animals': 'Экзотические животные',
     'Surgery': 'Хирургия', 'Dentistry': 'Стоматология', 'Emergency & Critical Care': 'Неотложная помощь',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    accomTabProperty: 'Недвижимость',
     accomTitle: 'Недвижимость и жильё', accomAll: 'Все', accomRent: 'Аренда', accomSale: 'Продажа', accomShortTerm: 'Краткосрочно', accomDorms: 'Общежития',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'Партнёр ADA',
@@ -7496,6 +7500,7 @@ const translations = {
     'Small Animals': 'Μικρά Ζώα', 'Large Animals': 'Μεγάλα Ζώα', 'Exotic Animals': 'Εξωτικά Ζώα',
     'Surgery': 'Χειρουργική', 'Dentistry': 'Οδοντιατρική', 'Emergency & Critical Care': 'Επείγοντα & Εντατική Φροντίδα',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    accomTabProperty: 'Ακίνητα',
     accomTitle: 'Ακίνητα & Διαμονή', accomAll: 'Όλα', accomRent: 'Ενοίκιο', accomSale: 'Πώληση', accomShortTerm: 'Βραχυπρόθεσμο', accomDorms: 'Εστίες',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'Συνεργάτης ADA',
@@ -9000,6 +9005,7 @@ const translations = {
     'Small Animals': 'Petits animaux', 'Large Animals': 'Grands animaux', 'Exotic Animals': 'Animaux exotiques',
     'Surgery': 'Chirurgie', 'Dentistry': 'Dentisterie', 'Emergency & Critical Care': 'Urgences & Soins intensifs',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    accomTabProperty: 'Immobilier',
     accomTitle: 'Immobilier & Logement', accomAll: 'Tout', accomRent: 'Location', accomSale: 'Vente', accomShortTerm: 'Court séjour', accomDorms: 'Résidences',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'Partenaire ADA',
@@ -10501,6 +10507,7 @@ const translations = {
     'Small Animals': 'Animales pequeños', 'Large Animals': 'Animales grandes', 'Exotic Animals': 'Animales exóticos',
     'Surgery': 'Cirugía', 'Dentistry': 'Odontología', 'Emergency & Critical Care': 'Urgencias & Cuidados intensivos',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    accomTabProperty: 'Inmuebles',
     accomTitle: 'Inmuebles y Alojamiento', accomAll: 'Todo', accomRent: 'Alquiler', accomSale: 'Venta', accomShortTerm: 'Corto plazo', accomDorms: 'Residencias',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'Socio ADA',
@@ -12002,6 +12009,7 @@ const translations = {
     'Small Animals': 'Kleintiere', 'Large Animals': 'Großtiere', 'Exotic Animals': 'Exotische Tiere',
     'Surgery': 'Chirurgie', 'Dentistry': 'Zahnmedizin', 'Emergency & Critical Care': 'Notfall & Intensivpflege',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    accomTabProperty: 'Immobilien',
     accomTitle: 'Immobilien & Unterkünfte', accomAll: 'Alle', accomRent: 'Miete', accomSale: 'Kauf', accomShortTerm: 'Kurzfristig', accomDorms: 'Wohnheime',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'ADA-Partner',
@@ -13502,6 +13510,7 @@ const translations = {
     'Small Animals': 'حیوانات کوچک', 'Large Animals': 'حیوانات بزرگ', 'Exotic Animals': 'حیوانات اگزوتیک',
     'Surgery': 'جراحی', 'Dentistry': 'دندانپزشکی', 'Emergency & Critical Care': 'اورژانس و مراقبت ویژه',
     // ─── Accommodation module ─────────────────────────────────────────────────
+    accomTabProperty: 'املاک',
     accomTitle: 'املاک و اقامتگاه', accomAll: 'همه', accomRent: 'اجاره', accomSale: 'فروش', accomShortTerm: 'کوتاه‌مدت', accomDorms: 'خوابگاه‌ها',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'شریک ADA',

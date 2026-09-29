@@ -21,7 +21,7 @@ import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions, areaName } from '../constants/areas'
 import { DORMS_LIVE } from '../constants/flags'
-import { accomSegments, accomLanding, DORM_PARTNERS } from '../constants/dorms'
+import { accomTabs, accomLandingTab, ACCOM_SEGMENTS, ACCOM_LANDING, DORM_PARTNERS } from '../constants/dorms'
 import { partnerLogo } from '../constants/partnerAssets'
 
 const { width: SCREEN_W } = Dimensions.get('window')
@@ -64,32 +64,14 @@ const CARD_PAGER_MAX = 5
 // Mirrors ReviewsScreen's PAGE. One pagination idiom in this repo, not two.
 const PAGE = 20
 
-// ─── SEGMENT ROW AND LANDING TAB ─────────────────────────────────────────────
-// Both come from constants/dorms.js, where the ORDER and the PROMOTED flag are config so
-// the Yurtlar promotion reverts without a code change. 'all' stays last because it is the
-// least coherent view.
-//
-// The 'all' tab cannot be coherently sorted: it interleaves intents (every £500/mo rental
-// outranks every £107,500 sale on a price sort), currencies (£107k vs ₺4.75m is not a
-// comparison — no FX by product decision) and rent periods (£6,000/year vs £500/month).
-// Landing on a SINGLE intent makes price sort mean something. That is still true and is
-// what sortOpts below is built on.
-//
-// LANDING WENT TO 'dorm' (2026-09-10) AND BACK TO 'sale' (2026-09-12), before the flag
-// was ever flipped — no user saw either state. Yurtlar keeps its FIRST position in the
-// chip row; only the selected-on-open tab moved back. The reasoning lives on
-// ACCOM_LANDING in constants/dorms.js, next to the value. If the Novest inventory
-// question is ever reopened,
-//   SELECT intent, count(*) FROM properties WHERE source IS NOT NULL GROUP BY intent;
-// settles it with data instead of intuition.
-//
-// ⚠ BOTH ARE DERIVED FROM DORMS_LIVE, NEVER READ STRAIGHT OFF THE CONFIG. ACCOM_LANDING
-//   is 'dorm' and the flag ships false, so a literal read would open the module on a tab
-//   that is not in the chip row — an empty list under a selection the user can neither
-//   see nor change. accomLanding() falls back to the first VISIBLE segment, which is
-//   'sale'. Module scope is correct: both are constant for a given bundle.
-const SEGMENTS       = accomSegments(DORMS_LIVE)
-const LANDING_INTENT = accomLanding(DORMS_LIVE)
+// ─── TOP TABS, EMLAK CHIP ROW, LANDING ───────────────────────────────────────
+// All config, in constants/dorms.js. Tabs are derived from the flags, never read straight
+// off the config, so a dark tab can neither render nor be landed on. Module scope is
+// correct: both are constant for a given bundle.
+const TABS           = accomTabs({ dorm: DORMS_LIVE })
+const LANDING_TAB    = accomLandingTab({ dorm: DORMS_LIVE })
+const SEGMENTS       = ACCOM_SEGMENTS
+const LANDING_INTENT = ACCOM_LANDING
 const PROP_TYPES = ['apartment', 'villa', 'studio', 'house', 'land', 'commercial']
 const BED_OPTS   = [1, 2, 3, 4]
 const PERIODS    = ['monthly', 'weekly', 'yearly', 'nightly']
@@ -124,8 +106,45 @@ function intentLabel(intent, lang) {
   if (intent === 'sale')       return t('accomSale', lang)
   if (intent === 'short_term') return t('accomShortTerm', lang)
   if (intent === 'all')        return t('accomAll', lang)
-  if (intent === 'dorm')       return t('accomDorms', lang)
   return intent
+}
+
+function tabLabel(tab, lang) {
+  if (tab === 'dorm') return t('accomDorms', lang)
+  return t('accomTabProperty', lang)
+}
+
+// Names only the tabs this bundle shows, so it can never announce a dark one.
+const HEADER_SUBTITLE = lang => (TABS.length > 1 ? TABS.map(tab => tabLabel(tab.id, lang)).join(' · ') : undefined)
+
+// ─── THE TOP TABS ─────────────────────────────────────────────────────────────
+// Equal-width segments on ONE line, so every tab is visible without scrolling in every
+// locale; a long label shrinks (minimumFontScale) rather than wrapping or clipping.
+// Rendered only when more than one tab is live — a single segment is not a choice.
+function TabBar({ tab, onChange, lang }) {
+  return (
+    <View style={cs.tabBar} accessibilityRole="tablist">
+      {TABS.map(item => {
+        const active = tab === item.id
+        return (
+          <TouchableOpacity key={item.id} style={[cs.tabSeg, active && cs.tabSegActive]}
+            onPress={() => onChange(item.id)} activeOpacity={0.85}
+            accessibilityRole="tab" accessibilityState={{ selected: active }}>
+            <Text style={[cs.tabSegText, active && cs.tabSegTextActive]}
+              numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {tabLabel(item.id, lang)}
+            </Text>
+            {/* The promoted marker, moved here from the old Yurtlar chip. Absolutely
+                positioned so it never changes the segment's size; state-aware colour for
+                the same contrast reason the chip's was (see intentDot below). */}
+            {item.promoted && (
+              <View pointerEvents="none" style={[cs.intentDot, active && cs.intentDotOnActive]} />
+            )}
+          </TouchableOpacity>
+        )
+      })}
+    </View>
+  )
 }
 
 function typeLabel(type, lang) {
@@ -406,6 +425,7 @@ export default function AccommodationScreen({
   const [done, setDone]             = useState(false)
   const [total, setTotal]           = useState(0)
 
+  const [tab, setTab]           = useState(LANDING_TAB)
   const [intent, setIntent]     = useState(LANDING_INTENT)
   const [district, setDistrict] = useState(null)
   const [area, setArea]         = useState(null)
@@ -423,10 +443,10 @@ export default function AccommodationScreen({
 
   const isSale = intent === 'sale'
   const isRent = intent === 'rent' || intent === 'short_term'
-  // The dorm segment is not a properties view at all: no query, no filters, no sort, no
-  // pagination. Everything below branches on this rather than on intent === 'dorm', so
-  // there is one name to search for when the second partner type arrives.
-  const isDorm = intent === 'dorm'
+  // The Yurtlar tab is not a properties view at all: no query, no filters, no sort, no
+  // pagination. Switching tabs never touches Emlak's intent or filters, so coming back to
+  // Emlak finds the list exactly as it was left.
+  const isDorm = tab === 'dorm'
 
   // 'all' mixes intents, currencies and rent periods, so a price sort there is
   // meaningless. Offer it only on a single-intent tab.
@@ -517,11 +537,6 @@ export default function AccommodationScreen({
   // cannot silently narrow a sale list.
   function changeIntent(next) {
     setIntent(next)
-    // Yurtlar applies no filter and no sort, so ENTERING it must disturb neither —
-    // otherwise a plot or price filter set before the detour is silently thrown away and
-    // the user comes back to a list they did not ask for. Leaving it falls through to the
-    // destination intent's own rules below, which are unchanged.
-    if (next === 'dorm') return
     if (next !== 'sale') setPlotMin('')
     if (next === 'sale' || next === 'all') { setFurnished(null); setPeriod(null) }
     if (next === 'all' && sort !== 'updated') setSort('updated')
@@ -554,23 +569,19 @@ export default function AccommodationScreen({
   return (
     <SafeAreaView style={cs.safe} edges={['top']}>
       <PageBackground topic="accommodation" />
-      <ScreenHeader onBack={onClose} title={t('accomTitle', lang)} lang={lang} />
+      <ScreenHeader onBack={onClose} title={t('accomTitle', lang)} subtitle={HEADER_SUBTITLE(lang)} lang={lang} />
 
-      {/* ─── A WRAPPING ROW, NOT A HORIZONTAL SCROLL ────────────────────────
-          Five chips do not fit on one line in ANY of the nine locales at 393dp, and four
-          did not fit in ar/ru/el/fr before Yurtlar existed — so the row has been
-          scrolling unannounced since the module shipped. Scrolling was never the problem;
-          DISCOVERY was: measured, the last chip is 0% visible in seven of nine locales,
-          because the viewport edge lands in the GAP between chips rather than across one.
-          A horizontal ScrollView's only free affordance is a partially-cut item, and there
-          is not one.
-          Wrapping shows every chip in every locale instead of signalling that something is
-          hidden. See the plan note for the measurements and for why the other two options
-          were rejected.
+      {TABS.length > 1 && <TabBar tab={tab} onChange={setTab} lang={lang} />}
+
+      {/* ─── EMLAK'S INTENT CHIPS: A WRAPPING ROW, NOT A HORIZONTAL SCROLL ─────
+          Four chips did not fit on one line in ar/ru/el/fr, and a horizontal ScrollView
+          hid the last chip in the GAP between chips (measured 0% visible in seven of nine
+          locales when Yurtlar was a fifth chip). Wrapping shows every chip in every locale.
+          Only on the Emlak tab: nothing on Yurtlar is a `properties` intent.
 
           flexShrink:0 — a fixed-height row above a scrolling list gets vertically
-          compressed once the list overflows, cropping its text top and bottom. It matters
-          MORE now than it did as one line: there is twice as much height to squeeze. */}
+          compressed once the list overflows, cropping its text top and bottom. */}
+      {!isDorm && (
       <View style={cs.intentBar}>
         {SEGMENTS.map(seg => (
           <TouchableOpacity key={seg.id} style={[cs.intentTab, intent === seg.id && cs.intentTabActive]}
@@ -578,33 +589,13 @@ export default function AccommodationScreen({
             <Text style={[cs.intentTabText, intent === seg.id && cs.intentTabTextActive]}>
               {intentLabel(seg.id, lang)}
             </Text>
-            {/* The promoted marker. ABSOLUTELY POSITIONED, and that is the whole
-                requirement: laid out inline it would add its own width and gap to the
-                chip and break "same shape and size as the other chips".
-                ─────────────────────────────────────────────────────────────────────
-                SHOWN IN BOTH STATES. It was previously gated on `intent !== seg.id`, on
-                the theory that the nudge has done its job once you are on the tab. That
-                was wrong the moment the landing moved to Yurtlar: the chip is SELECTED on
-                first paint, so the dot never rendered at all — which is why the device
-                check found no dot rather than a dim one. Absent, not invisible.
-                ─────────────────────────────────────────────────────────────────────
-                THE COLOUR IS STATE-AWARE BECAUSE NO SINGLE COLOUR WORKS. Measured against
-                both chip backgrounds (#FFFFFF unselected, colors.primary #0E7C7B
-                selected), nothing in the palette clears 3:1 on both — colors.accent is
-                2.41 and 2.08, which is the "unreadable at icon size" problem theme.js
-                already records for accent at this size. So: tintLifestyleFg (the repo's
-                own deepened accent) at 5.18:1 on white, and plain white at 5.01:1 on
-                teal. */}
-            {seg.promoted && (
-              <View pointerEvents="none"
-                style={[cs.intentDot, intent === seg.id && cs.intentDotOnActive]} />
-            )}
           </TouchableOpacity>
         ))}
       </View>
+      )}
 
       {/* HIDDEN ENTIRELY ON YURTLAR, not disabled. Every pill here filters or sorts a
-          `properties` query the dorm segment does not run — district, bedrooms, m², price
+          `properties` query the Yurtlar tab does not run — district, bedrooms, m², price
           period. A greyed-out bar reads as broken (the same reasoning the area pill's own
           comment gives for never being disabled), and sorting one partner is not a
           feature. */}
@@ -858,6 +849,14 @@ const cs = StyleSheet.create({
   intentTabActive:     { backgroundColor: colors.primary },
   intentTabText:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   intentTabTextActive: { fontFamily: 'Inter_700Bold', color: '#fff' },
+  // Top tabs. Unselected segments sit on cardBg and the selected one on primary — the
+  // same two backgrounds the intent chips use, so intentDot's two measured colours hold.
+  tabBar:              { flexDirection: 'row', flexGrow: 0, flexShrink: 0, marginHorizontal: 16, marginBottom: 10,
+                         padding: 3, borderRadius: 14, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border },
+  tabSeg:              { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, paddingHorizontal: 12, borderRadius: 11 },
+  tabSegActive:        { backgroundColor: colors.primary },
+  tabSegText:          { fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.textSecondary },
+  tabSegTextActive:    { fontFamily: 'Inter_700Bold', color: '#fff' },
   // The promoted marker. `position: 'absolute'` is the requirement, not the styling
   // choice: it takes the dot out of the chip's layout so the chip measures exactly as it
   // did before, which is what "same shape and size as the other chips" means. RN views

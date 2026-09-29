@@ -300,10 +300,10 @@ export const PREVIEW_PENDING_PARTNERS = false
 // itself still dark. Same resolution as PREVIEW_PENDING_PARTNERS.
 export const HS_SELF_REGISTRATION = false
 
-// Yurtlar (dorm partners) — the fifth segment of Emlak & Konaklama. false = the chip is
-// absent from the segment row, the showcase is unreachable, and the module opens on
-// Satılık exactly as it does today. true = the chip appears FIRST with its accent dot and
-// the module opens on it.
+// Yurtlar (dorm partners) — the second top tab of Emlak & Konaklama (a chip in the Emlak
+// row until 2026-09-29). false = the tab is absent, the showcase is unreachable, and with
+// no second tab the tab bar is not drawn at all. true = the Yurtlar tab with its accent
+// dot. The module opens on Emlak either way (ACCOM_LANDING_TAB).
 //
 // NOT a MODULE_FLAGS key, and the reason is mechanical rather than stylistic. A true
 // entry in that map trips three checks in scripts/check-module-flags.mjs — the
@@ -316,10 +316,8 @@ export const HS_SELF_REGISTRATION = false
 // PROFILE_GATE_LIVE above; carried in EXPECTED_SCALARS so a working-tree flip still
 // cannot ride out on an unrelated `eas update`.
 //
-// ⚠ IT ALSO MOVES THE LANDING TAB, WHICH IS WHY constants/dorms.js DERIVES IT.
-//   ACCOM_LANDING is 'dorm'. With this false, accomLanding() falls back to the first
-//   VISIBLE segment — 'sale' — so the dark state is correct by construction. Reading
-//   ACCOM_LANDING directly would open the module on a tab that is not in the chip row.
+// The landing tab is DERIVED (accomLandingTab in constants/dorms.js), so a dark tab can
+// never be the one the module opens on.
 //
 // ⚠ IT DOES NOT GATE ANY DATA, because there is no data to gate. Dorm partners live in
 //   constants/dorms.js, not in a table, so nothing is publicly readable and nothing is

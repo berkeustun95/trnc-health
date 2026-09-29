@@ -26,64 +26,50 @@
 // import this module. Assets are KEYS resolved by constants/partnerAssets.js — the same
 // split, for the same reason, that constants/partners.js and constants/ads.js carry.
 
-// ─── THE SEGMENT ROW, AS DATA ───────────────────────────────────────────────
+// ─── THE TOP TABS AND THE EMLAK CHIP ROW, AS DATA ────────────────────────────
 //
-// Order and promotion are config, not code, so reverting the Yurtlar promotion is an edit
-// to this array and nothing else. `promoted` draws an accent dot when the chip is NOT
-// selected; it does not change the chip's shape or size — the dot is absolutely
-// positioned in AccommodationScreen, because laid out inline it would widen the chip and
-// break the one thing the brief pinned down about it.
+// Emlak & Konaklama opens with top tabs — Emlak | Yurtlar (| Oteller, slice 4 of the
+// hotels plan, 2026-09-29) — and Emlak keeps its own intent chip row beneath them. Yurtlar
+// was a fifth chip in that row until 2026-09-29; it is a TAB now, because it is not a
+// filter on `properties` at all (no query, no filters, no sort).
 //
-// 'dorm' AND 'all' ARE BOTH PSEUDO-INTENTS. Neither is a `properties.intent` value and
-// neither is ever sent as one: 'all' omits the .eq() filter, and 'dorm' skips the
-// properties query altogether and renders DORM_PARTNERS instead. That is why this segment
-// needed no migration and properties_intent_check is untouched.
+// `gated` tabs appear only when their flag is live; the flags are INJECTED so this module
+// stays pure data a Node harness can drive in every state. `promoted` draws the accent dot
+// — it moved from the Yurtlar chip to the Yurtlar tab, so the prominence the dorm partner
+// was promised survives the restructure. The dot is absolutely positioned in
+// AccommodationScreen so it never changes the tab's size.
+export const ACCOM_TABS = [
+  { id: 'property' },
+  { id: 'dorm', promoted: true, gated: true },
+]
+
+export const accomTabs = live => ACCOM_TABS.filter(tab => !tab.gated || live[tab.id] === true)
+
+// The tab the module OPENS on: Emlak (decision 2026-09-29). Derived, never read straight
+// off the constant — if the landing tab is ever gated and dark, fall back to the first
+// VISIBLE tab rather than open on one the user can neither see nor leave.
+export const ACCOM_LANDING_TAB = 'property'
+export function accomLandingTab(live) {
+  const visible = accomTabs(live)
+  return visible.some(tab => tab.id === ACCOM_LANDING_TAB) ? ACCOM_LANDING_TAB : visible[0].id
+}
+
+// Emlak's intent chips. 'all' is a pseudo-intent (it omits the .eq() filter) and stays
+// last because it is the least coherent view: it interleaves intents, currencies and rent
+// periods, so price sort means nothing there.
 export const ACCOM_SEGMENTS = [
-  { id: 'dorm', promoted: true },
   { id: 'sale' },
   { id: 'rent' },
   { id: 'short_term' },
   { id: 'all' },
 ]
 
-// The tab the module OPENS on.
-//
-// ─── 'sale', AND THE CHIP IS STILL FIRST ───────────────────────────────────
-//
-// Set to 'dorm' on 2026-09-10 (fa0abb4) and moved back on 2026-09-12, BEFORE the flag
-// was ever flipped, so no user has seen either. The two decisions are separable and were
-// being made as one: ACCOM_SEGMENTS puts Yurtlar first in the chip row, which is the
-// prominence Özok were promised, and this constant decides which chip is SELECTED when
-// the module opens, which is a cost paid by everyone who is not looking for a dorm.
-//
-// WHY IT MOVED BACK. `deal` is null — Özok's exclusive-deal text has not arrived — so the
-// deal band does not render. Landing on Yurtlar would put a permanent one-tap detour in
-// front of every user hunting a flat, to reach a promotion with nothing in it. The detour
-// is not free and not dismissible: there is no "remember my last tab".
-//
-// WHEN THE DEAL TEXT ARRIVES, THIS IS ONE WORD. That is the moment the detour is earning
-// something, and the moment to make it — not before.
+// The intent chip SELECTED when Emlak opens. 'sale' since 2026-09-12: landing on a single
+// intent is what makes price sort mean something. If the Novest inventory question is
+// ever reopened,
+//   SELECT intent, count(*) FROM properties WHERE source IS NOT NULL GROUP BY intent;
+// settles it with data instead of intuition.
 export const ACCOM_LANDING = 'sale'
-
-// DORMS_LIVE is INJECTED rather than imported, so this module stays pure data a Node
-// harness can drive with either value — the same reason partnerGallery() takes its
-// resolver as an argument instead of importing it.
-export const accomSegments = dormsLive =>
-  ACCOM_SEGMENTS.filter(s => s.id !== 'dorm' || dormsLive)
-
-// ⚠ THE LANDING TAB MUST BE DERIVED, NEVER READ STRAIGHT OFF ACCOM_LANDING.
-//
-// ACCOM_LANDING is 'dorm' and DORMS_LIVE ships false, so taking the constant literally
-// would open the module on a tab that is not in the chip row: an empty list under a
-// selection the user can neither see nor change, in production, from the first OTA that
-// carries this file. Falling back to the first VISIBLE segment makes the dark state
-// correct by construction — it resolves to 'sale', which is exactly where the module
-// opened before this segment existed — and it needs no second constant to keep in step
-// with this one.
-export function accomLanding(dormsLive) {
-  const visible = accomSegments(dormsLive)
-  return visible.some(s => s.id === ACCOM_LANDING) ? ACCOM_LANDING : visible[0].id
-}
 
 // ─── THE PARTNERS ───────────────────────────────────────────────────────────
 export const DORM_PARTNERS = [

@@ -206,9 +206,9 @@ const EXPECTED_SCALARS = {
   // in that map would fail this script's own WAITLIST_BLAST_DONE and notify checks against
   // a perfectly correct app — the same reason HOME_V2_LIVE and AD_BANNERS_LIVE are here.
   //
-  // Baselined because a flip does two visible things at once: it adds the promoted chip
-  // AND moves the tab the module opens on, so a working-tree flip left over from a device
-  // check would ship Yurtlar early to every user AND change where Emlak & Konaklama lands.
+  // Baselined because a flip is user-visible at once: it adds (or removes) the promoted
+  // Yurtlar tab, so a working-tree flip left over from a device check would ship Yurtlar
+  // early to every user, or hide it from them.
   DORMS_LIVE:            true,   // live 2026-09-13
   // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar. Not a
   // MODULE_FLAGS key for the same mechanical reason DORMS_LIVE is not: it gates a PARTNER
