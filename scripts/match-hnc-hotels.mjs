@@ -80,6 +80,8 @@ const out = matches.map(({ r, c, alts, lost, held }) => {
   return { external_id: r.external_id, name: r.name, region: r.region, village: r.address,
     site_url: h?.url || null, site_name: h?.name || null, matched_by: c?.why || [], lost: lost || null, held: held || null, alts,
     photo: h?.photo || null, photo_from: h?.photo_from || null,
+    // Up to 6: the page's own gallery in page order, else KITOB's featured image alone.
+    gallery: h ? ((h.gallery?.length ? h.gallery : [h.photo]).filter(Boolean).slice(0, 6)) : [],
     description_en: h?.description && h.description.length >= MIN_DESC ? h.description : null,
     description_skipped: h?.placeholder ? 'lorem ipsum' : (h?.description && h.description.length < MIN_DESC ? `tagline (${h.description.length} chars): "${h.description}"` : null),
     kitob_marker: h?.marker || null, pin: pin || null, marker_vs_pin_km: markerKm == null ? null : +markerKm.toFixed(2) }

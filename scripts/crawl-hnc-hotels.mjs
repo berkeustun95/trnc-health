@@ -72,7 +72,7 @@ function parse(url, html) {
   const marker = html.match(/class="marker" data-lat="([-\d.]+)" data-lng="([-\d.]+)"/)
   return { url, name, location, class: klass, stars, address, phone, email, website: site,
     description: PLACEHOLDER.test(description) ? null : (description || null),
-    placeholder: PLACEHOLDER.test(description), photo: photos[0] || null, photo_count: photos.length,
+    placeholder: PLACEHOLDER.test(description), photo: photos[0] || null, photo_count: photos.length, gallery: photos,
     marker: marker ? { lat: +marker[1], lng: +marker[2] } : null }
 }
 
