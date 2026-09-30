@@ -10,33 +10,25 @@ import { IconButton } from '../../ui'
 import HeroCreditSheet from '../HeroCreditSheet'
 import { rampLayers } from '../HomeHero'
 
-// ~290pt city photograph: overline "Günaydın · {district}", headline, frosted 44pt bell and
-// menu. The search pill is NOT inside: it floats over this hero's bottom edge and is
-// rendered by the screen, so its search-open state can be the same element at the top.
+// The district photograph: ADA wordmark + frosted bell (and menu while the drawer exists),
+// and ONE line of text — the district, on a dark pill, with the photo-credit "i" beside it.
+// No greeting, no headline, no search: search lives in the Oli card below (Slice 1 rev).
 //
 // Kept from V2: the district photo (resolveHero), the tap-through to the pictured place,
-// the photo-credit sheet, the ADA wordmark, and the stepped scrim.
+// the photo-credit sheet, the wordmark.
 //
-// ─── CONTRAST, MEASURED ON THE REAL PHOTOS (p95 of the text rows, 3 device sizes) ───
-// Headline (26/700 = large text, 3:1 floor) with this ramp (0.80 over 72%): worst Karpaz
-// 5.74, generic 6.73, the rest 6.6–10.3. The 12pt overline could NOT be carried by a ramp
-// that leaves the photo alive — bare it measures Karpaz 3.44 even at this ramp (2.65 at
-// 0.72) — so it sits on its own rgba(0,0,0,0.60) pill: 5.74:1 over a pure-white pixel,
-// i.e. whatever photo is behind it, today's five or any added later.
-export const HERO_H = 290
-export const PILL_OVERLAP = 26          // half the search pill's 52pt height
+// ─── CONTRAST IS CARRIED BY THE PILL, NOT THE PHOTO ─────────────────────────
+// White 12pt on rgba(0,0,0,HERO_PILL_ALPHA) is 5.74:1 over a pure-white pixel, so it holds
+// on any photo, today's five or any added later. Measured on the real photos the BARE line
+// failed 4 of 6 (Karpaz 2.65). scripts/check-hero-contrast.mjs reads HERO_PILL_ALPHA from
+// this file and fails below 4.5:1.
+export const HERO_H = 196
+export const HERO_PILL_ALPHA = 0.6
 
 const TOP = rampLayers(0.32)
-const BOTTOM = rampLayers(0.80)
+const BOTTOM = rampLayers(0.35)
 const STEPS = TOP.length
 const LOGO = require('../../../assets/hero/ada-wordmark-keyline.png')
-
-export function greetingKey(date = new Date()) {
-  const h = date.getHours()
-  if (h >= 5 && h < 12) return 'hrGreetMorning'
-  if (h >= 12 && h < 18) return 'hrGreetDay'
-  return 'hrGreetEvening'
-}
 
 export default function RedesignHero({
   region, lang, hasUnread, hideActions, onShowNotifs, onOpenMenu, hamburgerRef, onOpenPlace,
@@ -55,12 +47,12 @@ export default function RedesignHero({
       <Image source={source} style={s.photo} resizeMode="cover" fadeDuration={0} />
       {TOP.map((a, i) => (
         <View key={`t${i}`} pointerEvents="none"
-          style={[s.band, { top: 0, height: (height * 0.4 / STEPS) * (i + 1), backgroundColor: `rgba(0,0,0,${a})` }]} />
+          style={[s.band, { top: 0, height: (height * 0.45 / STEPS) * (i + 1), backgroundColor: `rgba(0,0,0,${a})` }]} />
       ))}
       {isGeneric && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.28)' }]} />}
       {BOTTOM.map((a, i) => (
         <View key={`b${i}`} pointerEvents="none"
-          style={[s.band, { bottom: 0, height: (height * 0.72 / STEPS) * (i + 1), backgroundColor: `rgba(0,0,0,${a})` }]} />
+          style={[s.band, { bottom: 0, height: (height * 0.45 / STEPS) * (i + 1), backgroundColor: `rgba(0,0,0,${a})` }]} />
       ))}
     </View>
   )
@@ -80,26 +72,26 @@ export default function RedesignHero({
           <View style={s.actions}>
             <IconButton icon="notifications-outline" variant="frosted" onPress={onShowNotifs}
               badge={hasUnread} accessibilityLabel={t('notifications', lang)} />
-            <IconButton ref={hamburgerRef} icon="menu" variant="frosted" onPress={onOpenMenu}
-              accessibilityLabel={t('uiMenu', lang)} />
+            {!!onOpenMenu && (
+              <IconButton ref={hamburgerRef} icon="menu" variant="frosted" onPress={onOpenMenu}
+                accessibilityLabel={t('uiMenu', lang)} />
+            )}
           </View>
         )}
       </View>
 
-      <View style={s.content} pointerEvents="box-none">
-        <View style={s.overlineRow} pointerEvents="box-none">
-          <Text style={s.overline} numberOfLines={1}>
-            {t(greetingKey(), lang)} · {district}
-          </Text>
-          {!!credit && (
-            <TouchableOpacity style={s.info} onPress={() => setCreditOpen(true)}
-              hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
-              accessibilityRole="button" accessibilityLabel={t('heroCreditTitle', lang)}>
-              <Ionicons name="information" size={14} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
+      <View style={s.chipRow} pointerEvents="box-none">
+        <View style={s.chip} accessibilityRole="text">
+          <Ionicons name="location" size={13} color="#FFFFFF" />
+          <Text style={s.chipText} numberOfLines={1}>{district}</Text>
         </View>
-        <Text style={s.headline} numberOfLines={2} accessibilityRole="header">{t('hrHeadline', lang)}</Text>
+        {!!credit && (
+          <TouchableOpacity style={s.info} onPress={() => setCreditOpen(true)}
+            hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
+            accessibilityRole="button" accessibilityLabel={t('heroCreditTitle', lang)}>
+            <Ionicons name="information" size={14} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <HeroCreditSheet visible={creditOpen} credit={credit} lang={lang} onClose={() => setCreditOpen(false)} />
@@ -107,23 +99,20 @@ export default function RedesignHero({
   )
 }
 
-const shadowText = { textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }
-
 const s = StyleSheet.create({
-  hero:        { overflow: 'hidden', backgroundColor: colors.border,
-                 borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
-  photo:       { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  band:        { position: 'absolute', left: 0, right: 0 },
-  topRow:      { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16,
-                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  logo:        { width: 40, height: 44 },
-  actions:     { flexDirection: 'row', gap: 8 },
-  content:     { position: 'absolute', left: 20, right: 20, bottom: PILL_OVERLAP + 20 },
-  overlineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  overline:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 1,
-                 backgroundColor: 'rgba(0,0,0,0.60)', borderRadius: 13, overflow: 'hidden',
-                 paddingHorizontal: 10, paddingVertical: 5 },
-  info:        { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.42)',
-                 justifyContent: 'center', alignItems: 'center' },
-  headline:    { ...type.heroHeadline, color: '#FFFFFF', ...shadowText },
+  hero:     { overflow: 'hidden', backgroundColor: colors.border,
+              borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  photo:    { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  band:     { position: 'absolute', left: 0, right: 0 },
+  topRow:   { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16,
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  logo:     { width: 40, height: 44 },
+  actions:  { flexDirection: 'row', gap: 8 },
+  chipRow:  { position: 'absolute', left: 16, right: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chip:     { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
+              backgroundColor: `rgba(0,0,0,${HERO_PILL_ALPHA})`, borderRadius: 999,
+              paddingHorizontal: 11, paddingVertical: 6 },
+  chipText: { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 1 },
+  info:     { width: 26, height: 26, borderRadius: 13, backgroundColor: `rgba(0,0,0,${HERO_PILL_ALPHA})`,
+              justifyContent: 'center', alignItems: 'center' },
 })

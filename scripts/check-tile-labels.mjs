@@ -71,7 +71,8 @@ if (!FONT_FILE) {
   console.error(`\n  tile labels: no font file for the active family '${ACTIVE_FAMILY}'.\n`)
   process.exit(1)
 }
-const buf = readFileSync(FONT_FILE)
+function loadFont(file) {
+const buf = readFileSync(file)
 
 const u16 = o => buf.readUInt16BE(o)
 const i16 = o => buf.readInt16BE(o)
@@ -130,7 +131,7 @@ function glyphId(cp) {
 }
 
 const advCache = new Map()
-function advance(cp) {
+function adv(cp) {
   if (advCache.has(cp)) return advCache.get(cp)
   const g = glyphId(cp)
   const idx = Math.min(g, numberOfHMetrics - 1)
@@ -138,9 +139,14 @@ function advance(cp) {
   advCache.set(cp, a)
   return a
 }
+  return adv
+}
 
 // Zero-width joiners/marks contribute nothing.
 const ZERO = new Set([0x200C, 0x200D, 0x200E, 0x200F, 0x00AD, 0xFEFF])
+// The active measurer. V2 uses ACTIVE_FAMILY; the redesign section swaps weights.
+let advance = loadFont(FONT_FILE)
+
 export function width(str, px) {
   let w = 0
   for (const ch of str) {
@@ -347,6 +353,76 @@ for (const W of WIDTHS) {
     // longer render would be the guard reporting on ghosts — it would keep passing while
     // saying nothing, which is worse than not checking.
   }
+}
+
+// ═══ REDESIGNED HOME (feat/redesign) ═══════════════════════════════════════
+// Same measurement, the new geometry, BOTH label weights (the dev "Aa 500/700" toggle is
+// undecided until go-live, so each must fit). Everything is read from source; a renamed
+// style or constant fails the guard rather than passing on a box it no longer measures.
+const constNum = (file, name) => {
+  const m = new RegExp(`const ${name}\\s*=\\s*(-?[\\d.]+)`).exec(read(file))
+  return m ? { v: parseFloat(m[1]) } : { err: `${file}: no numeric const ${name}` }
+}
+const RGEOM = {
+  page:       num('screens/HomeScreen.js', 'rBelow', 'paddingHorizontal'),
+  widgetGap:  num('screens/HomeScreen.js', 'rWidgets', 'gap'),
+  panelGut:   constNum('components/home/redesign/ServicePanels.js', 'PANEL_GUTTER'),
+  tilePad:    constNum('components/home/redesign/ServicePanels.js', 'TILE_PAD'),
+  widgetPad:  num('components/home/redesign/Widgets.js', 'tile', 'padding'),
+}
+const rErr = Object.entries(RGEOM).filter(([, r]) => r.err).map(([k, r]) => `redesign ${k}: ${r.err}`)
+if (rErr.length) { for (const e of rErr) problems.push(e) } else {
+  const R = Object.fromEntries(Object.entries(RGEOM).map(([k, r]) => [k, r.v]))
+  const rTile   = W => (W - R.page * 2 - R.panelGut * 2) / 4               // one panel column
+  const rLabel  = W => rTile(W) - R.tilePad * 2                              // the label box
+  const rWidget = W => (W - R.page * 2 - R.widgetGap) / 2 - R.widgetPad * 2  // duty / weather text width
+  const fonts = {}
+  const use = w => { advance = fonts[w] ??= loadFont(FONTS[w]) }
+  const extraKeys = [...read('constants/homeGroups.js').matchAll(/labelKey:\s*'([a-zA-Z0-9_]+)'/g)].map(m => m[1])
+  const groupKeys = [...read('constants/homeGroups.js').matchAll(/titleKey:\s*'([a-zA-Z0-9_]+)'/g)].map(m => m[1])
+  if (!extraKeys.length || !groupKeys.length) problems.push('redesign: read ZERO keys from constants/homeGroups.js')
+  const { tCount } = await import('../constants/i18n.js')
+  const { untilTr } = await import('../utils/turkishTime.js')
+  const UNTILS = ['00:00', '19:00', '20:00', '22:00']
+  // The badge key is read from ServicePanels.js, not typed here, so a renamed key cannot
+  // leave this measuring a string the tile no longer shows.
+  const BADGE_KEY = (/soonText[^>]*>\{t\('([a-zA-Z0-9_]+)'/.exec(read('components/home/redesign/ServicePanels.js')) || [])[1]
+  if (!BADGE_KEY) problems.push('redesign: could not read the Yakında badge key from ServicePanels.js')
+  let rTight = { spare: Infinity }
+  const rAssess = (w, str, px, box, where, cursive, lines) => {
+    use(w); checked++
+    const { lines: got, midWord } = wrap(str, px, box)
+    const spare = headroom(str, px, box, lines)
+    if (!cursive && spare >= 0 && spare < rTight.spare) rTight = { spare, where, str, box }
+    if (midWord) problems.push(`${where}: ${JSON.stringify(str)} BREAKS MID-WORD in ${box.toFixed(1)}pt -> ${got.map(l => JSON.stringify(l)).join(' / ')}`)
+    else if (got.length > lines) problems.push(`${where}: ${JSON.stringify(str)} needs ${got.length} lines, has ${lines} (${box.toFixed(1)}pt)`)
+  }
+  for (const W of WIDTHS) for (const L of Object.keys(LANG_CODES)) {
+    const cur = CURSIVE.has(L)
+    for (const w of [500, 700]) {
+      for (const m of HOME_MODULES) {
+        rAssess(w, t(m.labelKey, L), 11, rLabel(W), `redesign ${W}dp ${L} ${w} tile:${m.id}`, cur, 2)
+        if (m.gridLabel) rAssess(w, t(m.gridLabel.key, L), m.gridLabel.size, rLabel(W),
+          `redesign ${W}dp ${L} ${w} gridLabel:${m.id}`, cur, m.gridLabel.lines)
+      }
+      for (const k of extraKeys) rAssess(w, t(k, L), 11, rLabel(W), `redesign ${W}dp ${L} ${w} tile:${k}`, cur, 2)
+    }
+    // "Yakında" badge: 9.5pt semibold, 6pt side padding, must stay inside the tile column.
+    rAssess(600, t(BADGE_KEY, L), 9.5, rTile(W) - 12, `redesign ${W}dp ${L} badge:comingSoon`, cur, 1)
+    for (const k of groupKeys) rAssess(600, t(k, L), 15, rTile(W) * 4 - 24 - 16, `redesign ${W}dp ${L} panel:${k}`, cur, 1)
+    // Duty tile — px and numberOfLines MIRROR Widgets.js (title 14/600 × 2, count 13/600 × 3,
+    // until 13/400 × 1, warnings 13/600 × 3). Change one, change both.
+    rAssess(600, t('stripDutyTitle', L), 14, rWidget(W), `redesign ${W}dp ${L} duty:title`, cur, 2)
+    for (const n of [1, 13]) rAssess(600, tCount('hrDutyCount', n, L), 13, rWidget(W), `redesign ${W}dp ${L} duty:count(${n})`, cur, 3)
+    for (const u of UNTILS) {
+      const str = L === 'Turkish' ? untilTr(u) : t('hrDutyUntil', L).replace('{time}', u)
+      rAssess(400, str, 13, rWidget(W), `redesign ${W}dp ${L} duty:until(${u})`, cur, 1)
+    }
+    for (const k of ['hrDutyPartial', 'hrDutyUnavailable']) rAssess(600, t(k, L), 13, rWidget(W), `redesign ${W}dp ${L} duty:${k}`, cur, 3)
+  }
+  use(WEIGHT || 700)
+  console.log(`  redesign: panel label box ${rLabel(320).toFixed(1)}pt, widget text ${rWidget(320).toFixed(1)}pt at 320dp; `
+    + `tightest ${JSON.stringify(rTight.str)} at ${rTight.where}, ${rTight.spare.toFixed(1)}pt headroom`)
 }
 
 if (checked === 0) {

@@ -101,6 +101,7 @@
     "web:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-web-assets.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs && npx wrangler deploy",
     "privacy:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs",
     "logo:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-logo.mjs",
+    "trtime:test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-turkish-time.mjs",
     "home:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-home-geometry.mjs",
     "hero:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-contrast.mjs",
     "labels:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs",

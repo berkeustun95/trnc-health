@@ -24,7 +24,7 @@ const OLI_POS_KEY = '@trnc_oli_pos'
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max)
 
 // Starter chips → intent targets. Matching/navigation lands in Slice 2.
-const CHIPS = [
+export const CHIPS = [
   { id: 'pharmacy',     labelKey: 'oliChipPharmacy' },
   { id: 'events',       labelKey: 'oliChipEvents' },
   { id: 'homeServices', labelKey: 'oliChipHomeServices' },

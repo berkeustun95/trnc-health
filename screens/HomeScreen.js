@@ -37,13 +37,11 @@ import {
   haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
 import BackButton from '../components/BackButton'
-import RedesignHero, { PILL_OVERLAP } from '../components/home/redesign/RedesignHero'
-import SearchPill from '../components/home/redesign/SearchPill'
-import { DutyTile, WeatherTile, OliTile, EventBanner, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
+import RedesignHero from '../components/home/redesign/RedesignHero'
+import { DutyTile, WeatherTile, OliSearchCard, EventBanner, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel } from '../components/home/redesign/ServicePanels'
-import { SectionHeader, ErrorState, useTabBarFootprint } from '../components/ui'
+import { SectionHeader, useTabBarFootprint } from '../components/ui'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const TYPE_ICON_MAP = {
   pharmacy: { lib: 'ion', name: 'medkit' },
@@ -91,7 +89,7 @@ const HEALTH_TYPES = ['pharmacy', 'clinic', 'hospital', 'dentist']
 // photo_attribution is INCLUDED and must stay: ExploreProfileScreen renders the credit
 // line and source link from it, and both callers here are production routes to that
 // screen.
-const PLACE_COLS = 'id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until, source'
+export const PLACE_COLS = 'id, category, name, name_i18n, description_i18n, region, latitude, longitude, cover_image_url, photos, photo_credits, photo_attribution, blue_flag, access_type, amenities, provider_id, featured_until, source'
 
 // ⚠ V1's TILE LIST. It uses this file's OWN three-value tint vocabulary (urgent /
 //   service / lifestyle, TINTS above); constants/homeModules.js uses V2's two-value one
@@ -225,12 +223,10 @@ export default function HomeScreen({
   onOpenExploreTab,       // the Keşfet tile switches to the Keşfet tab
   onShowWalkingRoutes,    // Keşfet tab, opened in routes mode
 }) {
-  const insets = useSafeAreaInsets()
   const tabFootprint = useTabBarFootprint()
   // DEV-ONLY: tile labels Medium (500) vs Bold (700). Toggled by the "Aa" chip beside
   // "Tüm hizmetler", which only renders in __DEV__. Default Medium.
   const [labelWeight, setLabelWeight] = useState(500)
-  const [searchError, setSearchError] = useState(false)
   const [snap] = useState(() => (backRef ? homeState : null))
   const [showFacilityList, setShowFacilityList] = useState(snap?.showFacilityList ?? forceFacilityList)
   const [searchText, setSearchText]             = useState(snap?.searchText ?? '')
@@ -282,14 +278,11 @@ export default function HomeScreen({
   const runSearch = useCallback(async (q) => {
     if (!q.trim()) { setGlobalResults([]); setIsSearching(false); return }
     setIsSearching(true)
-    setSearchError(false)
-    const { data, error } = await supabase.rpc('search_content', {
+    const { data } = await supabase.rpc('search_content', {
       query:    q.trim(),
       user_lat: coarseCoord(userLocation?.latitude  ?? null),
       user_lon: coarseCoord(userLocation?.longitude ?? null),
     })
-    // A failed RPC used to read as "no results" — the audit's #1 class. It is an error.
-    if (error) setSearchError(true)
     setGlobalResults(data ?? [])
     setIsSearching(false)
   }, [userLocation])
@@ -885,38 +878,15 @@ export default function HomeScreen({
     )
   }
 
-  // ─── The redesigned hub (feat/redesign, Slice 1) ───────────────────────────
-  // Top → bottom: hero · search pill over its edge · widgets (duty tall | weather + Oli) ·
-  // tonight banner · favourites · "Tüm hizmetler" panels. Everything below the hero scrolls
-  // under the floating tab bar, so the content pads by its footprint.
-  // Kept from V2, same handlers: search, favourites editing, weather sheet, hero credit,
-  // Oli, strip dismissal, the bottom ad slot, and the three coach-mark refs.
+  // ─── The redesigned hub (feat/redesign, Slice 1, revised) ─────────────────
+  // Top → bottom: hero (district photo, bell) · duty | weather · Oli + search (one card;
+  // opens the Oli sheet, which is also the search) · tonight banner · favourites ·
+  // "Tüm hizmetler". Everything below the hero scrolls under the floating tab bar, so the
+  // content pads by its footprint. Kept from V2, same handlers: favourites editing, weather
+  // sheet, hero credit, strip dismissal, and the coach-mark refs (search → the Oli field).
   function renderHubRedesign() {
     const hasUnread = notifications.some(n => !n.read)
     const byId = new Map(HOME_MODULES.map(m => [m.id, m]))
-    const sheets = (
-      <>
-        <WeatherSheet visible={weatherOpen} weatherData={weatherData} lang={lang} locale={locale}
-          onClose={() => setWeatherOpen(false)} />
-        <FavouritesEditSheet visible={favEditOpen} pins={favPins} usage={favUsage} overrides={favOverrides}
-          lang={lang} onSave={saveFavourites} onClose={() => setFavEditOpen(false)} />
-      </>
-    )
-
-    if (searchOpen) {
-      return (
-        <>
-          <SearchPill open lang={lang} query={globalQuery} onChangeText={setGlobalQuery} onClose={closeSearch}
-            style={{ marginTop: insets.top + 8, marginHorizontal: 16 }} />
-          <ScrollView {...searchMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[s.v2SearchContent, { paddingTop: 12, paddingBottom: tabFootprint + 16 }]}>
-            {renderSearchResults()}
-          </ScrollView>
-          {sheets}
-        </>
-      )
-    }
-
     return (
       <>
         <ScrollView {...hubMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
@@ -926,21 +896,21 @@ export default function HomeScreen({
             onOpenPlace={openPlaceById} />
 
           <View style={s.rBelow}>
-            {!hideHeaderActions && (
-              <SearchPill lang={lang} onOpen={() => setSearchOpen(true)} searchRef={searchRef}
-                style={{ marginTop: -PILL_OVERLAP }} />
-            )}
-
             <View style={s.rWidgets}>
               <View style={s.rCol}>
                 <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty}
                   dutyRef={dutyBannerRef} />
               </View>
-              <View style={[s.rCol, { gap: WIDGET_GAP }]}>
+              <View style={s.rCol}>
                 <WeatherTile weatherData={weatherData} lang={lang} onPress={() => setWeatherOpen(true)} />
-                <OliTile lang={lang} onPress={onOpenOli} />
               </View>
             </View>
+
+            {!hideHeaderActions && (
+              <View style={{ marginTop: WIDGET_GAP }}>
+                <OliSearchCard lang={lang} onPress={onOpenOli} searchRef={searchRef} />
+              </View>
+            )}
 
             <View style={{ marginTop: WIDGET_GAP }}>
               <EventBanner item={stripItem} loading={stripLoading} lang={lang}
@@ -966,16 +936,18 @@ export default function HomeScreen({
                 renderHubV2(). Adding it to the redesign is a guard change, made at go-live. */}
           </View>
         </ScrollView>
-        {sheets}
+
+        <WeatherSheet visible={weatherOpen} weatherData={weatherData} lang={lang} locale={locale}
+          onClose={() => setWeatherOpen(false)} />
+        <FavouritesEditSheet visible={favEditOpen} pins={favPins} usage={favUsage} overrides={favOverrides}
+          lang={lang} onSave={saveFavourites} onClose={() => setFavEditOpen(false)} />
       </>
     )
   }
 
   function renderSearchResults() {
     if (!globalQuery.trim()) return null
-    if (REDESIGN && searchError && !isSearching) {
-      return <ErrorState lang={lang} onRetry={() => runSearch(globalQuery)} />
-    }
+    // (Redesigned Home searches in OliSearchSheet, which has its own error state.)
     if (isSearching) {
       return (
         <View style={s.searchResultsWrap}>

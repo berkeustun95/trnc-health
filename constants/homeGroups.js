@@ -5,19 +5,20 @@
 // as its flag and cannot be forgotten. The __DEV__ check at the bottom logs any live
 // module that no panel places — that list is computed, not remembered.
 //
-// ⚠ DARK MODULES DO NOT SHOW. The V2 grid rendered dark tiles on purpose, routing to Coming
-//   Soon so their waitlists collect demand (constants/homeModules.js, "the towing lesson").
-//   The redesign brief shows live modules only, so jobs, transport and insurance lose that
-//   Home entry point. Decided for Slice 1 and flagged at the gate — not an oversight.
+// COMING SOON (Slice 1 revision, Berke 2026-09-30): jobs, transport, insurance and eSIM show
+// in their groups with a "Yakında" badge and open their existing Coming Soon / waitlist
+// screens — that is how a dark module collects demand ("the towing lesson",
+// constants/homeModules.js). Hotels stays HIDDEN (HOTELS_LIVE); grooming and garages stay
+// hidden (HIDDEN_TILES). A module that goes live loses its badge automatically.
 import { MODULE_FLAGS, HOTELS_LIVE, CONNECTIVITY_LIVE, EXPLORE_ROUTES_LIVE } from './flags'
 import { HOME_MODULES, HIDDEN_TILES } from './homeModules'
 
 // Tiles that are not HOME_MODULES entries: the duty list, the Keşfet tab, walking routes
 // and hotels have no grid tile in V2.
 const EXTRA = {
-  duty:          { id: 'duty',          icon: 'medkit-outline',     labelKey: 'dutyPharmacies' },
+  duty:          { id: 'duty',          icon: 'medkit-outline',     labelKey: 'hrTileDuty' },
   exploreTab:    { id: 'exploreTab',    icon: 'compass-outline',    labelKey: 'menuExplore' },
-  walkingRoutes: { id: 'walkingRoutes', icon: 'walk-outline',       labelKey: 'routesChip' },
+  walkingRoutes: { id: 'walkingRoutes', icon: 'walk-outline',       labelKey: 'hrTileRoutes' },
   hotels:        { id: 'hotels',        icon: 'bed-outline',        labelKey: 'accomTabHotels' },
 }
 
@@ -42,6 +43,12 @@ const GATES = {
   // `explore` (the directory tile) stays hidden: HIDDEN_TILES says the Keşfet tab covers
   // it, and the Keşfet tile below opens that tab.
   explore:       () => false,
+}
+
+const COMING_SOON = new Set(['jobPostings', 'transport', 'insurance', 'esim'])
+
+export function isComingSoon(id) {
+  return COMING_SOON.has(id) && !isLive(id)
 }
 
 export function isLive(id) {
@@ -72,7 +79,13 @@ export function categoryOf(id) { return CATEGORY_OF.get(id) || 'city' }
 
 export function liveGroups() {
   return HOME_GROUPS
-    .map(g => ({ ...g, modules: g.ids.filter(isLive).map(id => BY_ID.get(id)).filter(Boolean) }))
+    .map(g => ({
+      ...g,
+      modules: g.ids
+        .filter(id => isLive(id) || isComingSoon(id))
+        .map(id => BY_ID.get(id) && { ...BY_ID.get(id), soon: isComingSoon(id) })
+        .filter(Boolean),
+    }))
     .filter(g => g.modules.length > 0)
 }
 

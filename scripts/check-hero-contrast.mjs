@@ -120,6 +120,25 @@ for (const [name, file] of BACKGROUNDS) {
   }
 }
 
+// ═══ REDESIGNED HERO (feat/redesign) ═══════════════════════════════════════
+// Its only text — the district chip — sits on a dark pill, so the photo cannot decide the
+// ratio. The binding case is the pill over a PURE WHITE pixel; measured on the real photos
+// the bare text failed 4 of 6 (Karpaz 2.65), which is why the pill exists. The alpha is
+// read from source, so lowering it for looks goes red here rather than on a phone.
+{
+  const src = readFileSync(resolve(ROOT, 'components/home/redesign/RedesignHero.js'), 'utf8')
+  const m = /export const HERO_PILL_ALPHA\s*=\s*([\d.]+)/.exec(src)
+  if (!m) {
+    problems.push('redesign hero: cannot read HERO_PILL_ALPHA from RedesignHero.js — measuring nothing')
+  } else {
+    const a = parseFloat(m[1])
+    const g = 255 * (1 - a)                                  // the pill over pure white
+    const c = 1.05 / (Y(g, g, g) + 0.05)
+    rows.push({ name: 'redesign pill', worst: c, at: 'over #FFFFFF' })
+    if (c < FLOOR) problems.push(`redesign hero: white on rgba(0,0,0,${a}) over white is ${c.toFixed(2)}:1, under ${FLOOR}:1 — raise HERO_PILL_ALPHA`)
+  }
+}
+
 if (problems.length) {
   console.error('\n  ┌─ HERO CONTRAST CHECK FAILED ───────────────────────────────────┐')
   for (const p of problems) console.error('  │ ' + p)

@@ -21,8 +21,13 @@ export function ServiceTile({ mod, cat, lang, onPress, labelWeight = 500, width 
   const label = t(override?.key ?? mod.labelKey, lang)
   return (
     <TouchableOpacity style={[s.tile, { width }]} onPress={() => onPress(mod)} activeOpacity={press.small}
-      accessibilityRole="button" accessibilityLabel={label}>
-      <CategoryIcon icon={mod.icon} category={cat} size={52} />
+      accessibilityRole="button" accessibilityLabel={mod.soon ? `${label}, ${t('hrSoonBadge', lang)}` : label}>
+      <View>
+        <CategoryIcon icon={mod.icon} category={cat} size={52} />
+        {mod.soon && (
+          <View style={s.soon}><Text style={s.soonText} numberOfLines={1}>{t('hrSoonBadge', lang)}</Text></View>
+        )}
+      </View>
       <View style={s.labelBox}>
         <Text
           style={[s.label, { fontFamily: labelWeight === 700 ? 'Inter_700Bold' : 'Inter_500Medium' },
@@ -78,4 +83,9 @@ const s = StyleSheet.create({
   tile:     { alignItems: 'center', paddingVertical: 8, paddingHorizontal: TILE_PAD },
   labelBox: { height: GRID_LABEL_HEIGHT, alignSelf: 'stretch', marginTop: 8 },
   label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, color: colors.tileInk, textAlign: 'center' },
+  // "Yakında": white on tileInk, 8.61:1. Sits over the icon's top edge so the label box —
+  // the 68pt budget above — is untouched.
+  soon:     { position: 'absolute', top: -7, alignSelf: 'center', paddingHorizontal: 6, height: 16,
+              borderRadius: 8, backgroundColor: colors.tileInk, justifyContent: 'center' },
+  soonText: { fontSize: 9.5, lineHeight: 12, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
 })

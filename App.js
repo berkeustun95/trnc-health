@@ -88,7 +88,7 @@ import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import { signOutGoogle } from './utils/socialAuth'
-import HomeScreen from './screens/HomeScreen'
+import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import StudentHubScreen from './screens/StudentHubScreen'
@@ -109,6 +109,7 @@ import HomeCitySheet from './components/HomeCitySheet'
 import CityWelcomeSettings from './components/CityWelcomeSettings'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
+import OliSearchSheet from './components/OliSearchSheet'
 import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
@@ -2536,6 +2537,30 @@ export default function App() {
 
   // Ask Oli routing: map an intent target → the app's navigation state setters.
   // Close any open module sub-screen first so only the target renders.
+  // Redesign: a search_content row tapped in the Oli sheet. Same reset-then-open shape as
+  // oliNavigate below; the per-module routing mirrors HomeScreen's handleResultPress.
+  const openSearchResult = async (r) => {
+    oliNavigate(null)
+    switch (r?.module) {
+      case 'medical': {
+        const fac = facilities.find(f => f.id === r.id)
+        if (fac) { setActiveTab('home'); fac.provider_id ? setSelectedFacility(fac) : setUnclaimedFacility(fac) }
+        break
+      }
+      case 'events':       setShowEvents(true); break
+      case 'homeServices': setShowHomeServices(true); break
+      case 'transport':    setShowTransport(true); break
+      case 'jobPostings':  setShowJobPostings(true); break
+      case 'towing':       setShowTowing(true); break
+      case 'beach':
+      case 'landmark': {
+        const { data } = await supabase.from('places').select(PLACE_COLS).eq('id', r.id).eq('status', 'active').maybeSingle()
+        if (data) setSelectedExplorePlace(data)
+        break
+      }
+    }
+  }
+
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
@@ -2650,7 +2675,10 @@ export default function App() {
         onDismiss={() => dismissPolicyNotice(false)}
       />
       {oliVisible && (
-        <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} hideFab={HOME_V2_LIVE} />
+        REDESIGN
+          ? <OliSearchSheet lang={lang} userLocation={userLocation} onNavigate={oliNavigate} onOpenResult={openSearchResult}
+              onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} />
+          : <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} hideFab={HOME_V2_LIVE} />
       )}
 
       {showEmergencyModal && (
