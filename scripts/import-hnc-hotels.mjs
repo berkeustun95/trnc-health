@@ -19,6 +19,9 @@
 // (committed) holds {external_id: {sha, text}}; a translation is used only while its sha equals
 // the current English's, so a KITOB text change drops the stale translations instead of showing
 // them. A re-import therefore never wipes a translation whose source is unchanged.
+// data/kitob/description-overrides.json (committed, keyed by KITOB name) replaces KITOB's English
+// with ADA's correction BEFORE the sha is taken. Each carries the sha of the KITOB text it
+// corrected; if KITOB's text has changed since, the import refuses until it is re-reviewed.
 //
 // --apply writes ONLY photo_url, gallery_urls, photo_source, description_i18n, kitob_page_url, on
 // the matched external_id, and refuses to replace photos whose photo_source is not 'hnc'.
@@ -44,6 +47,16 @@ const covers = JSON.parse(readFileSync(resolve(ROOT, 'data/kitob/cover-overrides
 const TR_DIR = resolve(ROOT, 'data/kitob/description-translations')
 const translations = existsSync(TR_DIR) ? Object.fromEntries(readdirSync(TR_DIR).filter(f => f.endsWith('.json'))
   .map(f => [f.replace(/\.json$/, ''), JSON.parse(readFileSync(resolve(TR_DIR, f), 'utf8'))])) : {}
+const descOverrides = JSON.parse(readFileSync(resolve(ROOT, 'data/kitob/description-overrides.json'), 'utf8')).overrides || {}
+for (const [n, o] of Object.entries(descOverrides)) {
+  const m = match.find(x => x.name === n)
+  if (!m) { console.error(`description-overrides.json names a hotel that is not in the list: ${n}`); process.exit(1) }
+  const now = m.description_en ? sha(m.description_en).slice(0, 16) : null
+  if (now !== o.source_sha) { console.error(`description-overrides.json: KITOB's English for ${n} changed (${o.source_sha} → ${now}); re-review the correction`); process.exit(1) }
+  m.description_en = o.en
+}
+writeFileSync(resolve(ROOT, 'data/hnc/descriptions-en.json'), JSON.stringify(Object.fromEntries(match.filter(m => m.description_en)
+  .map(m => [m.external_id, { name: m.name, en: m.description_en, sha: sha(m.description_en).slice(0, 16) }])), null, 1))
 const unknownCover = Object.keys(covers).filter(n => !match.some(m => m.name === n))
 if (unknownCover.length) { console.error(`cover-overrides.json names hotels that are not in the list: ${unknownCover.join(', ')}`); process.exit(1) }
 
