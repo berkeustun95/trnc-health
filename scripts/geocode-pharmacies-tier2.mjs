@@ -39,6 +39,12 @@
  * Start with --limit 10 --dry-run and read the output.
  */
 
+// ⛔ RETIRED 2026-09-29 — geocoding storage policy (CLAUDE.md "Geocoding"). This script WROTE
+//    Google Places latitude/longitude (geocode_source 'google_places'), which the policy forbids:
+//    Places is a cross-check only. Its 349 pins are being re-sourced by
+//    scripts/resource-pharmacy-coords.mjs. Kept for the record; it refuses to run.
+console.error('geocode-pharmacies-tier2.mjs is RETIRED (stores Places coordinates). See scripts/resource-pharmacy-coords.mjs.');
+process.exit(1);
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';

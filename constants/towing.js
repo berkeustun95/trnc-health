@@ -68,13 +68,13 @@ export const MAP_VIEWBOX = { width: 1020, height: 436 }
 // The mockup anchors text at its LEFT baseline; these are converted to CENTRES so an RN
 // <Text> can be centred on them regardless of how long the translated label is.
 export const MAP_LABEL_ANCHORS = {
-  nicosia:    { x:  383, y: 320 },
-  kyrenia:    { x:  237, y: 255 },
-  famagusta:  { x:  534, y: 348 },
-  morphou:    { x:  174, y: 317 },
-  iskele:     { x:  661, y: 195 },
-  lefke:      { x:   36, y: 370 },
-  karpaz:     { x:  722, y: 170 },
+  nicosia:    { x:  383, y: 323 },
+  kyrenia:    { x:  237, y: 259 },
+  famagusta:  { x:  533, y: 350 },
+  morphou:    { x:  173, y: 320 },
+  iskele:     { x:  657, y: 207 },
+  lefke:      { x:   37, y: 373 },
+  karpaz:     { x:  719, y: 180 },
 }
 
 // ─── The drift guard the whole map design rests on ──────────────────────────

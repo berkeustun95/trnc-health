@@ -30,7 +30,7 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  ACCOM_SEGMENTS, ACCOM_LANDING, accomSegments, accomLanding,
+  ACCOM_TABS, ACCOM_SEGMENTS, ACCOM_LANDING, ACCOM_LANDING_TAB, accomTabs, accomLandingTab,
   DORM_PARTNERS, PENDING_KEYS, GALLERY_ORDER, SECTION_ORDER, COLLAPSIBLE,
   dormDeal, dormSections, dormWaCode, dormWaMessage, dormWebsiteUrl,
 } from '../constants/dorms.js'
@@ -72,28 +72,37 @@ if (t('zzNotARealKeyForTheDormGuard', 'Turkish') !== 'zzNotARealKeyForTheDormGua
 }
 if (!DORM_PARTNERS.length) problems.push('CONTROL: DORM_PARTNERS is empty — this guard would pass by checking nothing')
 
-// ─── 1. The segment row and the landing tab, in BOTH flag states ────────────
+// ─── 1. The top tabs and the landing tab, in BOTH flag states ────────────────
 //
 // Only testing the state you ship leaves the other untested until the day it matters, and
 // the day it matters is go-live. The dark state is what every user has right now; the live
 // state is what the flip produces.
-const darkIds = accomSegments(false).map(s => s.id)
-const liveIds = accomSegments(true).map(s => s.id)
-check(!darkIds.includes('dorm'), `dark chip row contains 'dorm': ${darkIds.join(',')}`)
-check(liveIds.includes('dorm'),  `live chip row is missing 'dorm': ${liveIds.join(',')}`)
-check(liveIds[0] === 'dorm',     `'dorm' is not first when live: ${liveIds.join(',')}`)
-check(liveIds.length === darkIds.length + 1, `live row should be exactly one longer than dark (${liveIds.length} vs ${darkIds.length})`)
+const darkIds = accomTabs({ dorm: false }).map(s => s.id)
+const liveIds = accomTabs({ dorm: true }).map(s => s.id)
+check(!darkIds.includes('dorm'), `dark tabs contain 'dorm': ${darkIds.join(',')}`)
+check(liveIds.includes('dorm'),  `live tabs are missing 'dorm': ${liveIds.join(',')}`)
+check(liveIds[0] === 'property' && liveIds[1] === 'dorm', `tabs are not Emlak | Yurtlar when live: ${liveIds.join(',')}`)
+check(liveIds.length === darkIds.length + 1, `live tabs should be exactly one longer than dark (${liveIds.length} vs ${darkIds.length})`)
 
-// THE BUG THIS EXISTS FOR. ACCOM_LANDING was 'dorm' while the flag shipped false, so a literal
-// read would open the module on a tab that is not in the chip row.
-check(accomLanding(true) === ACCOM_LANDING, `accomLanding(true) is ${accomLanding(true)}, expected the declared ${ACCOM_LANDING}`)
-check(darkIds.includes(accomLanding(false)),
-  `accomLanding(false) returned '${accomLanding(false)}', which is NOT in the dark chip row [${darkIds.join(',')}] — the module would open on an invisible tab`)
+// Oteller (HOTELS_LIVE) never appears on the dorm flag alone, and all three read in order.
+const allIds = accomTabs({ dorm: true, hotel: true }).map(s => s.id)
+check(!liveIds.includes('hotel'), `'hotel' shows without its own flag: ${liveIds.join(',')}`)
+check(allIds.join(',') === 'property,dorm,hotel', `all-live tabs are not Emlak | Yurtlar | Oteller: ${allIds.join(',')}`)
+
+// Yurtlar is a TAB now, never an intent chip: 'dorm' reaching the chip row would send
+// .eq('intent', 'dorm') to a CHECK constraint that has never heard of it.
+check(!ACCOM_SEGMENTS.some(s => s.id === 'dorm'), `'dorm' is back in the Emlak chip row: ${ACCOM_SEGMENTS.map(s => s.id).join(',')}`)
+check(ACCOM_SEGMENTS.some(s => s.id === ACCOM_LANDING), `ACCOM_LANDING '${ACCOM_LANDING}' is not an Emlak chip`)
+
+// The module must never open on a tab it is not showing.
+check(accomLandingTab({ dorm: true }) === ACCOM_LANDING_TAB, `accomLandingTab(live) is ${accomLandingTab({ dorm: true })}, expected the declared ${ACCOM_LANDING_TAB}`)
+check(darkIds.includes(accomLandingTab({ dorm: false })),
+  `accomLandingTab(dark) returned '${accomLandingTab({ dorm: false })}', which is NOT a visible tab [${darkIds.join(',')}]`)
 
 // A count, not a name list: a check phrased as a remembered name has no red to go to when
-// somebody adds a second promoted chip.
-const promoted = ACCOM_SEGMENTS.filter(s => s.promoted).map(s => s.id)
-check(promoted.length === 1, `expected exactly 1 promoted segment, found ${promoted.length}: [${promoted.join(',')}]`)
+// somebody adds a second promoted tab.
+const promoted = ACCOM_TABS.filter(s => s.promoted).map(s => s.id)
+check(promoted.length === 1 && promoted[0] === 'dorm', `expected exactly 1 promoted tab (dorm), found [${promoted.join(',')}]`)
 
 // ─── 2. Per-partner structure ───────────────────────────────────────────────
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -744,7 +753,7 @@ console.log(
   `dorm config: OK (${DORM_PARTNERS.length} partner(s) · ${assertions} assertions · `
   + `${referencedKeys.size + SCREEN_KEYS.length} key(s) x ${LANGS.length} locales · `
   + `${referencedAssets.size} asset key(s) · ${pending.size} pending key(s) held unwritten)`)
-console.log(`  segments dark: [${darkIds.join(', ')}]  landing ${accomLanding(false)}`)
-console.log(`  segments live: [${liveIds.join(', ')}]  landing ${accomLanding(true)}`)
+console.log(`  tabs dark: [${darkIds.join(', ')}]  landing ${accomLandingTab({ dorm: false })}`)
+console.log(`  tabs live: [${liveIds.join(', ')}]  landing ${accomLandingTab({ dorm: true })} · Emlak chips [${ACCOM_SEGMENTS.map(s => s.id).join(', ')}] landing ${ACCOM_LANDING}`)
 console.log(`  NOTE: this reads FILES. It says nothing about contact_events_action_check,`)
 console.log(`        which is supabase/verify_schema.sql's 20261014_website_action tokens.`)

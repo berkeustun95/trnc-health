@@ -39,6 +39,7 @@ import { useRouteMedal } from '../utils/routeMedals'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance, legKey } from '../constants/walkingRoutes'
 import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useLocationGranted, useHeading, fitRoute } from '../components/WalkingRoutes'
+import OsmAttribution from '../components/OsmAttribution'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 
@@ -664,6 +665,8 @@ export default function ExploreMapScreen({
           )
         })}
       </MapView>
+      {/* Facility pins are partly OSM-sourced (geocoding policy): ODbL credit. */}
+      <OsmAttribution lang={lang} overlay />
 
       <ChipRow
         sources={sources}

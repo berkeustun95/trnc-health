@@ -1,11 +1,11 @@
 # ADA — North Cyprus assistant
 
 ## What this is
-ADA is a TRNC super-app for residents and newcomers: facilities directory and duty roster,
-Explore (places, walking routes), events, accommodation, towing, home services, pets, Student
-Hub and more, each module behind `MODULE_FLAGS` (`constants/flags.js`). Expo SDK 54 + Supabase,
-9-language i18n (`constants/i18n.js`). Roles: customer, provider, admin (guests via
-`signInAnonymously()`). I am the architect, you are my fast hands; I review everything.
+ADA is a TRNC super-app for residents and newcomers: facilities directory and duty roster, Explore
+(places, walking routes), events, accommodation, hotels, towing, home services, pets, Student Hub and
+more, each module behind `MODULE_FLAGS` (`constants/flags.js`). Expo SDK 54 + Supabase, 9-language
+i18n (`constants/i18n.js`). Roles: customer, provider, admin; guests via `signInAnonymously()`.
+I am the architect, you are my fast hands; I review everything.
 Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-lessons.md`.
 
 **Touching supabase/, SQL, RLS or migrations? Read supabase/CLAUDE.md first.**
@@ -21,19 +21,17 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - ⚠ **Play: ADA is NOT a health app — deliberate, tested; do not "correct" it.** See Compliance.
 - ⚠ **`expo.locales` must never gain `ar` or `fa`.** An Arabic/Persian `.lproj` makes RN mirror the
   whole iOS layout (`allowRTL` defaults YES, read at bridge init). RTL is a separate app-wide decision.
-- ⚠ **Image messaging is blocked on a safety scope.** No attachment column, bucket or upload path
-  until `~/ObsidianVault/10-ada/2026-09-20_image-messaging-safety-scope-PARKED.md` is answered:
-  it is private between minors, `contains_blocked_term` cannot see an image, and auto-hide has no
-  messages branch. Message images never go in a public bucket (a guessable URL). Image buckets
-  (facility/event/property/place/towing/ad) are public; `avatars` is private (signed URLs, `Avatar.js`).
+- ⚠ **Image messaging is blocked on a safety scope** (vault `…image-messaging-safety-scope-PARKED.md`):
+  no attachment column, bucket or upload path until it is answered. Private between minors, the word
+  filter cannot see an image, no auto-hide for messages. Never a public bucket (guessable URL); image
+  buckets are public today, only `avatars` is private (signed URLs, `Avatar.js`).
 - ⚠ **Never raise `min_supported_version` above `'1.0.0'`** without the force-tier device pass.
-- ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`.** Both raw tools bundle the
-  WORKING TREE and have no hook, so the wrapper is the only guard.
+- ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`** — the wrappers are the only guard.
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
 - ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
-- ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `LiveStrip.js`, rank 3b, row
-  `is_active=false` by product decision). Don't delete or repurpose it; re-enable = one
-  `UPDATE … SET is_active = true`. Same for the `showAgentOnboarding` branch in App.js.
+- ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `NOTICE_FALLBACK` in `LiveStrip.js`, rank 3b
+  in `homeStripResolver.js`, `stripNoticeTitle`, `utils/stripDismissals.js`). Don't delete or repurpose it;
+  re-enable = one `UPDATE … SET is_active = true`. Same for the `showAgentOnboarding` branch in App.js.
 
 ## Release & deploy
 - **JS-only change:** `npm run ota -- --message "…"` (note the `--`). Pre-flight: stash check, then
@@ -42,17 +40,15 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   wrapper runs `check-module-flags.mjs` (also `npm run check:flags`); `git push` and `eas build` are
   covered by `.githooks/pre-push` and `eas-build-pre-install`. Fresh clone: `npm run setup:hooks`.
 - **OTA only reaches the production build** — never a preview APK; test OTA on the Play Store install.
-- **Native build** only for `app.config.js`, native dependencies, permissions, icons, SDK version:
-  `eas build --platform android --profile production`, then upload the AAB to Play closed testing
-  by hand (the Play service-account key here is used for the store listing only).
+- **Native build** only for `app.config.js`, native deps, permissions, icons, SDK: `eas build --platform
+  android --profile production`, AAB to Play closed testing by hand (Play key = listing only).
 - **iOS:** `npm run ios:build` / `ios:submit`, no Apple login; they source `~/.appstoreconnect/ada-eas.env`
   (outside repo) → ASC key "EAS Build" (`WYJ38BNP8L`, Admin, team MAQ8XPJ8Z6). Only a key passed via
   `EXPO_ASC_API_KEY_PATH`/`_KEY_ID`/`_ISSUER_ID` (+ `EXPO_APPLE_TEAM_ID`/`_TYPE`) regenerates profiles;
   an EAS-stored key never does. Never commit/print/copy the key; lost Mac → revoke in ASC → Users and Access.
 - **Never use `process.env.EAS_BUILD` in `app.config.js`.** Hardcode `checkAutomatically: 'ON_LOAD'`.
-- **Permission strings:** ONE source per usage description, its plugin option (`ios.infoPlist` is inert).
-  `RECORD_AUDIO` off, camera kept (accepted review risk), background location off. Verify with
-  `npx expo config --type introspect`, never by reading `app.config.js`.
+- **Permission strings:** ONE source each, its plugin option (`ios.infoPlist` is inert). Mic off, camera
+  kept (accepted review risk), background location off. Verify: `npx expo config --type introspect`.
 - **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build.
 - **Maps key is restricted** (`com.berkeustun95.ada` + SHA-1). Blank map, no error = SHA-1 mismatch;
   ADD the Play App Signing SHA-1 as a 2nd entry. Checklist: vault `play-console-status.md`.
@@ -119,23 +115,20 @@ name joined to a clinic review is a health disclosure about an identified person
 - When you write or change a policy, explain in plain English who can read/write what.
 - A customer must NEVER be able to read another customer's data.
 - Never put the service_role key or DB password in app code; only the anon key in `lib/supabase.js`.
-- Policies change through migrations only, never the Supabase dashboard. `TO authenticated` includes
-  guests — only `NOT is_anonymous_session()` excludes them. Every denial check needs a positive
-  control beside it. Details: supabase/CLAUDE.md.
+- Policies change through migrations only. `TO authenticated` includes guests (only
+  `NOT is_anonymous_session()` excludes them); every denial check needs a positive control. See supabase/CLAUDE.md.
 
 ## Conventions
 - Functional components with hooks; small components; one screen per file. `maybeSingle()` returns
   `{data: null, error: null}` on zero rows; it does not throw.
 - `facilities.type` is limited by `facilities_type_check`: pharmacy, clinic, hospital, dentist, vet,
   grooming, garage (repo migrations; confirm live with `pg_get_constraintdef`).
-- **Languages are stored as FULL ENGLISH NAMES** (`'Turkish'`), never ISO codes — the `LANGUAGES`
-  keys in `constants/i18n.js`, through `preferred_language`, `lang`, `t()`, `*_i18n.lang`,
-  `module_notif_text`. An ISO comparison never errors, it matches nothing. Any new per-language
-  column gets a CHECK rejecting `'tr'`/`'en'`.
+- **Languages are stored as FULL ENGLISH NAMES** (`'Turkish'`), never ISO codes: the `LANGUAGES` keys in
+  `constants/i18n.js`, through `preferred_language`, `lang`, `t()`, `*_i18n.lang`, `module_notif_text`.
+  An ISO comparison matches nothing, silently. New per-language columns get a CHECK rejecting `'tr'`/`'en'`.
 - `facility_change_requests.proposed_changes.languages` is a comma string; split before writing
   `facilities.languages` (`text[]`): `changes.languages.split(',').map(l => l.trim())`.
-- Admins never reach HomeScreen (selector is role-first): admin previews enter via `adminPreview`,
-  never a HomeScreen tile gated on `isAdmin`.
+- Admins never reach HomeScreen (role-first selector): previews enter via AdminScreen's `adminPreview`, never an `isAdmin` Home tile.
 - **Never use an admin as a test identity**: `|| isAdmin` unlocks dark modules and swaps the
   deterministic featured sort for a random shuffle (`utils/featured.js`). Use a guest or a real
   customer; reach dark modules by flipping the flag locally, uncommitted.
@@ -143,16 +136,15 @@ name joined to a clinic review is a health disclosure about an identified person
 - **`MODULE_FLAGS` does not gate search** (`search_content`). Pre-launch content is seeded in its
   table's unpublished state and published in the same step as the flag.
 - New admin-seeded directories DEFAULT to unpublished (`is_active DEFAULT false`), with an H token.
-- EXPIRING content ships with a staleness check (`check-*-staleness.mjs`, hand/cron, not pre-push).
-  If a table cannot legitimately be empty, render empty as an ERROR STATE.
+- EXPIRING content ships with a staleness check (`check-*-staleness.mjs`, hand/cron, not pre-push); a
+  table that cannot legitimately be empty renders empty as an ERROR STATE.
 - All back handlers register via `addBackListener` (`utils/backHandler.js`), never
   `BackHandler.addEventListener` directly (iOS edge swipe skips it). `npm run backlistener:check` and
   `npm run backchain:check` run in `npm run ota`; add a backchain case when a layer joins the chain.
 - Spot-check new UI in Turkish before declaring it done (longer strings surface layout bugs).
 
 ## Verification principles
-1. A green check is evidence only once you have seen it go red. Fix what the test measures, never
-   widen a tolerance until it passes.
+1. A green check is evidence only once seen red. Fix what the test measures; never widen a tolerance.
 2. A red-first run asserts TWO things: the break landed (`python3` `assert anchor in text`, not
    silent `sed`) and the probe noticed. A slice between markers asserts it contains what it must.
 3. Derive, never hardcode: assert `count(*)` and PRINT the rows, never a remembered name list
@@ -163,14 +155,12 @@ name joined to a clinic review is a health disclosure about an identified person
    value beside the expectation, and put it in the failure message.
 6. When a check fails, the first hypothesis is the check. Ask what it would forbid a CORRECT system
    from doing. Prefer a reading that needs no decoding.
-7. A migration file, a comment or a doc is a statement of intent. The live catalogs are the authority:
-   quote which one you read.
+7. A migration file, comment or doc is intent; the live catalogs are the authority. Quote which you read.
 8. When re-verifying, name the surfaces covered (client, RPCs, INVOKER/DEFINER, views, edge fns).
 9. When a guard goes green, say which question it answered ("the file exists" ≠ "it works in prod").
 10. Never verify a write from a role that is not allowed to read it.
 11. Use `IS DISTINCT FROM` / `IS NOT DISTINCT FROM` wherever NULL is reachable (`<>`/`=` go silent).
-12. Truncation guards compare `count: 'exact'` to what arrived; never `rows >= cap` (server
-    `max-rows` overrides the client limit).
+12. Truncation guards compare `count: 'exact'` to rows received, never `rows >= cap` (server `max-rows` wins).
 13. Look at what sample rows ARE before they overturn anything; structural proof first, data sizes.
 14. Group missing data along the axis the business uses (who pays, who is public) before calling it a
     gap. Before a column becomes a denominator, ask: fact about now, or about then? Undatable =
@@ -188,21 +178,22 @@ name joined to a clinic review is a health disclosure about an identified person
 - Reinstall does NOT reset first-run state (Auto Backup restores AsyncStorage) — a test artifact, not
   a bug. Use Clear storage or `adb shell pm clear com.berkeustun95.ada`; `EXPO_PUBLIC_DEV_ONBOARDED`.
 
-## Geocoding — storage policy (2026-09-29)
-- **Google Places is a CROSS-CHECK ONLY.** Never store its lat/lng, names or addresses (DB or
-  committed file); the place ID is exempt (`hotels.google_place_id`). iOS maps are Apple Maps.
-- Stored coordinates: `geocode_source` `osm` (tier 1, `google_places` in corroboration) or `manual`
-  (tier 3, `visual_satellite`). OSM is ODbL: `OsmAttribution` wherever those pins show.
-- OSM data via `scripts/lib/osm-snapshot.mjs` only (main Overpass, ≤72 h; mirrors served stale data).
-- Local Places-data files are gitignored, deleted within 30 days. Hotels enforce it (20261061).
-  282 pharmacy Google pins remain as a time-limited exception:
-  `data/geocode-exceptions/pharmacy-google-pins.csv` (`review_by`). No imagery is licensed for
-  deriving stored coordinates yet — Google/Esri/Bing/Mapbox tracing grants are for OSM only.
+## Geocoding — storage policy (revised 2026-09-29)
+- **Google Places pins are an ACCEPTED KNOWN RISK for pharmacies and hotels** (breaks Places' 30-day
+  cache limit and, on iOS Apple Maps, display terms; risk = key suspension). No deadline. Every
+  Google pin has a row in `data/geocode-exceptions/google-pins.csv` (`kind;id;name;place;address;reason`,
+  never coordinates): add the row in the same commit as the pin; an OSM replacement removes it.
+- **Prefer OSM where it agrees:** `geocode_source` `osm` (tier 1, `google_places` in corroboration);
+  `components/OsmAttribution.js` on every map/card showing an `osm` pin (ODbL). OSM data only via
+  `scripts/lib/osm-snapshot.mjs` (main Overpass, ≤ 72 h; a mirror served stale data).
+- A Google pin is saved only when corroborated: region + address town, plus phone, name or OSM. A
+  hotel that fails gets NO pin; its Harita button searches "<name>, <town>, North Cyprus".
+- `geocode-pharmacies-tier2.mjs` is retired. OSM hand placement (`npm run place`) is SHELVED: no OSM editing.
 
 ## Social sign-in (Google + Apple, native, from 1.2.0)
 Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
 - Runtime 1.2.0 is the fence (`runtimeVersion` = `appVersion`). 1.1.0 fixes ship from `release/1.1`.
-- Every social branch keys on `app_metadata.provider` (`socialProvider()`, first identity only).
+- Every social branch keys on `app_metadata.provider` (`socialProvider()` in `utils/socialAuth.js`, first identity only).
 - `revokeGoogle()` runs BEFORE anything signs out of Supabase (after, `revokeAccess()` no-ops).
 - Under 13: Google/Apple accounts are DELETED, email accounts are FLAGGED.
 - A name the provider gave is never asked for again (App Store 4.0); Apple sends it once.
@@ -250,12 +241,10 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
 "→ architecture.md updates needed" if structural.
 
 ## Open windows / pending (vault = `~/ObsidianVault/10-ada/`)
-- 1.2.0 permission strings (live only once 1.2.0 installs; Play health declaration drafted when the
-  build is scheduled) + Android RTL-mirroring device check → `2026-09-20_native-permission-strings-PARKED.md`.
+- 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.
-- Student Hub stale-affiliation recovery path (window: Hub OTA → `20261027`; applied? check
-  `schema_migrations_applied`) → `claude-md-lessons.md` "Student Hub recovery path".
+- Student Hub stale-affiliation recovery test (window closes when `20261027` applies) → `claude-md-lessons.md`.
 - Student Hub message push deep link, WARM and COLD, on the Play Store build → same file.
 - Student Hub terms re-ask (SOP step 6): `studentHub` is `true` in flags.js; decision unrecorded.
 - Image messaging safety scope → `2026-09-20_image-messaging-safety-scope-PARKED.md`.

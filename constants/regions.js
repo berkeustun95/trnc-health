@@ -267,6 +267,11 @@ export const ANCHORS = [
 //   1. OFFSHORE, BE GENEROUS. Sea vertices are deliberately slack — nobody
 //      opens the app in the water, so a loose coastline costs nothing and
 //      protects against coarse-rounding error at harbour towns (Boğaz, Girne).
+//      WIDENED 2026-09-29: the north coast (+0.020° lat), the south side of the
+//      peninsula (−0.025° lat) and the east coast north of Varosha (+0.020° lng)
+//      were still clipping beach-front resorts — the Bafra strip, Merit Crystal
+//      Cove (Alsancak), Tatlısu — which resolved to null. Green Line vertices,
+//      the Varosha sea point and the west coast were not moved.
 //   2. ON THE GREEN LINE, BE CAREFUL. Every vertex along the southern edge is
 //      pinned between a real TRNC place that must stay IN and a real RoC place
 //      that must stay OUT. The tight pairs are Beyarmudu (in) vs Deryneia (out)
@@ -293,46 +298,46 @@ export const TRNC_OUTLINE = [
   [35.355, 32.875],
   [35.4025, 32.9186], // Cape Kormakitis (Koruçam Burnu)
   // North coast, east toward Girne
-  [35.390, 33.000],
-  [35.368, 33.080],
-  [35.358, 33.170],
-  [35.352, 33.260],
-  [35.350, 33.320],
-  [35.356, 33.400],
-  [35.366, 33.470],
-  [35.372, 33.510],
-  [35.384, 33.600],
-  [35.396, 33.700],
-  [35.404, 33.790], // keeps Tatlısu inside
-  [35.424, 33.880],
-  [35.454, 33.960],
-  [35.494, 34.060],
-  [35.545, 34.150],
-  [35.585, 34.250],
-  [35.620, 34.360],
-  [35.655, 34.470],
-  [35.6893, 34.5865], // Cape Apostolos Andreas (Zafer Burnu)
+  [35.4100, 33.0000],
+  [35.3880, 33.0800],
+  [35.3780, 33.1700],
+  [35.3720, 33.2600],
+  [35.3700, 33.3200],
+  [35.3760, 33.4000],
+  [35.3860, 33.4700],
+  [35.3920, 33.5100],
+  [35.4040, 33.6000],
+  [35.4160, 33.7000],
+  [35.4240, 33.7900], // keeps Tatlısu inside
+  [35.4440, 33.8800],
+  [35.4740, 33.9600],
+  [35.5140, 34.0600],
+  [35.5650, 34.1500],
+  [35.6050, 34.2500],
+  [35.6400, 34.3600],
+  [35.6750, 34.4700],
+  [35.7093, 34.5865], // Cape Apostolos Andreas (Zafer Burnu)
   // Back down the SOUTH side of the Karpaz peninsula. The coast here runs almost
   // due north-south below the cape, so these vertices have to swing east before
   // heading west — a straight cut from the cape slices off Apostolos Andreas
   // Monastery and Golden Beach, both of which are real, seeded content.
-  [35.650, 34.620],
-  [35.605, 34.600],
-  [35.570, 34.545],
-  [35.535, 34.470],
-  [35.500, 34.390],
-  [35.465, 34.310],
-  [35.430, 34.230],
-  [35.400, 34.140],
-  [35.370, 34.050],
+  [35.6250, 34.6200],
+  [35.5800, 34.6000],
+  [35.5450, 34.5450],
+  [35.5100, 34.4700],
+  [35.4750, 34.3900],
+  [35.4400, 34.3100],
+  [35.4050, 34.2300],
+  [35.3750, 34.1400],
+  [35.3450, 34.0500],
   // East coast, south past Boğaz and Famagusta
-  [35.345, 33.975],
-  [35.295, 33.965],
-  [35.230, 33.960],
-  [35.180, 33.965],
-  [35.140, 33.975],
-  [35.100, 33.970],
-  [35.075, 33.958], // south end of Varosha — Green Line meets the sea
+  [35.3450, 33.9950],
+  [35.2950, 33.9850],
+  [35.2300, 33.9800],
+  [35.1800, 33.9850],
+  [35.1400, 33.9950],
+  [35.1000, 33.9900],
+  [35.0750, 33.9580], // south end of Varosha — Green Line meets the sea
   // GREEN LINE, west. Every vertex below is load-bearing.
   [35.062, 33.900], // Deryneia (35.0575, 33.9550) stays OUT
   [35.050, 33.820],

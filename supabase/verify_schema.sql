@@ -90,6 +90,8 @@ WITH report AS (
     ('1051_app_versions','app_update_events'),
     -- Route medals (1056). Owner-only read; written only by award_route_medal().
     ('1056_route_medals','route_medals'),
+    -- KITOB hotels (1059). Dark until go-live: is_active DEFAULT false; service_role writes only.
+    ('1059_hotels','hotels'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -259,7 +261,23 @@ WITH report AS (
     -- The owner's badge switch (1056). Read only by get_profile_route_badges (DEFINER).
     ('1056_route_medals','profiles','route_badges_public'),
     -- Gişe Kıbrıs sync liveness (1058). Stamped every run; read by check-gisekibris-staleness.
-    ('1058_events_last_seen_at','events','last_seen_at')
+    ('1058_events_last_seen_at','events','last_seen_at'),
+    -- Hotel geocode provenance (1060). HotelsTab selects none of these today; the geocoder
+    -- and the importer's coordinate rule both read them.
+    ('1060_hotels_geocode_provenance','hotels','geocode_source'),
+    ('1060_hotels_geocode_provenance','hotels','geocode_tier'),
+    ('1060_hotels_geocode_provenance','hotels','geocode_corroboration'),
+    ('1060_hotels_geocode_provenance','hotels','geocoded_at'),
+    -- The Places place ID (1061). Since 1062 also the trace of every google_places pin (known risk).
+    ('1061_hotels_places_crosscheck','hotels','google_place_id'),
+    -- KITOB guide content (1063). HotelsTab selects all three once applied: MISSING = 42703 on the tab.
+    ('1063_hotels_kitob_guide','hotels','photo_source'),
+    ('1063_hotels_kitob_guide','hotels','description_i18n'),
+    ('1063_hotels_kitob_guide','hotels','kitob_page_url'),
+    -- 1064. The card's swipeable photos, cover first. HotelsTab selects it: MISSING = 42703 on the tab.
+    ('1064_hotels_gallery','hotels','gallery_urls'),
+    -- 1065. Credit for a free-licence (Commons) photo. HotelsTab selects it: MISSING = 42703 on the tab.
+    ('1065_hotels_commons_credit','hotels','photo_credit')
 
   ) e(m,t,c)
 
@@ -405,7 +423,8 @@ WITH report AS (
     ('1051_app_versions','purge_app_update_events'),
     ('1052_purge_status_reporter','app_update_events_purge_status'),
     ('1056_route_medals','award_route_medal'),
-    ('1056_route_medals','get_profile_route_badges')
+    ('1056_route_medals','get_profile_route_badges'),
+    ('1059_hotels','hotels_touch_updated_at')
   ) e(m,o)
 
   UNION ALL
@@ -458,7 +477,8 @@ WITH report AS (
     ('1029_student_messaging','msg_30_ugc_screen'),
     ('1029_student_messaging','msg_40_immutable'),
     ('1029_student_messaging','msg_50_touch_conversation'),
-    ('1045_places_source','places_guard_source')
+    ('1045_places_source','places_guard_source'),
+    ('1059_hotels','hotels_touch_updated_at')
 
   ) e(m,o)
 
@@ -680,7 +700,37 @@ WITH report AS (
     ('1051_app_versions','app_update_events_runtime_len_check'),
     ('1056_route_medals','route_medals_pkey'),
     ('1056_route_medals','route_medals_user_id_fkey'),
-    ('1056_route_medals','route_medals_route_id_fkey')
+    ('1056_route_medals','route_medals_route_id_fkey'),
+    -- 1059. external_id_key is CORRECTNESS: the importer's ON CONFLICT arbiter. A plain UNIQUE,
+    -- never a partial index (the 20260830 lesson). The vocabularies are asserted as exact sets in H.
+    ('1059_hotels','hotels_pkey'),
+    ('1059_hotels','hotels_external_id_key'),
+    ('1059_hotels','hotels_external_id_check'),
+    ('1059_hotels','hotels_source_check'),
+    ('1059_hotels','hotels_kitob_class_check'),
+    ('1059_hotels','hotels_region_check'),
+    ('1059_hotels','hotels_name_check'),
+    ('1059_hotels','hotels_kitob_member_check'),
+    ('1059_hotels','hotels_link_scheme_check'),
+    ('1059_hotels','hotels_coords_check'),
+    -- 1060. Names only; the H tokens assert what each one permits.
+    ('1060_hotels_geocode_provenance','hotels_geocode_source_check'),
+    ('1060_hotels_geocode_provenance','hotels_geocode_tier_check'),
+    ('1060_hotels_geocode_provenance','hotels_geocode_corroboration_check'),
+    ('1060_hotels_geocode_provenance','hotels_coords_provenance_check'),
+    -- 1061. The UNIQUE is correctness: two hotels matched to one Place is a wrong match.
+    ('1061_hotels_places_crosscheck','hotels_google_place_id_check'),
+    ('1061_hotels_places_crosscheck','hotels_google_place_id_key'),
+    -- 1062. A Google pin (known risk) must stay traceable: place id + tier 2.
+    ('1062_hotels_google_places','hotels_google_places_traceable_check'),
+    -- 1063. The H tokens assert what each permits.
+    ('1063_hotels_kitob_guide','hotels_photo_source_check'),
+    ('1063_hotels_kitob_guide','hotels_description_i18n_check'),
+    ('1063_hotels_kitob_guide','hotels_kitob_page_url_check'),
+    -- 1064. The H token asserts the cover-first rule.
+    ('1064_hotels_gallery','hotels_gallery_check'),
+    -- 1065. The H token asserts the NULL-safe two-way rule.
+    ('1065_hotels_commons_credit','hotels_photo_credit_check')
 
   ) e(m,o)
 
@@ -2142,12 +2192,11 @@ WITH report AS (
       COALESCE(position('''pets''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
         WHERE conrelid = to_regclass('public.contact_events')
           AND conname  = 'contact_events_module_check')) > 0, false)
-    UNION ALL SELECT '0910_contact_events','contact_events module CHECK carries exactly 12 modules',
-      COALESCE((SELECT count(*) = 12 FROM (
-        SELECT regexp_matches(d, '''([a-zA-Z]+)''::text', 'g')
-          FROM (SELECT pg_get_constraintdef(oid) d FROM pg_constraint
-                 WHERE conrelid = to_regclass('public.contact_events')
-                   AND conname  = 'contact_events_module_check') x) y), false)
+    -- ⚠ RETIRED 2026-09-29 by 20261059: "contact_events module CHECK carries exactly 12 modules".
+    --   20261059 adds 'hotels', making 13. Retired rather than bumped (one count, one owner):
+    --   the 1059 token "contact_events module vocabulary is exactly the 13-module set" owns the
+    --   module vocabulary now, as an exact SET — a count passes with a module swapped out. The
+    --   'pets' token above is 0910's own fact and stays.
     -- ── 0925 moderation normalization. Behaviour-only CREATE OR REPLACE on
     -- contains_blocked_term(), so section C sees the NAME and cannot see the CHANGE.
     -- Without these tokens a database still on the old body reads 100% OK while the
@@ -3409,6 +3458,167 @@ WITH report AS (
     --     filters them out (a code shape in the view definition).
     UNION ALL SELECT '1056_route_medals','contact_events_monthly excludes route_complete',
       COALESCE(pg_get_viewdef(to_regclass('public.contact_events_monthly')) LIKE '%<> ''route_complete''%', false)
+    -- ── 1059: KITOB hotels ───────────────────────────────────────────────────────
+    -- Every token reaches hotels through to_regclass / the catalogs: QUERY 1 is one statement
+    -- and a bare name on an unapplied database kills the whole report.
+    -- (1) The pre-launch inversion. A reverted DEFAULT creates no named object.
+    UNION ALL SELECT '1059_hotels','hotels.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='hotels'
+          AND column_name='is_active' AND column_default = 'false')
+    -- (2) Read-only to clients, DERIVED: exactly one permissive SELECT policy whose body gates on
+    --     BOTH switches (admin's is_active, the importer's delisted_at), no client write privilege
+    --     (inherited grants resolved), and the positive control — anon and authenticated can
+    --     still SELECT, or go-live shows an empty tab.
+    UNION ALL SELECT '1059_hotels','hotels: RLS on, 1 SELECT policy on is_active + delisted_at, no client writes, clients can read',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.hotels')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='hotels') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='hotels'
+                  AND cmd='SELECT' AND permissive='PERMISSIVE'
+                  AND qual LIKE '%is_active%' AND qual LIKE '%delisted_at IS NULL%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.hotels'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.hotels'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('anon', to_regclass('public.hotels'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.hotels'), 'SELECT'), false)
+    -- (3) The vocabularies as exact SETS (the 1038 form). Same-name DROP/ADD is invisible to E.
+    --     kitob_class must match HOTEL_CLASSES in constants/hotels.js, which the importer reads.
+    UNION ALL SELECT '1059_hotels','hotels_kitob_class_check is exactly the 10 KITOB classes',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z0-9_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_kitob_class_check')
+      IS NOT DISTINCT FROM ARRAY['apart','boutique','bungalow','holiday_village','special_certified',
+                                 'star1','star2','star3','star4','star5']
+    UNION ALL SELECT '1059_hotels','hotels_region_check is exactly the 7 REGIONS keys',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_region_check')
+      IS NOT DISTINCT FROM ARRAY['famagusta','iskele','karpaz','kyrenia','lefke','morphou','nicosia']
+    -- A second source is a decision (and hotels_kitob_member_check keys on 'kitob').
+    UNION ALL SELECT '1059_hotels','hotels_source_check is exactly {kitob}',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_source_check')
+      IS NOT DISTINCT FROM ARRAY['kitob']
+    -- (4) The touch trigger ignores last_seen_at (stamped on every row every run). An
+    --     unconditional body passes D while making updated_at meaningless.
+    UNION ALL SELECT '1059_hotels','hotels_touch_updated_at is conditional (ignores last_seen_at)',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.hotels_touch_updated_at()')) LIKE '%- ''last_seen_at''%', false)
+    -- (5) The contact_events MODULE vocabulary, owned here since 0910's count was retired.
+    --     An exact SET: a count of 13 would pass with a module swapped out. A new module
+    --     changes this array in the same commit, and that edit is the review moment.
+    UNION ALL SELECT '1059_hotels','contact_events module vocabulary is exactly the 13-module set (incl. hotels)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
+      IS NOT DISTINCT FROM ARRAY['accommodation','events','explore','garages','grooming','homeServices',
+                                 'hotels','insurance','jobs','pets','studentHub','towing','transport']
+    -- ── 1060: hotel geocode provenance ─────────────────────────────────────────
+    -- (1) THE TWO-WAY RULE. Coordinates exist exactly when a source does (and a timestamp with
+    --     it). The half that matters most is source-without-coordinates being REFUSED: it is what
+    --     stops a KITOB list update from wiping a geocoded pin while leaving its provenance
+    --     behind. facilities' rule is one-way; loosening this one to match it would pass section
+    --     E by name and reopen exactly that clobber. Written from the live rendering.
+    UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_coords_provenance_check is two-way (lat <-> source <-> geocoded_at)',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_coords_provenance_check')
+               LIKE '%((lat IS NULL) = (geocode_source IS NULL))%((geocode_source IS NULL) = (geocoded_at IS NULL))%', false)
+    -- (2) ⚠ RETIRED 2026-09-29 by 20261061: "hotels_geocode_source_check is exactly
+    --   google_places/manual/osm/partner". 1061 removes google_places (storage policy: Places is a
+    --   cross-check only). Retired, not bumped — one fact, one owner. 1062 put google_places back;
+    --   the 1062 token owns the set now.
+    -- (3) Tier 1..3, matched on the RENDERING ('>= 1' / '<= 3'), never on BETWEEN (the 0919 trap).
+    UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_geocode_tier_check is still 1..3',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.hotels')
+        AND conname = 'hotels_geocode_tier_check'
+        AND pg_get_constraintdef(oid) LIKE '%>= 1%' AND pg_get_constraintdef(oid) LIKE '%<= 3%')
+    -- (4) The corroboration vocabulary as an exact SET. Unlike facilities this is ENFORCED, so a
+    --     rewrite that drops visual_satellite (mandatory for a hand-placed pin) goes red here.
+    UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_geocode_corroboration_check is exactly the 8-term vocabulary',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_geocode_corroboration_check')
+      IS NOT DISTINCT FROM ARRAY['address_town','google_places','name_match','osm','phone_exchange',
+                                 'phone_match','region_audit','visual_satellite']
+    -- ── 1061: google_place_id ───────────────────────────────────────────────────
+    -- (1)+(2) ⚠ RETIRED 2026-09-29 by 20261062: "source set is exactly manual/osm/partner" and
+    --   "no hotel row has geocode_source = google_places". Berke reversed the policy the same day:
+    --   hotels take corroborated Google pins as a known risk. The 1062 token owns the set.
+    -- (3) google_place_id is format-checked AND unique (two hotels, one Place = a wrong match).
+    UNION ALL SELECT '1061_hotels_places_crosscheck','hotels.google_place_id: format CHECK + UNIQUE',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.hotels')
+        AND conname = 'hotels_google_place_id_check' AND pg_get_constraintdef(oid) LIKE '%google_place_id ~%')
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.hotels')
+        AND conname = 'hotels_google_place_id_key' AND contype = 'u')
+    -- ── 1062: Google Places pins allowed again (known risk) ─────────────────────
+    -- (1) The source vocabulary as an exact SET. A same-name DROP/ADD that dropped a value would
+    --     pass E by name.
+    UNION ALL SELECT '1062_hotels_google_places','hotels_geocode_source_check is exactly google_places/manual/osm/partner',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_geocode_source_check')
+      IS NOT DISTINCT FROM ARRAY['google_places','manual','osm','partner']
+    -- (2) The traceability rule's body, not just its name: google_places ⇒ place id AND tier 2.
+    UNION ALL SELECT '1062_hotels_google_places','hotels_google_places_traceable_check requires google_place_id and tier 2',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_google_places_traceable_check')
+               LIKE '%google_places%google_place_id IS NOT NULL%geocode_tier = 2%', false)
+    -- ── 1063: KITOB guide content ───────────────────────────────────────────────
+    -- (1) THE BUCKET FLAG. Only storage.buckets.public says whether hotel photos render; a bucket
+    --     flipped private serves nothing and no named object changes. Limits asserted with it.
+    UNION ALL SELECT '1063_hotels_kitob_guide','bucket hotel-images is PUBLIC, 2 MB, jpeg/webp, and no storage policy names it',
+      COALESCE((SELECT public AND file_size_limit = 2097152 AND allowed_mime_types = ARRAY['image/jpeg','image/webp']
+                  FROM storage.buckets WHERE id = 'hotel-images'), false)
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+                      AND COALESCE(qual,'') || COALESCE(with_check,'') LIKE '%hotel-images%')
+    -- (2) Description keys are FULL language names: the allow-list carries 'English' and no ISO
+    --     code. A rewrite to 'en' keys passes E by name and matches nothing in the app, silently.
+    UNION ALL SELECT '1063_hotels_kitob_guide','hotels_description_i18n_check allows full language names only, string values',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_description_i18n_check')
+               LIKE '%''English''%''Turkish''%jsonb_path_exists%', false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_description_i18n_check')
+               NOT LIKE '%''en''%', false)
+    -- (3) A photo and its source travel together (the credit reads photo_source).
+    UNION ALL SELECT '1063_hotels_kitob_guide','hotels_photo_source_check is two-way with photo_url',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_source_check')
+               LIKE '%(photo_url IS NULL) = (photo_source IS NULL)%', false)
+    -- ── 1064: gallery + nine-language description cap ───────────────────────────
+    -- (1) The gallery is tied to the cover: present exactly with photo_url, element 1 IS
+    --     photo_url, and no NULL element (array_to_string skips NULLs, so the https regex alone
+    --     cannot see one). Read from the rendering.
+    UNION ALL SELECT '1064_hotels_gallery','hotels_gallery_check: two-way with photo_url, cover first, no NULL element',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_gallery_check')
+               LIKE '%(gallery_urls IS NULL) = (photo_url IS NULL)%gallery_urls[1] = photo_url%', false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_gallery_check')
+               LIKE '%array_position(gallery_urls, NULL%) IS NULL%', false)   -- renders NULL::text
+    -- (2) The description byte cap is 40000 (nine languages; 12000 refused 37 of 95). The 1063
+    --     token owns the key allow-list; this one owns the number.
+    UNION ALL SELECT '1064_hotels_gallery','hotels_description_i18n_check caps at 40000 bytes',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_description_i18n_check')
+               LIKE '%octet_length((description_i18n)::text) <= 40000%', false)
+    -- (1) 'commons' is an allowed photo source (the 1063 token owns the two-way clause).
+    UNION ALL SELECT '1065_hotels_commons_credit','hotels_photo_source_check allows commons',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_source_check')
+               LIKE '%''commons''::text%', false)
+    -- (2) The credit travels with 'commons' and nothing else, NULL-safe: IS NOT DISTINCT FROM
+    --     renders as NOT (… IS DISTINCT FROM …). The plain `=` form lets a credit sit on a
+    --     photo-less row, because a CHECK passes on NULL.
+    UNION ALL SELECT '1065_hotels_commons_credit','hotels_photo_credit_check: credit exactly with commons, NULL-safe',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_credit_check')
+               LIKE '%NOT (photo_source IS DISTINCT FROM ''commons''::text)) = (photo_credit IS NOT NULL)%', false)
   ) z
 
   UNION ALL

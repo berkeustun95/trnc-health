@@ -19,6 +19,7 @@ import { notifyFacilityOwner } from '../utils/notify'
 import { HEALTH_TYPES } from '../constants/facilityTypes'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
 import BackButton from '../components/BackButton'
+import OsmAttribution from '../components/OsmAttribution'
 
 const GARAGE_LABEL_KEY = Object.fromEntries(GARAGE_CATEGORIES.map(c => [c.key, c.labelKey]))
 const GARAGE_KEY_ORDER = GARAGE_CATEGORIES.map(c => c.key)
@@ -420,6 +421,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
                   >
                     <Marker coordinate={{ latitude: facility.latitude, longitude: facility.longitude }} pinColor={colors.primary} />
                   </MapView>
+                  {facility.geocode_source === 'osm' && <OsmAttribution lang={lang} overlay />}
                 </TouchableOpacity>
               </View>
             )}

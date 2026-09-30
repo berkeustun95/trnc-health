@@ -300,10 +300,10 @@ export const PREVIEW_PENDING_PARTNERS = false
 // itself still dark. Same resolution as PREVIEW_PENDING_PARTNERS.
 export const HS_SELF_REGISTRATION = false
 
-// Yurtlar (dorm partners) — the fifth segment of Emlak & Konaklama. false = the chip is
-// absent from the segment row, the showcase is unreachable, and the module opens on
-// Satılık exactly as it does today. true = the chip appears FIRST with its accent dot and
-// the module opens on it.
+// Yurtlar (dorm partners) — the second top tab of Emlak & Konaklama (a chip in the Emlak
+// row until 2026-09-29). false = the tab is absent, the showcase is unreachable, and with
+// no second tab the tab bar is not drawn at all. true = the Yurtlar tab with its accent
+// dot. The module opens on Emlak either way (ACCOM_LANDING_TAB).
 //
 // NOT a MODULE_FLAGS key, and the reason is mechanical rather than stylistic. A true
 // entry in that map trips three checks in scripts/check-module-flags.mjs — the
@@ -316,10 +316,8 @@ export const HS_SELF_REGISTRATION = false
 // PROFILE_GATE_LIVE above; carried in EXPECTED_SCALARS so a working-tree flip still
 // cannot ride out on an unrelated `eas update`.
 //
-// ⚠ IT ALSO MOVES THE LANDING TAB, WHICH IS WHY constants/dorms.js DERIVES IT.
-//   ACCOM_LANDING is 'dorm'. With this false, accomLanding() falls back to the first
-//   VISIBLE segment — 'sale' — so the dark state is correct by construction. Reading
-//   ACCOM_LANDING directly would open the module on a tab that is not in the chip row.
+// The landing tab is DERIVED (accomLandingTab in constants/dorms.js), so a dark tab can
+// never be the one the module opens on.
 //
 // ⚠ IT DOES NOT GATE ANY DATA, because there is no data to gate. Dorm partners live in
 //   constants/dorms.js, not in a table, so nothing is publicly readable and nothing is
@@ -339,6 +337,26 @@ export const HS_SELF_REGISTRATION = false
 //
 // Reverting is this one boolean, and so is the emergency direction.
 export const DORMS_LIVE = true   // live 2026-09-13
+
+// Oteller — the KITOB member-hotel tab of Emlak & Konaklama (plan:
+// ~/ObsidianVault/10-ada/2026-09-29_hotels-kitob-PLAN.md). false = no Oteller tab, and the
+// header subtitle does not name it. true = the third top tab, reading public.hotels.
+//
+// Not a MODULE_FLAGS key, for the DORMS_LIVE reason: a tab inside a live module has no
+// Coming Soon screen and no waitlist. Its empty state (Oli, "coming soon") shows only
+// while no hotel is published.
+//
+// ⚠ DO NOT FLIP until ALL of these hold, in this order:
+//   1. KITOB's WRITTEN permission to show their list, their name and the "KITOB üyesi"
+//      badge. The badge without it implies an endorsement.
+//   2. 20261059 applied and verify_schema.sql's 1059 rows OK. Until then contact taps
+//      with module='hotels' are rejected and swallowed (logContactEvent cannot throw).
+//   3. The KITOB file imported (npm run hotels:import), checked while dark, THEN the rows
+//      published with a reviewed UPDATE … SET is_active = true (go-live SOP steps 1-3).
+//   4. Turkish device pass with this flipped LOCALLY, then this in BOTH files in one
+//      commit (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs), then OTA.
+//   5. hotels:health green. The list on kitob.org is dated 2023.
+export const HOTELS_LIVE = false
 
 // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar.
 //

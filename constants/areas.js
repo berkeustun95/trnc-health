@@ -23,25 +23,36 @@ export const AREAS_BY_REGION = {
   kyrenia: [   // Girne
     'Merkez', 'Karakum', 'Zeytinlik', 'Ozanköy', 'Çatalköy',
     'Alsancak', 'Lapta', 'Karaoğlanoğlu', 'Beylerbeyi', 'Esentepe',
-    'Karşıyaka', 'Karaman', 'Çamlıbel', 'Tatlısu', 'Bahçeli',
+    'Karşıyaka', 'Karaman', 'Çamlıbel', 'Bahçeli',
     // Added 2026-08-24 from the Novest feed. NOTE 'Boğaz': İskele has one too, and both
     // slug to 'bogaz'. That is fine and already the established pattern — 'Merkez'
     // recurs across all seven regions — because areaName() resolves slug WITHIN a region.
     // Anything reading a bare slug without its region was already wrong before this.
     'Kozan', 'Yukarı Girne', 'Boğaz', 'Dikmen', 'Ağırdağ',
+    // Added 2026-09-29 from the KITOB hotel list (villages its hotels are filed under).
+    'Edremit', 'Ilgaz',
   ],
   famagusta: [ // Gazimağusa
     'Merkez', 'Sakarya', 'Baykal', 'Çanakkale', 'Yeni Boğaziçi',
     'Tuzla', 'Mutluyaka', 'Geçitkale', 'Vadili', 'Beyarmudu',
     'Maraş',   // added 2026-08-24 from the Novest feed
+    // Added 2026-09-29 from the KITOB hotel list. TATLISU MOVED HERE FROM KYRENIA: the
+    // municipality's own page calls it "Gazi Magosa ilçesinin en kuzeybatı bölgesindeki
+    // yerleşim yeri" (tatlisubelediyesi.org/icerik/tarihce), and constants/regions.js
+    // already resolves it to famagusta. 0 published properties / facilities carried
+    // area 'tatlisu' at the move. A Novest listing is placed by its STATE, so one filed
+    // under Girne with city Tatlısu now gets area NULL (sync-novest picks this up on its
+    // next deploy).
+    'Salamis', 'Tatlısu',
   ],
   morphou: [   // Güzelyurt
     'Merkez', 'Bostancı', 'Kalkanlı', 'Yayla', 'Zümrütköy',
     'Aydınköy', 'Gaziveren',
   ],
   iskele: [    // İskele
-    'Merkez', 'Long Beach', 'Boğaz', 'Bafra', 'Yeni İskele',
+    'Merkez', 'Long Beach', 'Boğaz', 'Yeni İskele',
     'Ötüken', 'Kurtuluş',
+    'Kaplıca',   // added 2026-09-29 from the KITOB hotel list (Berke: İskele, not Karpaz)
   ],
   lefke: [     // Lefke
     'Merkez', 'Gemikonağı', 'Yeşilyurt', 'Cengizköy', 'Bağlıköy',
@@ -50,6 +61,13 @@ export const AREAS_BY_REGION = {
   karpaz: [    // Karpaz
     'Yenierenköy', 'Dipkarpaz', 'Büyükkonuk', 'Kaleburnu',
     'Sipahi', 'Kuruova', 'Avtepe',
+    'Mehmetçik',   // added 2026-09-29 from the KITOB hotel list
+    // Moved from iskele 2026-09-29 to agree with constants/regions.js ("EAST OF BOĞAZ =
+    // KARPAZ"; the Bafra resort strip resolves to karpaz by design). 0 properties and 0
+    // facilities carried area 'bafra' at the move. ⚠ The Novest mapping still takes district
+    // from the agency's STATE (İskele), so a future Novest Bafra listing gets area NULL under
+    // iskele until that mapping learns the same rule and sync-novest is redeployed.
+    'Bafra',
   ],
 }
 

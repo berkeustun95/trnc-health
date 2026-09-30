@@ -14,8 +14,9 @@
 
 import {
   getAll, mapPropertyType, extractDeedType, cleanDescription, assertNoPhone,
-  decodeEntities, num, int, meta, metaArray, coordsInCyprus, PHONE_RE,
+  decodeEntities, num, int, meta, metaArray, coordsInCyprus, PHONE_RE, placeListing, TYPE_PRIORITY, KONUT,
 } from '../supabase/functions/_shared/novest-feed.mjs'
+import { AREAS_BY_REGION, areaSlug } from '../constants/areas.js'
 
 const self = process.argv.includes('--self')
 let failures = 0
@@ -85,6 +86,23 @@ if (self) {
     ? ok('coord tripwire rejects a lat/lng transposition')
     : fail('coord tripwire accepted transposed coordinates')
 
+  // Placement: Karpaz villages filed under the agency's İskele state move to karpaz, with
+  // their area; İskele's own villages and unknown cities do not move.
+  const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  const place = (st, ci) => placeListing(st, ci, AREAS_BY_REGION, areaSlug)
+  eq(place('iskele', 'bafra'), { district: 'karpaz', area: 'bafra' })
+    ? ok('placement: İskele state + Bafra -> karpaz / bafra') : fail('placement: Bafra', JSON.stringify(place('iskele', 'bafra')))
+  eq(place('iskele', 'bogaz'), { district: 'iskele', area: 'bogaz' })
+    ? ok('placement: İskele + Boğaz stays iskele') : fail('placement: İskele Boğaz moved', JSON.stringify(place('iskele', 'bogaz')))
+  eq(place('iskele', 'nowhere'), { district: 'iskele', area: null })
+    ? ok('placement: unknown city stays iskele, no area') : fail('placement: unknown city', JSON.stringify(place('iskele', 'nowhere')))
+  eq(place('girne', 'bogaz'), { district: 'kyrenia', area: 'bogaz' })
+    ? ok("placement: Girne's Boğaz stays kyrenia") : fail("placement: Girne's Boğaz", JSON.stringify(place('girne', 'bogaz')))
+  eq(place('gazimagusa', 'bafra'), { district: 'famagusta', area: null })
+    ? ok('placement: only İskele moves to karpaz (Gazimağusa + Bafra does not)') : fail('placement: non-İskele moved', JSON.stringify(place('gazimagusa', 'bafra')))
+  mapPropertyType(['komple-bina']) === 'commercial'
+    ? ok('type: komple-bina -> commercial') : fail('type: komple-bina ->', mapPropertyType(['komple-bina']))
+
   console.log(failures ? `\nSELF-TEST FAILED (${failures})\n` : '\nself-test clean — every guard refused its counter-example\n')
   if (failures) process.exit(1)
 }
@@ -98,14 +116,21 @@ console.log(`  fetched ${props.length} listings, ${types.length} type terms\n`)
 
 // Every type slug the feed uses must be known to the priority list — an unmapped one
 // means a new category appeared and rows are about to be skipped silently.
-const KNOWN = new Set([
-  'arsa','arazi','tarla','studyo','villa','ikiz-villa','bungalow','mustakil-ev',
-  'isyeri','dukkan','ticari','depo','magaza','ofis','otel',
-  'apartman-dairesi','penthouse','zemin-kat-daire','apartman','dubleks','konut',
-])
+// DERIVED from TYPE_PRIORITY (+ the konut fallback). It was a hand-copied list until
+// 2026-09-29, so mapping a new term in novest-feed.mjs still left this check red.
+const KNOWN = new Set([...TYPE_PRIORITY.flatMap(([, theirs]) => theirs), KONUT])
 const unknown = types.filter(t => !KNOWN.has(t.slug)).map(t => `${t.name} [${t.slug}]`)
 unknown.length ? fail(`UNMAPPED type term(s) — update TYPE_PRIORITY: ${unknown.join(', ')}`)
                : ok(`all ${types.length} type terms are mapped`)
+
+// Listings the agency published with NO taxonomy at all (no type, status, state or city), so
+// no mapping can place them. Decided, not forgotten: each stays skipped and is reported once as
+// a known skip. Retire an entry when Novest tags the listing or removes it — this check says so.
+const KNOWN_UNTAGGED = new Map([
+  [21853, 'Yenikent commercial building for sale, published 2026-06-18 untagged; "Yenikent" exists in Lefkoşa and Gazimağusa, so placing it would be a guess. Left skipped by Berke 2026-09-29.'],
+])
+const untagged = p => ['property_type', 'property_status', 'property_state', 'property_city']
+  .every(k => !(p[k] || []).length)
 
 let typed = 0, untyped = [], deed = 0, phoneLeaks = [], inBox = []
 for (const p of props) {
@@ -125,7 +150,15 @@ for (const p of props) {
 }
 
 ok(`${typed}/${props.length} listings resolve to a property_type`)
-untyped.length && console.log(`    untyped (will be skipped): ${untyped.join(', ')}`)
+const byId = new Map(props.map(p => [p.id, p]))
+const knownSkips = untyped.filter(id => KNOWN_UNTAGGED.has(id) && untagged(byId.get(id)))
+const newUntyped = untyped.filter(id => !knownSkips.includes(id))
+knownSkips.length && ok(`known skip — untagged in Novest's feed: ${knownSkips.join(', ')}`)
+newUntyped.length && console.log(`    ⚠ NEW untyped (will be skipped — needs a decision): ${newUntyped.join(', ')}`)
+for (const [id] of KNOWN_UNTAGGED) {
+  if (!byId.has(id)) console.log(`    ⚠ KNOWN_UNTAGGED ${id} is no longer in the feed — retire the entry`)
+  else if (!untagged(byId.get(id))) console.log(`    ⚠ KNOWN_UNTAGGED ${id} is now tagged in Novest's feed — retire the entry (it may import now)`)
+}
 
 phoneLeaks.length
   ? fail(`${phoneLeaks.length} listing(s) leak a phone after the strip:\n      ${phoneLeaks.join('\n      ')}`)
