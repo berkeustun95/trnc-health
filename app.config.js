@@ -12,13 +12,27 @@ if (!iosClientId?.endsWith('.apps.googleusercontent.com')) {
 }
 const googleIosUrlScheme = iosClientId.split('.').reverse().join('.')
 
+// ─── ADA Preview: the pre-production lane (installs NEXT TO the Play Store ADA) ──────
+// Set ONLY by eas.json's `preview` profile (env APP_VARIANT=preview). Unset — every
+// production build, every `npm run ota`, every local run — this file resolves exactly as
+// before; the redesign branch proved that by diffing `npx expo config --json` against the
+// pre-change output. It is NOT an EAS_BUILD conditional (see CLAUDE.md), and nothing here
+// touches `updates`: checkAutomatically stays 'ON_LOAD' in both variants.
+//
+// Its own applicationId/bundle id means its own Firebase app, Maps key entry and Google
+// OAuth client — see vault 10-ada/redesign-plan.md, "Preview variant: console checklist".
+// google-services.preview.json does not exist until Firebase issues it; the build fails
+// loudly without it rather than shipping a preview with production's push identity.
+const IS_PREVIEW = process.env.APP_VARIANT === 'preview'
+const APP_ID = IS_PREVIEW ? 'com.berkeustun95.ada.preview' : 'com.berkeustun95.ada'
+
 export default {
   expo: {
-    name: 'ADA',
+    name: IS_PREVIEW ? 'ADA Preview' : 'ADA',
     slug: 'trnc-health',
     version: '1.2.0',
     orientation: 'portrait',
-    icon: './assets/icon.png',
+    icon: IS_PREVIEW ? './assets/preview/icon.png' : './assets/icon.png',
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
@@ -35,7 +49,7 @@ export default {
     userInterfaceStyle: 'light',
     ios: {
       supportsTablet: false,
-      bundleIdentifier: 'com.berkeustun95.ada',
+      bundleIdentifier: APP_ID,
       usesAppleSignIn: true,
       minimumOsVersion: '14.0',
       // Usage descriptions are NOT set here. Each has ONE source, its plugin option below:
@@ -44,20 +58,20 @@ export default {
       // Verify with `npx expo config --type introspect`, never by reading this file.
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
-        CFBundleDisplayName: 'ADA - North Cyprus Assistant',
+        CFBundleDisplayName: IS_PREVIEW ? 'ADA Preview' : 'ADA - North Cyprus Assistant',
         CFBundleName: 'ADANorthCyprus',
       },
     },
     android: {
-      package: 'com.berkeustun95.ada',
-      googleServicesFile: './google-services.json',
+      package: APP_ID,
+      googleServicesFile: IS_PREVIEW ? './google-services.preview.json' : './google-services.json',
       config: {
         googleMaps: {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
         },
       },
       adaptiveIcon: {
-        foregroundImage: './assets/android-icon-foreground.png',
+        foregroundImage: IS_PREVIEW ? './assets/preview/android-icon-foreground.png' : './assets/android-icon-foreground.png',
         backgroundColor: '#FFFFFF',
         monochromeImage: './assets/android-icon-monochrome.png',
       },

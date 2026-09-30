@@ -16,6 +16,9 @@
       },
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "APP_VARIANT": "preview"
       }
     },
     "production-apk": {
