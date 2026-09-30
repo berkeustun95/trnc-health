@@ -30,6 +30,29 @@ export const LANGUAGES = [
 ]
 const translations = {
   en: {
+    // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
+    uiRetry: "Try again",
+    uiClose: "Close",
+    uiMenu: "Menu",
+    uiLoadFailed: "Couldn't load. Check your connection and try again.",
+    hrGreetMorning: "Good morning",
+    hrGreetDay: "Good afternoon",
+    hrGreetEvening: "Good evening",
+    hrHeadline: "What do you need today?",
+    hrDutyCount_one: "{count} pharmacy on duty today",
+    hrDutyCount_other: "{count} pharmacies on duty today",
+    hrDutyUntilMidnight: "until midnight",
+    hrDutyUntil: "until {time}",
+    hrDutyOpenList: "See the list",
+    hrDutyPartial: "Today's list may be incomplete",
+    hrDutyUnavailable: "Today's list couldn't be loaded",
+    hrWeatherUv: "UV {n} · {level}",
+    hrAllServices: "All services",
+    hrGroupHealth: "Health",
+    hrGroupExplore: "Explore & fun",
+    hrGroupHome: "Home & living",
+    hrGroupCity: "City & getting around",
+
     // The what's-new notice card in the live strip (20261043). TITLE ONLY — the
     // strip's cards lost their subtitles, so the band holds 2 lines at 14pt in a
     // 97pt box at 360dp. The breadth message cannot fit here and lives at the
@@ -1807,6 +1830,29 @@ const translations = {
     heroCreditNote: "This photo comes from Wikimedia Commons and is used under the licence shown above. It has been cropped and resized to fit this screen.",
   },
   tr: {
+    // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
+    uiRetry: "Tekrar dene",
+    uiClose: "Kapat",
+    uiMenu: "Menü",
+    uiLoadFailed: "Yüklenemedi. Bağlantını kontrol edip tekrar dene.",
+    hrGreetMorning: "Günaydın",
+    hrGreetDay: "İyi günler",
+    hrGreetEvening: "İyi akşamlar",
+    hrHeadline: "Bugün neye ihtiyacın var?",
+    hrDutyCount_one: "Bugün {count} eczane nöbette",
+    hrDutyCount_other: "Bugün {count} eczane nöbette",
+    hrDutyUntilMidnight: "gece yarısına kadar",
+    hrDutyUntil: "{time} saatine kadar",
+    hrDutyOpenList: "Listeyi gör",
+    hrDutyPartial: "Bugünkü liste eksik olabilir",
+    hrDutyUnavailable: "Bugünün listesi alınamadı",
+    hrWeatherUv: "UV {n} · {level}",
+    hrAllServices: "Tüm hizmetler",
+    hrGroupHealth: "Sağlık",
+    hrGroupExplore: "Keşfet ve Eğlence",
+    hrGroupHome: "Ev ve Yaşam",
+    hrGroupCity: "Şehir ve Ulaşım",
+
     // Live-strip notice card. See the en block.
     stripNoticeTitle: "ADA'da neler yeni?",
 
@@ -3556,6 +3602,29 @@ const translations = {
     heroCreditNote: "Bu fotoğraf Wikimedia Commons'tan alınmıştır ve yukarıda belirtilen lisansla kullanılmaktadır. Bu ekrana sığması için kırpılmış ve yeniden boyutlandırılmıştır.",
   },
   ar: {
+    // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
+    uiRetry: "حاول مجددًا",
+    uiClose: "إغلاق",
+    uiMenu: "القائمة",
+    uiLoadFailed: "تعذّر التحميل. تحقّق من اتصالك وحاول مجددًا.",
+    hrGreetMorning: "صباح الخير",
+    hrGreetDay: "نهارك سعيد",
+    hrGreetEvening: "مساء الخير",
+    hrHeadline: "ماذا تحتاج اليوم؟",
+    hrDutyCount_one: "صيدلية مناوبة اليوم: {count}",
+    hrDutyCount_other: "الصيدليات المناوبة اليوم: {count}",
+    hrDutyUntilMidnight: "حتى منتصف الليل",
+    hrDutyUntil: "حتى {time}",
+    hrDutyOpenList: "عرض القائمة",
+    hrDutyPartial: "قد تكون قائمة اليوم ناقصة",
+    hrDutyUnavailable: "تعذّر تحميل قائمة اليوم",
+    hrWeatherUv: "الأشعة فوق البنفسجية {n} · {level}",
+    hrAllServices: "كل الخدمات",
+    hrGroupHealth: "الصحة",
+    hrGroupExplore: "استكشاف وترفيه",
+    hrGroupHome: "المنزل والحياة",
+    hrGroupCity: "المدينة والتنقل",
+
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'ما الجديد في ADA؟',
 
@@ -5084,6 +5153,31 @@ const translations = {
     heroCreditNote: "هذه الصورة مأخوذة من ويكيميديا كومنز وتُستخدم بموجب الترخيص الموضح أعلاه. وقد تم اقتصاصها وتغيير حجمها لتناسب هذه الشاشة.",
   },
   ru: {
+    // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
+    uiRetry: "Повторить",
+    uiClose: "Закрыть",
+    uiMenu: "Меню",
+    uiLoadFailed: "Не удалось загрузить. Проверьте подключение и повторите попытку.",
+    hrGreetMorning: "Доброе утро",
+    hrGreetDay: "Добрый день",
+    hrGreetEvening: "Добрый вечер",
+    hrHeadline: "Что вам нужно сегодня?",
+    hrDutyCount_one: "Сегодня дежурит {count} аптека",
+    hrDutyCount_few: "Сегодня дежурят {count} аптеки",
+    hrDutyCount_many: "Сегодня дежурят {count} аптек",
+    hrDutyCount_other: "Сегодня дежурят {count} аптек",
+    hrDutyUntilMidnight: "до полуночи",
+    hrDutyUntil: "до {time}",
+    hrDutyOpenList: "Открыть список",
+    hrDutyPartial: "Сегодняшний список может быть неполным",
+    hrDutyUnavailable: "Не удалось загрузить список на сегодня",
+    hrWeatherUv: "УФ {n} · {level}",
+    hrAllServices: "Все сервисы",
+    hrGroupHealth: "Здоровье",
+    hrGroupExplore: "Отдых и развлечения",
+    hrGroupHome: "Дом и быт",
+    hrGroupCity: "Город и транспорт",
+
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Что нового в ADA',
 
@@ -6609,6 +6703,29 @@ const translations = {
     heroCreditNote: "Эта фотография взята из Викисклада и используется по указанной выше лицензии. Она была обрезана и уменьшена под этот экран.",
   },
   el: {
+    // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
+    uiRetry: "Δοκίμασε ξανά",
+    uiClose: "Κλείσιμο",
+    uiMenu: "Μενού",
+    uiLoadFailed: "Δεν φορτώθηκε. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
+    hrGreetMorning: "Καλημέρα",
+    hrGreetDay: "Καλό απόγευμα",
+    hrGreetEvening: "Καλησπέρα",
+    hrHeadline: "Τι χρειάζεσαι σήμερα;",
+    hrDutyCount_one: "{count} εφημερεύον φαρμακείο σήμερα",
+    hrDutyCount_other: "{count} εφημερεύοντα φαρμακεία σήμερα",
+    hrDutyUntilMidnight: "έως τα μεσάνυχτα",
+    hrDutyUntil: "έως τις {time}",
+    hrDutyOpenList: "Δες τη λίστα",
+    hrDutyPartial: "Η σημερινή λίστα ίσως είναι ελλιπής",
+    hrDutyUnavailable: "Η σημερινή λίστα δεν φορτώθηκε",
+    hrWeatherUv: "UV {n} · {level}",
+    hrAllServices: "Όλες οι υπηρεσίες",
+    hrGroupHealth: "Υγεία",
+    hrGroupExplore: "Εξερεύνηση & διασκέδαση",
+    hrGroupHome: "Σπίτι & ζωή",
+    hrGroupCity: "Πόλη & μετακίνηση",
+
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Τι νέο στο ADA',
 
@@ -8132,6 +8249,29 @@ const translations = {
     heroCreditNote: "Η φωτογραφία προέρχεται από το Wikimedia Commons και χρησιμοποιείται με την παραπάνω άδεια. Έχει περικοπεί και αλλάξει μέγεθος για να ταιριάζει σε αυτήν την οθόνη.",
   },
   fr: {
+    // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
+    uiRetry: "Réessayer",
+    uiClose: "Fermer",
+    uiMenu: "Menu",
+    uiLoadFailed: "Chargement impossible. Vérifiez votre connexion et réessayez.",
+    hrGreetMorning: "Bonjour",
+    hrGreetDay: "Bon après-midi",
+    hrGreetEvening: "Bonsoir",
+    hrHeadline: "De quoi avez-vous besoin aujourd'hui ?",
+    hrDutyCount_one: "{count} pharmacie de garde aujourd'hui",
+    hrDutyCount_other: "{count} pharmacies de garde aujourd'hui",
+    hrDutyUntilMidnight: "jusqu'à minuit",
+    hrDutyUntil: "jusqu'à {time}",
+    hrDutyOpenList: "Voir la liste",
+    hrDutyPartial: "La liste du jour est peut-être incomplète",
+    hrDutyUnavailable: "Impossible de charger la liste du jour",
+    hrWeatherUv: "UV {n} · {level}",
+    hrAllServices: "Tous les services",
+    hrGroupHealth: "Santé",
+    hrGroupExplore: "Découvrir & se divertir",
+    hrGroupHome: "Maison & vie",
+    hrGroupCity: "Ville & déplacements",
+
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Quoi de neuf',
 
@@ -9659,6 +9799,29 @@ const translations = {
     heroCreditNote: "Cette photo provient de Wikimedia Commons et est utilisée sous la licence indiquée ci-dessus. Elle a été recadrée et redimensionnée pour cet écran.",
   },
   es: {
+    // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
+    uiRetry: "Reintentar",
+    uiClose: "Cerrar",
+    uiMenu: "Menú",
+    uiLoadFailed: "No se pudo cargar. Revisa tu conexión e inténtalo de nuevo.",
+    hrGreetMorning: "Buenos días",
+    hrGreetDay: "Buenas tardes",
+    hrGreetEvening: "Buenas noches",
+    hrHeadline: "¿Qué necesitas hoy?",
+    hrDutyCount_one: "{count} farmacia de guardia hoy",
+    hrDutyCount_other: "{count} farmacias de guardia hoy",
+    hrDutyUntilMidnight: "hasta medianoche",
+    hrDutyUntil: "hasta las {time}",
+    hrDutyOpenList: "Ver la lista",
+    hrDutyPartial: "La lista de hoy puede estar incompleta",
+    hrDutyUnavailable: "No se pudo cargar la lista de hoy",
+    hrWeatherUv: "UV {n} · {level}",
+    hrAllServices: "Todos los servicios",
+    hrGroupHealth: "Salud",
+    hrGroupExplore: "Explorar y ocio",
+    hrGroupHome: "Hogar y vida",
+    hrGroupCity: "Ciudad y transporte",
+
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Novedades en ADA',
 
@@ -11183,6 +11346,29 @@ const translations = {
     heroCreditNote: "Esta foto procede de Wikimedia Commons y se usa bajo la licencia indicada arriba. Ha sido recortada y redimensionada para esta pantalla.",
   },
   de: {
+    // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
+    uiRetry: "Erneut versuchen",
+    uiClose: "Schließen",
+    uiMenu: "Menü",
+    uiLoadFailed: "Konnte nicht geladen werden. Prüf deine Verbindung und versuch es erneut.",
+    hrGreetMorning: "Guten Morgen",
+    hrGreetDay: "Guten Tag",
+    hrGreetEvening: "Guten Abend",
+    hrHeadline: "Was brauchst du heute?",
+    hrDutyCount_one: "Heute {count} Apotheke im Notdienst",
+    hrDutyCount_other: "Heute {count} Apotheken im Notdienst",
+    hrDutyUntilMidnight: "bis Mitternacht",
+    hrDutyUntil: "bis {time} Uhr",
+    hrDutyOpenList: "Liste ansehen",
+    hrDutyPartial: "Die heutige Liste ist evtl. unvollständig",
+    hrDutyUnavailable: "Die heutige Liste konnte nicht geladen werden",
+    hrWeatherUv: "UV {n} · {level}",
+    hrAllServices: "Alle Dienste",
+    hrGroupHealth: "Gesundheit",
+    hrGroupExplore: "Entdecken & Freizeit",
+    hrGroupHome: "Wohnen & Leben",
+    hrGroupCity: "Stadt & Unterwegs",
+
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'Neu in ADA',
 
@@ -12707,6 +12893,29 @@ const translations = {
     heroCreditNote: "Dieses Foto stammt von Wikimedia Commons und wird unter der oben genannten Lizenz verwendet. Es wurde für diesen Bildschirm zugeschnitten und skaliert.",
   },
   fa: {
+    // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
+    uiRetry: "تلاش دوباره",
+    uiClose: "بستن",
+    uiMenu: "منو",
+    uiLoadFailed: "بارگیری نشد. اتصالت را بررسی کن و دوباره تلاش کن.",
+    hrGreetMorning: "صبح بخیر",
+    hrGreetDay: "روز بخیر",
+    hrGreetEvening: "عصر بخیر",
+    hrHeadline: "امروز به چه چیزی نیاز داری؟",
+    hrDutyCount_one: "امروز {count} داروخانه کشیک است",
+    hrDutyCount_other: "امروز {count} داروخانه کشیک است",
+    hrDutyUntilMidnight: "تا نیمه‌شب",
+    hrDutyUntil: "تا ساعت {time}",
+    hrDutyOpenList: "دیدن فهرست",
+    hrDutyPartial: "فهرست امروز ممکن است ناقص باشد",
+    hrDutyUnavailable: "فهرست امروز بارگیری نشد",
+    hrWeatherUv: "فرابنفش {n} · {level}",
+    hrAllServices: "همه خدمات",
+    hrGroupHealth: "سلامت",
+    hrGroupExplore: "گردش و سرگرمی",
+    hrGroupHome: "خانه و زندگی",
+    hrGroupCity: "شهر و رفت‌وآمد",
+
     // Live-strip notice card. See the en block.
     stripNoticeTitle: 'تازه‌های ADA',
 
