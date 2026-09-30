@@ -397,6 +397,8 @@ $function$;
 
 ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
 ALTER TABLE public.notifications DROP COLUMN IF EXISTS type;
+-- The ledger would otherwise go on saying 20261066 is applied against a schema where it is not.
+DELETE FROM public.schema_migrations_applied WHERE filename = '20261066_notification_type.sql';
 
 DO $$
 DECLARE r record;

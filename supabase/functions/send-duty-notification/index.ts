@@ -86,7 +86,10 @@ serve(async () => {
   })
 
   for (let i = 0; i < notifRows.length; i += 500) {
-    await supabase.from('notifications').insert(notifRows.slice(i, i + 500))
+    const { error: insertError } = await supabase.from('notifications').insert(notifRows.slice(i, i + 500))
+    // Not fatal: the pushes below still go out. But a failed insert used to vanish, and the
+    // likeliest one is deploying this before 20261066 (column "type" does not exist).
+    if (insertError) console.error('notifications insert failed', insertError.message)
   }
 
   // Send push notifications — each message in the user's language
