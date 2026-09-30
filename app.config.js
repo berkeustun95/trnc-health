@@ -21,8 +21,8 @@ const googleIosUrlScheme = iosClientId.split('.').reverse().join('.')
 //
 // Its own applicationId/bundle id means its own Firebase app, Maps key entry and Google
 // OAuth client — see vault 10-ada/redesign-plan.md, "Preview variant: console checklist".
-// google-services.preview.json does not exist until Firebase issues it; the build fails
-// loudly without it rather than shipping a preview with production's push identity.
+// google-services.preview.json is used when present; without it the preview builds with
+// no push at all — never with production's push identity.
 const IS_PREVIEW = process.env.APP_VARIANT === 'preview'
 const APP_ID = IS_PREVIEW ? 'com.berkeustun95.ada.preview' : 'com.berkeustun95.ada'
 
@@ -47,6 +47,12 @@ export default {
       policy: 'appVersion',
     },
     userInterfaceStyle: 'light',
+    // Preview only, and it goes live WITH the redesign in a store release, never by OTA alone.
+    // false drops the grey scrim Android paints behind 3-button nav under edge-to-edge
+    // (expo-modules-core re-reads this theme item after RN forces it true). Only the redesign
+    // is safe without it: its FloatingTabBar lays a canvas band behind the buttons, while the
+    // legacy screens would put dark nav icons straight over scrolling content.
+    ...(IS_PREVIEW ? { androidNavigationBar: { enforceContrast: false } } : {}),
     ios: {
       supportsTablet: false,
       bundleIdentifier: APP_ID,
