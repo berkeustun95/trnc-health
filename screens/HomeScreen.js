@@ -44,6 +44,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, WeatherTile, OliSearchCard, EventBanner, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel } from '../components/home/redesign/ServicePanels'
 import { SectionHeader, useTabBarFootprint } from '../components/ui'
+import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
 
 const TYPE_ICON_MAP = {
@@ -906,7 +907,7 @@ export default function HomeScreen({
             const over = e.nativeEvent.contentOffset.y > HERO_H - 12
             if (over !== overCanvas) setOverCanvas(over)
           }}
-          contentContainerStyle={{ paddingBottom: tabFootprint + 16 }}>
+          contentContainerStyle={{ paddingBottom: tabFootprint + FADE_H + 8 }}>
           <RedesignHero region={region} lang={lang} hasUnread={hasUnread} hideActions={hideHeaderActions}
             onShowNotifs={onShowNotifs} onOpenMenu={onOpenMenu} hamburgerRef={hamburgerRef}
             onOpenPlace={openPlaceById} />

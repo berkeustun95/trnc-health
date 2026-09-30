@@ -30,6 +30,11 @@ export const LANGUAGES = [
 ]
 const translations = {
   en: {
+    hrWxPartlyTile: "Partly cloudy",
+    hrDutyTileAlertPartial: "List may be incomplete",
+    hrDutyTileAlertDown: "List unavailable",
+    hrDutyShort_one: "{count} pharmacy · {until}",
+    hrDutyShort_other: "{count} pharmacies · {until}",
     // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
     // ─── Redesign Slice 2 (Shell) ───
     hrSetPrefs: "Preferences",
@@ -1871,6 +1876,11 @@ const translations = {
     heroCreditNote: "This photo comes from Wikimedia Commons and is used under the licence shown above. It has been cropped and resized to fit this screen.",
   },
   tr: {
+    hrWxPartlyTile: "Parçalı bulutlu",
+    hrDutyTileAlertPartial: "Liste eksik olabilir",
+    hrDutyTileAlertDown: "Liste alınamadı",
+    hrDutyShort_one: "{count} eczane · {until}",
+    hrDutyShort_other: "{count} eczane · {until}",
     // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
     // ─── Redesign Slice 2 (Shell) ───
     hrSetPrefs: "Tercihler",
@@ -3684,6 +3694,11 @@ const translations = {
     heroCreditNote: "Bu fotoğraf Wikimedia Commons'tan alınmıştır ve yukarıda belirtilen lisansla kullanılmaktadır. Bu ekrana sığması için kırpılmış ve yeniden boyutlandırılmıştır.",
   },
   ar: {
+    hrWxPartlyTile: "غائم جزئيًا",
+    hrDutyTileAlertPartial: "قد تكون القائمة ناقصة",
+    hrDutyTileAlertDown: "القائمة غير متاحة",
+    hrDutyShort_one: "{count} صيدلية · {until}",
+    hrDutyShort_other: "{count} صيدلية · {until}",
     // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
     // ─── Redesign Slice 2 (Shell) ───
     hrSetPrefs: "التفضيلات",
@@ -5276,6 +5291,13 @@ const translations = {
     heroCreditNote: "هذه الصورة مأخوذة من ويكيميديا كومنز وتُستخدم بموجب الترخيص الموضح أعلاه. وقد تم اقتصاصها وتغيير حجمها لتناسب هذه الشاشة.",
   },
   ru: {
+    hrWxPartlyTile: "Малооблачно",
+    hrDutyTileAlertPartial: "Список неполный",
+    hrDutyTileAlertDown: "Список недоступен",
+    hrDutyShort_one: "{count} аптека · {until}",
+    hrDutyShort_few: "{count} аптеки · {until}",
+    hrDutyShort_many: "{count} аптек · {until}",
+    hrDutyShort_other: "{count} аптек · {until}",
     // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
     // ─── Redesign Slice 2 (Shell) ───
     hrSetPrefs: "Настройки",
@@ -6867,6 +6889,11 @@ const translations = {
     heroCreditNote: "Эта фотография взята из Викисклада и используется по указанной выше лицензии. Она была обрезана и уменьшена под этот экран.",
   },
   el: {
+    hrWxPartlyTile: "Αραιή συννεφιά",
+    hrDutyTileAlertPartial: "Ελλιπής λίστα",
+    hrDutyTileAlertDown: "Μη διαθέσιμη λίστα",
+    hrDutyShort_one: "{count} φαρμακείο · {until}",
+    hrDutyShort_other: "{count} φαρμακεία · {until}",
     // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
     // ─── Redesign Slice 2 (Shell) ───
     hrSetPrefs: "Προτιμήσεις",
@@ -8454,6 +8481,11 @@ const translations = {
     heroCreditNote: "Η φωτογραφία προέρχεται από το Wikimedia Commons και χρησιμοποιείται με την παραπάνω άδεια. Έχει περικοπεί και αλλάξει μέγεθος για να ταιριάζει σε αυτήν την οθόνη.",
   },
   fr: {
+    hrWxPartlyTile: "Éclaircies",
+    hrDutyTileAlertPartial: "Liste incomplète",
+    hrDutyTileAlertDown: "Liste indisponible",
+    hrDutyShort_one: "{count} pharmacie · {until}",
+    hrDutyShort_other: "{count} pharmacies · {until}",
     // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
     // ─── Redesign Slice 2 (Shell) ───
     hrSetPrefs: "Préférences",
@@ -10045,6 +10077,11 @@ const translations = {
     heroCreditNote: "Cette photo provient de Wikimedia Commons et est utilisée sous la licence indiquée ci-dessus. Elle a été recadrée et redimensionnée pour cet écran.",
   },
   es: {
+    hrWxPartlyTile: "Nubes y claros",
+    hrDutyTileAlertPartial: "Lista incompleta",
+    hrDutyTileAlertDown: "Lista no disponible",
+    hrDutyShort_one: "{count} farmacia · {until}",
+    hrDutyShort_other: "{count} farmacias · {until}",
     // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
     // ─── Redesign Slice 2 (Shell) ───
     hrSetPrefs: "Preferencias",
@@ -11633,6 +11670,11 @@ const translations = {
     heroCreditNote: "Esta foto procede de Wikimedia Commons y se usa bajo la licencia indicada arriba. Ha sido recortada y redimensionada para esta pantalla.",
   },
   de: {
+    hrWxPartlyTile: "Teilweise bewölkt",
+    hrDutyTileAlertPartial: "Liste unvollständig",
+    hrDutyTileAlertDown: "Liste nicht verfügbar",
+    hrDutyShort_one: "{count} Apotheke · {until}",
+    hrDutyShort_other: "{count} Apotheken · {until}",
     // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
     // ─── Redesign Slice 2 (Shell) ───
     hrSetPrefs: "Einstellungen",
@@ -13221,6 +13263,11 @@ const translations = {
     heroCreditNote: "Dieses Foto stammt von Wikimedia Commons und wird unter der oben genannten Lizenz verwendet. Es wurde für diesen Bildschirm zugeschnitten und skaliert.",
   },
   fa: {
+    hrWxPartlyTile: "نیمه‌ابری",
+    hrDutyTileAlertPartial: "فهرست ناقص است",
+    hrDutyTileAlertDown: "فهرست در دسترس نیست",
+    hrDutyShort_one: "{count} داروخانه · {until}",
+    hrDutyShort_other: "{count} داروخانه · {until}",
     // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
     // ─── Redesign Slice 2 (Shell) ───
     hrSetPrefs: "ترجیحات",

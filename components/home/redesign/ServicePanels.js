@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { colors, category as CATEGORY, type, radii, elevation, press } from '../../../constants/theme'
 import { t } from '../../../constants/i18n'
 import { GRID_LABEL_HEIGHT, GRID_LABEL_LINE_HEIGHT } from '../../../constants/homeModules'
@@ -14,8 +14,20 @@ import { CategoryIcon } from '../../ui'
 // padding without re-measuring (vault: 2026-09-05_tile-label-metrics.mjs).
 const PANEL_GUTTER = 4
 const TILE_PAD = 1
+// Large system text: labels grow at most 1.15×, and the label area is fixed at two lines of
+// that (2 · 16 · 1.15 ≈ 37 → 38), so every row keeps one height and nothing spills into the
+// tile below or beside it. labels:check measures at font scale 1.0 and 1.3 against this cap.
+const LABEL_CAP = 1.15
+// Below NARROW_W the 68pt column cannot take 1.15× (single words like "Événements" or
+// "Renovation" would break mid-word), so narrow phones keep the designed size instead of
+// rewording ~45 labels — including a partner-signed one — for one corner case.
+const LABEL_CAP_NARROW = 1.0
+const NARROW_W = 350
+export function labelCap(width) { return width < NARROW_W ? LABEL_CAP_NARROW : LABEL_CAP }
+const LABEL_BOX = 38
 
 export function ServiceTile({ mod, cat, lang, onPress, labelWeight = 500, width = '25%' }) {
+  const cap = labelCap(useWindowDimensions().width)
   const override = mod.gridLabel
   const lines = override?.lines ?? 2
   const label = t(override?.key ?? mod.labelKey, lang)
@@ -25,7 +37,7 @@ export function ServiceTile({ mod, cat, lang, onPress, labelWeight = 500, width 
       <View>
         <CategoryIcon icon={mod.icon} category={cat} size={52} />
         {mod.soon && (
-          <View style={s.soon}><Text style={s.soonText} numberOfLines={1}>{t('hrSoonBadge', lang)}</Text></View>
+          <View style={s.soon}><Text style={s.soonText} numberOfLines={1} maxFontSizeMultiplier={cap}>{t('hrSoonBadge', lang)}</Text></View>
         )}
       </View>
       <View style={s.labelBox}>
@@ -33,6 +45,7 @@ export function ServiceTile({ mod, cat, lang, onPress, labelWeight = 500, width 
           style={[s.label, { fontFamily: labelWeight === 700 ? 'Inter_700Bold' : 'Inter_500Medium' },
             override && { fontSize: override.size, lineHeight: GRID_LABEL_HEIGHT / lines }]}
           numberOfLines={lines}
+          maxFontSizeMultiplier={cap}
         >
           {label}
         </Text>
@@ -42,13 +55,14 @@ export function ServiceTile({ mod, cat, lang, onPress, labelWeight = 500, width 
 }
 
 export default function ServicePanels({ lang, onPress, labelWeight }) {
+  const cap = labelCap(useWindowDimensions().width)
   return (
     <View style={{ gap: 12 }}>
       {liveGroups().map(g => (
         <View key={g.key} style={[s.panel, elevation.card]}>
           <View style={s.head}>
             <View style={[s.dot, { backgroundColor: CATEGORY[g.key].ink }]} />
-            <Text style={s.title} accessibilityRole="header">{t(g.titleKey, lang)}</Text>
+            <Text style={s.title} accessibilityRole="header" numberOfLines={1} maxFontSizeMultiplier={cap}>{t(g.titleKey, lang)}</Text>
           </View>
           <View style={s.grid}>
             {g.modules.map(mod => (
@@ -81,7 +95,7 @@ const s = StyleSheet.create({
   title:    { ...type.rowTitle, color: colors.textPrimary },
   grid:     { flexDirection: 'row', flexWrap: 'wrap' },
   tile:     { alignItems: 'center', paddingVertical: 8, paddingHorizontal: TILE_PAD },
-  labelBox: { height: GRID_LABEL_HEIGHT, alignSelf: 'stretch', marginTop: 8 },
+  labelBox: { height: LABEL_BOX, alignSelf: 'stretch', marginTop: 8, overflow: 'hidden' },
   label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, color: colors.tileInk, textAlign: 'center' },
   // "Yakında": white on tileInk, 8.61:1. Sits over the icon's top edge so the label box —
   // the 68pt budget above — is untouched.

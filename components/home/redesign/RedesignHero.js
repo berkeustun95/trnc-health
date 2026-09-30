@@ -24,6 +24,7 @@ import { rampLayers } from '../HomeHero'
 // this file and fails below 4.5:1.
 export const HERO_H = 196
 export const HERO_PILL_ALPHA = 0.6
+export const CHIP_CAP = 1.2   // large system text: the chip grows at most 1.2×
 
 const TOP = rampLayers(0.32)
 const BOTTOM = rampLayers(0.35)
@@ -85,11 +86,11 @@ export default function RedesignHero({
             and is the ONLY part allowed to ellipsize: the district never shrinks. */}
         <View style={s.chip} accessibilityRole="text" accessibilityLabel={landmark ? `${district}, ${landmark}` : district}>
           <Ionicons name="location" size={13} color="#FFFFFF" />
-          <Text style={s.chipText} numberOfLines={1}>{district}</Text>
+          <Text style={s.chipText} numberOfLines={1} maxFontSizeMultiplier={CHIP_CAP}>{district}</Text>
           {!!landmark && (
             <>
-              <Text style={s.chipText}>·</Text>
-              <Text style={[s.chipText, s.chipLandmark]} numberOfLines={1} ellipsizeMode="tail">{landmark}</Text>
+              <Text style={s.chipText} maxFontSizeMultiplier={CHIP_CAP}>·</Text>
+              <Text style={[s.chipText, s.chipLandmark]} numberOfLines={1} ellipsizeMode="tail" maxFontSizeMultiplier={CHIP_CAP}>{landmark}</Text>
             </>
           )}
         </View>

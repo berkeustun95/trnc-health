@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { colors, type, radii, elevation } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { ListRow, Button, CategoryIcon, useTabBarFootprint } from '../ui'
+import { FADE_H } from '../ui/FloatingTabBar'
 
 // ─── Profil: the ONE settings place (redesign Slice 2) ──────────────────────
 // The drawer is gone; everything it held lives here, in four groups. Every row calls an
@@ -57,7 +58,7 @@ export function GuestProfile({ lang, a, onCreateAccount }) {
   const pad = useTabBarFootprint()
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={[s.content, { paddingBottom: pad + 16 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[s.content, { paddingBottom: pad + FADE_H + 8 }]} showsVerticalScrollIndicator={false}>
         <Text style={s.page} accessibilityRole="header">{t('tabProfile', lang)}</Text>
         <View style={[s.guestCard, elevation.card]}>
           <CategoryIcon icon="person-add-outline" category="city" size={48} />

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, category, type, radii, press } from '../../../constants/theme'
 import { t, tCount } from '../../../constants/i18n'
@@ -7,23 +7,58 @@ import { uvLevel, weatherGroup, weatherLabelKey } from '../../../utils/facilityU
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
+import { weatherPhoto, isNightNow } from '../../../constants/weatherPhotos'
 import { Bone, ErrorState, IconButton } from '../../ui'
 
-// Sized for the longest locale at 320dp: title 2 lines, count 3, until 1 = 132pt of content
-// (npm run labels:check measures the strings; this is their height budget).
-export const TILE_H = 136
+// Both tiles are the V2 live-strip card: full photo, icon badge top-left, dark text band at
+// the bottom. Height = badge (10 + 28) + band at its worst case at the 1.15 font cap:
+// 8 + 2·17·1.15 (title) + 2·16·1.15 (line) + 8 ≈ 92 → 38 + 4 + 92 = 134. Usually the band
+// is two lines and the photo shows above it. labels:check measures every string in it.
+export const TILE_H = 134
 export const GAP = 12
+export const TILE_FONT_CAP = 1.15   // maxFontSizeMultiplier for text in fixed-height tiles
+export const TILE_FONT_CAP_NARROW = 1.0   // below 350dp the band cannot take any growth
+const tileCap = w => (w < 350 ? TILE_FONT_CAP_NARROW : TILE_FONT_CAP)
 
-// ─── Duty pharmacies (compact: same size as the weather tile) ────────────────
-// COUNT ONLY, never a pharmacy name: the tile must not rank one pharmacy over another.
-// Four states, never confused with each other:
-//   loading  → bones (the query has not answered; the old default of "fresh" lied here)
-//   error    → the fetch failed: message + retry, and the tile still opens the list
-//   unhealthy→ partial / stale / absent roster: an ALERT, not "0 eczane" — an empty duty
-//              roster is an error in this country, there is always a duty pharmacy
-//   fresh    → "Bugün {n} eczane nöbette" · "00.00'a kadar"
-// The whole tile is the target (opens DutyListScreen, which carries the KTEB fallback);
-// dutyRef lands on it because App.js measures that ref for the coach mark.
+// ─── The photo card ──────────────────────────────────────────────────────────
+// ⚠ THE IMAGE STYLE IS V2's, ON PURPOSE. In the ADA Preview release APK the duty photo did not
+//   draw (the tile showed the scrim over its fallback colour) while the drawable WAS in the
+//   APK (aapt2: drawable/assets_backgrounds_adabgdutypharmacy) and the bundle referenced it.
+//   The one difference from the V2 strip — which renders this same drawable in production —
+//   was a bare StyleSheet.absoluteFill with no width/height. This uses V2's exact style
+//   (absoluteFillObject + width/height 100%). Not reproduced here (no emulator on this Mac):
+//   confirm on the next Preview build.
+// Text sits ONLY on the band: white on rgba(0,0,0,0.72) over a pure-white pixel is 9.29:1,
+// so the photo cannot decide the ratio.
+function PhotoTile({ image, icon, title, titleLines = 1, line, onPress, a11y, innerRef, surface, alert }) {
+  const onPhoto = !!image && !surface
+  const cap = tileCap(useWindowDimensions().width)
+  return (
+    <TouchableOpacity ref={innerRef} collapsable={false} onPress={onPress} disabled={!onPress}
+      activeOpacity={press.card} accessibilityRole="button" accessibilityLabel={a11y}
+      style={[s.card, { height: TILE_H, backgroundColor: surface || colors.border }, alert && s.alertBorder]}>
+      {onPhoto && <Image source={image} style={s.photo} resizeMode="cover" />}
+      <View style={[s.badge, alert && s.badgeAlert]}>
+        <Ionicons name={alert ? 'alert-circle' : icon} size={15} color={alert ? '#FFFFFF' : colors.textPrimary} />
+      </View>
+      {/* The arrow sits top-right, not in the band: the band keeps its full width for text. */}
+      {!!onPress && (
+        <View style={s.arrow}><Ionicons name="arrow-forward" size={15} color={colors.textPrimary} /></View>
+      )}
+      <View style={[s.band, !onPhoto && s.bandOnSurface]}>
+        <Text style={[s.bandTitle, !onPhoto && s.darkText]} numberOfLines={titleLines} maxFontSizeMultiplier={cap}>{title}</Text>
+        {typeof line === 'function' ? line(cap) : line}
+      </View>
+    </TouchableOpacity>
+  )
+}
+
+// ─── Duty pharmacies ─────────────────────────────────────────────────────────
+// COUNT ONLY, never a pharmacy name. States, never confused with each other:
+//   loading → bone line · error → message + retry (tinted surface) · partial/stale/absent →
+//   ALERT on the tinted surface (an empty duty roster is an error here, there is always a
+//   duty pharmacy) · fresh → "13 eczane · 00.00'a kadar". The whole tile opens the duty
+//   list (KTEB fallback lives there); dutyRef is App.js's coach-mark target.
 export function dutyUntilText(until, lang) {
   if (!until) return null
   if (lang === 'Turkish') return untilTr(until)
@@ -35,80 +70,68 @@ export function DutyTile({ summary, lang, onPress, onRetry, dutyRef }) {
   const fresh = status === DUTY_FRESH
   const alert = loaded && !error && !fresh
   const untilText = dutyUntilText(until, lang)
-  const countLine = loaded && !error && count > 0 ? tCount('hrDutyCount', count, lang) : null
-  const alertText = alert ? t(status === DUTY_PARTIAL ? 'hrDutyPartial' : 'hrDutyUnavailable', lang) : null
-  const a11y = [t('stripDutyTitle', lang), countLine, fresh ? untilText : null, alertText,
-    error ? t('hrDutyUnavailable', lang) : null].filter(Boolean).join(', ')
-
-  // The photo shows while the roster is healthy (or still loading). An alert or a failed
-  // fetch REPLACES it with the tinted surface and dark text — the V2 strip's rule: an
-  // unhealthy duty card must be unmistakable at a glance, not a shade different.
-  const onPhoto = !alert && !error
-  const ink = onPhoto ? '#FFFFFF' : category.health.ink
+  const short = loaded && !error && count > 0
+    ? tCount('hrDutyShort', count, lang).replace('{until}', fresh && untilText ? untilText : '').replace(/ · $/, '')
+    : null
+  // Tile-only short wording for the two unhealthy states; the full sentence is in the a11y label.
+  const alertText = alert ? t(status === DUTY_PARTIAL ? 'hrDutyTileAlertPartial' : 'hrDutyTileAlertDown', lang) : null
+  const title = t('stripDutyTitle', lang)
+  let line
+  if (!loaded) line = <Bone width="80%" height={11} style={{ marginTop: 5 }} />
+  else if (error) line = <ErrorState compact lang={lang} message={t('hrDutyTileAlertDown', lang)} onRetry={onRetry} />
+  else if (alert) line = cap => <Text style={s.alertText} numberOfLines={2} maxFontSizeMultiplier={cap}>{alertText}</Text>
+  else line = cap => <Text style={s.bandLine} numberOfLines={2} maxFontSizeMultiplier={cap}>{short}</Text>
   return (
-    <TouchableOpacity ref={dutyRef} collapsable={false} onPress={onPress} activeOpacity={press.card}
-      accessibilityRole="button" accessibilityLabel={a11y}
-      style={[s.tile, s.photoTile, { height: TILE_H, backgroundColor: category.health.bg }, alert && s.alertBorder]}>
-      {onPhoto && (
-        <>
-          <Image source={DUTY_IMAGE} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          <View style={[StyleSheet.absoluteFill, s.scrim]} />
-        </>
-      )}
-      <View style={s.titleRow}>
-        <Text style={[s.dutyTitle, { color: onPhoto ? '#FFFFFF' : colors.textPrimary }]} numberOfLines={2}>
-          {t('stripDutyTitle', lang)}
-        </Text>
-        <Ionicons name={alert || error ? 'alert-circle' : 'arrow-forward'} size={18} color={ink} />
-      </View>
-      {!loaded && (<><Bone width="90%" height={12} style={{ marginTop: 8 }} /><Bone width="60%" height={12} style={{ marginTop: 6 }} /></>)}
-      {loaded && error && (
-        <ErrorState compact lang={lang} message={t('hrDutyUnavailable', lang)} onRetry={onRetry} style={{ marginTop: 2 }} />
-      )}
-      {loaded && !error && (
-        <>
-          {!!countLine && <Text style={[s.dutyLine, onPhoto && s.onPhoto]} numberOfLines={3}>{countLine}</Text>}
-          {fresh && !!untilText && <Text style={[s.dutySub, onPhoto && s.onPhoto]} numberOfLines={1}>{untilText}</Text>}
-          {alert && <Text style={s.alertText} numberOfLines={3}>{alertText}</Text>}
-        </>
-      )}
-    </TouchableOpacity>
+    <PhotoTile
+      innerRef={dutyRef}
+      image={DUTY_IMAGE}
+      icon="medkit"
+      title={title}
+      titleLines={2}
+      line={line}
+      onPress={onPress}
+      surface={alert || error ? category.health.bg : null}
+      alert={alert || error}
+      a11y={[title, short, alert ? t(status === DUTY_PARTIAL ? 'hrDutyPartial' : 'hrDutyUnavailable', lang) : null,
+        error ? t('hrDutyUnavailable', lang) : null].filter(Boolean).join(', ')}
+    />
   )
 }
 
 // ─── Weather ─────────────────────────────────────────────────────────────────
-// Temperature, condition, UV AS TEXT. No emoji and no coloured UV badge — the V2 badges
-// measured 1.92–3.76:1. Opens the existing WeatherSheet.
+// "24° · Güneşli" on the band, UV as text below. The photo follows the weather (bundled CC0
+// set, constants/weatherPhotos.js); an unmapped code falls back to the city tint.
 const WEATHER_ION = {
-  clear: 'sunny-outline', partlyCloudy: 'partly-sunny-outline', overcast: 'cloudy-outline',
-  fog: 'cloudy-outline', drizzle: 'rainy-outline', rain: 'rainy-outline', snow: 'snow-outline',
-  showers: 'rainy-outline', thunder: 'thunderstorm-outline', unknown: 'thermometer-outline',
+  clear: 'sunny', partlyCloudy: 'partly-sunny', overcast: 'cloudy',
+  fog: 'cloudy', drizzle: 'rainy', rain: 'rainy', snow: 'snow',
+  showers: 'rainy', thunder: 'thunderstorm', unknown: 'thermometer',
 }
 
 export function WeatherTile({ weatherData, lang, onPress }) {
   const cur = weatherData?.current
   const uv = cur ? uvLevel(cur.uv_index) : null
   const temp = cur?.temperature_2m
-  const cond = cur ? t(weatherLabelKey(cur.symbol), lang) : null
+  // Tile-only: "Partly cloudy" is too long for the band in ru/fr/es; the short forecast term
+  // is used here and the full name stays in the weather sheet.
+  const condKey = cur ? weatherLabelKey(cur.symbol) : null
+  const cond = cur ? t(condKey === 'weatherPartlyCloudy' ? 'hrWxPartlyTile' : condKey, lang) : null
   const uvText = uv ? t('hrWeatherUv', lang).replace('{n}', String(Math.round(cur.uv_index))).replace('{level}', t(uv.key, lang)) : null
+  const photo = cur ? weatherPhoto(cur.symbol, isNightNow(weatherData)) : null
+  // "24° · Parçalı bulutlu" over up to two lines. UV left the tile (Berke: less text is fine);
+  // it stays in the weather sheet and in this tile's accessibility label.
+  const title = cur ? `${temp != null ? Math.round(temp) + '°' : '—'} · ${cond}` : t('homeWeatherTitle', lang)
+  const line = cur ? null : <Bone width="60%" height={11} style={{ marginTop: 5 }} />
   return (
-    <TouchableOpacity onPress={cur ? onPress : undefined} disabled={!cur} activeOpacity={press.card}
-      accessibilityRole="button"
-      accessibilityLabel={[t('homeWeatherTitle', lang), temp != null ? `${Math.round(temp)}°C` : null, cond, uvText].filter(Boolean).join(', ')}
-      style={[s.tile, { height: TILE_H, backgroundColor: category.city.bg }]}>
-      <View style={s.weatherTop}>
-        <Text style={s.temp}>{temp != null ? `${Math.round(temp)}°` : '—'}</Text>
-        <Ionicons name={WEATHER_ION[weatherGroup(cur?.symbol)] || WEATHER_ION.unknown} size={26} color={category.city.ink} />
-      </View>
-      {cur ? (
-        <>
-          <Text style={s.cond} numberOfLines={1}>{cond}</Text>
-          {!!uvText && <Text style={s.uv} numberOfLines={1}>{uvText}</Text>}
-        </>
-      ) : (
-        <><Bone width="70%" height={12} /><Bone width="50%" height={12} style={{ marginTop: 6 }} /></>
-      )}
-    </TouchableOpacity>
+    <PhotoTile
+      image={photo?.source}
+      icon={WEATHER_ION[weatherGroup(cur?.symbol)] || WEATHER_ION.unknown}
+      title={title}
+      titleLines={2}
+      line={line}
+      onPress={cur ? onPress : undefined}
+      surface={photo ? null : category.city.bg}
+      a11y={[t('homeWeatherTitle', lang), cur ? title : null, uvText].filter(Boolean).join(', ')}
+    />
   )
 }
 
@@ -179,32 +202,30 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
 }
 
 const s = StyleSheet.create({
-  tile:        { borderRadius: radii.widget, padding: 12 },
+  card:        { borderRadius: radii.widget, overflow: 'hidden' },
   alertBorder: { borderWidth: 1.5, borderColor: colors.dangerInk },
-  photoTile:   { overflow: 'hidden' },
-  // White on this photo under 0.60 black: p95 6.51:1 (393dp tile) / 6.45 (320dp), measured
-  // on ada-bg-duty-pharmacy.png at tile size — every pixel, since text can sit anywhere.
-  scrim:       { backgroundColor: 'rgba(0,0,0,0.60)' },
-  onPhoto:     { color: '#FFFFFF' },
-  titleRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  dutyTitle:   { ...type.body, fontFamily: 'Inter_600SemiBold', lineHeight: 18, flex: 1 },
-  dutyLine:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, marginTop: 2 },
-  dutySub:     { ...type.small, color: colors.textSecondary, marginTop: 1 },
-  alertText:   { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.dangerInk, marginTop: 2 },
-
-  weatherTop:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  temp:        { ...type.pageTitle, color: colors.textPrimary },
-  cond:        { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, marginTop: 4 },
-  uv:          { ...type.meta, color: colors.textSecondary, marginTop: 2 },
+  photo:       { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  badge:       { position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: 14,
+                 backgroundColor: 'rgba(255,255,255,0.94)', justifyContent: 'center', alignItems: 'center' },
+  badgeAlert:  { backgroundColor: colors.dangerInk },
+  band:        { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.72)',
+                 paddingHorizontal: 12, paddingVertical: 8 },
+  arrow:       { position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: 14,
+                 backgroundColor: 'rgba(255,255,255,0.94)', justifyContent: 'center', alignItems: 'center' },
+  bandOnSurface:{ backgroundColor: 'transparent' },
+  bandTitle:   { ...type.small, fontFamily: 'Inter_600SemiBold', lineHeight: 17, color: '#FFFFFF' },
+  bandLine:    { ...type.meta, fontFamily: 'Inter_500Medium', color: '#FFFFFF', marginTop: 1 },
+  darkText:    { color: colors.textPrimary },
+  alertText:   { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.dangerInk, marginTop: 1 },
 
   // ─── MASCOT GEOMETRY, FROM THE ASSET'S OWN ALPHA BOUNDS ────────────────────
-  // oli-button.png is 1024² and the art occupies x 26.6–72.3%, y 5.3–91.5%. At 136pt the
-  // visible mascot is 117pt tall on a 100pt card, feet on the card's bottom edge, head
-  // ~17pt above its top (it pops). Visible left edge 8pt, right edge 70pt, so the content
-  // starts at 78 — flush beside the mascot, no gap. overflow stays visible for the pop.
+  // oli-button.png is 1024² and the art occupies x 26.6–72.3%, y 5.3–91.5%. At 120pt the
+  // visible mascot is 103pt tall on a 100pt card: feet on the bottom edge, head ~3.4pt above
+  // the top — which leaves 8.6pt of the 12pt gap clear of the tiles above (Berke: ≥ 8pt).
+  // Visible left edge 8pt, right edge 63pt, so the content starts at 70 — flush beside him.
   oliCard:     { backgroundColor: colors.primary, borderRadius: radii.widget, height: 100,
-                 paddingLeft: 78, paddingRight: 12, justifyContent: 'center', overflow: 'visible' },
-  oli:         { position: 'absolute', left: -28, bottom: -12, width: 136, height: 136 },
+                 paddingLeft: 70, paddingRight: 12, justifyContent: 'center', overflow: 'visible' },
+  oli:         { position: 'absolute', left: -24, bottom: -10, width: 120, height: 120 },
   oliBody:     { gap: 6 },
   oliTitle:    { ...type.sectionHeading, color: colors.onPrimary },
   oliField:    { flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, borderRadius: 999,

@@ -356,9 +356,12 @@ for (const W of WIDTHS) {
 }
 
 // ═══ REDESIGNED HOME (feat/redesign) ═══════════════════════════════════════
-// Same measurement, the new geometry, BOTH label weights (the dev "Aa 500/700" toggle is
-// undecided until go-live, so each must fit). Everything is read from source; a renamed
-// style or constant fails the guard rather than passing on a box it no longer measures.
+// Real Inter metrics, the new geometry, BOTH label weights (the dev "Aa 500/700" toggle),
+// at system font scale 1.0 AND 1.3, at 320 / 360 / 393dp, in all 9 locales. Each element's
+// maxFontSizeMultiplier is READ FROM SOURCE and applied: effective px = px · min(scale, cap).
+// Everything is read from source; a renamed style or constant fails the guard rather than
+// passing on a box it no longer measures. (Berke's device showed "Exchange Rates" running
+// into "Welcome Guide" at a large system font — the 1.0-only version of this check was blind.)
 const constNum = (file, name) => {
   const m = new RegExp(`const ${name}\\s*=\\s*(-?[\\d.]+)`).exec(read(file))
   return m ? { v: parseFloat(m[1]) } : { err: `${file}: no numeric const ${name}` }
@@ -368,69 +371,76 @@ const RGEOM = {
   widgetGap:  num('screens/HomeScreen.js', 'rWidgets', 'gap'),
   panelGut:   constNum('components/home/redesign/ServicePanels.js', 'PANEL_GUTTER'),
   tilePad:    constNum('components/home/redesign/ServicePanels.js', 'TILE_PAD'),
-  widgetPad:  num('components/home/redesign/Widgets.js', 'tile', 'padding'),
+  labelCap:   constNum('components/home/redesign/ServicePanels.js', 'LABEL_CAP'),
+  labelCapN:  constNum('components/home/redesign/ServicePanels.js', 'LABEL_CAP_NARROW'),
+  narrowW:    constNum('components/home/redesign/ServicePanels.js', 'NARROW_W'),
+  tileCap:    constNum('components/home/redesign/Widgets.js', 'TILE_FONT_CAP'),
+  tileCapN:   constNum('components/home/redesign/Widgets.js', 'TILE_FONT_CAP_NARROW'),
+  chipCap:    constNum('components/home/redesign/RedesignHero.js', 'CHIP_CAP'),
+  bandPad:    num('components/home/redesign/Widgets.js', 'band', 'paddingHorizontal'),
 }
 const rErr = Object.entries(RGEOM).filter(([, r]) => r.err).map(([k, r]) => `redesign ${k}: ${r.err}`)
 if (rErr.length) { for (const e of rErr) problems.push(e) } else {
   const R = Object.fromEntries(Object.entries(RGEOM).map(([k, r]) => [k, r.v]))
+  const WIDTHS_R = [320, 360, 393]
+  const SCALES = [1.0, 1.3]
   const rTile   = W => (W - R.page * 2 - R.panelGut * 2) / 4               // one panel column
   const rLabel  = W => rTile(W) - R.tilePad * 2                              // the label box
-  const rWidget = W => (W - R.page * 2 - R.widgetGap) / 2 - R.widgetPad * 2  // duty / weather text width
+  const rCard   = W => (W - R.page * 2 - R.widgetGap) / 2                    // duty / weather card
+  const rBand   = W => rCard(W) - R.bandPad * 2                              // band text (arrow is top-right now)
+  const lCap = W => (W < R.narrowW ? R.labelCapN : R.labelCap)             // width-aware caps, as rendered
+  const tCap = W => (W < 350 ? R.tileCapN : R.tileCap)
   const fonts = {}
   const use = w => { advance = fonts[w] ??= loadFont(FONTS[w]) }
   const extraKeys = [...read('constants/homeGroups.js').matchAll(/labelKey:\s*'([a-zA-Z0-9_]+)'/g)].map(m => m[1])
   const groupKeys = [...read('constants/homeGroups.js').matchAll(/titleKey:\s*'([a-zA-Z0-9_]+)'/g)].map(m => m[1])
   if (!extraKeys.length || !groupKeys.length) problems.push('redesign: read ZERO keys from constants/homeGroups.js')
+  const BADGE_KEY = (/soonText[^>]*>\{t\('([a-zA-Z0-9_]+)'/.exec(read('components/home/redesign/ServicePanels.js')) || [])[1]
+  if (!BADGE_KEY) problems.push('redesign: could not read the Yakında badge key from ServicePanels.js')
   const { tCount } = await import('../constants/i18n.js')
   const { REGION_LABEL_KEY } = await import('../constants/regions.js')
   const { untilTr } = await import('../utils/turkishTime.js')
+  const { WEATHER_LABEL_KEY } = await import('../utils/facilityUtils.js')
   const UNTILS = ['00:00', '19:00', '20:00', '22:00']
-  // The badge key is read from ServicePanels.js, not typed here, so a renamed key cannot
-  // leave this measuring a string the tile no longer shows.
-  const BADGE_KEY = (/soonText[^>]*>\{t\('([a-zA-Z0-9_]+)'/.exec(read('components/home/redesign/ServicePanels.js')) || [])[1]
-  if (!BADGE_KEY) problems.push('redesign: could not read the Yakında badge key from ServicePanels.js')
   let rTight = { spare: Infinity }
-  const rAssess = (w, str, px, box, where, cursive, lines) => {
+  const rAssess = (w, str, px, cap, scale, box, where, cursive, lines) => {
     use(w); checked++
-    const { lines: got, midWord } = wrap(str, px, box)
-    const spare = headroom(str, px, box, lines)
+    const eff = px * Math.min(scale, cap)
+    const { lines: got, midWord } = wrap(str, eff, box)
+    const spare = headroom(str, eff, box, lines)
     if (!cursive && spare >= 0 && spare < rTight.spare) rTight = { spare, where, str, box }
-    if (midWord) problems.push(`${where}: ${JSON.stringify(str)} BREAKS MID-WORD in ${box.toFixed(1)}pt -> ${got.map(l => JSON.stringify(l)).join(' / ')}`)
-    else if (got.length > lines) problems.push(`${where}: ${JSON.stringify(str)} needs ${got.length} lines, has ${lines} (${box.toFixed(1)}pt)`)
+    if (midWord) problems.push(`${where}: ${JSON.stringify(str)} BREAKS MID-WORD in ${box.toFixed(1)}pt at ${eff.toFixed(1)}px -> ${got.map(l => JSON.stringify(l)).join(' / ')}`)
+    else if (got.length > lines) problems.push(`${where}: ${JSON.stringify(str)} needs ${got.length} lines, has ${lines} (${box.toFixed(1)}pt at ${eff.toFixed(1)}px)`)
   }
-  for (const W of WIDTHS) for (const L of Object.keys(LANG_CODES)) {
-    const cur = CURSIVE.has(L)
+  for (const W of WIDTHS_R) for (const S of SCALES) for (const L of Object.keys(LANG_CODES)) {
+    const cur = CURSIVE.has(L), at = `redesign ${W}dp ×${S} ${L}`
     for (const w of [500, 700]) {
       for (const m of HOME_MODULES) {
-        rAssess(w, t(m.labelKey, L), 11, rLabel(W), `redesign ${W}dp ${L} ${w} tile:${m.id}`, cur, 2)
-        if (m.gridLabel) rAssess(w, t(m.gridLabel.key, L), m.gridLabel.size, rLabel(W),
-          `redesign ${W}dp ${L} ${w} gridLabel:${m.id}`, cur, m.gridLabel.lines)
+        rAssess(w, t(m.labelKey, L), 11, lCap(W), S, rLabel(W), `${at} ${w} tile:${m.id}`, cur, 2)
+        if (m.gridLabel) rAssess(w, t(m.gridLabel.key, L), m.gridLabel.size, lCap(W), S, rLabel(W), `${at} ${w} gridLabel:${m.id}`, cur, m.gridLabel.lines)
       }
-      for (const k of extraKeys) rAssess(w, t(k, L), 11, rLabel(W), `redesign ${W}dp ${L} ${w} tile:${k}`, cur, 2)
+      for (const k of extraKeys) rAssess(w, t(k, L), 11, lCap(W), S, rLabel(W), `${at} ${w} tile:${k}`, cur, 2)
     }
-    // "Yakında" badge: 9.5pt semibold, 6pt side padding, must stay inside the tile column.
-    rAssess(600, t(BADGE_KEY, L), 9.5, rTile(W) - 12, `redesign ${W}dp ${L} badge:comingSoon`, cur, 1)
-    for (const k of groupKeys) rAssess(600, t(k, L), 15, rTile(W) * 4 - 24 - 16, `redesign ${W}dp ${L} panel:${k}`, cur, 1)
-    // Duty tile — px and numberOfLines MIRROR Widgets.js (title 14/600 × 2, count 13/600 × 3,
-    // until 13/400 × 1, warnings 13/600 × 3). Change one, change both.
-    // The arrow shares the title row: 18pt glyph + 8pt gap.
-    rAssess(600, t('stripDutyTitle', L), 14, rWidget(W) - 26, `redesign ${W}dp ${L} duty:title`, cur, 2)
-    for (const n of [1, 13]) rAssess(600, tCount('hrDutyCount', n, L), 13, rWidget(W), `redesign ${W}dp ${L} duty:count(${n})`, cur, 3)
-    for (const u of UNTILS) {
-      const str = L === 'Turkish' ? untilTr(u) : t('hrDutyUntil', L).replace('{time}', u)
-      rAssess(400, str, 13, rWidget(W), `redesign ${W}dp ${L} duty:until(${u})`, cur, 1)
+    rAssess(600, t(BADGE_KEY, L), 9.5, lCap(W), S, rTile(W) - 12, `${at} badge:${BADGE_KEY}`, cur, 1)
+    for (const k of groupKeys) rAssess(600, t(k, L), 15, lCap(W), S, rTile(W) * 4 - 24 - 16, `${at} panel:${k}`, cur, 1)
+    // Duty / weather band — px and numberOfLines MIRROR Widgets.js: titles 13/600 × 2,
+    // duty line 12/500 × 2, alerts 12/600 × 2 (UV left the tile). Change one, change both.
+    rAssess(600, t('stripDutyTitle', L), 13, tCap(W), S, rBand(W), `${at} duty:title`, cur, 2)
+    for (const n of [1, 13]) for (const u of UNTILS) {
+      const until = L === 'Turkish' ? untilTr(u) : t('hrDutyUntil', L).replace('{time}', u)
+      rAssess(500, tCount('hrDutyShort', n, L).replace('{until}', until), 12, tCap(W), S, rBand(W), `${at} duty:short(${n},${u})`, cur, 2)
     }
-    // Hero chip: the DISTRICT never ellipsizes (only the landmark does). Row = W − 2·16, minus
-    // the credit "i" (26) + gap (8), chip padding (2·11), pin (13) + 3 gaps (3·5), and ~34pt
-    // kept for "· L…" so a landmark is always at least hinted. Mirrors RedesignHero.js.
+    for (const k of ['hrDutyTileAlertPartial', 'hrDutyTileAlertDown']) rAssess(600, t(k, L), 12, tCap(W), S, rBand(W), `${at} duty:${k}`, cur, 2)
+    for (const k of new Set(Object.values(WEATHER_LABEL_KEY))) rAssess(600, `-12° · ${t(k === 'weatherPartlyCloudy' ? 'hrWxPartlyTile' : k, L)}`, 13, tCap(W), S, rBand(W), `${at} weather:${k}`, cur, 2)
+    // Hero chip: the DISTRICT never ellipsizes (only the landmark does). Row = W − 2·16 minus the
+    // credit "i" (26) + gap (8), chip padding (2·11), pin (13) + 3 gaps (3·5), ~34pt for "· L…".
     for (const key of Object.values(REGION_LABEL_KEY)) {
-      rAssess(600, t(key, L), 12, W - 32 - 34 - 22 - 13 - 15 - 34, `redesign ${W}dp ${L} heroChip:${key}`, cur, 1)
+      rAssess(600, t(key, L), 12, R.chipCap, S, W - 32 - 34 - 22 - 13 - 15 - 34, `${at} heroChip:${key}`, cur, 1)
     }
-    for (const k of ['hrDutyPartial', 'hrDutyUnavailable']) rAssess(600, t(k, L), 13, rWidget(W), `redesign ${W}dp ${L} duty:${k}`, cur, 3)
   }
   use(WEIGHT || 700)
-  console.log(`  redesign: panel label box ${rLabel(320).toFixed(1)}pt, widget text ${rWidget(320).toFixed(1)}pt at 320dp; `
-    + `tightest ${JSON.stringify(rTight.str)} at ${rTight.where}, ${rTight.spare.toFixed(1)}pt headroom`)
+  console.log(`  redesign: ${WIDTHS_R.join('/')}dp × font scale ${SCALES.join('/')}; label box ${rLabel(320).toFixed(1)}pt, `
+    + `band ${rBand(320).toFixed(1)}pt at 320dp; tightest ${JSON.stringify(rTight.str)} at ${rTight.where}, ${rTight.spare.toFixed(1)}pt headroom`)
 }
 
 if (checked === 0) {

@@ -14,6 +14,14 @@ import { t } from '../../constants/i18n'
 export const TAB_BAR_H = 64
 export const TAB_BAR_SIDE = 24
 const GAP_BELOW = 12
+// Content fades out instead of cutting sharply at the bar: a solid canvas band from the
+// screen's bottom edge (under the Android nav bar, which is edge-to-edge and draws its own
+// contrast scrim over whatever is behind it — canvas, now, not content) up to the bar's
+// middle, then FADE_H of canvas → transparent. Stepped views: expo-linear-gradient would be a
+// native module. Scroll content pads by the footprint + FADE_H so its last row clears it.
+export const FADE_H = 32
+const FADE_STEPS = 8
+const CANVAS_RGB = '244,246,245'   // colors.canvas #F4F6F5
 
 // The vertical space the bar occupies above the screen's bottom edge. Screens that must
 // not be covered pad by this; Home scrolls under it and pads its content instead.
@@ -26,15 +34,25 @@ export function useTabBarFootprint() {
 // their layout is exactly what it was above a docked bar. A component, not a hook call in
 // App: App.js renders its own SafeAreaProvider, so App's body has no insets to read.
 export function TabBarPad({ children }) {
-  const pad = useTabBarFootprint()
+  const pad = useTabBarFootprint() + FADE_H
   return <View style={{ flex: 1, paddingBottom: pad }}>{children}</View>
 }
 
 export default function FloatingTabBar({ tabs, activeTab, onTabPress, refs = {}, lang }) {
   const insets = useSafeAreaInsets()
+  const bottom = GAP_BELOW + Math.max(insets.bottom, 8)
+  const solid = bottom + TAB_BAR_H / 2
   return (
+    <>
+    <View pointerEvents="none" style={[s.fadeWrap, { height: solid + FADE_H }]}>
+      {Array.from({ length: FADE_STEPS }, (_, i) => (
+        <View key={i} style={{ height: FADE_H / FADE_STEPS,
+          backgroundColor: `rgba(${CANVAS_RGB},${((i + 1) / (FADE_STEPS + 1)).toFixed(3)})` }} />
+      ))}
+      <View style={{ height: solid, backgroundColor: `rgb(${CANVAS_RGB})` }} />
+    </View>
     <View
-      style={[s.bar, elevation.tabBar, { bottom: GAP_BELOW + Math.max(insets.bottom, 8) }]}
+      style={[s.bar, elevation.tabBar, { bottom }]}
       accessibilityRole="tablist"
     >
       {tabs.map(tab => {
@@ -58,10 +76,12 @@ export default function FloatingTabBar({ tabs, activeTab, onTabPress, refs = {},
         )
       })}
     </View>
+    </>
   )
 }
 
 const s = StyleSheet.create({
+  fadeWrap:  { position: 'absolute', left: 0, right: 0, bottom: 0 },
   bar:       { position: 'absolute', left: TAB_BAR_SIDE, right: TAB_BAR_SIDE, height: TAB_BAR_H,
                borderRadius: radii.pill, backgroundColor: colors.card, flexDirection: 'row',
                alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 8 },
