@@ -17,7 +17,8 @@ import { t } from '../constants/i18n'
 // Constants, not string literals: a typo'd literal silently never matches and the
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
-import { MODULE_FLAGS, HOME_V2_LIVE, REDESIGN } from '../constants/flags'
+import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
+import { REDESIGN } from '../constants/redesign'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
 import WeatherSheet, { WeatherCredit } from '../components/home/WeatherSheet'

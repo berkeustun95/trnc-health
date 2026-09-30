@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
 // Google's iOS URL scheme is the iOS client ID reversed, and constants/auth.js is the one
@@ -64,7 +64,12 @@ export default {
     },
     android: {
       package: APP_ID,
-      googleServicesFile: IS_PREVIEW ? './google-services.preview.json' : './google-services.json',
+      // Preview: its own Firebase file once it exists (vault redesign-plan.md, console checklist).
+      // Until then the preview builds WITHOUT one, which only means no push in that APK —
+      // registration is try/caught in App.js. Production always gets its own file.
+      googleServicesFile: IS_PREVIEW
+        ? (existsSync(join(__dirname, 'google-services.preview.json')) ? './google-services.preview.json' : undefined)
+        : './google-services.json',
       config: {
         googleMaps: {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -148,6 +153,9 @@ export default {
       de: './locales/de.json',
     },
     extra: {
+      // Preview only — the key does not exist in the production config (diffed).
+      // constants/redesign.js reads it to turn the redesign on in ADA Preview builds.
+      ...(IS_PREVIEW ? { appVariant: 'preview' } : {}),
       eas: {
         projectId: '704d192a-1a80-41f8-ab98-cb3c8f078d7c',
       },
