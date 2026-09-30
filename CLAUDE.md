@@ -32,6 +32,8 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `NOTICE_FALLBACK` in `LiveStrip.js`, rank 3b
   in `homeStripResolver.js`, `stripNoticeTitle`, `utils/stripDismissals.js`). Don't delete or repurpose it;
   re-enable = one `UPDATE … SET is_active = true`. Same for the `showAgentOnboarding` branch in App.js.
+  It is OFF by product decision ("Bugün ADA'da" = events + duty, no announcements): never repurpose it
+  for announcements; re-enabling = one UPDATE on the existing row.
 
 ## Release & deploy
 - **JS-only change:** `npm run ota -- --message "…"` (note the `--`). Pre-flight: stash check, then
@@ -183,6 +185,8 @@ name joined to a clinic review is a health disclosure about an identified person
   cache limit and, on iOS Apple Maps, display terms; risk = key suspension). No deadline. Every
   Google pin has a row in `data/geocode-exceptions/google-pins.csv` (`kind;id;name;place;address;reason`,
   never coordinates): add the row in the same commit as the pin; an OSM replacement removes it.
+- Map links: the Apple Maps risk applies to pharmacies only; hotels deliberately open in Google Maps
+  (Harita). Do not unify them.
 - **Prefer OSM where it agrees:** `geocode_source` `osm` (tier 1, `google_places` in corroboration);
   `components/OsmAttribution.js` on every map/card showing an `osm` pin (ODbL). OSM data only via
   `scripts/lib/osm-snapshot.mjs` (main Overpass, ≤ 72 h; a mirror served stale data).
@@ -229,6 +233,7 @@ Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this l
 
 ## Advisor
 Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.
+Some sessions have no advisor tool; when absent, skip this step.
 
 ## Don't
 - Don't add analytics, tracking, or third-party SDKs without asking.
