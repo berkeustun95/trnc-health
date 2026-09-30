@@ -962,7 +962,8 @@ export default function HomeScreen({
             </View>
             <ServicePanels lang={lang} onPress={openModule} labelWeight={labelWeight} />
 
-            <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />
+            {/* No ad slot here yet: check-ad-placement.mjs pins the home_footer mount to
+                renderHubV2(). Adding it to the redesign is a guard change, made at go-live. */}
           </View>
         </ScrollView>
         {sheets}

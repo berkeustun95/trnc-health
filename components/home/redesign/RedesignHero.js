@@ -15,13 +15,19 @@ import { rampLayers } from '../HomeHero'
 // rendered by the screen, so its search-open state can be the same element at the top.
 //
 // Kept from V2: the district photo (resolveHero), the tap-through to the pictured place,
-// the photo-credit sheet, the ADA wordmark, and the stepped scrim — white text carries its
-// contrast from the scrim ramp, never from textShadow alone.
+// the photo-credit sheet, the ADA wordmark, and the stepped scrim.
+//
+// ─── CONTRAST, MEASURED ON THE REAL PHOTOS (p95 of the text rows, 3 device sizes) ───
+// Headline (26/700 = large text, 3:1 floor) with this ramp (0.80 over 72%): worst Karpaz
+// 5.74, generic 6.73, the rest 6.6–10.3. The 12pt overline could NOT be carried by a ramp
+// that leaves the photo alive — bare it measures Karpaz 3.44 even at this ramp (2.65 at
+// 0.72) — so it sits on its own rgba(0,0,0,0.60) pill: 5.74:1 over a pure-white pixel,
+// i.e. whatever photo is behind it, today's five or any added later.
 export const HERO_H = 290
 export const PILL_OVERLAP = 26          // half the search pill's 52pt height
 
 const TOP = rampLayers(0.32)
-const BOTTOM = rampLayers(0.72)
+const BOTTOM = rampLayers(0.80)
 const STEPS = TOP.length
 const LOGO = require('../../../assets/hero/ada-wordmark-keyline.png')
 
@@ -54,7 +60,7 @@ export default function RedesignHero({
       {isGeneric && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.28)' }]} />}
       {BOTTOM.map((a, i) => (
         <View key={`b${i}`} pointerEvents="none"
-          style={[s.band, { bottom: 0, height: (height * 0.62 / STEPS) * (i + 1), backgroundColor: `rgba(0,0,0,${a})` }]} />
+          style={[s.band, { bottom: 0, height: (height * 0.72 / STEPS) * (i + 1), backgroundColor: `rgba(0,0,0,${a})` }]} />
       ))}
     </View>
   )
@@ -114,7 +120,9 @@ const s = StyleSheet.create({
   actions:     { flexDirection: 'row', gap: 8 },
   content:     { position: 'absolute', left: 20, right: 20, bottom: PILL_OVERLAP + 20 },
   overlineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  overline:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 1, ...shadowText },
+  overline:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 1,
+                 backgroundColor: 'rgba(0,0,0,0.60)', borderRadius: 13, overflow: 'hidden',
+                 paddingHorizontal: 10, paddingVertical: 5 },
   info:        { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.42)',
                  justifyContent: 'center', alignItems: 'center' },
   headline:    { ...type.heroHeadline, color: '#FFFFFF', ...shadowText },
