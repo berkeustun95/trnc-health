@@ -19,7 +19,8 @@
       },
       "env": {
         "APP_VARIANT": "preview"
-      }
+      },
+      "environment": "preview"
     },
     "production-apk": {
       "extends": "production",
