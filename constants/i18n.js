@@ -3607,7 +3607,7 @@ const translations = {
     // ─── Redesign Slice 0–1 (feat/redesign) — shared UI + new Home ───
     hrTileDuty: "صيدليات مناوبة",
     hrTileRoutes: "مسارات المشي",
-    hrSoonBadge: "قريبًا",
+    hrSoonBadge: "قريباً",
     hrOliField: "اسأل أولي أو ابحث…",
     hrSearchResults: "النتائج",
     uiClear: "مسح",
