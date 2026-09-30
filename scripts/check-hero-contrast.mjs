@@ -143,25 +143,48 @@ for (const [name, file] of BACKGROUNDS) {
   }
 }
 
-// Home v3 Oli bar: white text on the deep-teal fade, and on the glass pill (white 16%) over
-// it. The text is proven (labels:check) to sit only on the fade's SOLID part, so the ground
-// under it is FADE_COLOR at FADE_ALPHA over the scene. Bound over a PURE WHITE pixel, which
-// no scene exceeds, so one number covers every scene. Pill text is 13/500 → 4.5:1 applies.
+// Home v3 Oli bar: white text on the shared ground (oli-bg.png gradient + oli-glow.png), and
+// on the glass pill (white 16%) over it. labels:check proves the text ends inside TEXT_ZONE,
+// so this renders the REAL PNGs at 320/360/393dp exactly as OliBar lays them out (bg
+// stretched to the card; glow GLOW_SIZE square centred at GLOW_CX/GLOW_CY) and takes the
+// BRIGHTEST pixel anywhere in the zone — a bound for every locale's title and pill. The art
+// never enters the zone (right 40%, and TEXT_ZONE + ART_ZONE ≤ 1 is asserted). Pill text is
+// 13/500, so 4.5:1 applies to both.
 {
   const src = readFileSync(resolve(ROOT, 'components/home/redesign/OliBar.js'), 'utf8')
-  const col = (/export const FADE_COLOR = '#([0-9A-Fa-f]{6})'/.exec(src) || [])[1]
-  const a = parseFloat((/export const FADE_ALPHA = ([\d.]+)/.exec(src) || [])[1])
-  if (!col || !(a > 0) || !/backgroundColor: rgba\(FADE_COLOR, FADE_ALPHA\)/.test(src)
-      || !/'rgba\(255,255,255,0\.16\)'/.test(src)) {
-    problems.push('redesign Oli bar: cannot read FADE_COLOR / FADE_ALPHA / the 16% pill from OliBar.js — measuring nothing')
+  const k = name => parseFloat((new RegExp(`export const ${name} = ([\\d.]+)`).exec(src) || [])[1])
+  const [H, ZONE, ART, GS, GX, GY, TL] = ['OLI_BAR_H', 'TEXT_ZONE', 'ART_ZONE', 'GLOW_SIZE', 'GLOW_CX', 'GLOW_CY', 'TEXT_LEFT'].map(k)
+  if ([H, ZONE, ART, GS, GX, GY, TL].some(v => !(v >= 0)) || !/'rgba\(255,255,255,0\.16\)'/.test(src)
+      || !/source=\{BG\} resizeMode="stretch"/.test(src)) {
+    problems.push('redesign Oli bar: cannot read the ground geometry / 16% pill from OliBar.js — measuring nothing')
   } else {
-    const [r, g, b] = [0, 2, 4].map(i => parseInt(col.slice(i, i + 2), 16))
-    const fade = [r, g, b].map(v => v * a + 255 * (1 - a))
-    const pill = fade.map(v => 255 * 0.16 + v * 0.84)
-    const cf = 1.05 / (Y(...fade) + 0.05), cp = 1.05 / (Y(...pill) + 0.05)
-    rows.push({ name: 'oli fade', worst: cf, at: 'over #FFFFFF' }, { name: 'oli pill', worst: cp, at: 'over #FFFFFF' })
-    if (cp < FLOOR) problems.push(`redesign Oli bar: pill text on the fade is ${cp.toFixed(2)}:1 over white, under ${FLOOR}:1`)
-    if (cf < FLOOR) problems.push(`redesign Oli bar: title on the fade is ${cf.toFixed(2)}:1 over white, under ${FLOOR}:1`)
+    if (ZONE + ART > 1.0001) problems.push(`redesign Oli bar: TEXT_ZONE ${ZONE} + ART_ZONE ${ART} overlap — the art could sit under the text`)
+    let worstT = Infinity, worstP = Infinity, at = ''
+    for (const Wd of [320, 360, 393]) {
+      const cw = Wd - 32
+      const glow = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-glow.png')).resize(GS, GS).toBuffer()
+      const gl = Math.round(cw * GX - GS / 2), gt = Math.round(H * GY - GS / 2)
+      // extend the canvas so a glow hanging off the card still composites, then crop to the card
+      const pad = GS
+      // sharp orders its operations itself, so resize and extend are separate passes
+      const sized = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-bg.png')).resize(cw, H, { fit: 'fill' }).toBuffer()
+      const bg = await sharp(sized).extend({ top: pad, bottom: pad, left: pad, right: pad, extendWith: 'copy' }).toBuffer()
+      const lit = await sharp(bg).composite([{ input: glow, left: gl + pad, top: gt + pad }]).png().toBuffer()
+      const { data, info } = await sharp(lit).extract({ left: pad, top: pad, width: cw, height: H })
+        .removeAlpha().raw().toBuffer({ resolveWithObject: true })
+      const x1 = Math.ceil(cw * ZONE)
+      for (let y = 0; y < H; y++) for (let x = TL; x < x1; x++) {
+        const i = (y * info.width + x) * info.channels
+        const px = [data[i], data[i + 1], data[i + 2]]
+        const ct = 1.05 / (Y(...px) + 0.05)
+        const cp = 1.05 / (Y(...px.map(v => 255 * 0.16 + v * 0.84)) + 0.05)
+        if (ct < worstT) worstT = ct
+        if (cp < worstP) { worstP = cp; at = `${Wd}dp x=${x} y=${y} rgb(${px.join(',')})` }
+      }
+    }
+    rows.push({ name: 'oli title', worst: worstT, at }, { name: 'oli pill', worst: worstP, at })
+    if (worstT < FLOOR) problems.push(`redesign Oli bar: title on the ground is ${worstT.toFixed(2)}:1 at worst, under ${FLOOR}:1`)
+    if (worstP < FLOOR) problems.push(`redesign Oli bar: pill text is ${worstP.toFixed(2)}:1 at worst (${at}), under ${FLOOR}:1`)
   }
 }
 

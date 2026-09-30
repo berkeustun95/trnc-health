@@ -1,35 +1,39 @@
 import { useEffect, useRef, useState } from 'react'
 import { View, Text, Image, Animated, TouchableOpacity, StyleSheet, AppState, AccessibilityInfo, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, category, radii, press } from '../../../constants/theme'
+import { radii, press } from '../../../constants/theme'
 import { t } from '../../../constants/i18n'
 
 // ─── The Oli bar, "full scene" (Home v3, option B) ───────────────────────────
 // One card; the rotating Oli & Maki scene fills it, the text sits on a deep-teal fade on the
 // left, and the whole card opens the Oli sheet (search lives there, unchanged).
 //
-// SCENES are the 1080px originals, trimmed to the art and exported 300px tall. They are
-// cut-outs, so each scene = its own soft ground + the art, framed in the RIGHT 40% of the
-// card: right-anchored, feet on the bottom edge, scaled down only if it would be wider than
-// that zone. No scene needs cropping, so none is dropped. Exchange (no module) and insurance
-// (dark, and no 1080px original) are left out: a scene is a quiet promise of a feature.
+// ONE shared ground for every scene: a long horizontal gradient from BG_DARK (left, under
+// the text) to BG_LIGHT (right, under the mascots), eased as t^BG_EASE so the left stays deep
+// where the text is, plus a soft radial glow behind the art. No per-scene tints and no seam:
+// only the mascot cut-outs crossfade. Both are bundled PNGs (assets/oli-scenes/oli-bg.png,
+// oli-glow.png) — no gradient library in this app — generated from these constants.
 //
-// ─── THE FADE CARRIES THE CONTRAST, SO THE TEXT MUST STAY ON ITS SOLID PART ─
-// FADE_COLOR at FADE_ALPHA is solid to FADE_HOLD of the width, then a smoothstep ramp
-// (assets/oli-scenes/fade-ramp.png) reaches 0 at FADE_END. Over a PURE WHITE pixel — the
-// bound for every scene — white text is 8.66:1 on the fade and 5.68:1 on the glass pill
-// (white 16% on top). check-hero-contrast reads these constants; labels:check proves the
-// title and the pill end inside the solid part (TEXT_LEFT … FADE_HOLD·width) in 9 locales.
-// primaryDark (#0A5E5D) gave the pill only 4.67:1 — too thin a margin — hence the deeper teal.
+// The art is the 1080px originals, trimmed and exported 300px tall; welcome/services/pets
+// were opaque white and are cut out (edge flood fill, feathered). Framed in the RIGHT 40%:
+// right-anchored, feet on the bottom edge, scaled down only if wider than that zone. No scene
+// is cropped, none is dropped. Exchange and insurance are left out (no live module).
 //
+// ─── CONTRAST ────────────────────────────────────────────────────────────────
+// The title and the glass pill sit in TEXT_ZONE (labels:check proves every locale ends
+// inside it). check-hero-contrast renders the real bg + glow PNGs at 320/360/393dp and takes
+// the BRIGHTEST pixel in that zone: title and pill (white 16% on top) must clear 4.5:1 there.
 // Motion: 4s per scene, 600ms crossfade, a 1.00 → 1.05 zoom on the art. PAUSES when scrolled
 // away (`active`), in the background, and never starts under Reduce Motion (one still scene).
 export const OLI_BAR_H = 110
-export const FADE_COLOR = '#084B4A'
-export const FADE_ALPHA = 0.95
-export const FADE_HOLD = 0.56
-export const FADE_END = 0.62
+export const BG_DARK = '#084B4A'
+export const BG_LIGHT = '#58B5AE'
+export const BG_EASE = 2.5
+export const TEXT_ZONE = 0.56
 export const ART_ZONE = 0.4
+export const GLOW_SIZE = 130
+export const GLOW_CX = 0.8   // glow centre, as a fraction of the card width
+export const GLOW_CY = 0.6   // … and of its height
 export const TEXT_LEFT = 16
 export const PILL_PAD = 10
 export const OLI_FONT_CAP = 1.1
@@ -38,15 +42,16 @@ const rgba = (hex, a) => `rgba(${[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2)
 const PAGE = 16   // HomeScreen rBelow paddingHorizontal: the card is window − 2·16 wide
 
 const SCENES = [
-  { src: require('../../../assets/oli-scenes/welcome.png'),       bg: category.city.bg },
-  { src: require('../../../assets/oli-scenes/health.png'),        bg: category.health.bg },
-  { src: require('../../../assets/oli-scenes/emergency.png'),     bg: category.health.bg },
-  { src: require('../../../assets/oli-scenes/events.png'),        bg: category.explore.bg },
-  { src: require('../../../assets/oli-scenes/accommodation.png'), bg: category.homeLife.bg },
-  { src: require('../../../assets/oli-scenes/services.png'),      bg: category.homeLife.bg },
-  { src: require('../../../assets/oli-scenes/pets.png'),          bg: colors.primaryLight },
+  require('../../../assets/oli-scenes/welcome.png'),
+  require('../../../assets/oli-scenes/health.png'),
+  require('../../../assets/oli-scenes/emergency.png'),
+  require('../../../assets/oli-scenes/events.png'),
+  require('../../../assets/oli-scenes/accommodation.png'),
+  require('../../../assets/oli-scenes/services.png'),
+  require('../../../assets/oli-scenes/pets.png'),
 ]
-const RAMP = require('../../../assets/oli-scenes/fade-ramp.png')
+const BG = require('../../../assets/oli-scenes/oli-bg.png')
+const GLOW = require('../../../assets/oli-scenes/oli-glow.png')
 const HOLD = 4000
 const FADE = 600
 const ZOOM = 1.05
@@ -111,19 +116,15 @@ export default function OliBar({ lang, onPress, active = true, barRef }) {
   return (
     <TouchableOpacity ref={barRef} collapsable={false} onPress={onPress} activeOpacity={press.card}
       accessibilityRole="button" accessibilityLabel={`${title}. ${pill}`} style={s.card}>
-      {SCENES.map((sc, i) => (
-        <Animated.View key={i} pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { backgroundColor: sc.bg, opacity: opacity[i] }]}>
-          <Animated.Image source={sc.src} resizeMode="contain" accessibilityIgnoresInvertColors
-            style={[frame(sc.src, cardW), { transform: [{ scale: scale[i] }] }]} />
-        </Animated.View>
+      <Image source={BG} resizeMode="stretch" pointerEvents="none" style={s.fill} />
+      <Image source={GLOW} pointerEvents="none" style={[s.glow, {
+        left: cardW * GLOW_CX - GLOW_SIZE / 2, top: OLI_BAR_H * GLOW_CY - GLOW_SIZE / 2 }]} />
+      {SCENES.map((src, i) => (
+        <Animated.Image key={i} source={src} resizeMode="contain" accessibilityIgnoresInvertColors pointerEvents="none"
+          style={[frame(src, cardW), { opacity: opacity[i], transform: [{ scale: scale[i] }] }]} />
       ))}
 
-      <View pointerEvents="none" style={[s.fadeSolid, { width: `${FADE_HOLD * 100}%` }]} />
-      <Image source={RAMP} resizeMode="stretch" pointerEvents="none"
-        style={[s.fadeRamp, { left: `${FADE_HOLD * 100}%`, width: `${(FADE_END - FADE_HOLD) * 100}%` }]} />
-
-      <View style={[s.text, { width: `${FADE_HOLD * 100}%` }]} pointerEvents="none">
+      <View style={[s.text, { width: `${TEXT_ZONE * 100}%` }]} pointerEvents="none">
         <Text style={s.title} numberOfLines={1} maxFontSizeMultiplier={cap}>{title}</Text>
         <View style={s.pill}>
           <Text style={s.pillText} numberOfLines={1} maxFontSizeMultiplier={cap}>{pill}</Text>
@@ -141,9 +142,9 @@ export default function OliBar({ lang, onPress, active = true, barRef }) {
 }
 
 const s = StyleSheet.create({
-  card:      { height: OLI_BAR_H, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: colors.primaryLight },
-  fadeSolid: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: rgba(FADE_COLOR, FADE_ALPHA) },
-  fadeRamp:  { position: 'absolute', top: 0, bottom: 0, height: '100%' },
+  card:      { height: OLI_BAR_H, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: BG_DARK },
+  fill:      { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  glow:      { position: 'absolute', width: GLOW_SIZE, height: GLOW_SIZE },
   text:      { position: 'absolute', top: 0, bottom: 0, left: 0, paddingLeft: TEXT_LEFT, justifyContent: 'center', gap: 10 },
   title:     { fontSize: 20, lineHeight: 26, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   pill:      { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -151,7 +152,7 @@ const s = StyleSheet.create({
                backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' },
   pillText:  { fontSize: 13, lineHeight: 17, fontFamily: 'Inter_500Medium', color: '#FFFFFF', flexShrink: 1 },
   dots:      { position: 'absolute', right: 12, bottom: 8, flexDirection: 'row', gap: 3, paddingHorizontal: 5,
-               paddingVertical: 4, borderRadius: radii.pill, backgroundColor: rgba(FADE_COLOR, 0.45) },
+               paddingVertical: 4, borderRadius: radii.pill, backgroundColor: rgba(BG_DARK, 0.45) },
   dot:       { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.55)' },
   dotOn:     { width: 9, backgroundColor: '#FFFFFF' },
 })

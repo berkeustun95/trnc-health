@@ -378,12 +378,18 @@ const RGEOM = {
   tileCapN:   constNum('components/home/redesign/Widgets.js', 'TILE_FONT_CAP_NARROW'),
   chipCap:    constNum('components/home/redesign/RedesignHero.js', 'CHIP_CAP'),
   chipCapN:   constNum('components/home/redesign/RedesignHero.js', 'CHIP_CAP_NARROW'),
+  chipPad:    constNum('components/home/redesign/RedesignHero.js', 'CHIP_PAD'),
+  chipGap:    constNum('components/home/redesign/RedesignHero.js', 'CHIP_GAP'),
+  infoIcon:   constNum('components/home/redesign/RedesignHero.js', 'INFO_ICON'),
+  wxPad:      constNum('components/home/redesign/RedesignHero.js', 'WX_PAD'),
+  wxIcon:     constNum('components/home/redesign/RedesignHero.js', 'WX_ICON'),
+  rowGap:     constNum('components/home/redesign/RedesignHero.js', 'ROW_GAP'),
   bandPad:    num('components/home/redesign/Widgets.js', 'band', 'paddingHorizontal'),
   tileH:      constNum('components/home/redesign/Widgets.js', 'TILE_H'),
   tileHA:     constNum('components/home/redesign/Widgets.js', 'TILE_H_ALERT'),
   arrowW:     constNum('components/home/redesign/Widgets.js', 'ARROW_W'),
   oliH:       constNum('components/home/redesign/OliBar.js', 'OLI_BAR_H'),
-  fadeHold:   constNum('components/home/redesign/OliBar.js', 'FADE_HOLD'),
+  fadeHold:   constNum('components/home/redesign/OliBar.js', 'TEXT_ZONE'),
   textLeft:   constNum('components/home/redesign/OliBar.js', 'TEXT_LEFT'),
   pillPad:    constNum('components/home/redesign/OliBar.js', 'PILL_PAD'),
   oliCap:     constNum('components/home/redesign/OliBar.js', 'OLI_FONT_CAP'),
@@ -413,6 +419,10 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
   const { untilTr } = await import('../utils/turkishTime.js')
   const { WEATHER_LABEL_KEY } = await import('../utils/facilityUtils.js')
   const UNTILS = ['00:00', '19:00', '20:00', '22:00']
+  // region → landmark, read from homeHero.js TEXT (it requires images, so it cannot be imported)
+  const HERO_LANDMARKS = {}
+  for (const m of read('constants/homeHero.js').matchAll(/^  ([a-z_]+): \{[\s\S]*?landmark: '([^']+)'/gm)) HERO_LANDMARKS[m[1]] = m[2]
+  if (Object.keys(HERO_LANDMARKS).length < 5) problems.push(`redesign: read only ${Object.keys(HERO_LANDMARKS).length} hero landmarks from homeHero.js`)
   let rTight = { spare: Infinity }
   const rAssess = (w, str, px, cap, scale, box, where, cursive, lines) => {
     use(w); checked++
@@ -452,8 +462,8 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
       fitH(R.tileHA, [[tileText(600, t('stripDutyTitle', L), 13, rTitle(W)), 17], [tileText(600, t(k, L), 12, rBand(W)), 16]], `${at} duty:${k} height`)
     }
     rAssess(700, '112 · 155 · 199', 12, tCap(W), S, rCard(W) - 10 - 28 - 6 - 12, `${at} emergency:corner`, false, 1)
-    // Oli bar (full scene): the fade's contrast holds only on its SOLID part, so the title
-    // (20/700 × 1) and the pill must END inside it: zone = card · FADE_HOLD − TEXT_LEFT, card =
+    // Oli bar (full scene): contrast is proven only inside TEXT_ZONE (check-hero-contrast), so the
+    // title (20/700 × 1) and the pill must END inside it: zone = card · TEXT_ZONE − TEXT_LEFT, card =
     // W − 2·page. Pill = text 13/500 + gap 4 + arrow icon 14 (icons do not scale) + 2·PILL_PAD
     // + 2 border. Height: title 26 + gap 10 + pill (17 + 12 + 2) inside the card, 8pt clear.
     const oCap = W < 350 ? R.oliCapN : R.oliCap
@@ -464,19 +474,30 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
       const c = Math.min(S, oCap), h = 26 * c + 10 + 17 * c + 14
       if (h > R.oliH - 16 + 0.01) problems.push(`${at} oli: text block needs ${h.toFixed(1)}pt, the card has ${R.oliH - 16}`)
     }
-    // Hero row: the DISTRICT and the TEMPERATURE never shrink; the landmark and the condition
-    // ellipsize to "· …". What must fit is the district beside those minimums:
-    //   left  = pad 22 + pin 13 + 5 + [district] + 5 + "·" + 5 + "…" + gap 8 + "i" 26
-    //   right = pad 22 + icon 14 + 5 + "-12°" + 5 + "·" + 5 + "…"   ·  + 2 row gaps of 8
+    // Hero row (weather chip = icon + temperature only). At 360dp and up the WHOLE
+    // "{district} · {landmark}" must fit, each district with ITS OWN landmark (homeHero.js);
+    // below 360 only the landmark may ellipsize, so the district alone must fit.
+    //   location = 2·CHIP_PAD + 3·CHIP_GAP + district + "·" + landmark + INFO_ICON
+    //   weather  = 2·WX_PAD + WX_ICON + 4 + "-12°"   ·  + ROW_GAP (space-between, one gap)
     {
       use(600)
       const cCap = W < 350 ? R.chipCapN : R.chipCap
       const eff = 12 * Math.min(S, cCap)
       const wd = str => width(str, eff)
-      const fixed = 22 + 13 + 5 + 5 + wd('·') + 5 + wd('…') + 8 + 26
-                  + 22 + 14 + 5 + wd('-12°') + 5 + wd('·') + 5 + wd('…') + 16
-      for (const key of Object.values(REGION_LABEL_KEY)) {
-        rAssess(600, t(key, L), 12, cCap, S, W - 32 - fixed, `${at} heroRow:${key}`, cur, 1)
+      const fixed = 2 * R.chipPad + 3 * R.chipGap + R.infoIcon + 2 * R.wxPad + R.wxIcon + 4 + wd('-12°') + R.rowGap
+      const box = W - 32 - fixed
+      for (const [region, key] of Object.entries(REGION_LABEL_KEY)) {
+        const lm = HERO_LANDMARKS[region]
+        // FULL text: at 360dp+ at default size, and at 393dp+ at every size. At 360dp with the
+        // largest font the landmark may ellipsize (keeping the chip's 1.2 cap for large-text
+        // users was chosen over a ~1.05 cap that would fit it) — the district must still fit.
+        if (lm && (W >= 393 || (W >= 360 && S === 1.0))) {
+          const need = wd(t(key, L)) + wd('·') + wd(lm)
+          if (need > box + 0.01) problems.push(`${at} heroRow:${region}: "${t(key, L)} · ${lm}" needs ${need.toFixed(1)}pt, has ${box.toFixed(1)}pt`)
+          checked++
+        } else {
+          rAssess(600, t(key, L), 12, cCap, S, box - wd('·') - wd('…'), `${at} heroRow:${key}`, cur, 1)
+        }
       }
     }
   }

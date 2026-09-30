@@ -16,10 +16,10 @@ import { rampLayers } from '../HomeHero'
 // the weather tile left Home; the chip opens the weather sheet). No greeting, no search.
 //
 // ─── WHEN THE ROW IS TIGHT ──────────────────────────────────────────────────
-// The district and the temperature NEVER shrink. The landmark and the condition do, both
-// ellipsizing (flexShrink 1). labels:check measures the unshrinkable minimum —
-// district + temperature — at 320dp × font scale 1.3. The full text is in both chips'
-// accessibility labels and in the weather sheet.
+// The weather chip is icon + temperature only and never shrinks. The location chip gets the
+// rest: at 360dp+ "{district} · {landmark}" fits whole in all 9 locales (at 393dp+ at every
+// font size); on narrower phones, or at 360dp with the largest font, ONLY the landmark
+// ellipsizes. labels:check measures each district with its own landmark.
 //
 // Kept from V2: the district photo (resolveHero), the tap-through to the pictured place,
 // the photo-credit sheet, the wordmark.
@@ -36,6 +36,14 @@ export const HERO_MIN_BODY = 176
 export const HERO_PILL_ALPHA = 0.6
 export const CHIP_CAP = 1.2   // large system text: the chip grows at most 1.2×
 export const CHIP_CAP_NARROW = 1.0   // below 350dp the row cannot take growth (Gazimağusa + temp)
+// Chip geometry, read by labels:check. Location: pad 2·CHIP_PAD, gaps CHIP_GAP, the inline "i".
+// Weather: pad 2·WX_PAD, icon, gap, temperature. One ROW_GAP between them (space-between).
+export const CHIP_PAD = 11
+export const CHIP_GAP = 5
+export const INFO_ICON = 15
+export const WX_PAD = 9
+export const WX_ICON = 14
+export const ROW_GAP = 8
 
 const TOP = rampLayers(0.32)
 const BOTTOM = rampLayers(0.35)
@@ -107,10 +115,13 @@ export default function RedesignHero({
       </View>
 
       <View style={s.chipRow} pointerEvents="box-none">
-        {/* "{district} · {landmark}". The landmark is a Turkish proper name in every locale
-            and is the ONLY part allowed to ellipsize: the district never shrinks. */}
-        <View style={s.chip} accessibilityRole="text" accessibilityLabel={landmark ? `${district}, ${landmark}` : district}>
-          <Ionicons name="location" size={13} color="#FFFFFF" />
+        {/* "{district} · {landmark}" with the photo-credit "i" INSIDE the chip: the whole chip
+            opens the credit sheet. At 360dp+ the full text fits in all 9 locales (labels:check);
+            the landmark — a Turkish proper name in every locale — is the only part that may
+            ellipsize, on narrower phones or at large font sizes. The district never shrinks. */}
+        <TouchableOpacity style={s.chip} disabled={!credit} onPress={() => setCreditOpen(true)} activeOpacity={0.8}
+          hitSlop={{ top: 9, bottom: 9 }} accessibilityRole={credit ? 'button' : 'text'}
+          accessibilityLabel={[district, landmark, credit ? t('heroCreditTitle', lang) : null].filter(Boolean).join(', ')}>
           <Text style={s.chipText} numberOfLines={1} maxFontSizeMultiplier={chipCap}>{district}</Text>
           {!!landmark && (
             <>
@@ -118,29 +129,16 @@ export default function RedesignHero({
               <Text style={[s.chipText, s.chipLandmark]} numberOfLines={1} ellipsizeMode="tail" maxFontSizeMultiplier={chipCap}>{landmark}</Text>
             </>
           )}
-        </View>
-        {!!credit && (
-          <TouchableOpacity style={s.info} onPress={() => setCreditOpen(true)}
-            hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
-            accessibilityRole="button" accessibilityLabel={t('heroCreditTitle', lang)}>
-            <Ionicons name="information" size={14} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
-        <View style={s.spacer} />
-        {/* No weather yet (loading, or the call failed — App.js leaves weatherData null) → no
-            chip. The weather sheet would have nothing to show either. */}
+          {!!credit && <Ionicons name="information-circle-outline" size={INFO_ICON} color="#FFFFFF" />}
+        </TouchableOpacity>
+        {/* Icon + temperature only; the condition is in the label and the weather sheet. No
+            weather yet (loading, or the call failed — weatherData stays null) → no chip. */}
         {!!temp && (
           <TouchableOpacity ref={weatherRef} collapsable={false} style={[s.chip, s.wxChip]} onPress={onOpenWeather}
             hitSlop={{ top: 8, bottom: 8 }} accessibilityRole="button"
-            accessibilityLabel={`${t('homeWeatherTitle', lang)}: ${temp}, ${cond}`}>
-            <Ionicons name={WEATHER_ION[weatherGroup(cur.symbol)] || 'thermometer'} size={14} color="#FFFFFF" />
+            accessibilityLabel={[t('homeWeatherTitle', lang), temp, cond].filter(Boolean).join(', ')}>
+            <Ionicons name={WEATHER_ION[weatherGroup(cur.symbol)] || 'thermometer'} size={WX_ICON} color="#FFFFFF" />
             <Text style={s.chipText} maxFontSizeMultiplier={chipCap}>{temp}</Text>
-            {!!cond && (
-              <>
-                <Text style={s.chipText} maxFontSizeMultiplier={chipCap}>·</Text>
-                <Text style={[s.chipText, s.chipLandmark]} numberOfLines={1} ellipsizeMode="tail" maxFontSizeMultiplier={chipCap}>{cond}</Text>
-              </>
-            )}
           </TouchableOpacity>
         )}
       </View>
@@ -159,14 +157,11 @@ const s = StyleSheet.create({
               flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   logo:     { width: 40, height: 44 },
   actions:  { flexDirection: 'row', gap: 8 },
-  chipRow:  { position: 'absolute', left: 16, right: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  chip:     { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
+  chipRow:  { position: 'absolute', left: 16, right: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: ROW_GAP },
+  chip:     { flexDirection: 'row', alignItems: 'center', gap: CHIP_GAP, flexShrink: 1,
               backgroundColor: `rgba(0,0,0,${HERO_PILL_ALPHA})`, borderRadius: 999,
-              paddingHorizontal: 11, paddingVertical: 6 },
+              paddingHorizontal: CHIP_PAD, paddingVertical: 6 },
   chipText: { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 0 },
   chipLandmark: { fontFamily: 'Inter_500Medium', flexShrink: 1 },
-  spacer:   { flexGrow: 1, flexShrink: 0, minWidth: 0 },
-  wxChip:   { flexShrink: 1 },
-  info:     { width: 26, height: 26, borderRadius: 13, backgroundColor: `rgba(0,0,0,${HERO_PILL_ALPHA})`,
-              justifyContent: 'center', alignItems: 'center' },
+  wxChip:   { flexShrink: 0, paddingHorizontal: WX_PAD, gap: 4 },
 })
