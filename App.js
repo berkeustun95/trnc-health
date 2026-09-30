@@ -26,6 +26,7 @@ import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE } from './constants/flags'
 import { REDESIGN } from './constants/redesign'
 import { FloatingTabBar, TabBarPad } from './components/ui'
+import { font } from './constants/theme'
 import { REGION_TO_DUTY } from './constants/regions'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
 import ScreenHeader from './components/ScreenHeader'
@@ -111,6 +112,9 @@ import CityWelcomeSettings from './components/CityWelcomeSettings'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
 import OliSearchSheet from './components/OliSearchSheet'
+import { EmergencySheet, MunicipalSheet, LanguageSheet, AboutSheet } from './components/shell/Sheets'
+import { SettingsGroups, GuestProfile } from './components/shell/Settings'
+import { ConfirmDialog } from './components/ui'
 import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
@@ -409,6 +413,20 @@ class BLErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
+        REDESIGN ? (
+          <View style={{ flex: 1, padding: 24, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 17, lineHeight: 22, fontFamily: font.bold, color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>
+              {t('hrCrashTitle', this.props.lang)}
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: font.regular, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
+              {t('hrCrashBody', this.props.lang)}
+            </Text>
+            <TouchableOpacity onPress={() => this.setState({ hasError: false })} accessibilityRole="button"
+              style={{ minHeight: 48, paddingHorizontal: 20, justifyContent: 'center', backgroundColor: colors.primary, borderRadius: 12 }}>
+              <Text style={{ color: colors.onPrimary, fontFamily: font.semibold, fontSize: 15 }}>{t('back', this.props.lang)}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
         <View style={{ flex: 1, padding: 24, backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginBottom: 8 }}>Something went wrong</Text>
           <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 24 }}>Please go back and try again.</Text>
@@ -416,6 +434,7 @@ class BLErrorBoundary extends Component {
             <Text style={{ color: '#fff', fontWeight: 'bold' }}>Go Back</Text>
           </TouchableOpacity>
         </View>
+        )
       )
     }
     return this.props.children
@@ -623,6 +642,11 @@ export default function App() {
   const [openedDorm, setOpenedDorm] = useState(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
+  // ─── Redesign Slice 2 (shell) ───────────────────────────────────────────────
+  const [showAboutSheet, setShowAboutSheet] = useState(false)
+  const [signOutAsk, setSignOutAsk] = useState(null)       // null | 'guest' | 'user'
+  const [notifClearAsk, setNotifClearAsk] = useState(false)
+  const [notifClearError, setNotifClearError] = useState(null)
   // Ask Oli's sheet is a root overlay now, not a <Modal>: the root has to know it is
   // up (to hide the app content from the a11y tree) and how to close it (hardware back).
   const [oliSheetOpen, setOliSheetOpen] = useState(false)
@@ -657,6 +681,7 @@ export default function App() {
   const filterBarRef       = useRef(null)
   const dutyBannerRef      = useRef(null)
   const mapTabRef          = useRef(null)
+  const profileTabRef      = useRef(null)   // redesign: coach mark on the Profil tab
   const menuAnim = useRef(new Animated.Value(260)).current
   const sessionRef = useRef(null)
   const toSignUpRef = useRef(false)
@@ -686,11 +711,13 @@ export default function App() {
 
     // On-screen basics only. The drawer is now settings, not navigation, so the
     // menu step just highlights the button — it never opens the drawer.
-    const [menuBtn, search, duty, map] = await Promise.all([
-      measureRef(hamburgerRef),
+    // Redesign: no drawer, so no menu step; the Profil tab (where settings now live) gets one.
+    const [menuBtn, search, duty, map, profileTab] = await Promise.all([
+      REDESIGN ? null : measureRef(hamburgerRef),
       measureRef(searchRef),
       measureRef(dutyBannerRef),
       measureRef(mapTabRef),
+      REDESIGN ? measureRef(profileTabRef) : null,
     ])
 
     const steps = []
@@ -706,6 +733,7 @@ export default function App() {
     // AT that tab; describing health facilities while it reads Keşfet is half-swapped.
     if (map)     steps.push({ ...map,     title: t(EXPLORE_MAP_LIVE ? 'coachExploreTitle' : 'coachMapTitle', lang),
                                           body:  t(EXPLORE_MAP_LIVE ? 'coachExploreBody'  : 'coachMapBody',  lang) })
+    if (profileTab) steps.push({ ...profileTab, title: t('hrCoachProfileTitle', lang), body: t('hrCoachProfileBody', lang) })
     if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
   }
 
@@ -991,8 +1019,15 @@ export default function App() {
   }
 
   async function clearAllNotifs() {
-    await supabase.from('notifications').delete().eq('user_id', session.user.id)
+    const { error } = await supabase.from('notifications').delete().eq('user_id', session.user.id)
+    if (error) throw error
     setNotifications([])
+  }
+  // Redesign: "Clear all" asks first and reports a failure instead of pretending.
+  async function confirmClearAllNotifs() {
+    setNotifClearError(null)
+    try { await clearAllNotifs(); setNotifClearAsk(false) }
+    catch { setNotifClearError(t('hrClearFailed', lang)) }
   }
 
   async function markNotifRead(item) {
@@ -1878,7 +1913,7 @@ export default function App() {
       lang={lang}
       onBack={closeNotifs}
       onMarkAllRead={markAllNotifsRead}
-      onClearAll={clearAllNotifs}
+      onClearAll={REDESIGN ? () => { setNotifClearError(null); setNotifClearAsk(true) } : () => clearAllNotifs().catch(() => {})}
       onMarkRead={markNotifRead}
       onNotifPress={() => setShowDutyList(true)}
     />
@@ -1980,7 +2015,7 @@ export default function App() {
     content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
   } else if (showExploreBeach) {
     content = (
-      <BLErrorBoundary>
+      <BLErrorBoundary lang={lang}>
         <ExploreScreen lang={lang} onBack={closeExploreBeach} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} onAdNavigate={openAdRoute} placeOverlay={explorePlaceEl} backRef={exploreBackRef} />
       </BLErrorBoundary>
     )
@@ -1989,7 +2024,7 @@ export default function App() {
     // never reach HomeScreen so it's moot for the tile path). Dark today → Coming Soon, whose
     // Notify-me upserts module='explore' into module_waitlist (shape-guard accepts it now).
     content = (MODULE_FLAGS.explore || isAdmin) ? (
-      <BLErrorBoundary>
+      <BLErrorBoundary lang={lang}>
         <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} onAdNavigate={openAdRoute} placeOverlay={explorePlaceEl} backRef={exploreBackRef} />
       </BLErrorBoundary>
     ) : (
@@ -2022,7 +2057,7 @@ export default function App() {
     )
   } else if (adminPreview === 'explore') {
     content = (
-      <BLErrorBoundary>
+      <BLErrorBoundary lang={lang}>
         <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     )
@@ -2299,6 +2334,20 @@ export default function App() {
       { key: 'tutorial',     iconSet: 'ionicons', icon: 'compass-outline',           labelKey: 'menuTutorial',     dividerBefore: true, onPress: () => { closeMenu(); startCoachMarks() } },
       { key: 'signOut',      iconSet: 'feather',  icon: 'log-out',                   labelKey: 'signOut',          danger: true, onPress: () => supabase.auth.signOut() },
     ].filter(i => i.visible !== false)
+    // Profil's settings rows (redesign). Every handler is App's own, so a setting behaves
+    // the same wherever it is reached; the drawer that used to hold them is not rendered.
+    const settingsActions = {
+      onLanguage:      () => setShowLangModal(true),
+      onCityWelcome:   () => setShowCitySettings(true),
+      onNotifications: () => { if (requireAccount('gateNotifications')) return; setShowNotifs(true) },
+      onContact:       () => Linking.openURL(`mailto:getadaapp@gmail.com?subject=${encodeURIComponent('ADA Feedback')}`).catch(() => {}),
+      onRate:          rateApp,
+      onShare:         shareApp,
+      onTutorial:      () => startCoachMarks(),
+      onLegal:         () => setShowLegal(true),
+      onAbout:         () => setShowAboutSheet(true),
+      onSignOut:       () => setSignOutAsk(isGuest(session) ? 'guest' : 'user'),
+    }
     content = (
       <View style={{ flex: 1 }}>
 
@@ -2320,7 +2369,7 @@ export default function App() {
             searchRef={searchRef}
 
             dutyBannerRef={dutyBannerRef}
-            onOpenMenu={openMenu}
+            onOpenMenu={REDESIGN ? undefined : openMenu}
             onShowNotifs={() => { if (requireAccount('gateNotifications')) return; setShowNotifs(true) }}
             onShowDutyList={() => setShowDutyList(true)}
             onSelectFacility={setSelectedFacility}
@@ -2393,7 +2442,7 @@ export default function App() {
             {/* Boundary: a render throw here once unmounted the whole root — a black screen
                 with nothing to tap (walk-mode crash, 2026-09). Go Back remounts the map. */}
             {EXPLORE_MAP_LIVE ? (
-              <BLErrorBoundary>
+              <BLErrorBoundary lang={lang}>
               <ExploreMapScreen
                 // The directory's second entrance — see the prop's note in that file. It
                 // opens the SAME ExploreScreen the Home tile opens, so the tile can be
@@ -2440,9 +2489,15 @@ export default function App() {
             small number of the 208 users lose a saved list silently, and no query exists that
             could have told us whether anyone used it. */}
 
-        {activeTab === 'profile' && (
+        {activeTab === 'profile' && REDESIGN && isGuest(session) && (
+          <GuestProfile lang={lang} a={settingsActions} onCreateAccount={gateSignUp} />
+        )}
+        {activeTab === 'profile' && !(REDESIGN && isGuest(session)) && (
           <MaybeTabBarPad>
           <ProfileScreen
+            settingsSlot={REDESIGN ? (({ onDeleteAccount }) => (
+              <SettingsGroups lang={lang} a={{ ...settingsActions, onDeleteAccount }} />
+            )) : null}
             session={session}
             lang={lang}
             onBack={() => setActiveTab('home')}
@@ -2455,7 +2510,7 @@ export default function App() {
 
         {(() => {
           const onTabPress = tab => {
-            if (tab === 'profile' && requireAccount('gateProfile')) return
+            if (!REDESIGN && tab === 'profile' && requireAccount('gateProfile')) return
             // Leaving Profile with unsaved edits asks first — the same guard as its back button.
             if (activeTab === 'profile' && tab !== 'profile' && profileGuardRef.current) {
               profileGuardRef.current.leave(() => { setMapRoutesMode(false); setActiveTab(tab) }); return
@@ -2465,7 +2520,7 @@ export default function App() {
           }
           return REDESIGN
             ? <FloatingTabBar tabs={TAB_ITEMS} activeTab={activeTab} onTabPress={onTabPress}
-                refs={{ map: mapTabRef }} lang={lang} />
+                refs={{ map: mapTabRef, profile: profileTabRef }} lang={lang} />
             : <BottomTabBar activeTab={activeTab} onTabPress={onTabPress} mapTabRef={mapTabRef} lang={lang} />
         })()}
 
@@ -2500,7 +2555,8 @@ export default function App() {
         </Animated.View>
         )}
 
-        <Modal visible={showLangModal} transparent animationType="fade" onRequestClose={() => setShowLangModal(false)}>
+        {REDESIGN && <LanguageSheet visible={showLangModal} onClose={() => setShowLangModal(false)} lang={lang} onSelect={selectLang} />}
+        <Modal visible={!REDESIGN && showLangModal} transparent animationType="fade" onRequestClose={() => setShowLangModal(false)}>
           <TouchableOpacity style={styles.emergencyBackdrop} activeOpacity={1} onPress={() => setShowLangModal(false)}>
             <View style={styles.emergencySheet} onStartShouldSetResponder={() => true}>
               <View style={styles.emergencyHeader}>
@@ -2682,7 +2738,11 @@ export default function App() {
           : <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} hideFab={HOME_V2_LIVE} />
       )}
 
-      {showEmergencyModal && (
+      {REDESIGN && (
+        <EmergencySheet visible={showEmergencyModal} onClose={() => setShowEmergencyModal(false)} lang={lang}
+          onShowTowing={() => setShowTowing(true)} />
+      )}
+      {!REDESIGN && showEmergencyModal && (
         <SheetOverlay onDismiss={() => setShowEmergencyModal(false)}>
           <View style={styles.emergencySheet}>
             <View style={styles.emergencyHeader}>
@@ -2740,7 +2800,10 @@ export default function App() {
           force block short-circuiting the selector — this one is not, so it says so itself.
           Closing the hole by construction rather than by reasoning about which deep links
           can still fire, which is the same argument the force allow-list is built on. */}
-      {showMunicipalModal && updateTier !== 'force' && (
+      {REDESIGN && (
+        <MunicipalSheet visible={showMunicipalModal && updateTier !== 'force'} onClose={() => setShowMunicipalModal(false)} lang={lang} />
+      )}
+      {!REDESIGN && showMunicipalModal && updateTier !== 'force' && (
         <SheetOverlay onDismiss={() => setShowMunicipalModal(false)}>
           <View style={[styles.emergencySheet, { maxHeight: Dimensions.get('window').height * 0.75 }]}>
             <View style={styles.emergencyHeader}>
@@ -2845,6 +2908,46 @@ export default function App() {
         onSignUp={() => { setProfileGateKey(null); setSelectedFacility(null); setGateHealthList(false) }}
         onClose={() => setProfileGateKey(null)}
       />
+
+      {REDESIGN && (
+        <>
+          <AboutSheet visible={showAboutSheet} onClose={() => setShowAboutSheet(false)} lang={lang} />
+          {/* Sign-out asks first. A GUEST loses the anonymous account for good, so the guest
+              version leads with "Hesap oluştur" and names the loss. */}
+          <ConfirmDialog
+            visible={signOutAsk === 'guest'}
+            title={t('hrSignOutGuestTitle', lang)}
+            message={t('hrSignOutGuestBody', lang)}
+            cancelLabel={t('uiNevermind', lang)}
+            actions={[
+              { label: t('hrGuestTitle', lang), variant: 'primary', onPress: () => { setSignOutAsk(null); gateSignUp() } },
+              { label: t('hrSignOutAnyway', lang), variant: 'danger', onPress: () => { setSignOutAsk(null); supabase.auth.signOut() } },
+            ]}
+            onCancel={() => setSignOutAsk(null)}
+            lang={lang}
+          />
+          <ConfirmDialog
+            visible={signOutAsk === 'user'}
+            title={t('hrSignOutTitle', lang)}
+            confirmLabel={t('signOut', lang)}
+            destructive
+            onConfirm={() => { setSignOutAsk(null); supabase.auth.signOut() }}
+            onCancel={() => setSignOutAsk(null)}
+            lang={lang}
+          />
+          <ConfirmDialog
+            visible={notifClearAsk}
+            title={t('hrClearAllTitle', lang)}
+            message={t('hrClearAllBody', lang)}
+            error={notifClearError}
+            confirmLabel={t('clearAll', lang)}
+            destructive
+            onConfirm={confirmClearAllNotifs}
+            onCancel={() => setNotifClearAsk(false)}
+            lang={lang}
+          />
+        </>
+      )}
 
       <AccountRequiredSheet
         visible={!!gateKey}

@@ -5,6 +5,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
+import { REDESIGN } from '../constants/redesign'
+import { ScreenHeader, Button, EmptyState, RowSkeleton } from '../components/ui'
+import { colors as C, type, radii, elevation, press } from '../constants/theme'
 
 function timeAgo(isoString) {
   const diff = Date.now() - new Date(isoString).getTime()
@@ -30,7 +33,80 @@ function timeAgo(isoString) {
 // destination means putting a target on the notifications table, which is a schema change
 // and a decision about every notification type, not just messages.
 
-export default function NotificationsScreen({ notifications, loading, lang, onBack, onMarkAllRead, onClearAll, onNotifPress, onMarkRead }) {
+// Redesign: localised "time ago" (was hardcoded m / h / d in every language).
+function timeAgoLocal(isoString, lang) {
+  const mins = Math.max(0, Math.floor((Date.now() - new Date(isoString).getTime()) / 60000))
+  if (mins < 1) return t('hrAgoNow', lang)
+  if (mins < 60) return t('hrAgoMin', lang).replace('{n}', String(mins))
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return t('hrAgoHour', lang).replace('{n}', String(hrs))
+  return t('hrAgoDay', lang).replace('{n}', String(Math.floor(hrs / 24)))
+}
+
+// Duty notices are still recognised by title keywords: notifications has no type column
+// (checked live, 2026-09-30 — every candidate name is 42703), and adding one is a migration,
+// which this branch may not make. Listed for Berke; shared by both layouts.
+const DUTY_KEYWORDS = ['duty', 'nöbetçi', 'مناوبة', 'дежурн', 'εφημερεύ', 'garde', 'guardia', 'notdienst', 'نوبتی']
+const isDutyNotice = item => DUTY_KEYWORDS.some(kw => (item.title ?? '').toLowerCase().includes(kw))
+
+function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAllRead, onClearAll, onNotifPress, onMarkRead }) {
+  const listMem = useScrollMemory('notifs')
+  const unread = notifications.filter(n => !n.read).length
+  return (
+    <SafeAreaView style={r.safe} edges={['top']}>
+      <ScreenHeader title={t('notifications', lang)} onBack={onBack} lang={lang} />
+      {notifications.length > 0 && (
+        <View style={r.actions}>
+          {unread > 0
+            ? <Button variant="text" icon="checkmark-done-outline" title={t('markAllRead', lang)} onPress={onMarkAllRead} />
+            : <Button variant="text" icon="trash-outline" title={t('clearAll', lang)} onPress={onClearAll} />}
+        </View>
+      )}
+      {loading ? (
+        <View style={r.list}><RowSkeleton count={5} /></View>
+      ) : notifications.length === 0 ? (
+        <EmptyState icon="notifications-outline" category="city" title={t('noNewNotifications', lang)} />
+      ) : (
+        <FlatList
+          {...listMem}
+          data={notifications}
+          keyExtractor={item => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={r.list}
+          renderItem={({ item }) => {
+            const duty = isDutyNotice(item)
+            return (
+              <TouchableOpacity
+                style={[r.card, elevation.card]}
+                activeOpacity={press.card}
+                accessibilityRole="button"
+                accessibilityState={{ selected: !item.read }}
+                onPress={() => { onMarkRead?.(item); if (duty) onNotifPress?.(item) }}
+              >
+                {/* One unread colour app-wide: dangerInk, the same as the bell's badge. */}
+                <View style={[r.dot, item.read && r.dotRead]} />
+                <View style={{ flex: 1 }}>
+                  <View style={r.top}>
+                    <Text style={[r.title, !item.read && r.titleUnread]} numberOfLines={2}>{item.title}</Text>
+                    <Text style={r.time}>{timeAgoLocal(item.created_at, lang)}</Text>
+                  </View>
+                  <Text style={r.body}>{item.body}</Text>
+                  {duty && <Text style={r.hint}>{t('tapViewDuty', lang)}</Text>}
+                </View>
+              </TouchableOpacity>
+            )
+          }}
+        />
+      )}
+    </SafeAreaView>
+  )
+}
+
+export default function NotificationsScreen(props) {
+  return REDESIGN ? <NotificationsRedesign {...props} /> : <NotificationsLegacy {...props} />
+}
+
+function NotificationsLegacy({ notifications, loading, lang, onBack, onMarkAllRead, onClearAll, onNotifPress, onMarkRead }) {
   // Back from the duty list (opened from a notification, on top of this screen) lands at the
   // same scroll; App forgets it when notifications close (slice 10).
   const listMem = useScrollMemory('notifs')
@@ -76,7 +152,7 @@ export default function NotificationsScreen({ notifications, loading, lang, onBa
           contentContainerStyle={s.list}
           renderItem={({ item }) => {
             const title = item.title ?? ''
-            const isDuty = ['duty', 'nöbetçi', 'مناوبة', 'дежурн', 'εφημερεύ', 'garde', 'guardia', 'notdienst', 'نوبتی'].some(kw => title.toLowerCase().includes(kw))
+            const isDuty = isDutyNotice(item)
             return (
               <TouchableOpacity
                 style={[s.card, !item.read && s.cardUnread]}
@@ -124,4 +200,20 @@ const s = StyleSheet.create({
   cardTime:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   cardBodyText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18 },
   tapHint:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary, marginTop: 6 },
+})
+
+const r = StyleSheet.create({
+  safe:        { flex: 1, backgroundColor: C.canvas },
+  actions:     { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 8 },
+  list:        { paddingHorizontal: 16, paddingBottom: 32 },
+  card:        { backgroundColor: C.card, borderRadius: radii.md, padding: 14, marginBottom: 8,
+                 flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  dot:         { width: 9, height: 9, borderRadius: 4.5, backgroundColor: C.dangerInk, marginTop: 6 },
+  dotRead:     { backgroundColor: 'transparent' },
+  top:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 4 },
+  title:       { ...type.rowTitle, fontFamily: 'Inter_500Medium', color: C.textPrimary, flex: 1 },
+  titleUnread: { fontFamily: 'Inter_600SemiBold' },
+  time:        { ...type.caption, color: C.textSecondary },
+  body:        { ...type.small, color: C.textSecondary },
+  hint:        { ...type.meta, fontFamily: 'Inter_600SemiBold', color: C.primaryDark, marginTop: 6 },
 })

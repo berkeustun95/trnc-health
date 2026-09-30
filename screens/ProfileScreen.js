@@ -135,7 +135,7 @@ function draftFromRow(row) {
   }
 }
 
-export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange, guardRef = null }) {
+export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange, guardRef = null, settingsSlot = null }) {
   const [profile, setProfile]               = useState(null)
   const [form, setForm]                     = useState({
     first_name: '', last_name: '', display_name: '',
@@ -1390,6 +1390,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             </View>
           )}
 
+          {/* Redesign: Profil is the one settings place. App.js passes the grouped rows
+              (Tercihler · Destek · Yasal · Hesap); Legal then mounts only in App.js, and
+              sign-out asks first. The delete modal below is still this screen's. */}
+          {settingsSlot ? settingsSlot({ onDeleteAccount: () => { setDeleteError(null); setDeleteConfirmVisible(true) } }) : (<>
           <View style={s.legalRow}>
             <TouchableOpacity onPress={() => setLegalTab('privacy')}>
               <Text style={s.legalLink}>{t('privacyPolicy', lang)}</Text>
@@ -1407,6 +1411,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           <TouchableOpacity style={s.deleteAccountBtn} onPress={() => { setDeleteError(null); setDeleteConfirmVisible(true) }}>
             <Text style={s.deleteAccountText}>{t('deleteAccount', lang)}</Text>
           </TouchableOpacity>
+          </>)}
 
           <Modal visible={deleteConfirmVisible} animationType="fade" transparent onRequestClose={() => setDeleteConfirmVisible(false)}>
             <View style={s.deleteModalBackdrop}>

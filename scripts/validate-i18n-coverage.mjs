@@ -278,6 +278,10 @@ const SURFACES = [
   'components/ui/ConfirmDialog.js',
   'components/ui/ScreenHeader.js',
   'components/ui/FloatingTabBar.js',
+  // Slice 2 (shell).
+  'components/shell/Sheets.js',
+  'components/shell/Settings.js',
+  'screens/NotificationsScreen.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
@@ -351,6 +355,8 @@ const SAME_AS_ENGLISH = {
   'uiMenu':               { French: 'Menu is French' },
   'notifications':        { French: 'Notifications is French' },
   'accomTabHotels':       { German: 'Hotels is German' },
+  'hrAboutVersion':       { French: 'Version is French', German: 'Version is German' },
+  'hrAboutUpdate':        { German: 'Update is the usual German word for an app update' },
   // Events dropdowns, 2026-09-28 — genuinely the same word in French.
   'ddDate':               { French: 'Date is French' },
   'ddDistrict':           { French: 'District is French' },
