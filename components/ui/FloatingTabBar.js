@@ -22,6 +22,14 @@ export function useTabBarFootprint() {
   return TAB_BAR_H + GAP_BELOW + Math.max(insets.bottom, 8)
 }
 
+// For tab screens that must not be covered (Keşfet map, Profil): pads by the footprint, so
+// their layout is exactly what it was above a docked bar. A component, not a hook call in
+// App: App.js renders its own SafeAreaProvider, so App's body has no insets to read.
+export function TabBarPad({ children }) {
+  const pad = useTabBarFootprint()
+  return <View style={{ flex: 1, paddingBottom: pad }}>{children}</View>
+}
+
 export default function FloatingTabBar({ tabs, activeTab, onTabPress, refs = {}, lang }) {
   const insets = useSafeAreaInsets()
   return (

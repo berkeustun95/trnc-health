@@ -23,7 +23,9 @@ import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, REDESIGN } from './constants/flags'
+import { FloatingTabBar, TabBarPad } from './components/ui'
+import { REGION_TO_DUTY } from './constants/regions'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
 import ScreenHeader from './components/ScreenHeader'
 import { promosAllowed } from './constants/homeStrip'
@@ -333,6 +335,29 @@ const tabBar = StyleSheet.create({
 
 // Gate the Welcome Video drawer row until a real video (and its playback tech)
 // exists. Kept false so the row does not render — flip to true once wired.
+// ─── Redesign helpers (module scope, so nothing here can meet the TDZ rule) ───
+// The floating bar covers content; Keşfet and Profil keep their docked-bar layout by
+// padding for it. Home scrolls under the bar and pads its own content.
+function MaybeTabBarPad({ children }) {
+  return REDESIGN ? <TabBarPad>{children}</TabBarPad> : children
+}
+
+// The closing time of the user's own duty district, else the most common one today.
+// open_until varies by district (00:00 in the four big towns, 22:00 Lefke/İskele, 20:00
+// Karpaz, 19:00 Mesarya — scripts/gen-duty-roster-sql.mjs), so one island-wide "until"
+// would be wrong somewhere.
+function dutyUntilFor(rows, region) {
+  if (!rows?.length) return null
+  const own = (REGION_TO_DUTY[region] ?? [])[0]
+  const mine = own && rows.find(r => r.region === own)?.open_until
+  const pick = mine || (() => {
+    const n = {}
+    for (const r of rows) if (r.open_until) n[r.open_until] = (n[r.open_until] || 0) + 1
+    return Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+  })()
+  return pick ? String(pick).slice(0, 5) : null
+}
+
 const WELCOME_VIDEO_LIVE = false
 
 // Garages / Auto Services dark-launch. Controls only the Home TILE's visibility;
@@ -464,6 +489,17 @@ export default function App() {
   // already depends on — so the banner can stop promising a list that is not there.
   // This does NOT settle which table is authoritative; that decision is still open.
   const [dutyRosterStatus, setDutyRosterStatus] = useState(DUTY_FRESH)
+  // ─── Redesign: the duty tile's own view of the same read ────────────────────
+  // `loaded` is what the old default could not say: dutyRosterStatus STARTS as fresh, so
+  // until the query answers every consumer is told the roster is healthy. The tile shows
+  // bones until loaded, and a real error (not "0 pharmacies") when the fetch fails.
+  // Rows are today's { region, open_until } — ~13 a day — so the tile can name the closing
+  // time of the user's own district. `date` lets a foreground after midnight re-read.
+  const [dutyToday, setDutyToday] = useState({ loaded: false, error: false, rows: [], date: null })
+  const [dutyRetry, setDutyRetry] = useState(0)
+  // Home's "Yürüyüş Rotaları" tile opens the Keşfet tab straight into routes mode. Cleared
+  // whenever the tab bar is used, so a later plain visit opens the map as usual.
+  const [mapRoutesMode, setMapRoutesMode] = useState(false)
   // City welcome: the pending decision, plus the region each deep-linked screen
   // should open pre-filtered to. Cleared on that screen's back, so a later manual
   // open is not still filtered to a city the user has since left.
@@ -1289,11 +1325,18 @@ export default function App() {
       const today = localDateKey()
       // `region`, not head:true+count. The coverage check needs the DISTRICTS, and a
       // head request returns no rows to count them from. It is ~13 rows a day.
-      const [{ data: dutyToday }, { data: dutyNewest }] = await Promise.all([
-        supabase.from('duty_list').select('region').eq('duty_date', today),
+      const [{ data: dutyToday, error: todayErr }, { data: dutyNewest, error: newestErr }] = await Promise.all([
+        supabase.from('duty_list').select('region, open_until').eq('duty_date', today),
         supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
       ])
       if (cancelled) return
+      // A failed read is NOT an empty roster. Before this, an error left both arrays null,
+      // which scored as ABSENT and blamed the roster for a network problem.
+      if (todayErr || newestErr) {
+        setDutyToday({ loaded: true, error: true, rows: [], date: today })
+        return
+      }
+      setDutyToday({ loaded: true, error: false, rows: dutyToday ?? [], date: today })
       setDutyRosterStatus(dutyStatus({
         todayCount: dutyToday?.length ?? 0,
         todayDistricts: new Set((dutyToday ?? []).map(r => r.region)).size,
@@ -1302,7 +1345,16 @@ export default function App() {
     }
     loadRosterHealth()
     return () => { cancelled = true }
-  }, [retryCount, session?.user?.id])
+  }, [retryCount, dutyRetry, session?.user?.id])
+
+  // "Bugün {n} eczane nöbette" must not survive midnight: on foreground, re-read when the
+  // local date has changed since the last read. Same-day foregrounds cost nothing.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', next => {
+      if (next === 'active' && dutyToday.date && dutyToday.date !== localDateKey()) setDutyRetry(n => n + 1)
+    })
+    return () => sub.remove()
+  }, [dutyToday.date])
 
   // Store-update check — cold start, and foreground after >30 min away.
   //
@@ -2317,11 +2369,21 @@ export default function App() {
               isGuest: isGuest(session),
               dateOfBirth: profile?.date_of_birth,
             })}
+            // ─── Redesign (dev bundles only until REDESIGN_LIVE) ─────────────────
+            dutySummary={{
+              loaded: dutyToday.loaded, error: dutyToday.error, status: dutyRosterStatus,
+              count: dutyToday.rows.length,
+              until: dutyUntilFor(dutyToday.rows, liveRegion || profile?.region || deviceRegion),
+            }}
+            onRetryDuty={() => { setDutyToday(d => ({ ...d, loaded: false })); setDutyRetry(n => n + 1) }}
+            onOpenExploreTab={() => setActiveTab('map')}
+            onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
           />
         )}
 
 
         {activeTab === 'map' && (
+          <MaybeTabBarPad>
           <SafeAreaView style={styles.safe} edges={['top']}>
             {/* MapScreen is NOT dead code and must not be deleted — it is the committed
                 behaviour of this tab and the thing users have today. EXPLORE_MAP_LIVE
@@ -2352,6 +2414,7 @@ export default function App() {
                 lang={lang}
                 session={session}
                 onRequireAccount={requireAccount}
+                initialRoutesMode={mapRoutesMode}
               />
               </BLErrorBoundary>
             ) : (
@@ -2365,6 +2428,7 @@ export default function App() {
               />
             )}
           </SafeAreaView>
+          </MaybeTabBarPad>
         )}
 
         {/* The Kaydedilenler tab was removed on 2026-09-11 with its branch. `favorites` and
@@ -2375,6 +2439,7 @@ export default function App() {
             could have told us whether anyone used it. */}
 
         {activeTab === 'profile' && (
+          <MaybeTabBarPad>
           <ProfileScreen
             session={session}
             lang={lang}
@@ -2383,21 +2448,24 @@ export default function App() {
             onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
             onAvatarChange={url => setProfile(prev => ({ ...prev, avatar_url: url }))}
           />
+          </MaybeTabBarPad>
         )}
 
-        <BottomTabBar
-          activeTab={activeTab}
-          onTabPress={tab => {
+        {(() => {
+          const onTabPress = tab => {
             if (tab === 'profile' && requireAccount('gateProfile')) return
             // Leaving Profile with unsaved edits asks first — the same guard as its back button.
             if (activeTab === 'profile' && tab !== 'profile' && profileGuardRef.current) {
-              profileGuardRef.current.leave(() => setActiveTab(tab)); return
+              profileGuardRef.current.leave(() => { setMapRoutesMode(false); setActiveTab(tab) }); return
             }
+            setMapRoutesMode(false)
             setActiveTab(tab)
-          }}
-          mapTabRef={mapTabRef}
-          lang={lang}
-        />
+          }
+          return REDESIGN
+            ? <FloatingTabBar tabs={TAB_ITEMS} activeTab={activeTab} onTabPress={onTabPress}
+                refs={{ map: mapTabRef }} lang={lang} />
+            : <BottomTabBar activeTab={activeTab} onTabPress={onTabPress} mapTabRef={mapTabRef} lang={lang} />
+        })()}
 
         {showMenu && (
           <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />

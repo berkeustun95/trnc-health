@@ -280,6 +280,7 @@ export default function ExploreMapScreen({
   // Route medals (ROUTE_MEDALS_LIVE): who is walking, and the guest sign-in gate.
   session = null,
   onRequireAccount,
+  initialRoutesMode = false,   // Home's "Yürüyüş Rotaları" tile (redesign) opens straight into routes
 }) {
   const { width, height } = useWindowDimensions()
   const mapRef = useRef(null)
@@ -304,7 +305,7 @@ export default function ExploreMapScreen({
   const [routeRows, setRouteRows]         = useState([])
   const [legRows, setLegRows]             = useState([])
   const [routesError, setRoutesError]     = useState(false)
-  const [routesMode, setRoutesMode]       = useState(snap?.routesMode ?? false)
+  const [routesMode, setRoutesMode]       = useState(snap?.routesMode ?? initialRoutesMode)
   const [selectedRoute, setSelectedRoute] = useState(null)
   // Walk mode ("Başla"): null, or { next, armed } — see walkAdvance() in constants/walkingRoutes.
   const [walk, setWalk] = useState(null)

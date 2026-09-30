@@ -17,7 +17,7 @@ import { t } from '../constants/i18n'
 // Constants, not string literals: a typo'd literal silently never matches and the
 // banner would quietly stay green on a broken roster.
 import { DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
-import { MODULE_FLAGS, HOME_V2_LIVE } from '../constants/flags'
+import { MODULE_FLAGS, HOME_V2_LIVE, REDESIGN } from '../constants/flags'
 import HomeTopBar from '../components/home/HomeTopBar'
 import HomeHero from '../components/home/HomeHero'
 import WeatherSheet, { WeatherCredit } from '../components/home/WeatherSheet'
@@ -37,6 +37,13 @@ import {
   haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
 import BackButton from '../components/BackButton'
+import RedesignHero, { PILL_OVERLAP } from '../components/home/redesign/RedesignHero'
+import SearchPill from '../components/home/redesign/SearchPill'
+import { DutyTile, WeatherTile, OliTile, EventBanner, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
+import ServicePanels, { FavouritePanel } from '../components/home/redesign/ServicePanels'
+import { SectionHeader, ErrorState, useTabBarFootprint } from '../components/ui'
+import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const TYPE_ICON_MAP = {
   pharmacy: { lib: 'ion', name: 'medkit' },
@@ -212,7 +219,18 @@ export default function HomeScreen({
   // profile keeps this screen from acquiring a second opinion about it. Defaults to
   // false, so every caller that has not thought about it gets the safe branch.
   promosEligible = false,
+  // ─── Redesign (feat/redesign) ───────────────────────────────────────────────
+  dutySummary = null,     // { loaded, error, status, count, until } from App.js's roster read
+  onRetryDuty,
+  onOpenExploreTab,       // the Keşfet tile switches to the Keşfet tab
+  onShowWalkingRoutes,    // Keşfet tab, opened in routes mode
 }) {
+  const insets = useSafeAreaInsets()
+  const tabFootprint = useTabBarFootprint()
+  // DEV-ONLY: tile labels Medium (500) vs Bold (700). Toggled by the "Aa" chip beside
+  // "Tüm hizmetler", which only renders in __DEV__. Default Medium.
+  const [labelWeight, setLabelWeight] = useState(500)
+  const [searchError, setSearchError] = useState(false)
   const [snap] = useState(() => (backRef ? homeState : null))
   const [showFacilityList, setShowFacilityList] = useState(snap?.showFacilityList ?? forceFacilityList)
   const [searchText, setSearchText]             = useState(snap?.searchText ?? '')
@@ -264,11 +282,14 @@ export default function HomeScreen({
   const runSearch = useCallback(async (q) => {
     if (!q.trim()) { setGlobalResults([]); setIsSearching(false); return }
     setIsSearching(true)
-    const { data } = await supabase.rpc('search_content', {
+    setSearchError(false)
+    const { data, error } = await supabase.rpc('search_content', {
       query:    q.trim(),
       user_lat: coarseCoord(userLocation?.latitude  ?? null),
       user_lon: coarseCoord(userLocation?.longitude ?? null),
     })
+    // A failed RPC used to read as "no results" — the audit's #1 class. It is an error.
+    if (error) setSearchError(true)
     setGlobalResults(data ?? [])
     setIsSearching(false)
   }, [userLocation])
@@ -520,6 +541,16 @@ export default function HomeScreen({
     events:             onShowEvents,
     emergency:          onShowEmergency,
     health:             () => setShowFacilityList(true),
+    // Redesign-only tiles (constants/homeGroups.js EXTRA): not HOME_MODULES entries.
+    duty:               onShowDutyList,
+    exploreTab:         onOpenExploreTab,
+    walkingRoutes:      onShowWalkingRoutes,
+  }
+
+  if (__DEV__ && REDESIGN) {
+    const unplaced = unplacedLiveModules(), dup = duplicatePlacements()
+    if (unplaced.length) console.warn(`Home redesign: live modules not placed in any panel: ${unplaced.join(', ')}`)
+    if (dup.length) console.warn(`Home redesign: modules placed twice: ${dup.join(', ')}`)
   }
 
   // Every configured tile must resolve to a handler. A missing wire would otherwise be a
@@ -854,8 +885,96 @@ export default function HomeScreen({
     )
   }
 
+  // ─── The redesigned hub (feat/redesign, Slice 1) ───────────────────────────
+  // Top → bottom: hero · search pill over its edge · widgets (duty tall | weather + Oli) ·
+  // tonight banner · favourites · "Tüm hizmetler" panels. Everything below the hero scrolls
+  // under the floating tab bar, so the content pads by its footprint.
+  // Kept from V2, same handlers: search, favourites editing, weather sheet, hero credit,
+  // Oli, strip dismissal, the bottom ad slot, and the three coach-mark refs.
+  function renderHubRedesign() {
+    const hasUnread = notifications.some(n => !n.read)
+    const byId = new Map(HOME_MODULES.map(m => [m.id, m]))
+    const sheets = (
+      <>
+        <WeatherSheet visible={weatherOpen} weatherData={weatherData} lang={lang} locale={locale}
+          onClose={() => setWeatherOpen(false)} />
+        <FavouritesEditSheet visible={favEditOpen} pins={favPins} usage={favUsage} overrides={favOverrides}
+          lang={lang} onSave={saveFavourites} onClose={() => setFavEditOpen(false)} />
+      </>
+    )
+
+    if (searchOpen) {
+      return (
+        <>
+          <SearchPill open lang={lang} query={globalQuery} onChangeText={setGlobalQuery} onClose={closeSearch}
+            style={{ marginTop: insets.top + 8, marginHorizontal: 16 }} />
+          <ScrollView {...searchMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[s.v2SearchContent, { paddingTop: 12, paddingBottom: tabFootprint + 16 }]}>
+            {renderSearchResults()}
+          </ScrollView>
+          {sheets}
+        </>
+      )
+    }
+
+    return (
+      <>
+        <ScrollView {...hubMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: tabFootprint + 16 }}>
+          <RedesignHero region={region} lang={lang} hasUnread={hasUnread} hideActions={hideHeaderActions}
+            onShowNotifs={onShowNotifs} onOpenMenu={onOpenMenu} hamburgerRef={hamburgerRef}
+            onOpenPlace={openPlaceById} />
+
+          <View style={s.rBelow}>
+            {!hideHeaderActions && (
+              <SearchPill lang={lang} onOpen={() => setSearchOpen(true)} searchRef={searchRef}
+                style={{ marginTop: -PILL_OVERLAP }} />
+            )}
+
+            <View style={s.rWidgets}>
+              <View style={s.rCol}>
+                <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty}
+                  dutyRef={dutyBannerRef} />
+              </View>
+              <View style={[s.rCol, { gap: WIDGET_GAP }]}>
+                <WeatherTile weatherData={weatherData} lang={lang} onPress={() => setWeatherOpen(true)} />
+                <OliTile lang={lang} onPress={onOpenOli} />
+              </View>
+            </View>
+
+            <View style={{ marginTop: WIDGET_GAP }}>
+              <EventBanner item={stripItem} loading={stripLoading} lang={lang}
+                onPress={handleStripPress} onDismiss={dismissStripItem} />
+            </View>
+
+            <SectionHeader title={t('favSectionTitle', lang)}
+              action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
+            <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} labelWeight={labelWeight} />
+
+            <View style={s.rAllHead}>
+              <SectionHeader title={t('hrAllServices', lang)} style={{ flex: 1 }} />
+              {__DEV__ && (
+                <TouchableOpacity style={s.rDevChip} onPress={() => setLabelWeight(w => (w === 500 ? 700 : 500))}
+                  accessibilityRole="button" accessibilityLabel={`DEV label weight ${labelWeight}`}>
+                  <Text style={s.rDevChipText}>Aa {labelWeight}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <ServicePanels lang={lang} onPress={openModule} labelWeight={labelWeight} />
+
+            <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />
+          </View>
+        </ScrollView>
+        {sheets}
+      </>
+    )
+  }
+
   function renderSearchResults() {
     if (!globalQuery.trim()) return null
+    if (REDESIGN && searchError && !isSearching) {
+      return <ErrorState lang={lang} onRetry={() => runSearch(globalQuery)} />
+    }
     if (isSearching) {
       return (
         <View style={s.searchResultsWrap}>
@@ -1319,6 +1438,12 @@ export default function HomeScreen({
   // ⚠ THE BRANCH IS ON THE HUB ONLY. `showFacilityList` keeps the ImageBackground in
   //   BOTH flag states, so the profile gate's read-only directory — which is what that
   //   mode renders — is byte-identical to today whatever HOME_V2_LIVE says.
+  // The redesign replaces the HUB only. Facility-list mode — the profile gate's read-only
+  // directory — renders exactly today's tree whatever REDESIGN says.
+  if (REDESIGN && !showFacilityList) {
+    return <View style={s.rCanvas}>{renderHubRedesign()}</View>
+  }
+
   const v2Hub = HOME_V2_LIVE && !showFacilityList
 
   // ─── V2's HUB IS ITS OWN TREE, AND IT HAS TO BE ────────────────────────────
@@ -1407,6 +1532,16 @@ const s = StyleSheet.create({
   // The V2 page canvas. ONE background surface — cards on top of it are cardBg, as
   // everywhere else in the app. Do not add a second.
   v2Canvas:         { flex: 1, backgroundColor: colors.bgWarm },
+
+  // ─── Redesign (feat/redesign) ───
+  rCanvas:      { flex: 1, backgroundColor: colors.canvas },
+  rBelow:       { paddingHorizontal: 16 },
+  rWidgets:     { flexDirection: 'row', gap: 12, marginTop: 16 },
+  rCol:         { flex: 1 },
+  rAllHead:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rDevChip:     { marginTop: 24, marginBottom: 12, minHeight: 32, paddingHorizontal: 10, borderRadius: 16,
+                  borderWidth: 1, borderColor: colors.border, justifyContent: 'center' },
+  rDevChipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary },
 
   // Hub V2 (HOME_V2_LIVE)
   // No `gap` and no horizontal padding: the hero is full-bleed and the Oli row overlaps
