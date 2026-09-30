@@ -377,7 +377,14 @@ const RGEOM = {
   tileCap:    constNum('components/home/redesign/Widgets.js', 'TILE_FONT_CAP'),
   tileCapN:   constNum('components/home/redesign/Widgets.js', 'TILE_FONT_CAP_NARROW'),
   chipCap:    constNum('components/home/redesign/RedesignHero.js', 'CHIP_CAP'),
+  chipCapN:   constNum('components/home/redesign/RedesignHero.js', 'CHIP_CAP_NARROW'),
   bandPad:    num('components/home/redesign/Widgets.js', 'band', 'paddingHorizontal'),
+  tileH:      constNum('components/home/redesign/Widgets.js', 'TILE_H'),
+  tileHA:     constNum('components/home/redesign/Widgets.js', 'TILE_H_ALERT'),
+  arrowW:     constNum('components/home/redesign/Widgets.js', 'ARROW_W'),
+  oliTextW:   constNum('components/home/redesign/OliBar.js', 'OLI_TEXT_W'),
+  oliCap:     constNum('components/home/redesign/OliBar.js', 'OLI_FONT_CAP'),
+  oliCapN:    constNum('components/home/redesign/OliBar.js', 'OLI_FONT_CAP_NARROW'),
 }
 const rErr = Object.entries(RGEOM).filter(([, r]) => r.err).map(([k, r]) => `redesign ${k}: ${r.err}`)
 if (rErr.length) { for (const e of rErr) problems.push(e) } else {
@@ -387,7 +394,8 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
   const rTile   = W => (W - R.page * 2 - R.panelGut * 2) / 4               // one panel column
   const rLabel  = W => rTile(W) - R.tilePad * 2                              // the label box
   const rCard   = W => (W - R.page * 2 - R.widgetGap) / 2                    // duty / weather card
-  const rBand   = W => rCard(W) - R.bandPad * 2                              // band text (arrow is top-right now)
+  const rBand   = W => rCard(W) - R.bandPad * 2                              // full band width (alert line)
+  const rTitle  = W => rBand(W) - R.arrowW                                   // band title, beside the arrow
   const lCap = W => (W < R.narrowW ? R.labelCapN : R.labelCap)             // width-aware caps, as rendered
   const tCap = W => (W < 350 ? R.tileCapN : R.tileCap)
   const fonts = {}
@@ -423,19 +431,47 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
     }
     rAssess(600, t(BADGE_KEY, L), 9.5, lCap(W), S, rTile(W) - 12, `${at} badge:${BADGE_KEY}`, cur, 1)
     for (const k of groupKeys) rAssess(600, t(k, L), 15, lCap(W), S, rTile(W) * 4 - 24 - 16, `${at} panel:${k}`, cur, 1)
-    // Duty / weather band — px and numberOfLines MIRROR Widgets.js: titles 13/600 × 2,
-    // duty line 12/500 × 2, alerts 12/600 × 2 (UV left the tile). Change one, change both.
-    rAssess(600, t('stripDutyTitle', L), 13, tCap(W), S, rBand(W), `${at} duty:title`, cur, 2)
-    for (const n of [1, 13]) for (const u of UNTILS) {
-      const until = L === 'Turkish' ? untilTr(u) : t('hrDutyUntil', L).replace('{time}', u)
-      rAssess(500, tCount('hrDutyShort', n, L).replace('{until}', until), 12, tCap(W), S, rBand(W), `${at} duty:short(${n},${u})`, cur, 2)
+    // Home v3 tiles — px and numberOfLines MIRROR Widgets.js: titles 13/600 × 2 beside the
+    // arrow, alert line 12/600 × 2 under it, corner numbers 12/700 × 1. Change one, change both.
+    // HEIGHT too: the text block (lines as actually wrapped) + band padding must sit below the
+    // badge row (10 + 28 + 2) inside TILE_H, or TILE_H_ALERT when the alert line is present.
+    const tileText = (w, str, px, box) => { use(w); return wrap(str, px * Math.min(S, tCap(W)), box).lines.length }
+    const fitH = (H, parts, where) => {
+      const h = 40 + parts.reduce((acc, [n, lh]) => acc + n * lh * Math.min(S, tCap(W)), 0) + 1 + 8
+      if (h > H + 0.01) problems.push(`${where}: text block needs ${h.toFixed(1)}pt, tile is ${H}pt`)
     }
-    for (const k of ['hrDutyTileAlertPartial', 'hrDutyTileAlertDown']) rAssess(600, t(k, L), 12, tCap(W), S, rBand(W), `${at} duty:${k}`, cur, 2)
-    for (const k of new Set(Object.values(WEATHER_LABEL_KEY))) rAssess(600, `-12° · ${t(k === 'weatherPartlyCloudy' ? 'hrWxPartlyTile' : k, L)}`, 13, tCap(W), S, rBand(W), `${at} weather:${k}`, cur, 2)
-    // Hero chip: the DISTRICT never ellipsizes (only the landmark does). Row = W − 2·16 minus the
-    // credit "i" (26) + gap (8), chip padding (2·11), pin (13) + 3 gaps (3·5), ~34pt for "· L…".
-    for (const key of Object.values(REGION_LABEL_KEY)) {
-      rAssess(600, t(key, L), 12, R.chipCap, S, W - 32 - 34 - 22 - 13 - 15 - 34, `${at} heroChip:${key}`, cur, 1)
+    for (const key of ['stripDutyTitle', 'menuEmergency']) {
+      rAssess(600, t(key, L), 13, tCap(W), S, rTitle(W), `${at} tile:${key}`, cur, 2)
+      fitH(R.tileH, [[tileText(600, t(key, L), 13, rTitle(W)), 17]], `${at} tile:${key} height`)
+    }
+    for (const k of ['hrDutyTileAlertPartial', 'hrDutyTileAlertDown']) {
+      rAssess(600, t(k, L), 12, tCap(W), S, rBand(W), `${at} duty:${k}`, cur, 2)
+      fitH(R.tileHA, [[tileText(600, t('stripDutyTitle', L), 13, rTitle(W)), 17], [tileText(600, t(k, L), 12, rBand(W)), 16]], `${at} duty:${k} height`)
+    }
+    rAssess(700, '112 · 155 · 199', 12, tCap(W), S, rCard(W) - 10 - 28 - 6 - 12, `${at} emergency:corner`, false, 1)
+    // Oli bar: title 18/700 and subline 12/500, one line each, in OLI_TEXT_W − inset (6) − 10.
+    const oCap = W < 350 ? R.oliCapN : R.oliCap
+    rAssess(700, t('homeOliTitle', L), 17, oCap, S, R.oliTextW - 16, `${at} oli:title`, cur, 1)
+    rAssess(500, t('hrOliAskSub', L), 12, oCap, S, R.oliTextW - 16, `${at} oli:sub`, cur, 2)
+    {  // icon 22 + 2 + title (22) + 2 + subline lines (16) inside the bar's inner 104 − 2·6 = 92
+      use(500); const subLines = wrap(t('hrOliAskSub', L), 12 * Math.min(S, oCap), R.oliTextW - 16).lines.length
+      const h = 22 + 2 + 2 + 22 * Math.min(S, oCap) + 2 + Math.min(subLines, 2) * 16 * Math.min(S, oCap)
+      if (h > 92.01) problems.push(`${at} oli: text block needs ${h.toFixed(1)}pt, the bar has 92`)
+    }
+    // Hero row: the DISTRICT and the TEMPERATURE never shrink; the landmark and the condition
+    // ellipsize to "· …". What must fit is the district beside those minimums:
+    //   left  = pad 22 + pin 13 + 5 + [district] + 5 + "·" + 5 + "…" + gap 8 + "i" 26
+    //   right = pad 22 + icon 14 + 5 + "-12°" + 5 + "·" + 5 + "…"   ·  + 2 row gaps of 8
+    {
+      use(600)
+      const cCap = W < 350 ? R.chipCapN : R.chipCap
+      const eff = 12 * Math.min(S, cCap)
+      const wd = str => width(str, eff)
+      const fixed = 22 + 13 + 5 + 5 + wd('·') + 5 + wd('…') + 8 + 26
+                  + 22 + 14 + 5 + wd('-12°') + 5 + wd('·') + 5 + wd('…') + 16
+      for (const key of Object.values(REGION_LABEL_KEY)) {
+        rAssess(600, t(key, L), 12, cCap, S, W - 32 - fixed, `${at} heroRow:${key}`, cur, 1)
+      }
     }
   }
   use(WEIGHT || 700)

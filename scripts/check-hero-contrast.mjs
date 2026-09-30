@@ -137,6 +137,25 @@ for (const [name, file] of BACKGROUNDS) {
     rows.push({ name: 'redesign pill', worst: c, at: 'over #FFFFFF' })
     if (c < FLOOR) problems.push(`redesign hero: white on rgba(0,0,0,${a}) over white is ${c.toFixed(2)}:1, under ${FLOOR}:1 — raise HERO_PILL_ALPHA`)
   }
+  // Home v3: the weather chip must wear the SAME pill, or the number above says nothing about it.
+  if (!/style=\{\[s\.chip, s\.wxChip\]\}/.test(src)) {
+    problems.push('redesign hero: the weather chip is not styled with s.chip — the pill ratio above does not cover it')
+  }
+}
+
+// Home v3 emergency tile: white text straight on solid health red (no band, no photo).
+{
+  const w = readFileSync(resolve(ROOT, 'components/home/redesign/Widgets.js'), 'utf8')
+  const th = readFileSync(resolve(ROOT, 'constants/theme.js'), 'utf8')
+  const hex = (/health:\s*\{[^}]*ink:\s*'#([0-9A-Fa-f]{6})'/.exec(th) || [])[1]
+  if (!/export const EMERGENCY_BG = category\.health\.ink/.test(w) || !hex) {
+    problems.push('redesign emergency tile: EMERGENCY_BG is not category.health.ink, or the ink is unreadable — measuring nothing')
+  } else {
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16))
+    const c = 1.05 / (Y(r, g, b) + 0.05)
+    rows.push({ name: 'emergency tile', worst: c, at: `#${hex}` })
+    if (c < FLOOR) problems.push(`redesign emergency tile: white on #${hex} is ${c.toFixed(2)}:1, under ${FLOOR}:1`)
+  }
 }
 
 if (problems.length) {

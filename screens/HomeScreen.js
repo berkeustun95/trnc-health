@@ -38,10 +38,12 @@ import {
   haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
 import BackButton from '../components/BackButton'
-import RedesignHero, { HERO_H } from '../components/home/redesign/RedesignHero'
+import RedesignHero, { heroHeight } from '../components/home/redesign/RedesignHero'
+import OliBar, { OLI_BAR_H } from '../components/home/redesign/OliBar'
+import { weatherPhoto, isNightNow } from '../constants/weatherPhotos'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { DutyTile, WeatherTile, OliSearchCard, EventBanner, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
+import { DutyTile, EmergencyTile, EventBanner, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel } from '../components/home/redesign/ServicePanels'
 import { SectionHeader, useTabBarFootprint } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
@@ -181,6 +183,7 @@ export default function HomeScreen({
   hamburgerRef,
   searchRef,
   dutyBannerRef,
+  weatherRef,     // redesign: the hero weather chip (coach mark)
   onOpenMenu,
   onShowNotifs,
   onShowDutyList,
@@ -234,6 +237,7 @@ export default function HomeScreen({
   // threshold is crossed, not on every scroll frame. RN's StatusBar is a stack, so leaving
   // Home unmounts this entry and the app default comes back by itself.
   const [overCanvas, setOverCanvas] = useState(false)
+  const [oliOnScreen, setOliOnScreen] = useState(true)   // Oli bar carousel pauses when scrolled away
   // DEV-ONLY: tile labels Medium (500) vs Bold (700). Toggled by the "Aa" chip beside
   // "Tüm hizmetler", which only renders in __DEV__. Default Medium.
   const [labelWeight, setLabelWeight] = useState(500)
@@ -888,15 +892,19 @@ export default function HomeScreen({
     )
   }
 
-  // ─── The redesigned hub (feat/redesign, Slice 1, revised) ─────────────────
-  // Top → bottom: hero (district photo, bell) · duty | weather · Oli + search (one card;
-  // opens the Oli sheet, which is also the search) · tonight banner · favourites ·
-  // "Tüm hizmetler". Everything below the hero scrolls under the floating tab bar, so the
-  // content pads by its footprint. Kept from V2, same handlers: favourites editing, weather
-  // sheet, hero credit, strip dismissal, and the coach-mark refs (search → the Oli field).
+  // ─── The redesigned hub (feat/redesign, Home v3) ───────────────────────────
+  // Top → bottom: hero (district chip + weather chip, bell) · Oli bar (opens the Oli sheet,
+  // which is also the search) · Nöbetçi Eczaneler | Acil Numaralar · tonight banner ·
+  // favourites · "Tüm hizmetler". Everything below the hero scrolls under the floating tab
+  // bar, so the content pads by its footprint. Coach-mark refs: searchRef → the Oli bar,
+  // dutyBannerRef → the tiles row, weatherRef → the weather chip.
   function renderHubRedesign() {
     const hasUnread = notifications.some(n => !n.read)
     const byId = new Map(HOME_MODULES.map(m => [m.id, m]))
+    const heroH = heroHeight(insets.top)
+    const tileH = dutyTileNeedsRoom(dutySummary) ? TILE_H_ALERT : TILE_H
+    const cur = weatherData?.current
+    const wxPhoto = cur ? weatherPhoto(cur.symbol, isNightNow(weatherData)) : null
     return (
       <>
         <StatusBar style={overCanvas ? 'dark' : 'light'} />
@@ -904,30 +912,33 @@ export default function HomeScreen({
           scrollEventThrottle={32}
           onScroll={e => {
             hubMem.onScroll(e)
-            const over = e.nativeEvent.contentOffset.y > HERO_H - 12
+            const y = e.nativeEvent.contentOffset.y
+            const over = y > heroH - 12
             if (over !== overCanvas) setOverCanvas(over)
+            const oli = y < heroH + 16 + OLI_BAR_H
+            if (oli !== oliOnScreen) setOliOnScreen(oli)
           }}
           contentContainerStyle={{ paddingBottom: tabFootprint + FADE_H + 8 }}>
           <RedesignHero region={region} lang={lang} hasUnread={hasUnread} hideActions={hideHeaderActions}
             onShowNotifs={onShowNotifs} onOpenMenu={onOpenMenu} hamburgerRef={hamburgerRef}
-            onOpenPlace={openPlaceById} />
+            onOpenPlace={openPlaceById} weatherData={weatherData} onOpenWeather={() => setWeatherOpen(true)}
+            weatherRef={weatherRef} />
 
           <View style={s.rBelow}>
-            <View style={s.rWidgets}>
-              <View style={s.rCol}>
-                <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty}
-                  dutyRef={dutyBannerRef} />
-              </View>
-              <View style={s.rCol}>
-                <WeatherTile weatherData={weatherData} lang={lang} onPress={() => setWeatherOpen(true)} />
-              </View>
-            </View>
-
             {!hideHeaderActions && (
-              <View style={{ marginTop: WIDGET_GAP }}>
-                <OliSearchCard lang={lang} onPress={onOpenOli} searchRef={searchRef} />
+              <View style={{ marginTop: 16 }}>
+                <OliBar lang={lang} onPress={onOpenOli} active={oliOnScreen} barRef={searchRef} />
               </View>
             )}
+
+            <View ref={dutyBannerRef} collapsable={false} style={s.rWidgets}>
+              <View style={s.rCol}>
+                <DutyTile summary={dutySummary} lang={lang} onPress={onShowDutyList} onRetry={onRetryDuty} height={tileH} />
+              </View>
+              <View style={s.rCol}>
+                <EmergencyTile lang={lang} onPress={onShowEmergency} height={tileH} />
+              </View>
+            </View>
 
             <View style={{ marginTop: WIDGET_GAP }}>
               <EventBanner item={stripItem} loading={stripLoading} lang={lang}
@@ -958,7 +969,7 @@ export default function HomeScreen({
         {overCanvas && <View pointerEvents="none" style={[s.rStatusStrip, { height: insets.top }]} />}
 
         <WeatherSheet visible={weatherOpen} weatherData={weatherData} lang={lang} locale={locale}
-          onClose={() => setWeatherOpen(false)} />
+          photo={wxPhoto?.source} onClose={() => setWeatherOpen(false)} />
         <FavouritesEditSheet visible={favEditOpen} pins={favPins} usage={favUsage} overrides={favOverrides}
           lang={lang} onSave={saveFavourites} onClose={() => setFavEditOpen(false)} />
       </>
@@ -1531,7 +1542,7 @@ const s = StyleSheet.create({
   rStatusStrip: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.canvas,
                   borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   rBelow:       { paddingHorizontal: 16 },
-  rWidgets:     { flexDirection: 'row', gap: 12, marginTop: 16 },
+  rWidgets:     { flexDirection: 'row', gap: 12, marginTop: 12 },
   rCol:         { flex: 1 },
   rAllHead:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rDevChip:     { marginTop: 24, marginBottom: 12, minHeight: 32, paddingHorizontal: 10, borderRadius: 16,

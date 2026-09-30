@@ -3,50 +3,50 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } 
 import { Ionicons } from '@expo/vector-icons'
 import { colors, category, type, radii, press } from '../../../constants/theme'
 import { t, tCount } from '../../../constants/i18n'
-import { uvLevel, weatherGroup, weatherLabelKey } from '../../../utils/facilityUtils'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
-import { weatherPhoto, isNightNow } from '../../../constants/weatherPhotos'
-import { Bone, ErrorState, IconButton } from '../../ui'
+import { Bone, IconButton } from '../../ui'
 
-// Both tiles are the V2 live-strip card: full photo, icon badge top-left, dark text band at
-// the bottom. Height = badge (10 + 28) + band at its worst case at the 1.15 font cap:
-// 8 + 2·17·1.15 (title) + 2·16·1.15 (line) + 8 ≈ 92 → 38 + 4 + 92 = 134. Usually the band
-// is two lines and the photo shows above it. labels:check measures every string in it.
-export const TILE_H = 134
+// Home v3 tiles: two equal cards, 104pt. Duty is the V2 live-strip card (photo, icon badge
+// top-left, dark band); Acil Numaralar is solid health red. Each band carries its title and
+// an arrow — nothing else (Berke: no count, no time; those are in the accessibility label).
+// Height = badge (10 + 28) + band at the 1.15 cap: 8 + 2·17·1.15 + 8 ≈ 55 → 93 ≤ 104.
+// ALERT and ERROR are rare and must say something, so the row grows to TILE_H_ALERT: title
+// (2 lines) + message (2 lines) at the cap = 8 + 39 + 37 + 8 = 92, under a 38pt badge row
+// → 130; with the badge row overlapping the band's top padding that is 128. labels:check
+// measures every string in both boxes.
+export const TILE_H = 104
+export const TILE_H_ALERT = 128
 export const GAP = 12
 export const TILE_FONT_CAP = 1.15   // maxFontSizeMultiplier for text in fixed-height tiles
 export const TILE_FONT_CAP_NARROW = 1.0   // below 350dp the band cannot take any growth
+export const ARROW_W = 22           // chevron (16) + gap (6) beside the band title
 const tileCap = w => (w < 350 ? TILE_FONT_CAP_NARROW : TILE_FONT_CAP)
 
-// ─── The photo card ──────────────────────────────────────────────────────────
-// ⚠ THE IMAGE STYLE IS V2's, ON PURPOSE. In the ADA Preview release APK the duty photo did not
-//   draw (the tile showed the scrim over its fallback colour) while the drawable WAS in the
-//   APK (aapt2: drawable/assets_backgrounds_adabgdutypharmacy) and the bundle referenced it.
-//   The one difference from the V2 strip — which renders this same drawable in production —
-//   was a bare StyleSheet.absoluteFill with no width/height. This uses V2's exact style
-//   (absoluteFillObject + width/height 100%). Not reproduced here (no emulator on this Mac):
-//   confirm on the next Preview build.
-// Text sits ONLY on the band: white on rgba(0,0,0,0.72) over a pure-white pixel is 9.29:1,
-// so the photo cannot decide the ratio.
-function PhotoTile({ image, icon, title, titleLines = 1, line, onPress, a11y, innerRef, surface, alert }) {
+// ─── The card ────────────────────────────────────────────────────────────────
+// ⚠ THE IMAGE STYLE IS V2's, ON PURPOSE (absoluteFillObject + width/height 100%). The Preview
+//   duty photo did not draw with a bare StyleSheet.absoluteFill; V2 renders this same drawable
+//   in production with this style. Confirmed on the next Preview device check.
+// On a photo, text sits ONLY on the 0.72 band (white over a pure-white pixel: 9.29:1).
+function Tile({ image, bg, icon, iconColor, title, line, corner, onPress, a11y, innerRef, surface, alert, height }) {
   const onPhoto = !!image && !surface
+  const light = onPhoto || !!bg        // white text: on the band, or on the solid red
   const cap = tileCap(useWindowDimensions().width)
   return (
     <TouchableOpacity ref={innerRef} collapsable={false} onPress={onPress} disabled={!onPress}
       activeOpacity={press.card} accessibilityRole="button" accessibilityLabel={a11y}
-      style={[s.card, { height: TILE_H, backgroundColor: surface || colors.border }, alert && s.alertBorder]}>
+      style={[s.card, { height, backgroundColor: surface || bg || colors.border }, alert && s.alertBorder]}>
       {onPhoto && <Image source={image} style={s.photo} resizeMode="cover" />}
       <View style={[s.badge, alert && s.badgeAlert]}>
-        <Ionicons name={alert ? 'alert-circle' : icon} size={15} color={alert ? '#FFFFFF' : colors.textPrimary} />
+        <Ionicons name={alert ? 'alert-circle' : icon} size={15} color={alert ? '#FFFFFF' : (iconColor || colors.textPrimary)} />
       </View>
-      {/* The arrow sits top-right, not in the band: the band keeps its full width for text. */}
-      {!!onPress && (
-        <View style={s.arrow}><Ionicons name="arrow-forward" size={15} color={colors.textPrimary} /></View>
-      )}
-      <View style={[s.band, !onPhoto && s.bandOnSurface]}>
-        <Text style={[s.bandTitle, !onPhoto && s.darkText]} numberOfLines={titleLines} maxFontSizeMultiplier={cap}>{title}</Text>
+      {corner}
+      <View style={[s.band, !onPhoto && s.bandClear]}>
+        <View style={s.bandRow}>
+          <Text style={[s.bandTitle, !light && s.darkText]} numberOfLines={2} maxFontSizeMultiplier={cap}>{title}</Text>
+          {!!onPress && <Ionicons name="chevron-forward" size={16} color={light ? '#FFFFFF' : colors.textPrimary} />}
+        </View>
         {typeof line === 'function' ? line(cap) : line}
       </View>
     </TouchableOpacity>
@@ -54,18 +54,23 @@ function PhotoTile({ image, icon, title, titleLines = 1, line, onPress, a11y, in
 }
 
 // ─── Duty pharmacies ─────────────────────────────────────────────────────────
-// COUNT ONLY, never a pharmacy name. States, never confused with each other:
-//   loading → bone line · error → message + retry (tinted surface) · partial/stale/absent →
-//   ALERT on the tinted surface (an empty duty roster is an error here, there is always a
-//   duty pharmacy) · fresh → "13 eczane · 00.00'a kadar". The whole tile opens the duty
-//   list (KTEB fallback lives there); dutyRef is App.js's coach-mark target.
+// The tile says ONLY "Nöbetçi Eczaneler". Count and closing time are in the accessibility
+// label, never a pharmacy name. States, never confused with each other:
+//   loading → bone line · error → message (tinted; tap retries + opens the list) · partial/stale/absent → ALERT on
+//   the tinted surface (there is always a duty pharmacy, so an empty roster is an error here)
+//   · fresh → title only. The tile opens the duty list (KTEB fallback lives there).
 export function dutyUntilText(until, lang) {
   if (!until) return null
   if (lang === 'Turkish') return untilTr(until)
   return t('hrDutyUntil', lang).replace('{time}', String(until).slice(0, 5))
 }
 
-export function DutyTile({ summary, lang, onPress, onRetry, dutyRef }) {
+export function dutyTileNeedsRoom(summary) {
+  const { loaded, error, status } = summary || {}
+  return !!loaded && (!!error || status !== DUTY_FRESH)
+}
+
+export function DutyTile({ summary, lang, onPress, onRetry, height }) {
   const { loaded, error, status, count, until } = summary || {}
   const fresh = status === DUTY_FRESH
   const alert = loaded && !error && !fresh
@@ -73,23 +78,25 @@ export function DutyTile({ summary, lang, onPress, onRetry, dutyRef }) {
   const short = loaded && !error && count > 0
     ? tCount('hrDutyShort', count, lang).replace('{until}', fresh && untilText ? untilText : '').replace(/ · $/, '')
     : null
-  // Tile-only short wording for the two unhealthy states; the full sentence is in the a11y label.
   const alertText = alert ? t(status === DUTY_PARTIAL ? 'hrDutyTileAlertPartial' : 'hrDutyTileAlertDown', lang) : null
   const title = t('stripDutyTitle', lang)
-  let line
-  if (!loaded) line = <Bone width="80%" height={11} style={{ marginTop: 5 }} />
-  else if (error) line = <ErrorState compact lang={lang} message={t('hrDutyTileAlertDown', lang)} onRetry={onRetry} />
-  else if (alert) line = cap => <Text style={s.alertText} numberOfLines={2} maxFontSizeMultiplier={cap}>{alertText}</Text>
-  else line = cap => <Text style={s.bandLine} numberOfLines={2} maxFontSizeMultiplier={cap}>{short}</Text>
+  let line = null
+  if (!loaded) line = <Bone width="60%" height={10} style={{ marginTop: 4 }} />
+  // ERROR: the same short message as the down alert. The tile still opens the duty list —
+  // which has its own retry and the KTEB call fallback — and re-runs Home's fetch on the way.
+  else if (error || alert) line = cap => (
+    <Text style={s.alertText} numberOfLines={2} maxFontSizeMultiplier={cap}>
+      {error ? t('hrDutyTileAlertDown', lang) : alertText}
+    </Text>
+  )
   return (
-    <PhotoTile
-      innerRef={dutyRef}
+    <Tile
       image={DUTY_IMAGE}
       icon="medkit"
       title={title}
-      titleLines={2}
       line={line}
-      onPress={onPress}
+      onPress={error ? () => { onRetry?.(); onPress?.() } : onPress}
+      height={height}
       surface={alert || error ? category.health.bg : null}
       alert={alert || error}
       a11y={[title, short, alert ? t(status === DUTY_PARTIAL ? 'hrDutyPartial' : 'hrDutyUnavailable', lang) : null,
@@ -98,62 +105,26 @@ export function DutyTile({ summary, lang, onPress, onRetry, dutyRef }) {
   )
 }
 
-// ─── Weather ─────────────────────────────────────────────────────────────────
-// "24° · Güneşli" on the band, UV as text below. The photo follows the weather (bundled CC0
-// set, constants/weatherPhotos.js); an unmapped code falls back to the city tint.
-const WEATHER_ION = {
-  clear: 'sunny', partlyCloudy: 'partly-sunny', overcast: 'cloudy',
-  fog: 'cloudy', drizzle: 'rainy', rain: 'rainy', snow: 'snow',
-  showers: 'rainy', thunder: 'thunderstorm', unknown: 'thermometer',
-}
-
-export function WeatherTile({ weatherData, lang, onPress }) {
-  const cur = weatherData?.current
-  const uv = cur ? uvLevel(cur.uv_index) : null
-  const temp = cur?.temperature_2m
-  // Tile-only: "Partly cloudy" is too long for the band in ru/fr/es; the short forecast term
-  // is used here and the full name stays in the weather sheet.
-  const condKey = cur ? weatherLabelKey(cur.symbol) : null
-  const cond = cur ? t(condKey === 'weatherPartlyCloudy' ? 'hrWxPartlyTile' : condKey, lang) : null
-  const uvText = uv ? t('hrWeatherUv', lang).replace('{n}', String(Math.round(cur.uv_index))).replace('{level}', t(uv.key, lang)) : null
-  const photo = cur ? weatherPhoto(cur.symbol, isNightNow(weatherData)) : null
-  // "24° · Parçalı bulutlu" over up to two lines. UV left the tile (Berke: less text is fine);
-  // it stays in the weather sheet and in this tile's accessibility label.
-  const title = cur ? `${temp != null ? Math.round(temp) + '°' : '—'} · ${cond}` : t('homeWeatherTitle', lang)
-  const line = cur ? null : <Bone width="60%" height={11} style={{ marginTop: 5 }} />
+// ─── Emergency numbers ───────────────────────────────────────────────────────
+// Solid health red (white on #B83246 is measured by check-hero-contrast). The numbers in the
+// corner are the state lines — the same three the emergency sheet lists first — and are
+// digits in every locale. Opens the emergency BottomSheet (the force-update escape too).
+export const EMERGENCY_CORNER = '112 · 155 · 199'
+export const EMERGENCY_BG = category.health.ink
+export function EmergencyTile({ lang, onPress, height }) {
+  const cap = tileCap(useWindowDimensions().width)
+  const title = t('menuEmergency', lang)
   return (
-    <PhotoTile
-      image={photo?.source}
-      icon={WEATHER_ION[weatherGroup(cur?.symbol)] || WEATHER_ION.unknown}
+    <Tile
+      bg={EMERGENCY_BG}
+      icon="call"
+      iconColor={EMERGENCY_BG}
       title={title}
-      titleLines={2}
-      line={line}
-      onPress={cur ? onPress : undefined}
-      surface={photo ? null : category.city.bg}
-      a11y={[t('homeWeatherTitle', lang), cur ? title : null, uvText].filter(Boolean).join(', ')}
+      onPress={onPress}
+      height={height}
+      corner={<Text style={s.corner} numberOfLines={1} maxFontSizeMultiplier={cap}>{EMERGENCY_CORNER}</Text>}
+      a11y={`${title}: 112, 155, 199`}
     />
-  )
-}
-
-// ─── Oli + search (one card; the hero no longer has a search bar) ──────────
-// The only solid tile. White on primary is 5.01:1. The field is a white pill inside the
-// card; the whole card opens the Oli sheet with its input focused. searchRef lands on the
-// field — App.js measures it for the search coach mark.
-export function OliSearchCard({ lang, onPress, searchRef }) {
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={press.card} accessibilityRole="search"
-      accessibilityLabel={`${t('homeOliTitle', lang)}. ${t('hrOliField', lang)}`}
-      style={s.oliCard}>
-      <Image source={require('../../../assets/oli-button.png')} style={s.oli} resizeMode="contain"
-        accessibilityIgnoresInvertColors pointerEvents="none" />
-      <View style={s.oliBody}>
-        <Text style={s.oliTitle} numberOfLines={1}>{t('homeOliTitle', lang)}</Text>
-        <View ref={searchRef} collapsable={false} style={s.oliField}>
-          <Ionicons name="search" size={17} color={colors.textSecondary} />
-          <Text style={s.oliFieldText} numberOfLines={1}>{t('hrOliField', lang)}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
   )
 }
 
@@ -208,29 +179,14 @@ const s = StyleSheet.create({
   badge:       { position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: 14,
                  backgroundColor: 'rgba(255,255,255,0.94)', justifyContent: 'center', alignItems: 'center' },
   badgeAlert:  { backgroundColor: colors.dangerInk },
+  corner:      { position: 'absolute', top: 16, right: 12, ...type.meta, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   band:        { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.72)',
                  paddingHorizontal: 12, paddingVertical: 8 },
-  arrow:       { position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: 14,
-                 backgroundColor: 'rgba(255,255,255,0.94)', justifyContent: 'center', alignItems: 'center' },
-  bandOnSurface:{ backgroundColor: 'transparent' },
-  bandTitle:   { ...type.small, fontFamily: 'Inter_600SemiBold', lineHeight: 17, color: '#FFFFFF' },
-  bandLine:    { ...type.meta, fontFamily: 'Inter_500Medium', color: '#FFFFFF', marginTop: 1 },
+  bandClear:   { backgroundColor: 'transparent' },
+  bandRow:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bandTitle:   { ...type.small, fontFamily: 'Inter_600SemiBold', lineHeight: 17, color: '#FFFFFF', flex: 1 },
   darkText:    { color: colors.textPrimary },
   alertText:   { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.dangerInk, marginTop: 1 },
-
-  // ─── MASCOT GEOMETRY, FROM THE ASSET'S OWN ALPHA BOUNDS ────────────────────
-  // oli-button.png is 1024² and the art occupies x 26.6–72.3%, y 5.3–91.5%. At 120pt the
-  // visible mascot is 103pt tall on a 100pt card: feet on the bottom edge, head ~3.4pt above
-  // the top — which leaves 8.6pt of the 12pt gap clear of the tiles above (Berke: ≥ 8pt).
-  // Visible left edge 8pt, right edge 63pt, so the content starts at 70 — flush beside him.
-  oliCard:     { backgroundColor: colors.primary, borderRadius: radii.widget, height: 100,
-                 paddingLeft: 70, paddingRight: 12, justifyContent: 'center', overflow: 'visible' },
-  oli:         { position: 'absolute', left: -24, bottom: -10, width: 120, height: 120 },
-  oliBody:     { gap: 6 },
-  oliTitle:    { ...type.sectionHeading, color: colors.onPrimary },
-  oliField:    { flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, borderRadius: 999,
-                 backgroundColor: colors.card, paddingHorizontal: 14 },
-  oliFieldText:{ ...type.body, color: colors.textSecondary, flex: 1 },
 
   banner:      { height: 160, borderRadius: radii.widget, overflow: 'hidden', backgroundColor: colors.border },
   bannerPhoto: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },

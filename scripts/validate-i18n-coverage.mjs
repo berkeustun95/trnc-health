@@ -267,6 +267,7 @@ const SURFACES = [
   // titleKey maps; the ui components carry the shared uiRetry / uiClose / uiLoadFailed.
   'components/home/redesign/RedesignHero.js',
   'components/home/redesign/Widgets.js',
+  'components/home/redesign/OliBar.js',
   'components/home/redesign/ServicePanels.js',
   'constants/homeGroups.js',
   'components/OliSearchSheet.js',

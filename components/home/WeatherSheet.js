@@ -1,4 +1,4 @@
-import { View, Text, Modal, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, Text, Image, Modal, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, radius } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -17,7 +17,9 @@ import { uvLevel, weatherIcon, weatherLabelKey } from '../../utils/facilityUtils
 // The 4-day slice, the UV thresholds and the icon/description mapping are the SAME
 // helpers the old card used (utils/facilityUtils.js) — this is a re-housing, not a
 // reimplementation, so there is no second copy of the UV bands to drift.
-export default function WeatherSheet({ visible, weatherData, lang, locale, onClose }) {
+// `photo` (redesign only): the current weather's photo from constants/weatherPhotos.js, same
+// mapping and night variants as the Home v2 tile had. No text sits on it. V2 passes none.
+export default function WeatherSheet({ visible, weatherData, lang, locale, onClose, photo }) {
   const cur = weatherData?.current
   const daily = weatherData?.daily
   const uv = cur ? uvLevel(cur.uv_index) : null
@@ -39,6 +41,10 @@ export default function WeatherSheet({ visible, weatherData, lang, locale, onClo
               temperature pill in that case, so this sheet is unreachable — but it
               renders a truthful empty rather than crashing if it is ever opened
               another way. */}
+          {!!photo && !!cur && (
+            <Image source={photo} style={s.photo} resizeMode="cover" accessibilityIgnoresInvertColors />
+          )}
+
           {!cur ? (
             <Text style={s.empty}>{t('noResultsTitle', lang)}</Text>
           ) : (
@@ -109,6 +115,7 @@ const s = StyleSheet.create({
   creditText: { flexShrink: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   backdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:      { backgroundColor: colors.cardBg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, paddingBottom: 34 },
+  photo:      { width: '100%', height: 132, borderRadius: radius.lg, marginBottom: 16, backgroundColor: colors.border },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   title:      { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   empty:      { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', paddingVertical: 24 },

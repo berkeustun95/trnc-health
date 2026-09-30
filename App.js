@@ -682,6 +682,7 @@ export default function App() {
   const dutyBannerRef      = useRef(null)
   const mapTabRef          = useRef(null)
   const profileTabRef      = useRef(null)   // redesign: coach mark on the Profil tab
+  const weatherChipRef     = useRef(null)   // redesign: coach mark on the hero weather chip
   const menuAnim = useRef(new Animated.Value(260)).current
   const sessionRef = useRef(null)
   const toSignUpRef = useRef(false)
@@ -712,15 +713,29 @@ export default function App() {
     // On-screen basics only. The drawer is now settings, not navigation, so the
     // menu step just highlights the button — it never opens the drawer.
     // Redesign: no drawer, so no menu step; the Profil tab (where settings now live) gets one.
-    const [menuBtn, search, duty, map, profileTab] = await Promise.all([
+    const [menuBtn, search, duty, map, profileTab, weatherChip] = await Promise.all([
       REDESIGN ? null : measureRef(hamburgerRef),
       measureRef(searchRef),
       measureRef(dutyBannerRef),
       measureRef(mapTabRef),
       REDESIGN ? measureRef(profileTabRef) : null,
+      REDESIGN ? measureRef(weatherChipRef) : null,
     ])
 
     const steps = []
+    // Home v3: searchRef is the Oli bar, dutyBannerRef the duty | emergency row, and the
+    // weather chip is new. A chip that is not rendered (no weather yet) measures null and
+    // its step is skipped, like every other step here.
+    if (REDESIGN) {
+      if (search)      steps.push({ ...search,      title: t('homeOliTitle', lang),      body: t('hrCoachOliBody', lang) })
+      if (weatherChip) steps.push({ ...weatherChip, title: t('homeWeatherTitle', lang),  body: t('hrCoachWeatherBody', lang) })
+      if (duty)        steps.push({ ...duty,        title: t('hrCoachTilesTitle', lang), body: t('hrCoachTilesBody', lang) })
+      if (map)         steps.push({ ...map,         title: t(EXPLORE_MAP_LIVE ? 'coachExploreTitle' : 'coachMapTitle', lang),
+                                                    body:  t(EXPLORE_MAP_LIVE ? 'coachExploreBody'  : 'coachMapBody',  lang) })
+      if (profileTab)  steps.push({ ...profileTab,  title: t('hrCoachProfileTitle', lang), body: t('hrCoachProfileBody', lang) })
+      if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
+      return
+    }
     if (menuBtn) steps.push({ ...menuBtn, title: t('coachMenuTitle', lang), body: t('coachMenuBody', lang) })
     // Copy follows HOME_V2_LIVE, same reason the map step follows EXPLORE_MAP_LIVE below:
     // under V2 this ref is on a search ICON in the top bar, and V1's body describes a
@@ -2369,6 +2384,7 @@ export default function App() {
             searchRef={searchRef}
 
             dutyBannerRef={dutyBannerRef}
+            weatherRef={weatherChipRef}
             onOpenMenu={REDESIGN ? undefined : openMenu}
             onShowNotifs={() => { if (requireAccount('gateNotifications')) return; setShowNotifs(true) }}
             onShowDutyList={() => setShowDutyList(true)}
