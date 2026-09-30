@@ -441,6 +441,9 @@ class BLErrorBoundary extends Component {
   }
 }
 
+const WX_COACH_WAIT_MS = 3000
+const WX_COACH_PENDING = '@trnc_coach_wx_pending'
+
 export default function App() {
   // ─── FOUR INTER WEIGHTS, AND TWO OF THEM ARE A BUG FIX ────────────────────
   //
@@ -683,6 +686,7 @@ export default function App() {
   const mapTabRef          = useRef(null)
   const profileTabRef      = useRef(null)   // redesign: coach mark on the Profil tab
   const weatherChipRef     = useRef(null)   // redesign: coach mark on the hero weather chip
+  const wxCoachTriedRef    = useRef(false)  // the deferred weather coach mark: once per launch
   const menuAnim = useRef(new Animated.Value(260)).current
   const sessionRef = useRef(null)
   const toSignUpRef = useRef(false)
@@ -713,6 +717,15 @@ export default function App() {
     // On-screen basics only. The drawer is now settings, not navigation, so the
     // menu step just highlights the button — it never opens the drawer.
     // Redesign: no drawer, so no menu step; the Profil tab (where settings now live) gets one.
+    // Home v3: the weather chip only exists once weather has loaded. Wait for it briefly;
+    // if it never comes, the tour runs without it and the chip gets its own one-step mark on
+    // a later launch (WX_COACH_PENDING), so the skip holds for this run only.
+    if (REDESIGN) {
+      wxCoachTriedRef.current = true   // a skipped weather step waits for the NEXT launch
+      for (let waited = 0; !weatherChipRef.current && waited < WX_COACH_WAIT_MS; waited += 150) {
+        await new Promise(r => setTimeout(r, 150))
+      }
+    }
     const [menuBtn, search, duty, map, profileTab, weatherChip] = await Promise.all([
       REDESIGN ? null : measureRef(hamburgerRef),
       measureRef(searchRef),
@@ -733,6 +746,7 @@ export default function App() {
       if (map)         steps.push({ ...map,         title: t(EXPLORE_MAP_LIVE ? 'coachExploreTitle' : 'coachMapTitle', lang),
                                                     body:  t(EXPLORE_MAP_LIVE ? 'coachExploreBody'  : 'coachMapBody',  lang) })
       if (profileTab)  steps.push({ ...profileTab,  title: t('hrCoachProfileTitle', lang), body: t('hrCoachProfileBody', lang) })
+      if (!weatherChip) AsyncStorage.setItem(WX_COACH_PENDING, '1').catch(() => {})
       if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
       return
     }
@@ -751,6 +765,23 @@ export default function App() {
     if (profileTab) steps.push({ ...profileTab, title: t('hrCoachProfileTitle', lang), body: t('hrCoachProfileBody', lang) })
     if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
   }
+
+  // The weather step a first run had to skip (weather not loaded in time): shown alone, once,
+  // the next time Home has weather and nothing else is on screen.
+  useEffect(() => {
+    if (!REDESIGN || wxCoachTriedRef.current || !weatherData || activeTab !== 'home'
+      || showCoachMarks || showNotifs || showHomeCityAsk) return
+    wxCoachTriedRef.current = true
+    AsyncStorage.getItem(WX_COACH_PENDING).then(async pending => {
+      if (pending !== '1') return
+      await new Promise(r => setTimeout(r, 400))
+      const chip = await measureRef(weatherChipRef)
+      if (!chip) { wxCoachTriedRef.current = false; return }
+      AsyncStorage.removeItem(WX_COACH_PENDING).catch(() => {})
+      setCoachSteps([{ ...chip, title: t('homeWeatherTitle', lang), body: t('hrCoachWeatherBody', lang) }])
+      setShowCoachMarks(true)
+    }).catch(() => {})
+  }, [weatherData, activeTab, showCoachMarks, showNotifs, showHomeCityAsk])
 
   function handleCoachFinish() {
     setShowCoachMarks(false)

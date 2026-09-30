@@ -382,7 +382,10 @@ const RGEOM = {
   tileH:      constNum('components/home/redesign/Widgets.js', 'TILE_H'),
   tileHA:     constNum('components/home/redesign/Widgets.js', 'TILE_H_ALERT'),
   arrowW:     constNum('components/home/redesign/Widgets.js', 'ARROW_W'),
-  oliTextW:   constNum('components/home/redesign/OliBar.js', 'OLI_TEXT_W'),
+  oliH:       constNum('components/home/redesign/OliBar.js', 'OLI_BAR_H'),
+  fadeHold:   constNum('components/home/redesign/OliBar.js', 'FADE_HOLD'),
+  textLeft:   constNum('components/home/redesign/OliBar.js', 'TEXT_LEFT'),
+  pillPad:    constNum('components/home/redesign/OliBar.js', 'PILL_PAD'),
   oliCap:     constNum('components/home/redesign/OliBar.js', 'OLI_FONT_CAP'),
   oliCapN:    constNum('components/home/redesign/OliBar.js', 'OLI_FONT_CAP_NARROW'),
 }
@@ -449,14 +452,17 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
       fitH(R.tileHA, [[tileText(600, t('stripDutyTitle', L), 13, rTitle(W)), 17], [tileText(600, t(k, L), 12, rBand(W)), 16]], `${at} duty:${k} height`)
     }
     rAssess(700, '112 · 155 · 199', 12, tCap(W), S, rCard(W) - 10 - 28 - 6 - 12, `${at} emergency:corner`, false, 1)
-    // Oli bar: title 18/700 and subline 12/500, one line each, in OLI_TEXT_W − inset (6) − 10.
+    // Oli bar (full scene): the fade's contrast holds only on its SOLID part, so the title
+    // (20/700 × 1) and the pill must END inside it: zone = card · FADE_HOLD − TEXT_LEFT, card =
+    // W − 2·page. Pill = text 13/500 + gap 4 + arrow icon 14 (icons do not scale) + 2·PILL_PAD
+    // + 2 border. Height: title 26 + gap 10 + pill (17 + 12 + 2) inside the card, 8pt clear.
     const oCap = W < 350 ? R.oliCapN : R.oliCap
-    rAssess(700, t('homeOliTitle', L), 17, oCap, S, R.oliTextW - 16, `${at} oli:title`, cur, 1)
-    rAssess(500, t('hrOliAskSub', L), 12, oCap, S, R.oliTextW - 16, `${at} oli:sub`, cur, 2)
-    {  // icon 22 + 2 + title (22) + 2 + subline lines (16) inside the bar's inner 104 − 2·6 = 92
-      use(500); const subLines = wrap(t('hrOliAskSub', L), 12 * Math.min(S, oCap), R.oliTextW - 16).lines.length
-      const h = 22 + 2 + 2 + 22 * Math.min(S, oCap) + 2 + Math.min(subLines, 2) * 16 * Math.min(S, oCap)
-      if (h > 92.01) problems.push(`${at} oli: text block needs ${h.toFixed(1)}pt, the bar has 92`)
+    const zone = (W - R.page * 2) * R.fadeHold - R.textLeft
+    rAssess(700, t('hrOliBarTitle', L), 20, oCap, S, zone, `${at} oli:title`, cur, 1)
+    rAssess(500, t('hrOliAskSub', L), 13, oCap, S, zone - 4 - 14 - R.pillPad * 2 - 2, `${at} oli:pill`, cur, 1)
+    {
+      const c = Math.min(S, oCap), h = 26 * c + 10 + 17 * c + 14
+      if (h > R.oliH - 16 + 0.01) problems.push(`${at} oli: text block needs ${h.toFixed(1)}pt, the card has ${R.oliH - 16}`)
     }
     // Hero row: the DISTRICT and the TEMPERATURE never shrink; the landmark and the condition
     // ellipsize to "· …". What must fit is the district beside those minimums:

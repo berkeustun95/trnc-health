@@ -143,6 +143,28 @@ for (const [name, file] of BACKGROUNDS) {
   }
 }
 
+// Home v3 Oli bar: white text on the deep-teal fade, and on the glass pill (white 16%) over
+// it. The text is proven (labels:check) to sit only on the fade's SOLID part, so the ground
+// under it is FADE_COLOR at FADE_ALPHA over the scene. Bound over a PURE WHITE pixel, which
+// no scene exceeds, so one number covers every scene. Pill text is 13/500 → 4.5:1 applies.
+{
+  const src = readFileSync(resolve(ROOT, 'components/home/redesign/OliBar.js'), 'utf8')
+  const col = (/export const FADE_COLOR = '#([0-9A-Fa-f]{6})'/.exec(src) || [])[1]
+  const a = parseFloat((/export const FADE_ALPHA = ([\d.]+)/.exec(src) || [])[1])
+  if (!col || !(a > 0) || !/backgroundColor: rgba\(FADE_COLOR, FADE_ALPHA\)/.test(src)
+      || !/'rgba\(255,255,255,0\.16\)'/.test(src)) {
+    problems.push('redesign Oli bar: cannot read FADE_COLOR / FADE_ALPHA / the 16% pill from OliBar.js — measuring nothing')
+  } else {
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(col.slice(i, i + 2), 16))
+    const fade = [r, g, b].map(v => v * a + 255 * (1 - a))
+    const pill = fade.map(v => 255 * 0.16 + v * 0.84)
+    const cf = 1.05 / (Y(...fade) + 0.05), cp = 1.05 / (Y(...pill) + 0.05)
+    rows.push({ name: 'oli fade', worst: cf, at: 'over #FFFFFF' }, { name: 'oli pill', worst: cp, at: 'over #FFFFFF' })
+    if (cp < FLOOR) problems.push(`redesign Oli bar: pill text on the fade is ${cp.toFixed(2)}:1 over white, under ${FLOOR}:1`)
+    if (cf < FLOOR) problems.push(`redesign Oli bar: title on the fade is ${cf.toFixed(2)}:1 over white, under ${FLOOR}:1`)
+  }
+}
+
 // Home v3 emergency tile: white text straight on solid health red (no band, no photo).
 {
   const w = readFileSync(resolve(ROOT, 'components/home/redesign/Widgets.js'), 'utf8')
