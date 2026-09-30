@@ -35,7 +35,7 @@ export default function RedesignHero({
 }) {
   const insets = useSafeAreaInsets()
   const [creditOpen, setCreditOpen] = useState(false)
-  const { source, placeId, credit, isGeneric } = resolveHero(region)
+  const { source, placeId, credit, isGeneric, landmark } = resolveHero(region)
   const district = region && REGION_LABEL_KEY[region]
     ? t(REGION_LABEL_KEY[region], lang)
     : t('homeHeroFallbackTitle', lang)
@@ -81,9 +81,17 @@ export default function RedesignHero({
       </View>
 
       <View style={s.chipRow} pointerEvents="box-none">
-        <View style={s.chip} accessibilityRole="text">
+        {/* "{district} · {landmark}". The landmark is a Turkish proper name in every locale
+            and is the ONLY part allowed to ellipsize: the district never shrinks. */}
+        <View style={s.chip} accessibilityRole="text" accessibilityLabel={landmark ? `${district}, ${landmark}` : district}>
           <Ionicons name="location" size={13} color="#FFFFFF" />
           <Text style={s.chipText} numberOfLines={1}>{district}</Text>
+          {!!landmark && (
+            <>
+              <Text style={s.chipText}>·</Text>
+              <Text style={[s.chipText, s.chipLandmark]} numberOfLines={1} ellipsizeMode="tail">{landmark}</Text>
+            </>
+          )}
         </View>
         {!!credit && (
           <TouchableOpacity style={s.info} onPress={() => setCreditOpen(true)}
@@ -112,7 +120,8 @@ const s = StyleSheet.create({
   chip:     { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
               backgroundColor: `rgba(0,0,0,${HERO_PILL_ALPHA})`, borderRadius: 999,
               paddingHorizontal: 11, paddingVertical: 6 },
-  chipText: { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 1 },
+  chipText: { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', flexShrink: 0 },
+  chipLandmark: { fontFamily: 'Inter_500Medium', flexShrink: 1 },
   info:     { width: 26, height: 26, borderRadius: 13, backgroundColor: `rgba(0,0,0,${HERO_PILL_ALPHA})`,
               justifyContent: 'center', alignItems: 'center' },
 })

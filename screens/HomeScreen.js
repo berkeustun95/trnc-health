@@ -37,7 +37,9 @@ import {
   haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
 import BackButton from '../components/BackButton'
-import RedesignHero from '../components/home/redesign/RedesignHero'
+import RedesignHero, { HERO_H } from '../components/home/redesign/RedesignHero'
+import { StatusBar } from 'expo-status-bar'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, WeatherTile, OliSearchCard, EventBanner, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel } from '../components/home/redesign/ServicePanels'
 import { SectionHeader, useTabBarFootprint } from '../components/ui'
@@ -224,6 +226,12 @@ export default function HomeScreen({
   onShowWalkingRoutes,    // Keşfet tab, opened in routes mode
 }) {
   const tabFootprint = useTabBarFootprint()
+  const insets = useSafeAreaInsets()
+  // Status bar over the redesigned hero: LIGHT icons on the photo, then a solid canvas strip
+  // with DARK icons once the photo has scrolled out from under it. State flips only when the
+  // threshold is crossed, not on every scroll frame. RN's StatusBar is a stack, so leaving
+  // Home unmounts this entry and the app default comes back by itself.
+  const [overCanvas, setOverCanvas] = useState(false)
   // DEV-ONLY: tile labels Medium (500) vs Bold (700). Toggled by the "Aa" chip beside
   // "Tüm hizmetler", which only renders in __DEV__. Default Medium.
   const [labelWeight, setLabelWeight] = useState(500)
@@ -889,7 +897,14 @@ export default function HomeScreen({
     const byId = new Map(HOME_MODULES.map(m => [m.id, m]))
     return (
       <>
+        <StatusBar style={overCanvas ? 'dark' : 'light'} />
         <ScrollView {...hubMem} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={32}
+          onScroll={e => {
+            hubMem.onScroll(e)
+            const over = e.nativeEvent.contentOffset.y > HERO_H - 12
+            if (over !== overCanvas) setOverCanvas(over)
+          }}
           contentContainerStyle={{ paddingBottom: tabFootprint + 16 }}>
           <RedesignHero region={region} lang={lang} hasUnread={hasUnread} hideActions={hideHeaderActions}
             onShowNotifs={onShowNotifs} onOpenMenu={onOpenMenu} hamburgerRef={hamburgerRef}
@@ -936,6 +951,9 @@ export default function HomeScreen({
                 renderHubV2(). Adding it to the redesign is a guard change, made at go-live. */}
           </View>
         </ScrollView>
+
+        {/* The solid strip under the status bar once the photo is gone. */}
+        {overCanvas && <View pointerEvents="none" style={[s.rStatusStrip, { height: insets.top }]} />}
 
         <WeatherSheet visible={weatherOpen} weatherData={weatherData} lang={lang} locale={locale}
           onClose={() => setWeatherOpen(false)} />
@@ -1508,6 +1526,8 @@ const s = StyleSheet.create({
 
   // ─── Redesign (feat/redesign) ───
   rCanvas:      { flex: 1, backgroundColor: colors.canvas },
+  rStatusStrip: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.canvas,
+                  borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   rBelow:       { paddingHorizontal: 16 },
   rWidgets:     { flexDirection: 'row', gap: 12, marginTop: 16 },
   rCol:         { flex: 1 },

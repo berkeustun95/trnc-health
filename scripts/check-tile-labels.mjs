@@ -382,6 +382,7 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
   const groupKeys = [...read('constants/homeGroups.js').matchAll(/titleKey:\s*'([a-zA-Z0-9_]+)'/g)].map(m => m[1])
   if (!extraKeys.length || !groupKeys.length) problems.push('redesign: read ZERO keys from constants/homeGroups.js')
   const { tCount } = await import('../constants/i18n.js')
+  const { REGION_LABEL_KEY } = await import('../constants/regions.js')
   const { untilTr } = await import('../utils/turkishTime.js')
   const UNTILS = ['00:00', '19:00', '20:00', '22:00']
   // The badge key is read from ServicePanels.js, not typed here, so a renamed key cannot
@@ -412,11 +413,18 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
     for (const k of groupKeys) rAssess(600, t(k, L), 15, rTile(W) * 4 - 24 - 16, `redesign ${W}dp ${L} panel:${k}`, cur, 1)
     // Duty tile — px and numberOfLines MIRROR Widgets.js (title 14/600 × 2, count 13/600 × 3,
     // until 13/400 × 1, warnings 13/600 × 3). Change one, change both.
-    rAssess(600, t('stripDutyTitle', L), 14, rWidget(W), `redesign ${W}dp ${L} duty:title`, cur, 2)
+    // The arrow shares the title row: 18pt glyph + 8pt gap.
+    rAssess(600, t('stripDutyTitle', L), 14, rWidget(W) - 26, `redesign ${W}dp ${L} duty:title`, cur, 2)
     for (const n of [1, 13]) rAssess(600, tCount('hrDutyCount', n, L), 13, rWidget(W), `redesign ${W}dp ${L} duty:count(${n})`, cur, 3)
     for (const u of UNTILS) {
       const str = L === 'Turkish' ? untilTr(u) : t('hrDutyUntil', L).replace('{time}', u)
       rAssess(400, str, 13, rWidget(W), `redesign ${W}dp ${L} duty:until(${u})`, cur, 1)
+    }
+    // Hero chip: the DISTRICT never ellipsizes (only the landmark does). Row = W − 2·16, minus
+    // the credit "i" (26) + gap (8), chip padding (2·11), pin (13) + 3 gaps (3·5), and ~34pt
+    // kept for "· L…" so a landmark is always at least hinted. Mirrors RedesignHero.js.
+    for (const key of Object.values(REGION_LABEL_KEY)) {
+      rAssess(600, t(key, L), 12, W - 32 - 34 - 22 - 13 - 15 - 34, `redesign ${W}dp ${L} heroChip:${key}`, cur, 1)
     }
     for (const k of ['hrDutyPartial', 'hrDutyUnavailable']) rAssess(600, t(k, L), 13, rWidget(W), `redesign ${W}dp ${L} duty:${k}`, cur, 3)
   }

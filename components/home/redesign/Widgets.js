@@ -9,8 +9,9 @@ import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
 import { Bone, ErrorState, IconButton } from '../../ui'
 
-// Sized for the longest locale at 320dp: title 2 lines, count 3, until 1 (npm run labels:check).
-export const TILE_H = 172
+// Sized for the longest locale at 320dp: title 2 lines, count 3, until 1 = 132pt of content
+// (npm run labels:check measures the strings; this is their height budget).
+export const TILE_H = 136
 export const GAP = 12
 
 // ─── Duty pharmacies (compact: same size as the weather tile) ────────────────
@@ -39,25 +40,35 @@ export function DutyTile({ summary, lang, onPress, onRetry, dutyRef }) {
   const a11y = [t('stripDutyTitle', lang), countLine, fresh ? untilText : null, alertText,
     error ? t('hrDutyUnavailable', lang) : null].filter(Boolean).join(', ')
 
+  // The photo shows while the roster is healthy (or still loading). An alert or a failed
+  // fetch REPLACES it with the tinted surface and dark text — the V2 strip's rule: an
+  // unhealthy duty card must be unmistakable at a glance, not a shade different.
+  const onPhoto = !alert && !error
+  const ink = onPhoto ? '#FFFFFF' : category.health.ink
   return (
     <TouchableOpacity ref={dutyRef} collapsable={false} onPress={onPress} activeOpacity={press.card}
       accessibilityRole="button" accessibilityLabel={a11y}
-      style={[s.tile, { height: TILE_H, backgroundColor: category.health.bg }, alert && s.alertBorder]}>
-      <View style={s.tileTop}>
-        <View style={s.iconDisc}>
-          <Ionicons name={alert || error ? 'alert-circle' : 'medkit'} size={18} color={category.health.ink} />
-        </View>
-        <Ionicons name="arrow-forward" size={18} color={category.health.ink} />
+      style={[s.tile, s.photoTile, { height: TILE_H, backgroundColor: category.health.bg }, alert && s.alertBorder]}>
+      {onPhoto && (
+        <>
+          <Image source={DUTY_IMAGE} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <View style={[StyleSheet.absoluteFill, s.scrim]} />
+        </>
+      )}
+      <View style={s.titleRow}>
+        <Text style={[s.dutyTitle, { color: onPhoto ? '#FFFFFF' : colors.textPrimary }]} numberOfLines={2}>
+          {t('stripDutyTitle', lang)}
+        </Text>
+        <Ionicons name={alert || error ? 'alert-circle' : 'arrow-forward'} size={18} color={ink} />
       </View>
-      <Text style={s.dutyTitle} numberOfLines={2}>{t('stripDutyTitle', lang)}</Text>
-      {!loaded && (<><Bone width="90%" height={12} style={{ marginTop: 6 }} /><Bone width="60%" height={12} style={{ marginTop: 6 }} /></>)}
+      {!loaded && (<><Bone width="90%" height={12} style={{ marginTop: 8 }} /><Bone width="60%" height={12} style={{ marginTop: 6 }} /></>)}
       {loaded && error && (
         <ErrorState compact lang={lang} message={t('hrDutyUnavailable', lang)} onRetry={onRetry} style={{ marginTop: 2 }} />
       )}
       {loaded && !error && (
         <>
-          {!!countLine && <Text style={s.dutyLine} numberOfLines={3}>{countLine}</Text>}
-          {fresh && !!untilText && <Text style={s.dutySub} numberOfLines={1}>{untilText}</Text>}
+          {!!countLine && <Text style={[s.dutyLine, onPhoto && s.onPhoto]} numberOfLines={3}>{countLine}</Text>}
+          {fresh && !!untilText && <Text style={[s.dutySub, onPhoto && s.onPhoto]} numberOfLines={1}>{untilText}</Text>}
           {alert && <Text style={s.alertText} numberOfLines={3}>{alertText}</Text>}
         </>
       )}
@@ -109,9 +120,9 @@ export function OliSearchCard({ lang, onPress, searchRef }) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={press.card} accessibilityRole="search"
       accessibilityLabel={`${t('homeOliTitle', lang)}. ${t('hrOliField', lang)}`}
-      style={[s.tile, s.oliCard]}>
+      style={s.oliCard}>
       <Image source={require('../../../assets/oli-button.png')} style={s.oli} resizeMode="contain"
-        accessibilityIgnoresInvertColors />
+        accessibilityIgnoresInvertColors pointerEvents="none" />
       <View style={s.oliBody}>
         <Text style={s.oliTitle} numberOfLines={1}>{t('homeOliTitle', lang)}</Text>
         <View ref={searchRef} collapsable={false} style={s.oliField}>
@@ -129,6 +140,8 @@ export function OliSearchCard({ lang, onPress, searchRef }) {
 // banner never stands empty. Photo, dark band, time chip (events only). Dismiss exists only
 // on a notice, as in V2.
 const EVENTS_IMAGE = require('../../../assets/backgrounds/ada-bg-events.png')
+// The old live strip's duty card photo, reused (no new image).
+const DUTY_IMAGE = require('../../../assets/backgrounds/ada-bg-duty-pharmacy.png')
 const NOTICE_FALLBACK = { accommodation: require('../../../assets/backgrounds/ada-bg-accommodation.png') }
 
 export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
@@ -168,10 +181,13 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
 const s = StyleSheet.create({
   tile:        { borderRadius: radii.widget, padding: 12 },
   alertBorder: { borderWidth: 1.5, borderColor: colors.dangerInk },
-  tileTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  iconDisc:    { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.card,
-                 justifyContent: 'center', alignItems: 'center' },
-  dutyTitle:   { ...type.body, fontFamily: 'Inter_600SemiBold', lineHeight: 18, color: colors.textPrimary, marginTop: 8 },
+  photoTile:   { overflow: 'hidden' },
+  // White on this photo under 0.60 black: p95 6.51:1 (393dp tile) / 6.45 (320dp), measured
+  // on ada-bg-duty-pharmacy.png at tile size — every pixel, since text can sit anywhere.
+  scrim:       { backgroundColor: 'rgba(0,0,0,0.60)' },
+  onPhoto:     { color: '#FFFFFF' },
+  titleRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  dutyTitle:   { ...type.body, fontFamily: 'Inter_600SemiBold', lineHeight: 18, flex: 1 },
   dutyLine:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, marginTop: 2 },
   dutySub:     { ...type.small, color: colors.textSecondary, marginTop: 1 },
   alertText:   { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.dangerInk, marginTop: 2 },
@@ -181,12 +197,17 @@ const s = StyleSheet.create({
   cond:        { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, marginTop: 4 },
   uv:          { ...type.meta, color: colors.textSecondary, marginTop: 2 },
 
-  oliCard:     { backgroundColor: colors.primary, overflow: 'hidden', minHeight: 124, paddingLeft: 96,
-                 justifyContent: 'center' },
-  oli:         { position: 'absolute', left: 8, bottom: -6, width: 84, height: 84 },
-  oliBody:     { gap: 10 },
+  // ─── MASCOT GEOMETRY, FROM THE ASSET'S OWN ALPHA BOUNDS ────────────────────
+  // oli-button.png is 1024² and the art occupies x 26.6–72.3%, y 5.3–91.5%. At 136pt the
+  // visible mascot is 117pt tall on a 100pt card, feet on the card's bottom edge, head
+  // ~17pt above its top (it pops). Visible left edge 8pt, right edge 70pt, so the content
+  // starts at 78 — flush beside the mascot, no gap. overflow stays visible for the pop.
+  oliCard:     { backgroundColor: colors.primary, borderRadius: radii.widget, height: 100,
+                 paddingLeft: 78, paddingRight: 12, justifyContent: 'center', overflow: 'visible' },
+  oli:         { position: 'absolute', left: -28, bottom: -12, width: 136, height: 136 },
+  oliBody:     { gap: 6 },
   oliTitle:    { ...type.sectionHeading, color: colors.onPrimary },
-  oliField:    { flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, borderRadius: 999,
+  oliField:    { flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, borderRadius: 999,
                  backgroundColor: colors.card, paddingHorizontal: 14 },
   oliFieldText:{ ...type.body, color: colors.textSecondary, flex: 1 },
 
