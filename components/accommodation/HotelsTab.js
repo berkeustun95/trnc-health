@@ -17,8 +17,9 @@ import OsmAttribution from '../OsmAttribution'
 // filtered on the device — the dropdowns answer instantly and only offer values that
 // actually have a hotel behind them.
 
-// photo_source drives the KITOB credit; description_i18n the card text (both 20261063).
-const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, gallery_urls, photo_source, description_i18n, is_kitob_member'
+// photo_source drives the credit (KITOB, or photo_credit for a Commons photo — 20261065);
+// description_i18n the card text (20261063).
+const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, gallery_urls, photo_source, photo_credit, description_i18n, is_kitob_member'
 
 const CLASS_RANK = Object.fromEntries(HOTEL_CLASSES.map((k, i) => [k, i]))
 const collator = new Intl.Collator('tr')
@@ -84,6 +85,9 @@ function HotelPhotos({ hotel, lang }) {
       )}
       {hotel.photo_source === 'hnc' && (
         <Text pointerEvents="none" style={hs.photoCredit} numberOfLines={1}>{t('hotelPhotoCredit', lang)}</Text>
+      )}
+      {hotel.photo_source === 'commons' && !!hotel.photo_credit && (
+        <Text pointerEvents="none" style={hs.photoCredit} numberOfLines={1}>{t('hotelPhotoCreditBy', lang).replace('{credit}', hotel.photo_credit)}</Text>
       )}
     </View>
   )

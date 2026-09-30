@@ -275,7 +275,9 @@ WITH report AS (
     ('1063_hotels_kitob_guide','hotels','description_i18n'),
     ('1063_hotels_kitob_guide','hotels','kitob_page_url'),
     -- 1064. The card's swipeable photos, cover first. HotelsTab selects it: MISSING = 42703 on the tab.
-    ('1064_hotels_gallery','hotels','gallery_urls')
+    ('1064_hotels_gallery','hotels','gallery_urls'),
+    -- 1065. Credit for a free-licence (Commons) photo. HotelsTab selects it: MISSING = 42703 on the tab.
+    ('1065_hotels_commons_credit','hotels','photo_credit')
 
   ) e(m,t,c)
 
@@ -726,7 +728,9 @@ WITH report AS (
     ('1063_hotels_kitob_guide','hotels_description_i18n_check'),
     ('1063_hotels_kitob_guide','hotels_kitob_page_url_check'),
     -- 1064. The H token asserts the cover-first rule.
-    ('1064_hotels_gallery','hotels_gallery_check')
+    ('1064_hotels_gallery','hotels_gallery_check'),
+    -- 1065. The H token asserts the NULL-safe two-way rule.
+    ('1065_hotels_commons_credit','hotels_photo_credit_check')
 
   ) e(m,o)
 
@@ -3603,6 +3607,18 @@ WITH report AS (
       COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_description_i18n_check')
                LIKE '%octet_length((description_i18n)::text) <= 40000%', false)
+    -- (1) 'commons' is an allowed photo source (the 1063 token owns the two-way clause).
+    UNION ALL SELECT '1065_hotels_commons_credit','hotels_photo_source_check allows commons',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_source_check')
+               LIKE '%''commons''::text%', false)
+    -- (2) The credit travels with 'commons' and nothing else, NULL-safe: IS NOT DISTINCT FROM
+    --     renders as NOT (… IS DISTINCT FROM …). The plain `=` form lets a credit sit on a
+    --     photo-less row, because a CHECK passes on NULL.
+    UNION ALL SELECT '1065_hotels_commons_credit','hotels_photo_credit_check: credit exactly with commons, NULL-safe',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_credit_check')
+               LIKE '%NOT (photo_source IS DISTINCT FROM ''commons''::text)) = (photo_credit IS NOT NULL)%', false)
   ) z
 
   UNION ALL

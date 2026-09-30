@@ -691,7 +691,8 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('hotels', 'photo_source', false, NULL, 'text'),
     ('hotels', 'description_i18n', false, NULL, 'jsonb'),
     ('hotels', 'kitob_page_url', false, NULL, 'text'),
-    ('hotels', 'gallery_urls', false, NULL, 'text[]')
+    ('hotels', 'gallery_urls', false, NULL, 'text[]'),
+    ('hotels', 'photo_credit', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -841,7 +842,8 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('hotels_kitob_page_url_check', '9|^https://hotelsofnorthcyprus\.com/hotels/[a-z0-9-]+/$', 'kitob_page_url'),
     ('hotels_link_scheme_check', '^https://|^https?://', 'photo_url|website'),
     ('hotels_name_check', '1|200', 'name'),
-    ('hotels_photo_source_check', 'hnc', 'photo_source|photo_url'),
+    ('hotels_photo_credit_check', '1|200|[\r\n]|commons', 'photo_credit|photo_source'),
+    ('hotels_photo_source_check', 'commons|hnc', 'photo_source|photo_url'),
     ('hotels_pkey', '', 'id'),
     ('hotels_region_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'region'),
     ('hotels_source_check', 'kitob', 'source'),

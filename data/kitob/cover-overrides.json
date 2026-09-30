@@ -2,9 +2,14 @@
   "_readme": "Per-hotel cover photo for the Oteller card, keyed by the hotel's KITOB name (as in the KITOB list). {\"cover\": \"<part of a source file name on hotelsofnorthcyprus.com>\"} moves that photo to the front of the gallery; {\"cover\": null} shows no photo (placeholder). Read by scripts/import-hnc-hotels.mjs; a name that matches no hotel stops the import.",
   "overrides": {
     "Merit Lefkoşa Hotel & Casino": {
-      "cover": null,
-      "reason": "KITOB's page has no photo of the hotel: its gallery is a museum, an event poster and 3 Unsplash stock images, and its featured image is stock too.",
-      "date": "2026-09-29"
+      "commons": {
+        "file": "Tall buildings in North Nicosia.JPG",
+        "author": "Seksen iki yüz kırk beş",
+        "license": "CC0",
+        "page": "https://commons.wikimedia.org/wiki/File:Tall_buildings_in_North_Nicosia.JPG"
+      },
+      "reason": "KITOB's page has no photo of the hotel (a museum, an event poster and stock images). Commons CC0 photo (2012), Bedrettin Demirel Avenue: the hotel on the right with the MERIT roof sign; the YAR office tower on the left. Chosen over 'Merit and YAR highrises in North Nicosia 1-3' (CC BY-SA 3.0), where the YAR tower and logo dominate.",
+      "date": "2026-09-30"
     },
     "Almond Holiday Village": {
       "cover": "almond-havuz",
