@@ -77,6 +77,9 @@ serve(async () => {
     const lang = p.preferred_language || 'English'
     return {
       user_id: p.id,
+      // 20261066. Deploy AFTER that migration: before it, this column does not exist and
+      // the whole day's insert fails.
+      type: 'duty',
       title: getDutyTitle(lang),
       body: getDutyBody(lang, duties),
     }

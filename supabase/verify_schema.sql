@@ -277,7 +277,9 @@ WITH report AS (
     -- 1064. The card's swipeable photos, cover first. HotelsTab selects it: MISSING = 42703 on the tab.
     ('1064_hotels_gallery','hotels','gallery_urls'),
     -- 1065. Credit for a free-licence (Commons) photo. HotelsTab selects it: MISSING = 42703 on the tab.
-    ('1065_hotels_commons_credit','hotels','photo_credit')
+    ('1065_hotels_commons_credit','hotels','photo_credit'),
+    -- 1066. What a notification is. App.js selects it: MISSING = 42703, the notifications list renders empty.
+    ('1066_notification_type','notifications','type')
 
   ) e(m,t,c)
 
@@ -730,7 +732,9 @@ WITH report AS (
     -- 1064. The H token asserts the cover-first rule.
     ('1064_hotels_gallery','hotels_gallery_check'),
     -- 1065. The H token asserts the NULL-safe two-way rule.
-    ('1065_hotels_commons_credit','hotels_photo_credit_check')
+    ('1065_hotels_commons_credit','hotels_photo_credit_check'),
+    -- 1066. Its allow-list token lands after the apply, written from prod's own rendering.
+    ('1066_notification_type','notifications_type_check')
 
   ) e(m,o)
 
@@ -3619,6 +3623,16 @@ WITH report AS (
       COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_credit_check')
                LIKE '%NOT (photo_source IS DISTINCT FROM ''commons''::text)) = (photo_credit IS NOT NULL)%', false)
+    -- ── 1066: notifications.type ────────────────────────────────────────────────
+    -- (1) Every function that inserts a notification sets `type`. DERIVED: the writer set is
+    --     read from pg_proc, not named, so a seventh writer that forgets goes red here. Six
+    --     today; a legitimate new writer bumps the count in the same commit, saying why.
+    UNION ALL SELECT '1066_notification_type','6 notification writers, all six set type, none uses the 3-column INSERT',
+      COALESCE((SELECT count(*) = 6
+                   AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES%')
+                   AND NOT bool_or(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body) VALUES%')
+                  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                 WHERE n.nspname = 'public' AND p.prosrc ~* 'insert\s+into\s+(public\.)?notifications\M'), false)
   ) z
 
   UNION ALL

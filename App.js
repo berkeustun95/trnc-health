@@ -1057,7 +1057,7 @@ export default function App() {
         }
       })
     setNotifsLoading(true)
-    supabase.from('notifications').select('id, title, body, read, created_at')
+    supabase.from('notifications').select('id, title, body, read, created_at, type')
       .eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
       .then(({ data }) => { if (data) setNotifications(data); setNotifsLoading(false) })
 
