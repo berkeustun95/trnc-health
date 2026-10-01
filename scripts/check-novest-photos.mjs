@@ -5,7 +5,10 @@
 //   node scripts/check-novest-photos.mjs --self   # offline: the threshold rule only
 //
 // Read-only. A live listing (source='novest', status='active') with no property_images
-// row renders as a card with no picture. Some can never have one — the partner's own
+// row is HIDDEN from users by the RESTRICTIVE policy props_hide_photoless_novest (20261068)
+// and comes back on its own once a photo row exists. This check lists the hidden ones and
+// ALSO proves the policy is still doing it: an anon client must see exactly live − hidden.
+// If the policy is ever dropped, photo-less cards reappear and this goes red. Some can never have one — the partner's own
 // media 404 (novest-20111: all six references dead) — so a FEW are expected and are
 // listed as a ::warning::, not a failure. The run FAILS only when more than 10% of live
 // listings have none: that is a mirror pass that stopped running (novest-images is
@@ -63,15 +66,24 @@ async function all(table, select, filter = q => q) {
 const live = await all('properties', 'id,external_id,title', q => q.eq('source', 'novest').eq('status', 'active'))
 const ids = new Set((await all('property_images', 'property_id')).map(r => r.property_id))
 const without = live.filter(p => !ids.has(p.id))
+// The rule, observed from outside: what an app user (anon key, RLS applies) can see.
+const anon = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+const { count: visible, error: ve } = await anon.from('properties').select('id', { count: 'exact', head: true }).eq('source', 'novest').eq('status', 'active')
+if (ve) { console.error(`anon read failed: ${ve.message}`); process.exit(2) }
 const v = verdict(without.length, live.length)
 const pct = live.length ? (100 * without.length / live.length).toFixed(1) : '0.0'
 
 console.log(`Novest photos: ${live.length} live listing(s), ${without.length} with no photo (${pct}%, fail above ${MAX_SHARE * 100}%)`)
+console.log(`  app users see ${visible} — expected ${live.length - without.length} (the ${without.length} without a photo are hidden)`)
 for (const p of without) console.log(`  · ${p.external_id}  ${p.title}`)
 if (without.length) {
   const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
-  console.log(`::warning title=Novest listings with no photo::` + esc(`${without.length} of ${live.length} live listing(s): ` +
+  console.log(`::warning title=Novest listings hidden (no photo)::` + esc(`${without.length} of ${live.length} live listing(s) have no photo and are HIDDEN from users until one is mirrored: ` +
     without.map(p => `${p.external_id} (${p.title})`).join('; ')))
+}
+if (visible !== live.length - without.length) {
+  console.error(`\n✗ app users see ${visible} live Novest listings, expected ${live.length - without.length}: the hide rule (props_hide_photoless_novest) is not in effect.`)
+  process.exit(1)
 }
 if (v === 'fail') {
   console.error(`\n✗ ${pct}% of live Novest listings have no photo — more than ${MAX_SHARE * 100}%. Run: gh workflow run novest-images -f apply=true`)

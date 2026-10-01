@@ -159,6 +159,9 @@ name joined to a clinic review is a health disclosure about an identified person
 - **`MODULE_FLAGS` does not gate search** (`search_content`). Pre-launch content is seeded in its
   table's unpublished state and published in the same step as the flag.
 - New admin-seeded directories DEFAULT to unpublished (`is_active DEFAULT false`), with an H token.
+- **A live Novest listing with no `property_images` row is hidden from app users** by the RESTRICTIVE
+  policy `props_hide_photoless_novest` (20261068) and reappears on the next read once a photo row exists:
+  no flag, no job, no OTA. Never delete or delist a listing to hide it. `daily-health` lists the hidden ones.
 - EXPIRING content ships with a staleness check (`check-*-staleness.mjs`, hand/cron, not pre-push); a
   table that cannot legitimately be empty renders empty as an ERROR STATE.
 - All back handlers register via `addBackListener` (`utils/backHandler.js`), never

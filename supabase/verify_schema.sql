@@ -3625,6 +3625,25 @@ WITH report AS (
     UNION ALL SELECT '1067_ledger_comment_supabase_migrate','schema_migrations_applied comment names supabase-migrate and keeps the baseline caveat',
       COALESCE(obj_description(to_regclass('public.schema_migrations_applied'), 'pg_class')
                  LIKE 'One row per applied migration.%Baseline rows%supabase-migrate GitHub Actions workflow%', false)
+    -- ── 1068: a live Novest listing with no photo is hidden (RESTRICTIVE policy) ──
+    -- (1) The policy: RESTRICTIVE, SELECT, and the three arms as code shapes. A PERMISSIVE
+    --     copy would OR with props_select_public and hide nothing.
+    UNION ALL SELECT '1068_novest_hide_photoless','props_hide_photoless_novest is RESTRICTIVE SELECT on novest + is_admin() + property_has_photo(id)',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='properties'
+        AND policyname='props_hide_photoless_novest' AND permissive='RESTRICTIVE' AND cmd='SELECT'
+        AND qual LIKE '%novest%' AND qual LIKE '%is_admin()%' AND qual LIKE '%property_has_photo(id)%')
+    -- (2) The FULL policy set on properties, derived: 7 before 1068 + this one. Q3 never
+    --     counted properties, so this token owns the count.
+    UNION ALL SELECT '1068_novest_hide_photoless','properties has exactly 8 policies',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='properties') = 8
+    -- (3) The helper: DEFINER (so property_images' policy, which reads properties, is never
+    --     entered — no 42P17 cycle), search_path pinned, STABLE, and EXECUTE-able by anon —
+    --     the positive control: a helper nobody can run makes every guest read error.
+    UNION ALL SELECT '1068_novest_hide_photoless','private.property_has_photo: DEFINER, search_path pinned, STABLE, anon can execute',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 's'
+                   AND EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) c WHERE c LIKE 'search_path=%')
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('private.property_has_photo(uuid)')), false)
+      AND COALESCE(has_function_privilege('anon', to_regprocedure('private.property_has_photo(uuid)'), 'EXECUTE'), false)
   ) z
 
   UNION ALL
