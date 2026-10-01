@@ -42,9 +42,14 @@ jobs:
       - name: novest:health
         if: success() || failure()
         run: npm run -s novest:health
-      - name: novest:verify
+      # novest:verify is NOT here on purpose: it is the post-import check (88 rows, all
+      # active, a fixed image-less set) and reads red on a healthy, grown catalogue. Run it
+      # by hand after an import. This is the standing question it was answering daily:
+      - name: novest:photos (live listings with no photo; fails above 10%)
         if: success() || failure()
-        run: npm run -s novest:verify
+        run: |
+          node scripts/check-novest-photos.mjs --self
+          npm run -s novest:photos
       - name: notify:health
         if: success() || failure()
         run: npm run -s notify:health

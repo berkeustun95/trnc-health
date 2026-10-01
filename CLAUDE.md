@@ -74,7 +74,8 @@ Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; secret
 - Apple user deletion: `revoke-apple-token -f user_id=<uuid>` BEFORE deleting the user.
 - Edge functions: `supabase-functions-deploy -f function=<name>|all`. verify_jwt comes from
   `supabase/functions/deploy-config.json` (read from prod); a new function is added there first.
-- Health: `daily-health` (05:00 UTC daily: hotels, novest health + verify, notify). A red run emails.
+- Health: `daily-health` (05:00 UTC daily: hotels, novest health, novest photos (fails > 10% of live
+  listings photo-less), notify). A red run emails. `npm run novest:verify` is post-import only, by hand in CI.
 - Migrations: `supabase-migrate -f file=<FULL name>.sql` (dry: SQL + ledger check), then `-f apply=true`.
   Stamp first (`node scripts/migration-ledger.mjs --stamp <file>`; `--verify` checks it). Never `db push`:
   prod has no CLI ledger and 13 prefixes repeat. Details: supabase/CLAUDE.md.
