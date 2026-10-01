@@ -26,7 +26,7 @@ const NARROW_W = 350
 export function labelCap(width) { return width < NARROW_W ? LABEL_CAP_NARROW : LABEL_CAP }
 const LABEL_BOX = 38
 
-export function ServiceTile({ mod, cat, lang, onPress, labelWeight = 500, width = '25%' }) {
+export function ServiceTile({ mod, cat, lang, onPress, width = '25%' }) {
   const cap = labelCap(useWindowDimensions().width)
   const override = mod.gridLabel
   const lines = override?.lines ?? 2
@@ -42,7 +42,7 @@ export function ServiceTile({ mod, cat, lang, onPress, labelWeight = 500, width 
       </View>
       <View style={s.labelBox}>
         <Text
-          style={[s.label, { fontFamily: labelWeight === 700 ? 'Inter_700Bold' : 'Inter_500Medium' },
+          style={[s.label,
             override && { fontSize: override.size, lineHeight: GRID_LABEL_HEIGHT / lines }]}
           numberOfLines={lines}
           maxFontSizeMultiplier={cap}
@@ -54,7 +54,7 @@ export function ServiceTile({ mod, cat, lang, onPress, labelWeight = 500, width 
   )
 }
 
-export default function ServicePanels({ lang, onPress, labelWeight }) {
+export default function ServicePanels({ lang, onPress }) {
   const cap = labelCap(useWindowDimensions().width)
   return (
     <View style={{ gap: 12 }}>
@@ -66,7 +66,7 @@ export default function ServicePanels({ lang, onPress, labelWeight }) {
           </View>
           <View style={s.grid}>
             {g.modules.map(mod => (
-              <ServiceTile key={mod.id} mod={mod} cat={g.key} lang={lang} onPress={onPress} labelWeight={labelWeight} />
+              <ServiceTile key={mod.id} mod={mod} cat={g.key} lang={lang} onPress={onPress} />
             ))}
           </View>
         </View>
@@ -76,12 +76,12 @@ export default function ServicePanels({ lang, onPress, labelWeight }) {
 }
 
 // Favourites: the same tile, in a single white panel, coloured by each module's category.
-export function FavouritePanel({ ids, modules, lang, onPress, labelWeight }) {
+export function FavouritePanel({ ids, modules, lang, onPress }) {
   return (
     <View style={[s.panel, elevation.card]}>
       <View style={s.grid}>
         {ids.map(id => modules.get(id)).filter(Boolean).map(mod => (
-          <ServiceTile key={mod.id} mod={mod} cat={categoryOf(mod.id)} lang={lang} onPress={onPress} labelWeight={labelWeight} />
+          <ServiceTile key={mod.id} mod={mod} cat={categoryOf(mod.id)} lang={lang} onPress={onPress} />
         ))}
       </View>
     </View>
@@ -96,7 +96,8 @@ const s = StyleSheet.create({
   grid:     { flexDirection: 'row', flexWrap: 'wrap' },
   tile:     { alignItems: 'center', paddingVertical: 8, paddingHorizontal: TILE_PAD },
   labelBox: { height: LABEL_BOX, alignSelf: 'stretch', marginTop: 8, overflow: 'hidden' },
-  label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, color: colors.tileInk, textAlign: 'center' },
+  // Medium (500) — final (Berke, 2026-10-01). check-tile-labels reads this family to pick its font.
+  label:    { fontSize: 11, lineHeight: GRID_LABEL_LINE_HEIGHT, fontFamily: 'Inter_500Medium', color: colors.tileInk, textAlign: 'center' },
   // "Yakında": white on tileInk, 8.61:1. Sits over the icon's top edge so the label box —
   // the 68pt budget above — is untouched.
   soon:     { position: 'absolute', top: -7, alignSelf: 'center', paddingHorizontal: 6, height: 16,

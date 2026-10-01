@@ -356,7 +356,14 @@ for (const W of WIDTHS) {
 }
 
 // ═══ REDESIGNED HOME (feat/redesign) ═══════════════════════════════════════
-// Real Inter metrics, the new geometry, BOTH label weights (the dev "Aa 500/700" toggle),
+// The tile label's face, derived (the dev 500/700 toggle is gone; Medium is final): unreadable = fail.
+const R_LABEL_WEIGHT = Number(((readFileSync(resolve(ROOT, 'components/home/redesign/ServicePanels.js'), 'utf8')
+  .match(/\blabel:\s*\{[^}]*fontFamily:\s*'Inter_(\d{3})/) || [])[1]))
+if (![400, 500, 600, 700].includes(R_LABEL_WEIGHT)) {
+  console.error('check-tile-labels: cannot read the redesign tile label fontFamily from ServicePanels.js — measuring nothing')
+  process.exit(1)
+}
+// Real Inter metrics, the new geometry, the tile label's weight READ from ServicePanels' style,
 // at system font scale 1.0 AND 1.3, at 320 / 360 / 393dp, in all 9 locales. Each element's
 // maxFontSizeMultiplier is READ FROM SOURCE and applied: effective px = px · min(scale, cap).
 // Everything is read from source; a renamed style or constant fails the guard rather than
@@ -441,7 +448,7 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
   }
   for (const W of WIDTHS_R) for (const S of SCALES) for (const L of Object.keys(LANG_CODES)) {
     const cur = CURSIVE.has(L), at = `redesign ${W}dp ×${S} ${L}`
-    for (const w of [500, 700]) {
+    for (const w of [R_LABEL_WEIGHT]) {
       for (const m of HOME_MODULES) {
         rAssess(w, t(m.labelKey, L), 11, lCap(W), S, rLabel(W), `${at} ${w} tile:${m.id}`, cur, 2)
         if (m.gridLabel) rAssess(w, t(m.gridLabel.key, L), m.gridLabel.size, lCap(W), S, rLabel(W), `${at} ${w} gridLabel:${m.id}`, cur, m.gridLabel.lines)

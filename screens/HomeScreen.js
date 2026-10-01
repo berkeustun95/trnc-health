@@ -246,9 +246,6 @@ export default function HomeScreen({
   // Home unmounts this entry and the app default comes back by itself.
   const [overCanvas, setOverCanvas] = useState(false)
   const [oliOnScreen, setOliOnScreen] = useState(true)   // Oli bar carousel pauses when scrolled away
-  // DEV-ONLY: tile labels Medium (500) vs Bold (700). Toggled by the "Aa" chip beside
-  // "Tüm hizmetler", which only renders in __DEV__. Default Medium.
-  const [labelWeight, setLabelWeight] = useState(500)
   const [snap] = useState(() => (backRef ? homeState : null))
   const [showFacilityList, setShowFacilityList] = useState(snap?.showFacilityList ?? forceFacilityList)
   const [searchText, setSearchText]             = useState(snap?.searchText ?? '')
@@ -959,18 +956,10 @@ export default function HomeScreen({
 
             <SectionHeader title={t('favSectionTitle', lang)}
               action={{ label: t('favEdit', lang), onPress: () => setFavEditOpen(true) }} />
-            <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} labelWeight={labelWeight} />
+            <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
 
-            <View style={s.rAllHead}>
-              <SectionHeader title={t('hrAllServices', lang)} style={{ flex: 1 }} />
-              {__DEV__ && (
-                <TouchableOpacity style={s.rDevChip} onPress={() => setLabelWeight(w => (w === 500 ? 700 : 500))}
-                  accessibilityRole="button" accessibilityLabel={`DEV label weight ${labelWeight}`}>
-                  <Text style={s.rDevChipText}>Aa {labelWeight}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <ServicePanels lang={lang} onPress={openModule} labelWeight={labelWeight} />
+            <SectionHeader title={t('hrAllServices', lang)} />
+            <ServicePanels lang={lang} onPress={openModule} />
 
             {/* No ad slot here yet: check-ad-placement.mjs pins the home_footer mount to
                 renderHubV2(). Adding it to the redesign is a guard change, made at go-live. */}
@@ -1748,10 +1737,6 @@ const s = StyleSheet.create({
   rBelow:       { paddingHorizontal: 16 },
   rWidgets:     { flexDirection: 'row', gap: 12, marginTop: 12 },
   rCol:         { flex: 1 },
-  rAllHead:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rDevChip:     { marginTop: 24, marginBottom: 12, minHeight: 32, paddingHorizontal: 10, borderRadius: 16,
-                  borderWidth: 1, borderColor: colors.border, justifyContent: 'center' },
-  rDevChipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary },
 
   // Hub V2 (HOME_V2_LIVE)
   // No `gap` and no horizontal padding: the hero is full-bleed and the Oli row overlaps

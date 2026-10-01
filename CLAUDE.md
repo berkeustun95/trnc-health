@@ -105,10 +105,12 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
 - Match the data-fetch pattern: query Supabase → useState → render.
 - **Ask for ONE item per message** (an ID, a query result, a decision) and wait.
 - **Push the working branch after EVERY slice**, feature branches too ("push to git" still = main).
-- **Device tests are served from `~/trnc-health-swipe`, never `~/trnc-health`** (shared with other
-  sessions; Metro bundles its folder's working tree). `git -C ~/trnc-health-swipe checkout <branch>`,
-  then `NODE_PATH=~/.npm-global/lib/node_modules npx expo start -c --tunnel` there; URL from
-  `curl 127.0.0.1:4040/api/tunnels`. iOS uses TestFlight "My Expo Go" (SDK 54), not App Store Expo Go.
+- **Device tests never run from `~/trnc-health`** (shared with other sessions; Metro bundles its
+  folder's working tree). **The redesign (`feat/redesign`) is served from `~/trnc-health-redesign`:
+  Berke starts it himself with `npx expo start --lan --go`** — don't start one. Other branches:
+  `git -C ~/trnc-health-swipe checkout <branch>`, then `NODE_PATH=~/.npm-global/lib/node_modules
+  npx expo start -c --tunnel` there; URL from `curl 127.0.0.1:4040/api/tunnels`. iOS uses TestFlight
+  "My Expo Go" (SDK 54), not App Store Expo Go.
 
 ## Security (non-negotiable)
 Why: profiles, reviews and messages are personal data on a declared 13+ mixed-audience app, and a
