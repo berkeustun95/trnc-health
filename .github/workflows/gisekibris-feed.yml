@@ -60,12 +60,17 @@ concurrency:
 
 jobs:
   sync:
-    # TODO(before 2026-10-19): GitHub moves `ubuntu-latest` to Ubuntu 26 from 19 Oct
-    # (actions/runner-images#14748; announced as a notice on run 36412513281). Either
-    # pin `ubuntu-24.04` on BOTH jobs, or do one workflow_dispatch with
-    # `runs-on: ubuntu-26.04` on a branch first. What can break: `npm ci` rebuilding
+    # Pinned, not `ubuntu-latest`, which moves to Ubuntu 26 from 2026-10-19
+    # (actions/runner-images#14748). Moving is a deliberate edit, tested with one
+    # workflow_dispatch on a branch first: what can break is `npm ci` rebuilding
     # sharp's native binary, and Node 24 from setup-node on the new image.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    # Setting this block zeroes every scope it does not list, so contents: read is
+    # what keeps checkout working. issues: write is for the unmapped-category step
+    # only; the repo default token is read-only.
+    permissions:
+      contents: read
+      issues: write
     timeout-minutes: 20
     env:
       GISEKIBRIS_FEED_URL: ${{ secrets.GISEKIBRIS_FEED_URL }}
@@ -148,6 +153,41 @@ jobs:
       - name: Transform to the clean seed
         run: node scripts/prepare-gisekibris-feed.mjs supabase/seed/gisekibris-feed-raw.json
 
+      # An unmapped category no longer halts the sync: prepare imports it as 'other'
+      # and records it in meta.unmapped_categories. This step turns each one into an
+      # email — a new issue per value, or a comment on the open one with that exact
+      # title, so a label that stays unmapped for a week is one thread, not seven.
+      # continue-on-error: a reporting failure must not block the import. prepare's
+      # ::warning:: annotation is the fallback signal if this step goes orange.
+      # The raw value is partner-controlled text: it only ever travels as a quoted
+      # argument or a jq --arg, never interpolated into shell source.
+      - name: Report unmapped categories
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          seed=supabase/seed/gisekibris-events-clean.json
+          n=$(jq '.meta.unmapped_categories | length' "$seed")
+          if [ "$n" = "0" ]; then echo "No unmapped categories."; exit 0; fi
+          open_issues=$(gh issue list --state open --limit 200 --json number,title)
+          jq -c '.meta.unmapped_categories[]' "$seed" | while IFS= read -r u; do
+            raw=$(jq -r '.raw // "(empty)"' <<<"$u")
+            count=$(jq -r '.count' <<<"$u")
+            title="Gişe Kıbrıs: unmapped category $raw"
+            body=$(printf '%s\n\n%s\n\n%s\n' \
+              "Run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID imported $count event(s) with raw category \`$raw\` as **other**." \
+              "Fix: add the value to \`CATEGORY\` in scripts/prepare-gisekibris-feed.mjs (events_category_check: music, nightlife, sports, arts, family, other). The next sync moves those rows out of 'other'." \
+              "Close this issue once the mapping is on main.")
+            num=$(jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty' <<<"$open_issues")
+            if [ -n "$num" ]; then
+              gh issue comment "$num" --body "$body"
+              echo "Commented on #$num: $title"
+            else
+              gh issue create --title "$title" --body "$body"
+              echo "Opened: $title"
+            fi
+          done
+
       # --apply nulls any ticket_url that no longer resolves. Exits non-zero if a
       # row in the feed is cancelled, which halts the job on purpose.
       - name: Probe ticket URLs and cancellation flags
@@ -196,7 +236,7 @@ jobs:
   #   without this appearing.
   weekly-heartbeat:
     if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned with sync — see the note there
     timeout-minutes: 10
     env:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
