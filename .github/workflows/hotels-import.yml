@@ -1,0 +1,66 @@
+# ─── KITOB hotels import ─────────────────────────────────────────────────────
+#
+# Production is written only from GitHub Actions (scripts/lib/prod-write-guard.mjs).
+# The list must be committed under data/kitob/ first. Default is a dry run.
+#
+#   gh workflow run hotels-import -f file=data/kitob/<file>.csv -f list_date=YYYY-MM-DD
+#   gh workflow run hotels-import -f file=data/kitob/<file>.csv -f list_date=YYYY-MM-DD -f apply=true
+
+name: hotels-import
+
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: 'KITOB CSV, committed under data/kitob/'
+        type: string
+        required: true
+      list_date:
+        description: 'Date printed on the KITOB list (YYYY-MM-DD)'
+        type: string
+        required: true
+      apply:
+        description: 'Write to production (otherwise a dry run)'
+        type: boolean
+        default: false
+      allow_mass_delist:
+        description: 'Pass --allow-mass-delist (only after reading a dry run)'
+        type: boolean
+        default: false
+
+concurrency: { group: prod-hotels, cancel-in-progress: false }
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      IN_FILE: ${{ inputs.file }}
+      IN_DATE: ${{ inputs.list_date }}
+      IN_APPLY: ${{ inputs.apply }}
+      IN_MASS: ${{ inputs.allow_mass_delist }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Secrets and inputs
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+          [[ "$IN_FILE" =~ ^data/kitob/[^/]+\.csv$ ]] || { echo "::error::file must be data/kitob/<name>.csv, got: $IN_FILE"; exit 1; }
+          [ -f "$IN_FILE" ] || { echo "::error::$IN_FILE is not in this commit — commit it first"; exit 1; }
+          [[ "$IN_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "::error::list_date must be YYYY-MM-DD"; exit 1; }
+      - name: Self-test (offline)
+        run: node scripts/import-kitob-hotels.mjs --self
+      - name: Import
+        run: |
+          args=("$IN_FILE" --list-date "$IN_DATE")
+          [ "$IN_APPLY" = "true" ] && args+=(--apply)
+          [ "$IN_MASS" = "true" ] && args+=(--allow-mass-delist)
+          node scripts/import-kitob-hotels.mjs "${args[@]}"

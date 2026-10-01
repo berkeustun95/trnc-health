@@ -144,8 +144,11 @@ jobs:
           node scripts/check-feed-secrets.mjs --selftest
           node scripts/fetch-gisekibris-feed.mjs --selftest
           node scripts/prepare-gisekibris-feed.mjs --selftest
+          node scripts/import-gisekibris-events.mjs --selftest
           node scripts/check-gisekibris-urls.mjs --selftest
           node scripts/sweep-gisekibris-cancellations.mjs --selftest
+          node scripts/check-prod-write-guard.mjs --selftest
+          node scripts/check-prod-write-guard.mjs
 
       - name: Fetch the live feed
         run: node scripts/fetch-gisekibris-feed.mjs
@@ -232,8 +235,10 @@ jobs:
   #   the workflow, the heartbeat stops too and no email is sent, because nothing
   #   failed. Closing that properly needs a dead-man's switch OUTSIDE this repo
   #   (a service that alerts when it has NOT heard from us). Until then the honest
-  #   statement is: run `npm run gisekibris:health` by hand if a Monday goes by
-  #   without this appearing.
+  #   statement is: if a Monday goes by without this appearing, dispatch the
+  #   workflow (`gh workflow run gisekibris-feed`) and read its Content health step.
+  #   `npm run gisekibris:health` no longer runs locally: it needs the service key,
+  #   and no Mac holds one since 2026-10-01.
   weekly-heartbeat:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-24.04   # pinned with sync — see the note there

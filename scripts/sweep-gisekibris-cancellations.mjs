@@ -55,6 +55,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SEED = resolve(ROOT, 'supabase/seed/gisekibris-events-clean.json')
@@ -87,6 +88,8 @@ const MAX_SHARE = 0.25
 const args = process.argv.slice(2)
 const dry = args.includes('--dry')
 const selftest = args.includes('--selftest')
+prodWriteGuard({ wouldWrite: !dry && !selftest, workflow: 'gisekibris-feed',
+  dryHint: 'node scripts/sweep-gisekibris-cancellations.mjs --dry' })
 
 // ─── The decision, as a pure function ───────────────────────────────────────
 //

@@ -27,6 +27,9 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   buckets are public today, only `avatars` is private (signed URLs, `Avatar.js`).
 - ⚠ **Never raise `min_supported_version` above `'1.0.0'`** without the force-tier device pass.
 - ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`** — the wrappers are the only guard.
+- ⚠ **Production is written only from GitHub Actions.** No service key on any Mac (removed 2026-10-01);
+  every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New writer = new
+  `workflow_dispatch` workflow, dry by default. Humans still write via the SQL editor (migrations, SOP).
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
 - ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
 - ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `NOTICE_FALLBACK` in `LiveStrip.js`, rank 3b
@@ -203,7 +206,7 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
 - A name the provider gave is never asked for again (App Store 4.0); Apple sends it once.
 - `display_name` is labelled "Username" in all nine locales, never "name".
 - The three native modules are `require()`d inside functions (`check-native-import-safety.mjs`).
-- Deleting an Apple user outside the app: `node scripts/revoke-apple-token.mjs <user-id>` FIRST,
+- Deleting an Apple user outside the app: `gh workflow run revoke-apple-token -f user_id=<id>` FIRST,
   confirm revoked, THEN delete (`apple_refresh_tokens` cascades with `auth.users`).
 - `handle_new_user` reads no metadata; names reach `profiles` from the client only.
 

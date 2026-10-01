@@ -16,8 +16,12 @@
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+// A write (it revokes Apple's grant and deletes the stored token), so CI only:
+//   gh workflow run revoke-apple-token -f user_id=<uuid>
+prodWriteGuard({ wouldWrite: true, workflow: 'revoke-apple-token' })
 const userId = process.argv[2]
 const key = process.env.SUPABASE_SECRET_KEY
 

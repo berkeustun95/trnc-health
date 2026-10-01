@@ -32,6 +32,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { metresBetween } from '../constants/walkingRoutes.js'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ORS_URL = 'https://api.openrouteservice.org/v2/directions/foot-walking/geojson'
@@ -50,6 +51,8 @@ const MAX_EXTRA_M = 100
 const STALE_M = 50
 const dry = process.argv.includes('--dry')
 const force = process.argv.includes('--force')
+// No workflow: needs the ORS API key, which is not a repository secret.
+prodWriteGuard({ wouldWrite: !dry, workflow: null, dryHint: 'node scripts/import-walking-legs.mjs --dry' })
 
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 const sleep = ms => new Promise(r => setTimeout(r, ms))

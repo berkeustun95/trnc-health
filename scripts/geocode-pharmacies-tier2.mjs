@@ -49,12 +49,15 @@ import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { prodWriteGuard } from './lib/prod-write-guard.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const KEYCHAIN_SERVICE = 'ada-supabase-service-role';
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
+// RETIRED (CLAUDE.md, geocoding policy): no workflow, and none should be added.
+prodWriteGuard({ wouldWrite: !DRY_RUN, workflow: null, dryHint: 'node scripts/geocode-pharmacies-tier2.mjs --dry-run' });
 const LIMIT = Number(args[args.indexOf('--limit') + 1]) || 25;
 
 function loadEnv() {

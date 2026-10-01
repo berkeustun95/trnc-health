@@ -32,6 +32,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATA = join(ROOT, 'scripts/data/visitncy')
@@ -39,6 +40,8 @@ const SOURCE = 'visitncy'
 const TAIL_JUMP_M = 1000
 const MIN_STOPS = 4
 const dry = process.argv.includes('--dry')
+// No workflow: its input (data/visitncy/matches.json) is not in the repo.
+prodWriteGuard({ wouldWrite: !dry, workflow: null, dryHint: 'node scripts/import-visitncy-routes.mjs --dry' })
 
 // Map → route identity. Names mirror Visit NCY's own map titles ("Kyrenia City Map / Girne
 // Şehir Haritası"); sort_order is the order the region chips list the cities in.

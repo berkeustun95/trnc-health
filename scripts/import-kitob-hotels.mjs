@@ -24,7 +24,6 @@
 // Credentials: EXPO_PUBLIC_SUPABASE_URL from .env; the service-role key from the macOS
 // Keychain entry the Novest importer uses. Nothing is printed or written to disk.
 
-import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -32,9 +31,9 @@ import { createHash } from 'node:crypto'
 import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY } from '../constants/hotels.js'
 import { LANG_CODES } from '../constants/i18n.js'
 import { REGIONS } from '../constants/regions.js'
+import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const KEYCHAIN_SERVICE = 'ada-supabase-service-role'
 const SOURCE = 'kitob'
 const DELIST_FLOOR = 0.7
 
@@ -365,19 +364,6 @@ function loadEnv() {
   }
 }
 
-function serviceRoleKey() {
-  let out
-  try {
-    out = execFileSync('security', ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-w'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-  } catch {
-    fail(`Keychain entry "${KEYCHAIN_SERVICE}" not found.`)
-  }
-  const key = out.trim()
-  if (!key || key.startsWith('sb_publishable_')) fail(`Keychain entry "${KEYCHAIN_SERVICE}" is empty or holds the publishable key.`)
-  return key
-}
-
 async function main() {
   const args = process.argv.slice(2)
   const apply = args.includes('--apply')
@@ -385,6 +371,8 @@ async function main() {
   const dateAt = args.indexOf('--list-date')
   const listDate = dateAt >= 0 ? args[dateAt + 1] : null
   const file = args.find((a, i) => !a.startsWith('--') && (dateAt < 0 || i !== dateAt + 1))
+  prodWriteGuard({ wouldWrite: apply, workflow: 'hotels-import',
+    dryHint: 'npm run hotels:import -- data/kitob/<file>.csv --list-date YYYY-MM-DD' })
 
   if (!file) fail('Usage: npm run hotels:import -- <file.csv> --list-date YYYY-MM-DD [--apply]')
   if (!listDate || !/^\d{4}-\d{2}-\d{2}$/.test(listDate) || Number.isNaN(Date.parse(listDate))) {

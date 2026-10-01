@@ -105,7 +105,8 @@
     "hero:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-contrast.mjs",
     "labels:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs",
     "backchain:check": "node scripts/check-back-chain.cjs",
-    "backlistener:check": "node scripts/check-back-listener.mjs"
+    "backlistener:check": "node scripts/check-back-listener.mjs",
+    "check:prod-writes": "node scripts/check-prod-write-guard.mjs"
   },
   "private": true,
   "devDependencies": {

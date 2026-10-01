@@ -40,7 +40,6 @@
 // When the feed outgrows one page (>100 listings) this is worth revisiting WITH a real
 // cursor column, added deliberately rather than derived from a clock we do not own.
 
-import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -53,14 +52,16 @@ import {
   INTENT_BY_STATUS, DISTRICT_BY_STATE, AREA_ALIASES, FEATURE_TO_COLUMN, placeListing,
 } from '../supabase/functions/_shared/novest-feed.mjs'
 import { AREAS_BY_REGION, areaSlug } from '../constants/areas.js'
+import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const KEYCHAIN_SERVICE = 'ada-supabase-service-role'
 const dry = process.argv.includes('--dry')
 // Maps and validates the whole feed with NO database connection and no credentials.
 // This is how a mapping change is tested: every CHECK constraint below is enforced in
 // JS, so a row that would be rejected by Postgres is caught here instead of at 3am.
 const offline = process.argv.includes('--offline')
+prodWriteGuard({ wouldWrite: !dry && !offline, workflow: 'novest-import',
+  dryHint: 'node scripts/import-novest-properties.mjs --dry  (or --offline: no DB at all)' })
 
 // Fewer than this share of the previously-active rows coming back means something is
 // wrong with THEIR site, not with their listings. Delisting on a bad fetch would empty
@@ -82,23 +83,6 @@ function loadEnv() {
   }
 }
 
-function serviceRoleKey() {
-  let out
-  try {
-    out = execFileSync('security', ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-w'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-  } catch {
-    fail(`Keychain entry "${KEYCHAIN_SERVICE}" not found.`, '',
-      'Create it with:', `  security add-generic-password -a "$USER" -s ${KEYCHAIN_SERVICE} -w`)
-  }
-  const key = out.trim()
-  if (!key) fail(`Keychain entry "${KEYCHAIN_SERVICE}" is empty.`)
-  if (key.startsWith('sb_publishable_')) {
-    fail(`Keychain entry "${KEYCHAIN_SERVICE}" holds the PUBLISHABLE key, not the secret one.`,
-      'It is bound by RLS and cannot write rows with agent_id NULL.')
-  }
-  return key
-}
 
 // ─── Row mapping ─────────────────────────────────────────────────────────────
 

@@ -33,6 +33,7 @@ import { fileURLToPath } from 'node:url'
 import { normaliseFile, fold } from './import-kitob-hotels.mjs'
 import { resolveRegion } from '../utils/resolveRegion.js'
 import { osmSnapshot } from './lib/osm-snapshot.mjs'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CSV = 'data/kitob/kitob-2026-09-17.csv'
@@ -42,6 +43,8 @@ const args = process.argv.slice(2)
 const DRY = args.includes('--dry-run')
 const APPLY = args.includes('--apply')
 const LIMIT = args.includes('--limit') ? Number(args[args.indexOf('--limit') + 1]) : Infinity
+// No workflow: needs GOOGLE_PLACES_API_KEY, which is not a repository secret.
+prodWriteGuard({ wouldWrite: APPLY, workflow: null, dryHint: 'node scripts/geocode-kitob-hotels.mjs --dry-run' })
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 
 // Accent-insensitive, Turkish-aware, Greek-safe comparison form.
