@@ -12,7 +12,7 @@ import { REGION_TO_DUTY } from '../constants/regions'
 import { dutyStatus, localDateKey, DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { buildFacilityIndex, matchDutyRow } from '../utils/dutyFacilityMatch'
 import { REDESIGN } from '../constants/redesign'
-import { ScreenHeader as KitHeader, ListCard, InfoBanner, InlineAlert, ContactBar, Button, CardSkeleton, ModuleScreen, SectionHeader } from '../components/ui'
+import { ScreenHeader as KitHeader, InfoBanner, InlineAlert, ContactBar, Button, CardSkeleton, ModuleScreen, SectionHeader } from '../components/ui'
 import { CARD_BG } from '../components/ui/ModuleScreen'
 import { colors as C, category, type, radii, elevation } from '../constants/theme'
 
@@ -164,32 +164,51 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
 
 // Redesign: the equal list card. Same URLs as PharmacyCard, byte for byte; no ranking of
 // any kind — the order is the list's own (district, then name; or nearest-first).
+// Redesign duty card: the LIVE app's layout (Berke, 2026-10-01: "cards are too tall") in the new
+// card style — 93% white, radius 20, elevation.card, kit type tokens. No icon well. Equal for every
+// pharmacy. Row 1 name + hours pill · row 2 region chip + straight-line distance · row 3 address
+// (one line; the full address is its accessibility label) · row 4 the NUMBER on a solid teal
+// button + Yol Tarifi outlined, 44pt. Directions URL unchanged (name + address + country search).
 function PharmacyCardRedesign({ item, showRegionBadge, lang }) {
-  const actions = [
-    item.phone ? { kind: 'call', onPress: () => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`), accessibilityLabel: `${t('call', lang)} ${item.phone}` } : null,
-    {
-      kind: 'directions',
-      onPress: () => Linking.openURL(
-        `https://maps.google.com/?q=${encodeURIComponent(
-          [item.name, item.address, 'Kuzey Kıbrıs'].filter(Boolean).join(', ')
-        )}`
-      ),
-    },
-  ].filter(Boolean)
+  const region = showRegionBadge && item.region ? regionLabel(item.region, lang) : null
+  const dist = item._dist != null ? `${item._dist.toFixed(1)} km ${t('dutyStraightLine', lang)}` : null
   return (
-    <ListCard
-      title={item.name}
-      subtitle={item.address || null}
-      leading={{ icon: 'medkit-outline', category: 'health' }}
-      badge={`${item.open_from}–${item.open_until}`}
-      meta={[
-        showRegionBadge && item.region ? { icon: 'location-outline', text: regionLabel(item.region, lang) } : null,
-        item._dist != null ? { icon: 'navigate-outline', text: `${item._dist.toFixed(1)} km · ${t('dutyStraightLine', lang)}` } : null,
-      ]}
-      actions={actions}
-      lang={lang}
-      style={r.card}
-    />
+    <View style={r.pCard}>
+      <View style={r.pTop}>
+        <Text style={r.pName} numberOfLines={2}>{item.name}</Text>
+        <View style={r.pHours}><Text style={r.pHoursText} numberOfLines={1}>{item.open_from}–{item.open_until}</Text></View>
+      </View>
+      {region || dist ? (
+        <View style={r.pMeta}>
+          {region ? <View style={r.pRegion}><Text style={r.pRegionText} numberOfLines={1}>{region}</Text></View> : null}
+          {region && dist ? <Text style={r.pMetaText}>·</Text> : null}
+          {dist ? <Text style={[r.pMetaText, { flexShrink: 1 }]} numberOfLines={1}>{dist}</Text> : null}
+        </View>
+      ) : null}
+      {item.address ? (
+        <Text style={r.pAddress} numberOfLines={1} accessibilityLabel={item.address}>{item.address}</Text>
+      ) : null}
+      <View style={r.pActions}>
+        {item.phone ? (
+          <TouchableOpacity style={[r.pBtn, r.pCall]} activeOpacity={0.8}
+            onPress={() => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`)}
+            accessibilityRole="button" accessibilityLabel={`${t('call', lang)} ${item.phone}`}>
+            <Ionicons name="call" size={15} color="#FFFFFF" />
+            <Text style={r.pCallText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{item.phone}</Text>
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity style={[r.pBtn, r.pDir]} activeOpacity={0.8}
+          onPress={() => Linking.openURL(
+            `https://maps.google.com/?q=${encodeURIComponent(
+              [item.name, item.address, 'Kuzey Kıbrıs'].filter(Boolean).join(', ')
+            )}`
+          )}
+          accessibilityRole="button" accessibilityLabel={`${t('getDirections', lang)}: ${item.name}`}>
+          <Ionicons name="navigate-outline" size={15} color={C.primaryDark} />
+          <Text style={r.pDirText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{t('getDirections', lang)}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   )
 }
 
@@ -352,7 +371,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
 
           {loading ? (
             <View style={{ paddingTop: 8 }}>
-              {[0, 1, 2].map(i => <CardSkeleton key={i} height={132} style={r.card} />)}
+              {[0, 1, 2].map(i => <CardSkeleton key={i} height={150} style={r.card} />)}
             </View>
           ) : empty ? (
             /* An ERROR state, never an empty state: there is always a duty pharmacy in the
@@ -591,6 +610,24 @@ const r = StyleSheet.create({
   center:       { flex: 1, justifyContent: 'center' },
   listContent:  { paddingTop: 4, paddingBottom: 40 },
   card:         { marginBottom: 10 },
+  pCard:        { backgroundColor: CARD_BG, borderRadius: radii.card, padding: 16, marginBottom: 10, ...elevation.card },
+  pTop:         { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  pName:        { ...type.rowTitle, fontFamily: 'Inter_700Bold', color: C.textPrimary, flex: 1 },
+  pHours:       { backgroundColor: C.primaryLight, borderRadius: radii.pill, paddingHorizontal: 9, paddingVertical: 3, flexShrink: 0 },
+  pHoursText:   { ...type.caption, fontFamily: 'Inter_700Bold', color: C.primaryDark },
+  pMeta:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  pRegion:      { backgroundColor: C.soft, borderRadius: radii.pill, paddingHorizontal: 8, paddingVertical: 2, flexShrink: 0 },
+  pRegionText:  { ...type.meta, fontFamily: 'Inter_600SemiBold', color: C.textPrimary },
+  pMetaText:    { ...type.meta, color: C.textSecondary },
+  pAddress:     { ...type.small, color: C.textSecondary, marginTop: 6 },
+  pActions:     { flexDirection: 'row', gap: 8, marginTop: 12 },
+  pBtn:         { flex: 1, minHeight: 44, borderRadius: radii.md, paddingHorizontal: 10,
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  pCall:        { flex: 1.35, backgroundColor: C.primary },   // the number is longer than "Yol Tarifi" (fits 320dp at ≥ 0.8 scale)
+  pCallText:    { ...type.body, fontFamily: 'Inter_700Bold', color: '#FFFFFF', flexShrink: 1 },
+  // backgroundColor explicit: borderRadius + borderWidth on Android renders opaque otherwise.
+  pDir:         { backgroundColor: C.card, borderWidth: 1.5, borderColor: C.primary },
+  pDirText:     { ...type.body, fontFamily: 'Inter_700Bold', color: C.primaryDark, flexShrink: 1 },
   note:         { marginBottom: 10 },
   partial:      { flexShrink: 0, marginBottom: 12 },
   regionHeader: { marginTop: 16, marginBottom: 8 },

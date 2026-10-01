@@ -205,15 +205,18 @@ function FeatureSlide({ slide, lang }) {
 const R_PHOTO = {
   welcome: require('../assets/backgrounds/ada-bg-transportation.jpg'),
   explore: require('../assets/backgrounds/ada-bg-events.jpg'),
-  settle:  require('../assets/backgrounds/ada-bg-home-services.jpg'),
+  settle:  require('../assets/backgrounds/ada-bg-accommodation.jpg'),   // shared with Welcome + the location screen: own crop
   oli:     require('../assets/backgrounds/ada-bg-duty-pharmacy.jpg'),
 }
 // The recognisable part of each photo (source x/y, 0–1) and how much to enlarge it, so the
-// coast, the street lights, the craftsman and the pharmacy sit in the visible photo zone.
+// coast, the street lights, the terrace and the pharmacy sit in the visible photo zone.
+// The Kyrenia photo is used three times (Welcome: harbour + castle · location screen: bougainvillea
+// and boats · Settle in: the terrace lounge), each on a clearly different part of it. The stone
+// houses were too thin a strip of the photo to fill the zone without heavy zoom.
 const R_FOCUS = {
   welcome: { x: 0.5,  y: 0.64, zoom: 1.25 },   // coastal road + bus
   explore: { x: 0.5,  y: 0.62, zoom: 1.2 },    // string lights + crowd
-  settle:  { x: 0.4,  y: 0.70, zoom: 1.2 },    // craftsman at the bench
+  settle:  { x: 0.9,  y: 0.76, zoom: 2.0 },    // the terrace lounge: cushions, throw, lantern
   oli:     { x: 0.55, y: 0.64, zoom: 1.15 },   // shelves + pharmacist
 }
 const R_SCENE = {

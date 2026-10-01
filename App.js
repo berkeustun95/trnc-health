@@ -1126,6 +1126,24 @@ export default function App() {
     setPolicySeen(LEGAL_VERSION)
     setPendingLang(selectedLang)
     setOnboarded(true)
+    if (REDESIGN) askLocationAfterOnboarding()
+  }
+
+  // Redesign: the location explanation comes RIGHT AFTER the onboarding slides on a new install
+  // (startup skipped it, see load()). Same handling as the startup ask from here on.
+  async function askLocationAfterOnboarding() {
+    try {
+      const r = await requestWithPrimer('location', { auto: true })
+      setLocationCanAsk(r.canAskAgain)
+      if (r.status !== 'granted') { setLocationDenied(true); return }
+      const loc = await passiveFix(Location.Accuracy.Balanced)
+      if (!loc) { setLocationDenied(true); return }
+      setUserLocation(loc.coords)
+      setLocationDenied(false)
+      fetchWeather(loc.coords)
+    } catch {
+      setLocationDenied(true)
+    }
   }
 
   async function reloadFacilities() {
@@ -1401,7 +1419,11 @@ export default function App() {
       }
 
       let resolvedCoords = { latitude: 35.1856, longitude: 33.3823 }
-      try {
+      // Redesign, new install: the location ask waits until the onboarding slides are done
+      // (completeOnboarding → askLocationAfterOnboarding). Read from storage, not `onboarded`:
+      // this runs at mount, before that state has loaded. Existing users: unchanged.
+      const firstRun = REDESIGN && (await AsyncStorage.getItem('@trnc_onboarded').catch(() => null)) !== 'true'
+      if (!firstRun) try {
         let status
         if (REDESIGN) {
           const r = await requestWithPrimer('location', { auto: true })

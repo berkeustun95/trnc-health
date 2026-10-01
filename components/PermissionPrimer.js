@@ -13,8 +13,9 @@ import { primerStore, registerHost, answerPrimer } from '../utils/permissionPrim
 // Back = "Şimdi değil".
 const KIND = {
   location: {
-    photo: require('../assets/backgrounds/ada-bg-duty-pharmacy.jpg'),
-    focus: { x: 0.55, y: 0.64, zoom: 1.15 },
+    // The Kyrenia photo, like Welcome — but the bougainvillea and boats, not Welcome's castle.
+    photo: require('../assets/backgrounds/ada-bg-accommodation.jpg'),
+    focus: { x: 0.1, y: 0.58, zoom: 1.8 },
     scene: require('../assets/oli-scenes/health.png'),
     title: 'permLocationTitle', body: 'permLocationBody',
   },

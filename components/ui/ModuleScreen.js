@@ -15,7 +15,7 @@ import { OnPhotoContext } from './onPhoto'
 export const MODULE_TINT = 0.25
 export const HEADER_SCRIM = 0.5
 export const HEADER_BAND = 60      // pt below the status bar: the screen header
-export const SCRIM_FADE = 56
+export const SCRIM_FADE = 20      // short: the photo's upper part shows right below the header, as in the live app
 export const PILL_ALPHA = 0.55
 export const CARD_ALPHA = 0.93
 export const CARD_BG = `rgba(255,255,255,${CARD_ALPHA})`
@@ -46,7 +46,9 @@ export default function ModuleScreen({ topic, children, style }) {
     <OnPhotoContext.Provider value={true}>
       <View style={[s.root, style]}>
         <StatusBar style="light" />
-        {!!photo && <Image source={photo} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />}
+        {/* Placed like the live app's PageBackground (inside a top-edge SafeAreaView): from below the
+            status bar, cover, centred — so the photo's top (the duty pharmacy's beams) sits under the header. */}
+        {!!photo && <Image source={photo} style={[s.photo, { top: insets.top }]} resizeMode="cover" accessibilityIgnoresInvertColors />}
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${MODULE_TINT})` }]} />
         <View pointerEvents="none" style={[s.band, { top: 0, height: insets.top + HEADER_BAND, backgroundColor: `rgba(0,0,0,${HEADER_SCRIM})` }]} />
         <Image pointerEvents="none" source={DARK_FADE} resizeMode="stretch"
@@ -69,6 +71,7 @@ export function OnPhotoLabel({ children, style, textStyle, numberOfLines = 1, ac
 const s = StyleSheet.create({
   root:     { flex: 1, backgroundColor: '#22313A' },
   band:     { position: 'absolute', left: 0, right: 0, width: '100%' },
+  photo:    { position: 'absolute', left: 0, right: 0, bottom: 0 },
   pill:     { alignSelf: 'flex-start', backgroundColor: `rgba(0,0,0,${PILL_ALPHA})`, borderRadius: radii.pill,
               paddingHorizontal: 12, paddingVertical: 5 },
   pillText: { ...type.small, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
