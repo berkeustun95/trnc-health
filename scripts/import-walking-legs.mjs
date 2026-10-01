@@ -20,8 +20,12 @@
 // Ratio routed/straight > MAX_RATIO, or a stop more than MAX_SNAP_M from where the router
 // joined the path network, means the router probably found a different place or a long way
 // round (a gate it could not see, a missing footpath). Those legs are printed and SKIPPED —
-// the app draws them as dashed straight lines — and the run exits 1, so a flag is a
-// decision for a person, never something a re-run quietly accepts. Very short legs (< 60 m
+// the app draws them as dashed straight lines — and listed in ONE ::warning:: annotation
+// (route + leg), exit 0: a flag is a known, standing decision for a person, never
+// something a re-run quietly accepts, but it is not an outage. (Until 2026-10-01 it
+// exited 1, which kept the workflow permanently red over six legs nobody had decided.)
+// EXIT 1 is kept for real failures: ORS HTTP errors, a rejected key, a read or write
+// error — anything that means this run did not do its job. Very short legs (< 60 m
 // straight) are exempt from the ratio: stop pins sit inside buildings, so 30 m can route 80.
 //
 // Rate: ORS Standard allows 40 directions/minute and 2,000/day; one call per 1.6 s.
@@ -97,7 +101,7 @@ for (const r of routes) {
   }
 }
 
-const rows = [], flagged = [], skipped = []
+const rows = [], flagged = [], skipped = [], orsErrors = []
 let n = 0
 for (const [key, { a, b, route, leg }] of pairs) {
   const straight = metresBetween(a, b)
@@ -112,8 +116,8 @@ for (const [key, { a, b, route, leg }] of pairs) {
     body: JSON.stringify({ coordinates: [[a.longitude, a.latitude], [b.longitude, b.latitude]] }),
   })
   if (!res.ok) {
-    flagged.push({ route, leg, a: a.name, b: b.name, why: `ORS HTTP ${res.status}` })
     if (res.status === 401 || res.status === 403) fail('ORS rejected the key (HTTP ' + res.status + ').')
+    orsErrors.push({ route, leg, a: a.name, b: b.name, why: `ORS HTTP ${res.status}` })
     continue
   }
   const f = (await res.json()).features?.[0]
@@ -153,7 +157,16 @@ if (!dry && rows.length) {
 } else if (dry) console.log(`(dry) nothing written${tableReady ? '' : ' — walking_legs does not exist yet'}`)
 
 if (flagged.length) {
-  console.error(`\n${flagged.length} leg(s) NOT written — check each on a map; the app draws them dashed:`)
-  for (const f of flagged) console.error(`  • ${f.route} ${f.leg}: ${f.a} → ${f.b} — ${f.why}`)
+  console.log(`\n${flagged.length} leg(s) NOT written — check each on a map; the app draws them dashed:`)
+  for (const f of flagged) console.log(`  • ${f.route} ${f.leg}: ${f.a} → ${f.b} — ${f.why}`)
+  // One annotation, every leg named (route + leg), escaped per the workflow-command spec.
+  const esc = v => String(v).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
+  console.log(`::warning title=Walking legs not written (quality gate)::` + esc(
+    `${flagged.length} leg(s) failed the quality gate and are drawn dashed: ` +
+    flagged.map(f => `${f.route} ${f.leg} (${f.a} → ${f.b}: ${f.why})`).join('; ')))
+}
+if (orsErrors.length) {
+  console.error(`\n✗ ${orsErrors.length} leg(s) could not be routed — ORS errors, not a quality decision:`)
+  for (const f of orsErrors) console.error(`  • ${f.route} ${f.leg}: ${f.a} → ${f.b} — ${f.why}`)
   process.exit(1)
 }
