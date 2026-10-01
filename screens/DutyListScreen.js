@@ -11,7 +11,7 @@ import { REGION_TO_DUTY } from '../constants/regions'
 import { dutyStatus, localDateKey, DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { buildFacilityIndex, matchDutyRow } from '../utils/dutyFacilityMatch'
 import { REDESIGN } from '../constants/redesign'
-import { ScreenHeader as KitHeader, ListCard, InfoBanner, InlineAlert, ContactBar, Button, CardSkeleton, ModuleScreen, OnPhotoLabel, SectionHeader } from '../components/ui'
+import { ScreenHeader as KitHeader, ListCard, InfoBanner, InlineAlert, ContactBar, Button, CardSkeleton, ModuleScreen, SectionHeader } from '../components/ui'
 import { CARD_BG } from '../components/ui/ModuleScreen'
 import { colors as C, category, type, radii, elevation } from '../constants/theme'
 
@@ -382,10 +382,8 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
               contentContainerStyle={r.listContent}
               stickySectionHeadersEnabled={false}
               renderSectionHeader={({ section }) => (
-                <View style={r.regionHeader}>
-                  <SectionHeader title={regionLabel(section.title, lang)} style={r.regionName} />
-                  {section.data.length > 0 ? <OnPhotoLabel>{section.data.length}</OnPhotoLabel> : null}
-                </View>
+                <SectionHeader style={r.regionHeader}
+                  title={section.data.length > 0 ? `${regionLabel(section.title, lang)} · ${section.data.length}` : regionLabel(section.title, lang)} />
               )}
               renderSectionFooter={({ section }) => (
                 section.data.length === 0 ? <MesaryaNoteRedesign lang={lang} /> : null
@@ -590,8 +588,7 @@ const r = StyleSheet.create({
   card:         { marginBottom: 10 },
   note:         { marginBottom: 10 },
   partial:      { flexShrink: 0, marginBottom: 12 },
-  regionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 16, marginBottom: 8 },
-  regionName:   { flex: 1, marginTop: 0, marginBottom: 0 },
+  regionHeader: { marginTop: 16, marginBottom: 8 },
   errorCard:    { backgroundColor: CARD_BG, borderRadius: 20, padding: 20, alignItems: 'center', ...elevation.card },
   errorIcon:    { width: 56, height: 56, borderRadius: radii.tile, backgroundColor: category.health.bg, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   errorTitle:   { ...type.sheetTitle, color: C.textPrimary, textAlign: 'center', marginBottom: 6 },
