@@ -319,9 +319,10 @@ function genericEventsItem() {
 // does not match, and the ladder continues to rank 4 and then to the terminal rank 6,
 // which reads nothing and cannot fail. So a dismissed notice can never leave an empty
 // card — that property comes from the ladder's existing shape, not from new code.
-// `upcoming` (redesign Home banner): keep `startsAt` on event items for the date chip, and fall
-// back to the NEXT event after today before any non-event rank (see readNextEvent).
+// `upcoming` = the redesign Home banner, which has its own ladder (resolveRedesignBanner).
+// The legacy LiveStrip never passes it, so the ladder below is unchanged for production.
 export async function resolveStripItem({ lang, promosEligible = false, now = new Date(), dismissedIds = null, upcoming = false }) {
+  if (upcoming) return resolveRedesignBanner({ lang, promosEligible, now, dismissedIds })
   const isDismissed = id => !!dismissedIds && dismissedIds.has(String(id))
   const todayIso = isoDay(now)
   let pins = null
@@ -342,16 +343,9 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
     if (e) {
       const withinSoon = e.startsAt - now.getTime() <= STRIP_SOON_HOURS * 60 * 60 * 1000
       const { startsAt, ...item } = e
-      return upcoming ? { ...item, startsAt, soon: withinSoon } : { ...item, soon: withinSoon }
+      return { ...item, soon: withinSoon }
     }
   } catch { /* fall through */ }
-  // ── RANK 3a ── redesign only: the next upcoming event, with its date.
-  if (upcoming) {
-    try {
-      const e = await readNextEvent(now, lang)
-      if (e) return { ...e, soon: false }
-    } catch { /* fall through */ }
-  }
 
   // ── RANK 3b ── a first-party notice. BELOW the event ranks on purpose: an event
   // starting in six hours is time-critical and an announcement is not, so the notice
@@ -399,6 +393,67 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
   }
 
   // ── RANK 6 ── the generic events card. No await, no failure mode.
+  return genericEventsItem()
+}
+
+// ─── THE REDESIGN HOME BANNER — its own ladder (Berke, 2026-10-01) ──────────
+//
+//   0  a pin for TODAY, any kind        home_strip_pin, pin_date = today — the manual override
+//   1  a sponsored promo                the SAME two hard gates as rank 5 above: promosEligible
+//                                       (never a guest, a null DOB or anyone under PROMO_MIN_AGE)
+//                                       and never twice running (STRIP_LAST_KIND_KEY)
+//   2  tonight's event, else the NEXT upcoming event (startsAt kept for the day/time chip)
+//   3  a first-party notice (dormant), then a place added in the last 7 days
+//   4  the generic events card — terminal, reads nothing
+//
+// Every rank catches its own failure and falls through, exactly as the legacy ladder does.
+// DEV_TEST_PROMO: Expo Go only (__DEV__), for testing rank 1 while no promo row is live. Set it
+// LOCALLY and never commit it non-null — a real test row in home_strip_pin would also reach
+// production's LiveStrip. Release builds (ADA Preview, the store app) never read it.
+const DEV_TEST_PROMO = null
+// e.g. { kind: 'promo', id: 'dev-test', title_i18n: { tr: 'Test sponsor', en: 'Test sponsor' },
+//        subtitle_i18n: null, image_url: null, link_url: 'https://getadaapp.com', pin_date: null }
+async function resolveRedesignBanner({ lang, promosEligible, now, dismissedIds }) {
+  const isDismissed = id => !!dismissedIds && dismissedIds.has(String(id))
+  const todayIso = isoDay(now)
+  let pins = null
+  try {
+    pins = await readPins()
+    for (const p of pins.filter(p => p.pin_date === todayIso && !isDismissed(p.id))) {
+      const item = await hydratePin(p, lang)
+      if (item) return item
+    }
+  } catch { /* fall through */ }
+  if (promosEligible) {
+    try {
+      let lastKind = null
+      try { lastKind = await AsyncStorage.getItem(STRIP_LAST_KIND_KEY) } catch { /* absent is fine */ }
+      if (lastKind !== 'promo') {
+        if (!pins) pins = await readPins()
+        const dev = typeof __DEV__ !== 'undefined' && __DEV__ && DEV_TEST_PROMO ? [DEV_TEST_PROMO] : []
+        const pool = [...dev, ...pins.filter(p => p.kind === 'promo' && !p.pin_date && !isDismissed(p.id))]
+        for (const p of pool) {
+          const item = await hydratePin(p, lang)
+          if (item) return item
+        }
+      }
+    } catch { /* fall through */ }
+  }
+  try {
+    const e = (await readEventsToday(now, lang)) || (await readNextEvent(now, lang))
+    if (e) return { ...e, soon: e.startsAt - now.getTime() <= STRIP_SOON_HOURS * 60 * 60 * 1000 }
+  } catch { /* fall through */ }
+  try {
+    if (!pins) pins = await readPins()
+    for (const n of pins.filter(p => p.kind === 'notice' && !p.pin_date && !isDismissed(p.id))) {
+      const item = await hydratePin(n, lang)
+      if (item) return item
+    }
+  } catch { /* fall through */ }
+  try {
+    const p = await readNewPlace(now, lang)
+    if (p) return p
+  } catch { /* fall through */ }
   return genericEventsItem()
 }
 
