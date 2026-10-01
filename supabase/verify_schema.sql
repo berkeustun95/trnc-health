@@ -3619,6 +3619,12 @@ WITH report AS (
       COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_credit_check')
                LIKE '%NOT (photo_source IS DISTINCT FROM ''commons''::text)) = (photo_credit IS NOT NULL)%', false)
+    -- ── 1067: the ledger table's comment names the supabase-migrate workflow ────
+    -- A COMMENT creates no named object. Both halves: the new sentence, and the 20260903
+    -- text it extends (what a baseline row does and does not prove) still leading it.
+    UNION ALL SELECT '1067_ledger_comment_supabase_migrate','schema_migrations_applied comment names supabase-migrate and keeps the baseline caveat',
+      COALESCE(obj_description(to_regclass('public.schema_migrations_applied'), 'pg_class')
+                 LIKE 'One row per applied migration.%Baseline rows%supabase-migrate GitHub Actions workflow%', false)
   ) z
 
   UNION ALL

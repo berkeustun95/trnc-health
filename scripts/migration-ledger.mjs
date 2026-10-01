@@ -192,6 +192,56 @@ if (stampIdx !== -1) {
   process.exit(0)
 }
 
+// ─── --verify: is this file safe for the supabase-migrate workflow? ─────────
+//
+// The workflow sends the file to production UNCHANGED. Atomicity of "the migration and
+// its ledger row" therefore has to be a property of the FILE, and this proves it:
+//   1. it carries its own stamp, naming itself, with the checksum of its stripped body;
+//   2. exactly one top-level `BEGIN;` and one `COMMIT;`, the stamp the last thing before
+//      COMMIT — so a failure anywhere rolls back the whole file AND leaves no ledger row;
+//   3. outside that transaction, only SET ROLE postgres / RESET ROLE / NOTIFY pgrst.
+// Exit 0 = safe to apply. Anything else names every reason.
+const verifyIdx = process.argv.indexOf('--verify')
+if (verifyIdx !== -1) {
+  const f = basename(process.argv[verifyIdx + 1] ?? '')
+  const problems = []
+  if (!f || !files.includes(f)) { console.error(`--verify: ${f || '(none)'} is not in supabase/migrations/`); process.exit(1) }
+  if (f === BOOTSTRAP) { console.error(`${f} is the ledger bootstrap — never applied by the workflow.`); process.exit(1) }
+  const text = readMigration(f)
+  let bare
+  try { bare = stripStamp(text, f) } catch (e) { problems.push(e.message) }
+  if (bare !== undefined) {
+    if (bare === text) problems.push(`no stamp block — run: node scripts/migration-ledger.mjs --stamp ${f}`)
+    else {
+      const m = /VALUES \('([^']+)', '([0-9a-f]{64})'\)/.exec(text.slice(text.indexOf(STAMP_BEGIN)))
+      const want = sha256text(bare)
+      if (!m || m[2] !== want) problems.push(`stamp checksum ${m?.[2]?.slice(0, 12) ?? '?'}… ≠ file checksum ${want.slice(0, 12)}… — edited after stamping? re-run --stamp`)
+    }
+  }
+  const lines = text.split('\n')
+  const at = re => lines.map((l, i) => (re.test(l) ? i : -1)).filter(i => i >= 0)
+  const begins = at(/^BEGIN;\s*$/), commits = at(/^COMMIT;\s*$/)
+  if (begins.length !== 1 || commits.length !== 1) problems.push(`${begins.length} top-level BEGIN; / ${commits.length} COMMIT; — need exactly one each`)
+  else {
+    const [b, c] = [begins[0], commits[0]]
+    const endAt = at(new RegExp('^' + STAMP_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))[0]
+    if (endAt === undefined) { /* unstamped: already reported above */ }
+    else if (endAt < b || endAt > c) problems.push('the stamp is not inside the BEGIN/COMMIT')
+    else if (lines.slice(endAt + 1, c).some(l => l.trim() && !l.trim().startsWith('--'))) problems.push('statements between the stamp and COMMIT — the stamp must be the last statement')
+    const ALLOWED = /^(SET ROLE postgres;|RESET ROLE;|NOTIFY pgrst, 'reload schema';)$/
+    const outside = [...lines.slice(0, b), ...lines.slice(c + 1)].map(l => l.trim()).filter(l => l && !l.startsWith('--'))
+    const stray = outside.filter(l => !ALLOWED.test(l))
+    if (stray.length) problems.push(`outside the transaction (would not roll back): ${stray.slice(0, 3).map(l => JSON.stringify(l.slice(0, 60))).join(', ')}`)
+  }
+  if (problems.length) {
+    console.error(`✗ ${f} is NOT safe for supabase-migrate:`)
+    for (const p of problems) console.error(`    • ${p}`)
+    process.exit(1)
+  }
+  console.log(`✓ ${f}: stamped (${sha256(f).slice(0, 12)}…), one transaction, stamp last, nothing outside it but role/notify`)
+  process.exit(0)
+}
+
 // ─── --baseline: the one-time bootstrap migration ────────────────────────────
 
 if (process.argv.includes('--baseline')) {
