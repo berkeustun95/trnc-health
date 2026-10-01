@@ -220,6 +220,35 @@ async function readEventsToday(now, lang) {
   }
 }
 
+// ─── RANK 3a (REDESIGN only, `upcoming`) — the next event after today ──────────
+// The redesign's Home banner is an EVENT banner with a date chip, not the "Bugün ADA'da"
+// strip, so the midnight cap above does not bind it (Berke, 2026-10-01: "if none tonight, the
+// next upcoming one with its date chip; the generic card only if there are truly no upcoming
+// events"). The legacy LiveStrip never passes `upcoming`, so its ladder is unchanged.
+async function readNextEvent(now, lang) {
+  const endOfDay = new Date(now); endOfDay.setHours(23, 59, 59, 999)
+  const { data, error } = await supabase
+    .from('events')
+    .select('id, title, images, source_image_url, start_date')
+    .eq('status', 'approved')
+    .gt('start_date', endOfDay.toISOString())
+    .order('start_date', { ascending: true })
+    .limit(1)
+  if (error) throw error
+  const e = (data || [])[0]
+  if (!e) return null
+  return {
+    kind: 'event', id: e.id,
+    title: e.title || '',
+    subtitle: eventWhen(e.start_date, lang),
+    icon: 'calendar-outline',
+    imageUrl: firstImage(e.images) || e.source_image_url || null,
+    sponsored: false,
+    action: { type: 'events', id: e.id },
+    startsAt: new Date(e.start_date).getTime(),
+  }
+}
+
 // ─── RANK 4 — a place added in the last 7 days ──────────────────────────────
 //
 // ⚠ created_at IS A SUBMISSION TIMESTAMP, NOT A PUBLICATION ONE, AND THE TWO CAN BE WEEKS
@@ -290,7 +319,9 @@ function genericEventsItem() {
 // does not match, and the ladder continues to rank 4 and then to the terminal rank 6,
 // which reads nothing and cannot fail. So a dismissed notice can never leave an empty
 // card — that property comes from the ladder's existing shape, not from new code.
-export async function resolveStripItem({ lang, promosEligible = false, now = new Date(), dismissedIds = null }) {
+// `upcoming` (redesign Home banner): keep `startsAt` on event items for the date chip, and fall
+// back to the NEXT event after today before any non-event rank (see readNextEvent).
+export async function resolveStripItem({ lang, promosEligible = false, now = new Date(), dismissedIds = null, upcoming = false }) {
   const isDismissed = id => !!dismissedIds && dismissedIds.has(String(id))
   const todayIso = isoDay(now)
   let pins = null
@@ -311,9 +342,16 @@ export async function resolveStripItem({ lang, promosEligible = false, now = new
     if (e) {
       const withinSoon = e.startsAt - now.getTime() <= STRIP_SOON_HOURS * 60 * 60 * 1000
       const { startsAt, ...item } = e
-      return { ...item, soon: withinSoon }
+      return upcoming ? { ...item, startsAt, soon: withinSoon } : { ...item, soon: withinSoon }
     }
   } catch { /* fall through */ }
+  // ── RANK 3a ── redesign only: the next upcoming event, with its date.
+  if (upcoming) {
+    try {
+      const e = await readNextEvent(now, lang)
+      if (e) return { ...e, soon: false }
+    } catch { /* fall through */ }
+  }
 
   // ── RANK 3b ── a first-party notice. BELOW the event ranks on purpose: an event
   // starting in six hours is time-critical and an announcement is not, so the notice

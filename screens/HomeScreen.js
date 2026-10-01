@@ -199,6 +199,7 @@ export default function HomeScreen({
   onToggleFavorite,
   onRetry,
   onShowEvents,
+  onOpenEvent,
   onShowAccommodation,
   onShowPets,
   onShowHomeServices,
@@ -352,7 +353,7 @@ export default function HomeScreen({
     // whatever rank comes next. That is what makes the slot fill again instead of going
     // blank — the card is not hidden, the item is re-resolved without it.
     readStripDismissals()
-      .then(dismissedIds => resolveStripItem({ lang, promosEligible, dismissedIds }))
+      .then(dismissedIds => resolveStripItem({ lang, promosEligible, dismissedIds, upcoming: REDESIGN }))
       .then(item => { if (alive) { setStripItem(item); setStripLoading(false) } })
     return () => { alive = false }
   }, [lang, promosEligible, showFacilityList, stripDismissTick])
@@ -445,7 +446,9 @@ export default function HomeScreen({
       // through EventsScreen's own selection state, which is its own change. The list is
       // date-ordered and the strip only ever surfaces something starting today, so the
       // event is at the top of it.
-      case 'events':    onShowEvents?.(); break
+      // Redesign: the banner names ONE event, so a tap opens that event (App fetches the row;
+      // Back returns here). The generic card has no id and still opens the list.
+      case 'events':    if (REDESIGN && a.id && onOpenEvent) onOpenEvent(a.id); else onShowEvents?.(); break
       // A PINNED place is still reachable — home_strip_pin accepts kind 'place', which is
       // an editorial act rather than a ranked one. The unranked place rank is gone; this
       // branch is not it.

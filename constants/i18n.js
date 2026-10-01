@@ -1895,6 +1895,8 @@ const translations = {
     permNotifOff: "Notifications are off.",
     permNotifTurnOn: "Turn on notifications",
     dutyDirections: "Directions",   // short: two 44pt buttons share a 320dp card
+    stripTonight: "Tonight",
+    stripTomorrow: "Tomorrow",
     stripDutyTitle: "Duty pharmacies",
     stripDutyPartialTitle: "List incomplete",
     stripDutyStaleTitle: "List out of date",
@@ -3749,6 +3751,8 @@ const translations = {
     permNotifOff: "Bildirimler kapalı.",
     permNotifTurnOn: "Bildirimleri aç",
     dutyDirections: "Yol Tarifi",   // short: two 44pt buttons share a 320dp card
+    stripTonight: "Bu akşam",
+    stripTomorrow: "Yarın",
     stripDutyTitle: "Nöbetçi Eczaneler",
     stripDutyPartialTitle: "Liste eksik",
     stripDutyStaleTitle: "Liste eski",
@@ -5382,6 +5386,8 @@ const translations = {
     permNotifOff: "الإشعارات متوقفة.",
     permNotifTurnOn: "تفعيل الإشعارات",
     dutyDirections: "الاتجاهات",   // short: two 44pt buttons share a 320dp card
+    stripTonight: "الليلة",
+    stripTomorrow: "غدًا",
     stripDutyTitle: "صيدليات مناوبة",
     stripDutyPartialTitle: "القائمة ناقصة",
     stripDutyStaleTitle: "القائمة قديمة",
@@ -7016,6 +7022,8 @@ const translations = {
     permNotifOff: "Уведомления выключены.",
     permNotifTurnOn: "Включить уведомления",
     dutyDirections: "Маршрут",   // short: two 44pt buttons share a 320dp card
+    stripTonight: "Сегодня вечером",
+    stripTomorrow: "Завтра",
     stripDutyTitle: "Аптеки",
     stripDutyPartialTitle: "Список неполный",
     stripDutyStaleTitle: "Список устарел",
@@ -8644,6 +8652,8 @@ const translations = {
     permNotifOff: "Οι ειδοποιήσεις είναι απενεργοποιημένες.",
     permNotifTurnOn: "Ενεργοποίηση ειδοποιήσεων",
     dutyDirections: "Οδηγίες",   // short: two 44pt buttons share a 320dp card
+    stripTonight: "Απόψε",
+    stripTomorrow: "Αύριο",
     stripDutyTitle: "Εφημερίες",
     stripDutyPartialTitle: "Λίστα ελλιπής",
     stripDutyStaleTitle: "Λίστα παλιά",
@@ -10276,6 +10286,8 @@ const translations = {
     permNotifOff: "Les notifications sont désactivées.",
     permNotifTurnOn: "Activer les notifications",
     dutyDirections: "Itinéraire",   // short: two 44pt buttons share a 320dp card
+    stripTonight: "Ce soir",
+    stripTomorrow: "Demain",
     stripDutyTitle: "Pharmacies",
     stripDutyPartialTitle: "Liste partielle",
     stripDutyStaleTitle: "Liste périmée",
@@ -11905,6 +11917,8 @@ const translations = {
     permNotifOff: "Las notificaciones están desactivadas.",
     permNotifTurnOn: "Activar notificaciones",
     dutyDirections: "Cómo llegar",   // short: two 44pt buttons share a 320dp card
+    stripTonight: "Esta noche",
+    stripTomorrow: "Mañana",
     stripDutyTitle: "Farmacias",
     stripDutyPartialTitle: "Lista incompleta",
     stripDutyStaleTitle: "Lista caducada",
@@ -13534,6 +13548,8 @@ const translations = {
     permNotifOff: "Benachrichtigungen sind aus.",
     permNotifTurnOn: "Benachrichtigungen einschalten",
     dutyDirections: "Route",   // short: two 44pt buttons share a 320dp card
+    stripTonight: "Heute Abend",
+    stripTomorrow: "Morgen",
     stripDutyTitle: "Notdienst",
     stripDutyPartialTitle: "Liste lückenhaft",
     stripDutyStaleTitle: "Liste veraltet",
@@ -15162,6 +15178,8 @@ const translations = {
     permNotifOff: "اعلان‌ها خاموش است.",
     permNotifTurnOn: "روشن کردن اعلان‌ها",
     dutyDirections: "مسیریابی",   // short: two 44pt buttons share a 320dp card
+    stripTonight: "امشب",
+    stripTomorrow: "فردا",
     stripDutyTitle: "داروخانه کشیک",
     stripDutyPartialTitle: "فهرست ناقص",
     stripDutyStaleTitle: "فهرست قدیمی",

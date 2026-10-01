@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, category, type, radii, press } from '../../../constants/theme'
-import { t, tCount } from '../../../constants/i18n'
+import { t, tCount, LANG_CODES } from '../../../constants/i18n'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
@@ -138,13 +138,33 @@ const EVENTS_IMAGE = require('../../../assets/backgrounds/ada-bg-events.jpg')
 const DUTY_IMAGE = require('../../../assets/backgrounds/ada-bg-duty-pharmacy.jpg')
 const NOTICE_FALLBACK = { accommodation: require('../../../assets/backgrounds/ada-bg-accommodation.jpg') }
 
+// The event's day + time, 24h: "Bu akşam · 21:00" (today from 17:00), "Bugün · 14:00",
+// "Yarın · 20:00", else a short date "3 Eki Cum · 20:00". Device-local time, like the list.
+const pad2 = n => String(n).padStart(2, '0')
+function eventChip(startsAt, lang) {
+  const d = new Date(startsAt)
+  const day0 = new Date(); day0.setHours(0, 0, 0, 0)
+  const that = new Date(d); that.setHours(0, 0, 0, 0)
+  const days = Math.round((that - day0) / 864e5)
+  let day
+  if (days <= 0) day = d.getHours() >= 17 ? t('stripTonight', lang) : t('dateToday', lang)
+  else if (days === 1) day = t('stripTomorrow', lang)
+  else {
+    try { day = d.toLocaleDateString(LANG_CODES[lang] || 'en', { weekday: 'short', day: 'numeric', month: 'short' }) }
+    catch { day = `${d.getDate()}.${d.getMonth() + 1}.` }   // a locale Hermes' Intl lacks
+  }
+  return { text: `${day} · ${pad2(d.getHours())}:${pad2(d.getMinutes())}`, future: days > 0 }
+}
+
 export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
   const kind = item?.kind
   useEffect(() => { if (!loading && kind) rememberStripKind(kind) }, [loading, kind])
   if (loading) return <Bone width="100%" height={160} borderRadius={radii.widget} />
   if (!item) return null
   const title = item.generic ? t(item.titleKey, lang) : item.title
-  const time = item.kind === 'event' && !item.generic && item.subtitle ? item.subtitle : null
+  const isEvent = item.kind === 'event' && !item.generic
+  const chip = isEvent && item.startsAt ? eventChip(item.startsAt, lang) : null
+  const time = chip ? chip.text : isEvent && item.subtitle ? item.subtitle : null
   const tag = item.sponsored ? t('stripSponsored', lang) : item.soon ? t('stripStartingSoon', lang) : null
   const fallback = (item.kind === 'notice' && NOTICE_FALLBACK[item.action?.route]) || EVENTS_IMAGE
   return (
@@ -154,7 +174,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
         <RemoteImage source={item.imageUrl ? { uri: item.imageUrl } : fallback} style={s.bannerPhoto} resizeMode="cover" />
         {!!time && (
           <View style={s.timeChip}>
-            <Ionicons name="time-outline" size={14} color={colors.textPrimary} />
+            <Ionicons name={chip?.future ? 'calendar-outline' : 'time-outline'} size={14} color={colors.textPrimary} />
             <Text style={s.timeText}>{time}</Text>
           </View>
         )}

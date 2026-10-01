@@ -676,6 +676,9 @@ export default function App() {
   // Events detail overlay — hoisted like openedProperty so the Android back chain closes the
   // DETAIL (list stays mounted underneath, scroll + filters intact) instead of the module.
   const [openedEvent, setOpenedEvent] = useState(null)
+  // Redesign Home banner → one event's detail. Back from that detail returns to Home, not to the
+  // Events list the user never opened.
+  const [eventFromHome, setEventFromHome] = useState(false)
   // The dorm showcase overlay. State lives HERE and not in AccommodationScreen for one
   // reason: the Android back chain below. If it were local to that screen, hardware back
   // would fall through to `showAccommodation` and close the whole module instead of the
@@ -852,7 +855,18 @@ export default function App() {
       .then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true }))))
   }
   function closeDutyList()     { setShowDutyList(false); setDutyRegion(null) }
-  function closeEvents()       { setShowEvents(false); setEventsDistrict(null); setOpenedEvent(null) }
+  function closeEvents()       { setShowEvents(false); setEventsDistrict(null); setOpenedEvent(null); setEventFromHome(false) }
+  // Same columns as EventsScreen's list query, so EventDetailScreen gets the row it expects.
+  // Not found (unapproved since, offline) → the list, which is where the generic card goes.
+  async function openEventFromHome(id) {
+    try {
+      const { data } = await supabase.from('events')
+        .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, category, ticket_url, latitude, longitude, price_from, price_text')
+        .eq('id', id).eq('status', 'approved').maybeSingle()
+      if (data) { setOpenedEvent(data); setEventFromHome(true) }
+    } catch {}
+    setShowEvents(true)
+  }
   function closeExploreBeach() { setShowExploreBeach(false); setExploreBeachRegion(null) }
 
   // Returns true if the action was gated (caller should stop). Guests only.
@@ -1029,7 +1043,7 @@ export default function App() {
       // the profile is still incomplete and the gate is there again next launch. A back
       // button that does nothing at all reads as a frozen screen.
       if (gateHealthList) { setGateHealthList(false); return true }
-      if (openedEvent) { setOpenedEvent(null); return true }
+      if (openedEvent) { if (eventFromHome) closeEvents(); else setOpenedEvent(null); return true }
       if (showEvents) { closeEvents(); return true }
       if (openedDorm) { setOpenedDorm(null); return true }
       if (openedProperty) { setOpenedProperty(null); return true }
@@ -1080,7 +1094,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -2036,7 +2050,7 @@ export default function App() {
   } else if (showEvents) {
     content = (MODULE_FLAGS.events || isAdmin)
       ? <EventsScreen lang={lang} onBack={closeEvents} initialDistrict={eventsDistrict} onAdNavigate={openAdRoute}
-          selectedEvent={openedEvent} onOpenEvent={setOpenedEvent} onCloseEvent={() => setOpenedEvent(null)} />
+          selectedEvent={openedEvent} onOpenEvent={setOpenedEvent} onCloseEvent={() => (eventFromHome ? closeEvents() : setOpenedEvent(null))} />
       : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={closeEvents} />
   // PARKED, NOT DEAD. `showAgentOnboarding` is never set to true any more: the only
   // caller was the "become an agent" CTA on AccommodationScreen, removed in Slice 3c
@@ -2494,6 +2508,7 @@ export default function App() {
             onToggleFavorite={toggleFavorite}
             onRetry={() => { setLoading(true); setRetryCount(c => c + 1) }}
             onShowEvents={() => setShowEvents(true)}
+            onOpenEvent={openEventFromHome}
             onShowAccommodation={() => setShowAccommodation(true)}
             onShowPets={() => setShowPets(true)}
             onShowHomeServices={() => setShowHomeServices(true)}
