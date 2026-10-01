@@ -506,6 +506,27 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
         }
       }
     }
+    // S3 ContactBar: equal-width buttons. Label box = button − 2·CONTACT_PAD − icon − 6.
+    // In a list card (inner = W − 2·page − 2·14) and in the sticky detail bar (W − 2·16),
+    // rows of 1..CONTACT_MAX actions (labelledCount labelled, up to 2 lines; the rest icon-only).
+    {
+      const cs = read('components/ui/ContactBar.js')
+      const cn = name => parseFloat((new RegExp(`export const ${name} = ([\\d.]+)`).exec(cs) || [])[1])
+      const [CP, CG, CI, CC, CCN, CIB, CM] = ['CONTACT_PAD', 'CONTACT_GAP', 'CONTACT_ICON', 'CONTACT_FONT_CAP',
+        'CONTACT_FONT_CAP_NARROW', 'CONTACT_ICON_BTN', 'CONTACT_MAX'].map(cn)
+      const labelled = n => (n <= 2 ? n : 1)   // mirrors labelledCount in ContactBar.js
+      if (!/export const labelledCount = n => \(n <= 2 \? n : 1\)/.test(cs)) problems.push('redesign: ContactBar labelledCount changed — update the mirror in labels:check')
+      if ([CP, CG, CI, CC, CCN, CIB, CM].some(v => !(v > 0))) problems.push('redesign: cannot read ContactBar geometry')
+      else {
+        const labels = { call: t('call', L), getDirections: t('getDirections', L), visitWebsite: t('visitWebsite', L), whatsapp: 'WhatsApp' }
+        for (const [where, inner] of [['card', W - R.page * 2 - 28], ['sticky', W - 32]]) for (let n = 1; n <= CM; n++) {
+          // the labelled buttons share what the icon-only buttons leave
+          const lab = labelled(n), icons = n - lab
+          const box = (inner - CIB * icons - CG * (n - 1)) / lab - 2 * CP - CI - 6
+          for (const [k, v] of Object.entries(labels)) rAssess(600, v, 13, W < 350 ? CCN : CC, S, box, `${at} contact:${where}×${n}:${k}`, cur, 2)
+        }
+      }
+    }
     // S2b OliBand text: welcome tagline 18/700 × 4 and the sign-in titles 18/700 × 3 (cap: bandCap)
     // (login, signup, reset, account created), all inside BAND_TEXT_ZONE·W − BAND_TEXT_LEFT.
     {
