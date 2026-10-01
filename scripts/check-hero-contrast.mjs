@@ -235,6 +235,39 @@ for (const [name, file] of BACKGROUNDS) {
   }
 }
 
+// Photo-led Welcome A + onboarding: (1) all text sits on the SOLID teal (PhotoFade lays the
+// fade ABOVE the content block), so the number is PHOTO_TEAL vs white; (2) the language
+// button and "Atla" sit top-right on dark glass (black 0.38) over the top scrim (black 0.5 → 0
+// over 180pt) over each slide's PHOTO — measured on the real photos, cover-cropped at
+// 320×640 / 360×780 / 393×852, brightest pixel in the button box.
+{
+  const pf = readFileSync(resolve(ROOT, 'components/ui/PhotoFade.js'), 'utf8')
+  const teal = (/export const PHOTO_TEAL = '#([0-9A-Fa-f]{6})'/.exec(pf) || [])[1]
+  if (!teal || !/s\.solid/.test(pf)) problems.push('PhotoFade: cannot read PHOTO_TEAL / the solid layer — measuring nothing')
+  else {
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(teal.slice(i, i + 2), 16))
+    const c = 1.05 / (Y(r, g, b) + 0.05)
+    rows.push({ name: 'photo-led text', worst: c, at: `#${teal}` })
+    if (c < FLOOR) problems.push(`PhotoFade: white on #${teal} is ${c.toFixed(2)}:1`)
+  }
+  const photos = ['ada-bg-accommodation', 'ada-bg-transportation', 'ada-bg-events', 'ada-bg-home-services', 'ada-bg-duty-pharmacy']
+  let worst = Infinity, at = ''
+  for (const ph of photos) for (const [Wd, Hd] of [[320, 640], [360, 780], [393, 852]]) {
+    const { data, info } = await sharp(resolve(ROOT, `assets/backgrounds/${ph}.jpg`)).resize(Wd, Hd, { fit: 'cover' })
+      .removeAlpha().raw().toBuffer({ resolveWithObject: true })
+    // button box: right 16, width ~120, from the status bar (24) + 8 down 44pt
+    for (let y = 32; y < 32 + 44; y++) for (let x = Wd - 136; x < Wd - 16; x++) {
+      const i = (y * info.width + x) * info.channels
+      const t = y / 180, sm = t * t * (3 - 2 * t), scrim = 0.5 * (1 - Math.min(1, sm))
+      const px = [data[i], data[i + 1], data[i + 2]].map(v => v * (1 - scrim) * (1 - 0.38))
+      const c = 1.05 / (Y(...px) + 0.05)
+      if (c < worst) { worst = c; at = `${ph} ${Wd}×${Hd} x=${x} y=${y}` }
+    }
+  }
+  rows.push({ name: 'photo glass buttons', worst, at })
+  if (worst < FLOOR) problems.push(`Photo-led glass buttons: white is ${worst.toFixed(2)}:1 at worst (${at}), under ${FLOOR}:1`)
+}
+
 // Home v3 emergency tile: white text straight on solid health red (no band, no photo).
 {
   const w = readFileSync(resolve(ROOT, 'components/home/redesign/Widgets.js'), 'utf8')

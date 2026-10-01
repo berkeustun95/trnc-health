@@ -527,6 +527,13 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
         }
       }
     }
+    // Welcome A headline beside the Oli & Maki scene (gap 12, page 24), ≤ 4 lines, growth bandCap.
+    {
+      const ws = read('screens/WelcomeScreen.js')
+      const sw = parseFloat((/WELCOME_SCENE_W = ([\d.]+)/.exec(ws) || [])[1]), hp = parseFloat((/WELCOME_HEAD_PX = ([\d.]+)/.exec(ws) || [])[1])
+      if (!(sw > 0 && hp > 0)) problems.push('redesign: cannot read the Welcome headline geometry')
+      else rAssess(700, t('hrWelcomeHeadline', L), hp, W < 350 ? BAND.capN : BAND.cap, S, W - 48 - sw - 12, `${at} welcome:headline`, cur, 4)
+    }
     // S2b OliBand text: welcome tagline 18/700 × 4 and the sign-in titles 18/700 × 3 (cap: bandCap)
     // (login, signup, reset, account created), all inside BAND_TEXT_ZONE·W − BAND_TEXT_LEFT.
     {

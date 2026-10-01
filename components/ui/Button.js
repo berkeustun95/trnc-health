@@ -22,6 +22,7 @@ const VARIANTS = {
 export default function Button({
   title, onPress, variant = 'primary', icon, loading = false, disabled = false,
   disabledHint, fullWidth = false, accessibilityLabel, style,
+  size,   // 'lg' = the 52pt pill used on the photo-led Welcome / onboarding
 }) {
   const v = VARIANTS[variant] || VARIANTS.primary
   const off = disabled || loading
@@ -41,6 +42,7 @@ export default function Button({
         style={[
           s.btn,
           (variant === 'text' || variant === 'onDarkText') && s.textBtn,
+          size === 'lg' && s.lg,
           { backgroundColor: v.bg },
           v.border && { borderWidth: 1, borderColor: v.border },
           off && s.off,
@@ -65,6 +67,7 @@ const s = StyleSheet.create({
   btn:     { minHeight: TAP + 4, borderRadius: radii.md, paddingHorizontal: 18,
              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   textBtn: { minHeight: TAP, paddingHorizontal: 8 },
+  lg:      { minHeight: 52, borderRadius: radii.pill, paddingHorizontal: 24 },
   // Opacity on the real colours, never a lighter text colour: the label keeps its contrast
   // ratio relative to its own fill.
   off:     { opacity: 0.45 },

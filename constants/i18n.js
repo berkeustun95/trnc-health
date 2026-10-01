@@ -83,6 +83,8 @@ const translations = {
     hrOliAskSub: "Ask, search",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Ask Oli",
+    hrWelcomeHeadline: "Your guide to life in North Cyprus",
+    hrSkip: "Skip",
     uiShowPassword: "Show password",
     uiHidePassword: "Hide password",
     uiClearSearch: "Clear search",
@@ -1953,6 +1955,8 @@ const translations = {
     hrOliAskSub: "Sor, ara, keşfet",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Oli'ye sor",
+    hrWelcomeHeadline: "Kuzey Kıbrıs'ta hayatın rehberi",
+    hrSkip: "Atla",
     uiShowPassword: "Şifreyi göster",
     uiHidePassword: "Şifreyi gizle",
     uiClearSearch: "Aramayı temizle",
@@ -3795,6 +3799,8 @@ const translations = {
     hrOliAskSub: "اسأل وابحث",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "اسأل أولي",
+    hrWelcomeHeadline: "دليلك للحياة في شمال قبرص",
+    hrSkip: "تخطٍّ",
     uiShowPassword: "إظهار كلمة المرور",
     uiHidePassword: "إخفاء كلمة المرور",
     uiClearSearch: "مسح البحث",
@@ -5418,6 +5424,8 @@ const translations = {
     hrOliAskSub: "Вопрос, поиск",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Спросите Оли",
+    hrWelcomeHeadline: "Ваш гид по жизни на Северном Кипре",
+    hrSkip: "Пропустить",
     uiShowPassword: "Показать пароль",
     uiHidePassword: "Скрыть пароль",
     uiClearSearch: "Очистить поиск",
@@ -7038,6 +7046,8 @@ const translations = {
     hrOliAskSub: "Ρώτα, ψάξε",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Ρώτα τον Oli",
+    hrWelcomeHeadline: "Ο οδηγός σου για τη ζωή στη Βόρεια Κύπρο",
+    hrSkip: "Παράλειψη",
     uiShowPassword: "Εμφάνιση κωδικού",
     uiHidePassword: "Απόκρυψη κωδικού",
     uiClearSearch: "Καθαρισμός αναζήτησης",
@@ -8654,6 +8664,8 @@ const translations = {
     hrOliAskSub: "Posez, cherchez",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Parlez à Oli",
+    hrWelcomeHeadline: "Votre guide de la vie à Chypre du Nord",
+    hrSkip: "Passer",
     uiShowPassword: "Afficher le mot de passe",
     uiHidePassword: "Masquer le mot de passe",
     uiClearSearch: "Effacer la recherche",
@@ -10274,6 +10286,8 @@ const translations = {
     hrOliAskSub: "Pregunta, busca",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Pregunta a Oli",
+    hrWelcomeHeadline: "Tu guía para la vida en el norte de Chipre",
+    hrSkip: "Omitir",
     uiShowPassword: "Mostrar contraseña",
     uiHidePassword: "Ocultar contraseña",
     uiClearSearch: "Borrar búsqueda",
@@ -11891,6 +11905,8 @@ const translations = {
     hrOliAskSub: "Fragen, suchen",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "Frag Oli",
+    hrWelcomeHeadline: "Dein Begleiter für das Leben in Nordzypern",
+    hrSkip: "Überspringen",
     uiShowPassword: "Passwort anzeigen",
     uiHidePassword: "Passwort verbergen",
     uiClearSearch: "Suche löschen",
@@ -13508,6 +13524,8 @@ const translations = {
     hrOliAskSub: "بپرس و بگرد",
     // Oli bar only: fr "Demandez à Oli" is 152pt at 320dp, the fade's solid part leaves 145.
     hrOliBarTitle: "از اولی بپرس",
+    hrWelcomeHeadline: "راهنمای زندگی در قبرس شمالی",
+    hrSkip: "رد شدن",
     uiShowPassword: "نمایش رمز عبور",
     uiHidePassword: "پنهان کردن رمز عبور",
     uiClearSearch: "پاک کردن جستجو",

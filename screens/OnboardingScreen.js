@@ -7,6 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, type, radii } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
+import { StatusBar } from 'expo-status-bar'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import PhotoFade from '../components/ui/PhotoFade'
+import { Button } from '../components/ui'
 import { t, LANGUAGES } from '../constants/i18n'
 
 // Module scope is safe here: app.config.js locks orientation to 'portrait', so this
@@ -191,6 +195,64 @@ function FeatureSlide({ slide, lang }) {
   )
 }
 
+// ─── Redesign: onboarding in the Welcome A style ─────────────────────────────
+// Each slide: a full-screen photo of ours matching its topic, fading into the deep teal, with
+// the Oli & Maki scene and the title + text in white ON the solid teal (12.54:1). Same slides,
+// same order, same strings. "Atla" (skip) sits below the status bar; the bottom row — dots,
+// a round 52pt back button and a 52pt pill "İleri" — is fixed over every slide, and each slide
+// reserves its height on the solid teal, so there is no white strip and the (transparent,
+// edge-to-edge) system nav bar sits on teal.
+const R_PHOTO = {
+  welcome: require('../assets/backgrounds/ada-bg-transportation.jpg'),
+  explore: require('../assets/backgrounds/ada-bg-events.jpg'),
+  settle:  require('../assets/backgrounds/ada-bg-home-services.jpg'),
+  oli:     require('../assets/backgrounds/ada-bg-duty-pharmacy.jpg'),
+}
+const R_SCENE = {
+  welcome: require('../assets/oli-scenes/welcome.png'),
+  explore: require('../assets/oli-scenes/events.png'),
+  settle:  require('../assets/oli-scenes/accommodation.png'),
+  oli:     require('../assets/oli-scenes/emergency.png'),
+}
+const R_NAV_H = 88   // the fixed bottom row: dots (7 + 14) + the 52pt buttons + its 15pt gap, reserved on every slide
+// Slide 1 also carries the 9-language picker (~560pt in all); below 720pt of screen its scene is
+// left out so the block never reaches the skip button.
+const R_SHORT = height < 720
+
+function RedesignSlide({ slide, lang, setLang, bottomInset }) {
+  const welcome = slide.id === 'welcome'
+  return (
+    <View style={{ width, height: '100%' }}>
+      <PhotoFade photo={R_PHOTO[slide.id]}>
+        <View style={[rs.content, { paddingBottom: bottomInset + R_NAV_H + 12 }]}>
+          {!(welcome && R_SHORT) && (
+            <Image source={R_SCENE[slide.id]} style={rs.scene} resizeMode="contain" accessibilityIgnoresInvertColors />
+          )}
+          <Text style={rs.title} accessibilityRole="header">
+            {t(welcome ? 'onboardingWelcomeTitle' : slide.titleKey, lang)}
+          </Text>
+          <Text style={rs.body}>{t(welcome ? 'onboardingWelcomeBody' : slide.bodyKey, lang)}</Text>
+          {!!slide.noteKey && <Text style={rs.note}>{t(slide.noteKey, lang)}</Text>}
+          {welcome && (
+            <>
+              <Text style={rs.langLabel}>{t('chooseLanguage', lang)}</Text>
+              <View style={rs.langGrid}>
+                {LANGUAGES.map(({ key, label }) => (
+                  <TouchableOpacity key={key} onPress={() => setLang(key)} activeOpacity={0.75}
+                    style={[rs.langChip, lang === key && rs.langChipOn]}
+                    accessibilityRole="radio" accessibilityState={{ selected: lang === key }}>
+                    <Text style={[rs.langChipText, lang === key && rs.langChipTextOn]}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+      </PhotoFade>
+    </View>
+  )
+}
+
 export default function OnboardingScreen({ onComplete }) {
   const [lang, setLang] = useState('English')
   const [index, setIndex] = useState(0)
@@ -202,6 +264,11 @@ export default function OnboardingScreen({ onComplete }) {
     listRef.current?.scrollToIndex({ index: i, animated: true })
     setIndex(i)
   }
+
+  if (REDESIGN) return (
+    <OnboardingRedesign lang={lang} setLang={setLang} index={index} setIndex={setIndex}
+      listRef={listRef} goTo={goTo} isLast={isLast} onComplete={onComplete} />
+  )
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -446,3 +513,73 @@ const redesignS = StyleSheet.create({
   nextText:      { ...type.rowTitle, color: colors.onPrimary },
 })
 const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS
+
+// Module scope (defined outside the screen, so it never remounts on a parent render).
+function OnboardingRedesign({ lang, setLang, index, setIndex, listRef, goTo, isLast, onComplete }) {
+  const insets = useSafeAreaInsets()
+  return (
+    <View style={{ flex: 1, backgroundColor: '#083A39' }}>
+      <StatusBar style="light" />
+      <FlatList
+        ref={listRef}
+        data={SLIDES}
+        keyExtractor={item => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
+        renderItem={({ item }) => <RedesignSlide slide={item} lang={lang} setLang={setLang} bottomInset={insets.bottom} />}
+      />
+      {/* "Atla" finishes onboarding with the language chosen so far — the same onComplete the
+          last slide calls (writes @trnc_onboarded + @trnc_lang, then WelcomeScreen). */}
+      {!isLast && (
+        <TouchableOpacity style={[rs.skip, { top: insets.top + 8 }]} onPress={() => onComplete(lang)}
+          accessibilityRole="button" accessibilityLabel={t('hrSkip', lang)}>
+          <Text style={rs.skipText}>{t('hrSkip', lang)}</Text>
+        </TouchableOpacity>
+      )}
+      <View style={[rs.nav, { paddingBottom: insets.bottom + 12 }]} pointerEvents="box-none">
+        <View style={rs.dots}>
+          {SLIDES.map((_, i) => <View key={i} style={[rs.dot, i === index && rs.dotOn]} />)}
+        </View>
+        <View style={rs.navRow}>
+          {index > 0 && (
+            <TouchableOpacity style={rs.backRound} onPress={() => goTo(index - 1)} activeOpacity={0.75}
+              accessibilityRole="button" accessibilityLabel={t('back', lang)}>
+              <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+          <Button size="lg" variant="inverse" icon="arrow-forward" style={{ flex: 1 }} fullWidth
+            title={isLast ? t('getStarted', lang) : t('next', lang)}
+            onPress={() => (isLast ? onComplete(lang) : goTo(index + 1))} />
+        </View>
+      </View>
+    </View>
+  )
+}
+
+const rs = StyleSheet.create({
+  content:      { paddingHorizontal: 24, paddingTop: 8 },
+  scene:        { width: 150, height: 120, marginBottom: 8 },
+  title:        { fontSize: 26, lineHeight: 32, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 8 },
+  body:         { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', color: '#FFFFFF' },
+  note:         { ...type.small, color: '#FFFFFF', marginTop: 10 },
+  langLabel:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', marginTop: 16, marginBottom: 8 },
+  langGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  langChip:     { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', borderRadius: radii.pill,
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.55)', backgroundColor: 'rgba(255,255,255,0.10)' },
+  langChipOn:   { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
+  langChipText: { ...type.body, color: '#FFFFFF' },
+  langChipTextOn:{ fontFamily: 'Inter_700Bold', color: '#083A39' },
+  skip:         { position: 'absolute', right: 16, minHeight: 44, minWidth: 44, paddingHorizontal: 16,
+                  justifyContent: 'center', borderRadius: radii.pill, backgroundColor: 'rgba(0,0,0,0.38)',
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  skipText:     { ...type.body, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  nav:          { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 24 },
+  dots:         { flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 14 },
+  dot:          { width: 7, height: 7, borderRadius: 3.5, backgroundColor: 'rgba(255,255,255,0.45)' },
+  dotOn:        { width: 18, backgroundColor: '#FFFFFF' },
+  navRow:       { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  backRound:    { width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)',
+                  backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+})
