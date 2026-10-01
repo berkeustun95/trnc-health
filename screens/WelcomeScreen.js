@@ -3,13 +3,21 @@ import { View, Text, Image, ImageBackground, TouchableOpacity, StyleSheet, Activ
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
-import { colors } from '../constants/theme'
+import { colors, type, radii } from '../constants/theme'
 import { t, LANG_CODES, LANGUAGES } from '../constants/i18n'
+import { REDESIGN } from '../constants/redesign'
+import { Button, OliBand, InlineAlert } from '../components/ui'
+import { bandCap } from '../components/ui/OliBand'
+import { useWindowDimensions } from 'react-native'
+import { LanguageSheet } from '../components/shell/Sheets'
+
+const WELCOME_SCENE = require('../assets/oli-scenes/welcome.png')
 
 // Native names, not English ones — someone stuck in a language they can't read
 // recognises "Türkçe", not "Turkish".
 
 export default function WelcomeScreen({ lang, onLogin, onSignUp, onLangChange }) {
+  const { width: winW } = useWindowDimensions()
   const [guestLoading, setGuestLoading] = useState(false)
   const [error, setError] = useState(null)
   const [showLangPicker, setShowLangPicker] = useState(false)
@@ -24,6 +32,46 @@ export default function WelcomeScreen({ lang, onLogin, onSignUp, onLangChange })
       setError(t('guestSignInFailed', lang))
       setGuestLoading(false)
     }
+  }
+
+  // ─── Redesign (S2b): photo above, the Oli ground below ───────────────────────
+  // Same three actions, same order, same guest path (signInAnonymously, one tap, no gate).
+  // The tagline sits in the band's text zone (white on the gradient, measured); the actions
+  // sit on solid BG_DARK (white 9.93:1, the inverse button 7.58:1). 44pt+ everywhere.
+  if (REDESIGN) {
+    return (
+      <View style={r.root}>
+        <ImageBackground source={require('../assets/auth-bg.png')} style={r.photo} resizeMode="cover">
+          <View style={r.photoShade} />
+          <SafeAreaView edges={['top']} style={r.photoInner}>
+            <TouchableOpacity style={r.langPill} onPress={() => setShowLangPicker(true)} activeOpacity={0.75}
+              accessibilityRole="button" accessibilityLabel={t('chooseLanguage', lang)}>
+              <Ionicons name="globe-outline" size={16} color="#fff" />
+              <Text style={r.langPillText}>{(LANG_CODES[lang] ?? 'en').toUpperCase()}</Text>
+              <Ionicons name="chevron-down" size={14} color="#fff" />
+            </TouchableOpacity>
+            <Image source={require('../assets/logonobg.png')} style={r.logo} resizeMode="contain"
+              accessibilityRole="image" accessibilityLabel="ADA" />
+          </SafeAreaView>
+        </ImageBackground>
+
+        <View style={r.panel}>
+          <OliBand scene={WELCOME_SCENE}>
+            <Text style={r.tagline} maxFontSizeMultiplier={bandCap(winW)} numberOfLines={4}>{t('welcomeTagline', lang)}</Text>
+          </OliBand>
+          <SafeAreaView edges={['bottom']} style={r.actions}>
+            <InlineAlert message={error} style={{ marginBottom: 4 }} />
+            <Button variant="inverse" title={t('login', lang)} onPress={onLogin} disabled={guestLoading} fullWidth />
+            <Button variant="onDark" title={t('signup', lang)} onPress={onSignUp} disabled={guestLoading} fullWidth />
+            <Button variant="onDarkText" title={t('continueAsGuest', lang)} onPress={continueAsGuest}
+              loading={guestLoading} fullWidth />
+          </SafeAreaView>
+        </View>
+
+        <LanguageSheet visible={showLangPicker} lang={lang} onClose={() => setShowLangPicker(false)}
+          onSelect={key => { onLangChange?.(key); setShowLangPicker(false) }} />
+      </View>
+    )
   }
 
   return (
@@ -141,4 +189,20 @@ const s = StyleSheet.create({
   langChipActive:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   langChipText:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   langChipTextActive: { color: colors.primary },
+})
+
+const r = StyleSheet.create({
+  root:        { flex: 1, backgroundColor: '#084B4A' },
+  photo:       { flex: 1 },
+  photoShade:  { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.18)' },
+  photoInner:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  logo:        { width: 260, height: 180 },
+  // 44pt tall: the old pill was ~28pt.
+  langPill:    { position: 'absolute', top: 8, right: 16, flexDirection: 'row', alignItems: 'center', gap: 6,
+                 minHeight: 44, paddingHorizontal: 14, borderRadius: radii.pill, backgroundColor: 'rgba(0,0,0,0.45)' },
+  langPillText:{ ...type.meta, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.5 },
+  panel:       { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', backgroundColor: '#084B4A',
+                 marginTop: -28 },
+  tagline:     { fontSize: 18, lineHeight: 23, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  actions:     { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, gap: 10 },
 })

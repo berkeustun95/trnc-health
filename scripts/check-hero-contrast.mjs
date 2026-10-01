@@ -206,6 +206,35 @@ for (const [name, file] of BACKGROUNDS) {
   }
 }
 
+// S2b OliBand (welcome tagline, sign-in titles): the same ground at full width. Rendered at
+// 320/360/393dp for both band heights in use (150 welcome, 140 sign-in), brightest pixel in
+// the band's text zone, white text must clear 4.5:1. labels:check keeps the text in the zone.
+{
+  const src = readFileSync(resolve(ROOT, 'components/ui/OliBand.js'), 'utf8')
+  const k = name => parseFloat((new RegExp(`export const ${name} = ([\\d.]+)`).exec(src) || [])[1])
+  const [ZONE, TL, GS, GX, GY] = ['BAND_TEXT_ZONE', 'BAND_TEXT_LEFT', 'BAND_GLOW_SIZE', 'BAND_GLOW_CX', 'BAND_GLOW_CY'].map(k)
+  if ([ZONE, TL, GS, GX, GY].some(v => !(v >= 0))) {
+    problems.push('OliBand: cannot read its geometry from components/ui/OliBand.js — measuring nothing')
+  } else {
+    let worst = Infinity, at = ''
+    for (const H of [150, 140]) for (const Wd of [320, 360, 393]) {
+      const pad = GS
+      const sized = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-bg.png')).resize(Wd, H, { fit: 'fill' }).toBuffer()
+      const bg = await sharp(sized).extend({ top: pad, bottom: pad, left: pad, right: pad, extendWith: 'copy' }).toBuffer()
+      const glow = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-glow.png')).resize(GS, GS).toBuffer()
+      const lit = await sharp(bg).composite([{ input: glow, left: Math.round(Wd * GX - GS / 2) + pad, top: Math.round(H * GY - GS / 2) + pad }]).png().toBuffer()
+      const { data, info } = await sharp(lit).extract({ left: pad, top: pad, width: Wd, height: H }).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+      for (let y = 0; y < H; y++) for (let x = TL; x < Math.ceil(Wd * ZONE); x++) {
+        const i = (y * info.width + x) * info.channels
+        const c = 1.05 / (Y(data[i], data[i + 1], data[i + 2]) + 0.05)
+        if (c < worst) { worst = c; at = `${Wd}dp×${H} x=${x} y=${y}` }
+      }
+    }
+    rows.push({ name: 'oli band', worst, at })
+    if (worst < FLOOR) problems.push(`OliBand: white text is ${worst.toFixed(2)}:1 at worst (${at}), under ${FLOOR}:1`)
+  }
+}
+
 // Home v3 emergency tile: white text straight on solid health red (no band, no photo).
 {
   const w = readFileSync(resolve(ROOT, 'components/home/redesign/Widgets.js'), 'utf8')

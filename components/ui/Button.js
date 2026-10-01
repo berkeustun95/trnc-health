@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, type, radii, press, TAP } from '../../constants/theme'
 import { haptic } from './haptics'
 
-// primary · secondary · text · danger. Min 44pt tall whatever the label size, so a short
+// primary · secondary · text · danger · inverse / onDark / onDarkText (on the teal Oli ground). Min 44pt tall whatever the label size, so a short
 // label can never shrink the target. Primary and danger give a light haptic on press.
 //
 // `disabledHint` is shown under a disabled button: a greyed-out control with no reason
@@ -13,6 +13,10 @@ const VARIANTS = {
   secondary: { bg: colors.card,     fg: colors.primaryDark, border: colors.border },
   text:      { bg: 'transparent',   fg: colors.primaryDark, border: null },
   danger:    { bg: colors.dangerInk, fg: colors.onPrimary, border: null },
+  // On the teal Oli ground (welcome, auth): primaryDark on white 7.58:1; white on #084B4A 9.93:1.
+  inverse:   { bg: colors.card,     fg: colors.primaryDark, border: null },
+  onDark:    { bg: 'transparent',   fg: colors.onPrimary,  border: 'rgba(255,255,255,0.7)' },
+  onDarkText:{ bg: 'transparent',   fg: colors.onPrimary,  border: null },
 }
 
 export default function Button({
@@ -36,7 +40,7 @@ export default function Button({
         accessibilityState={{ disabled: off, busy: loading }}
         style={[
           s.btn,
-          variant === 'text' && s.textBtn,
+          (variant === 'text' || variant === 'onDarkText') && s.textBtn,
           { backgroundColor: v.bg },
           v.border && { borderWidth: 1, borderColor: v.border },
           off && s.off,

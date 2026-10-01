@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
-import { colors } from '../constants/theme'
+import { colors, radii } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 
@@ -33,7 +34,7 @@ export default function CityPicker({ value, onSelect, lang }) {
   )
 }
 
-const s = StyleSheet.create({
+const legacyS = StyleSheet.create({
   grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:           { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20,
                     backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
@@ -41,3 +42,13 @@ const s = StyleSheet.create({
   chipText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
 })
+
+// Redesign: 44pt chips with a 3.66:1 boundary (colors.border was 1.18:1).
+const redesignS = StyleSheet.create({
+  chip:           { paddingHorizontal: 14, minHeight: 44, justifyContent: 'center', borderRadius: radii.pill,
+                    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder },
+  chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary, borderWidth: 2 },
+  chipText:       { fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.textPrimary },
+  chipTextActive: { fontFamily: 'Inter_700Bold', color: colors.primaryDark },
+})
+const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS

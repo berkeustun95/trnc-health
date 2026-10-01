@@ -420,6 +420,12 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
   const { WEATHER_LABEL_KEY } = await import('../utils/facilityUtils.js')
   const UNTILS = ['00:00', '19:00', '20:00', '22:00']
   // region → landmark, read from homeHero.js TEXT (it requires images, so it cannot be imported)
+  const bandSrc = read('components/ui/OliBand.js')
+  const BAND = { zone: parseFloat((/BAND_TEXT_ZONE = ([\d.]+)/.exec(bandSrc) || [])[1]),
+                 left: parseFloat((/BAND_TEXT_LEFT = ([\d.]+)/.exec(bandSrc) || [])[1]),
+                 cap: parseFloat((/BAND_FONT_CAP = ([\d.]+)/.exec(bandSrc) || [])[1]),
+                 capN: parseFloat((/BAND_FONT_CAP_NARROW = ([\d.]+)/.exec(bandSrc) || [])[1]) }
+  if (!(BAND.zone > 0) || !(BAND.left >= 0)) problems.push('redesign: cannot read OliBand text zone')
   const HERO_LANDMARKS = {}
   for (const m of read('constants/homeHero.js').matchAll(/^  ([a-z_]+): \{[\s\S]*?landmark: '([^']+)'/gm)) HERO_LANDMARKS[m[1]] = m[2]
   if (Object.keys(HERO_LANDMARKS).length < 5) problems.push(`redesign: read only ${Object.keys(HERO_LANDMARKS).length} hero landmarks from homeHero.js`)
@@ -499,6 +505,15 @@ if (rErr.length) { for (const e of rErr) problems.push(e) } else {
           rAssess(600, t(key, L), 12, cCap, S, box - wd('·') - wd('…'), `${at} heroRow:${key}`, cur, 1)
         }
       }
+    }
+    // S2b OliBand text: welcome tagline 18/700 × 4 and the sign-in titles 18/700 × 3 (cap: bandCap)
+    // (login, signup, reset, account created), all inside BAND_TEXT_ZONE·W − BAND_TEXT_LEFT.
+    {
+      const bandZone = W * BAND.zone - BAND.left
+      const bCap = W < 350 ? BAND.capN : BAND.cap
+      rAssess(700, t('welcomeTagline', L), 18, bCap, S, bandZone, `${at} band:welcomeTagline`, cur, 4)
+      for (const k of ['login', 'signup', 'resetPassword', 'accountCreated'])
+        rAssess(700, t(k, L), 18, bCap, S, bandZone, `${at} band:${k}`, cur, 3)
     }
   }
   use(WEIGHT || 700)

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, Animated, Dimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
-import { colors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius, radii, type } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
+import { BottomSheet, Button } from './ui'
 import { t, tCity } from '../constants/i18n'
 import { VISITING } from '../utils/cityWelcomeRules'
 import CityPicker from './CityPicker'
@@ -23,7 +25,51 @@ import CityPicker from './CityPicker'
 // A soft dismiss (tap-outside, "Not now", backgrounding) resolves to NOTHING:
 // `asked` stays false and we re-ask on a later run. It must never fall through
 // to "visitor", and it must never lock the user out of being asked again.
-export default function HomeCitySheet({ detectedRegion, lang, onResolve, onDismiss }) {
+// ─── Redesign (S2b): shared BottomSheet with a dim backdrop (clears the floating tab bar),
+// the same question, the same three paths in the same order. The visiting subline is full
+// white: at 0.85 opacity it measured 4.08:1 on primary; at 1.0 it is 5.01:1. "Later" is a
+// 44pt Button (was ~27pt).
+function HomeCityBottomSheet({ detectedRegion, lang, onResolve, onDismiss }) {
+  const [expanded, setExpanded] = useState(false)
+  const hint = detectedRegion ? tCity('cwAskDetected', detectedRegion, lang) : null
+  return (
+    <BottomSheet visible onClose={onDismiss} title={t('cwAskTitle', lang)} lang={lang}>
+      <View style={r.head}>
+        <Image source={require('../assets/oli-button.png')} style={r.mascot} resizeMode="contain" accessibilityIgnoresInvertColors />
+        <Text style={r.body}>{t('cwAskBody', lang)}</Text>
+      </View>
+      <TouchableOpacity style={r.primary} onPress={() => onResolve(VISITING)} activeOpacity={0.85} accessibilityRole="button">
+        <Feather name="map" size={18} color="#FFFFFF" />
+        <View style={{ flex: 1 }}>
+          <Text style={r.primaryTitle}>{t('cwAskVisiting', lang)}</Text>
+          <Text style={r.primarySub}>{t('cwAskVisitingHint', lang)}</Text>
+        </View>
+      </TouchableOpacity>
+      {!expanded ? (
+        <TouchableOpacity style={r.secondary} onPress={() => setExpanded(true)} activeOpacity={0.8}
+          accessibilityRole="button" accessibilityState={{ expanded: false }}>
+          <Feather name="home" size={16} color={colors.textPrimary} />
+          <Text style={r.secondaryText}>{t('cwAskLiveHere', lang)}</Text>
+          <Feather name="chevron-down" size={16} color={colors.textSecondary} />
+        </TouchableOpacity>
+      ) : (
+        <View style={{ marginTop: 14 }}>
+          <Text style={r.pickLabel}>{t('cwAskPickCity', lang)}</Text>
+          {hint ? <Text style={r.hint}>{hint}</Text> : null}
+          <CityPicker value={null} onSelect={onResolve} lang={lang} />
+        </View>
+      )}
+      <Button variant="text" title={t('cwAskLater', lang)} onPress={onDismiss} fullWidth style={{ marginTop: 8 }} />
+    </BottomSheet>
+  )
+}
+
+export default function HomeCitySheet(props) {
+  if (REDESIGN) return <HomeCityBottomSheet {...props} />
+  return <HomeCitySheetLegacy {...props} />
+}
+
+function HomeCitySheetLegacy({ detectedRegion, lang, onResolve, onDismiss }) {
   const insets = useSafeAreaInsets()
   const slide = useRef(new Animated.Value(Dimensions.get('window').height)).current
   const [expanded, setExpanded] = useState(false)
@@ -118,4 +164,20 @@ const s = StyleSheet.create({
 
   later:        { alignSelf: 'center', marginTop: 14, paddingVertical: 6, paddingHorizontal: 12 },
   laterText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+})
+
+const r = StyleSheet.create({
+  head:         { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  mascot:       { width: 64, height: 64 },
+  body:         { ...type.body, color: colors.textSecondary, flex: 1 },
+  primary:      { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, backgroundColor: colors.primary,
+                  borderRadius: radii.card, paddingVertical: 12, paddingHorizontal: 16 },
+  primaryTitle: { ...type.rowTitle, color: '#FFFFFF' },
+  primarySub:   { ...type.meta, fontFamily: 'Inter_400Regular', color: '#FFFFFF', marginTop: 2 },
+  secondary:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10, minHeight: 52,
+                  backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.fieldBorder,
+                  borderRadius: radii.card, paddingHorizontal: 16 },
+  secondaryText:{ flex: 1, ...type.rowTitle, color: colors.textPrimary },
+  pickLabel:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, marginBottom: 6 },
+  hint:         { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginBottom: 10 },
 })

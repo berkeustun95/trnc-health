@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { View, Text, Image, ImageBackground, TextInput, TouchableOpacity, StyleSheet,
-         ActivityIndicator, ScrollView } from 'react-native'
+         ActivityIndicator, ScrollView, useWindowDimensions } from 'react-native'
 import { addBackListener } from '../utils/backHandler'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
-import { colors, shadow } from '../constants/theme'
+import { colors, shadow, type, radii, elevation } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
+import { OliBand, InlineAlert } from '../components/ui'
+import { bandCap } from '../components/ui/OliBand'
+import { authErrorKey } from '../utils/authErrors'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import LegalScreen from './LegalScreen'
@@ -21,6 +25,47 @@ const LANGUAGES = [
   { key: 'Russian', code: 'RU' }, { key: 'Greek',   code: 'EL' }, { key: 'French',  code: 'FR' },
   { key: 'Spanish', code: 'ES' }, { key: 'German',  code: 'DE' }, { key: 'Persian', code: 'FA' },
 ]
+
+// ─── Redesign (S2b): the same three screens (form, reset, sign-up done), same logic and
+// fields; only the frame changes. Legacy keeps the photo + logo; the redesign puts an Oli
+// band (teal ground + Oli & Maki, the Home Oli bar's colour flow) above a white card on the
+// canvas, with 44pt+ targets and field borders at 3.66:1.
+const AUTH_SCENE = require('../assets/oli-scenes/welcome.png')
+
+function AuthFrame({ children }) {
+  if (!REDESIGN) {
+    return (
+      <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
+        <View style={legacy.overlay} />
+        {children}
+      </ImageBackground>
+    )
+  }
+  return <View style={{ flex: 1, backgroundColor: colors.canvas }}>{children}</View>
+}
+
+function AuthHead({ title, top }) {
+  const { width: winW } = useWindowDimensions()
+  if (!REDESIGN) {
+    return (
+      <View style={legacy.logoArea}>
+        <Image source={require('../assets/logonobg.png')} style={legacy.logoImg} resizeMode="contain" />
+      </View>
+    )
+  }
+  return (
+    <OliBand scene={AUTH_SCENE} top={top} height={140}>
+      <Text style={redesign.headTitle} numberOfLines={3} maxFontSizeMultiplier={bandCap(winW)} accessibilityRole="header">{title}</Text>
+    </OliBand>
+  )
+}
+
+// A failure is announced (role alert) in both paths; the redesign shows it as an InlineAlert.
+function AuthError({ message }) {
+  if (!message) return null
+  if (REDESIGN) return <InlineAlert message={message} style={{ marginBottom: 12 }} />
+  return <Text style={legacy.error} accessibilityRole="alert">{message}</Text>
+}
 
 export default function AuthScreen({ lang: initialLang = 'English', onLangChange, initialMode = 'login', onBack }) {
   const insets = useSafeAreaInsets()
@@ -66,7 +111,8 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
     const { error } = mode === 'signup'
       ? await supabase.auth.signUp({ email: trimmedEmail, password, options: { emailRedirectTo: 'ada://' } })
       : await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
-    if (error) setError(error.message)
+    // Never the server's own text: it is English and written for developers.
+    if (error) setError(t(authErrorKey(error), lang))
     else if (mode === 'signup') {
       // ─── THE TICK IS RECORDED HERE, AND THE ROW IS WRITTEN LATER ──────────
       //
@@ -106,8 +152,11 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
     }
     setResetLoading(true)
     setError(null)
-    await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: 'ada://' })
+    // Was fire-and-forget: a rate limit or a dead connection still said "check your email".
+    // (Supabase returns no error for an unknown address, so this reveals nothing about accounts.)
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: 'ada://' })
     setResetLoading(false)
+    if (error) { setError(t(authErrorKey(error), lang)); return }
     setResetSent(true)
   }
 
@@ -126,13 +175,10 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
 
   if (signupDone) {
     return (
-      <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
-        <View style={styles.overlay} />
-      <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]}>
+      <AuthFrame>
+      <SafeAreaView edges={REDESIGN ? ['bottom', 'left', 'right'] : undefined} style={[styles.safe, { backgroundColor: 'transparent' }]}>
         <View style={styles.container}>
-          <View style={styles.logoArea}>
-            <Image source={require('../assets/logonobg.png')} style={styles.logoImg} resizeMode="contain" />
-          </View>
+          <AuthHead title={t('accountCreated', lang)} top={insets.top} />
           <View style={styles.formCard}>
             <View style={styles.resetSuccessWrap}>
               <View style={styles.resetSuccessIcon}>
@@ -150,20 +196,17 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
           </View>
         </View>
       </SafeAreaView>
-      </ImageBackground>
+      </AuthFrame>
     )
   }
 
   if (showReset) {
     return (
-      <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
-        <View style={styles.overlay} />
-      <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]}>
+      <AuthFrame>
+      <SafeAreaView edges={REDESIGN ? ['bottom', 'left', 'right'] : undefined} style={[styles.safe, { backgroundColor: 'transparent' }]}>
         <KeyboardAwareForm style={styles.kav}>
           <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <View style={styles.logoArea}>
-              <Image source={require('../assets/logonobg.png')} style={styles.logoImg} resizeMode="contain" />
-            </View>
+            <AuthHead title={t('resetPassword', lang)} top={insets.top} />
 
             {resetSent ? (
               <View style={styles.formCard}>
@@ -203,7 +246,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
                   />
                 </View>
 
-                {error && <Text style={styles.error}>{error}</Text>}
+                <AuthError message={error} />
 
                 <TouchableOpacity style={styles.submit} onPress={sendReset} disabled={resetLoading}>
                   {resetLoading
@@ -223,23 +266,20 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
           </ScrollView>
         </KeyboardAwareForm>
       </SafeAreaView>
-      </ImageBackground>
+      </AuthFrame>
     )
   }
 
   return (
-    <ImageBackground source={require('../assets/auth-bg.png')} style={{ flex: 1 }} resizeMode="cover">
-      <View style={styles.overlay} />
-    <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]}>
+    <AuthFrame>
+    <SafeAreaView edges={REDESIGN ? ['bottom', 'left', 'right'] : undefined} style={[styles.safe, { backgroundColor: 'transparent' }]}>
       <KeyboardAwareForm style={styles.kav}>
         <ScrollView
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.logoArea}>
-            <Image source={require('../assets/logonobg.png')} style={styles.logoImg} resizeMode="contain" />
-          </View>
+          <AuthHead title={mode === 'login' ? t('login', lang) : t('signup', lang)} top={insets.top} />
 
           <View style={styles.formCard}>
           <View style={styles.toggle}>
@@ -306,7 +346,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
             </View>
           </View>
 
-          {error && <Text style={styles.error}>{error}</Text>}
+          <AuthError message={error} />
 
           <TouchableOpacity
             style={[styles.submit, blockedByTerms && styles.submitOff]}
@@ -367,13 +407,13 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
           </View>
         </ScrollView>
       </KeyboardAwareForm>
-      <BackButton variant="bare" lang={lang} onPress={onBack} style={[styles.backBtn, { top: insets.top + 8 }]} />
+      <BackButton variant={REDESIGN ? 'hero' : 'bare'} lang={lang} onPress={onBack} style={[styles.backBtn, { top: insets.top + 8 }]} />
     </SafeAreaView>
-    </ImageBackground>
+    </AuthFrame>
   )
 }
 
-const styles = StyleSheet.create({
+const legacy = StyleSheet.create({
   safe:              { flex: 1, backgroundColor: 'transparent' },
   formCard:          { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 24, padding: 24, paddingTop: 20 },
   overlay:           { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.55)' },
@@ -464,3 +504,44 @@ const styles = StyleSheet.create({
   resetSuccessSub:    { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   resetEmail:         { fontFamily: 'Inter_700Bold', color: colors.textPrimary },
 })
+
+const redesign = StyleSheet.create({
+  headTitle:         { fontSize: 18, lineHeight: 23, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  container:         { flexGrow: 1, paddingBottom: 32 },
+  formCard:          { marginHorizontal: 16, marginTop: -16, backgroundColor: colors.card, borderRadius: radii.card,
+                       padding: 20, ...elevation.card },
+  toggle:            { flexDirection: 'row', backgroundColor: colors.canvas, borderRadius: radii.md, marginBottom: 20, padding: 3 },
+  tab:               { flex: 1, minHeight: 44, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center' },
+  tabActive:         { backgroundColor: colors.card, ...elevation.card },
+  tabText:           { ...type.body, color: colors.textSecondary },
+  tabTextActive:     { fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  fieldLabel:        { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, marginBottom: 6 },
+  passwordLabelRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  forgotLink:        { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.primaryDark, paddingVertical: 12, paddingLeft: 12 },
+  input:             { borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, minHeight: 48,
+                       paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, fontFamily: 'Inter_400Regular',
+                       backgroundColor: colors.card, color: colors.textPrimary },
+  passwordWrap:      { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.fieldBorder,
+                       borderRadius: radii.md, backgroundColor: colors.card, minHeight: 48 },
+  passwordInput:     { flex: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  eyeBtn:            { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  submit:            { backgroundColor: colors.primary, borderRadius: radii.md, minHeight: 50, alignItems: 'center',
+                       justifyContent: 'center', marginTop: 4 },
+  submitText:        { ...type.rowTitle, color: colors.onPrimary },
+  legalNotice:       { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', marginTop: 14 },
+  langRow:           { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4, marginTop: 20, paddingTop: 12,
+                       borderTopWidth: 1, borderTopColor: colors.divider },
+  langChip:          { minWidth: 44, minHeight: 44, paddingHorizontal: 8, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center' },
+  langChipText:      { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.5 },
+  langChipTextActive:{ color: colors.primaryDark },
+  backLink:          { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, marginBottom: 16 },
+  backLinkText:      { ...type.body, color: colors.textSecondary },
+  resetTitle:        { ...type.sectionHeading, color: colors.textPrimary, marginBottom: 8 },
+  resetSub:          { ...type.body, color: colors.textSecondary, marginBottom: 20 },
+  resetSuccessTitle: { ...type.sectionHeading, color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
+  resetSuccessSub:   { ...type.body, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 },
+})
+
+// The redesign overrides the legacy styles key by key; anything it does not name (the
+// checkbox block, the legal links, the reset success icon) stays exactly as measured above.
+const styles = REDESIGN ? { ...legacy, ...redesign } : legacy

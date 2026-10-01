@@ -5,7 +5,8 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, shadow } from '../constants/theme'
+import { colors, shadow, type, radii } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
 import { t, LANGUAGES } from '../constants/i18n'
 
 // Module scope is safe here: app.config.js locks orientation to 'portrait', so this
@@ -114,6 +115,8 @@ function WelcomeSlide({ lang, setLang }) {
             style={[s.langChip, lang === key && s.langChipActive]}
             onPress={() => setLang(key)}
             activeOpacity={0.7}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: lang === key }}
           >
             <Text style={[s.langChipText, lang === key && s.langChipTextActive]}>
               {label}
@@ -125,10 +128,38 @@ function WelcomeSlide({ lang, setLang }) {
   )
 }
 
+// ─── Redesign (S2b): the slide's picture is an Oli & Maki scene on the teal Oli ground
+// (the Home Oli bar's gradient + glow). Picture only — no text sits on it, so it carries no
+// contrast obligation. Explore → the events scene, Settle → accommodation, Oli → emergency
+// (slide 4 is duty pharmacy + emergency numbers).
+const SCENE = {
+  explore: require('../assets/oli-scenes/events.png'),
+  settle:  require('../assets/oli-scenes/accommodation.png'),
+  oli:     require('../assets/oli-scenes/emergency.png'),
+}
+const SCENE_W = Math.min(width - 48, 340)
+const SCENE_H = Math.round(SCENE_W * 0.66)
+
+function SceneCard({ id }) {
+  const src = SCENE[id]
+  const meta = Image.resolveAssetSource(src)
+  const h = SCENE_H - 24
+  return (
+    <View style={s.sceneCard}>
+      <Image source={require('../assets/oli-scenes/oli-bg.png')} resizeMode="stretch" style={StyleSheet.absoluteFill} />
+      <Image source={require('../assets/oli-scenes/oli-glow.png')}
+        style={{ position: 'absolute', width: SCENE_H * 1.3, height: SCENE_H * 1.3, left: SCENE_W / 2 - SCENE_H * 0.65, top: -SCENE_H * 0.1 }} />
+      <Image source={src} resizeMode="contain" accessibilityIgnoresInvertColors
+        style={{ position: 'absolute', bottom: 0, alignSelf: 'center', height: h, width: h * meta.width / meta.height }} />
+    </View>
+  )
+}
+
 function FeatureSlide({ slide, lang }) {
   const tint = TINTS[slide.tint]
   return (
     <View style={s.featureSlide}>
+      {REDESIGN ? <SceneCard id={slide.id} /> : (
       <View style={[s.circle, { backgroundColor: tint.bg }]}>
         {slide.mascot
           // ─── THE OFFSETS ARE THE ARTWORK'S, NOT A NUDGE ───────────────────
@@ -147,6 +178,7 @@ function FeatureSlide({ slide, lang }) {
             />
           : <Ionicons name={slide.icon} size={68} color={tint.fg} />}
       </View>
+      )}
 
       <View style={s.featureText}>
         <Text style={s.featureTitle}>{t(slide.titleKey, lang)}</Text>
@@ -201,7 +233,8 @@ export default function OnboardingScreen({ onComplete }) {
 
         <View style={s.navButtons}>
           {index > 0 && (
-            <TouchableOpacity style={s.backBtn} onPress={() => goTo(index - 1)} activeOpacity={0.7}>
+            <TouchableOpacity style={s.backBtn} onPress={() => goTo(index - 1)} activeOpacity={0.7}
+              accessibilityRole="button" accessibilityLabel={t('back', lang)}>
               <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
@@ -231,7 +264,7 @@ export default function OnboardingScreen({ onComplete }) {
 const CIRCLE = 156
 const MASCOT_BOX = CIRCLE * 0.875   // see the bbox note in FeatureSlide
 
-const s = StyleSheet.create({
+const legacyS = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bgWarm },
 
   // ── Slide 1 ──
@@ -382,3 +415,34 @@ const s = StyleSheet.create({
   nextBtnLast: { backgroundColor: colors.primaryDark },
   nextText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.surface },
 })
+
+// Redesign overrides, key by key (the slide geometry above is unchanged, so the measured
+// Turkish worst case on slide 1 still holds). 44pt language chips with a 3.66:1 boundary,
+// dots that are visible (fieldBorder 3.66:1; colors.border was 1.18), the "coming soon"
+// note at full textSecondary (the 0.7 opacity put it under AA), 50pt next button.
+const redesignS = StyleSheet.create({
+  safe:          { flex: 1, backgroundColor: colors.canvas },
+  welcomeTitle:  { ...type.pageTitle, color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
+  welcomeBody:   { ...type.body, color: colors.textSecondary, textAlign: 'center', marginBottom: 16 },
+  divider:       { height: 1, backgroundColor: colors.divider, marginBottom: 16 },
+  langLabel:     { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, marginBottom: 10 },
+  langChip:      { paddingHorizontal: 14, minHeight: 44, borderRadius: radii.pill, justifyContent: 'center',
+                   backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder },
+  langChipActive:{ backgroundColor: colors.primaryLight, borderColor: colors.primary, borderWidth: 2 },
+  langChipText:  { ...type.body, color: colors.textPrimary },
+  sceneCard:     { width: SCENE_W, height: SCENE_H, borderRadius: radii.sheet, overflow: 'hidden', marginBottom: 32,
+                   backgroundColor: '#084B4A' },
+  featureTitle:  { ...type.pageTitle, color: colors.textPrimary, textAlign: 'center', marginBottom: 12 },
+  featureBody:   { ...type.body, fontSize: 16, lineHeight: 24, color: colors.textSecondary, textAlign: 'center', maxWidth: 320 },
+  featureNote:   { ...type.small, color: colors.textSecondary, textAlign: 'center', marginTop: 14, maxWidth: 300 },
+  nav:           { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 12, backgroundColor: colors.card,
+                   borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider },
+  dot:           { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.fieldBorder },
+  dotActive:     { width: 18, backgroundColor: colors.primary },
+  backBtn:       { width: 50, height: 50, borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder,
+                   backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center' },
+  nextBtn:       { flex: 1, backgroundColor: colors.primary, borderRadius: radii.md, minHeight: 50, paddingHorizontal: 24,
+                   flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  nextText:      { ...type.rowTitle, color: colors.onPrimary },
+})
+const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS

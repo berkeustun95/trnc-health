@@ -35,7 +35,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  ActivityIndicator, Modal, Platform, Alert,
+  ActivityIndicator, Modal, Platform, Alert, Image,
 } from 'react-native'
 import { addBackListener } from '../utils/backHandler'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -47,7 +47,8 @@ import { useDisplayNameCheck, displayNameSaveError, NameFeedback } from '../comp
 import { supabase } from '../lib/supabase'
 import { socialProvider, hasGoogleIdentity, revokeGoogle, hasAppleIdentity, revokeApple } from '../utils/socialAuth'
 import { LEGAL_VERSION, legalLocaleFor, isLegalFallback } from '../constants/legal'
-import { colors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius, radii, type } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
 import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
 import LegalScreen from './LegalScreen'
 import LegalLinkedText from '../components/LegalLinkedText'
@@ -852,6 +853,14 @@ export default function ProfileSetupScreen({
 
           {step === 0 && (
             <View style={s.intro}>
+              {/* Redesign: Oli & Maki on the teal Oli ground. Picture only, no text on it. */}
+              {REDESIGN && (
+                <View style={s.introScene}>
+                  <Image source={require('../assets/oli-scenes/oli-bg.png')} resizeMode="stretch" style={StyleSheet.absoluteFill} />
+                  <Image source={require('../assets/oli-scenes/welcome.png')} resizeMode="contain"
+                    accessibilityIgnoresInvertColors style={s.introSceneArt} />
+                </View>
+              )}
               {SHOW_WIZARD_HEADINGS && <Text style={s.introTitle}>{t('pgIntroTitle', lang)}</Text>}
               <Text style={s.introBody}>{t('pgIntroBody', lang)}</Text>
               {/* The data line matters more than the reason: for a returning user the
@@ -1163,7 +1172,7 @@ export default function ProfileSetupScreen({
   )
 }
 
-const s = StyleSheet.create({
+const legacyS = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -1318,3 +1327,75 @@ const s = StyleSheet.create({
   helpNote: { color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, marginTop: 14 },
 
 })
+
+// ─── Redesign (S2b) overrides, key by key. Visual only: no field, step or rule changes.
+// Fixes three things that were invisible: the disabled next button (white on colors.border,
+// 1.18:1 — now the real colour at 0.45 opacity, as Button does), the opt-in box boundary
+// (colors.border 1.18:1 → fieldBorder 3.66:1), and the fontWeight-only styles that rendered
+// in the system font (Inter families throughout). Every control is 44pt+.
+const redesignS = StyleSheet.create({
+  safe:          { flex: 1, backgroundColor: colors.canvas },
+  dot:           { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.fieldBorder },
+  helpBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 44, paddingHorizontal: 12,
+                   backgroundColor: colors.accentLight, borderColor: '#F5C9B4', borderWidth: 1, borderRadius: radii.pill },
+  helpBtnText:   { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.tintLifestyleFg },
+  langBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 44, paddingHorizontal: 12,
+                   backgroundColor: colors.card, borderColor: colors.fieldBorder, borderWidth: 1, borderRadius: radii.pill },
+  langBtnText:   { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.textSecondary, letterSpacing: 0.4 },
+  stepLabel:     { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, marginBottom: 4 },
+  title:         { fontSize: 24, lineHeight: 30, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 18 },
+  introScene:    { height: 132, borderRadius: radii.widget, overflow: 'hidden', marginBottom: 18, backgroundColor: '#084B4A' },
+  introSceneArt: { position: 'absolute', bottom: 0, right: 18, top: 12, width: 150 },
+  introTitle:    { fontSize: 24, lineHeight: 30, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 12 },
+  introBody:     { ...type.body, color: colors.textSecondary, marginBottom: 16 },
+  introDataText: { flex: 1, ...type.small, fontFamily: 'Inter_500Medium', color: colors.primaryDark },
+  introTime:     { ...type.small, color: colors.textSecondary },
+  label:         { fontSize: 14, lineHeight: 19, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, marginBottom: 7 },
+  hint:          { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 6 },
+  input:         { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md,
+                   minHeight: 48, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 13 : 10,
+                   fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  select:        { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md,
+                   minHeight: 48, paddingHorizontal: 14, paddingVertical: 12,
+                   flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  selectText:    { fontSize: 16, fontFamily: 'Inter_400Regular', color: colors.textPrimary, flexShrink: 1 },
+  chip:          { paddingHorizontal: 14, minHeight: 44, justifyContent: 'center', borderRadius: radii.pill,
+                   backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder },
+  chipOn:        { backgroundColor: colors.primaryLight, borderColor: colors.primary, borderWidth: 2 },
+  chipText:      { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
+  row:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48,
+                   backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder,
+                   borderRadius: radii.md, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
+  rowOn:         { borderColor: colors.primary, borderWidth: 2, backgroundColor: colors.primaryLight },
+  rowText:       { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textPrimary, flex: 1, paddingRight: 8 },
+  rowTextOn:     { color: colors.primaryDark, fontFamily: 'Inter_600SemiBold' },
+  err:           { ...type.small, fontFamily: 'Inter_500Medium', color: colors.dangerInk, marginTop: 7 },
+  exitRow:       { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 24, marginTop: 20 },
+  exitText:      { ...type.body, color: colors.textSecondary, textDecorationLine: 'underline' },
+  optIn:         { flexDirection: 'row', alignItems: 'flex-start', gap: 11, marginTop: 6, padding: 14,
+                   backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md },
+  optInBox:      { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: colors.fieldBorder,
+                   backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  termsText:     { flex: 1, fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+  optInText:     { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
+  optInHint:     { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 4 },
+  legalFooter:   { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 16 },
+  legalFooterLink:{ color: colors.primaryDark, fontFamily: 'Inter_700Bold', textDecorationLine: 'underline' },
+  footer:        { flexShrink: 0, flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
+                   borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, backgroundColor: colors.card },
+  primaryBtn:    { backgroundColor: colors.primary, borderRadius: radii.md, minHeight: 50,
+                   alignItems: 'center', justifyContent: 'center' },
+  primaryBtnOff: { backgroundColor: colors.primary, opacity: 0.45 },
+  primaryBtnText:{ ...type.rowTitle, color: colors.onPrimary },
+  backBtn:       { paddingHorizontal: 20, minHeight: 50, borderRadius: radii.md, backgroundColor: colors.card,
+                   borderWidth: 1, borderColor: colors.fieldBorder, alignItems: 'center', justifyContent: 'center' },
+  backBtnText:   { ...type.rowTitle, color: colors.textPrimary },
+  modalTitle:    { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flexShrink: 1, paddingRight: 10 },
+  helpCard:      { backgroundColor: colors.card, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet,
+                   paddingTop: 16, paddingHorizontal: 18, paddingBottom: 26 },
+  helpRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52,
+                   borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
+  helpRowText:   { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
+  helpNote:      { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 14 },
+})
+const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS

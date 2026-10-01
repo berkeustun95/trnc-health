@@ -46,6 +46,7 @@ export const colors = {
   // ALL red text. `danger` #D1495B is 4.36 on white and fails AA on every surface; this is
   // 5.38 on white, 4.61 on the lowest category tint. `danger` stays for icons and fills.
   dangerInk:     '#C0384A',
+  fieldBorder:   '#7A8796',   // input / control boundary on white: 3.66:1 (WCAG 1.4.11 asks 3:1; colors.border is 1.18)
   onPrimary:     '#FFFFFF',
   success:       '#2E9E5B',
   successLight:  '#E6F5ED',
