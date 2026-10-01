@@ -57,6 +57,7 @@ const CATEGORY = {
   'Konser':              'music',
   'Hotel Konseri':       'music',
   'Sahne':               'arts',
+  'Spor':                'sports',
 }
 
 // The partner's city strings → the district names the rest of the app uses
@@ -237,6 +238,8 @@ if (selftest) {
   t("'Club & Lounge & Bar'",          CATEGORY_FOLDED.get(trFold('Club & Lounge & Bar')), 'nightlife')
   t("'KONSER' upper",                 CATEGORY_FOLDED.get(trFold('KONSER')), 'music')
   t("'Hotel Konseri'",                CATEGORY_FOLDED.get(trFold('Hotel Konseri')), 'music')
+  t("'Spor' (live feed, 2026-09-30)", CATEGORY_FOLDED.get(trFold('Spor')), 'sports')
+  t("'SPOR' upper",                  CATEGORY_FOLDED.get(trFold('SPOR')), 'sports')
   t('unknown stays unmapped',         CATEGORY_FOLDED.get(trFold('Tiyatro Gecesi')), undefined)
   // The trap itself: a naive lowercase leaves a combining dot and must NOT match.
   t('naive toLowerCase would MISS',   'ELEKTRONİK MÜZİK'.toLowerCase() === 'elektronik müzik', false)
