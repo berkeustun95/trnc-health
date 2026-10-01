@@ -268,6 +268,46 @@ for (const [name, file] of BACKGROUNDS) {
   if (worst < FLOOR) problems.push(`Photo-led glass buttons: white is ${worst.toFixed(2)}:1 at worst (${at}), under ${FLOOR}:1`)
 }
 
+// Module backdrops (ModuleBackdrop A 'photo' / C 'wash'), on the real module photos at
+// 320/360/393dp. A: white over the photo darkened by HEADER_SCRIM across the text zone (64pt
+// for a header, 170pt for the facility list's title block). C: textPrimary and WASH_SECONDARY
+// over the photo under a WASH_VEIL canvas veil, anywhere on screen.
+{
+  const mb = readFileSync(resolve(ROOT, 'components/ui/ModuleBackdrop.js'), 'utf8')
+  const num = n => parseFloat((new RegExp(`export const ${n} = ([\\d.]+)`).exec(mb) || [])[1])
+  const scrim = num('HEADER_SCRIM'), veil = num('WASH_VEIL')
+  const wsec = (/export const WASH_SECONDARY = '#([0-9A-Fa-f]{6})'/.exec(mb) || [])[1]
+  if (!(scrim > 0) || !(veil > 0) || !wsec) problems.push('ModuleBackdrop: cannot read HEADER_SCRIM / WASH_VEIL / WASH_SECONDARY — measuring nothing')
+  else {
+    const hex = h => [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16))
+    const cr = (a, b) => { const x = Y(...a), y = Y(...b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05) }
+    const canvas = [0xF4, 0xF6, 0xF5], tp = [0x1A, 0x2B, 0x33], ws = hex(wsec)
+    let wA = Infinity, aAt = '', wP = Infinity, wS = Infinity, cAt = ''
+    for (const [ph, zone] of [['medical-facilities', 170], ['events', 64], ['accommodation', 64]]) {
+      for (const [Wd, Hd] of [[320, 640], [360, 780], [393, 852]]) {
+        const inset = 24
+        const A = await sharp(resolve(ROOT, `assets/backgrounds/ada-bg-${ph}.jpg`)).resize(Wd, Math.max(300, zone + 140) + inset, { fit: 'cover' }).removeAlpha().raw().toBuffer()
+        for (let y = inset; y < inset + zone; y++) for (let x = 16; x < Wd - 16; x++) {
+          const i = (y * Wd + x) * 3
+          const c = cr([255, 255, 255], [A[i], A[i + 1], A[i + 2]].map(v => v * (1 - scrim)))
+          if (c < wA) { wA = c; aAt = `${ph} ${Wd}dp y=${y}` }
+        }
+        const C = await sharp(resolve(ROOT, `assets/backgrounds/ada-bg-${ph}.jpg`)).resize(Wd, Hd, { fit: 'cover' }).removeAlpha().raw().toBuffer()
+        for (let i = 0; i < C.length; i += 3) {
+          const px = [0, 1, 2].map(k => canvas[k] * veil + C[i + k] * (1 - veil))
+          const p1 = cr(tp, px), p2 = cr(ws, px)
+          if (p1 < wP) wP = p1
+          if (p2 < wS) { wS = p2; cAt = `${ph} ${Wd}dp` }
+        }
+      }
+    }
+    rows.push({ name: 'backdrop A white', worst: wA, at: aAt }, { name: 'backdrop C primary', worst: wP, at: cAt }, { name: 'backdrop C secondary', worst: wS, at: cAt })
+    if (wA < FLOOR) problems.push(`ModuleBackdrop A: white text ${wA.toFixed(2)}:1 at worst (${aAt}), under ${FLOOR}:1`)
+    if (wP < FLOOR) problems.push(`ModuleBackdrop C: textPrimary ${wP.toFixed(2)}:1 at worst`)
+    if (wS < FLOOR) problems.push(`ModuleBackdrop C: WASH_SECONDARY ${wS.toFixed(2)}:1 at worst (${cAt})`)
+  }
+}
+
 // Home v3 emergency tile: white text straight on solid health red (no band, no photo).
 {
   const w = readFileSync(resolve(ROOT, 'components/home/redesign/Widgets.js'), 'utf8')

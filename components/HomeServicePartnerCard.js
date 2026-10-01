@@ -4,6 +4,7 @@ import HomeServiceIcon from './HomeServiceIcon'
 import PartnerLogoStrip from './PartnerLogoStrip'
 import { partnerLogo } from '../constants/partnerAssets'
 import { colors, shadow, radius } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
 import { t } from '../constants/i18n'
 import { hsCategory, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 import { partnerWaMessage } from '../constants/partners'
@@ -131,7 +132,7 @@ export default function HomeServicePartnerCard({
 
       <View style={s.btnRow}>
         {!!waNum && (
-          <TouchableOpacity style={s.waBtn} onPress={openWhatsApp} activeOpacity={0.8}>
+          <TouchableOpacity style={[s.waBtn, REDESIGN && WA_DARK]} onPress={openWhatsApp} activeOpacity={0.8}>
             <Ionicons name="logo-whatsapp" size={15} color="#fff" />
             <Text style={s.btnText}>{t('hsWhatsApp', lang)}</Text>
           </TouchableOpacity>
@@ -146,6 +147,10 @@ export default function HomeServicePartnerCard({
     </Wrap>
   )
 }
+
+// Redesign: WhatsApp's dark green, white 7.67:1 (was #25D366, 1.98:1) — approved by Berke
+// 2026-10-01 for the partner surfaces (Yurtlar, TadilArt, Shiny Paw). Label, position, link unchanged.
+const WA_DARK = { backgroundColor: '#075E54' }
 
 const s = StyleSheet.create({
   // backgroundColor is EXPLICIT, not inherited: on Android a View with both borderRadius

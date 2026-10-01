@@ -303,7 +303,7 @@ const redesignS = StyleSheet.create({
   close:    { width: TAP, height: TAP, alignItems: 'center', justifyContent: 'center', marginTop: -10, marginRight: -10 },
   sourceLink: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: TAP },
   waBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18,
-              minHeight: 48, borderRadius: radii.md, backgroundColor: '#25D366' },
+              minHeight: 48, borderRadius: radii.md, backgroundColor: '#075E54' },
   siteBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10,
               minHeight: 48, borderRadius: radii.md, borderWidth: 1.5, borderColor: colors.primary,
               backgroundColor: 'transparent' },

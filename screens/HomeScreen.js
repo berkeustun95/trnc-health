@@ -40,6 +40,7 @@ import {
 import BackButton from '../components/BackButton'
 import RedesignHero, { heroHeight } from '../components/home/redesign/RedesignHero'
 import OliBar, { OLI_BAR_H } from '../components/home/redesign/OliBar'
+import ModuleBackdrop, { BackdropToggle, useBackdropHeaderTone } from '../components/ui/ModuleBackdrop'
 import { weatherPhoto, isNightNow } from '../constants/weatherPhotos'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -240,6 +241,7 @@ export default function HomeScreen({
   // threshold is crossed, not on every scroll frame. RN's StatusBar is a stack, so leaving
   // Home unmounts this entry and the app default comes back by itself.
   const [overCanvas, setOverCanvas] = useState(false)
+  const backdropTone = useBackdropHeaderTone()
   const [oliOnScreen, setOliOnScreen] = useState(true)   // Oli bar carousel pauses when scrolled away
   // DEV-ONLY: tile labels Medium (500) vs Bold (700). Toggled by the "Aa" chip beside
   // "Tüm hizmetler", which only renders in __DEV__. Default Medium.
@@ -1119,10 +1121,10 @@ export default function HomeScreen({
       const rosterPartial = dutyRosterStatus === DUTY_PARTIAL
       const filtered = !!(searchText || activeType || activeSpecialty)
       return (
-        <View style={fr.sheet}>
+        <View style={[fr.sheet, { backgroundColor: 'transparent' }]}>
           <View style={fr.top}>
-            <Text style={fr.title} accessibilityRole="header">{t('medIntroTitle', lang)}</Text>
-            <Text style={fr.sub}>{t('medIntroSub', lang)}</Text>
+            <Text style={[fr.title, backdropTone === 'light' && fr.onPhoto]} accessibilityRole="header">{t('medIntroTitle', lang)}</Text>
+            <Text style={[fr.sub, backdropTone === 'light' && fr.onPhoto, backdropTone === 'wash' && fr.onWash]}>{t('medIntroSub', lang)}</Text>
             <View style={fr.search}>
               <Feather name="search" size={18} color={colors.textSecondary} />
               <TextInput
@@ -1220,7 +1222,7 @@ export default function HomeScreen({
             ListEmptyComponent={facilityLoadError && facilities.length === 0 ? (
               <ErrorState message={t('facilityLoadError', lang)} onRetry={onRetry} lang={lang} />
             ) : (
-              <EmptyState
+              <EmptyState tone={backdropTone}
                 icon={filtered ? 'search-outline' : 'medical-outline'}
                 category="health"
                 title={t(filtered ? 'noResultsTitle' : 'noFacilitiesTitle', lang)}
@@ -1660,7 +1662,11 @@ export default function HomeScreen({
   const shell = (
     <>
       {/* Facility-list mode swaps the hub's sky for the medical-facilities art (full-bleed). */}
-      {showFacilityList && <PageBackground topic="medical_facilities" />}
+      {/* Redesign: the module photo as ModuleBackdrop (style A or C, DEV toggle); legacy keeps
+          PageBackground. The HEADER below is unchanged either way (the gate's safety property). */}
+      {showFacilityList && (REDESIGN
+        ? <ModuleBackdrop photo={require('../assets/backgrounds/ada-bg-medical-facilities.jpg')} textZone={170} />
+        : <PageBackground topic="medical_facilities" />)}
       <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
         <View style={s.container}>
           {/* ─── THE HEADER IS V1's, UNCONDITIONALLY ──────────────────────────
@@ -1701,6 +1707,7 @@ export default function HomeScreen({
           {showFacilityList ? renderFacilityList() : renderHub()}
         </View>
       </SafeAreaView>
+      {showFacilityList && REDESIGN && <BackdropToggle />}
     </>
   )
 
@@ -1913,6 +1920,8 @@ const fr = StyleSheet.create({
   top:        { flexShrink: 0, paddingHorizontal: 16, paddingTop: 20 },
   title:      { ...TYPE.pageTitle, color: colors.textPrimary },
   sub:        { ...TYPE.body, color: colors.textSecondary, marginTop: 2 },
+  onPhoto:    { color: '#FFFFFF' },
+  onWash:     { color: '#3E4A59' },   // ModuleBackdrop WASH_SECONDARY
   search:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, minHeight: 48, paddingLeft: 14, paddingRight: 2,
                 backgroundColor: colors.card, borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder },
   searchInput:{ flex: 1, ...TYPE.body, color: colors.textPrimary, paddingVertical: 10 },

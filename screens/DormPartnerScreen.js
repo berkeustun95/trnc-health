@@ -753,7 +753,7 @@ const redesignS = StyleSheet.create({
   directionsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14,
                    minHeight: 48, borderRadius: radii.md, backgroundColor: colors.primary },
   waBtn:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-                   minHeight: 48, borderRadius: radii.md, backgroundColor: '#25D366' },
+                   minHeight: 48, borderRadius: radii.md, backgroundColor: '#075E54' },
   callBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
                    minHeight: 48, borderRadius: radii.md, backgroundColor: colors.primary },
 })

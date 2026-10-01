@@ -271,9 +271,8 @@ export default function HomeServicePartnerScreen({
           <ContactBar
             lang={lang}
             actions={[
-              // #25D366 kept: TadilArt is a partner and the button colour is part of the agreed look —
-              // the darker WhatsApp green is a proposal in the report, not a build.
-              waNum ? { kind: 'whatsapp', label: t('hsWhatsApp', lang), onPress: openWhatsApp, bg: '#25D366' } : null,
+              // WhatsApp's dark green (ContactBar default, 7.67:1): approved for partner surfaces 2026-10-01.
+              waNum ? { kind: 'whatsapp', label: t('hsWhatsApp', lang), onPress: openWhatsApp } : null,
               phone ? { kind: 'call', label: t('hsCall', lang), onPress: call } : null,
             ]}
           />

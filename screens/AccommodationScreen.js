@@ -18,6 +18,7 @@ import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { colors, shadow, radii, type, elevation, category, TAP } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
+import ModuleBackdrop, { BackdropToggle, useBackdropHeaderTone } from '../components/ui/ModuleBackdrop'
 import {
   ScreenHeader as RScreenHeader, FilterBar, CardSkeleton, EmptyState, ErrorState,
 } from '../components/ui'
@@ -426,6 +427,7 @@ export default function AccommodationScreen({
   onOpenProperty, selectedProperty, onCloseProperty,
   onOpenDorm, selectedDorm, onCloseDorm,
 }) {
+  const headerTone = useBackdropHeaderTone()
   const [items, setItems]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -593,9 +595,12 @@ export default function AccommodationScreen({
   }
 
   return (
+    <View style={{ flex: 1, backgroundColor: REDESIGN ? colors.canvas : undefined }}>
+    {/* Module photo (Konaklama's own) — style A or C, see ModuleBackdrop. */}
+    {REDESIGN && <ModuleBackdrop photo={require('../assets/backgrounds/ada-bg-accommodation.jpg')} />}
     <SafeAreaView style={cs.safe} edges={['top']}>
       {REDESIGN ? (
-        <RScreenHeader onBack={onClose} title={t('accomTitle', lang)} subtitle={HEADER_SUBTITLE(lang)} lang={lang} />
+        <RScreenHeader onBack={onClose} title={t('accomTitle', lang)} subtitle={HEADER_SUBTITLE(lang)} lang={lang} tone={headerTone} />
       ) : (
         <>
           <PageBackground topic="accommodation" />
@@ -756,7 +761,7 @@ export default function AccommodationScreen({
             // one entry and the list is not a query), so this is what the list does at
             // N=0, not something a user can currently see.
             isDorm ? null : REDESIGN ? (
-              <EmptyState icon="home-outline" category="homeLife"
+              <EmptyState tone={headerTone} icon="home-outline" category="homeLife"
                 title={t('accomNoResults', lang)} message={t('accomNoResultsSub', lang)} style={{ marginTop: 28 }} />
             ) : (
               <View style={cs.emptyWrap}>
@@ -879,6 +884,8 @@ export default function AccommodationScreen({
         </KeyboardAwareForm>
       </Modal>
     </SafeAreaView>
+    {REDESIGN && <BackdropToggle />}
+    </View>
   )
 }
 
@@ -996,7 +1003,7 @@ const legacyCs = StyleSheet.create({
 // property card stays photo-led (a 64pt ListCard thumb would hide what the listing is), and
 // the dorm card is a partner surface (logo strip, order, accent dot untouched).
 const redesignCs = StyleSheet.create({
-  safe:                { flex: 1, backgroundColor: colors.canvas },
+  safe:                { flex: 1, backgroundColor: 'transparent' },
   detailOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: colors.canvas, zIndex: 20, elevation: 20 },
   intentTab:           { minHeight: TAP, justifyContent: 'center', paddingHorizontal: 16, borderRadius: radii.pill,
                          backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder },

@@ -23,6 +23,7 @@ import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { openTicketUrl } from '../utils/events'
 import BackButton from '../components/BackButton'
 import { REDESIGN } from '../constants/redesign'
+import ModuleBackdrop, { BackdropToggle, useBackdropHeaderTone } from '../components/ui/ModuleBackdrop'
 import { formatPetDate } from '../constants/petsContent'
 import {
   ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button,
@@ -588,6 +589,7 @@ export { EventDetailScreen }
 // openedProperty: the detail is an overlay over the still-mounted list, and App's hardware-back
 // chain closes the overlay first — one close function for the button and Android back.
 export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistrict = null, selectedEvent = null, onOpenEvent, onCloseEvent }) {
+  const headerTone = useBackdropHeaderTone()
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -706,9 +708,11 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
 
   return (
     <View style={s.root}>
+    {/* Module photo (Etkinlikler's own) — style A or C, see ModuleBackdrop. */}
+    {REDESIGN && <ModuleBackdrop photo={require('../assets/backgrounds/ada-bg-events.jpg')} />}
     <SafeAreaView style={s.safe} edges={['top']}>
       {REDESIGN ? (
-        <KitHeader onBack={onBack} title={t('eventsTitle', lang)} lang={lang} />
+        <KitHeader onBack={onBack} title={t('eventsTitle', lang)} lang={lang} tone={headerTone} />
       ) : (<>
       <PageBackground topic="events" />
       <ScreenHeader onBack={onBack} title={t('eventsTitle', lang)} lang={lang} />
@@ -752,7 +756,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
           ListFooterComponent={bottomSlot}
           ListEmptyComponent={
             loadError ? <ErrorState lang={lang} onRetry={retry} />
-            : REDESIGN ? <EmptyState icon="calendar-outline" category="explore" title={t('noUpcomingEvents', lang)} />
+            : REDESIGN ? <EmptyState tone={headerTone} icon="calendar-outline" category="explore" title={t('noUpcomingEvents', lang)} />
             : <View style={s.emptyWrap}>
               <View style={s.emptyCard}>
                 <Ionicons name="calendar-outline" size={48} color={colors.border} style={{ marginBottom: 12 }} />
@@ -811,6 +815,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
         <EventDetailScreen event={selectedEvent} lang={lang} onBack={() => onCloseEvent?.()} onAdNavigate={onAdNavigate} />
       </View>
     )}
+    {REDESIGN && !selectedEvent && <BackdropToggle />}
     </View>
   )
 }
@@ -936,7 +941,7 @@ const legacy = StyleSheet.create({
 // partner artwork, so only ADA chrome — surface, radius, type, label colour — moves to tokens.
 const rd = StyleSheet.create({
   root:          { flex: 1, backgroundColor: C.canvas },
-  safe:          { flex: 1, backgroundColor: C.canvas },
+  safe:          { flex: 1, backgroundColor: 'transparent' },
   detailOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: C.canvas, zIndex: 10, elevation: 10 },
   card:          { flexDirection: 'row', backgroundColor: C.card, borderRadius: radii.card,
                    overflow: 'hidden', minHeight: CARD_H, ...elevation.card },

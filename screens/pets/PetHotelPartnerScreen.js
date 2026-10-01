@@ -423,13 +423,13 @@ const legacyS = StyleSheet.create({
 
 // S5 redesign overrides — shape and spacing only (partner rule): the ADA page ground, 44–48pt
 // buttons on the redesign radius. Every colour, label, link and position is unchanged; the
-// WhatsApp green stays #25D366 (a visible change, so a proposal, not a build).
+// WhatsApp is WhatsApp's dark green #075E54 (7.67:1; was #25D366, 1.98:1) — approved 2026-10-01.
 const redesignS = StyleSheet.create({
   safe:     { flex: 1, backgroundColor: colors.canvas },
   mapsBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44,
               borderWidth: 1.5, borderColor: colors.primary, borderRadius: radii.md, marginTop: 10, backgroundColor: 'transparent' },
   waBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48,
-              backgroundColor: '#25D366', borderRadius: radii.md },
+              backgroundColor: '#075E54', borderRadius: radii.md },
   callBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48,
               backgroundColor: colors.primary, borderRadius: radii.md },
 })

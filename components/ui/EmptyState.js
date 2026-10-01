@@ -5,12 +5,13 @@ import Button from './Button'
 
 // "There is genuinely nothing here." NEVER used for a failed fetch — that is ErrorState.
 // An empty result from a table that cannot legitimately be empty is an error (CLAUDE.md).
-export default function EmptyState({ icon = 'albums-outline', category, title, message, action, style }) {
+// tone 'wash': the message in WASH_SECONDARY, for an empty list drawn on ModuleBackdrop C.
+export default function EmptyState({ icon = 'albums-outline', category, title, message, action, style, tone }) {
   return (
     <View style={[s.wrap, style]}>
       <CategoryIcon icon={icon} category={category} size={56} />
       {!!title && <Text style={s.title}>{title}</Text>}
-      {!!message && <Text style={s.msg}>{message}</Text>}
+      {!!message && <Text style={[s.msg, tone === 'wash' && { color: '#3E4A59' }, tone === 'light' && { color: '#3E4A59' }]}>{message}</Text>}
       {!!action && <Button variant="secondary" title={action.label} onPress={action.onPress} style={s.btn} />}
     </View>
   )
