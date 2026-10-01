@@ -8,7 +8,7 @@ import * as Notifications from 'expo-notifications'
 // Shown only when the OS would actually ask: never once granted, never when the OS will no
 // longer ask (canAskAgain false — the screens offer "Ayarları aç" instead).
 // Same triggers as before; only the explanation is new. Automatic triggers (app start, sign-in)
-// back off after "Şimdi değil": SNOOZE_DAYS the first time, then no automatic ask at all —
+// back off after "Şimdi değil" or an OS "No": SNOOZE_DAYS the first time, then no automatic ask —
 // tap-triggered asks (a "near me" button, Başla) still explain every time.
 export const SNOOZE_DAYS = 7
 const AUTO_MAX_LATER = 2
@@ -100,6 +100,9 @@ export function requestWithPrimer(kind, { auto = false } = {}) {
       return now
     }
     const res = await api.request()
+    // A "No" in the OS dialog backs off too (Android keeps canAskAgain after the first one, and
+    // the sign-in trigger re-runs on session refresh).
+    if (auto && res.status !== 'granted') await recordLater(kind)
     return { status: res.status, canAskAgain: res.canAskAgain !== false, asked: true }
   })
 }
