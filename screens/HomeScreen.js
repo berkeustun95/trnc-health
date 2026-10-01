@@ -40,7 +40,6 @@ import {
 import BackButton from '../components/BackButton'
 import RedesignHero, { heroHeight } from '../components/home/redesign/RedesignHero'
 import OliBar, { OLI_BAR_H } from '../components/home/redesign/OliBar'
-import ModuleBackdrop, { BackdropToggle, useBackdropHeaderTone } from '../components/ui/ModuleBackdrop'
 import { weatherPhoto, isNightNow } from '../constants/weatherPhotos'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -50,7 +49,8 @@ import { SectionHeader, useTabBarFootprint } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
 // Facility-list redesign (S3) — renderFacilityList() only.
-import { ListCard, ContactBar, ErrorState, EmptyState, InlineAlert, IconButton, Button, FilterBar } from '../components/ui'
+import { ListCard, ContactBar, ErrorState, EmptyState, InlineAlert, IconButton, Button, FilterBar, ModuleScreen, OnPhotoLabel } from '../components/ui'
+import { CARD_BG } from '../components/ui/ModuleScreen'
 import { category as CAT, type as TYPE, radii, elevation } from '../constants/theme'
 
 const TYPE_ICON_MAP = {
@@ -241,7 +241,6 @@ export default function HomeScreen({
   // threshold is crossed, not on every scroll frame. RN's StatusBar is a stack, so leaving
   // Home unmounts this entry and the app default comes back by itself.
   const [overCanvas, setOverCanvas] = useState(false)
-  const backdropTone = useBackdropHeaderTone()
   const [oliOnScreen, setOliOnScreen] = useState(true)   // Oli bar carousel pauses when scrolled away
   // DEV-ONLY: tile labels Medium (500) vs Bold (700). Toggled by the "Aa" chip beside
   // "Tüm hizmetler", which only renders in __DEV__. Default Medium.
@@ -1121,10 +1120,10 @@ export default function HomeScreen({
       const rosterPartial = dutyRosterStatus === DUTY_PARTIAL
       const filtered = !!(searchText || activeType || activeSpecialty)
       return (
-        <View style={[fr.sheet, { backgroundColor: 'transparent' }]}>
+        <View style={fr.sheet}>
           <View style={fr.top}>
-            <Text style={[fr.title, backdropTone === 'light' && fr.onPhoto]} accessibilityRole="header">{t('medIntroTitle', lang)}</Text>
-            <Text style={[fr.sub, backdropTone === 'light' && fr.onPhoto, backdropTone === 'wash' && fr.onWash]}>{t('medIntroSub', lang)}</Text>
+            <OnPhotoLabel textStyle={fr.title} numberOfLines={0} accessibilityRole="header">{t('medIntroTitle', lang)}</OnPhotoLabel>
+            <OnPhotoLabel style={fr.sub} numberOfLines={0}>{t('medIntroSub', lang)}</OnPhotoLabel>
             <View style={fr.search}>
               <Feather name="search" size={18} color={colors.textSecondary} />
               <TextInput
@@ -1216,13 +1215,13 @@ export default function HomeScreen({
                     <Button variant="text" icon="refresh" title={t('uiRetry', lang)} onPress={onRetry} />
                   </View>
                 )}
-                {locationDenied && <Text style={fr.note}>{t('enableLocation', lang)}</Text>}
+                {locationDenied && <OnPhotoLabel style={fr.note} numberOfLines={0}>{t('enableLocation', lang)}</OnPhotoLabel>}
               </>
             )}
             ListEmptyComponent={facilityLoadError && facilities.length === 0 ? (
               <ErrorState message={t('facilityLoadError', lang)} onRetry={onRetry} lang={lang} />
             ) : (
-              <EmptyState tone={backdropTone}
+              <EmptyState
                 icon={filtered ? 'search-outline' : 'medical-outline'}
                 category="health"
                 title={t(filtered ? 'noResultsTitle' : 'noFacilitiesTitle', lang)}
@@ -1659,14 +1658,7 @@ export default function HomeScreen({
     )
   }
 
-  const shell = (
-    <>
-      {/* Facility-list mode swaps the hub's sky for the medical-facilities art (full-bleed). */}
-      {/* Redesign: the module photo as ModuleBackdrop (style A or C, DEV toggle); legacy keeps
-          PageBackground. The HEADER below is unchanged either way (the gate's safety property). */}
-      {showFacilityList && (REDESIGN
-        ? <ModuleBackdrop photo={require('../assets/backgrounds/ada-bg-medical-facilities.jpg')} textZone={170} />
-        : <PageBackground topic="medical_facilities" />)}
+  const shellBody = (
       <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
         <View style={s.container}>
           {/* ─── THE HEADER IS V1's, UNCONDITIONALLY ──────────────────────────
@@ -1707,7 +1699,15 @@ export default function HomeScreen({
           {showFacilityList ? renderFacilityList() : renderHub()}
         </View>
       </SafeAreaView>
-      {showFacilityList && REDESIGN && <BackdropToggle />}
+  )
+
+  const shell = (
+    <>
+      {/* Facility-list mode swaps the hub's sky for the medical-facilities art (full-bleed).
+          Redesign: the same SafeAreaView inside ModuleScreen (option B); legacy keeps
+          PageBackground. The HEADER is unchanged either way (the gate's safety property). */}
+      {showFacilityList && !REDESIGN && <PageBackground topic="medical_facilities" />}
+      {showFacilityList && REDESIGN ? <ModuleScreen topic="medical">{shellBody}</ModuleScreen> : shellBody}
     </>
   )
 
@@ -1913,15 +1913,12 @@ const s = StyleSheet.create({
 // Facility-list redesign (renderFacilityList only).
 const TYPE_ION_R = { pharmacy: 'medkit-outline', clinic: 'medical-outline', hospital: 'business-outline', dentist: 'medical-outline' }
 const fr = StyleSheet.create({
-  // A canvas sheet under the shell's header. The negative margin cancels the shell's 16pt
-  // container padding so the sheet runs edge to edge; the cards bring their own gutter.
-  sheet:      { flex: 1, marginHorizontal: -16, backgroundColor: colors.canvas, borderTopLeftRadius: radii.sheet,
-                borderTopRightRadius: radii.sheet, overflow: 'hidden' },
+  // A transparent sheet over the ModuleScreen photo, under the shell's header. The negative margin
+  // cancels the shell's 16pt container padding; the cards bring their own gutter.
+  sheet:      { flex: 1, marginHorizontal: -16 },
   top:        { flexShrink: 0, paddingHorizontal: 16, paddingTop: 20 },
-  title:      { ...TYPE.pageTitle, color: colors.textPrimary },
-  sub:        { ...TYPE.body, color: colors.textSecondary, marginTop: 2 },
-  onPhoto:    { color: '#FFFFFF' },
-  onWash:     { color: '#3E4A59' },   // ModuleBackdrop WASH_SECONDARY
+  title:      { ...TYPE.pageTitle, color: '#FFFFFF' },
+  sub:        { marginTop: 6 },
   search:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, minHeight: 48, paddingLeft: 14, paddingRight: 2,
                 backgroundColor: colors.card, borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder },
   searchInput:{ flex: 1, ...TYPE.body, color: colors.textPrimary, paddingVertical: 10 },
@@ -1932,13 +1929,13 @@ const fr = StyleSheet.create({
   chipTextOn: { color: colors.primaryDark },
   list:       { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   duty:       { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, padding: 14, marginBottom: 12,
-                backgroundColor: colors.card, borderRadius: radii.card, ...elevation.card },
+                backgroundColor: CARD_BG, borderRadius: 20, ...elevation.card },
   dutyAlert:  { backgroundColor: CAT.health.bg, borderWidth: 1, borderColor: colors.dangerInk },
   dutyIcon:   { width: 40, height: 40, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card },
   dutyTitle:  { ...TYPE.rowTitle, color: colors.textPrimary },
   dutySub:    { ...TYPE.small, color: colors.textSecondary },
   inlineErr:  { marginBottom: 12, alignItems: 'flex-start' },
-  note:       { ...TYPE.small, color: colors.textSecondary, textAlign: 'center', marginBottom: 12 },
+  note:       { alignSelf: 'center', marginBottom: 12 },
   card:       { marginBottom: 10 },
   actions:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
 })

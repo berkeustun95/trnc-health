@@ -7,7 +7,7 @@ import { colors, shadow, radius, typeColors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import BackButton from '../../components/BackButton'
 import { REDESIGN } from '../../constants/redesign'
-import { ScreenHeader, ListCard, ErrorState, EmptyState, CardSkeleton } from '../../components/ui'
+import { ScreenHeader, ListCard, ErrorState, EmptyState, CardSkeleton, ModuleScreen } from '../../components/ui'
 
 // Same links as the vet's own profile (FacilityProfileScreen): tel: with the stored number,
 // Google Maps by coordinates, else by address.
@@ -46,6 +46,7 @@ function VetListCard({ vet, lang, onPress }) {
 
 function VetDirectoryRedesign({ lang, onBack, onOpenVet, vets, loading, error, loadVets }) {
   return (
+    <ModuleScreen topic="pets">
     <SafeAreaView style={r.safe} edges={['top']}>
       <ScreenHeader title={t('petsVetDirectoryTitle', lang)} onBack={onBack} lang={lang} />
       {loading ? (
@@ -73,6 +74,7 @@ function VetDirectoryRedesign({ lang, onBack, onOpenVet, vets, loading, error, l
         />
       )}
     </SafeAreaView>
+    </ModuleScreen>
   )
 }
 
@@ -237,7 +239,7 @@ const s = StyleSheet.create({
 })
 
 const r = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
+  safe: { flex: 1 },
   list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   gap:  { height: 12 },
   skel: { marginBottom: 12 },

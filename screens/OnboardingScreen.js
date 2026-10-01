@@ -9,7 +9,7 @@ import { colors, shadow, type, radii } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import PhotoFade from '../components/ui/PhotoFade'
+import PhotoFade, { PHOTO_GLASS } from '../components/ui/PhotoFade'
 import { Button } from '../components/ui'
 import { t, LANGUAGES } from '../constants/i18n'
 
@@ -208,6 +208,14 @@ const R_PHOTO = {
   settle:  require('../assets/backgrounds/ada-bg-home-services.jpg'),
   oli:     require('../assets/backgrounds/ada-bg-duty-pharmacy.jpg'),
 }
+// The recognisable part of each photo (source x/y, 0–1) and how much to enlarge it, so the
+// coast, the street lights, the craftsman and the pharmacy sit in the visible photo zone.
+const R_FOCUS = {
+  welcome: { x: 0.5,  y: 0.64, zoom: 1.25 },   // coastal road + bus
+  explore: { x: 0.5,  y: 0.62, zoom: 1.2 },    // string lights + crowd
+  settle:  { x: 0.4,  y: 0.70, zoom: 1.2 },    // craftsman at the bench
+  oli:     { x: 0.55, y: 0.64, zoom: 1.15 },   // shelves + pharmacist
+}
 const R_SCENE = {
   welcome: require('../assets/oli-scenes/welcome.png'),
   explore: require('../assets/oli-scenes/events.png'),
@@ -223,11 +231,9 @@ function RedesignSlide({ slide, lang, setLang, bottomInset }) {
   const welcome = slide.id === 'welcome'
   return (
     <View style={{ width, height: '100%' }}>
-      <PhotoFade photo={R_PHOTO[slide.id]}>
+      <PhotoFade photo={R_PHOTO[slide.id]} focus={R_FOCUS[slide.id]}
+        mascot={welcome && R_SHORT ? null : R_SCENE[slide.id]}>
         <View style={[rs.content, { paddingBottom: bottomInset + R_NAV_H + 12 }]}>
-          {!(welcome && R_SHORT) && (
-            <Image source={R_SCENE[slide.id]} style={rs.scene} resizeMode="contain" accessibilityIgnoresInvertColors />
-          )}
           <Text style={rs.title} accessibilityRole="header">
             {t(welcome ? 'onboardingWelcomeTitle' : slide.titleKey, lang)}
           </Text>
@@ -559,20 +565,19 @@ function OnboardingRedesign({ lang, setLang, index, setIndex, listRef, goTo, isL
 }
 
 const rs = StyleSheet.create({
-  content:      { paddingHorizontal: 24, paddingTop: 8 },
-  scene:        { width: 150, height: 120, marginBottom: 8 },
-  title:        { fontSize: 26, lineHeight: 32, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 8 },
-  body:         { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', color: '#FFFFFF' },
-  note:         { ...type.small, color: '#FFFFFF', marginTop: 10 },
-  langLabel:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', marginTop: 16, marginBottom: 8 },
-  langGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  content:      { paddingHorizontal: 24, paddingTop: 4 },
+  title:        { fontSize: 26, lineHeight: 32, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 8, textAlign: 'center' },
+  body:         { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', color: '#FFFFFF', textAlign: 'center' },
+  note:         { ...type.small, color: '#FFFFFF', marginTop: 10, textAlign: 'center' },
+  langLabel:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', marginTop: 16, marginBottom: 8, textAlign: 'center' },
+  langGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   langChip:     { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', borderRadius: radii.pill,
                   borderWidth: 1, borderColor: 'rgba(255,255,255,0.55)', backgroundColor: 'rgba(255,255,255,0.10)' },
   langChipOn:   { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
   langChipText: { ...type.body, color: '#FFFFFF' },
   langChipTextOn:{ fontFamily: 'Inter_700Bold', color: '#083A39' },
   skip:         { position: 'absolute', right: 16, minHeight: 44, minWidth: 44, paddingHorizontal: 16,
-                  justifyContent: 'center', borderRadius: radii.pill, backgroundColor: 'rgba(0,0,0,0.38)',
+                  justifyContent: 'center', borderRadius: radii.pill, backgroundColor: `rgba(0,0,0,${PHOTO_GLASS})`,
                   borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   skipText:     { ...type.body, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
   nav:          { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 24 },

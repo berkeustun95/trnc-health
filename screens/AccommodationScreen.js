@@ -18,9 +18,9 @@ import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import { colors, shadow, radii, type, elevation, category, TAP } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
-import ModuleBackdrop, { BackdropToggle, useBackdropHeaderTone } from '../components/ui/ModuleBackdrop'
+import { OnPhotoContext } from '../components/ui/onPhoto'
 import {
-  ScreenHeader as RScreenHeader, FilterBar, CardSkeleton, EmptyState, ErrorState,
+  ScreenHeader as RScreenHeader, FilterBar, CardSkeleton, EmptyState, ErrorState, ModuleScreen,
 } from '../components/ui'
 import { t } from '../constants/i18n'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
@@ -427,7 +427,6 @@ export default function AccommodationScreen({
   onOpenProperty, selectedProperty, onCloseProperty,
   onOpenDorm, selectedDorm, onCloseDorm,
 }) {
-  const headerTone = useBackdropHeaderTone()
   const [items, setItems]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -595,12 +594,10 @@ export default function AccommodationScreen({
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: REDESIGN ? colors.canvas : undefined }}>
-    {/* Module photo (Konaklama's own) — style A or C, see ModuleBackdrop. */}
-    {REDESIGN && <ModuleBackdrop photo={require('../assets/backgrounds/ada-bg-accommodation.jpg')} />}
+    <Root>
     <SafeAreaView style={cs.safe} edges={['top']}>
       {REDESIGN ? (
-        <RScreenHeader onBack={onClose} title={t('accomTitle', lang)} subtitle={HEADER_SUBTITLE(lang)} lang={lang} tone={headerTone} />
+        <RScreenHeader onBack={onClose} title={t('accomTitle', lang)} subtitle={HEADER_SUBTITLE(lang)} lang={lang} />
       ) : (
         <>
           <PageBackground topic="accommodation" />
@@ -761,7 +758,7 @@ export default function AccommodationScreen({
             // one entry and the list is not a query), so this is what the list does at
             // N=0, not something a user can currently see.
             isDorm ? null : REDESIGN ? (
-              <EmptyState tone={headerTone} icon="home-outline" category="homeLife"
+              <EmptyState icon="home-outline" category="homeLife"
                 title={t('accomNoResults', lang)} message={t('accomNoResultsSub', lang)} style={{ marginTop: 28 }} />
             ) : (
               <View style={cs.emptyWrap}>
@@ -857,14 +854,18 @@ export default function AccommodationScreen({
           correct by construction rather than by winning a registration race. */}
       {selectedDorm && (
         <View style={cs.detailOverlay}>
-          <DormPartnerScreen partner={selectedDorm} lang={lang} region={null}
-            onBack={onCloseDorm} onAdNavigate={onAdNavigate} />
+          <OffPhoto>
+            <DormPartnerScreen partner={selectedDorm} lang={lang} region={null}
+              onBack={onCloseDorm} onAdNavigate={onAdNavigate} />
+          </OffPhoto>
         </View>
       )}
 
       {selectedProperty && (
         <View style={cs.detailOverlay}>
-          <PropertyDetailScreen property={selectedProperty} lang={lang} onBack={onCloseProperty} onAdNavigate={onAdNavigate} />
+          <OffPhoto>
+            <PropertyDetailScreen property={selectedProperty} lang={lang} onBack={onCloseProperty} onAdNavigate={onAdNavigate} />
+          </OffPhoto>
         </View>
       )}
 
@@ -884,9 +885,20 @@ export default function AccommodationScreen({
         </KeyboardAwareForm>
       </Modal>
     </SafeAreaView>
-    {REDESIGN && <BackdropToggle />}
-    </View>
+    </Root>
   )
+}
+
+// Redesign: Konaklama's photo full-screen behind the module (option B, ModuleScreen).
+function Root({ children }) {
+  if (REDESIGN) return <ModuleScreen topic="accommodation">{children}</ModuleScreen>
+  return <View style={{ flex: 1 }}>{children}</View>
+}
+
+// The detail overlays are opaque full screens of their own, not content on the photo: they
+// leave the on-photo context so their kit headers and cards keep their normal colours.
+function OffPhoto({ children }) {
+  return <OnPhotoContext.Provider value={false}>{children}</OnPhotoContext.Provider>
 }
 
 // The existing pill row, or the redesign's FilterBar (same children, same flexShrink: 0).
@@ -998,7 +1010,7 @@ const legacyCs = StyleSheet.create({
   applyBtnText:        { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
 })
 
-// REDESIGN: the same layout on the new tokens — canvas ground, Inter roles, 44pt targets.
+// REDESIGN: the same layout on the new tokens — on the module photo (ModuleScreen), Inter roles, 44pt targets.
 // The photo pager, the price/intent overlays and the dorm card's content are unchanged: the
 // property card stays photo-led (a 64pt ListCard thumb would hide what the listing is), and
 // the dorm card is a partner surface (logo strip, order, accent dot untouched).
@@ -1018,7 +1030,7 @@ const redesignCs = StyleSheet.create({
                          borderRadius: radii.pill, backgroundColor: colors.dangerLight },
   clearPillText:       { ...type.small, fontFamily: 'Inter_700Bold', color: colors.dangerInk },
   listContent:         { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 24 },
-  card:                { backgroundColor: colors.card, borderRadius: radii.card, marginBottom: 12, overflow: 'hidden', ...elevation.card },
+  card:                { backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20, marginBottom: 12, overflow: 'hidden', ...elevation.card },
   dormName:            { ...type.sheetTitle, color: colors.textPrimary },
   dormMetaText:        { flex: 1, ...type.small, color: colors.textSecondary },
   cardBody:            { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 6 },

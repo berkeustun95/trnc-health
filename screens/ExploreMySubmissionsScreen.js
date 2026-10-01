@@ -12,7 +12,7 @@ import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { categoryToGroup, GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { REDESIGN } from '../constants/redesign'
-import { ScreenHeader as KitHeader, ErrorState, EmptyState, RowSkeleton } from '../components/ui'
+import { ScreenHeader as KitHeader, ErrorState, EmptyState, RowSkeleton, ModuleScreen } from '../components/ui'
 import { colors as C, type, radii, elevation } from '../constants/theme'
 
 // The submitter's own rows at ANY status (places_select RLS permits submitted_by = auth.uid()).
@@ -122,6 +122,7 @@ export default function ExploreMySubmissionsScreen({ lang, session, onBack, back
 
   if (REDESIGN) {
     return (
+      <ModuleScreen topic="explore">
       <SafeAreaView style={r.safe} edges={['top']}>
         <KitHeader onBack={onBack} title={t('exploreMySubmissions', lang)} lang={lang} />
         {loading ? (
@@ -139,6 +140,7 @@ export default function ExploreMySubmissionsScreen({ lang, session, onBack, back
           />
         )}
       </SafeAreaView>
+      </ModuleScreen>
     )
   }
 
@@ -195,9 +197,9 @@ const legacy = StyleSheet.create({
 })
 
 const r = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: C.canvas },
+  safe:     { flex: 1, backgroundColor: 'transparent' },
   list:     { paddingHorizontal: 16, paddingTop: 8, gap: 12, paddingBottom: 40 },
-  card:     { backgroundColor: C.card, borderRadius: radii.card, padding: 14, ...elevation.card },
+  card:     { backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20, padding: 14, ...elevation.card },
   thumb:    { width: 64, height: 64, borderRadius: radii.tile, flexShrink: 0 },
   cardName: { ...type.rowTitle, color: C.textPrimary },
   cardCat:  { ...type.meta, color: C.textSecondary, marginTop: 2, marginBottom: 6 },

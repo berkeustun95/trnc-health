@@ -1,3 +1,5 @@
+import { StatusBar } from 'expo-status-bar'
+import { REDESIGN } from '../constants/redesign'
 import { useState, useEffect } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
@@ -896,6 +898,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     //   the Android three-button navigation bar and cannot be tapped — the same failure
     //   the message composer had. ProfileSetupScreen's footer is the pattern this copies.
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      {REDESIGN && <StatusBar style="dark" />}
       <KeyboardAwareForm>
         <ScrollView
           {...profileMem}

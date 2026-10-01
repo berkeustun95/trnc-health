@@ -23,10 +23,10 @@ import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { openTicketUrl } from '../utils/events'
 import BackButton from '../components/BackButton'
 import { REDESIGN } from '../constants/redesign'
-import ModuleBackdrop, { BackdropToggle, useBackdropHeaderTone } from '../components/ui/ModuleBackdrop'
+import { StatusBar } from 'expo-status-bar'
 import { formatPetDate } from '../constants/petsContent'
 import {
-  ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button,
+  ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button, ModuleScreen,
 } from '../components/ui'
 import { colors as C, category as CAT, type, radii, elevation } from '../constants/theme'
 
@@ -580,6 +580,12 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
 
 export { EventDetailScreen }
 
+// Redesign: the list sits on the Etkinlikler photo (option B). The detail overlay is rendered
+// OUTSIDE this frame, so it keeps its own canvas look and kit colours.
+function ListFrame({ children }) {
+  return REDESIGN ? <ModuleScreen topic="events">{children}</ModuleScreen> : children
+}
+
 // `initialDistrict` is a canonical region slug, set when the user arrives from a
 // city-welcome card; it pre-selects the İlçe dropdown. The events table has no district
 // column: an event's district is eventRegion() — its coordinates (resolveRegion), else the
@@ -589,7 +595,6 @@ export { EventDetailScreen }
 // openedProperty: the detail is an overlay over the still-mounted list, and App's hardware-back
 // chain closes the overlay first — one close function for the button and Android back.
 export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistrict = null, selectedEvent = null, onOpenEvent, onCloseEvent }) {
-  const headerTone = useBackdropHeaderTone()
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -708,11 +713,10 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
 
   return (
     <View style={s.root}>
-    {/* Module photo (Etkinlikler's own) — style A or C, see ModuleBackdrop. */}
-    {REDESIGN && <ModuleBackdrop photo={require('../assets/backgrounds/ada-bg-events.jpg')} />}
+    <ListFrame>
     <SafeAreaView style={s.safe} edges={['top']}>
       {REDESIGN ? (
-        <KitHeader onBack={onBack} title={t('eventsTitle', lang)} lang={lang} tone={headerTone} />
+        <KitHeader onBack={onBack} title={t('eventsTitle', lang)} lang={lang} />
       ) : (<>
       <PageBackground topic="events" />
       <ScreenHeader onBack={onBack} title={t('eventsTitle', lang)} lang={lang} />
@@ -756,7 +760,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
           ListFooterComponent={bottomSlot}
           ListEmptyComponent={
             loadError ? <ErrorState lang={lang} onRetry={retry} />
-            : REDESIGN ? <EmptyState tone={headerTone} icon="calendar-outline" category="explore" title={t('noUpcomingEvents', lang)} />
+            : REDESIGN ? <EmptyState icon="calendar-outline" category="explore" title={t('noUpcomingEvents', lang)} />
             : <View style={s.emptyWrap}>
               <View style={s.emptyCard}>
                 <Ionicons name="calendar-outline" size={48} color={colors.border} style={{ marginBottom: 12 }} />
@@ -803,6 +807,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
         </Modal>
       )}
     </SafeAreaView>
+    </ListFrame>
 
     {/* Sibling of the SafeAreaView, not a child: absolute children offset from the
         parent's PADDING box, so nesting this inside edges={['top']} would apply the
@@ -812,10 +817,10 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
         offset survives the round trip. */}
     {selectedEvent && (
       <View style={s.detailOverlay}>
+        {REDESIGN && <StatusBar style="dark" />}
         <EventDetailScreen event={selectedEvent} lang={lang} onBack={() => onCloseEvent?.()} onAdNavigate={onAdNavigate} />
       </View>
     )}
-    {REDESIGN && !selectedEvent && <BackdropToggle />}
     </View>
   )
 }
@@ -943,7 +948,7 @@ const rd = StyleSheet.create({
   root:          { flex: 1, backgroundColor: C.canvas },
   safe:          { flex: 1, backgroundColor: 'transparent' },
   detailOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: C.canvas, zIndex: 10, elevation: 10 },
-  card:          { flexDirection: 'row', backgroundColor: C.card, borderRadius: radii.card,
+  card:          { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20,
                    overflow: 'hidden', minHeight: CARD_H, ...elevation.card },
   thumbFallback: { backgroundColor: CAT.explore.bg, justifyContent: 'center', alignItems: 'center' },
   catLabel:      { ...type.caption, fontFamily: 'Inter_700Bold', lineHeight: 16, color: CAT.explore.ink, letterSpacing: 0.4 },

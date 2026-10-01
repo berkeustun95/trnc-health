@@ -5,11 +5,12 @@ import ContentReportMenu from '../components/ContentReportMenu'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
-import { colors, shadow, type, radii, elevation } from '../constants/theme'
+import { colors, shadow, type, elevation } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import { REDESIGN } from '../constants/redesign'
-import { ScreenHeader, ErrorState, EmptyState, CardSkeleton } from '../components/ui'
+import { ScreenHeader, ErrorState, EmptyState, CardSkeleton, ModuleScreen } from '../components/ui'
+import { CARD_BG } from '../components/ui/ModuleScreen'
 
 const PAGE = 20
 
@@ -127,6 +128,7 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack, onRe
     // the newest 20, not the facility.
     const complete = reviews.length >= total
     return (
+      <ModuleScreen topic="medical">
       <SafeAreaView style={r.safe} edges={['top', 'bottom']}>
         <ScreenHeader onBack={onBack} title={facility.name} subtitle={t('tabReviews', lang)} lang={lang} />
         {loading ? (
@@ -167,6 +169,7 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack, onRe
           />
         )}
       </SafeAreaView>
+      </ModuleScreen>
     )
   }
 
@@ -263,15 +266,15 @@ const s = StyleSheet.create({
 })
 
 const r = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: colors.canvas },
+  safe:        { flex: 1 },
   list:        { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
-  summary:     { backgroundColor: colors.card, borderRadius: radii.card, padding: 16, flexDirection: 'row', gap: 16, marginBottom: 16, ...elevation.card },
+  summary:     { backgroundColor: CARD_BG, borderRadius: 20, padding: 16, flexDirection: 'row', gap: 16, marginBottom: 16, ...elevation.card },
   summaryLeft: { alignItems: 'center', justifyContent: 'center', minWidth: 64 },
   avgNum:      { ...type.display, color: colors.textPrimary },
   avgStars:    { fontSize: 13, color: '#F5A623', letterSpacing: 1, marginTop: 2 },
   summaryRight:{ flex: 1, justifyContent: 'center', gap: 5 },
   count:       { ...type.meta, color: colors.textSecondary },
-  card:        { backgroundColor: colors.card, borderRadius: radii.card, padding: 14, marginBottom: 10, ...elevation.card },
+  card:        { backgroundColor: CARD_BG, borderRadius: 20, padding: 14, marginBottom: 10, ...elevation.card },
   top:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   topRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
   stars:       { fontSize: 15, color: '#F5A623', letterSpacing: 1 },

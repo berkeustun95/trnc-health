@@ -19,6 +19,7 @@ import { REDESIGN } from '../constants/redesign'
 import { colors as C, category as CAT, type, radii, elevation, press } from '../constants/theme'
 import {
   ScreenHeader as UiHeader, FilterBar, Dropdown, InfoBanner, ListCard, ErrorState, EmptyState, CardSkeleton,
+  ModuleScreen,
 } from '../components/ui'
 
 const CATEGORIES = [
@@ -191,6 +192,7 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
 
   if (REDESIGN) {
     return (
+      <ModuleScreen topic="grooming">
       <SafeAreaView style={r.safe} edges={['top']}>
         <UiHeader onBack={onBack} title={t('groomTitle', lang)} lang={lang} />
         <FilterBar>
@@ -242,6 +244,7 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
           />
         )}
       </SafeAreaView>
+      </ModuleScreen>
     )
   }
 
@@ -388,11 +391,11 @@ const s = StyleSheet.create({
 
 // Redesign styles (REDESIGN only).
 const r = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: C.canvas },
+  safe:     { flex: 1, backgroundColor: 'transparent' },
   list:     { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40, gap: 12 },
   desc:     { ...type.small, color: C.textSecondary, marginTop: 10 },
-  cta:      { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, backgroundColor: C.card,
-              borderRadius: radii.card, padding: 14, ...elevation.card },
+  cta:      { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, backgroundColor: 'rgba(255,255,255,0.93)',
+              borderRadius: 20, padding: 14, ...elevation.card },
   ctaIcon:  { width: 44, height: 44, borderRadius: radii.tile, backgroundColor: CAT.homeLife.bg,
               alignItems: 'center', justifyContent: 'center' },
   ctaTitle: { ...type.rowTitle, color: C.textPrimary },

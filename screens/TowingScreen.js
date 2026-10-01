@@ -23,6 +23,7 @@ import { REDESIGN } from '../constants/redesign'
 import { colors as C, type, radii, press } from '../constants/theme'
 import {
   ScreenHeader as UiHeader, FilterBar, Dropdown, InfoBanner, ListCard, ContactBar, ErrorState, EmptyState, CardSkeleton,
+  ModuleScreen, OnPhotoLabel,
 } from '../components/ui'
 
 // The fallback on a failed load. A REAL number already in the app (the emergency sheet in
@@ -308,6 +309,7 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
 
   if (REDESIGN) {
     return (
+      <ModuleScreen topic="towing">
       <SafeAreaView style={r.safe} edges={['top']}>
         <UiHeader lang={lang} title={t('menuTowing', lang)} onBack={onBack} />
         <FilterBar>
@@ -355,7 +357,9 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
               ) : null
             }
             ListEmptyComponent={<EmptyState icon="car-outline" category="homeLife" title={t('towingEmpty', lang)} />}
-            ListFooterComponent={<Text style={r.disclaimer}>{t('towingDisclaimer', lang)}</Text>}
+            ListFooterComponent={
+              <OnPhotoLabel numberOfLines={0} style={r.disclaimer} textStyle={r.disclaimerText}>{t('towingDisclaimer', lang)}</OnPhotoLabel>
+            }
             renderItem={({ item }) => (
               <RTowingCard
                 item={item}
@@ -369,6 +373,7 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
           />
         )}
       </SafeAreaView>
+      </ModuleScreen>
     )
   }
 
@@ -549,13 +554,14 @@ const s = StyleSheet.create({
 // Redesign styles: every text style carries an Inter family (the legacy block above has
 // 17 fontWeight-only styles, which render in the system font on Android).
 const r = StyleSheet.create({
-  safe:          { flex: 1, backgroundColor: C.canvas },
+  safe:          { flex: 1, backgroundColor: 'transparent' },
   list:          { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40, gap: 12 },
   actions:       { marginTop: 12 },
   secondNumBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
                    marginTop: 8, minHeight: 44, paddingHorizontal: 10, borderRadius: radii.md,
                    borderWidth: 1, borderColor: C.fieldBorder, backgroundColor: C.card },
   secondNumText: { ...type.small, fontFamily: 'Inter_600SemiBold', color: C.primaryDark, flexShrink: 1 },
-  disclaimer:    { ...type.caption, fontFamily: 'Inter_400Regular', lineHeight: 17, color: C.textSecondary,
-                   textAlign: 'center', marginTop: 14, paddingHorizontal: 8 },
+  // On the module photo: a dark pill (OnPhotoLabel), white text.
+  disclaimer:    { alignSelf: 'center', marginTop: 14 },
+  disclaimerText:{ ...type.caption, fontFamily: 'Inter_400Regular', lineHeight: 17, textAlign: 'center' },
 })

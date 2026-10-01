@@ -21,8 +21,9 @@ import { PREVIEW_PARTNER_ROWS } from '../constants/partnerPreview'
 import { REDESIGN } from '../constants/redesign'
 import { colors as C, category as CAT, type, radii, elevation, press } from '../constants/theme'
 import {
-  ScreenHeader as UiHeader, FilterBar, Dropdown, InfoBanner, ErrorState, CardSkeleton,
+  ScreenHeader as UiHeader, FilterBar, Dropdown, InfoBanner, ErrorState, CardSkeleton, ModuleScreen,
 } from '../components/ui'
+import { OnPhotoContext } from '../components/ui/onPhoto'
 import HomeServicePartnerScreen from './HomeServicePartnerScreen'
 import HomeServiceOnboardingScreen from './HomeServiceOnboardingScreen'
 
@@ -97,6 +98,11 @@ function RCategoryTile({ item, lang, onPress }) {
       <Text style={r.catLabel} numberOfLines={2}>{t(item.labelKey, lang)}</Text>
     </TouchableOpacity>
   )
+}
+
+function Root({ children }) {
+  if (REDESIGN) return <ModuleScreen topic="homeServices">{children}</ModuleScreen>
+  return <View style={{ flex: 1 }}>{children}</View>
 }
 
 export default function HomeServicesScreen({ lang, session, onBack, onRequireAccount, backRef = null }) {
@@ -203,22 +209,26 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
 
   // The partner showcase draws OVER the landing or category list (still mounted), so back
   // lands on the same scroll with the category and district intact (slice 6, 2026-09-28).
+  // Redesign: the module photo behind the landing and the category page (option B). The partner
+  // showcase is an opaque full screen of its own, so it leaves the on-photo context.
   const withPartner = body => (
-    <View style={{ flex: 1 }}>
+    <Root>
       {body}
       {selectedPartner && (
         <View style={s.partnerOverlay}>
-          <HomeServicePartnerScreen
-            partner={selectedPartner.partner}
-            row={selectedPartner.row}
-            lang={lang}
-            serviceContext={selectedPartner.serviceContext}
-            region={selectedPartner.region}
-            onBack={() => setSelectedPartner(null)}
-          />
+          <OnPhotoContext.Provider value={false}>
+            <HomeServicePartnerScreen
+              partner={selectedPartner.partner}
+              row={selectedPartner.row}
+              lang={lang}
+              serviceContext={selectedPartner.serviceContext}
+              region={selectedPartner.region}
+              onBack={() => setSelectedPartner(null)}
+            />
+          </OnPhotoContext.Provider>
         </View>
       )}
-    </View>
+    </Root>
   )
 
   // ORDER COMES FROM THE CONFIG, not from the database. HS_PARTNERS is the display
@@ -494,19 +504,19 @@ const s = StyleSheet.create({
 })
 
 const r = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: C.canvas },
+  safe:        { flex: 1, backgroundColor: 'transparent' },
   scroll:      { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   catScroll:   { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   banner:      { marginBottom: 16 },
   partnerWrap: { marginBottom: 16 },
   grid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
-  catTile:     { width: '47%', minHeight: 112, backgroundColor: C.card, borderRadius: radii.card,
+  catTile:     { width: '47%', minHeight: 112, backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20,
                  padding: 16, alignItems: 'center', justifyContent: 'center', gap: 10, ...elevation.card },
   catIconWrap: { width: 48, height: 48, borderRadius: radii.tile, backgroundColor: CAT.homeLife.bg,
                  alignItems: 'center', justifyContent: 'center' },
   catLabel:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: C.textPrimary, textAlign: 'center' },
-  ctaCard:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, backgroundColor: C.card,
-                 borderRadius: radii.card, padding: 16, ...elevation.card },
+  ctaCard:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, backgroundColor: 'rgba(255,255,255,0.93)',
+                 borderRadius: 20, padding: 16, ...elevation.card },
   ctaTitle:    { ...type.rowTitle, color: C.textPrimary, marginBottom: 2 },
   ctaSub:      { ...type.small, color: C.textSecondary },
 })

@@ -14,7 +14,7 @@ import { t } from '../constants/i18n'
 import { REDESIGN } from '../constants/redesign'
 import {
   ScreenHeader as UiScreenHeader, InfoBanner, Card, ListRow, ListCard, SectionHeader,
-  ContactBar, InfoRow, Button,
+  ContactBar, InfoRow, Button, ModuleScreen,
 } from '../components/ui'
 
 const CARDS = [
@@ -69,7 +69,9 @@ function SectionTitle({ text }) {
   return <Text style={s.sectionTitle}>{text}</Text>
 }
 
-// The redesign's content block (Card on the canvas); the legacy path keeps ContentCard.
+// The redesign's content block (a Card on the module photo); the legacy path keeps ContentCard.
+// Its children are back off the photo, so a SectionHeader inside the card stays dark text
+// instead of taking the on-photo pill.
 const Block = REDESIGN ? Card : ContentCard
 
 function DirectionsButton({ url, lang, legacyStyle }) {
@@ -468,15 +470,18 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
 
   if (REDESIGN && activeCard && card) {
     return (
+      <ModuleScreen topic="newcomer">
       <SafeAreaView style={s.safe} edges={['top']}>
         <UiScreenHeader onBack={() => setActiveCard(null)} lang={lang} title={t(card.labelKey, lang)} />
         {renderCardContent(activeCard, lang, toRates)}
       </SafeAreaView>
+      </ModuleScreen>
     )
   }
 
   if (REDESIGN) {
     return (
+      <ModuleScreen topic="newcomer">
       <SafeAreaView style={s.safe} edges={['top']}>
         <UiScreenHeader onBack={onBack} lang={lang} title={t('essHubTitle', lang)} />
         <ScrollView {...hubMem} contentContainerStyle={s.hubContent} showsVerticalScrollIndicator={false}>
@@ -495,6 +500,7 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
           </Card>
         </ScrollView>
       </SafeAreaView>
+      </ModuleScreen>
     )
   }
 
@@ -796,8 +802,8 @@ const legacyS = StyleSheet.create({
 // Redesign overrides: every text style carries an Inter family (the audit found 16 on the
 // system font) and no italic, since only the four upright Inter faces are registered.
 const redesignS = StyleSheet.create({
-  safe:             { flex: 1, backgroundColor: colors.canvas },
-  cardContent:      { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40, backgroundColor: colors.canvas, minHeight: '100%' },
+  safe:             { flex: 1, backgroundColor: 'transparent' },
+  cardContent:      { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   hubContent:       { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   rBanner:          { marginBottom: 16 },
   rHubList:         { paddingHorizontal: 14 },
@@ -815,7 +821,7 @@ const redesignS = StyleSheet.create({
   crossingNote:     { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 10 },
   crossingNoteText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textSecondary },
   hoursNote:        { fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textSecondary, marginTop: 0, marginBottom: 4 },
-  embassyBlock:     { backgroundColor: colors.card, borderRadius: radii.card, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4,
+  embassyBlock:     { backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4,
                       marginBottom: 12, ...shadow },
   embassyTitle:     { fontSize: 15, lineHeight: 20, fontFamily: font.semibold, color: colors.textPrimary, marginBottom: 2 },
   embassyNote:      { fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textSecondary, marginTop: 8, marginBottom: 10 },

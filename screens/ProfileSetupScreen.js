@@ -49,6 +49,7 @@ import { socialProvider, hasGoogleIdentity, revokeGoogle, hasAppleIdentity, revo
 import { LEGAL_VERSION, legalLocaleFor, isLegalFallback } from '../constants/legal'
 import { colors, shadow, radius, radii, type } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
+import { StatusBar } from 'expo-status-bar'
 import { SHOW_WIZARD_HEADINGS, TERMS_CHECKBOX_LIVE, MODULE_FLAGS } from '../constants/flags'
 import LegalScreen from './LegalScreen'
 import LegalLinkedText from '../components/LegalLinkedText'
@@ -815,6 +816,7 @@ export default function ProfileSetupScreen({
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      {REDESIGN && <StatusBar style="dark" />}
       <KeyboardAwareForm>
         {/* flexShrink: 0 — a fixed-height row above a scrollable list in a flex:1 column
             gets vertically compressed the moment the list overflows, cropping its text.

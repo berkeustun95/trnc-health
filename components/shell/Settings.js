@@ -1,5 +1,6 @@
 import { View, Text, ScrollView, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { StatusBar } from 'expo-status-bar'
 import { colors, type, radii, elevation } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import { ListRow, Button, CategoryIcon, useTabBarFootprint } from '../ui'
@@ -58,6 +59,7 @@ export function GuestProfile({ lang, a, onCreateAccount }) {
   const pad = useTabBarFootprint()
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <StatusBar style="dark" />
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: pad + FADE_H + 8 }]} showsVerticalScrollIndicator={false}>
         <Text style={s.page} accessibilityRole="header">{t('tabProfile', lang)}</Text>
         <View style={[s.guestCard, elevation.card]}>

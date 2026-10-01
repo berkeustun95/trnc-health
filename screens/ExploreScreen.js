@@ -30,9 +30,9 @@ import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { REDESIGN } from '../constants/redesign'
 import {
   ScreenHeader as KitHeader, FilterBar, ListCard, EmptyState, ErrorState, CardSkeleton,
-  CategoryIcon, IconButton,
+  CategoryIcon, IconButton, ModuleScreen,
 } from '../components/ui'
-import { colors as C, type, radii, elevation, press } from '../constants/theme'
+import { colors as C, type, elevation, press } from '../constants/theme'
 
 // name_i18n[lang] if present, else fall through to the plain `name` column (never '').
 function extractI18n(obj, lang) {
@@ -328,6 +328,12 @@ function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
   )
 }
 
+// Redesign: the Keşfet list surfaces sit on the module photo (option B). The place overlay,
+// the submit form and My Submissions render outside this frame.
+function ModuleFrame({ children }) {
+  return REDESIGN ? <ModuleScreen topic="explore">{children}</ModuleScreen> : children
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 // Explicit browse columns — NOT select('*'). Anti-steering (iOS 3.1.1): featured_requested_at
@@ -532,6 +538,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   if (showSaved && REDESIGN) {
     const saved = places.filter(p => placeFavorites?.has(p.id))
     body = (
+      <ModuleScreen topic="explore">
       <SafeAreaView style={s.safe} edges={['top']}>
         <KitHeader onBack={() => setShowSaved(false)} title={t('exploreSavedTitle', lang)} lang={lang} />
         <FlatList
@@ -543,6 +550,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
           renderItem={({ item }) => <PlaceListCard {...cardProps(item)} />}
         />
       </SafeAreaView>
+      </ModuleScreen>
     )
   } else if (showSaved) {
     const saved = places.filter(p => placeFavorites?.has(p.id))
@@ -595,6 +603,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
       />
     )
   } else body = (
+    <ModuleFrame>
     <SafeAreaView style={s.safe} edges={['top']}>
       {REDESIGN ? (
         <KitHeader
@@ -774,6 +783,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
         </TouchableOpacity>
       )}
     </SafeAreaView>
+    </ModuleFrame>
   )
 
   // The place profile (App state) sits OVER whichever view is showing — list, map, saved —
@@ -872,14 +882,14 @@ const legacy = StyleSheet.create({
 // Redesign styles. listContent keeps paddingHorizontal 16 = AD_PAGE_INSET (the inline ad's bleed).
 const r = StyleSheet.create({
   root:         { flex: 1, backgroundColor: C.canvas },
-  safe:         { flex: 1, backgroundColor: C.canvas },
+  safe:         { flex: 1, backgroundColor: 'transparent' },
   placeOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: C.canvas },
   listContent:  { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 96, gap: 12 },
   skeletons:    { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   cardFoot:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: -8 },
   cardFootLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   tilesWrap:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 16 },
-  tile:         { width: '47%', backgroundColor: C.card, borderRadius: radii.card, padding: 16, gap: 10, ...elevation.card },
+  tile:         { width: '47%', backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20, padding: 16, gap: 10, ...elevation.card },
   tileLabel:    { ...type.rowTitle, color: C.textPrimary },
   tileCount:    { ...type.meta, color: C.textSecondary, marginTop: -6 },
   fab:          { position: 'absolute', bottom: 24, right: 16, width: 56, height: 56, borderRadius: 28,

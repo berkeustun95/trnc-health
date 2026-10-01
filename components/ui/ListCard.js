@@ -3,6 +3,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, type, radii, elevation, press } from '../../constants/theme'
 import CategoryIcon from './CategoryIcon'
 import ContactBar from './ContactBar'
+import { useOnPhoto, OnPhotoContext } from './onPhoto'
+import { CARD_BG } from './ModuleScreen'
 
 // The equal list card (S3). Every non-partner directory row is this card: same structure,
 // same height rhythm, no visual ranking beyond the list's own sort (Berke: duty pharmacies
@@ -16,6 +18,7 @@ import ContactBar from './ContactBar'
 export default function ListCard({
   title, subtitle, leading, meta = [], badge, onPress, actions, lang, accent, accessibilityLabel, style, children,
 }) {
+  const onPhoto = useOnPhoto()   // on a module photo: 93% white (text stays ≥ 5.1:1)
   const lead = leading?.uri || leading?.source
     ? <Image source={leading.source || { uri: leading.uri }} style={s.thumb} resizeMode="cover" accessibilityIgnoresInvertColors />
     : leading?.icon ? <CategoryIcon icon={leading.icon} category={leading.category} size={48} /> : null
@@ -40,14 +43,14 @@ export default function ListCard({
     </View>
   )
   return (
-    <View style={[s.card, accent && { borderWidth: 2, borderColor: accent }, style]}>
+    <View style={[s.card, onPhoto && { backgroundColor: CARD_BG }, accent && { borderWidth: 2, borderColor: accent }, style]}>
       {onPress ? (
         <TouchableOpacity onPress={onPress} activeOpacity={press.card} accessibilityRole="button"
           accessibilityLabel={accessibilityLabel || [title, subtitle, ...meta.map(m => m?.text)].filter(Boolean).join(', ')}>
           {head}
         </TouchableOpacity>
       ) : head}
-      {children}
+      {onPhoto ? <OnPhotoContext.Provider value={false}>{children}</OnPhotoContext.Provider> : children}
       {!!actions && <ContactBar actions={actions} lang={lang} style={s.actions} />}
     </View>
   )

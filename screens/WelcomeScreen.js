@@ -7,7 +7,7 @@ import { colors, type, radii } from '../constants/theme'
 import { t, LANG_CODES, LANGUAGES } from '../constants/i18n'
 import { REDESIGN } from '../constants/redesign'
 import { Button, InlineAlert } from '../components/ui'
-import PhotoFade from '../components/ui/PhotoFade'
+import PhotoFade, { PHOTO_GLASS } from '../components/ui/PhotoFade'
 import { bandCap } from '../components/ui/OliBand'
 import { useWindowDimensions } from 'react-native'
 import { LanguageSheet } from '../components/shell/Sheets'
@@ -15,9 +15,10 @@ import { LanguageSheet } from '../components/shell/Sheets'
 const WELCOME_SCENE = require('../assets/oli-scenes/welcome.png')
 const WELCOME_PHOTO = require('../assets/backgrounds/ada-bg-accommodation.jpg')
 const WORDMARK = require('../assets/hero/ada-wordmark-keyline.png')
-// Headline geometry (labels:check reads these): 24/30 beside a 96pt scene, page padding 24.
-export const WELCOME_SCENE_W = 96
-export const WELCOME_HEAD_PX = 24
+// Headline geometry (labels:check reads these): centred, full width (page padding 24), ≤ 3 lines.
+export const WELCOME_HEAD_PX = 26
+// The harbour is the recognisable part (source y ≈ 0.40–0.58): centre it in the photo zone.
+const WELCOME_FOCUS = { x: 0.5, y: 0.47, zoom: 1.35 }
 
 // Native names, not English ones — someone stuck in a language they can't read
 // recognises "Türkçe", not "Turkish".
@@ -50,6 +51,8 @@ export default function WelcomeScreen({ lang, onLogin, onSignUp, onLangChange })
     return (
       <PhotoFade
         photo={WELCOME_PHOTO}
+        focus={WELCOME_FOCUS}
+        mascot={WELCOME_SCENE}
         top={
           <SafeAreaView edges={['top']} style={r.topArea} pointerEvents="box-none">
             <View style={r.topRow}>
@@ -64,10 +67,8 @@ export default function WelcomeScreen({ lang, onLogin, onSignUp, onLangChange })
           </SafeAreaView>
         }>
         <SafeAreaView edges={['bottom']} style={r.content}>
-          <View style={r.headRow}>
-            <Text style={r.headline} maxFontSizeMultiplier={bandCap(winW)} accessibilityRole="header">{t('hrWelcomeHeadline', lang)}</Text>
-            <Image source={WELCOME_SCENE} style={r.scene} resizeMode="contain" accessibilityIgnoresInvertColors />
-          </View>
+          <Text style={r.headline} maxFontSizeMultiplier={bandCap(winW)} numberOfLines={3}
+            accessibilityRole="header">{t('hrWelcomeHeadline', lang)}</Text>
           <InlineAlert message={error} />
           <Button size="lg" variant="inverse" title={t('login', lang)} onPress={onLogin} disabled={guestLoading} fullWidth />
           <Button size="lg" variant="onDark" title={t('signup', lang)} onPress={onSignUp} disabled={guestLoading} fullWidth />
@@ -201,14 +202,13 @@ const s = StyleSheet.create({
 const r = StyleSheet.create({
   topArea:     { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' },
   topRow:      { alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, paddingTop: 8 },
-  // Dark glass, 44pt: white text on rgba(0,0,0,0.38) over the scrimmed sky (measured).
+  // Dark glass, 44pt: white on rgba(0,0,0,GLASS) clears AA over ANY photo pixel (check-hero-contrast).
   langPill:    { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14,
-                 borderRadius: radii.pill, backgroundColor: 'rgba(0,0,0,0.38)',
+                 borderRadius: radii.pill, backgroundColor: `rgba(0,0,0,${PHOTO_GLASS})`,
                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   langPillText:{ ...type.meta, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.5 },
   logo:        { width: 120, height: 147, marginTop: 24 },
-  content:     { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 12, gap: 12 },
-  headRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginBottom: 6 },
-  headline:    { flex: 1, fontSize: WELCOME_HEAD_PX, lineHeight: 30, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  scene:       { width: WELCOME_SCENE_W, height: WELCOME_SCENE_W },
+  content:     { paddingHorizontal: 24, paddingTop: 4, paddingBottom: 12, gap: 12 },
+  headline:    { fontSize: WELCOME_HEAD_PX, lineHeight: 32, fontFamily: 'Inter_700Bold', color: '#FFFFFF',
+                 textAlign: 'center', marginBottom: 4 },
 })

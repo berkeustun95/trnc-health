@@ -8,6 +8,7 @@ import { Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { colors, shadow, type, radii, elevation } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
+import { StatusBar } from 'expo-status-bar'
 import { OliBand, InlineAlert } from '../components/ui'
 import { bandCap } from '../components/ui/OliBand'
 import { authErrorKey } from '../utils/authErrors'
@@ -41,7 +42,8 @@ function AuthFrame({ children }) {
       </ImageBackground>
     )
   }
-  return <View style={{ flex: 1, backgroundColor: colors.canvas }}>{children}</View>
+  // Light status-bar icons over the teal band at the top.
+  return <View style={{ flex: 1, backgroundColor: colors.canvas }}><StatusBar style="light" />{children}</View>
 }
 
 function AuthHead({ title, top }) {

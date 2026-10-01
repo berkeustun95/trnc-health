@@ -274,8 +274,12 @@ const legacyHs = StyleSheet.create({
 const redesignHs = StyleSheet.create({
   filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, flexShrink: 0 },
   listContent:   { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 },
-  card:          { backgroundColor: colors.card, borderRadius: radii.card, marginBottom: 12, overflow: 'hidden', ...elevation.card },
+  // On Konaklama's module photo (ModuleScreen, option B): cards at 93% white, radius 20.
+  card:          { backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20, marginBottom: 12, overflow: 'hidden', ...elevation.card },
   photo:         { width: '100%', height: 150, backgroundColor: category.homeLife.bg },
+  // Coming-soon text would otherwise sit straight on the photo: it goes in a card.
+  soon:          { alignItems: 'center', marginTop: 28, marginHorizontal: 16, paddingVertical: 28, paddingHorizontal: 20,
+                   borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.93)', ...elevation.card },
   name:          { ...type.sheetTitle, color: colors.textPrimary },
   classText:     { ...type.small, fontFamily: 'Inter_500Medium', color: colors.textSecondary },
   badge:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.pill, backgroundColor: colors.tintServiceBg },

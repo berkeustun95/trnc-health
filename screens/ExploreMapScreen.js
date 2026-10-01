@@ -12,6 +12,8 @@
 // Clustering is supercluster — pure JS, one pure-JS dependency (kdbush), no native module,
 // so it ships over OTA and needs no rebuild.
 
+import { StatusBar } from 'expo-status-bar'
+import { REDESIGN } from '../constants/redesign'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import FilterDropdown from '../components/FilterDropdown'
 import {
@@ -595,6 +597,7 @@ export default function ExploreMapScreen({
 
   return (
     <View style={s.container}>
+      {REDESIGN && <StatusBar style="dark" />}
       {/* ─── MAP / LIST, AS A PAIR ────────────────────────────────────────────
           A segmented control rather than a lone "list" button: a pair states that there
           are two views of one thing, where a single button reads as an action leaving the
