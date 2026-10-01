@@ -169,6 +169,8 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
 // pharmacy. Row 1 name + hours pill · row 2 region chip + straight-line distance · row 3 address
 // (one line; the full address is its accessibility label) · row 4 the NUMBER on a solid teal
 // button + Yol Tarifi outlined, 44pt. Directions URL unchanged (name + address + country search).
+// Measured at 320dp (Inter Bold 14): the number needs 0.86 scale, "Cómo llegar" 0.78 — both above
+// their minimumFontScale; English uses the short "Directions" ("Get Directions" needed 0.66).
 function PharmacyCardRedesign({ item, showRegionBadge, lang }) {
   const region = showRegionBadge && item.region ? regionLabel(item.region, lang) : null
   const dist = item._dist != null ? `${item._dist.toFixed(1)} km ${t('dutyStraightLine', lang)}` : null
@@ -205,7 +207,7 @@ function PharmacyCardRedesign({ item, showRegionBadge, lang }) {
           )}
           accessibilityRole="button" accessibilityLabel={`${t('getDirections', lang)}: ${item.name}`}>
           <Ionicons name="navigate-outline" size={15} color={C.primaryDark} />
-          <Text style={r.pDirText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{t('getDirections', lang)}</Text>
+          <Text style={r.pDirText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{t('dutyDirections', lang)}</Text>
         </TouchableOpacity>
       </View>
     </View>

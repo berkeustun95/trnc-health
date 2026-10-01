@@ -1894,6 +1894,7 @@ const translations = {
     permUseLocation: "Use my location",
     permNotifOff: "Notifications are off.",
     permNotifTurnOn: "Turn on notifications",
+    dutyDirections: "Directions",   // short: two 44pt buttons share a 320dp card
     stripDutyTitle: "Duty pharmacies",
     stripDutyPartialTitle: "List incomplete",
     stripDutyStaleTitle: "List out of date",
@@ -3747,6 +3748,7 @@ const translations = {
     permUseLocation: "Konumumu kullan",
     permNotifOff: "Bildirimler kapalı.",
     permNotifTurnOn: "Bildirimleri aç",
+    dutyDirections: "Yol Tarifi",   // short: two 44pt buttons share a 320dp card
     stripDutyTitle: "Nöbetçi Eczaneler",
     stripDutyPartialTitle: "Liste eksik",
     stripDutyStaleTitle: "Liste eski",
@@ -5379,6 +5381,7 @@ const translations = {
     permUseLocation: "استخدم موقعي",
     permNotifOff: "الإشعارات متوقفة.",
     permNotifTurnOn: "تفعيل الإشعارات",
+    dutyDirections: "الاتجاهات",   // short: two 44pt buttons share a 320dp card
     stripDutyTitle: "صيدليات مناوبة",
     stripDutyPartialTitle: "القائمة ناقصة",
     stripDutyStaleTitle: "القائمة قديمة",
@@ -7012,6 +7015,7 @@ const translations = {
     permUseLocation: "Использовать моё местоположение",
     permNotifOff: "Уведомления выключены.",
     permNotifTurnOn: "Включить уведомления",
+    dutyDirections: "Маршрут",   // short: two 44pt buttons share a 320dp card
     stripDutyTitle: "Аптеки",
     stripDutyPartialTitle: "Список неполный",
     stripDutyStaleTitle: "Список устарел",
@@ -8639,6 +8643,7 @@ const translations = {
     permUseLocation: "Χρήση της τοποθεσίας μου",
     permNotifOff: "Οι ειδοποιήσεις είναι απενεργοποιημένες.",
     permNotifTurnOn: "Ενεργοποίηση ειδοποιήσεων",
+    dutyDirections: "Οδηγίες",   // short: two 44pt buttons share a 320dp card
     stripDutyTitle: "Εφημερίες",
     stripDutyPartialTitle: "Λίστα ελλιπής",
     stripDutyStaleTitle: "Λίστα παλιά",
@@ -10270,6 +10275,7 @@ const translations = {
     permUseLocation: "Utiliser ma position",
     permNotifOff: "Les notifications sont désactivées.",
     permNotifTurnOn: "Activer les notifications",
+    dutyDirections: "Itinéraire",   // short: two 44pt buttons share a 320dp card
     stripDutyTitle: "Pharmacies",
     stripDutyPartialTitle: "Liste partielle",
     stripDutyStaleTitle: "Liste périmée",
@@ -11898,6 +11904,7 @@ const translations = {
     permUseLocation: "Usar mi ubicación",
     permNotifOff: "Las notificaciones están desactivadas.",
     permNotifTurnOn: "Activar notificaciones",
+    dutyDirections: "Cómo llegar",   // short: two 44pt buttons share a 320dp card
     stripDutyTitle: "Farmacias",
     stripDutyPartialTitle: "Lista incompleta",
     stripDutyStaleTitle: "Lista caducada",
@@ -13526,6 +13533,7 @@ const translations = {
     permUseLocation: "Meinen Standort verwenden",
     permNotifOff: "Benachrichtigungen sind aus.",
     permNotifTurnOn: "Benachrichtigungen einschalten",
+    dutyDirections: "Route",   // short: two 44pt buttons share a 320dp card
     stripDutyTitle: "Notdienst",
     stripDutyPartialTitle: "Liste lückenhaft",
     stripDutyStaleTitle: "Liste veraltet",
@@ -15153,6 +15161,7 @@ const translations = {
     permUseLocation: "استفاده از موقعیت من",
     permNotifOff: "اعلان‌ها خاموش است.",
     permNotifTurnOn: "روشن کردن اعلان‌ها",
+    dutyDirections: "مسیریابی",   // short: two 44pt buttons share a 320dp card
     stripDutyTitle: "داروخانه کشیک",
     stripDutyPartialTitle: "فهرست ناقص",
     stripDutyStaleTitle: "فهرست قدیمی",
