@@ -1,0 +1,10 @@
+{
+  "_note": "Per-function deploy settings for .github/workflows/supabase-functions-deploy.yml. verify_jwt was READ FROM PRODUCTION on 2026-10-01 (supabase functions list), not assumed. The workflow refuses to deploy a function whose live verify_jwt differs from this file, and asserts it is unchanged after the deploy. A new function must be added here first: deciding verify_jwt is part of shipping it. apple-token, walk-leg and weather are false on purpose (their callers send the publishable key, which is not a JWT) — see each index.ts.",
+  "functions": {
+    "apple-token":            { "verify_jwt": false },
+    "send-duty-notification": { "verify_jwt": true },
+    "sync-novest":            { "verify_jwt": true },
+    "walk-leg":               { "verify_jwt": false },
+    "weather":                { "verify_jwt": false, "smoke": { "body": { "lat": 35.185, "lon": 33.382 }, "expect_key": "current" } }
+  }
+}
