@@ -272,6 +272,13 @@ for (const [name, file] of BACKGROUNDS) {
   const ms = readFileSync(resolve(ROOT, 'components/ui/ModuleScreen.js'), 'utf8')
   const num = n => parseFloat((new RegExp(`export const ${n} = ([\\d.]+)`).exec(ms) || [])[1])
   const [tint, hs, pa, ca] = ['MODULE_TINT', 'HEADER_SCRIM', 'PILL_ALPHA', 'CARD_ALPHA'].map(num)
+  // The photo must be SIZED to its frame: a require()d Image defaults to the asset's own size
+  // (704×1520) and absolute insets don't override it — every number below would then be measured
+  // against a photo the user never sees whole (2026-10-01, ADA Preview). Same style as main's
+  // PageBackground.
+  const photoStyle = (/\bphoto:\s*\{([^}]*)\}/.exec(ms) || [])[1] || ''
+  if (!/width:\s*'100%'/.test(photoStyle) || !/height:\s*'100%'/.test(photoStyle))
+    problems.push(`ModuleScreen: the photo style must set width: '100%' and height: '100%' (found: {${photoStyle.trim()}})`)
   if ([tint, hs, pa, ca].some(v => !(v > 0))) problems.push('ModuleScreen: cannot read MODULE_TINT / HEADER_SCRIM / PILL_ALPHA / CARD_ALPHA — measuring nothing')
   else {
     const over = k => { const v = 255 * k; return 1.05 / (Y(v, v, v) + 0.05) }

@@ -1712,7 +1712,7 @@ export default function HomeScreen({
           Redesign: the same SafeAreaView inside ModuleScreen (option B); legacy keeps
           PageBackground. The HEADER is unchanged either way (the gate's safety property). */}
       {showFacilityList && !REDESIGN && <PageBackground topic="medical_facilities" />}
-      {showFacilityList && REDESIGN ? <ModuleScreen topic="medical">{shellBody}</ModuleScreen> : shellBody}
+      {showFacilityList && REDESIGN ? <ModuleScreen topic="medical" fullBleed>{shellBody}</ModuleScreen> : shellBody}
     </>
   )
 

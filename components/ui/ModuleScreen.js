@@ -39,16 +39,27 @@ export const MODULE_PHOTO = {
   grooming:       require('../../assets/backgrounds/ada-bg-pets.jpg'),
 }
 
-export default function ModuleScreen({ topic, children, style }) {
+// fullBleed: the photo from the very top, under the status bar — main's Sağlık facility list
+// (HomeScreen) is the one PageBackground that sat OUTSIDE its SafeAreaView; every other module's
+// started below the status bar.
+export default function ModuleScreen({ topic, fullBleed = false, children, style }) {
   const insets = useSafeAreaInsets()
   const photo = MODULE_PHOTO[topic]
   return (
     <OnPhotoContext.Provider value={true}>
       <View style={[s.root, style]}>
         <StatusBar style="light" />
-        {/* Placed like the live app's PageBackground (inside a top-edge SafeAreaView): from below the
-            status bar, cover, centred — so the photo's top (the duty pharmacy's beams) sits under the header. */}
-        {!!photo && <Image source={photo} style={[s.photo, { top: insets.top }]} resizeMode="cover" accessibilityIgnoresInvertColors />}
+        {/* The live app's PageBackground, exactly: a frame from below the status bar (it sat in a
+            top-edge SafeAreaView) to the bottom of the SCREEN — this root is the screen, never the
+            list — and the photo filling it, cover, centred. width/height '100%' are REQUIRED: a
+            require()d Image gets the asset's own size (704×1520) as its default width/height
+            (RN Image.android.js / Image.ios.js), and absolute insets do not override it — that
+            showed only the photo's top-left, enlarged (2026-10-01). */}
+        {!!photo && (
+          <View pointerEvents="none" style={[s.photoFrame, { top: fullBleed ? 0 : insets.top }]}>
+            <Image source={photo} resizeMode="cover" style={s.photo} accessibilityIgnoresInvertColors />
+          </View>
+        )}
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${MODULE_TINT})` }]} />
         <View pointerEvents="none" style={[s.band, { top: 0, height: insets.top + HEADER_BAND, backgroundColor: `rgba(0,0,0,${HEADER_SCRIM})` }]} />
         <Image pointerEvents="none" source={DARK_FADE} resizeMode="stretch"
@@ -71,7 +82,8 @@ export function OnPhotoLabel({ children, style, textStyle, numberOfLines = 1, ac
 const s = StyleSheet.create({
   root:     { flex: 1, backgroundColor: '#22313A' },
   band:     { position: 'absolute', left: 0, right: 0, width: '100%' },
-  photo:    { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  photoFrame: { position: 'absolute', left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+  photo:    { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   pill:     { alignSelf: 'flex-start', backgroundColor: `rgba(0,0,0,${PILL_ALPHA})`, borderRadius: radii.pill,
               paddingHorizontal: 12, paddingVertical: 5 },
   pillText: { ...type.small, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
