@@ -71,6 +71,14 @@ const args = process.argv.slice(2)
 const dry = args.includes('--dry')
 // Reprocess rows that already carry an image (used to re-mirror at a new size).
 const remirror = args.includes('--remirror')
+// An unknown flag is refused, never ignored: this script WRITES by default, so a
+// mistyped `--dyr` or a `--selftest` it does not have used to run a real import
+// (2026-10-01: a `--selftest` loop over the feed scripts wrote one prod row).
+const unknownArgs = args.filter(a => a !== '--dry' && a !== '--remirror')
+if (unknownArgs.length) {
+  console.error(`Unknown argument(s): ${unknownArgs.join(' ')} — this script takes only --dry and --remirror. Nothing was run.`)
+  process.exit(1)
+}
 
 // ─── Credentials ─────────────────────────────────────────────────────────────
 
@@ -360,8 +368,11 @@ const vanished = (existing ?? []).filter(
 // Alias-aware on both counts: a renamed venue that inherits a pin is neither
 // missing coordinates nor unknown, and reporting it as either would send somebody
 // to re-supply a pin that is already there.
-const missingCoords = [...new Set(
-  feed.filter(ev => resolveVenue(ev.venue)?.latitude == null).map(ev => ev.venue))].sort()
+// ONE list, used for both the venue names and the event count below, so the two
+// can never disagree. The count once used the entry's own pin instead, and reported
+// Lions Garden and the Rauf Denktaş venue (pinned through `aliases`) as unpinned.
+const unpinnedEvents = feed.filter(ev => resolveVenue(ev.venue)?.latitude == null)
+const missingCoords = [...new Set(unpinnedEvents.map(ev => ev.venue))].sort()
 
 const unknownVenues = [...new Set(
   feed.filter(ev => !venues.has(ev.venue) && !resolveVenue(ev.venue)).map(ev => ev.venue))].sort()
@@ -715,9 +726,10 @@ if (unknownVenues.length) {
   console.log('    Add them there (coords may stay null) so next week inherits the entry.')
 }
 
-if (missingCoords.length) {
-  const affected = feed.filter(ev => venues.get(ev.venue)?.latitude == null).length
-  console.log(`\n  ${missingCoords.length} venue(s) still need coordinates — ${affected} event(s) affected:`)
+if (!missingCoords.length) {
+  console.log(`\n  ✓ every event has coordinates — 0 unpinned of ${feed.length}`)
+} else {
+  console.log(`\n  ${missingCoords.length} venue(s) still need coordinates — ${unpinnedEvents.length} event(s) affected:`)
   for (const v of missingCoords) console.log(`      ${v}`)
   console.log('    Imported with NULL lat/lng (correct). They are invisible under the Events')
   console.log('    district filter until coords land; they show fine with no district filter.')

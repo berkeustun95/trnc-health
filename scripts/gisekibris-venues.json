@@ -1,6 +1,6 @@
 {
   "_note": "Venue -> coordinate lookup for the Gise Kibris import. Coordinates are Google Maps place pins, OWNER-SUPPLIED and user-verified. Do not invent values; leave null until verified. Matching is BYTE-FOR-BYTE on `venue`. Some entries DELIBERATELY SHARE A PIN (a club or bar inside a hotel is the same place under a different name in the feed) — do not dedupe them. `aliases` lists FORMER names of the same venue: an entry with no pin of its own inherits the pin of an alias that has one, so a renamed venue keeps its coordinates and the pin still has exactly one owner. Old names keep their own entries because older `events` rows store them in `organizer_name`. Where a pin disagrees with the feed's `city`, the pin is right and is marked OWNER-CONFIRMED. `event_count` and `_coverage` are regenerated from the drop named in _coverage — they describe that drop only, so a venue at 0 is quiet this round, not retired.",
-  "_coverage": "39/49 events (live feed, 2026-10-01)",
+  "_coverage": "49/49 events (live feed, 2026-10-01)",
   "venues": [
     { "venue": "Cage Club", "city": "Girne", "event_count": 9, "latitude": 35.3351422, "longitude": 33.3654195 },
     { "venue": "Girne Amfi Tiyatro", "city": "Girne", "event_count": 0, "latitude": 35.33964, "longitude": 33.326215 },
@@ -49,19 +49,23 @@
     { "venue": "Rauf Denktaş Üniversitesi Kültür Merkezi (eski Mısırlızade Sineması)", "city": "Lefkoşa", "event_count": 4, "latitude": null, "longitude": null,
       "aliases": ["Mısırlızade Sahnesi"],
       "note": "RENAMED. Was 'Mısırlızade Sahnesi'; the partner's own new name says 'eski Mısırlızade Sineması' (formerly the Mısırlızade cinema), which is the confirmation. Inherits its pin through `aliases`. Still DISTINCT from 'Mısırlızade Açık Hava Sahnesi' (open-air) — different spaces, and that one keeps its own entry." },
-    { "venue": "Berlin Lefkoşa", "city": "Lefkoşa", "event_count": 2, "latitude": null, "longitude": null,
-      "note": "New venue in the 2026-09-24 live feed. Not a rename — no existing entry matches and no alias was invented for it. Unpinned until coordinates are supplied." },
-    { "venue": "Deniz Kapısı Porta Del Mare", "city": "Gazimağusa", "event_count": 1, "latitude": null, "longitude": null,
-      "note": "New venue in the 2026-09-24 live feed. Not a rename — no existing entry matches and no alias was invented for it. Unpinned until coordinates are supplied." },
-    { "venue": "Kaya Palazzo", "city": "Girne", "event_count": 1, "latitude": null, "longitude": null,
-      "note": "New venue in the 2026-09-24 live feed. Not a rename — no existing entry matches and no alias was invented for it. Unpinned until coordinates are supplied." },
-    { "venue": "Shamrock Live", "city": "Gazimağusa", "event_count": 4, "latitude": null, "longitude": null,
-      "note": "New venue in the 2026-09-24 live feed. Not a rename — no existing entry matches and no alias was invented for it. Unpinned until coordinates are supplied." },
+    { "venue": "Berlin Lefkoşa", "city": "Lefkoşa", "event_count": 2, "latitude": 35.177592, "longitude": 33.365223,
+      "note": "New venue in the 2026-09-24 live feed. Not a rename — no existing entry matches and no alias was invented for it. Pin OWNER-SUPPLIED 2026-10-01." },
+    { "venue": "Deniz Kapısı Porta Del Mare", "city": "Gazimağusa", "event_count": 1, "latitude": 35.131263, "longitude": 33.944101,
+      "note": "New venue in the 2026-09-24 live feed. Not a rename — no existing entry matches and no alias was invented for it. Pin OWNER-SUPPLIED 2026-10-01." },
+    { "venue": "Kaya Palazzo", "city": "Girne", "event_count": 1, "latitude": 35.357512, "longitude": 33.270255,
+      "note": "New venue in the 2026-09-24 live feed. Not a rename — no existing entry matches and no alias was invented for it. Pin OWNER-SUPPLIED 2026-10-01." },
+    { "venue": "Shamrock Live", "city": "Gazimağusa", "event_count": 4, "latitude": 35.132741, "longitude": 33.915324,
+      "note": "New venue in the 2026-09-24 live feed. Not a rename — no existing entry matches and no alias was invented for it. Pin OWNER-SUPPLIED 2026-10-01." },
     { "venue": "Bottega Club", "city": "Girne", "event_count": 1, "latitude": 35.338849, "longitude": 33.276851,
       "note": "New venue in the 2026-10-01 live feed. Pin OWNER-SUPPLIED 2026-10-01." },
     { "venue": "Concorde Tower Hotel", "city": "Lefkoşa", "event_count": 2, "latitude": 35.208597, "longitude": 33.322154,
       "note": "Lefkoşa, OWNER-CONFIRMED 2026-10-01. A different property from Concorde Aria (Girne) — not a rename, no alias." },
     { "venue": "Girne Belediyesi", "city": "Girne", "event_count": 1, "latitude": 35.333457, "longitude": 33.319307,
-      "note": "The municipality's main building, OWNER-SUPPLIED 2026-10-01. DISTINCT from 'Girne Belediyesi Batı Doğa Parkı' (a park) — matching is byte-for-byte, keep both." }
+      "note": "The municipality's main building, OWNER-SUPPLIED 2026-10-01. DISTINCT from 'Girne Belediyesi Batı Doğa Parkı' (a park) — matching is byte-for-byte, keep both." },
+    { "venue": "Gloria Jean’s Coffees Edremit", "city": "Girne", "event_count": 1, "latitude": 35.333914, "longitude": 33.267095,
+      "note": "New venue in the 2026-10-01 live feed. Pin OWNER-SUPPLIED 2026-10-01. The feed spells this one with a CURLY apostrophe (U+2019) and its Lapta sibling with a STRAIGHT one (U+0027). Matching is byte-for-byte: do not normalise either." },
+    { "venue": "Gloria Jean's Coffees Lapta", "city": "Girne", "event_count": 1, "latitude": 35.350479, "longitude": 33.175996,
+      "note": "New venue in the 2026-10-01 live feed. Pin OWNER-SUPPLIED 2026-10-01. STRAIGHT apostrophe (U+0027), unlike the Edremit entry (U+2019). Matching is byte-for-byte: do not normalise either." }
   ]
 }
