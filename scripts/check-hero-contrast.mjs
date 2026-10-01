@@ -90,6 +90,7 @@ const Y = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
 const rampAlpha = u => (u >= 1 ? 0 : G.BOTTOM_MAX * Math.pow(1 - u, G.RAMP_EXP))
 
 const problems = []
+let dotsContrast = null   // non-text UI (3:1), reported apart from the 4.5:1 text rows
 const rows = []
 for (const [name, file] of BACKGROUNDS) {
   let worst = Infinity, at = ''
@@ -153,13 +154,14 @@ for (const [name, file] of BACKGROUNDS) {
 {
   const src = readFileSync(resolve(ROOT, 'components/home/redesign/OliBar.js'), 'utf8')
   const k = name => parseFloat((new RegExp(`export const ${name} = ([\\d.]+)`).exec(src) || [])[1])
-  const [H, ZONE, ART, GS, GX, GY, TL] = ['OLI_BAR_H', 'TEXT_ZONE', 'ART_ZONE', 'GLOW_SIZE', 'GLOW_CX', 'GLOW_CY', 'TEXT_LEFT'].map(k)
-  if ([H, ZONE, ART, GS, GX, GY, TL].some(v => !(v >= 0)) || !/'rgba\(255,255,255,0\.16\)'/.test(src)
+  const [H, ZONE, ART, GS, GX, GY, TL, DX, DOT, DON, DB, DA] = ['OLI_BAR_H', 'TEXT_ZONE', 'ART_ZONE', 'GLOW_SIZE', 'GLOW_CX', 'GLOW_CY', 'TEXT_LEFT',
+    'DOTS_X', 'DOT', 'DOT_ON', 'DOTS_BOTTOM', 'DOT_ALPHA'].map(k)
+  if ([H, ZONE, ART, GS, GX, GY, TL, DX, DOT, DON, DB, DA].some(v => !(v >= 0)) || !/'rgba\(255,255,255,0\.16\)'/.test(src)
       || !/source=\{BG\} resizeMode="stretch"/.test(src)) {
     problems.push('redesign Oli bar: cannot read the ground geometry / 16% pill from OliBar.js — measuring nothing')
   } else {
     if (ZONE + ART > 1.0001) problems.push(`redesign Oli bar: TEXT_ZONE ${ZONE} + ART_ZONE ${ART} overlap — the art could sit under the text`)
-    let worstT = Infinity, worstP = Infinity, at = ''
+    let worstT = Infinity, worstP = Infinity, at = '', worstD = Infinity, atD = ''
     for (const Wd of [320, 360, 393]) {
       const cw = Wd - 32
       const glow = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-glow.png')).resize(GS, GS).toBuffer()
@@ -181,8 +183,24 @@ for (const [name, file] of BACKGROUNDS) {
         if (ct < worstT) worstT = ct
         if (cp < worstP) { worstP = cp; at = `${Wd}dp x=${x} y=${y} rgb(${px.join(',')})` }
       }
+      // Scene dots: a vertical column that must sit BETWEEN the text zone and the art (whose
+      // left edge is ≥ cw·(1 − ART_ZONE) on every scene), never on either. The dimmest dot
+      // (white at DOT_ALPHA) must clear 3:1 against every ground pixel behind the column (WCAG 1.4.11).
+      const dl = cw * DX - DOT / 2, dr = dl + DOT
+      if (dl < cw * ZONE + 1) problems.push(`redesign Oli bar: ${Wd}dp dots start at ${dl.toFixed(1)}pt, inside the text zone (ends ${(cw * ZONE).toFixed(1)})`)
+      if (dr > cw * (1 - ART) - 1) problems.push(`redesign Oli bar: ${Wd}dp dots end at ${dr.toFixed(1)}pt, inside the art zone (starts ${(cw * (1 - ART)).toFixed(1)})`)
+      const colH = 6 * DOT + DON + 6 * 3
+      for (let y = Math.floor(H - DB - colH); y < H - DB; y++) for (let x = Math.floor(dl); x < Math.ceil(dr); x++) {
+        const i = (y * info.width + x) * info.channels
+        const px = [data[i], data[i + 1], data[i + 2]]
+        const dot = px.map(v => 255 * DA + v * (1 - DA))
+        const c = (Y(...dot) + 0.05) / (Y(...px) + 0.05)
+        if (c < worstD) { worstD = c; atD = `${Wd}dp x=${x} y=${y} rgb(${px.join(',')})` }
+      }
     }
     rows.push({ name: 'oli title', worst: worstT, at }, { name: 'oli pill', worst: worstP, at })
+    dotsContrast = { worst: worstD, at: atD }
+    if (worstD < 3) problems.push(`redesign Oli bar: inactive dot is ${worstD.toFixed(2)}:1 against the ground (${atD}), under 3:1`)
     if (worstT < FLOOR) problems.push(`redesign Oli bar: title on the ground is ${worstT.toFixed(2)}:1 at worst, under ${FLOOR}:1`)
     if (worstP < FLOOR) problems.push(`redesign Oli bar: pill text is ${worstP.toFixed(2)}:1 at worst (${at}), under ${FLOOR}:1`)
   }
@@ -213,3 +231,4 @@ console.log(`hero contrast: OK — white text on all ${rows.length} backgrounds 
 console.log(`  ramp ${G.BOTTOM_MAX}/${G.RAMP_EXP} · generic +${G.GENERIC_SCRIM} flat · text row `
   + `${CONTENT_BOTTOM}pt above the hero's bottom (read from source, not typed here)`)
 console.log('  ' + rows.map(r => `${r.name} ${r.worst.toFixed(2)}`).join(' · '))
+if (dotsContrast) console.log(`  oli scene dots (non-text, 3:1): inactive ${dotsContrast.worst.toFixed(2)}:1 worst`)

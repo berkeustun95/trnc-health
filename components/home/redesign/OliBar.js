@@ -34,11 +34,18 @@ export const ART_ZONE = 0.4
 export const GLOW_SIZE = 130
 export const GLOW_CX = 0.8   // glow centre, as a fraction of the card width
 export const GLOW_CY = 0.6   // … and of its height
+// Scene dots: a VERTICAL column in the strip between the text zone (ends at TEXT_ZONE) and the
+// art (starts at ≥ 1 − ART_ZONE: right-anchored, never wider than the zone), so they can never
+// overlap the mascots on any scene. check-hero-contrast asserts the strip and the dots' contrast.
+export const DOTS_X = 0.58   // column centre, as a fraction of the card width
+export const DOT = 4
+export const DOT_ON = 9
+export const DOTS_BOTTOM = 12
+export const DOT_ALPHA = 0.65   // inactive dot: white at this opacity
 export const TEXT_LEFT = 16
 export const PILL_PAD = 10
 export const OLI_FONT_CAP = 1.1
 export const OLI_FONT_CAP_NARROW = 1.0
-const rgba = (hex, a) => `rgba(${[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(',')},${a})`
 const PAGE = 16   // HomeScreen rBelow paddingHorizontal: the card is window − 2·16 wide
 
 const SCENES = [
@@ -133,7 +140,7 @@ export default function OliBar({ lang, onPress, active = true, barRef }) {
       </View>
 
       {!reduce && (
-        <View style={s.dots} pointerEvents="none">
+        <View style={[s.dots, { left: cardW * DOTS_X - DOT / 2 }]} pointerEvents="none">
           {SCENES.map((_, i) => <View key={i} style={[s.dot, i === idx && s.dotOn]} />)}
         </View>
       )}
@@ -151,8 +158,7 @@ const s = StyleSheet.create({
                paddingHorizontal: PILL_PAD, paddingVertical: 6, borderRadius: radii.pill,
                backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' },
   pillText:  { fontSize: 13, lineHeight: 17, fontFamily: 'Inter_500Medium', color: '#FFFFFF', flexShrink: 1 },
-  dots:      { position: 'absolute', right: 12, bottom: 8, flexDirection: 'row', gap: 3, paddingHorizontal: 5,
-               paddingVertical: 4, borderRadius: radii.pill, backgroundColor: rgba(BG_DARK, 0.45) },
-  dot:       { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.55)' },
-  dotOn:     { width: 9, backgroundColor: '#FFFFFF' },
+  dots:      { position: 'absolute', bottom: DOTS_BOTTOM, width: DOT, flexDirection: 'column', gap: 3 },
+  dot:       { width: DOT, height: DOT, borderRadius: DOT / 2, backgroundColor: `rgba(255,255,255,${DOT_ALPHA})` },
+  dotOn:     { height: DOT_ON, backgroundColor: '#FFFFFF' },
 })
