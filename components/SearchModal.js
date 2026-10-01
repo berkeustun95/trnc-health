@@ -225,7 +225,7 @@ const s = StyleSheet.create({
     paddingTop: 16, paddingHorizontal: 18, paddingBottom: 24,
   },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  modalTitle: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary, flexShrink: 1, paddingRight: 10 },
+  modalTitle: { fontSize: 16.5, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flexShrink: 1, paddingRight: 10 },
   search: {
     backgroundColor: colors.bg, borderRadius: radius.md, paddingHorizontal: 13,
     paddingVertical: Platform.OS === 'ios' ? 11 : 8, fontSize: 15, marginBottom: 10,
@@ -237,5 +237,5 @@ const s = StyleSheet.create({
   },
   // flex:1, not flexShrink:1 — see the note on renderItem above and f1a7b99.
   modalItemText: { fontSize: 15, color: colors.textPrimary, flex: 1, paddingRight: 10 },
-  modalItemTextOn: { color: colors.primary, fontWeight: '700' },
+  modalItemTextOn: { color: colors.primary, fontFamily: 'Inter_700Bold' },
 })

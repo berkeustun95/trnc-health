@@ -1189,21 +1189,21 @@ const legacyS = StyleSheet.create({
     backgroundColor: colors.accentLight, borderColor: '#F5C9B4', borderWidth: 1,
     paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999,
   },
-  helpBtnText: { color: colors.tintLifestyleFg, fontSize: 12.5, fontWeight: '700' },
+  helpBtnText: { color: colors.tintLifestyleFg, fontSize: 12.5, fontFamily: 'Inter_700Bold' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   langBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1,
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
   },
-  langBtnText: { color: colors.textSecondary, fontSize: 12.5, fontWeight: '700', letterSpacing: 0.4 },
+  langBtnText: { color: colors.textSecondary, fontSize: 12.5, fontFamily: 'Inter_700Bold', letterSpacing: 0.4 },
 
   scroll: { paddingHorizontal: 20, paddingBottom: 24 },
-  stepLabel: { color: colors.textSecondary, fontSize: 12.5, fontWeight: '600', marginBottom: 4 },
-  title: { color: colors.textPrimary, fontSize: 23, fontWeight: '700', marginBottom: 18 },
+  stepLabel: { color: colors.textSecondary, fontSize: 12.5, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
+  title: { color: colors.textPrimary, fontSize: 23, fontFamily: 'Inter_700Bold', marginBottom: 18 },
 
   intro: { paddingTop: 8 },
-  introTitle: { color: colors.textPrimary, fontSize: 24, fontWeight: '700', marginBottom: 12 },
+  introTitle: { color: colors.textPrimary, fontSize: 24, fontFamily: 'Inter_700Bold', marginBottom: 12 },
   introBody: { color: colors.textSecondary, fontSize: 15, lineHeight: 22, marginBottom: 16 },
   introData: {
     flexDirection: 'row', gap: 10, backgroundColor: colors.primaryLight,
@@ -1213,7 +1213,7 @@ const legacyS = StyleSheet.create({
   introTime: { color: colors.textSecondary, fontSize: 13 },
 
   field: { marginBottom: 18 },
-  label: { color: colors.textPrimary, fontSize: 14, fontWeight: '600', marginBottom: 7 },
+  label: { color: colors.textPrimary, fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 7 },
   hint: { color: colors.textSecondary, fontSize: 12.5, marginTop: 6, lineHeight: 18 },
   input: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
@@ -1236,7 +1236,7 @@ const legacyS = StyleSheet.create({
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
   },
   chipOn: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  chipText: { fontSize: 13.5, color: colors.textSecondary, fontWeight: '600' },
+  chipText: { fontSize: 13.5, color: colors.textSecondary, fontFamily: 'Inter_600SemiBold' },
   chipTextOn: { color: colors.primaryDark },
 
   row: {
@@ -1252,7 +1252,7 @@ const legacyS = StyleSheet.create({
   // reports is the height it needs. s.row has no height and no maxHeight, so once the
   // measurement is right the row grows and a wrapped label is fully visible.
   rowText: { fontSize: 14.5, color: colors.textPrimary, flex: 1, paddingRight: 8 },
-  rowTextOn: { color: colors.primaryDark, fontWeight: '600' },
+  rowTextOn: { color: colors.primaryDark, fontFamily: 'Inter_600SemiBold' },
 
   err: { color: colors.danger, fontSize: 13, marginTop: 7, lineHeight: 19 },
 
@@ -1288,7 +1288,7 @@ const legacyS = StyleSheet.create({
   optInText: { color: colors.textPrimary, fontSize: 14, lineHeight: 20 },
   optInHint: { color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
   legalFooter: { color: colors.textSecondary, fontSize: 12.5, lineHeight: 19, marginTop: 16 },
-  legalFooterLink: { color: colors.primary, fontWeight: '700', textDecorationLine: 'underline' },
+  legalFooterLink: { color: colors.primary, fontFamily: 'Inter_700Bold', textDecorationLine: 'underline' },
 
   footer: {
     flexShrink: 0, flexDirection: 'row', gap: 10,
@@ -1300,20 +1300,20 @@ const legacyS = StyleSheet.create({
     paddingVertical: 15, alignItems: 'center', justifyContent: 'center', ...shadow,
   },
   primaryBtnOff: { backgroundColor: colors.border, shadowOpacity: 0, elevation: 0 },
-  primaryBtnText: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
+  primaryBtnText: { color: '#fff', fontSize: 15.5, fontFamily: 'Inter_700Bold' },
   backBtn: {
     paddingHorizontal: 20, paddingVertical: 15, borderRadius: radius.md,
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
-  backBtnText: { color: colors.textSecondary, fontSize: 15, fontWeight: '600' },
+  backBtnText: { color: colors.textSecondary, fontSize: 15, fontFamily: 'Inter_600SemiBold' },
 
   // Backs the emergency-help sheet below. The searchable-list styles that used to sit
   // beside it moved to components/SearchModal.js; this one stayed because this screen
   // still renders a sheet of its own.
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(26,43,51,0.45)', justifyContent: 'flex-end' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  modalTitle: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary, flexShrink: 1, paddingRight: 10 },
+  modalTitle: { fontSize: 16.5, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flexShrink: 1, paddingRight: 10 },
 
   helpCard: {
     backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg,
@@ -1323,7 +1323,7 @@ const legacyS = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  helpRowText: { flex: 1, fontSize: 15, color: colors.textPrimary, fontWeight: '600' },
+  helpRowText: { flex: 1, fontSize: 15, color: colors.textPrimary, fontFamily: 'Inter_600SemiBold' },
   helpNote: { color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, marginTop: 14 },
 
 })

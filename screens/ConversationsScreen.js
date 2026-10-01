@@ -187,27 +187,27 @@ const s = StyleSheet.create({
 
   body:    { flex: 1, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name:    { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  name:    { flex: 1, fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   time:    { fontSize: 11, color: colors.textSecondary },
   preview: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   previewMuted: { fontStyle: 'italic' },
 
   requestPill: { alignSelf: 'flex-start', backgroundColor: colors.primaryLight, borderRadius: radius.sm,
                  paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 },
-  requestText: { fontSize: 11, fontWeight: '700', color: colors.primaryDark },
+  requestText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
   closedPill:  { alignSelf: 'flex-start', backgroundColor: colors.cardBg, borderRadius: radius.sm,
                  paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 },
-  closedText:  { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
+  closedText:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
 
   empty:     { fontSize: 14, color: colors.textSecondary, lineHeight: 20, textAlign: 'center' },
   emptyIcon: { alignSelf: 'center', marginBottom: 8 },
   retryBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
                marginTop: 14, backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 11 },
-  retryText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
+  retryText: { color: colors.surface, fontSize: 14, fontFamily: 'Inter_700Bold' },
 
-  lockedTitle:  { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  lockedTitle:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6 },
   lockedBody:   { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   lockedBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14,
                   borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.primary, paddingVertical: 11 },
-  lockedBtnText:{ fontSize: 14, fontWeight: '700', color: colors.primary },
+  lockedBtnText:{ fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
 })

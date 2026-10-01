@@ -132,14 +132,14 @@ export function NameFeedback({ state, lang, onPick }) {
 
 const s = StyleSheet.create({
   okRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 7 },
-  ok: { color: colors.success, fontSize: 13, fontWeight: '600' },
+  ok: { color: colors.success, fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   err: { color: colors.danger, fontSize: 13, marginTop: 7, lineHeight: 19 },
   muted: { color: colors.textSecondary, fontSize: 13, marginTop: 7 },
-  link: { color: colors.primary, fontSize: 13, fontWeight: '700', marginTop: 6 },
+  link: { color: colors.primary, fontSize: 13, fontFamily: 'Inter_700Bold', marginTop: 6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   suggest: {
     paddingHorizontal: 13, paddingVertical: 8, borderRadius: 999,
     backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primary,
   },
-  suggestText: { fontSize: 13.5, color: colors.primaryDark, fontWeight: '700' },
+  suggestText: { fontSize: 13.5, color: colors.primaryDark, fontFamily: 'Inter_700Bold' },
 })

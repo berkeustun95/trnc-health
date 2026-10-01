@@ -478,7 +478,7 @@ const s = StyleSheet.create({
   },
   noDataTitle: {
     fontSize: 17,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: colors.textPrimary,
     textAlign: 'center',
   },
@@ -497,7 +497,7 @@ const s = StyleSheet.create({
   },
   retryBtnText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: colors.surface,
   },
   body: {
@@ -536,14 +536,14 @@ const s = StyleSheet.create({
   },
   officialLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   dateValue: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
     marginTop: 2,
   },
@@ -572,7 +572,7 @@ const s = StyleSheet.create({
   },
   toggleText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: colors.textSecondary,
   },
   toggleTextActive: {
@@ -587,7 +587,7 @@ const s = StyleSheet.create({
   },
   calcTitle: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
@@ -620,7 +620,7 @@ const s = StyleSheet.create({
   calcChipFlag: { fontSize: 16 },
   calcChipText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textSecondary,
   },
   calcChipTextActive: {
@@ -650,14 +650,14 @@ const s = StyleSheet.create({
   calcFieldFlag: { fontSize: 22 },
   calcFieldCode: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
   },
   calcInput: {
     flex: 1,
     textAlign: 'right',
     fontSize: 22,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
     padding: 0,
     fontVariant: ['tabular-nums'],
@@ -666,7 +666,7 @@ const s = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
     fontSize: 22,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.primary,
     fontVariant: ['tabular-nums'],
   },
@@ -687,7 +687,7 @@ const s = StyleSheet.create({
   calcRateLine: {
     marginTop: 12,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
   },
@@ -717,7 +717,7 @@ const s = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
@@ -741,14 +741,14 @@ const s = StyleSheet.create({
   rateFlag: { fontSize: 24 },
   rateCurrency: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
   },
   rateValue: {
     flex: 1,
     textAlign: 'right',
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
   },
@@ -780,6 +780,6 @@ const s = StyleSheet.create({
   retryLinkText: {
     fontSize: 14,
     color: colors.primary,
-    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
   },
 })

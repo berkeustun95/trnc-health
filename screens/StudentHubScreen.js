@@ -908,7 +908,7 @@ const s = StyleSheet.create({
   //   NOT AdminScreen's horizontally scrolling pills, which are right for its dozen tabs
   //   and wrong here: a brand-new feature must not be hidden behind a swipe.
   //   textAlign matters once there are two lines; alignItems centres the block, not the text.
-  segmentText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
+  segmentText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, textAlign: 'center' },
   segmentTextActive: { color: colors.primary },
 
   tabScroll: { flex: 1 },
@@ -938,7 +938,7 @@ const s = StyleSheet.create({
     borderColor: colors.border,
   },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  chipText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary },
   chipTextActive: { color: colors.surface },
 
   uniCard: {
@@ -950,8 +950,8 @@ const s = StyleSheet.create({
   },
   uniRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   uniRowBody: { flex: 1 },
-  uniName: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, lineHeight: 21 },
-  uniDetailName: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, lineHeight: 26 },
+  uniName: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 21 },
+  uniDetailName: { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 26 },
   uniMeta: { fontSize: 13, color: colors.textSecondary, marginTop: 3 },
 
   emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },
@@ -986,7 +986,7 @@ const s = StyleSheet.create({
     paddingVertical: 13,
     marginTop: 18,
   },
-  retryText: { fontSize: 15, fontWeight: '600', color: colors.surface },
+  retryText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.surface },
 
   secondCard: { marginTop: 16 },
 
@@ -998,21 +998,21 @@ const s = StyleSheet.create({
   studentDivider:      { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   studentBody:         { flex: 1, minWidth: 0 },
   studentNameRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  studentName:         { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
+  studentName:         { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flexShrink: 1 },
   studentYouPill:      { paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.sm, backgroundColor: colors.primaryLight },
-  studentYouText:      { fontSize: 11, fontWeight: '700', color: colors.primary },
+  studentYouText:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
   studentMeta:         { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  studentStatus:       { fontSize: 12, color: colors.primary, marginTop: 3, fontWeight: '600' },
+  studentStatus:       { fontSize: 12, color: colors.primary, marginTop: 3, fontFamily: 'Inter_600SemiBold' },
   studentStatusAlumni: { color: colors.textSecondary },
   studentEmpty:        { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
 
-  studentLockedTitle:  { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  studentLockedTitle:  { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6 },
   studentLockedBody:   { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
   studentLockedBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.primary, backgroundColor: 'transparent' },
-  studentLockedBtnText:{ fontSize: 15, fontWeight: '700', color: colors.primary },
+  studentLockedBtnText:{ fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
   sectionTitle: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -1033,9 +1033,9 @@ const s = StyleSheet.create({
   },
   taskIconDone: { backgroundColor: colors.successLight },
   taskBody: { flex: 1 },
-  taskTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  taskTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   taskSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: 2 },
-  taskCount: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, flexShrink: 0 },
+  taskCount: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, flexShrink: 0 },
   taskCountDone: { color: colors.success },
   taskPendingText: { flex: 1, fontSize: 14, fontStyle: 'italic', color: colors.textSecondary },
 
@@ -1055,14 +1055,14 @@ const s = StyleSheet.create({
   offlineText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
 
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  sectionCount: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+  sectionCount: { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   noteRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   noteText: { flex: 1, fontSize: 14, color: colors.textPrimary, lineHeight: 21 },
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8 },
   stepText: { flex: 1, fontSize: 15, color: colors.textPrimary, lineHeight: 22 },
   stepTextDone: { color: colors.textSecondary, textDecorationLine: 'line-through' },
   resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 10 },
-  resetText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  resetText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary },
   docRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 5 },
   docText: { flex: 1, fontSize: 14, color: colors.textPrimary, lineHeight: 21 },
 
@@ -1078,7 +1078,7 @@ const s = StyleSheet.create({
     marginTop: 8,
     gap: 8,
   },
-  linkBtnText: { fontSize: 15, fontWeight: '600', color: colors.surface },
+  linkBtnText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.surface },
   linkBtnGhost: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1090,6 +1090,6 @@ const s = StyleSheet.create({
     paddingVertical: 13,
     gap: 8,
   },
-  linkBtnGhostText: { fontSize: 15, fontWeight: '600', color: colors.primary },
+  linkBtnGhostText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.primary },
   linkBtnStacked: { marginTop: 10 },
 })

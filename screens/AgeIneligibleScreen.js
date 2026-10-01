@@ -79,7 +79,7 @@ const s = StyleSheet.create({
     width: 62, height: 62, borderRadius: 31, backgroundColor: colors.bg,
     alignItems: 'center', justifyContent: 'center', marginBottom: 18,
   },
-  title: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginBottom: 10 },
+  title: { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 10 },
   body:  { fontSize: 14.5, color: colors.textSecondary, textAlign: 'center', lineHeight: 21, marginBottom: 26 },
   error: { fontSize: 13.5, color: colors.danger, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
   btn: {
@@ -87,5 +87,5 @@ const s = StyleSheet.create({
     paddingVertical: 15, alignItems: 'center', justifyContent: 'center', ...shadow,
   },
   btnOff:  { opacity: 0.6 },
-  btnText: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
+  btnText: { color: '#fff', fontSize: 15.5, fontFamily: 'Inter_700Bold' },
 })

@@ -60,5 +60,5 @@ const s = StyleSheet.create({
   },
   img:           { width: '100%', height: '100%' },
   monogram:      { backgroundColor: colors.primary },
-  monogramText:  { color: '#FFFFFF', fontWeight: '800', letterSpacing: 0.5 },
+  monogramText:  { color: '#FFFFFF', fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
 })

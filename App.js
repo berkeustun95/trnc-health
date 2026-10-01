@@ -434,10 +434,10 @@ class BLErrorBoundary extends Component {
           </View>
         ) : (
         <View style={{ flex: 1, padding: 24, backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginBottom: 8 }}>Something went wrong</Text>
+          <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: '#1E293B', marginBottom: 8 }}>Something went wrong</Text>
           <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 24 }}>Please go back and try again.</Text>
           <TouchableOpacity onPress={() => this.setState({ hasError: false })} style={{ padding: 14, backgroundColor: '#0E7C7B', borderRadius: 12 }}>
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Go Back</Text>
+            <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold' }}>Go Back</Text>
           </TouchableOpacity>
         </View>
         )
