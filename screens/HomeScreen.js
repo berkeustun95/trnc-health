@@ -48,6 +48,9 @@ import ServicePanels, { FavouritePanel } from '../components/home/redesign/Servi
 import { SectionHeader, useTabBarFootprint } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
+// Facility-list redesign (S3) — renderFacilityList() only.
+import { ListCard, ContactBar, ErrorState, EmptyState, InlineAlert, IconButton, Button, FilterBar } from '../components/ui'
+import { category as CAT, type as TYPE, radii, elevation } from '../constants/theme'
 
 const TYPE_ICON_MAP = {
   pharmacy: { lib: 'ion', name: 'medkit' },
@@ -719,7 +722,9 @@ export default function HomeScreen({
   //   onExitFacilityList to hand an incomplete profile a READ-ONLY directory WITHOUT the
   //   hub. The hub carries a tile for every module, so if the V2 branch ever reached the
   //   gated path it would grant the whole app to a profile that has not been completed.
-  //   The flag must never appear anywhere near renderFacilityList().
+  //   HOME_V2_LIVE must never appear anywhere near renderFacilityList(). (REDESIGN does
+  //   appear inside it, since S3, and only RESTYLES the list: same shell, same gate props,
+  //   no new navigation — the hub is never reachable from the gated path.)
   //
   // ─── WHAT SLICE 1 DELIBERATELY DOES NOT RENDER ─────────────────────────────
   // The "Bugün ADA'da" live strip is Slice 2 and the "Sık kullandıkların" favourites row
@@ -1032,7 +1037,7 @@ export default function HomeScreen({
             clearButtonMode="while-editing"
           />
           {globalQuery.length > 0 && (
-            <TouchableOpacity onPress={() => { setGlobalQuery(''); setGlobalResults([]) }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClearSearch', lang)} onPress={() => { setGlobalQuery(''); setGlobalResults([]) }}>
               <Feather name="x" size={15} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
@@ -1105,6 +1110,186 @@ export default function HomeScreen({
         )
       : []
 
+    // ─── Redesign (S3) — the LIST only ──────────────────────────────────────────
+    // The gate's safety lives in the shell (BackButton / hideHeaderActions / no hub), which
+    // this branch does not touch: it renders inside the same shell, under the same header.
+    // Same data (`listed`), same filters with the same meaning, same handlers and URLs.
+    if (REDESIGN) {
+      const rosterOk = dutyRosterStatus === DUTY_FRESH
+      const rosterPartial = dutyRosterStatus === DUTY_PARTIAL
+      const filtered = !!(searchText || activeType || activeSpecialty)
+      return (
+        <View style={fr.sheet}>
+          <View style={fr.top}>
+            <Text style={fr.title} accessibilityRole="header">{t('medIntroTitle', lang)}</Text>
+            <Text style={fr.sub}>{t('medIntroSub', lang)}</Text>
+            <View style={fr.search}>
+              <Feather name="search" size={18} color={colors.textSecondary} />
+              <TextInput
+                style={fr.searchInput}
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholder={t('searchPlaceholder', lang)}
+                placeholderTextColor={colors.textSecondary}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
+              />
+              {searchText.length > 0 && (
+                <IconButton icon="close" iconSize={18} color={colors.textSecondary} onPress={() => setSearchText('')} accessibilityLabel={t('accomClear', lang)} />
+              )}
+            </View>
+          </View>
+
+          {/* The pharmacy chip NAVIGATES to the roster (never a selected look); open and
+              my-language stay on/off chips (2026-09-28). Type + specialty are the dropdowns. */}
+          <FilterBar>
+            <TouchableOpacity style={[fr.chip, openOnly && fr.chipOn]} onPress={() => setOpenOnly(v => !v)}
+              accessibilityRole="switch" accessibilityState={{ checked: openOnly }}>
+              <Feather name="clock" size={14} color={openOnly ? colors.primaryDark : colors.textSecondary} />
+              <Text style={[fr.chipText, openOnly && fr.chipTextOn]}>{t('open', lang)}</Text>
+            </TouchableOpacity>
+            <FilterDropdown
+              label={t('ddType', lang)}
+              lang={lang}
+              options={['clinic', 'hospital', 'dentist'].map(type => ({
+                value: type, label: t({ clinic: 'clinics', hospital: 'hospitals', dentist: 'dentists' }[type], lang),
+              }))}
+              value={activeType}
+              onChange={v => { setActiveType(v); setActiveSpecialty(null) }}
+            />
+            {specList.length > 0 && (
+              <FilterDropdown
+                label={t('ddSpecialty', lang)}
+                lang={lang}
+                options={specList.map(sp => ({ value: sp, label: t(sp, lang) }))}
+                value={activeSpecialty}
+                onChange={setActiveSpecialty}
+              />
+            )}
+            <TouchableOpacity style={[fr.chip, langFilter && fr.chipOn]} onPress={() => setLangFilter(v => !v)}
+              accessibilityRole="switch" accessibilityState={{ checked: langFilter }}>
+              <Ionicons name="language-outline" size={14} color={langFilter ? colors.primaryDark : colors.textSecondary} />
+              <Text style={[fr.chipText, langFilter && fr.chipTextOn]}>{t('myLang', lang)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={fr.chip} onPress={() => onShowDutyList?.()} accessibilityRole="button">
+              <Ionicons name="medkit-outline" size={14} color={colors.textSecondary} />
+              <Text style={fr.chipText}>{t('chipDutyPharmacies', lang)}</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </FilterBar>
+
+          <FlatList
+            {...listMem}
+            data={listed}
+            keyExtractor={item => item.id}
+            showsVerticalScrollIndicator={false}
+            style={{ flex: 1 }}
+            contentContainerStyle={fr.list}
+            keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={(
+              <>
+                {/* Same three titles / two subs as legacy. A roster that is not fresh must
+                    never read as healthy, so it gets the alert ink and border. */}
+                <TouchableOpacity
+                  style={[fr.duty, !rosterOk && fr.dutyAlert]}
+                  onPress={onShowDutyList}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                >
+                  <View style={[fr.dutyIcon, rosterOk && { backgroundColor: CAT.health.bg }]}>
+                    <Ionicons name={rosterOk ? 'medkit-outline' : 'alert-circle-outline'} size={20} color={CAT.health.ink} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[fr.dutyTitle, !rosterOk && { color: colors.dangerInk }]}>
+                      {t(rosterOk ? 'tonightDuty' : rosterPartial ? 'dutyBannerPartialTitle' : 'dutyBannerStaleTitle', lang)}
+                    </Text>
+                    <Text style={fr.dutySub}>{t(rosterOk ? 'allRegions' : 'dutyBannerStaleSub', lang)}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={rosterOk ? colors.textSecondary : colors.dangerInk} />
+                </TouchableOpacity>
+                {/* A failed refresh over rows we still hold: say so, keep the rows. */}
+                {facilityLoadError && facilities.length > 0 && (
+                  <View style={fr.inlineErr}>
+                    <InlineAlert message={t('facilityLoadError', lang)} />
+                    <Button variant="text" icon="refresh" title={t('uiRetry', lang)} onPress={onRetry} />
+                  </View>
+                )}
+                {locationDenied && <Text style={fr.note}>{t('enableLocation', lang)}</Text>}
+              </>
+            )}
+            ListEmptyComponent={facilityLoadError && facilities.length === 0 ? (
+              <ErrorState message={t('facilityLoadError', lang)} onRetry={onRetry} lang={lang} />
+            ) : (
+              <EmptyState
+                icon={filtered ? 'search-outline' : 'medical-outline'}
+                category="health"
+                title={t(filtered ? 'noResultsTitle' : 'noFacilitiesTitle', lang)}
+                message={t(filtered ? 'noResultsBody' : 'noFacilitiesBody', lang)}
+              />
+            )}
+            renderItem={({ item }) => {
+              const isOpen = parseIsOpen(item.opening_hours)
+              const isDuty = item.id === dutyFacilityId
+              const isFav  = favorites.has(item.id)
+              const rating = facilityRatings[item.id]
+              const spec = item.specialty?.length
+                ? (Array.isArray(item.specialty) ? item.specialty.map(sp => t(sp, lang)).join(' · ') : t(item.specialty, lang))
+                : null
+              const actions = [
+                item.phone ? {
+                  kind: 'call',
+                  onPress: () => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`),
+                  accessibilityLabel: `${t('call', lang)} ${item.phone}`,
+                } : null,
+                {
+                  kind: 'directions',
+                  onPress: () => Linking.openURL(
+                    item.latitude != null
+                      ? `https://maps.google.com/?q=${item.latitude},${item.longitude}`
+                      : item.address
+                        ? `https://maps.google.com/?q=${encodeURIComponent(item.address)}`
+                        : `https://maps.google.com/?q=${encodeURIComponent(item.name)}`
+                  ),
+                },
+              ].filter(Boolean)
+              // No "Bookable" badge: it was hardcoded English and claimed a booking flow
+              // that 20261003 removed. Verified stays — it is the admin-set flag.
+              return (
+                <ListCard
+                  title={item.name}
+                  subtitle={[t(item.type, lang), spec].filter(Boolean).join(' · ')}
+                  leading={item.cover_image_url ? { uri: item.cover_image_url }
+                    : item.logo_url ? { uri: item.logo_url }
+                    : { icon: TYPE_ION_R[item.type] || 'medical-outline', category: 'health' }}
+                  badge={isDuty ? t('onDuty', lang) : null}
+                  meta={[
+                    item._dist != null ? { icon: 'navigate-outline', text: `${item._dist.toFixed(1)} km` } : null,
+                    isOpen != null ? { icon: 'time-outline', text: t(isOpen ? 'open' : 'closed', lang), tone: isOpen ? 'ok' : 'warn' } : null,
+                    rating ? { icon: 'star', text: `${rating.avg} (${rating.count})` } : null,
+                    item.verified ? { icon: 'shield-checkmark', text: t('verified', lang), tone: 'ok' } : null,
+                    item.address ? { icon: 'location-outline', text: item.address } : null,
+                  ]}
+                  onPress={() => item.provider_id ? onSelectFacility(item) : onUnclaimedFacility(item)}
+                  lang={lang}
+                  style={fr.card}
+                >
+                  <View style={fr.actions}>
+                    <ContactBar actions={actions} lang={lang} style={{ flex: 1 }} />
+                    <IconButton
+                      icon={isFav ? 'heart' : 'heart-outline'}
+                      color={isFav ? colors.danger : colors.textSecondary}
+                      onPress={() => onToggleFavorite(item.id)}
+                      accessibilityLabel={t('favourites', lang)}
+                    />
+                  </View>
+                </ListCard>
+              )
+            }}
+          />
+        </View>
+      )
+    }
+
     return (
       <View style={{ flex: 1 }}>
         <MascotIntroCard
@@ -1125,7 +1310,7 @@ export default function HomeScreen({
             clearButtonMode="while-editing"
           />
           {searchText.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchText('')}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClearSearch', lang)} onPress={() => setSearchText('')}>
               <Feather name="x" size={15} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
@@ -1161,7 +1346,7 @@ export default function HomeScreen({
               </TouchableOpacity>
             )}
           </ScrollView>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiFilters', lang)} accessibilityState={{ expanded: !!showFilters }}
             style={[s.filterToggleBtn, showFilters && s.filterToggleBtnActive]}
             onPress={() => setShowFilters(v => !v)}
           >
@@ -1267,7 +1452,7 @@ export default function HomeScreen({
           )
         })()}
 
-        {facilityLoadError && (
+        {facilityLoadError && facilities.length > 0 && (
           <View style={s.errorRow}>
             <Text style={s.locationNote}>{t('facilityLoadError', lang)}</Text>
             <TouchableOpacity onPress={onRetry} style={s.retryBtn}>
@@ -1288,7 +1473,10 @@ export default function HomeScreen({
             <View style={s.emptyWrap}>
               <View style={s.emptyBlurBubble}>
                 <BlurView intensity={85} tint="light" style={StyleSheet.absoluteFill} />
-                {searchText || activeType || activeSpecialty ? (
+                {/* A failed load is never "no facilities" — say it failed and offer retry. */}
+                {facilityLoadError && facilities.length === 0 ? (
+                  <ErrorState message={t('facilityLoadError', lang)} onRetry={onRetry} lang={lang} style={{ paddingVertical: 0 }} />
+                ) : searchText || activeType || activeSpecialty ? (
                   <>
                     <Ionicons name="search-outline" size={44} color={colors.border} style={{ marginBottom: 16 }} />
                     <Text style={s.emptyTitle}>{t('noResultsTitle', lang)}</Text>
@@ -1411,7 +1599,7 @@ export default function HomeScreen({
                       ) : null}
                     </View>
                     <View style={s.cardActions}>
-                      <TouchableOpacity onPress={() => onToggleFavorite(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t(isFav ? 'uiFavRemove' : 'uiFavAdd', lang)} onPress={() => onToggleFavorite(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? colors.danger : colors.border} />
                       </TouchableOpacity>
                       <Ionicons name="chevron-forward" size={16} color={colors.border} />
@@ -1442,8 +1630,9 @@ export default function HomeScreen({
   // ⚠ THE BRANCH IS ON THE HUB ONLY. `showFacilityList` keeps the ImageBackground in
   //   BOTH flag states, so the profile gate's read-only directory — which is what that
   //   mode renders — is byte-identical to today whatever HOME_V2_LIVE says.
-  // The redesign replaces the HUB only. Facility-list mode — the profile gate's read-only
-  // directory — renders exactly today's tree whatever REDESIGN says.
+  // The redesign replaces the HUB here. Facility-list mode — the profile gate's read-only
+  // directory — keeps its shell (header, back, hideHeaderActions) in both states; since S3
+  // REDESIGN restyles the list INSIDE renderFacilityList() and adds no navigation.
   if (REDESIGN && !showFacilityList) {
     return <View style={s.rCanvas}>{renderHubRedesign()}</View>
   }
@@ -1501,7 +1690,7 @@ export default function HomeScreen({
                   <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
                   {notifications.some(n => !n.read) && <View style={s.notifDot} />}
                 </TouchableOpacity>
-                <TouchableOpacity ref={hamburgerRef} style={s.hamburgerBtn} onPress={onOpenMenu}>
+                <TouchableOpacity ref={hamburgerRef} style={s.hamburgerBtn} onPress={onOpenMenu} accessibilityRole="button" accessibilityLabel={t('uiMenu', lang)}>
                   <Feather name="menu" size={20} color={colors.textPrimary} />
                 </TouchableOpacity>
               </View>
@@ -1712,4 +1901,35 @@ const s = StyleSheet.create({
   emptyIcon:        { fontSize: 48, marginBottom: 16 },
   emptyTitle:       { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
   emptyBody:        { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 21 },
+})
+
+// Facility-list redesign (renderFacilityList only).
+const TYPE_ION_R = { pharmacy: 'medkit-outline', clinic: 'medical-outline', hospital: 'business-outline', dentist: 'medical-outline' }
+const fr = StyleSheet.create({
+  // A canvas sheet under the shell's header. The negative margin cancels the shell's 16pt
+  // container padding so the sheet runs edge to edge; the cards bring their own gutter.
+  sheet:      { flex: 1, marginHorizontal: -16, backgroundColor: colors.canvas, borderTopLeftRadius: radii.sheet,
+                borderTopRightRadius: radii.sheet, overflow: 'hidden' },
+  top:        { flexShrink: 0, paddingHorizontal: 16, paddingTop: 20 },
+  title:      { ...TYPE.pageTitle, color: colors.textPrimary },
+  sub:        { ...TYPE.body, color: colors.textSecondary, marginTop: 2 },
+  search:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, minHeight: 48, paddingLeft: 14, paddingRight: 2,
+                backgroundColor: colors.card, borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder },
+  searchInput:{ flex: 1, ...TYPE.body, color: colors.textPrimary, paddingVertical: 10 },
+  chip:       { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: radii.pill,
+                borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: colors.card },
+  chipOn:     { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  chipText:   { ...TYPE.small, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
+  chipTextOn: { color: colors.primaryDark },
+  list:       { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
+  duty:       { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, padding: 14, marginBottom: 12,
+                backgroundColor: colors.card, borderRadius: radii.card, ...elevation.card },
+  dutyAlert:  { backgroundColor: CAT.health.bg, borderWidth: 1, borderColor: colors.dangerInk },
+  dutyIcon:   { width: 40, height: 40, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card },
+  dutyTitle:  { ...TYPE.rowTitle, color: colors.textPrimary },
+  dutySub:    { ...TYPE.small, color: colors.textSecondary },
+  inlineErr:  { marginBottom: 12, alignItems: 'flex-start' },
+  note:       { ...TYPE.small, color: colors.textSecondary, textAlign: 'center', marginBottom: 12 },
+  card:       { marginBottom: 10 },
+  actions:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
 })

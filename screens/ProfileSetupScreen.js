@@ -1111,36 +1111,36 @@ export default function ProfileSetupScreen({
         </View>
       </KeyboardAwareForm>
 
-      <SearchModal visible={picker === 'day'} title={t('pgDay', lang)} options={dayOptions}
+      <SearchModal lang={lang} visible={picker === 'day'} title={t('pgDay', lang)} options={dayOptions}
         value={dobD} onSelect={v => { setDobD(v); setPicker(null) }} onClose={() => setPicker(null)} />
-      <SearchModal visible={picker === 'month'} title={t('pgMonth', lang)} options={monthOptions}
+      <SearchModal lang={lang} visible={picker === 'month'} title={t('pgMonth', lang)} options={monthOptions}
         value={dobM} onSelect={v => { setDobM(v); setPicker(null) }} onClose={() => setPicker(null)} />
-      <SearchModal visible={picker === 'year'} title={t('pgYear', lang)} options={yearOptions}
+      <SearchModal lang={lang} visible={picker === 'year'} title={t('pgYear', lang)} options={yearOptions}
         value={dobY} onSelect={v => { setDobY(v); setPicker(null) }} onClose={() => setPicker(null)} />
-      <SearchModal visible={picker === 'nat'} searchable title={t('pgNationality', lang)}
+      <SearchModal lang={lang} visible={picker === 'nat'} searchable title={t('pgNationality', lang)}
         searchPlaceholder={t('pgNationalitySearch', lang)} options={natOptions}
         value={nationality} onSelect={v => { setNationality(v); setPicker(null) }} onClose={() => setPicker(null)} />
-      <SearchModal visible={picker === 'cc'} searchable title={t('pgPhoneCountry', lang)}
+      <SearchModal lang={lang} visible={picker === 'cc'} searchable title={t('pgPhoneCountry', lang)}
         searchPlaceholder={t('pgNationalitySearch', lang)} options={ccOptions}
         value={cc} onSelect={v => { setCc(v); setPicker(null) }} onClose={() => setPicker(null)} />
-      <SearchModal visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
+      <SearchModal lang={lang} visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
         searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
         value={institution} onSelect={v => { setInstitution(v); setPicker(null) }} onClose={() => setPicker(null)} />
-      <SearchModal visible={picker === 'subject'} searchable title={t('pgSubject', lang)}
+      <SearchModal lang={lang} visible={picker === 'subject'} searchable title={t('pgSubject', lang)}
         searchPlaceholder={t('pgSubjectSearch', lang)} options={subjectOpts}
         value={subjectId} onSelect={v => { setSubjectId(v); setPicker(null) }} onClose={() => setPicker(null)} />
-      <SearchModal visible={picker === 'startYear'} title={t('pgStudyStart', lang)} options={startYearOptions}
+      <SearchModal lang={lang} visible={picker === 'startYear'} title={t('pgStudyStart', lang)} options={startYearOptions}
         value={startYear}
         onSelect={v => { setStartYear(v); if (endYear != null && endYear < v) setEndYear(null); setPicker(null) }}
         onClose={() => setPicker(null)} />
-      <SearchModal visible={picker === 'endYear'} title={t('pgStudyEnd', lang)} options={endYearOptions}
+      <SearchModal lang={lang} visible={picker === 'endYear'} title={t('pgStudyEnd', lang)} options={endYearOptions}
         value={endYear} onSelect={v => { setEndYear(v); setPicker(null) }} onClose={() => setPicker(null)} />
       {/* Nothing here is re-read from `profile` on a language change, so every value the
           user has typed survives it: the fields are component state, the screen is not
           remounted (same type, same slot in App.js's content chain), and the one effect
           that repopulates from the row keys on profile?.phone — a value a language write
           does not touch. */}
-      <SearchModal visible={picker === 'lang'} title={t('menuLanguage', lang)} options={langOptions}
+      <SearchModal lang={lang} visible={picker === 'lang'} title={t('menuLanguage', lang)} options={langOptions}
         value={lang} onSelect={v => { setPicker(null); onLangChange?.(v) }} onClose={() => setPicker(null)} />
 
       <Modal visible={helpOpen} animationType="slide" transparent onRequestClose={() => setHelpOpen(false)}>
@@ -1148,7 +1148,7 @@ export default function ProfileSetupScreen({
           <View style={s.helpCard}>
             <View style={s.modalHeader}>
               <Text style={s.modalTitle}>{t('pgHelpTitle', lang)}</Text>
-              <TouchableOpacity onPress={() => setHelpOpen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} onPress={() => setHelpOpen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Feather name="x" size={20} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>

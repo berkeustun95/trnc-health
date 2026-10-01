@@ -5,9 +5,11 @@ import ContentReportMenu from '../components/ContentReportMenu'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
-import { colors, shadow } from '../constants/theme'
+import { colors, shadow, type, radii, elevation } from '../constants/theme'
 import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
+import { REDESIGN } from '../constants/redesign'
+import { ScreenHeader, ErrorState, EmptyState, CardSkeleton } from '../components/ui'
 
 const PAGE = 20
 
@@ -43,13 +45,36 @@ function ReviewCard({ item, lang, onBlocked, onRequireAccount }) {
   )
 }
 
-export default function ReviewsScreen({ facility, lang = 'English', onBack, onRequireAccount }) {
+// Redesign card. No "Verified visit" line: since 20261004 a review needs no appointment,
+// so nothing about a visit is verified — the claim was false.
+function ReviewCardRedesign({ item, lang, onBlocked, onRequireAccount }) {
+  const date = new Date(item.created_at).toLocaleDateString([], { dateStyle: 'medium' })
+  return (
+    <View style={r.card}>
+      <View style={r.top}>
+        <Text style={r.stars} accessibilityLabel={`${item.rating}/5`}>
+          {'★'.repeat(item.rating)}{'☆'.repeat(5 - item.rating)}
+        </Text>
+        <View style={r.topRight}>
+          <Text style={r.date}>{date}</Text>
+          <ContentReportMenu contentType="review" contentId={item.id} lang={lang} onBlocked={onBlocked} onRequireAccount={onRequireAccount} />
+        </View>
+      </View>
+      {item.comment ? <Text style={r.comment}>{item.comment}</Text> : null}
+    </View>
+  )
+}
+
+// `average` is the profile's all-ratings average. The redesign shows that one number rather
+// than re-deriving one from the loaded page, which disagrees with the profile past PAGE reviews.
+export default function ReviewsScreen({ facility, lang = 'English', onBack, onRequireAccount, average = null }) {
   const [reviews, setReviews]     = useState([])
   const [loading, setLoading]     = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [total, setTotal]         = useState(0)
   const [page, setPage]           = useState(0)
   const [done, setDone]           = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   const dist = [0, 0, 0, 0, 0]
   for (const r of reviews) dist[r.rating - 1]++
@@ -59,12 +84,13 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack, onRe
     if (pageNum === 0) setLoading(true); else setLoadingMore(true)
     const from = pageNum * PAGE
     const to = from + PAGE - 1
-    const { data, count } = await supabase
+    const { data, count, error } = await supabase
       .from('reviews')
       .select('id, rating, comment, created_at', { count: 'exact' })
       .eq('facility_id', facility.id)
       .order('created_at', { ascending: false })
       .range(from, to)
+    if (pageNum === 0) setLoadError(!!error)
     if (data) {
       setReviews(prev => pageNum === 0 ? data : [...prev, ...data])
       setTotal(count ?? 0)
@@ -83,11 +109,65 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack, onRe
     load(0)
   }
 
+  function retry() {
+    setPage(0)
+    setDone(false)
+    load(0)
+  }
+
   function loadMore() {
     if (loadingMore || done) return
     const next = page + 1
     setPage(next)
     load(next)
+  }
+
+  if (REDESIGN) {
+    // Distribution bars only once every review is loaded: bars over a partial page describe
+    // the newest 20, not the facility.
+    const complete = reviews.length >= total
+    return (
+      <SafeAreaView style={r.safe} edges={['top', 'bottom']}>
+        <ScreenHeader onBack={onBack} title={facility.name} subtitle={t('tabReviews', lang)} lang={lang} />
+        {loading ? (
+          <View style={r.list}>
+            {[0, 1, 2].map(i => <CardSkeleton key={i} height={96} style={{ marginBottom: 10 }} />)}
+          </View>
+        ) : loadError ? (
+          <ErrorState onRetry={retry} lang={lang} />
+        ) : (
+          <FlatList
+            data={reviews}
+            keyExtractor={x => x.id}
+            contentContainerStyle={r.list}
+            showsVerticalScrollIndicator={false}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.3}
+            ListHeaderComponent={reviews.length > 0 ? (
+              <View style={r.summary}>
+                {average != null && (
+                  <View style={r.summaryLeft}>
+                    <Text style={r.avgNum}>{average}</Text>
+                    <Text style={r.avgStars}>{'★'.repeat(Math.round(parseFloat(average)))}{'☆'.repeat(5 - Math.round(parseFloat(average)))}</Text>
+                  </View>
+                )}
+                <View style={r.summaryRight}>
+                  <Text style={r.count}>{t('reviewCountLabel', lang).replace('{n}', total)}</Text>
+                  {complete && [5, 4, 3, 2, 1].map(star => (
+                    <StarBar key={star} star={star} count={dist[star - 1]} total={reviews.length} />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+            ListEmptyComponent={(
+              <EmptyState icon="star-outline" category="health" title={t('noReviews', lang)} message={t('firstReviewPrompt', lang)} />
+            )}
+            renderItem={({ item }) => <ReviewCardRedesign item={item} lang={lang} onBlocked={handleBlocked} onRequireAccount={onRequireAccount} />}
+            ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} /> : null}
+          />
+        )}
+      </SafeAreaView>
+    )
   }
 
   return (
@@ -100,6 +180,8 @@ export default function ReviewsScreen({ facility, lang = 'English', onBack, onRe
         <View style={s.list}>
           {[0, 1, 2, 3].map(i => <ReviewSkeleton key={i} />)}
         </View>
+      ) : loadError ? (
+        <ErrorState onRetry={retry} lang={lang} />
       ) : (
         <FlatList
           data={reviews}
@@ -178,4 +260,21 @@ const s = StyleSheet.create({
   emptyWrap:     { alignItems: 'center', paddingTop: 40, paddingHorizontal: 32 },
   emptyTitle:    { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
   empty:         { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
+})
+
+const r = StyleSheet.create({
+  safe:        { flex: 1, backgroundColor: colors.canvas },
+  list:        { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
+  summary:     { backgroundColor: colors.card, borderRadius: radii.card, padding: 16, flexDirection: 'row', gap: 16, marginBottom: 16, ...elevation.card },
+  summaryLeft: { alignItems: 'center', justifyContent: 'center', minWidth: 64 },
+  avgNum:      { ...type.display, color: colors.textPrimary },
+  avgStars:    { fontSize: 13, color: '#F5A623', letterSpacing: 1, marginTop: 2 },
+  summaryRight:{ flex: 1, justifyContent: 'center', gap: 5 },
+  count:       { ...type.meta, color: colors.textSecondary },
+  card:        { backgroundColor: colors.card, borderRadius: radii.card, padding: 14, marginBottom: 10, ...elevation.card },
+  top:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  topRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stars:       { fontSize: 15, color: '#F5A623', letterSpacing: 1 },
+  date:        { ...type.meta, color: colors.textSecondary },
+  comment:     { ...type.body, color: colors.textPrimary },
 })

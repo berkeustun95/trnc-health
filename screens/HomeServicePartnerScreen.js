@@ -10,6 +10,9 @@ import { hsCategory, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
 import { partnerWaMessage, partnerGallery } from '../constants/partners'
 import { partnerLogo, partnerAsset } from '../constants/partnerAssets'
 import { logContactEvent } from '../utils/logContactEvent'
+import { REDESIGN } from '../constants/redesign'
+import { colors as C, type } from '../constants/theme'
+import { ScreenHeader as UiHeader, ContactBar } from '../components/ui'
 
 // The partner detail screen. Structure mirrors TowingDetailScreen — navbar, hero, a stack
 // of bordered blocks, a fixed contact bar — because that is the shape this app already
@@ -45,8 +48,8 @@ const projectAspect = p =>
 
 function Block({ title, children }) {
   return (
-    <View style={s.block}>
-      <Text style={s.blockTitle}>{title}</Text>
+    <View style={st.block}>
+      <Text style={st.blockTitle}>{title}</Text>
       {children}
     </View>
   )
@@ -114,12 +117,16 @@ export default function HomeServicePartnerScreen({
   }
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.navbar}>
-        <BackButton lang={lang} onPress={onBack} />
-        <Text style={s.navTitle} numberOfLines={1}>{row.name}</Text>
-        <View style={s.navSpacer} />
-      </View>
+    <SafeAreaView style={st.safe} edges={['top']}>
+      {REDESIGN ? (
+        <UiHeader onBack={onBack} title={row.name} lang={lang} />
+      ) : (
+        <View style={s.navbar}>
+          <BackButton lang={lang} onPress={onBack} />
+          <Text style={s.navTitle} numberOfLines={1}>{row.name}</Text>
+          <View style={s.navSpacer} />
+        </View>
+      )}
 
       {/* 120 clears the absolute contact bar — the same figure TowingDetailScreen and
           PropertyDetailScreen use for their identical bars. */}
@@ -257,6 +264,21 @@ export default function HomeServicePartnerScreen({
         </Block>
       </ScrollView>
 
+      {REDESIGN ? (
+        // Same two buttons, same order (WhatsApp, then Ara), same labels, same handlers and
+        // therefore the same wa.me / tel: URLs — only the button shape is the kit's.
+        <View style={[r.contactBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <ContactBar
+            lang={lang}
+            actions={[
+              // #25D366 kept: TadilArt is a partner and the button colour is part of the agreed look —
+              // the darker WhatsApp green is a proposal in the report, not a build.
+              waNum ? { kind: 'whatsapp', label: t('hsWhatsApp', lang), onPress: openWhatsApp, bg: '#25D366' } : null,
+              phone ? { kind: 'call', label: t('hsCall', lang), onPress: call } : null,
+            ]}
+          />
+        </View>
+      ) : (
       <View style={[s.contactBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {!!waNum && (
           <TouchableOpacity style={s.waBtn} onPress={openWhatsApp} activeOpacity={0.85}>
@@ -271,6 +293,7 @@ export default function HomeServicePartnerScreen({
           </TouchableOpacity>
         )}
       </View>
+      )}
     </SafeAreaView>
   )
 }
@@ -355,3 +378,14 @@ const s = StyleSheet.create({
                   gap: 8, backgroundColor: colors.primary, paddingVertical: 13, borderRadius: radius.sm },
   barBtnText:   { color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_700Bold' },
 })
+
+// Redesign: page canvas, kit header and bar, Inter section titles. Nothing about the partner
+// (logo strip, badge, gallery, copy, order) is restyled here.
+const r = StyleSheet.create({
+  safe:       { flex: 1, backgroundColor: C.canvas },
+  block:      { paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.divider },
+  blockTitle: { ...type.rowTitle, color: C.textPrimary, marginBottom: 10 },
+  contactBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 10,
+                backgroundColor: C.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.divider },
+})
+const st = REDESIGN ? { ...s, ...r } : s

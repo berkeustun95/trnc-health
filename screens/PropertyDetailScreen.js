@@ -6,7 +6,9 @@ import {
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, shadow } from '../constants/theme'
+import { colors, shadow, category as CAT, type, radii, elevation, TAP } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
+import { IconButton, InfoRow, ContactBar, Button } from '../components/ui'
 import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { areaName } from '../constants/areas'
@@ -159,6 +161,18 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
   const whatsapp = agency?.contact_whatsapp
   function call()     { if (phone)    Linking.openURL(`tel:${phone}`) }
   function whatsApp() { if (whatsapp) Linking.openURL(`https://wa.me/${whatsapp.replace(/\D/g, '')}`) }
+
+  // ONE mount point in this file (check-ad-placement counts them); both paths render it.
+  const adSlot = <AccommodationDetailBottomSlot lang={lang} onNavigate={onAdNavigate} />
+
+  if (REDESIGN) {
+    return (
+      <PropertyDetailRedesign prop={prop} lang={lang} onBack={onBack} adSlot={adSlot}
+        images={images} agency={agency} isRent={isRent} place={place} rooms={rooms} floorText={floorText}
+        phone={phone} whatsapp={whatsapp} call={call} whatsApp={whatsApp} openMap={openMap}
+        translateDescription={translateDescription} />
+    )
+  }
 
   return (
     <SafeAreaView style={ds.safe} edges={['top']}>
@@ -320,7 +334,7 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
                 lands above that reserve and clears the fixed contact bar on its own. The
                 comment on CONTACT_BAR_BASE records that a fixed constant was got wrong
                 here once; the safest change to it is none. */}
-          <AccommodationDetailBottomSlot lang={lang} onNavigate={onAdNavigate} />
+          {adSlot}
         </View>
       </ScrollView>
 
@@ -410,6 +424,229 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
     </SafeAreaView>
   )
 }
+
+// ─── REDESIGN (S4) ──────────────────────────────────────────────────────────
+// DetailScaffold's shape — photo ground, white sheet rising over it, category tag, sticky
+// action bar — composed here rather than through DetailScaffold, because the scaffold takes ONE
+// image and a listing's whole point is its gallery (median 8 photos). Same facts, same
+// handlers, same URLs as the legacy body above; only the look changes.
+function PropertyDetailRedesign({
+  prop, lang, onBack, adSlot, images, agency, isRent, place, rooms, floorText,
+  phone, whatsapp, call, whatsApp, openMap, translateDescription,
+}) {
+  const insets = useSafeAreaInsets()
+  const [imgIdx, setImgIdx] = useState(0)
+  const c = CAT.homeLife
+  const hasCoords = prop.latitude != null && prop.longitude != null
+  const actions = [
+    phone && { kind: 'call', label: t('accomCall', lang), onPress: call },
+    whatsapp && { kind: 'whatsapp', label: t('accomWhatsApp', lang), onPress: whatsApp },
+  ].filter(Boolean)
+  const facts = [
+    [t('accomRooms', lang), rooms],
+    [t('accomBaths', lang), prop.bathrooms != null ? String(prop.bathrooms) : null],
+    [t('accomEnsuite', lang), prop.ensuite_count != null ? String(prop.ensuite_count) : null],
+    [t('accomGrossArea', lang), prop.area_sqm != null ? `${prop.area_sqm} m²` : null],
+    [t('accomNetArea', lang), prop.net_area_sqm != null ? `${prop.net_area_sqm} m²` : null],
+    [t('accomPlot', lang), prop.plot_sqm != null ? `${Number(prop.plot_sqm).toLocaleString('en-GB')} m²` : null],
+    [t('accomFloor', lang), floorText],
+    [t('accomBuildingAge', lang), prop.building_age_band],
+    [t('accomDeedType', lang), prop.deed_type ? (DEED_LABEL[prop.deed_type] || prop.deed_type) : null],
+    [t('accomGated', lang), prop.gated_community != null ? (prop.gated_community ? t('accomYes', lang) : t('accomNo', lang)) : null],
+    [t('accomSwap', lang), prop.swap_available],
+    [t('accomFilterFurnished', lang), prop.furnished != null ? (prop.furnished ? t('accomFurnished', lang) : t('accomUnfurnished', lang)) : null],
+    isRent && [t('accomDeposit', lang), prop.deposit != null ? priceDisplay(prop.deposit, prop.deposit_currency || prop.currency, null, lang) : null],
+    isRent && [t('accomMinTerm', lang), prop.min_term_months != null ? `${prop.min_term_months} ${t('accomMonths', lang)}` : null],
+    isRent && [t('accomBills', lang), prop.bills_included],
+  ].filter(f => f && f[1] !== null && f[1] !== undefined && f[1] !== '')
+
+  // The agency row (logo or name) sits on top of the sticky bar, as in the legacy bar.
+  const barH = 10 + LOGO_H + 10 + TAP + 10
+  return (
+    <SafeAreaView style={rs.root} edges={['top']}>
+      {/* The overlays below are positioned against this View, not the SafeAreaView, so the
+          back button sits 8pt under whatever top inset the host applied. */}
+      <View style={{ flex: 1 }}>
+      <ScrollView showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: barH + Math.max(insets.bottom, 12) + 16 }}>
+        {images.length > 0 ? (
+          <View>
+            <FlatList
+              data={images} horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+              keyExtractor={i => i.id}
+              onMomentumScrollEnd={e => setImgIdx(Math.round(e.nativeEvent.contentOffset.x / W))}
+              renderItem={({ item }) => (
+                <Image source={{ uri: item.url }} style={ds.galleryImg} resizeMode="cover" accessibilityIgnoresInvertColors />
+              )}
+            />
+            {images.length > 1 && (
+              <View pointerEvents="none" style={rs.counter}>
+                <Ionicons name="images-outline" size={12} color="#fff" />
+                <Text style={rs.counterText}>{imgIdx + 1} / {images.length}</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={[rs.ground, { backgroundColor: c.bg }]}>
+            <Ionicons name="home-outline" size={64} color={c.ink} />
+          </View>
+        )}
+
+        <View style={rs.sheet}>
+          <View style={rs.tagRow}>
+            <View style={[rs.tag, { backgroundColor: c.bg }]}>
+              <Ionicons name="home-outline" size={13} color={c.ink} />
+              <Text style={[rs.tagText, { color: c.ink }]} numberOfLines={1}>{typeLabel(prop.property_type, lang)}</Text>
+            </View>
+            <View style={[rs.tag, { backgroundColor: colors.primaryLight }]}>
+              <Text style={[rs.tagText, { color: colors.primaryDark }]} numberOfLines={1}>{intentLabel(prop.intent, lang)}</Text>
+            </View>
+          </View>
+          <Text style={rs.title} accessibilityRole="header">{prop.title}</Text>
+          <Text style={rs.price}>{priceDisplay(prop.price, prop.currency, prop.price_period, lang)}</Text>
+
+          <View style={rs.rows}>
+            <InfoRow icon="location-outline" category="homeLife" label={t('accomFilterArea', lang)} value={place}
+              onPress={hasCoords ? openMap : undefined} />
+            <InfoRow icon="business-outline" category="homeLife" label={null} value={prop.development_name} />
+            <InfoRow icon="pricetag-outline" category="homeLife" label={t('accomRefNo', lang)}
+              value={prop.external_id != null ? String(prop.external_id) : null} divider={false} />
+          </View>
+
+          {facts.length > 0 && (
+            <>
+              <Text style={rs.section}>{t('accomKeyFacts', lang)}</Text>
+              <View style={rs.factGrid}>
+                {facts.map(([label, value]) => (
+                  <View key={label} style={rs.fact}>
+                    <Text style={rs.factLabel}>{label}</Text>
+                    <Text style={rs.factValue}>{value}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          {!!prop.description && (
+            <>
+              <View style={rs.descHead}>
+                <Text style={[rs.section, { marginBottom: 0 }]}>{t('accomDescription', lang)}</Text>
+                <TouchableOpacity style={rs.translateBtn} onPress={translateDescription} activeOpacity={0.7}
+                  accessibilityRole="button">
+                  <Ionicons name="language-outline" size={15} color={colors.primaryDark} />
+                  <Text style={rs.translateText}>{t('accomTranslate', lang)}</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={rs.description}>{prop.description}</Text>
+              <Text style={rs.note}>{t('accomTranslateNote', lang)}</Text>
+            </>
+          )}
+
+          {Array.isArray(prop.amenities) && prop.amenities.length > 0 && (
+            <>
+              <Text style={rs.section}>{t('accomFeatures', lang)}</Text>
+              <View style={rs.amenityWrap}>
+                {prop.amenities.map(a => (
+                  <View key={a} style={rs.amenityChip}>
+                    <Ionicons name="checkmark" size={13} color={c.ink} />
+                    <Text style={rs.amenityText}>{amenityLabel(a)}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          {/* Map honesty — the same three states as the legacy body. */}
+          {hasCoords ? (
+            <>
+              <Text style={rs.section}>{t('accomFilterArea', lang)}</Text>
+              {prop.location_precision === 'area' && (
+                <View style={rs.approxBox}>
+                  <Ionicons name="information-circle-outline" size={18} color={c.ink} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={rs.approxTitle}>{t('accomApproxArea', lang)}</Text>
+                    <Text style={rs.approxSub}>{t('accomApproxAreaSub', lang)}</Text>
+                  </View>
+                </View>
+              )}
+              <Button variant="secondary" icon="map-outline" title={t('accomViewOnMap', lang)} onPress={openMap}
+                style={{ marginTop: 12 }} />
+            </>
+          ) : !!place && (
+            <>
+              <Text style={rs.section}>{t('accomFilterArea', lang)}</Text>
+              <View style={rs.approxBox}>
+                <Ionicons name="information-circle-outline" size={18} color={c.ink} />
+                <View style={{ flex: 1 }}>
+                  <Text style={rs.approxTitle}>{place}</Text>
+                  <Text style={rs.approxSub}>{t('accomApproxAreaSub', lang)}</Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          <View style={{ height: 20 }} />
+          {adSlot}
+        </View>
+      </ScrollView>
+
+      <View style={rs.topBar} pointerEvents="box-none">
+        <IconButton icon="chevron-back" variant="frosted" onPress={onBack} accessibilityLabel={t('back', lang)} />
+      </View>
+
+      {/* Sticky bar: the agency (never a person — see the legacy bar's note), then Ara /
+          WhatsApp with the same handlers and URLs. */}
+      <View style={[rs.sticky, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        {agency?.logo_url ? (
+          <Image source={{ uri: agency.logo_url }} style={ds.contactLogo} resizeMode="contain"
+            accessibilityLabel={agency?.name ?? ''} />
+        ) : (
+          <Text style={rs.agencyName} numberOfLines={1}>{agency?.name || '—'}</Text>
+        )}
+        <ContactBar actions={actions} lang={lang} />
+      </View>
+      </View>
+    </SafeAreaView>
+  )
+}
+
+const rs = StyleSheet.create({
+  root:        { flex: 1, backgroundColor: colors.canvas },
+  ground:      { width: W, height: GALLERY_H, alignItems: 'center', justifyContent: 'center' },
+  counter:     { position: 'absolute', bottom: 40, right: 14, flexDirection: 'row', alignItems: 'center', gap: 4,
+                 paddingHorizontal: 9, paddingVertical: 4, borderRadius: radii.pill, backgroundColor: 'rgba(0,0,0,0.6)' },
+  counterText: { ...type.meta, fontFamily: 'Inter_700Bold', color: '#fff' },
+  sheet:       { marginTop: -28, backgroundColor: colors.card, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet,
+                 paddingHorizontal: 20, paddingTop: 20, minHeight: 300 },
+  tagRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  tag:         { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  tagText:     { ...type.meta, fontFamily: 'Inter_700Bold' },
+  title:       { ...type.detailTitle, color: colors.textPrimary },
+  price:       { ...type.sectionHeading, fontSize: 22, lineHeight: 28, color: colors.primaryDark, marginTop: 6 },
+  rows:        { marginTop: 12 },
+  section:     { ...type.sectionHeading, color: colors.textPrimary, marginTop: 24, marginBottom: 10 },
+  factGrid:    { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.soft, borderRadius: radii.tile, padding: 6 },
+  fact:        { width: '50%', paddingVertical: 8, paddingHorizontal: 8 },
+  factLabel:   { ...type.meta, color: colors.textSecondary },
+  factValue:   { ...type.rowTitle, color: colors.textPrimary, marginTop: 2 },
+  descHead:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 10 },
+  translateBtn:{ flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: TAP, paddingHorizontal: 12, borderRadius: radii.pill,
+                 backgroundColor: colors.primaryLight },
+  translateText:{ ...type.small, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
+  description: { ...type.body, fontSize: 15, lineHeight: 23, color: colors.textPrimary },
+  note:        { ...type.meta, color: colors.textSecondary, marginTop: 10, fontStyle: 'italic' },
+  amenityWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  amenityChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radii.pill,
+                 backgroundColor: colors.soft },
+  amenityText: { ...type.small, color: colors.textPrimary },
+  approxBox:   { flexDirection: 'row', gap: 10, alignItems: 'flex-start', padding: 14, borderRadius: radii.tile, backgroundColor: CAT.homeLife.bg },
+  approxTitle: { ...type.body, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
+  approxSub:   { ...type.meta, color: colors.textSecondary, marginTop: 2 },
+  topBar:      { position: 'absolute', top: 8, left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between' },
+  sticky:      { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.card, paddingHorizontal: 16, paddingTop: 10,
+                 gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, ...elevation.floating },
+  agencyName:  { ...type.rowTitle, color: colors.textPrimary },
+})
 
 const ds = StyleSheet.create({
   safe:               { flex: 1, backgroundColor: colors.bg },

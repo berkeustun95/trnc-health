@@ -118,7 +118,7 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
                 : null
               }
             </View>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)}
               onPress={() => setSelectedPin(null)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >

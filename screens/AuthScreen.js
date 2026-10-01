@@ -340,7 +340,7 @@ export default function AuthScreen({ lang: initialLang = 'English', onLangChange
                 value={password}
                 onChangeText={setPassword}
               />
-              <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={styles.eyeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t(showPassword ? 'uiHidePassword' : 'uiShowPassword', lang)} onPress={() => setShowPassword(v => !v)} style={styles.eyeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>

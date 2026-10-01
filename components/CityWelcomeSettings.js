@@ -76,6 +76,7 @@ export default function CityWelcomeSettings({ visible, lang, onClose }) {
               onPress={onClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityRole="button"
+              accessibilityLabel={t('uiClose', lang)}
             >
               <Feather name="x" size={20} color={colors.textSecondary} />
             </TouchableOpacity>

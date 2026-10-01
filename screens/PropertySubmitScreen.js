@@ -347,7 +347,7 @@ export default function PropertySubmitScreen({ session, lang, property: editProp
               {photos.map((ph, i) => (
                 <View key={ph.id || i} style={ps.photoThumb}>
                   <Image source={{ uri: ph.url }} style={ps.photoThumbImg} resizeMode="cover" />
-                  <TouchableOpacity style={ps.photoRemoveBtn} onPress={() => removePhoto(ph)}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiRemove', lang)} style={ps.photoRemoveBtn} onPress={() => removePhoto(ph)}>
                     <Feather name="x" size={14} color="#fff" />
                   </TouchableOpacity>
                 </View>

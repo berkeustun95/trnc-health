@@ -301,7 +301,7 @@ export default function OliGuide({ lang, onNavigate, onOpenChange, closeRef, ope
         <Animated.View style={[s.sheet, { paddingTop: insets.top + 8, transform: [{ translateY }] }]}>
           <View {...pan.panHandlers}>
             <View style={s.grabber} />
-            <TouchableOpacity style={s.closeBtn} onPress={closeSheet} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity style={s.closeBtn} onPress={closeSheet} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
               <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
 
@@ -362,7 +362,7 @@ export default function OliGuide({ lang, onNavigate, onOpenChange, closeRef, ope
               returnKeyType="search"
               onSubmitEditing={handleSubmit}
             />
-            <TouchableOpacity style={s.sendBtn} activeOpacity={0.85} onPress={handleSubmit}>
+            <TouchableOpacity style={s.sendBtn} activeOpacity={0.85} onPress={handleSubmit} accessibilityRole="button" accessibilityLabel={t('send', lang)}>
               <Ionicons name="arrow-up" size={20} color="#fff" />
             </TouchableOpacity>
           </Animated.View>

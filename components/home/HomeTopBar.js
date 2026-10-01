@@ -143,7 +143,7 @@ export default function HomeTopBar({
             {hasUnread && <View style={s.dot} />}
           </TouchableOpacity>
 
-          <TouchableOpacity ref={hamburgerRef} style={s.heroAction} onPress={onOpenMenu} accessibilityRole="button">
+          <TouchableOpacity ref={hamburgerRef} style={s.heroAction} onPress={onOpenMenu} accessibilityRole="button" accessibilityLabel={t('uiMenu', lang)}>
             <Feather name="menu" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>

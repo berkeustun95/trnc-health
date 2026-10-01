@@ -31,7 +31,7 @@ export default function WeatherSheet({ visible, weatherData, lang, locale, onClo
         <View style={s.sheet} onStartShouldSetResponder={() => true}>
           <View style={s.header}>
             <Text style={s.title}>{t('homeWeatherTitle', lang)}</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>

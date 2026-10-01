@@ -213,7 +213,7 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
           <Text style={p.city}>{city}</Text>
           <Text style={p.name}>{routeName(route, lang)}</Text>
         </View>
-        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
           <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -377,7 +377,7 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
         <Text style={[p.city, { flex: 1 }]}>
           {done ? routeName(route, lang) : t('walkStopOf', lang).replace('{i}', String(walk.next + 1)).replace('{n}', String(n))}
         </Text>
-        <TouchableOpacity onPress={onEnd} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={onEnd} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
           <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>

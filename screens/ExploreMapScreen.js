@@ -240,7 +240,7 @@ function PinCard({ pin, lang, onClose, onViewProfile }) {
           <Text style={s.name} numberOfLines={1}>{title}</Text>
           {sub ? <Text style={s.sub} numberOfLines={1}>{sub}</Text> : null}
         </View>
-        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
           <Ionicons name="close-circle" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>

@@ -6,6 +6,79 @@ import { supabase } from '../../lib/supabase'
 import { colors, shadow, radius, typeColors } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import BackButton from '../../components/BackButton'
+import { REDESIGN } from '../../constants/redesign'
+import { ScreenHeader, ListCard, ErrorState, EmptyState, CardSkeleton } from '../../components/ui'
+
+// Same links as the vet's own profile (FacilityProfileScreen): tel: with the stored number,
+// Google Maps by coordinates, else by address.
+function vetActions(vet) {
+  const actions = []
+  if (vet.phone) actions.push({ kind: 'call', onPress: () => Linking.openURL(`tel:${vet.phone}`) })
+  if (vet.latitude != null && vet.longitude != null) {
+    actions.push({ kind: 'directions', onPress: () => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${vet.latitude},${vet.longitude}`) })
+  } else if (vet.address) {
+    actions.push({ kind: 'directions', onPress: () => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(vet.address)}`) })
+  }
+  return actions.length ? actions : undefined
+}
+
+function VetListCard({ vet, lang, onPress }) {
+  const sp = vet.specialties || []
+  const spText = sp.length > 0
+    ? sp.slice(0, 3).join(' · ') + (sp.length > 3 ? ` +${sp.length - 3}` : '')
+    : null
+  return (
+    <ListCard
+      title={vet.name}
+      subtitle={vet.address || null}
+      leading={{ icon: 'paw-outline', category: 'health' }}
+      meta={[
+        vet.verified ? { icon: 'checkmark-circle', text: t('verified', lang), tone: 'ok' } : null,
+        vet.phone ? { icon: 'call-outline', text: vet.phone } : null,
+        spText ? { icon: 'medkit-outline', text: spText } : null,
+      ]}
+      onPress={onPress}
+      actions={vetActions(vet)}
+      lang={lang}
+    />
+  )
+}
+
+function VetDirectoryRedesign({ lang, onBack, onOpenVet, vets, loading, error, loadVets }) {
+  return (
+    <SafeAreaView style={r.safe} edges={['top']}>
+      <ScreenHeader title={t('petsVetDirectoryTitle', lang)} onBack={onBack} lang={lang} />
+      {loading ? (
+        <View style={r.list}>
+          {[0, 1, 2].map(i => <CardSkeleton key={i} height={150} style={r.skel} />)}
+        </View>
+      ) : error ? (
+        <View style={r.center}>
+          <ErrorState message={t('facilityLoadError', lang)} onRetry={loadVets} lang={lang} />
+        </View>
+      ) : vets.length === 0 ? (
+        <View style={r.center}>
+          <EmptyState icon="paw-outline" category="health" title={t('petsNoVets', lang)} message={t('petsNoVetsSub', lang)} />
+        </View>
+      ) : (
+        <FlatList
+          data={vets}
+          keyExtractor={item => item.id}
+          contentContainerStyle={r.list}
+          ItemSeparatorComponent={Separator}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <VetListCard vet={item} lang={lang} onPress={() => onOpenVet(item)} />
+          )}
+        />
+      )}
+    </SafeAreaView>
+  )
+}
+
+function Separator() {
+  return <View style={r.gap} />
+}
 
 function VetCard({ vet, lang, onPress }) {
   const vetColors = typeColors.vet
@@ -83,6 +156,15 @@ export default function VetDirectoryScreen({ lang, onBack, onOpenVet }) {
     setLoading(false)
   }
 
+  if (REDESIGN) {
+    return (
+      <VetDirectoryRedesign
+        lang={lang} onBack={onBack} onOpenVet={onOpenVet}
+        vets={vets} loading={loading} error={error} loadVets={loadVets}
+      />
+    )
+  }
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
@@ -152,4 +234,12 @@ const s = StyleSheet.create({
   specialtyMore:    { fontSize: 12, color: colors.textSecondary, fontFamily: 'Inter_400Regular', alignSelf: 'center' },
   cardFooter:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 10, gap: 4 },
   viewProfile:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
+})
+
+const r = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
+  gap:  { height: 12 },
+  skel: { marginBottom: 12 },
+  center: { flex: 1, justifyContent: 'center' },
 })

@@ -1,7 +1,8 @@
 import { View, Text, Modal, Pressable, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, radius } from '../constants/theme'
+import { colors, radius, radii, TAP } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
 import { t, LANG_CODES } from '../constants/i18n'
 import { dormWaMessage, dormWebsiteUrl } from '../constants/dorms'
 import { logContactEvent } from '../utils/logContactEvent'
@@ -160,7 +161,7 @@ function SheetBody({ room, partner, lang, region, onClose, insets }) {
               </Text>
             )}
           </View>
-          <TouchableOpacity onPress={onClose} hitSlop={10} accessibilityLabel={t('cancel', lang)}>
+          <TouchableOpacity onPress={onClose} hitSlop={10} accessibilityLabel={t('cancel', lang)} style={s.close}>
             <Ionicons name="close" size={22} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -252,7 +253,8 @@ export default function DormRoomSheet({ room, partner, lang, region = null, onCl
   )
 }
 
-const s = StyleSheet.create({
+const legacyS = StyleSheet.create({
+  close:    {},
   overlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:    { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
   header:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
@@ -293,3 +295,17 @@ const s = StyleSheet.create({
               backgroundColor: 'transparent' },
   siteBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
 })
+
+// REDESIGN — partner surface: sheet and button SHAPE only (radius, 44pt+ targets). Labels,
+// order, links and colours (WhatsApp green, teal outline) are unchanged.
+const redesignS = StyleSheet.create({
+  sheet:    { backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet, padding: 20 },
+  close:    { width: TAP, height: TAP, alignItems: 'center', justifyContent: 'center', marginTop: -10, marginRight: -10 },
+  sourceLink: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: TAP },
+  waBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18,
+              minHeight: 48, borderRadius: radii.md, backgroundColor: '#25D366' },
+  siteBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10,
+              minHeight: 48, borderRadius: radii.md, borderWidth: 1.5, borderColor: colors.primary,
+              backgroundColor: 'transparent' },
+})
+const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS

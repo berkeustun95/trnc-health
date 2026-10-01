@@ -10,6 +10,9 @@ import { t } from '../constants/i18n'
 import { REGION_TO_DUTY } from '../constants/regions'
 import { dutyStatus, localDateKey, DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { buildFacilityIndex, matchDutyRow } from '../utils/dutyFacilityMatch'
+import { REDESIGN } from '../constants/redesign'
+import { ScreenHeader as KitHeader, ListCard, InfoBanner, InlineAlert, ContactBar, Button, CardSkeleton } from '../components/ui'
+import { colors as C, category, type, radii, elevation } from '../constants/theme'
 
 // KTEB publish the roster and are the fallback we send people to. Their number is the
 // office line; the page shows TODAY's list for every region.
@@ -157,6 +160,41 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
   )
 }
 
+// Redesign: the equal list card. Same URLs as PharmacyCard, byte for byte; no ranking of
+// any kind — the order is the list's own (district, then name; or nearest-first).
+function PharmacyCardRedesign({ item, showRegionBadge, lang }) {
+  const actions = [
+    item.phone ? { kind: 'call', onPress: () => Linking.openURL(`tel:${item.phone.replace(/\s+/g, '')}`), accessibilityLabel: `${t('call', lang)} ${item.phone}` } : null,
+    {
+      kind: 'directions',
+      onPress: () => Linking.openURL(
+        `https://maps.google.com/?q=${encodeURIComponent(
+          [item.name, item.address, 'Kuzey Kıbrıs'].filter(Boolean).join(', ')
+        )}`
+      ),
+    },
+  ].filter(Boolean)
+  return (
+    <ListCard
+      title={item.name}
+      subtitle={item.address || null}
+      leading={{ icon: 'medkit-outline', category: 'health' }}
+      badge={`${item.open_from}–${item.open_until}`}
+      meta={[
+        showRegionBadge && item.region ? { icon: 'location-outline', text: regionLabel(item.region, lang) } : null,
+        item._dist != null ? { icon: 'navigate-outline', text: `${item._dist.toFixed(1)} km · ${t('dutyStraightLine', lang)}` } : null,
+      ]}
+      actions={actions}
+      lang={lang}
+      style={r.card}
+    />
+  )
+}
+
+function MesaryaNoteRedesign({ lang }) {
+  return <InfoBanner icon="information-circle-outline" category="health" message={t('dutyMesaryaWeekdayNote', lang)} style={r.note} />
+}
+
 // `initialRegion` is a canonical region slug (from city welcome). We hoist that
 // region's sections to the top rather than scrolling to them: the list is short,
 // and SectionList.scrollToLocation throws when the index is out of range — which
@@ -167,6 +205,9 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
   const [loading, setLoading] = useState(true)
   // 'fresh' | 'stale' | 'absent' — see utils/dutyStatus.js. Only 'fresh' is a good state.
   const [status, setStatus] = useState(DUTY_FRESH)
+  // A failed READ, as opposed to a roster that is genuinely stale/absent. Both land on the
+  // KTEB card; only this one is worth a retry.
+  const [fetchError, setFetchError] = useState(false)
 
   // ee28b42's condition, restored unchanged: distance sorting is on only when we actually
   // have a fix. locationDenied is checked separately from userLocation because a denied
@@ -181,8 +222,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
   }, [loading])
   const sortByDistance = lockedSort ?? liveSortByDistance
 
-  useEffect(() => {
-    async function load() {
+  async function load() {
       // localDateKey(), not toISOString(): TRNC is UTC+2/+3, so between local midnight
       // and 03:00 the UTC date is still YESTERDAY — precisely the hours someone is
       // hunting for a duty pharmacy.
@@ -193,7 +233,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
       // distance anyway, so fetching them would cost bandwidth to change nothing. 315 of
       // 387 carry coordinates today; the count guard below is what notices when that
       // crosses PostgREST's max-rows cap, which a plain .limit() cannot.
-      const [{ data }, { data: newest }, { data: facs, count: facCount }] = await Promise.all([
+      const [{ data, error: dutyErr }, { data: newest, error: newestErr }, { data: facs, count: facCount }] = await Promise.all([
         supabase.from('duty_list')
           .select('id, name, address, phone, open_from, open_until, region')
           .eq('duty_date', today),
@@ -203,6 +243,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
           .eq('type', 'pharmacy')
           .not('latitude', 'is', null),
       ])
+      setFetchError(!!(dutyErr || newestErr))
       // District coverage, not row count — see the threshold note in utils/dutyStatus.js.
       setStatus(dutyStatus({
         todayCount: data?.length ?? 0,
@@ -219,9 +260,13 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
       setFacIndex(buildFacilityIndex(facs))
       setRows(data ?? [])
       setLoading(false)
-    }
+  }
+  useEffect(() => { load() }, [])
+
+  function retry() {
+    setLoading(true)
     load()
-  }, [])
+  }
 
   // Distances are DERIVED, not stored: userLocation resolves asynchronously in App.js and
   // can land after this screen mounts, so computing them in the fetch would leave a list
@@ -278,6 +323,78 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
 
   const d = new Date()
   const dateLabel = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+  if (REDESIGN) {
+    const ktebActions = [
+      { kind: 'call', label: t('dutyCallKteb', lang), onPress: () => Linking.openURL(`tel:${KTEB_TEL}`) },
+      { kind: 'web', label: t('dutyOpenKteb', lang), onPress: () => Linking.openURL(KTEB_URL) },
+    ]
+    const empty = (sortByDistance ? nearest : sections).length === 0
+    return (
+      <SafeAreaView style={r.safe} edges={['top']}>
+        <KitHeader onBack={onBack} title={t('dutyPharmacies', lang)} subtitle={dateLabel} lang={lang} />
+        <View style={r.container}>
+          {/* PARTIAL keeps its rows and its KTEB escape; flexShrink 0 for the same reason as
+              the legacy notice (cropped once the list scrolls). */}
+          {!loading && status === DUTY_PARTIAL ? (
+            <View style={r.partial}>
+              <InlineAlert message={t('dutyIncompleteNotice', lang)} />
+              <ContactBar actions={ktebActions} lang={lang} style={{ marginTop: 10 }} />
+            </View>
+          ) : null}
+
+          {loading ? (
+            <View style={{ paddingTop: 8 }}>
+              {[0, 1, 2].map(i => <CardSkeleton key={i} height={132} style={r.card} />)}
+            </View>
+          ) : empty ? (
+            /* An ERROR state, never an empty state: there is always a duty pharmacy in the
+               TRNC. Same copy and both KTEB actions as the legacy card; retry only when the
+               read itself failed. */
+            <View style={r.center}>
+              <View style={r.errorCard} accessibilityRole="alert">
+                <View style={r.errorIcon}>
+                  <Ionicons name="alert-circle-outline" size={30} color={C.dangerInk} />
+                </View>
+                <Text style={r.errorTitle}>{t('dutyUnavailableTitle', lang)}</Text>
+                <Text style={r.errorBody}>{t('dutyUnavailableBody', lang)}</Text>
+                <ContactBar actions={ktebActions} lang={lang} style={{ marginTop: 18, alignSelf: 'stretch' }} />
+                {fetchError ? <Button variant="text" icon="refresh" title={t('uiRetry', lang)} onPress={retry} style={{ marginTop: 6 }} /> : null}
+                <Text style={r.attribution}>{t('dutyKtebAttribution', lang)}</Text>
+              </View>
+            </View>
+          ) : sortByDistance ? (
+            <FlatList
+              data={nearest}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={r.listContent}
+              renderItem={({ item }) => <PharmacyCardRedesign item={item} showRegionBadge lang={lang} />}
+              ListFooterComponent={mesaryaMissing ? <MesaryaNoteRedesign lang={lang} /> : null}
+            />
+          ) : (
+            <SectionList
+              sections={sections}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={r.listContent}
+              stickySectionHeadersEnabled={false}
+              renderSectionHeader={({ section }) => (
+                <View style={r.regionHeader}>
+                  <Text style={r.regionName} accessibilityRole="header">{regionLabel(section.title, lang)}</Text>
+                  {section.data.length > 0 ? <Text style={r.regionCount}>{section.data.length}</Text> : null}
+                </View>
+              )}
+              renderSectionFooter={({ section }) => (
+                section.data.length === 0 ? <MesaryaNoteRedesign lang={lang} /> : null
+              )}
+              renderItem={({ item }) => <PharmacyCardRedesign item={item} showRegionBadge={false} lang={lang} />}
+            />
+          )}
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -354,6 +471,13 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
                 <Feather name="external-link" size={15} color={colors.primaryDark} />
                 <Text style={s.ktebLinkText}>{t('dutyOpenKteb', lang)}</Text>
               </TouchableOpacity>
+
+              {fetchError ? (
+                <TouchableOpacity style={s.retryBtn} onPress={retry} activeOpacity={0.7} accessibilityRole="button">
+                  <Feather name="refresh-cw" size={14} color={colors.primaryDark} />
+                  <Text style={s.retryText}>{t('tryAgain', lang)}</Text>
+                </TouchableOpacity>
+              ) : null}
 
               <Text style={s.ktebAttribution}>{t('dutyKtebAttribution', lang)}</Text>
             </View>
@@ -451,4 +575,24 @@ const s = StyleSheet.create({
   callBtnText:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.accent },
   directionsBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primaryLight, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 12 },
   directionsBtnText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
+  retryBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, alignSelf: 'stretch', minHeight: 44, marginTop: 6 },
+  retryText:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
+})
+
+const r = StyleSheet.create({
+  safe:         { flex: 1, backgroundColor: C.canvas },
+  container:    { flex: 1, paddingHorizontal: 16 },
+  center:       { flex: 1, justifyContent: 'center' },
+  listContent:  { paddingTop: 4, paddingBottom: 40 },
+  card:         { marginBottom: 10 },
+  note:         { marginBottom: 10 },
+  partial:      { flexShrink: 0, marginBottom: 12 },
+  regionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 8, paddingHorizontal: 4 },
+  regionName:   { ...type.sectionHeading, color: C.textPrimary, flex: 1 },
+  regionCount:  { ...type.meta, color: C.textSecondary },
+  errorCard:    { backgroundColor: C.card, borderRadius: radii.card, padding: 20, alignItems: 'center', ...elevation.card },
+  errorIcon:    { width: 56, height: 56, borderRadius: radii.tile, backgroundColor: category.health.bg, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  errorTitle:   { ...type.sheetTitle, color: C.textPrimary, textAlign: 'center', marginBottom: 6 },
+  errorBody:    { ...type.body, color: C.textSecondary, textAlign: 'center' },
+  attribution:  { ...type.meta, color: C.textSecondary, textAlign: 'center', marginTop: 12 },
 })

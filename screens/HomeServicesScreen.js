@@ -18,6 +18,11 @@ import { HS_CATEGORIES, hsCategory, HS_DISTRICTS, HS_DISTRICT_LABEL_KEY } from '
 import { HS_PARTNERS, HS_PARTNER_IDS } from '../constants/partners'
 import { PREVIEW_PENDING_PARTNERS, HS_SELF_REGISTRATION } from '../constants/flags'
 import { PREVIEW_PARTNER_ROWS } from '../constants/partnerPreview'
+import { REDESIGN } from '../constants/redesign'
+import { colors as C, category as CAT, type, radii, elevation, press } from '../constants/theme'
+import {
+  ScreenHeader as UiHeader, FilterBar, Dropdown, InfoBanner, ErrorState, CardSkeleton,
+} from '../components/ui'
 import HomeServicePartnerScreen from './HomeServicePartnerScreen'
 import HomeServiceOnboardingScreen from './HomeServiceOnboardingScreen'
 
@@ -81,6 +86,19 @@ function CategoryTile({ item, lang, onPress }) {
   )
 }
 
+// Redesign tile: the same twelve doors, on the Ev & Yaşam category ground.
+function RCategoryTile({ item, lang, onPress }) {
+  return (
+    <TouchableOpacity style={r.catTile} onPress={onPress} activeOpacity={press.card}
+      accessibilityRole="button" accessibilityLabel={t(item.labelKey, lang)}>
+      <View style={r.catIconWrap}>
+        <HomeServiceIcon category={item} size={26} color={CAT.homeLife.ink} />
+      </View>
+      <Text style={r.catLabel} numberOfLines={2}>{t(item.labelKey, lang)}</Text>
+    </TouchableOpacity>
+  )
+}
+
 export default function HomeServicesScreen({ lang, session, onBack, onRequireAccount, backRef = null }) {
   // Held as a { partner, row } pair rather than an id, because the row is already in
   // hand at the tap site and re-fetching it would give the screen a loading state it
@@ -98,6 +116,11 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
   // state flashes for the length of the round trip on every open. Starts true in preview,
   // where the fixture is available synchronously and no request is made.
   const [loaded,           setLoaded]           = useState(PARTNER_PREVIEW)
+  // A failed fetch used to land on the same render as "no partner rows", so the category page
+  // came up blank (audit). Now it is its own state with a retry that re-runs the same query.
+  const [loadError,        setLoadError]        = useState(false)
+  const [attempt,          setAttempt]          = useState(0)
+  const retry = () => { setLoadError(false); setLoaded(false); setAttempt(a => a + 1) }
 
   const partnerRows = PARTNER_PREVIEW ? PREVIEW_PARTNER_ROWS : fetchedRows
 
@@ -116,14 +139,19 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
       .eq('status', 'active')
       // BOTH handlers. A supabase-js query builder is a lazy thenable, and .then() with
       // only a success arm turns a network failure into an unhandled rejection — the
-      // same reason utils/logContactEvent.js passes two. A failed fetch lands on the
-      // empty state, which is the honest thing to show when we could not ask.
+      // same reason utils/logContactEvent.js passes two. Either failure (a PostgREST
+      // error in the result, or a rejection) is an ERROR state with a retry, never empty.
       .then(
-        ({ data }) => { if (alive) { setFetchedRows(data || []); setLoaded(true) } },
-        ()          => { if (alive) setLoaded(true) },
+        ({ data, error }) => {
+          if (!alive) return
+          if (error) setLoadError(true)
+          else setFetchedRows(data || [])
+          setLoaded(true)
+        },
+        () => { if (alive) { setLoadError(true); setLoaded(true) } },
       )
     return () => { alive = false }
-  }, [])
+  }, [attempt])
 
   function selectCategory(key) {
     setSelectedDistrict(null)
@@ -203,6 +231,83 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
 
   const activeCat = hsCategory(selectedCategory)
 
+  // ─── Redesign (REDESIGN only; same state, handlers, order and pinning) ─────
+  // The partner card itself (HomeServicePartnerCard) is untouched: same component, same
+  // props, same position at the top of the landing and of every category page.
+  if (REDESIGN) {
+    const partnerList = (forCategory) => {
+      if (!loaded) return <CardSkeleton height={190} />
+      if (loadError) return <ErrorState lang={lang} onRetry={retry} />
+      return cards.map(({ partner, row }) => {
+        // Same covered-only rule as the legacy path below: the draft names the category
+        // only when the firm lists it.
+        const serviceContext = forCategory && (row.service_types || []).includes(selectedCategory) && activeCat
+          ? { tr: t(activeCat.labelKey, 'Turkish'), en: t(activeCat.labelKey, 'English') }
+          : null
+        const region = forCategory ? selectedDistrict : null
+        return (
+          <View key={partner.id} style={r.partnerWrap}>
+            <HomeServicePartnerCard
+              partner={partner}
+              row={row}
+              lang={lang}
+              serviceContext={serviceContext}
+              region={region}
+              onPress={() => setSelectedPartner({ partner, row, serviceContext, region })}
+            />
+          </View>
+        )
+      })
+    }
+
+    if (!selectedCategory) {
+      return withPartner(
+        <SafeAreaView style={r.safe} edges={['top']}>
+          <UiHeader onBack={handleBack} title={t('hsTitle', lang)} lang={lang} />
+          <ScrollView {...landingMem} contentContainerStyle={r.scroll} showsVerticalScrollIndicator={false}>
+            <InfoBanner icon="ribbon-outline" category="homeLife" message={t('hsPartnersIntro', lang)} style={r.banner} />
+            {partnerList(false)}
+            <View style={r.grid}>
+              {HS_CATEGORIES.map(cat => (
+                <RCategoryTile key={cat.key} item={cat} lang={lang} onPress={() => selectCategory(cat.key)} />
+              ))}
+            </View>
+            {HS_SELF_REGISTRATION && (
+              <TouchableOpacity style={r.ctaCard} onPress={() => { if (onRequireAccount?.('gateHomeService')) return; setShowOnboarding(true) }} activeOpacity={press.card}>
+                <View style={r.catIconWrap}>
+                  <Ionicons name="add-circle-outline" size={26} color={CAT.homeLife.ink} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={r.ctaTitle}>{t('hsRegisterCTA', lang)}</Text>
+                  <Text style={r.ctaSub}>{t('hsRegisterCTASub', lang)}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={C.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      )
+    }
+
+    return withPartner(
+      <SafeAreaView style={r.safe} edges={['top']}>
+        <UiHeader onBack={handleBack} title={activeCat ? t(activeCat.labelKey, lang) : t('hsTitle', lang)} lang={lang} />
+        <FilterBar>
+          <Dropdown
+            label={t('ddDistrict', lang)}
+            lang={lang}
+            options={HS_DISTRICTS.map(d => ({ value: d, label: districtLabel(d, lang) }))}
+            value={selectedDistrict}
+            onChange={setSelectedDistrict}
+          />
+        </FilterBar>
+        <ScrollView contentContainerStyle={r.catScroll} showsVerticalScrollIndicator={false}>
+          {partnerList(true)}
+        </ScrollView>
+      </SafeAreaView>
+    )
+  }
+
   // ─── Landing ──────────────────────────────────────────────────────────────
 
   if (!selectedCategory) {
@@ -220,6 +325,8 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
 
           {!loaded ? (
             <ActivityIndicator size="large" color={colors.primary} style={s.spinner} />
+          ) : loadError ? (
+            <ErrorState lang={lang} onRetry={retry} />
           ) : cards.length > 0 ? (
             cards.map(({ partner, row }) => (
               <View key={partner.id} style={s.partnerWrap}>
@@ -310,6 +417,8 @@ export default function HomeServicesScreen({ lang, session, onBack, onRequireAcc
       <ScrollView contentContainerStyle={s.catScroll} showsVerticalScrollIndicator={false}>
         {!loaded ? (
           <ActivityIndicator size="large" color={colors.primary} style={s.spinner} />
+        ) : loadError ? (
+          <ErrorState lang={lang} onRetry={retry} />
         ) : (
           <>
             {visible.map(({ partner, row }) => {
@@ -382,4 +491,22 @@ const s = StyleSheet.create({
   ctaCardTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary,
                   marginBottom: 2 },
   ctaCardSub:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+})
+
+const r = StyleSheet.create({
+  safe:        { flex: 1, backgroundColor: C.canvas },
+  scroll:      { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
+  catScroll:   { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
+  banner:      { marginBottom: 16 },
+  partnerWrap: { marginBottom: 16 },
+  grid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
+  catTile:     { width: '47%', minHeight: 112, backgroundColor: C.card, borderRadius: radii.card,
+                 padding: 16, alignItems: 'center', justifyContent: 'center', gap: 10, ...elevation.card },
+  catIconWrap: { width: 48, height: 48, borderRadius: radii.tile, backgroundColor: CAT.homeLife.bg,
+                 alignItems: 'center', justifyContent: 'center' },
+  catLabel:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: C.textPrimary, textAlign: 'center' },
+  ctaCard:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, backgroundColor: C.card,
+                 borderRadius: radii.card, padding: 16, ...elevation.card },
+  ctaTitle:    { ...type.rowTitle, color: C.textPrimary, marginBottom: 2 },
+  ctaSub:      { ...type.small, color: C.textSecondary },
 })

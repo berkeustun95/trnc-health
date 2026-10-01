@@ -133,10 +133,10 @@ export function EmergencyTile({ lang, onPress, height }) {
 // the dormant notice path, a new place or a promo — and the generic events fallback, so the
 // banner never stands empty. Photo, dark band, time chip (events only). Dismiss exists only
 // on a notice, as in V2.
-const EVENTS_IMAGE = require('../../../assets/backgrounds/ada-bg-events.png')
+const EVENTS_IMAGE = require('../../../assets/backgrounds/ada-bg-events.jpg')
 // The old live strip's duty card photo, reused (no new image).
-const DUTY_IMAGE = require('../../../assets/backgrounds/ada-bg-duty-pharmacy.png')
-const NOTICE_FALLBACK = { accommodation: require('../../../assets/backgrounds/ada-bg-accommodation.png') }
+const DUTY_IMAGE = require('../../../assets/backgrounds/ada-bg-duty-pharmacy.jpg')
+const NOTICE_FALLBACK = { accommodation: require('../../../assets/backgrounds/ada-bg-accommodation.jpg') }
 
 export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
   const kind = item?.kind

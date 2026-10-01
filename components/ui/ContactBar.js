@@ -9,7 +9,9 @@ import { haptic } from './haptics'
 // stays built at the call site, unchanged, so a partner's tel:/wa.me/maps link is
 // byte-identical before and after.
 //
-//   actions: [{ kind: 'call' | 'directions' | 'whatsapp' | 'web', onPress, label?, accessibilityLabel? }]
+//   actions: [{ kind: 'call' | 'directions' | 'whatsapp' | 'web', onPress, label?, accessibilityLabel?, bg? }]
+//   bg: ONLY for a partner surface whose button colour is part of the agreed look (partner rule:
+//   a visible colour change there is a proposal, not a build). Never for contrast-neutral reasons.
 //
 // Up to TWO actions: both labelled, equal width (labels may wrap to two lines, never mid-word).
 // THREE: the first is labelled and the other two are 48pt icon-only buttons with their label as
@@ -55,7 +57,8 @@ export default function ContactBar({ actions = [], lang, style }) {
           <TouchableOpacity key={a.kind} activeOpacity={press.small}
             onPress={() => { if (v !== 'outline') haptic(); a.onPress() }}
             accessibilityRole="button" accessibilityLabel={a.accessibilityLabel || label}
-            style={[s.btn, iconOnly && s.iconOnly, v === 'primary' && s.primary, v === 'whatsapp' && s.whatsapp, v === 'outline' && s.outline]}>
+            style={[s.btn, iconOnly && s.iconOnly, v === 'primary' && s.primary, v === 'whatsapp' && s.whatsapp, v === 'outline' && s.outline,
+              !!a.bg && { backgroundColor: a.bg, borderWidth: 0 }]}>
             <Ionicons name={k.icon} size={iconOnly ? 20 : CONTACT_ICON} color={fg} />
             {!iconOnly && <Text style={[s.label, { color: fg }]} numberOfLines={2} maxFontSizeMultiplier={cap}>{label}</Text>}
           </TouchableOpacity>

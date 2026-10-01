@@ -9,8 +9,13 @@ import PageBackground from '../components/PageBackground'
 import ScreenHeader from '../components/ScreenHeader'
 import ContentCard from '../components/ContentCard'
 import MascotIntroCard from '../components/MascotIntroCard'
-import { colors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius, category, font, radii } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { REDESIGN } from '../constants/redesign'
+import {
+  ScreenHeader as UiScreenHeader, InfoBanner, Card, ListRow, ListCard, SectionHeader,
+  ContactBar, InfoRow, Button,
+} from '../components/ui'
 
 const CARDS = [
   { id: 'driving',   icon: 'car-outline',       color: '#185FA5', bg: '#EAF2FB', labelKey: 'essCardDriving'   },
@@ -60,7 +65,22 @@ const FIXED_HOLIDAYS = [
 const RELIGIOUS_HOLIDAYS = ['essHolRamazan', 'essHolKurban']
 
 function SectionTitle({ text }) {
+  if (REDESIGN) return <SectionHeader title={text} style={s.rSectionHeader} />
   return <Text style={s.sectionTitle}>{text}</Text>
+}
+
+// The redesign's content block (Card on the canvas); the legacy path keeps ContentCard.
+const Block = REDESIGN ? Card : ContentCard
+
+function DirectionsButton({ url, lang, legacyStyle }) {
+  const open = () => Linking.openURL(url)
+  if (REDESIGN) return <ContactBar actions={[{ kind: 'directions', onPress: open }]} lang={lang} style={s.rDirections} />
+  return (
+    <TouchableOpacity style={legacyStyle} onPress={open} activeOpacity={0.7}>
+      <Feather name="navigation" size={13} color={colors.primary} />
+      <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
+    </TouchableOpacity>
+  )
 }
 
 function BulletRow({ iconName, iconColor, text }) {
@@ -80,7 +100,7 @@ function BulletRow({ iconName, iconColor, text }) {
 function DrivingCard({ lang }) {
   return (
     <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
-      <ContentCard>
+      <Block>
         <SectionTitle text={t('essDrivingRulesTitle', lang)} />
         <BulletRow iconName="alert-circle-outline" iconColor={colors.danger} text={t('essDrivingRule1', lang)} />
         <BulletRow text={t('essDrivingRule2', lang)} />
@@ -98,7 +118,7 @@ function DrivingCard({ lang }) {
         <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate1', lang)} />
         <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate2', lang)} />
         <BulletRow iconName="car-outline" iconColor="#185FA5" text={t('essDrivingPlate3', lang)} />
-      </ContentCard>
+      </Block>
     </ScrollView>
   )
 }
@@ -108,7 +128,7 @@ function CurrencyCard({ lang, onShowExchangeRates }) {
   const mem = useScrollMemory('guide:currency')
   return (
     <ScrollView {...mem} style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
-      <ContentCard>
+      <Block>
         <BulletRow iconName="cash-outline" iconColor={colors.primary} text={t('essCurrPrimary', lang)} />
         <BulletRow text={t('essCurrAccepted', lang)} />
         <BulletRow iconName="cart-outline" iconColor={colors.accent} text={t('essCurrCash', lang)} />
@@ -116,11 +136,15 @@ function CurrencyCard({ lang, onShowExchangeRates }) {
         <BulletRow iconName="location-outline" iconColor={colors.textSecondary} text={t('essCurrATM', lang)} />
         <BulletRow iconName="swap-horizontal-outline" iconColor={colors.textSecondary} text={t('essCurrBureaux', lang)} />
 
-        <TouchableOpacity style={s.fxButton} onPress={onShowExchangeRates} activeOpacity={0.8}>
-          <Ionicons name="trending-up-outline" size={18} color={colors.surface} />
-          <Text style={s.fxButtonText}>{t('essCurrRatesBtn', lang)}</Text>
-        </TouchableOpacity>
-      </ContentCard>
+        {REDESIGN ? (
+          <Button icon="trending-up-outline" title={t('essCurrRatesBtn', lang)} onPress={onShowExchangeRates} fullWidth style={s.rFxButton} />
+        ) : (
+          <TouchableOpacity style={s.fxButton} onPress={onShowExchangeRates} activeOpacity={0.8}>
+            <Ionicons name="trending-up-outline" size={18} color={colors.surface} />
+            <Text style={s.fxButtonText}>{t('essCurrRatesBtn', lang)}</Text>
+          </TouchableOpacity>
+        )}
+      </Block>
     </ScrollView>
   )
 }
@@ -128,7 +152,7 @@ function CurrencyCard({ lang, onShowExchangeRates }) {
 function HolidaysCard({ lang }) {
   return (
     <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
-      <ContentCard>
+      <Block>
         <SectionTitle text={t('essHolFixedTitle', lang)} />
         {FIXED_HOLIDAYS.map(key => (
           <BulletRow key={key} iconName="flag-outline" iconColor={colors.danger} text={t(key, lang)} />
@@ -143,7 +167,7 @@ function HolidaysCard({ lang }) {
         <BulletRow iconName="lock-closed-outline" iconColor={colors.textSecondary} text={t('essHolClosuresNote', lang)} />
 
         <Text style={s.yearNote}>{t('essHolYearNote', lang)}</Text>
-      </ContentCard>
+      </Block>
     </ScrollView>
   )
 }
@@ -151,7 +175,7 @@ function HolidaysCard({ lang }) {
 function PortsCard({ lang }) {
   return (
     <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
-      <ContentCard>
+      <Block>
         <SectionTitle text={t('essPortsAirTitle', lang)} />
         {AIRPORTS.map(entry => (
           <View key={entry.id} style={s.portEntry}>
@@ -160,14 +184,11 @@ function PortsCard({ lang }) {
               <Text style={s.bulletText}>{t(entry.labelKey, lang)}</Text>
             </View>
             {entry.lat != null && entry.lng != null && (
-              <TouchableOpacity
-                style={[s.directionsBtn, { alignSelf: 'flex-start', marginLeft: 24, marginTop: 8 }]}
-                onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${entry.lat},${entry.lng}`)}
-                activeOpacity={0.7}
-              >
-                <Feather name="navigation" size={13} color={colors.primary} />
-                <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
-              </TouchableOpacity>
+              <DirectionsButton
+                url={`https://www.google.com/maps/dir/?api=1&destination=${entry.lat},${entry.lng}`}
+                lang={lang}
+                legacyStyle={[s.directionsBtn, { alignSelf: 'flex-start', marginLeft: 24, marginTop: 8 }]}
+              />
             )}
           </View>
         ))}
@@ -181,18 +202,15 @@ function PortsCard({ lang }) {
               <Text style={s.bulletText}>{t(entry.labelKey, lang)}</Text>
             </View>
             {entry.lat != null && entry.lng != null && (
-              <TouchableOpacity
-                style={[s.directionsBtn, { alignSelf: 'flex-start', marginLeft: 24, marginTop: 8 }]}
-                onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${entry.lat},${entry.lng}`)}
-                activeOpacity={0.7}
-              >
-                <Feather name="navigation" size={13} color={colors.primary} />
-                <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
-              </TouchableOpacity>
+              <DirectionsButton
+                url={`https://www.google.com/maps/dir/?api=1&destination=${entry.lat},${entry.lng}`}
+                lang={lang}
+                legacyStyle={[s.directionsBtn, { alignSelf: 'flex-start', marginLeft: 24, marginTop: 8 }]}
+              />
             )}
           </View>
         ))}
-      </ContentCard>
+      </Block>
     </ScrollView>
   )
 }
@@ -200,7 +218,7 @@ function PortsCard({ lang }) {
 function LastReviewedTag({ text }) {
   return (
     <View style={s.lastReviewedTag}>
-      <Ionicons name="alert-circle-outline" size={13} color={colors.accent} />
+      <Ionicons name="alert-circle-outline" size={13} color={REDESIGN ? category.city.ink : colors.accent} />
       <Text style={s.lastReviewedText}>{text}</Text>
     </View>
   )
@@ -216,6 +234,31 @@ function BordersCard({ lang }) {
         const typeKey  = c.type === 'pedestrian' ? 'essBordersPedestrian' : 'essBordersVehiclePed'
         const typeColor = c.type === 'pedestrian' ? '#5B5BD6' : '#0E7C7B'
         const typeBg    = c.type === 'pedestrian' ? '#EAE8F5' : '#E0F5F4'
+        const dirUrl = `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`
+        if (REDESIGN) {
+          return (
+            <ListCard
+              key={c.id}
+              title={c.south != null ? `${c.north} / ${c.south}` : c.north}
+              subtitle={c.region}
+              leading={{ icon: 'git-branch-outline', category: 'city' }}
+              meta={[
+                { icon: c.type === 'pedestrian' ? 'walk-outline' : 'car-outline', text: t(typeKey, lang) },
+                { icon: 'time-outline', text: t(hoursKey, lang) },
+              ]}
+              actions={c.lat != null && c.lng != null ? [{ kind: 'directions', onPress: () => Linking.openURL(dirUrl) }] : undefined}
+              lang={lang}
+              style={s.rCrossingCard}
+            >
+              {c.noteKey && (
+                <View style={s.crossingNote}>
+                  <Ionicons name="information-circle-outline" size={13} color={category.city.ink} style={{ marginTop: 2, flexShrink: 0 }} />
+                  <Text style={s.crossingNoteText}>{t(c.noteKey, lang)}</Text>
+                </View>
+              )}
+            </ListCard>
+          )
+        }
         return (
           <View key={c.id} style={s.crossingCard}>
             <Text style={s.crossingName}>
@@ -239,21 +282,14 @@ function BordersCard({ lang }) {
             )}
             {c.lat != null && c.lng != null && (
               <View style={s.crossingActions}>
-                <TouchableOpacity
-                  style={s.directionsBtn}
-                  onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`)}
-                  activeOpacity={0.7}
-                >
-                  <Feather name="navigation" size={13} color={colors.primary} />
-                  <Text style={s.directionsBtnText}>{t('getDirections', lang)}</Text>
-                </TouchableOpacity>
+                <DirectionsButton url={dirUrl} lang={lang} legacyStyle={s.directionsBtn} />
               </View>
             )}
           </View>
         )
       })}
 
-      <ContentCard style={{ marginTop: 8 }}>
+      <Block style={{ marginTop: 8 }}>
         <Text style={s.hoursNote}>{t('essBordersHoursNote', lang)}</Text>
 
         <SectionTitle text={t('essBordersInsTitle', lang)} />
@@ -266,12 +302,24 @@ function BordersCard({ lang }) {
         <BulletRow text={t('essBordersDocStamp', lang)} />
         <BulletRow text={t('essBordersDocRoC', lang)} />
         <BulletRow iconName="alert-circle-outline" iconColor={colors.accent} text={t('essBordersDocEntryRoute', lang)} />
-      </ContentCard>
+      </Block>
     </ScrollView>
   )
 }
 
-function PhoneRow({ phone, label, iconName = 'call-outline', iconColor }) {
+function PhoneRow({ phone, label, iconName = 'call-outline', iconColor, last = false }) {
+  if (REDESIGN) {
+    return (
+      <InfoRow
+        icon={iconName}
+        label={label}
+        value={phone}
+        category="city"
+        divider={!last}
+        onPress={() => Linking.openURL(`tel:${phone.replace(/\s/g, '')}`)}
+      />
+    )
+  }
   return (
     <TouchableOpacity
       style={s.embassyRow}
@@ -287,15 +335,22 @@ function PhoneRow({ phone, label, iconName = 'call-outline', iconColor }) {
   )
 }
 
+function AddressRow({ text }) {
+  if (REDESIGN) return <InfoRow icon="location-outline" value={text} category="city" />
+  return (
+    <View style={s.embassyRow}>
+      <Ionicons name="location-outline" size={15} color={colors.textSecondary} style={{ marginTop: 1 }} />
+      <Text style={s.embassyDetail}>{text}</Text>
+    </View>
+  )
+}
+
 function OfficeRow({ office }) {
   return (
     <View style={s.embassyBlock}>
       <Text style={s.embassyTitle}>{office.name}</Text>
-      <View style={s.embassyRow}>
-        <Ionicons name="location-outline" size={15} color={colors.textSecondary} style={{ marginTop: 1 }} />
-        <Text style={s.embassyDetail}>{office.address}</Text>
-      </View>
-      <PhoneRow phone={office.phone} />
+      <AddressRow text={office.address} />
+      <PhoneRow phone={office.phone} last />
     </View>
   )
 }
@@ -307,30 +362,28 @@ function EmbassiesCard({ lang }) {
 
       <View style={s.embassyBlock}>
         <Text style={s.embassyTitle}>{t('essEmbTurkeyTitle', lang)}</Text>
-        <View style={s.embassyRow}>
-          <Ionicons name="location-outline" size={15} color={colors.textSecondary} style={{ marginTop: 1 }} />
-          <Text style={s.embassyDetail}>{t('essEmbTurkeyAddress', lang)}</Text>
-        </View>
+        <AddressRow text={t('essEmbTurkeyAddress', lang)} />
         <PhoneRow phone="+90 392 600 3100" />
         <PhoneRow
           phone="+90 539 100 10 20"
           label={t('essEmbTurkeyEmergencyLabel', lang)}
           iconName="alert-circle-outline"
           iconColor={colors.danger}
+          last
         />
         <Text style={s.embassyNote}>{t('essEmbTurkeyNote', lang)}</Text>
       </View>
 
       <View style={s.embassyBlock}>
         <Text style={s.embassyTitle}>{t('essEmbFamagustaTitle', lang)}</Text>
-        <PhoneRow phone="+90 392 633 02 00" />
+        <PhoneRow phone="+90 392 633 02 00" last />
       </View>
 
       <SectionTitle text={t('essEmbOtherTitle', lang)} />
       {OFFICES.map(o => <OfficeRow key={o.id} office={o} />)}
-      <ContentCard style={{ marginTop: 4 }}>
+      <Block style={{ marginTop: 4 }}>
         <Text style={s.embassyOtherNote}>{t('essEmbOtherNote', lang)}</Text>
-      </ContentCard>
+      </Block>
 
       <Text style={s.embassyCaveat}>{t('essEmbCaveat', lang)}</Text>
     </ScrollView>
@@ -341,7 +394,7 @@ function LivingCard({ lang }) {
   return (
     <ScrollView style={s.cardScroll} contentContainerStyle={s.cardContent} showsVerticalScrollIndicator={false}>
       <LastReviewedTag text={t('essLivingLastReviewed', lang)} />
-      <ContentCard>
+      <Block>
         <SectionTitle text={t('essLivingWaterTitle', lang)} />
         <BulletRow iconName="water-outline" iconColor="#185FA5" text={t('essLivingWater1', lang)} />
         <BulletRow iconName="cube-outline" iconColor={colors.textSecondary} text={t('essLivingWater2', lang)} />
@@ -365,7 +418,7 @@ function LivingCard({ lang }) {
         <BulletRow iconName="warning-outline" iconColor={colors.danger} text={t('essLivingViper1', lang)} />
         <BulletRow iconName="footsteps-outline" iconColor={colors.textSecondary} text={t('essLivingViper2', lang)} />
         <BulletRow iconName="medkit-outline" iconColor={colors.danger} text={t('essLivingViper3', lang)} />
-      </ContentCard>
+      </Block>
     </ScrollView>
   )
 }
@@ -412,6 +465,38 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
   })
 
   const card = CARDS.find(c => c.id === activeCard)
+
+  if (REDESIGN && activeCard && card) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <UiScreenHeader onBack={() => setActiveCard(null)} lang={lang} title={t(card.labelKey, lang)} />
+        {renderCardContent(activeCard, lang, toRates)}
+      </SafeAreaView>
+    )
+  }
+
+  if (REDESIGN) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <UiScreenHeader onBack={onBack} lang={lang} title={t('essHubTitle', lang)} />
+        <ScrollView {...hubMem} contentContainerStyle={s.hubContent} showsVerticalScrollIndicator={false}>
+          <InfoBanner icon="compass-outline" category="city" message={t('essHubSubtitle', lang)} style={s.rBanner} />
+          <Card padding={0} style={s.rHubList}>
+            {CARDS.map((c, i) => (
+              <ListRow
+                key={c.id}
+                title={t(c.labelKey, lang)}
+                leading={{ icon: c.icon, category: 'city' }}
+                onPress={() => setActiveCard(c.id)}
+                divider={i < CARDS.length - 1}
+                style={s.rHubRow}
+              />
+            ))}
+          </Card>
+        </ScrollView>
+      </SafeAreaView>
+    )
+  }
 
   if (activeCard && card) {
     return (
@@ -463,7 +548,7 @@ export default function NewcomerEssentialsScreen({ lang, onBack, onShowExchangeR
   )
 }
 
-const s = StyleSheet.create({
+const legacyS = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   introCard: {
     marginBottom: 24,
@@ -495,7 +580,7 @@ const s = StyleSheet.create({
   },
   tileLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: colors.textPrimary,
     lineHeight: 18,
   },
@@ -515,7 +600,7 @@ const s = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -547,7 +632,7 @@ const s = StyleSheet.create({
   },
   fxButtonText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: colors.surface,
   },
   yearNote: {
@@ -574,7 +659,7 @@ const s = StyleSheet.create({
   lastReviewedText: {
     fontSize: 12,
     color: colors.accent,
-    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
   },
   crossingCard: {
     backgroundColor: colors.surface,
@@ -585,13 +670,13 @@ const s = StyleSheet.create({
   },
   crossingName: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
     marginBottom: 2,
   },
   crossingSlash: {
     color: colors.textSecondary,
-    fontWeight: '400',
+    fontFamily: 'Inter_400Regular',
   },
   crossingRegion: {
     fontSize: 13,
@@ -630,7 +715,7 @@ const s = StyleSheet.create({
   },
   badgeText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
   hoursNote: {
     fontSize: 12,
@@ -648,7 +733,7 @@ const s = StyleSheet.create({
   },
   embassyTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
     marginBottom: 8,
   },
@@ -669,7 +754,7 @@ const s = StyleSheet.create({
   },
   embassyPhoneLink: {
     color: colors.primary,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
   embassyNote: {
     fontSize: 13,
@@ -707,3 +792,37 @@ const s = StyleSheet.create({
     lineHeight: 22,
   },
 })
+
+// Redesign overrides: every text style carries an Inter family (the audit found 16 on the
+// system font) and no italic, since only the four upright Inter faces are registered.
+const redesignS = StyleSheet.create({
+  safe:             { flex: 1, backgroundColor: colors.canvas },
+  cardContent:      { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40, backgroundColor: colors.canvas, minHeight: '100%' },
+  hubContent:       { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
+  rBanner:          { marginBottom: 16 },
+  rHubList:         { paddingHorizontal: 14 },
+  rHubRow:          { minHeight: 60 },
+  rSectionHeader:   { marginTop: 16, marginBottom: 10 },
+  rDirections:      { marginTop: 8 },
+  rFxButton:        { marginTop: 20 },
+  rCrossingCard:    { marginBottom: 12 },
+  bulletText:       { flex: 1, fontSize: 15, lineHeight: 22, fontFamily: font.regular, color: colors.textPrimary },
+  yearNote:         { fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textPrimary, marginTop: 16, padding: 12,
+                      backgroundColor: category.city.bg, borderRadius: radii.md },
+  lastReviewedTag:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: category.city.bg, borderRadius: radii.pill,
+                      paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start', marginBottom: 12 },
+  lastReviewedText: { fontSize: 12, lineHeight: 16, fontFamily: font.medium, color: category.city.ink },
+  crossingNote:     { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 10 },
+  crossingNoteText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textSecondary },
+  hoursNote:        { fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textSecondary, marginTop: 0, marginBottom: 4 },
+  embassyBlock:     { backgroundColor: colors.card, borderRadius: radii.card, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4,
+                      marginBottom: 12, ...shadow },
+  embassyTitle:     { fontSize: 15, lineHeight: 20, fontFamily: font.semibold, color: colors.textPrimary, marginBottom: 2 },
+  embassyNote:      { fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textSecondary, marginTop: 8, marginBottom: 10 },
+  embassyOtherNote: { fontSize: 15, lineHeight: 22, fontFamily: font.regular, color: colors.textPrimary },
+  embassyCaveat:    { fontSize: 13, lineHeight: 18, fontFamily: font.regular, color: colors.textPrimary, padding: 12,
+                      backgroundColor: category.city.bg, borderRadius: radii.md, marginTop: 12 },
+  pendingText:      { fontSize: 15, lineHeight: 22, fontFamily: font.regular, color: colors.textSecondary, textAlign: 'center' },
+})
+
+const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS

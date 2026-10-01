@@ -2593,7 +2593,8 @@ export default function App() {
               textSize={18}
             />
             <Text style={styles.menuEmail} numberOfLines={1}>{session.user.email ?? t('guestLabel', lang)}</Text>
-            <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ flexShrink: 0 }}>
+            <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ flexShrink: 0 }}
+              accessibilityRole="button" accessibilityLabel={t('uiClose', lang)}>
               <Ionicons name="close" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
@@ -2616,7 +2617,7 @@ export default function App() {
             <View style={styles.emergencySheet} onStartShouldSetResponder={() => true}>
               <View style={styles.emergencyHeader}>
                 <Text style={styles.emergencyTitle}>{t('menuLanguage', lang)}</Text>
-                <TouchableOpacity onPress={() => setShowLangModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} onPress={() => setShowLangModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Ionicons name="close" size={22} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -2802,7 +2803,7 @@ export default function App() {
           <View style={styles.emergencySheet}>
             <View style={styles.emergencyHeader}>
               <Text style={styles.emergencyTitle}>{t('menuEmergency', lang)}</Text>
-              <TouchableOpacity onPress={() => setShowEmergencyModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} onPress={() => setShowEmergencyModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -2863,7 +2864,7 @@ export default function App() {
           <View style={[styles.emergencySheet, { maxHeight: Dimensions.get('window').height * 0.75 }]}>
             <View style={styles.emergencyHeader}>
               <Text style={styles.emergencyTitle}>{t('menuMunicipalities', lang)}</Text>
-              <TouchableOpacity onPress={() => setShowMunicipalModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} onPress={() => setShowMunicipalModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -2902,10 +2903,10 @@ export default function App() {
                           <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={13} color={colors.textSecondary} />
                         </View>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('hrMuniMapA11y', lang).replace('{name}', name)} onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
                         <Ionicons name="map-outline" size={18} color={colors.textSecondary} />
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('hrMuniCallA11y', lang).replace('{name}', name)} onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Ionicons name="call" size={18} color={colors.primary} />
                       </TouchableOpacity>
                     </View>

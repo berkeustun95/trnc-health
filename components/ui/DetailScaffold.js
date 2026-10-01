@@ -18,15 +18,17 @@ import ContactBar from './ContactBar'
 //   tag:      { label, category, icon? }
 //   actions:  ContactBar actions for the sticky bar (omit for none)
 //   headerRight: optional element over the photo, top-right (share, favourite)
+//   scrollProps: spread onto the ScrollView — e.g. a useScrollMemory() result, so coming back
+//                from a deeper screen (all reviews) returns to the same scroll position
 export const DETAIL_PHOTO_H = 260
 export default function DetailScaffold({
-  photo, icon = 'location-outline', tag, title, subtitle, onBack, actions, headerRight, lang, children,
+  photo, icon = 'location-outline', tag, title, subtitle, onBack, actions, headerRight, lang, children, scrollProps,
 }) {
   const insets = useSafeAreaInsets()
   const c = CAT[tag?.category] || CAT.city
   return (
     <View style={s.root}>
-      <ScrollView contentContainerStyle={{ paddingBottom: (actions ? 96 : 24) + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <ScrollView {...scrollProps} contentContainerStyle={{ paddingBottom: (actions ? 96 : 24) + insets.bottom }} showsVerticalScrollIndicator={false}>
         <View style={[s.photo, { height: DETAIL_PHOTO_H + insets.top, backgroundColor: c.bg }]}>
           {photo
             ? <Image source={photo} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />

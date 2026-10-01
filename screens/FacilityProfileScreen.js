@@ -20,6 +20,9 @@ import { HEALTH_TYPES } from '../constants/facilityTypes'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
 import BackButton from '../components/BackButton'
 import OsmAttribution from '../components/OsmAttribution'
+import { REDESIGN } from '../constants/redesign'
+import { DetailScaffold, InfoRow, IconButton } from '../components/ui'
+import { type as TYPE, radii } from '../constants/theme'
 
 const GARAGE_LABEL_KEY = Object.fromEntries(GARAGE_CATEGORIES.map(c => [c.key, c.labelKey]))
 const GARAGE_KEY_ORDER = GARAGE_CATEGORIES.map(c => c.key)
@@ -27,6 +30,10 @@ const GARAGE_KEY_ORDER = GARAGE_CATEGORIES.map(c => c.key)
 const SW = Dimensions.get('window').width
 
 const TYPE_ICONS = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
+const TYPE_ION = {
+  pharmacy: 'medkit-outline', clinic: 'medical-outline', hospital: 'business-outline', dentist: 'medical-outline',
+  vet: 'paw-outline', grooming: 'cut-outline', garage: 'car-sport-outline',
+}
 
 export default function FacilityProfileScreen({ facility, lang, session, isFavorite, onToggleFavorite, onBack, onRequireAccount, backRef = null }) {
   // Any signed-in viewer who is NOT the listing's owner may report it. Logged-out
@@ -257,7 +264,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
   })
 
   if (showAllReviews) {
-    return <ReviewsScreen facility={facility} lang={lang} onBack={() => setShowAllReviews(false)} onRequireAccount={onRequireAccount} />
+    return <ReviewsScreen facility={facility} lang={lang} average={reviewAvg} onBack={() => setShowAllReviews(false)} onRequireAccount={onRequireAccount} />
   }
 
   const tc         = typeColors[facility.type] || typeColors.clinic
@@ -268,6 +275,366 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
     : typeof facility.languages === 'string' && facility.languages
       ? facility.languages.split(',').map(l => l.trim()).filter(Boolean)
       : []
+
+  // Shared by both paths. `sx` is the legacy sheet when REDESIGN is off, so the legacy tree
+  // renders exactly as before; the redesign overrides a few keys (headings, card grounds).
+  const sx = REDESIGN ? RS : s
+  const infoSections = (
+    <>
+      {/* Languages */}
+      {languages.length > 0 && (
+        <View style={sx.section}>
+          <Text style={sx.sectionLabel}>{t('languagesSpoken', lang)}</Text>
+          <View style={sx.chipRow}>
+            {languages.map(l => (
+              <View key={l} style={sx.chip}>
+                <Text style={sx.chipText}>{l}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Credentials */}
+      {credentials.length > 0 && (
+        <View style={sx.section}>
+          <Text style={sx.sectionLabel}>{t('qualificationsLabel', lang)}</Text>
+          {credentials.map(cred => (
+            <View key={cred.id} style={sx.credRow}>
+              <Text style={sx.credIcon}>{cred.cred_type === 'diploma' ? '🎓' : '📜'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={sx.credTitle}>{cred.title}</Text>
+                <Text style={sx.credSub}>{cred.institution}{cred.year ? ` · ${cred.year}` : ''}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* About */}
+      {facility.description ? (
+        <View style={sx.section}>
+          <Text style={sx.sectionLabel}>{t('aboutFacility', lang)}</Text>
+          <Text style={sx.description}>{facility.description}</Text>
+        </View>
+      ) : null}
+
+      {/* Service prices (garage physical-service ranges, TL) */}
+      {garagePrices.length > 0 && (
+        <View style={sx.section}>
+          <Text style={sx.sectionLabel}>{t('garagePricesLabel', lang)}</Text>
+          {garagePrices.map(p => (
+            <View key={p.key} style={sx.priceRow}>
+              <Text style={sx.priceService}>{t(GARAGE_LABEL_KEY[p.key] || p.key, lang)}</Text>
+              <Text style={sx.priceValue}>{formatPriceRange(p)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Map location */}
+      {facility.latitude != null && facility.longitude != null && (
+        <View style={sx.section}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${facility.latitude},${facility.longitude}`)}
+          >
+            <MapView
+              style={sx.miniMap}
+              pointerEvents="none"
+              scrollEnabled={false}
+              zoomEnabled={false}
+              rotateEnabled={false}
+              pitchEnabled={false}
+              initialRegion={{
+                latitude: facility.latitude,
+                longitude: facility.longitude,
+                latitudeDelta: 0.008,
+                longitudeDelta: 0.008,
+              }}
+            >
+              <Marker coordinate={{ latitude: facility.latitude, longitude: facility.longitude }} pinColor={colors.primary} />
+            </MapView>
+            {facility.geocode_source === 'osm' && <OsmAttribution lang={lang} overlay />}
+          </TouchableOpacity>
+        </View>
+      )}
+    </>
+  )
+  const reviewsSection = (
+      <View style={sx.section}>
+        <Text style={sx.sectionLabel}>{t('tabReviews', lang)}</Text>
+
+        {/* Write / show your own review. A provider does not review their own
+            listing; a signed-out viewer sees the stars and is gated on tap. */}
+        {!reviewsLoading && !isOwner && (myReview ? (
+          <View style={sx.myReviewBox}>
+            <Text style={sx.myReviewLabel}>{t('yourReview', lang)}</Text>
+            <View style={sx.starsRow}>
+              {[1, 2, 3, 4, 5].map(star => (
+                <Text key={star} style={[sx.star, myReview.rating >= star && sx.starActive]}>★</Text>
+              ))}
+            </View>
+            {myReview.comment ? <Text style={sx.myReviewComment}>{myReview.comment}</Text> : null}
+            <TouchableOpacity onPress={() => deleteReview(myReview.id)} style={{ alignSelf: 'flex-start' }} accessibilityRole="button">
+              <Text style={sx.deleteReviewText}>{t('deleteReview', lang)}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={sx.myReviewBox}>
+            <Text style={sx.myReviewLabel}>{t('rateVisit', lang)}</Text>
+            <View style={sx.starsRow}>
+              {[1, 2, 3, 4, 5].map(star => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => { if (onRequireAccount?.('gateReview')) return; setRatingValue(star) }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[sx.star, ratingValue >= star && sx.starActive]}>★</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {ratingValue > 0 && (
+              <>
+                <TextInput
+                  style={sx.commentInput}
+                  value={ratingComment}
+                  onChangeText={setRatingComment}
+                  placeholder={t('commentOptional', lang)}
+                  placeholderTextColor={colors.textSecondary}
+                  multiline
+                  maxLength={500}
+                />
+                {reviewError ? <Text style={sx.error}>{reviewError}</Text> : null}
+                <TouchableOpacity
+                  style={[sx.submitReviewBtn, submittingReview && { opacity: 0.4 }]}
+                  onPress={submitReview}
+                  disabled={submittingReview}
+                >
+                  {submittingReview
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={sx.submitReviewText}>{t('save', lang)}</Text>}
+                </TouchableOpacity>
+                <Text style={sx.termsNotice}>{t('termsAgreeContent', lang)}</Text>
+              </>
+            )}
+          </View>
+        ))}
+
+        {reviewsLoading ? (
+          <>{[0, 1].map(i => <ReviewSkeleton key={i} />)}</>
+        ) : reviews.length === 0 ? (
+          <View style={sx.noReviewsWrap}>
+            <Ionicons name="star-outline" size={40} color={colors.border} style={{ marginBottom: 12 }} />
+            <Text style={sx.noReviewsTitle}>{t('noReviews', lang)}</Text>
+            <Text style={sx.noReviewsSub}>{t('firstReviewPrompt', lang)}</Text>
+          </View>
+        ) : (
+          <>
+            {reviewAvg && (
+              <View style={sx.avgRow}>
+                <Text style={sx.avgNum}>{reviewAvg}</Text>
+                <View>
+                  <Text style={sx.avgStars}>{'★'.repeat(Math.round(parseFloat(reviewAvg)))}{'☆'.repeat(5 - Math.round(parseFloat(reviewAvg)))}</Text>
+                  <Text style={sx.reviewCount}>{t('reviewCountLabel', lang).replace('{n}', reviewTotal)}</Text>
+                </View>
+              </View>
+            )}
+            {reviews.map(r => (
+              <View key={r.id} style={sx.reviewCard}>
+                <View style={sx.reviewTop}>
+                  <Text style={sx.stars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</Text>
+                  <View style={sx.reviewTopRight}>
+                    <Text style={sx.reviewDate}>{new Date(r.created_at).toLocaleDateString([], { dateStyle: 'medium' })}</Text>
+                    <ContentReportMenu contentType="review" contentId={r.id} lang={lang} onBlocked={reloadReviews} onRequireAccount={onRequireAccount} />
+                  </View>
+                </View>
+                {r.comment ? <Text style={sx.reviewComment}>{r.comment}</Text> : null}
+              </View>
+            ))}
+            {reviewTotal > 3 && (
+              <TouchableOpacity style={sx.seeAllBtn} onPress={() => setShowAllReviews(true)}>
+                <Text style={sx.seeAllText}>{t('seeAllReviews', lang).replace('{n}', reviewTotal)}</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+      </View>
+  )
+  const questionsSection = (
+      <View style={sx.section}>
+        <Text style={sx.sectionLabel}>{t('questionsAnswers', lang)}</Text>
+
+        <View style={sx.askRow}>
+          <TextInput
+            style={sx.askInput}
+            value={newQ}
+            onChangeText={setNewQ}
+            placeholder={t('askPlaceholder', lang)}
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            maxLength={300}
+          />
+          <TouchableOpacity
+            style={[sx.askBtn, (!newQ.trim() || submittingQ) && { opacity: 0.4 }]}
+            onPress={submitQuestion}
+            disabled={!newQ.trim() || submittingQ}
+          >
+            {submittingQ
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={sx.askBtnText}>{t('ask', lang)}</Text>
+            }
+          </TouchableOpacity>
+        </View>
+
+        {qError && <Text style={sx.error}>{qError}</Text>}
+
+        <Text style={sx.termsNotice}>{t('termsAgreeContent', lang)}</Text>
+
+        {questionsLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
+        ) : questions.length === 0 ? (
+          <Text style={sx.noQText}>{t('noQuestions', lang)}</Text>
+        ) : (
+          questions.map(q => (
+            <View key={q.id} style={sx.qCard}>
+              <Text style={sx.qBody}>{q.body}</Text>
+              {q.answers && q.answers.length > 0 ? (
+                <View style={sx.answerBlock}>
+                  <View style={sx.answerTop}>
+                    <Text style={sx.answerLabel}>{t('providerAnswer', lang)}</Text>
+                    <ContentReportMenu contentType="answer" contentId={q.answers[0].id} lang={lang} onRequireAccount={onRequireAccount} />
+                  </View>
+                  <Text style={sx.answerBody}>{q.answers[0].body}</Text>
+                </View>
+              ) : (
+                <Text style={sx.noAnswer}>{t('awaitingAnswer', lang)}</Text>
+              )}
+              {q.customer_id && q.customer_id === session?.user?.id && (
+                <TouchableOpacity
+                  onPress={() => deleteQuestion(q.id)}
+                  style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                  accessibilityRole="button"
+                >
+                  <Text style={{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger }}>
+                    {t('deleteQuestion', lang)}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))
+        )}
+      </View>
+  )
+  const lightboxModal = (
+    <Modal visible={!!lightbox} transparent animationType="fade" onRequestClose={() => setLightbox(null)}>
+      <TouchableOpacity style={s.lightboxBg} onPress={() => setLightbox(null)} activeOpacity={1}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} style={s.lightboxClose} onPress={() => setLightbox(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="close" size={22} color="#fff" />
+        </TouchableOpacity>
+        {lightbox && (
+          <Image source={{ uri: lightbox }} style={s.lightboxImg} resizeMode="contain" />
+        )}
+      </TouchableOpacity>
+    </Modal>
+  )
+
+  // ─── Redesign (S4) ───────────────────────────────────────────────────────────
+  // Same state, handlers and URLs as the legacy tree. Removed vs legacy: nothing the user can
+  // act on. The review average appears ONCE (reviewsSection), never also in the header.
+  if (REDESIGN) {
+    const cat = ['garage', 'grooming'].includes(facility.type) ? 'homeLife' : 'health'
+    const gallery = [facility.cover_image_url, ...(Array.isArray(facility.photos) ? facility.photos : [])].filter(Boolean)
+    const hasPin = facility.latitude != null && facility.longitude != null
+    const actions = [
+      facility.phone ? { kind: 'call', onPress: () => Linking.openURL(`tel:${facility.phone}`), accessibilityLabel: `${t('call', lang)} ${facility.phone}` } : null,
+      hasPin
+        ? { kind: 'directions', onPress: () => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${facility.latitude},${facility.longitude}`) }
+        : facility.address
+          ? { kind: 'directions', onPress: () => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(facility.address)}`) }
+          : null,
+    ].filter(Boolean)
+    const specialty = facility.specialty?.length
+      ? (Array.isArray(facility.specialty) ? facility.specialty.join(' · ') : facility.specialty)
+      : null
+    return (
+      <View style={{ flex: 1 }}>
+        {/* profileMem keeps the scroll position when coming back from all reviews;
+            DetailScaffold spreads scrollProps onto its own ScrollView. */}
+        <DetailScaffold
+          photo={facility.cover_image_url ? { uri: facility.cover_image_url } : null}
+          icon={TYPE_ION[facility.type] || 'medical-outline'}
+          tag={{ label: t(facility.type, lang), category: cat, icon: TYPE_ION[facility.type] }}
+          title={facility.name}
+          subtitle={specialty}
+          onBack={onBack}
+          lang={lang}
+          scrollProps={profileMem}
+          actions={actions.length ? actions : undefined}
+          headerRight={(
+            <View style={RS.headerRight}>
+              {canReport && (
+                <View style={RS.frost}>
+                  <ContentReportMenu contentType="facility" contentId={facility.id} lang={lang} onRequireAccount={onRequireAccount} />
+                </View>
+              )}
+              <IconButton
+                icon={isFavorite ? 'heart' : 'heart-outline'}
+                variant="frosted"
+                color={isFavorite ? colors.danger : colors.textPrimary}
+                onPress={onToggleFavorite}
+                accessibilityLabel={t('favourites', lang)}
+              />
+            </View>
+          )}
+        >
+          {facility.logo_url ? (
+            <TouchableOpacity activeOpacity={0.9} onPress={() => setLightbox(facility.logo_url)} style={RS.logoWrap}
+              accessibilityRole="imagebutton" accessibilityLabel={facility.name}>
+              <Image source={{ uri: facility.logo_url }} style={RS.logo} resizeMode="contain" />
+            </TouchableOpacity>
+          ) : null}
+
+          {gallery.length > 0 && (
+            <FlatList
+              data={gallery}
+              keyExtractor={(_, i) => String(i)}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={RS.gallery}
+              contentContainerStyle={{ gap: 8 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity onPress={() => setLightbox(item)} activeOpacity={0.85} accessibilityRole="imagebutton">
+                  <Image source={{ uri: item }} style={RS.photoThumb} resizeMode="cover" />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+
+          <View style={RS.facts}>
+            <InfoRow icon="location-outline" category={cat} label={t('labelAddress', lang)} value={facility.address}
+              onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(facility.address)}`)} />
+            <InfoRow icon="map-outline" category={cat}
+              value={facility.city && REGION_LABEL_KEY[facility.city]
+                ? `${facility.area ? `${areaName(facility.area, facility.city)}, ` : ''}${t(REGION_LABEL_KEY[facility.city], lang)}`
+                : null} />
+            <InfoRow icon="call-outline" category={cat} label={t('phone', lang)} value={facility.phone}
+              onPress={() => Linking.openURL(`tel:${facility.phone}`)} />
+            <InfoRow icon="time-outline" category={cat} label={t('labelHours', lang)}
+              value={facility.opening_hours ? formatHoursDisplay(facility.opening_hours) : null} />
+            <InfoRow icon="globe-outline" category={cat} value={facility.website ? t('visitWebsite', lang) : null}
+              onPress={() => Linking.openURL(facility.website)} divider={false} />
+          </View>
+
+          {infoSections}
+          {reviewsSection}
+          {questionsSection}
+        </DetailScaffold>
+        {lightboxModal}
+      </View>
+    )
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -286,7 +653,9 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
                   onRequireAccount={onRequireAccount}
                 />
               )}
-              <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button" accessibilityState={{ selected: !!isFavorite }}
+                accessibilityLabel={t(isFavorite ? 'uiFavRemove' : 'uiFavAdd', lang)}>
                 <Ionicons
                   name={isFavorite ? 'heart' : 'heart-outline'}
                   size={22}
@@ -347,84 +716,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
               </View>
             )}
 
-            {/* Languages */}
-            {languages.length > 0 && (
-              <View style={s.section}>
-                <Text style={s.sectionLabel}>{t('languagesSpoken', lang)}</Text>
-                <View style={s.chipRow}>
-                  {languages.map(l => (
-                    <View key={l} style={s.chip}>
-                      <Text style={s.chipText}>{l}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Credentials */}
-            {credentials.length > 0 && (
-              <View style={s.section}>
-                <Text style={s.sectionLabel}>{t('qualificationsLabel', lang)}</Text>
-                {credentials.map(cred => (
-                  <View key={cred.id} style={s.credRow}>
-                    <Text style={s.credIcon}>{cred.cred_type === 'diploma' ? '🎓' : '📜'}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.credTitle}>{cred.title}</Text>
-                      <Text style={s.credSub}>{cred.institution}{cred.year ? ` · ${cred.year}` : ''}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* About */}
-            {facility.description ? (
-              <View style={s.section}>
-                <Text style={s.sectionLabel}>{t('aboutFacility', lang)}</Text>
-                <Text style={s.description}>{facility.description}</Text>
-              </View>
-            ) : null}
-
-            {/* Service prices (garage physical-service ranges, TL) */}
-            {garagePrices.length > 0 && (
-              <View style={s.section}>
-                <Text style={s.sectionLabel}>{t('garagePricesLabel', lang)}</Text>
-                {garagePrices.map(p => (
-                  <View key={p.key} style={s.priceRow}>
-                    <Text style={s.priceService}>{t(GARAGE_LABEL_KEY[p.key] || p.key, lang)}</Text>
-                    <Text style={s.priceValue}>{formatPriceRange(p)}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Map location */}
-            {facility.latitude != null && facility.longitude != null && (
-              <View style={s.section}>
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${facility.latitude},${facility.longitude}`)}
-                >
-                  <MapView
-                    style={s.miniMap}
-                    pointerEvents="none"
-                    scrollEnabled={false}
-                    zoomEnabled={false}
-                    rotateEnabled={false}
-                    pitchEnabled={false}
-                    initialRegion={{
-                      latitude: facility.latitude,
-                      longitude: facility.longitude,
-                      latitudeDelta: 0.008,
-                      longitudeDelta: 0.008,
-                    }}
-                  >
-                    <Marker coordinate={{ latitude: facility.latitude, longitude: facility.longitude }} pinColor={colors.primary} />
-                  </MapView>
-                  {facility.geocode_source === 'osm' && <OsmAttribution lang={lang} overlay />}
-                </TouchableOpacity>
-              </View>
-            )}
+            {infoSections}
 
             {/* Contact */}
             <View style={s.section}>
@@ -487,184 +779,15 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
             </View>
 
             {/* Reviews */}
-            <View style={s.section}>
-              <Text style={s.sectionLabel}>{t('tabReviews', lang)}</Text>
-
-              {/* Write / show your own review. A provider does not review their own
-                  listing; a signed-out viewer sees the stars and is gated on tap. */}
-              {!reviewsLoading && !isOwner && (myReview ? (
-                <View style={s.myReviewBox}>
-                  <Text style={s.myReviewLabel}>{t('yourReview', lang)}</Text>
-                  <View style={s.starsRow}>
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <Text key={star} style={[s.star, myReview.rating >= star && s.starActive]}>★</Text>
-                    ))}
-                  </View>
-                  {myReview.comment ? <Text style={s.myReviewComment}>{myReview.comment}</Text> : null}
-                  <TouchableOpacity onPress={() => deleteReview(myReview.id)} style={{ alignSelf: 'flex-start' }} accessibilityRole="button">
-                    <Text style={s.deleteReviewText}>{t('deleteReview', lang)}</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={s.myReviewBox}>
-                  <Text style={s.myReviewLabel}>{t('rateVisit', lang)}</Text>
-                  <View style={s.starsRow}>
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <TouchableOpacity
-                        key={star}
-                        onPress={() => { if (onRequireAccount?.('gateReview')) return; setRatingValue(star) }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[s.star, ratingValue >= star && s.starActive]}>★</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  {ratingValue > 0 && (
-                    <>
-                      <TextInput
-                        style={s.commentInput}
-                        value={ratingComment}
-                        onChangeText={setRatingComment}
-                        placeholder={t('commentOptional', lang)}
-                        placeholderTextColor={colors.textSecondary}
-                        multiline
-                        maxLength={500}
-                      />
-                      {reviewError ? <Text style={s.error}>{reviewError}</Text> : null}
-                      <TouchableOpacity
-                        style={[s.submitReviewBtn, submittingReview && { opacity: 0.4 }]}
-                        onPress={submitReview}
-                        disabled={submittingReview}
-                      >
-                        {submittingReview
-                          ? <ActivityIndicator color="#fff" size="small" />
-                          : <Text style={s.submitReviewText}>{t('save', lang)}</Text>}
-                      </TouchableOpacity>
-                      <Text style={s.termsNotice}>{t('termsAgreeContent', lang)}</Text>
-                    </>
-                  )}
-                </View>
-              ))}
-
-              {reviewsLoading ? (
-                <>{[0, 1].map(i => <ReviewSkeleton key={i} />)}</>
-              ) : reviews.length === 0 ? (
-                <View style={s.noReviewsWrap}>
-                  <Ionicons name="star-outline" size={40} color={colors.border} style={{ marginBottom: 12 }} />
-                  <Text style={s.noReviewsTitle}>{t('noReviews', lang)}</Text>
-                  <Text style={s.noReviewsSub}>{t('firstReviewPrompt', lang)}</Text>
-                </View>
-              ) : (
-                <>
-                  {reviewAvg && (
-                    <View style={s.avgRow}>
-                      <Text style={s.avgNum}>{reviewAvg}</Text>
-                      <View>
-                        <Text style={s.avgStars}>{'★'.repeat(Math.round(parseFloat(reviewAvg)))}{'☆'.repeat(5 - Math.round(parseFloat(reviewAvg)))}</Text>
-                        <Text style={s.reviewCount}>{t('reviewCountLabel', lang).replace('{n}', reviewTotal)}</Text>
-                      </View>
-                    </View>
-                  )}
-                  {reviews.map(r => (
-                    <View key={r.id} style={s.reviewCard}>
-                      <View style={s.reviewTop}>
-                        <Text style={s.stars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</Text>
-                        <View style={s.reviewTopRight}>
-                          <Text style={s.reviewDate}>{new Date(r.created_at).toLocaleDateString([], { dateStyle: 'medium' })}</Text>
-                          <ContentReportMenu contentType="review" contentId={r.id} lang={lang} onBlocked={reloadReviews} onRequireAccount={onRequireAccount} />
-                        </View>
-                      </View>
-                      {r.comment ? <Text style={s.reviewComment}>{r.comment}</Text> : null}
-                    </View>
-                  ))}
-                  {reviewTotal > 3 && (
-                    <TouchableOpacity style={s.seeAllBtn} onPress={() => setShowAllReviews(true)}>
-                      <Text style={s.seeAllText}>{t('seeAllReviews', lang).replace('{n}', reviewTotal)}</Text>
-                      <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-                    </TouchableOpacity>
-                  )}
-                </>
-              )}
-            </View>
+            {reviewsSection}
 
             {/* Questions & Answers — shown for every facility type, incl. pharmacy */}
-            <View style={s.section}>
-              <Text style={s.sectionLabel}>{t('questionsAnswers', lang)}</Text>
-
-              <View style={s.askRow}>
-                <TextInput
-                  style={s.askInput}
-                  value={newQ}
-                  onChangeText={setNewQ}
-                  placeholder={t('askPlaceholder', lang)}
-                  placeholderTextColor={colors.textSecondary}
-                  multiline
-                  maxLength={300}
-                />
-                <TouchableOpacity
-                  style={[s.askBtn, (!newQ.trim() || submittingQ) && { opacity: 0.4 }]}
-                  onPress={submitQuestion}
-                  disabled={!newQ.trim() || submittingQ}
-                >
-                  {submittingQ
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={s.askBtnText}>{t('ask', lang)}</Text>
-                  }
-                </TouchableOpacity>
-              </View>
-
-              {qError && <Text style={s.error}>{qError}</Text>}
-
-              <Text style={s.termsNotice}>{t('termsAgreeContent', lang)}</Text>
-
-              {questionsLoading ? (
-                <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
-              ) : questions.length === 0 ? (
-                <Text style={s.noQText}>{t('noQuestions', lang)}</Text>
-              ) : (
-                questions.map(q => (
-                  <View key={q.id} style={s.qCard}>
-                    <Text style={s.qBody}>{q.body}</Text>
-                    {q.answers && q.answers.length > 0 ? (
-                      <View style={s.answerBlock}>
-                        <View style={s.answerTop}>
-                          <Text style={s.answerLabel}>{t('providerAnswer', lang)}</Text>
-                          <ContentReportMenu contentType="answer" contentId={q.answers[0].id} lang={lang} onRequireAccount={onRequireAccount} />
-                        </View>
-                        <Text style={s.answerBody}>{q.answers[0].body}</Text>
-                      </View>
-                    ) : (
-                      <Text style={s.noAnswer}>{t('awaitingAnswer', lang)}</Text>
-                    )}
-                    {q.customer_id && q.customer_id === session?.user?.id && (
-                      <TouchableOpacity
-                        onPress={() => deleteQuestion(q.id)}
-                        style={{ alignSelf: 'flex-start', marginTop: 8 }}
-                        accessibilityRole="button"
-                      >
-                        <Text style={{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger }}>
-                          {t('deleteQuestion', lang)}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))
-              )}
-            </View>
+            {questionsSection}
           </View>
         </ScrollView>
 
         {/* Photo lightbox */}
-        <Modal visible={!!lightbox} transparent animationType="fade" onRequestClose={() => setLightbox(null)}>
-          <TouchableOpacity style={s.lightboxBg} onPress={() => setLightbox(null)} activeOpacity={1}>
-            <TouchableOpacity style={s.lightboxClose} onPress={() => setLightbox(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={22} color="#fff" />
-            </TouchableOpacity>
-            {lightbox && (
-              <Image source={{ uri: lightbox }} style={s.lightboxImg} resizeMode="contain" />
-            )}
-          </TouchableOpacity>
-        </Modal>
+        {lightboxModal}
 
       </View>
     </SafeAreaView>
@@ -750,3 +873,31 @@ const s = StyleSheet.create({
   noReviewsTitle:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, marginBottom: 6, textAlign: 'center' },
   noReviewsSub:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },
 })
+
+// Redesign overrides: the legacy keys the shared sections read, re-set on the new tokens.
+// Sections sit on the white sheet, so their cards drop to the canvas ground with no shadow.
+const FLAT = { shadowOpacity: 0, elevation: 0 }
+const RS = {
+  ...s,
+  section:      { marginTop: 24 },
+  sectionLabel: { ...TYPE.sectionHeading, color: colors.textPrimary, marginBottom: 10 },
+  chip:         { backgroundColor: colors.canvas, borderRadius: radii.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  chipText:     { ...TYPE.small, color: colors.textPrimary },
+  description:  { ...TYPE.body, color: colors.textPrimary },
+  miniMap:      { ...s.miniMap, borderRadius: radii.card },
+  reviewCard:   { ...s.reviewCard, ...FLAT, backgroundColor: colors.canvas, borderRadius: radii.card },
+  qCard:        { ...s.qCard, ...FLAT, backgroundColor: colors.canvas, borderRadius: radii.card },
+  myReviewBox:  { ...s.myReviewBox, borderColor: colors.fieldBorder, backgroundColor: colors.card, borderRadius: radii.card },
+  askInput:     { ...s.askInput, borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: colors.card, minHeight: 44 },
+  askBtn:       { ...s.askBtn, minHeight: 44 },
+  commentInput: { ...s.commentInput, borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: colors.card },
+  ...StyleSheet.create({
+    headerRight: { flexDirection: 'row', gap: 8 },
+    frost:       { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.94)', alignItems: 'center', justifyContent: 'center' },
+    logoWrap:    { alignSelf: 'flex-start', marginTop: 14 },
+    logo:        { width: 56, height: 56, borderRadius: radii.tile, borderWidth: 1, borderColor: colors.divider, backgroundColor: colors.card },
+    gallery:     { marginTop: 16, flexGrow: 0 },
+    photoThumb:  { width: 140, height: 105, borderRadius: radii.tile, backgroundColor: colors.border },
+    facts:       { marginTop: 12 },
+  }),
+}

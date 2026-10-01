@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, Image, TouchableOpacity, FlatList, ActivityIndicator, Linking, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
-import { colors, shadow } from '../../constants/theme'
+import { colors, shadow, radii, type, elevation, category, TAP } from '../../constants/theme'
+import { REDESIGN } from '../../constants/redesign'
+import { CardSkeleton, EmptyState, ErrorState } from '../ui'
 import { t } from '../../constants/i18n'
 import FilterDropdown from '../FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../../constants/regions'
@@ -168,9 +170,13 @@ export default function HotelsTab({ lang }) {
   const shown = sorted.filter(h => (!klass || h.kitob_class === klass) && (!district || h.region === district)
     && (!area || areaOf.get(h.id)?.value === area))
 
-  if (loading) return <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
+  if (loading) {
+    if (REDESIGN) return <View style={hs.listContent}>{[0, 1, 2].map(i => <CardSkeleton key={i} height={240} style={{ marginBottom: 12 }} />)}</View>
+    return <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
+  }
 
   if (failed) {
+    if (REDESIGN) return <ErrorState lang={lang} message={t('hotelsLoadError', lang)} onRetry={load} style={{ marginTop: 40 }} />
     return (
       <View style={hs.center}>
         <Ionicons name="cloud-offline-outline" size={40} color={colors.border} />
@@ -204,7 +210,10 @@ export default function HotelsTab({ lang }) {
         initialNumToRender={6}
         windowSize={7}
         renderItem={({ item }) => <HotelCard hotel={item} lang={lang} district={district} />}
-        ListEmptyComponent={
+        ListEmptyComponent={REDESIGN ? (
+          <EmptyState icon="bed-outline" category="homeLife" title={t('hotelsNoResults', lang)} style={{ marginTop: 28 }}
+            action={{ label: t('accomClear', lang), onPress: () => { setKlass(null); setDistrict(null); setArea(null) } }} />
+        ) : (
           <View style={hs.center}>
             <Ionicons name="bed-outline" size={40} color={colors.border} />
             <Text style={hs.emptyTitle}>{t('hotelsNoResults', lang)}</Text>
@@ -212,13 +221,13 @@ export default function HotelsTab({ lang }) {
               <Text style={hs.retryText}>{t('accomClear', lang)}</Text>
             </TouchableOpacity>
           </View>
-        }
+        )}
       />
     </View>
   )
 }
 
-const hs = StyleSheet.create({
+const legacyHs = StyleSheet.create({
   // flexShrink:0 — a fixed-height row above a scrolling list (CLAUDE.md).
   filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexShrink: 0 },
   listContent:   { paddingHorizontal: 16, paddingBottom: 32 },
@@ -258,3 +267,25 @@ const hs = StyleSheet.create({
   soonTitle:     { fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 10 },
   soonBody:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
 })
+
+// REDESIGN: same card, same three buttons in the same order with the same labels and links
+// (Harita stays a Google Maps link) — new tokens and 44pt buttons only. Not a ListCard: the
+// hotel photo is KITOB's, so its crop stays full-width (partner rule).
+const redesignHs = StyleSheet.create({
+  filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, flexShrink: 0 },
+  listContent:   { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 },
+  card:          { backgroundColor: colors.card, borderRadius: radii.card, marginBottom: 12, overflow: 'hidden', ...elevation.card },
+  photo:         { width: '100%', height: 150, backgroundColor: category.homeLife.bg },
+  name:          { ...type.sheetTitle, color: colors.textPrimary },
+  classText:     { ...type.small, fontFamily: 'Inter_500Medium', color: colors.textSecondary },
+  badge:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.pill, backgroundColor: colors.tintServiceBg },
+  badgeText:     { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
+  placeText:     { flex: 1, ...type.small, color: colors.textSecondary },
+  action:        { flex: 1, minHeight: TAP, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                   paddingHorizontal: 8, borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder,
+                   backgroundColor: colors.card },
+  actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  actionText:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark, flexShrink: 1 },
+  actionTextPrimary: { color: colors.onPrimary },
+})
+const hs = REDESIGN ? { ...legacyHs, ...redesignHs } : legacyHs

@@ -43,8 +43,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
 import { colors, radius } from '../constants/theme'
+import { t } from '../constants/i18n'
 
 export default function SearchModal({
+  lang,   // only for the close button's accessibilityLabel
   visible, title, searchPlaceholder, options, value, searchable, onSelect, onClose,
 }) {
   const [q, setQ] = useState('')
@@ -149,7 +151,7 @@ export default function SearchModal({
         <View style={[s.modalCard, { maxHeight: cardMaxHeight }]}>
           <View style={s.modalHeader}>
             <Text style={s.modalTitle}>{title}</Text>
-            <TouchableOpacity onPress={() => { Keyboard.dismiss(); onClose() }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} onPress={() => { Keyboard.dismiss(); onClose() }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Feather name="x" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>

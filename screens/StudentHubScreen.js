@@ -321,7 +321,7 @@ function UniversitiesTab({ lang, universities, failed, onRetry, onOpen, query, s
           returnKeyType="search"
         />
         {query ? (
-          <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClearSearch', lang)} onPress={() => setQuery('')} hitSlop={8}>
             <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         ) : null}
