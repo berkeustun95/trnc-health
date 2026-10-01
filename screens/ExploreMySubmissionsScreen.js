@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Image,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -12,7 +12,7 @@ import { colors, placeColors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
 import { categoryToGroup, GROUP_META, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { REDESIGN } from '../constants/redesign'
-import { ScreenHeader as KitHeader, ErrorState, EmptyState, RowSkeleton, ModuleScreen } from '../components/ui'
+import { ScreenHeader as KitHeader, ErrorState, EmptyState, RowSkeleton, ModuleScreen, RemoteImage } from '../components/ui'
 import { colors as C, type, radii, elevation } from '../constants/theme'
 
 // The submitter's own rows at ANY status (places_select RLS permits submitted_by = auth.uid()).
@@ -60,7 +60,7 @@ function SubmissionCard({ item, lang, onResubmit }) {
     <View style={s.card}>
       <View style={s.cardRow}>
         {photo
-          ? <Image source={{ uri: photo }} style={s.thumb} resizeMode="cover" />
+          ? <RemoteImage source={{ uri: photo }} style={s.thumb} resizeMode="cover" />
           : <View style={[s.thumb, s.thumbFallback, { backgroundColor: pc.bg }]}><Text style={s.thumbEmoji}>{groupEmoji(group)}</Text></View>}
         <View style={{ flex: 1 }}>
           <Text style={s.cardName} numberOfLines={1}>{placeName(item, lang)}</Text>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
-  TextInput, ScrollView, Image, Dimensions, Modal, Pressable,
+  TextInput, ScrollView, Dimensions, Modal, Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
@@ -21,6 +21,7 @@ import { REDESIGN } from '../constants/redesign'
 import { OnPhotoContext } from '../components/ui/onPhoto'
 import {
   ScreenHeader as RScreenHeader, FilterBar, CardSkeleton, EmptyState, ErrorState, ModuleScreen,
+  RemoteImage,
 } from '../components/ui'
 import { t } from '../constants/i18n'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
@@ -253,7 +254,7 @@ function PropertyCard({ item, lang, onPress }) {
             onMomentumScrollEnd={e => setImgIdx(Math.round(e.nativeEvent.contentOffset.x / CARD_W))}
             renderItem={({ item: im }) => (
               <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
-                <Image source={{ uri: im.url }} style={cs.cardImage} resizeMode="cover" />
+                <RemoteImage source={{ uri: im.url }} style={cs.cardImage} resizeMode="cover" />
               </TouchableOpacity>
             )}
           />

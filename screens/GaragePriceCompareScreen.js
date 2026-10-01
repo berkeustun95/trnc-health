@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -14,6 +14,7 @@ import { areaOptions, areaName } from '../constants/areas'
 import FilterDropdown from '../components/FilterDropdown'
 import { pricedServices, formatPriceRange } from '../utils/servicePrices'
 import { GARAGE_CATEGORIES } from './GaragesScreen'
+import { RemoteImage } from '../components/ui'
 
 // Fields kept identical to the garages directory select so a tapped result opens a
 // fully-rendered FacilityProfileScreen (which reads the passed row, no re-fetch).
@@ -36,7 +37,7 @@ function CompareRow({ item, rank, lang, onPress }) {
     <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.85}>
       <View style={s.rank}><Text style={s.rankText}>{rank}</Text></View>
       {item.logo_url
-        ? <Image source={{ uri: item.logo_url }} style={s.logo} resizeMode="cover" />
+        ? <RemoteImage source={{ uri: item.logo_url }} style={s.logo} resizeMode="cover" />
         : <View style={[s.logo, s.logoFallback]}><Ionicons name="car-sport-outline" size={18} color={colors.textSecondary} /></View>
       }
       <View style={{ flex: 1 }}>

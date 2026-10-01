@@ -1,9 +1,10 @@
-import { View, Text, Image, ScrollView, StyleSheet } from 'react-native'
+import { View, Text, ScrollView, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, category as CAT, type, radii, elevation } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 import IconButton from './IconButton'
+import RemoteImage from './RemoteImage'
 import { StatusBar } from 'expo-status-bar'
 import ContactBar from './ContactBar'
 
@@ -33,7 +34,7 @@ export default function DetailScaffold({
       <ScrollView {...scrollProps} contentContainerStyle={{ paddingBottom: (actions ? 96 : 24) + insets.bottom }} showsVerticalScrollIndicator={false}>
         <View style={[s.photo, { height: DETAIL_PHOTO_H + insets.top, backgroundColor: c.bg }]}>
           {photo
-            ? <Image source={photo} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+            ? <RemoteImage source={photo} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
             : <Ionicons name={icon} size={64} color={c.ink} style={{ marginTop: insets.top }} />}
         </View>
         <View style={s.sheet}>

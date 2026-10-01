@@ -38,6 +38,7 @@ import {
   haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
 import BackButton from '../components/BackButton'
+import LocationOffRow from '../components/LocationOffRow'
 import RedesignHero, { heroHeight } from '../components/home/redesign/RedesignHero'
 import OliBar, { OLI_BAR_H } from '../components/home/redesign/OliBar'
 import { weatherPhoto, isNightNow } from '../constants/weatherPhotos'
@@ -45,7 +46,7 @@ import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { DutyTile, EmergencyTile, EventBanner, dutyTileNeedsRoom, TILE_H, TILE_H_ALERT, GAP as WIDGET_GAP } from '../components/home/redesign/Widgets'
 import ServicePanels, { FavouritePanel } from '../components/home/redesign/ServicePanels'
-import { SectionHeader, useTabBarFootprint } from '../components/ui'
+import { SectionHeader, useTabBarFootprint, RemoteImage } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { unplacedLiveModules, duplicatePlacements } from '../constants/homeGroups'
 // Facility-list redesign (S3) — renderFacilityList() only.
@@ -183,6 +184,8 @@ export default function HomeScreen({
   notifications,
   facilityLoadError,
   locationDenied,
+  locationCanAsk = true,
+  onEnableLocation,
   weatherData,
   hamburgerRef,
   searchRef,
@@ -1215,7 +1218,9 @@ export default function HomeScreen({
                     <Button variant="text" icon="refresh" title={t('uiRetry', lang)} onPress={onRetry} />
                   </View>
                 )}
-                {locationDenied && <OnPhotoLabel style={fr.note} numberOfLines={0}>{t('enableLocation', lang)}</OnPhotoLabel>}
+                {locationDenied && (onEnableLocation
+                  ? <LocationOffRow lang={lang} canAsk={locationCanAsk} onEnable={onEnableLocation} style={fr.locRow} />
+                  : <OnPhotoLabel style={fr.note} numberOfLines={0}>{t('enableLocation', lang)}</OnPhotoLabel>)}
               </>
             )}
             ListEmptyComponent={facilityLoadError && facilities.length === 0 ? (
@@ -1505,7 +1510,7 @@ export default function HomeScreen({
                 onPress={() => item.provider_id ? onSelectFacility(item) : onUnclaimedFacility(item)}
               >
                 {item.cover_image_url
-                  ? <Image source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
+                  ? <RemoteImage source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
                   : null
                 }
                 <View style={s.cardBody}>
@@ -1517,7 +1522,7 @@ export default function HomeScreen({
                   <View style={s.cardMain}>
                     <View style={[s.typeIcon, { backgroundColor: tc.bg }]}>
                       {item.logo_url
-                        ? <Image source={{ uri: item.logo_url }} style={{ width: 36, height: 36, borderRadius: 8 }} resizeMode="contain" />
+                        ? <RemoteImage placeholderColor="transparent" source={{ uri: item.logo_url }} style={{ width: 36, height: 36, borderRadius: 8 }} resizeMode="contain" />
                         : <TypeSVGIcon type={item.type} size={22} color={tc.text} />
                       }
                     </View>
@@ -1936,6 +1941,7 @@ const fr = StyleSheet.create({
   dutySub:    { ...TYPE.small, color: colors.textSecondary },
   inlineErr:  { marginBottom: 12, alignItems: 'flex-start' },
   note:       { alignSelf: 'center', marginBottom: 12 },
+  locRow:     { marginBottom: 12 },
   card:       { marginBottom: 10 },
   actions:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
 })

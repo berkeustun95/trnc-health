@@ -1,4 +1,4 @@
-import { Component, Fragment, useEffect, useState, useRef } from 'react'
+import { Component, Fragment, useEffect, useState, useRef, useCallback } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Pressable, Platform, TextInput, ScrollView, Linking, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
 import { addBackListener } from './utils/backHandler'
@@ -8,7 +8,9 @@ import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
-import { passiveFix } from './utils/locationServices'
+import { passiveFix, askedFix } from './utils/locationServices'
+import { requestWithPrimer } from './utils/permissionPrimer'
+import PermissionPrimer from './components/PermissionPrimer'
 // Deep imports, never the barrels: '@expo-google-fonts/inter' (and the Playfair one) is a barrel
 // of top-level requires, so importing ANY name from it bundles every face it has. These six
 // are the faces that are registered and rendered; see the note at useFonts below.
@@ -516,6 +518,34 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [userLocation, setUserLocation] = useState(null)
   const [locationDenied, setLocationDenied] = useState(false)
+  // Redesign: can the OS still ask? false = permanently denied → the screens offer "Ayarları aç";
+  // true (never asked, or "Şimdi değil") → they offer the explanation + OS pop-up again.
+  const [locationCanAsk, setLocationCanAsk] = useState(true)
+  // Bumped by the notifications inbox's "Bildirimleri aç" (a tap → the explanation shows again).
+  const [pushRetry, setPushRetry] = useState(0)
+  const enableLocation = useCallback(async () => {
+    if (!locationCanAsk) { Linking.openSettings().catch(() => {}); return }
+    const r = await requestWithPrimer('location')
+    setLocationCanAsk(r.canAskAgain)
+    if (r.status !== 'granted') return
+    const loc = await askedFix(Location.Accuracy.Balanced)   // a tap: may ask to turn device location on
+    if (loc) { setUserLocation(loc.coords); setLocationDenied(false) }
+  }, [locationCanAsk])
+  // Back from Settings with location now allowed: pick it up without a relaunch.
+  useEffect(() => {
+    if (!REDESIGN || !locationDenied) return
+    const sub = AppState.addEventListener('change', async st => {
+      if (st !== 'active') return
+      try {
+        const { status, canAskAgain } = await Location.getForegroundPermissionsAsync()
+        setLocationCanAsk(canAskAgain !== false)
+        if (status !== 'granted') return
+        const loc = await passiveFix(Location.Accuracy.Balanced)
+        if (loc) { setUserLocation(loc.coords); setLocationDenied(false) }
+      } catch {}
+    })
+    return () => sub.remove()
+  }, [locationDenied])
   const [dutyFacilityId, setDutyFacilityId] = useState(null)
   // Roster health for the Home banner. Read from duty_list — the table DutyListScreen
   // already depends on — so the banner can stop promising a list that is not there.
@@ -1267,7 +1297,9 @@ export default function App() {
     async function registerPushToken() {
       try {
         if (!Device.isDevice) return
-        const { status } = await Notifications.requestPermissionsAsync()
+        const { status } = REDESIGN
+          ? await requestWithPrimer('notifications', { auto: pushRetry === 0 })
+          : await Notifications.requestPermissionsAsync()
         if (status !== 'granted') return
         if (Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync('default', {
@@ -1284,7 +1316,7 @@ export default function App() {
       }
     }
     registerPushToken()
-  }, [session])
+  }, [session, pushRetry])
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
@@ -1370,7 +1402,14 @@ export default function App() {
 
       let resolvedCoords = { latitude: 35.1856, longitude: 33.3823 }
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync()
+        let status
+        if (REDESIGN) {
+          const r = await requestWithPrimer('location', { auto: true })
+          status = r.status
+          setLocationCanAsk(r.canAskAgain)
+        } else {
+          ;({ status } = await Location.requestForegroundPermissionsAsync())
+        }
         if (status !== 'granted') {
           setLocationDenied(true)
         } else {
@@ -1716,7 +1755,7 @@ export default function App() {
   // FAB and PolicyUpdateNotice off the screen — the force modal can never collide with them.
   } else if (updateTier === 'force') {
     content = showDutyList
-      ? <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+      ? <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
       : <View style={styles.center} />
   } else if (ageDeletedNotice) {
     // A sign-out that failed offline would leave a session for a deleted user; retry it here.
@@ -1800,7 +1839,7 @@ export default function App() {
     // 20261004, reviews. There is no second path to close: booking was the only write
     // that did not go through onRequireAccount, and it is gone.
     if (showDutyList) {
-      content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+      content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
     } else if (showTowing) {
       content = <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} backRef={towingBackRef} />
     } else if (selectedFacility) {
@@ -1824,7 +1863,7 @@ export default function App() {
         favorites={favorites}
         notifications={notifications}
         facilityLoadError={facilityLoadError}
-        locationDenied={locationDenied}
+        locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation}
         weatherData={weatherData}
         forceFacilityList
         hideHeaderActions
@@ -1959,7 +1998,7 @@ export default function App() {
   // Duty list ABOVE Notifications: a notification opens it on top, and back returns to the
   // notifications at the same scroll (slice 10).
   } else if (showDutyList) {
-    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
   } else if (showNotifs) {
     content = <NotificationsScreen
       notifications={notifications}
@@ -1970,6 +2009,7 @@ export default function App() {
       onClearAll={REDESIGN ? () => { setNotifClearError(null); setNotifClearAsk(true) } : () => clearAllNotifs().catch(() => {})}
       onMarkRead={markNotifRead}
       onNotifPress={() => setShowDutyList(true)}
+      onEnablePush={() => setPushRetry(n => n + 1)}
     />
   } else if (showEvents) {
     content = (MODULE_FLAGS.events || isAdmin)
@@ -2039,7 +2079,7 @@ export default function App() {
             operator={connectivityOperator}
             lang={lang}
             userLocation={userLocation}
-            locationDenied={locationDenied}
+            locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation}
             onBack={() => setConnectivitySub('operator')}
           />
       : connectivitySub?.view === 'package'
@@ -2054,7 +2094,7 @@ export default function App() {
             operator={connectivityOperator}
             lang={lang}
             userLocation={userLocation}
-            locationDenied={locationDenied}
+            locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation}
             onBack={() => setConnectivitySub(null)}
             onOpenPackage={pkg => setConnectivitySub({ view: 'package', pkg })}
             onOpenStores={() => setConnectivitySub('stores')}
@@ -2417,7 +2457,7 @@ export default function App() {
             favorites={favorites}
             notifications={notifications}
             facilityLoadError={facilityLoadError}
-            locationDenied={locationDenied}
+            locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation}
             weatherData={weatherData}
             hamburgerRef={hamburgerRef}
             searchRef={searchRef}
@@ -3029,6 +3069,7 @@ export default function App() {
         onDuty={() => setShowDutyList(true)}
       />
       <EdgeSwipeStrip />
+      {REDESIGN && fontsLoaded && <PermissionPrimer lang={lang} />}
     </SafeAreaProvider>
   )
 }

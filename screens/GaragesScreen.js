@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
-  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Linking,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -25,6 +25,7 @@ import { colors as C, category as CAT, type, radii, elevation, press } from '../
 import {
   ScreenHeader as UiHeader, FilterBar, Dropdown, InfoBanner, ListCard, ErrorState, EmptyState, CardSkeleton,
   ModuleScreen,
+  RemoteImage,
 } from '../components/ui'
 
 // Multi-tag auto-service categories. A garage can offer several; the directory
@@ -52,13 +53,13 @@ function GarageCard({ item, lang, onPress, showFeatured }) {
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
       {!!item.cover_image_url && (
-        <Image source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
+        <RemoteImage source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
       )}
       <View style={s.cardBody}>
         {showFeatured && isFeatured(item) && <FeaturedBadge lang={lang} style={{ marginBottom: 8 }} />}
         <View style={s.cardHead}>
           {!!item.logo_url && (
-            <Image source={{ uri: item.logo_url }} style={s.cardLogo} resizeMode="cover" />
+            <RemoteImage source={{ uri: item.logo_url }} style={s.cardLogo} resizeMode="cover" />
           )}
           <Text style={[s.cardName, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
         </View>

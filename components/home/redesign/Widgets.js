@@ -6,7 +6,7 @@ import { t, tCount } from '../../../constants/i18n'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../../utils/dutyStatus'
 import { rememberStripKind } from '../../../utils/homeStripResolver'
 import { untilTr } from '../../../utils/turkishTime'
-import { Bone, IconButton } from '../../ui'
+import { Bone, IconButton, RemoteImage } from '../../ui'
 
 // Home v3 tiles: two equal cards, 104pt. Duty is the V2 live-strip card (photo, icon badge
 // top-left, dark band); Acil Numaralar is solid health red. Each band carries its title and
@@ -151,7 +151,7 @@ export function EventBanner({ item, loading, lang, onPress, onDismiss }) {
     <View>
       <TouchableOpacity onPress={() => onPress?.(item)} activeOpacity={press.card} accessibilityRole="button"
         accessibilityLabel={[title, time, tag].filter(Boolean).join(', ')} style={s.banner}>
-        <Image source={item.imageUrl ? { uri: item.imageUrl } : fallback} style={s.bannerPhoto} resizeMode="cover" />
+        <RemoteImage source={item.imageUrl ? { uri: item.imageUrl } : fallback} style={s.bannerPhoto} resizeMode="cover" />
         {!!time && (
           <View style={s.timeChip}>
             <Ionicons name="time-outline" size={14} color={colors.textPrimary} />

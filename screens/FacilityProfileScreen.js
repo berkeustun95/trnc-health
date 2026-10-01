@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
-import { View, Text, Image, ScrollView, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Modal, StyleSheet, Linking, Dimensions, Alert } from 'react-native'
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Modal, StyleSheet, Linking, Dimensions, Alert } from 'react-native'
 import MapView, { Marker } from 'react-native-maps'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
@@ -21,7 +21,7 @@ import { GARAGE_CATEGORIES } from './GaragesScreen'
 import BackButton from '../components/BackButton'
 import OsmAttribution from '../components/OsmAttribution'
 import { REDESIGN } from '../constants/redesign'
-import { DetailScaffold, InfoRow, IconButton } from '../components/ui'
+import { DetailScaffold, InfoRow, IconButton, RemoteImage } from '../components/ui'
 import { type as TYPE, radii } from '../constants/theme'
 
 const GARAGE_LABEL_KEY = Object.fromEntries(GARAGE_CATEGORIES.map(c => [c.key, c.labelKey]))
@@ -534,7 +534,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
           <Ionicons name="close" size={22} color="#fff" />
         </TouchableOpacity>
         {lightbox && (
-          <Image source={{ uri: lightbox }} style={s.lightboxImg} resizeMode="contain" />
+          <RemoteImage placeholderColor="transparent" source={{ uri: lightbox }} style={s.lightboxImg} resizeMode="contain" />
         )}
       </TouchableOpacity>
     </Modal>
@@ -592,7 +592,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
           {facility.logo_url ? (
             <TouchableOpacity activeOpacity={0.9} onPress={() => setLightbox(facility.logo_url)} style={RS.logoWrap}
               accessibilityRole="imagebutton" accessibilityLabel={facility.name}>
-              <Image source={{ uri: facility.logo_url }} style={RS.logo} resizeMode="contain" />
+              <RemoteImage placeholderColor="transparent" source={{ uri: facility.logo_url }} style={RS.logo} resizeMode="contain" />
             </TouchableOpacity>
           ) : null}
 
@@ -606,7 +606,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
               contentContainerStyle={{ gap: 8 }}
               renderItem={({ item }) => (
                 <TouchableOpacity onPress={() => setLightbox(item)} activeOpacity={0.85} accessibilityRole="imagebutton">
-                  <Image source={{ uri: item }} style={RS.photoThumb} resizeMode="cover" />
+                  <RemoteImage source={{ uri: item }} style={RS.photoThumb} resizeMode="cover" />
                 </TouchableOpacity>
               )}
             />
@@ -668,7 +668,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
           {/* Cover image */}
           {facility.cover_image_url
             ? <TouchableOpacity activeOpacity={0.9} onPress={() => setLightbox(facility.cover_image_url)}>
-                <Image source={{ uri: facility.cover_image_url }} style={s.cover} resizeMode="cover" />
+                <RemoteImage source={{ uri: facility.cover_image_url }} style={s.cover} resizeMode="cover" />
               </TouchableOpacity>
             : <View style={[s.cover, s.coverFallback, { backgroundColor: tc.bg }]}>
                 <Text style={s.coverFallbackIcon}>{TYPE_ICONS[facility.type] ?? '🏥'}</Text>
@@ -680,7 +680,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
             <View style={s.identityRow}>
               {facility.logo_url
                 ? <TouchableOpacity activeOpacity={0.9} onPress={() => setLightbox(facility.logo_url)}>
-                    <Image source={{ uri: facility.logo_url }} style={s.logo} resizeMode="contain" />
+                    <RemoteImage placeholderColor="transparent" source={{ uri: facility.logo_url }} style={s.logo} resizeMode="contain" />
                   </TouchableOpacity>
                 : <View style={[s.logo, s.logoFallback, { backgroundColor: tc.bg }]}>
                     <Text style={{ fontSize: 22 }}>{TYPE_ICONS[facility.type] ?? '🏥'}</Text>
@@ -709,7 +709,7 @@ export default function FacilityProfileScreen({ facility, lang, session, isFavor
                   contentContainerStyle={{ gap: 8 }}
                   renderItem={({ item }) => (
                     <TouchableOpacity onPress={() => setLightbox(item)} activeOpacity={0.85}>
-                      <Image source={{ uri: item }} style={s.photoThumb} resizeMode="cover" />
+                      <RemoteImage source={{ uri: item }} style={s.photoThumb} resizeMode="cover" />
                     </TouchableOpacity>
                   )}
                 />

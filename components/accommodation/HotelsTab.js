@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { colors, shadow, radii, type, elevation, category, TAP } from '../../constants/theme'
 import { REDESIGN } from '../../constants/redesign'
-import { CardSkeleton, EmptyState, ErrorState } from '../ui'
+import { CardSkeleton, EmptyState, ErrorState, RemoteImage } from '../ui'
 import { t } from '../../constants/i18n'
 import FilterDropdown from '../FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../../constants/regions'
@@ -52,7 +52,7 @@ function HotelCard({ hotel, lang, district }) {
 
   return (
     <View style={hs.card}>
-      {!!hotel.photo_url && <Image source={{ uri: hotel.photo_url }} style={hs.photo} resizeMode="cover" />}
+      {!!hotel.photo_url && <RemoteImage source={{ uri: hotel.photo_url }} style={hs.photo} resizeMode="cover" />}
       <View style={hs.cardBody}>
         <Text style={hs.name} numberOfLines={2}>{hotel.name}</Text>
 

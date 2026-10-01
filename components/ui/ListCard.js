@@ -1,7 +1,8 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, type, radii, elevation, press } from '../../constants/theme'
 import CategoryIcon from './CategoryIcon'
+import RemoteImage from './RemoteImage'
 import ContactBar from './ContactBar'
 import { useOnPhoto, OnPhotoContext } from './onPhoto'
 import { CARD_BG } from './ModuleScreen'
@@ -20,7 +21,7 @@ export default function ListCard({
 }) {
   const onPhoto = useOnPhoto()   // on a module photo: 93% white (text stays ≥ 5.1:1)
   const lead = leading?.uri || leading?.source
-    ? <Image source={leading.source || { uri: leading.uri }} style={s.thumb} resizeMode="cover" accessibilityIgnoresInvertColors />
+    ? <RemoteImage source={leading.source || { uri: leading.uri }} style={s.thumb} resizeMode="cover" accessibilityIgnoresInvertColors />
     : leading?.icon ? <CategoryIcon icon={leading.icon} category={leading.category} size={48} /> : null
   const head = (
     <View style={s.head}>

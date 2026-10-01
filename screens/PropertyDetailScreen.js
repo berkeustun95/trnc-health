@@ -1,14 +1,14 @@
 import AccommodationDetailBottomSlot from '../components/ads/AccommodationDetailBottomSlot'
 import { useState } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
   FlatList, Dimensions, Linking, Platform,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, category as CAT, type, radii, elevation, TAP } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
-import { IconButton, InfoRow, ContactBar, Button } from '../components/ui'
+import { IconButton, InfoRow, ContactBar, Button, RemoteImage } from '../components/ui'
 import { t } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { areaName } from '../constants/areas'
@@ -196,7 +196,7 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
               keyExtractor={i => i.id}
               onMomentumScrollEnd={e => setImgIdx(Math.round(e.nativeEvent.contentOffset.x / W))}
               renderItem={({ item }) => (
-                <Image source={{ uri: item.url }} style={ds.galleryImg} resizeMode="cover" />
+                <RemoteImage source={{ uri: item.url }} style={ds.galleryImg} resizeMode="cover" />
               )}
             />
             {images.length > 1 && (
@@ -395,7 +395,7 @@ export default function PropertyDetailScreen({ property: prop, lang, onBack, onO
             only appears when something has gone wrong, is the worst place for it.
             One layout, correct either way. The vertical cost is the price of that. */}
         {agency?.logo_url ? (
-          <Image source={{ uri: agency.logo_url }} style={ds.contactLogo} resizeMode="contain"
+          <RemoteImage placeholderColor="transparent" source={{ uri: agency.logo_url }} style={ds.contactLogo} resizeMode="contain"
             accessibilityLabel={agency?.name ?? ''} />
         ) : (
           <Text style={ds.contactName} numberOfLines={1}>{agency?.name || '—'}</Text>
@@ -476,7 +476,7 @@ function PropertyDetailRedesign({
               keyExtractor={i => i.id}
               onMomentumScrollEnd={e => setImgIdx(Math.round(e.nativeEvent.contentOffset.x / W))}
               renderItem={({ item }) => (
-                <Image source={{ uri: item.url }} style={ds.galleryImg} resizeMode="cover" accessibilityIgnoresInvertColors />
+                <RemoteImage source={{ uri: item.url }} style={ds.galleryImg} resizeMode="cover" accessibilityIgnoresInvertColors />
               )}
             />
             {images.length > 1 && (
@@ -598,7 +598,7 @@ function PropertyDetailRedesign({
           WhatsApp with the same handlers and URLs. */}
       <View style={[rs.sticky, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {agency?.logo_url ? (
-          <Image source={{ uri: agency.logo_url }} style={ds.contactLogo} resizeMode="contain"
+          <RemoteImage placeholderColor="transparent" source={{ uri: agency.logo_url }} style={ds.contactLogo} resizeMode="contain"
             accessibilityLabel={agency?.name ?? ''} />
         ) : (
           <Text style={rs.agencyName} numberOfLines={1}>{agency?.name || '—'}</Text>

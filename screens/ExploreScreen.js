@@ -3,7 +3,7 @@ import ExploreListInlineSlot from '../components/ads/ExploreListInlineSlot'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ScrollView, Image, Linking,
+  ActivityIndicator, ScrollView, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -31,6 +31,7 @@ import { REDESIGN } from '../constants/redesign'
 import {
   ScreenHeader as KitHeader, FilterBar, ListCard, EmptyState, ErrorState, CardSkeleton,
   CategoryIcon, IconButton, ModuleScreen,
+  RemoteImage,
 } from '../components/ui'
 import { colors as C, type, elevation, press } from '../constants/theme'
 
@@ -77,7 +78,7 @@ function PlaceCard({ item, lang, onPress, showFeatured, isSaved, onToggleSave })
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.88}>
       <View style={s.photoWrap}>
         {photo
-          ? <Image source={{ uri: photo }} style={s.photo} resizeMode="cover" />
+          ? <RemoteImage source={{ uri: photo }} style={s.photo} resizeMode="cover" />
           : <View style={[s.photoPlaceholder, { backgroundColor: pc.bg }]}>
               <Text style={s.photoEmoji}>{groupEmoji(group)}</Text>
             </View>
@@ -191,7 +192,7 @@ function BottomPinCard({ item, lang, onClose, onViewProfile }) {
     <View style={pm.card}>
       <View style={pm.row}>
         {photo
-          ? <Image source={{ uri: photo }} style={pm.thumb} resizeMode="cover" />
+          ? <RemoteImage source={{ uri: photo }} style={pm.thumb} resizeMode="cover" />
           : <View style={[pm.thumb, pm.thumbFallback, { backgroundColor: pc.bg }]}>
               <Text style={pm.thumbEmoji}>{groupEmoji(group)}</Text>
             </View>

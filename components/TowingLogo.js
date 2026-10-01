@@ -1,5 +1,6 @@
 import { View, Text, Image, StyleSheet } from 'react-native'
 import { colors } from '../constants/theme'
+import { RemoteImage } from './ui'
 
 // Firm logo, or an initials monogram when there is no logo yet.
 //
@@ -36,7 +37,7 @@ export default function TowingLogo({ uri, name, size = 64, style }) {
   if (uri) {
     return (
       <View style={boxStyle}>
-        <Image source={{ uri }} style={s.img} resizeMode="cover" />
+        <RemoteImage source={{ uri }} style={s.img} resizeMode="cover" />
       </View>
     )
   }

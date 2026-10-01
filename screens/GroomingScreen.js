@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
-  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Linking,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -20,6 +20,7 @@ import { colors as C, category as CAT, type, radii, elevation, press } from '../
 import {
   ScreenHeader as UiHeader, FilterBar, Dropdown, InfoBanner, ListCard, ErrorState, EmptyState, CardSkeleton,
   ModuleScreen,
+  RemoteImage,
 } from '../components/ui'
 
 const CATEGORIES = [
@@ -39,12 +40,12 @@ function ProviderCard({ item, lang, onPress }) {
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
       {!!item.cover_image_url && (
-        <Image source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
+        <RemoteImage source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
       )}
       <View style={s.cardBody}>
         <View style={s.cardTop}>
           {!!item.logo_url && (
-            <Image source={{ uri: item.logo_url }} style={s.cardLogo} resizeMode="cover" />
+            <RemoteImage source={{ uri: item.logo_url }} style={s.cardLogo} resizeMode="cover" />
           )}
           <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
         </View>

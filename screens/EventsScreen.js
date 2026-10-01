@@ -27,6 +27,7 @@ import { StatusBar } from 'expo-status-bar'
 import { formatPetDate } from '../constants/petsContent'
 import {
   ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button, ModuleScreen,
+  RemoteImage,
 } from '../components/ui'
 import { colors as C, category as CAT, type, radii, elevation } from '../constants/theme'
 
@@ -192,7 +193,7 @@ function EventCard({ event, lang, onPress }) {
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.88}>
       {img
-        ? <Image source={{ uri: img }} style={s.thumb} resizeMode="cover" />
+        ? <RemoteImage source={{ uri: img }} style={s.thumb} resizeMode="cover" />
         : <View style={[s.thumb, s.thumbFallback]}>
             <Ionicons name="calendar-outline" size={32} color={colors.border} />
           </View>
@@ -285,13 +286,13 @@ function ImageViewer({ images, startIndex, onClose, lang }) {
             onMomentumScrollEnd={e => setPage(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))}
             renderItem={({ item }) => (
               <TouchableOpacity activeOpacity={1} onPress={onClose}>
-                <Image source={{ uri: item }} style={s.viewerImage} resizeMode="contain" />
+                <RemoteImage placeholderColor="transparent" source={{ uri: item }} style={s.viewerImage} resizeMode="contain" />
               </TouchableOpacity>
             )}
           />
         ) : (
           <TouchableOpacity activeOpacity={1} onPress={onClose}>
-            <Image source={{ uri: images[0] }} style={s.viewerImage} resizeMode="contain" />
+            <RemoteImage placeholderColor="transparent" source={{ uri: images[0] }} style={s.viewerImage} resizeMode="contain" />
           </TouchableOpacity>
         )}
       </Animated.View>
@@ -402,7 +403,7 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
                       onPress={() => setViewerIndex(index)}
                       accessibilityRole="imagebutton"
                     >
-                      <Image
+                      <RemoteImage
                         source={{ uri: item }}
                         style={[s.detailImage, { aspectRatio: heroRatio }]}
                         resizeMode="contain"

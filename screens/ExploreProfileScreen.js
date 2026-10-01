@@ -2,7 +2,7 @@ import ExploreDetailBottomSlot from '../components/ads/ExploreDetailBottomSlot'
 import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, FlatList, Dimensions, Linking, Modal, TextInput, ActivityIndicator,
+  FlatList, Dimensions, Linking, Modal, TextInput, ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -22,7 +22,7 @@ import BackButton from '../components/BackButton'
 import ComingSoonScreen from '../components/ComingSoonScreen'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import { REDESIGN } from '../constants/redesign'
-import { DetailScaffold, IconButton, Button } from '../components/ui'
+import { DetailScaffold, IconButton, Button, RemoteImage } from '../components/ui'
 import { colors as C, category as CAT, type, radii, press } from '../constants/theme'
 
 const { width: W } = Dimensions.get('window')
@@ -254,7 +254,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
                 <TouchableOpacity key={i} onPress={() => setImgIdx(i)} activeOpacity={press.small}
                   accessibilityRole="imagebutton" accessibilityState={{ selected: i === imgIdx }}
                   accessibilityLabel={`${i + 1} / ${photos.length}`}>
-                  <Image source={{ uri: u }} style={[r.thumb, i === imgIdx && r.thumbActive]} resizeMode="cover" />
+                  <RemoteImage source={{ uri: u }} style={[r.thumb, i === imgIdx && r.thumbActive]} resizeMode="cover" />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -360,7 +360,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
                 setImgIdx(Math.round(e.nativeEvent.contentOffset.x / W))
               }
               renderItem={({ item }) => (
-                <Image source={{ uri: item }} style={s.galleryImg} resizeMode="cover" />
+                <RemoteImage source={{ uri: item }} style={s.galleryImg} resizeMode="cover" />
               )}
             />
             {photos.length > 1 && (

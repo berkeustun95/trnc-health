@@ -20,6 +20,8 @@ import { REGION_LABEL_KEY } from '../constants/regions'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { colors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
+import { REDESIGN } from '../constants/redesign'
+import { requestWithPrimer } from '../utils/permissionPrimer'
 import { medalDate } from '../utils/routeMedals'
 import { WALK_SIM, fakeFixNear } from '../utils/walkSim'
 
@@ -284,7 +286,9 @@ export function useWalkPosition(active) {
         let { status: st, canAskAgain } = await Location.getForegroundPermissionsAsync()
         if (st !== 'granted' && canAskAgain && !asked) {
           asked = true
-          ;({ status: st } = await Location.requestForegroundPermissionsAsync())
+          ;({ status: st } = REDESIGN
+            ? await requestWithPrimer('location')
+            : await Location.requestForegroundPermissionsAsync())
         }
         if (gone) return
         setStatus(st === 'granted' ? 'granted' : 'denied')

@@ -1,5 +1,7 @@
 import { useScrollMemory } from '../utils/scrollMemory'
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { useEffect, useState } from 'react'
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, AppState, Linking } from 'react-native'
+import * as Notifications from 'expo-notifications'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow } from '../constants/theme'
@@ -49,12 +51,36 @@ function timeAgoLocal(isoString, lang) {
 const DUTY_KEYWORDS = ['duty', 'nöbetçi', 'مناوبة', 'дежурн', 'εφημερεύ', 'garde', 'guardia', 'notdienst', 'نوبتی']
 const isDutyNotice = item => DUTY_KEYWORDS.some(kw => (item.title ?? '').toLowerCase().includes(kw))
 
-function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAllRead, onClearAll, onNotifPress, onMarkRead }) {
+// Notifications are not allowed: one quiet row, no nagging. The OS will still ask → "Bildirimleri
+// aç" (the explanation, then the OS pop-up); it will not → "Ayarları aç". Re-read on return.
+function PushOffRow({ lang, onEnablePush }) {
+  const [perm, setPerm] = useState(null)
+  useEffect(() => {
+    let gone = false
+    const check = () => Notifications.getPermissionsAsync().then(p => { if (!gone) setPerm(p) }).catch(() => {})
+    check()
+    const sub = AppState.addEventListener('change', st => { if (st === 'active') check() })
+    return () => { gone = true; sub.remove() }
+  }, [])
+  if (!perm || perm.status === 'granted') return null
+  const settings = perm.canAskAgain === false
+  return (
+    <View style={r.pushOff}>
+      <Ionicons name="notifications-off-outline" size={18} color={C.textSecondary} />
+      <Text style={r.pushOffText}>{t('permNotifOff', lang)}</Text>
+      <Button variant="text" title={t(settings ? 'openSettings' : 'permNotifTurnOn', lang)}
+        onPress={() => (settings ? Linking.openSettings().catch(() => {}) : onEnablePush?.())} />
+    </View>
+  )
+}
+
+function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAllRead, onClearAll, onNotifPress, onMarkRead, onEnablePush }) {
   const listMem = useScrollMemory('notifs')
   const unread = notifications.filter(n => !n.read).length
   return (
     <SafeAreaView style={r.safe} edges={['top']}>
       <ScreenHeader title={t('notifications', lang)} onBack={onBack} lang={lang} />
+      <PushOffRow lang={lang} onEnablePush={onEnablePush} />
       {notifications.length > 0 && (
         <View style={r.actions}>
           {unread > 0
@@ -205,6 +231,9 @@ const s = StyleSheet.create({
 const r = StyleSheet.create({
   safe:        { flex: 1, backgroundColor: C.canvas },
   actions:     { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 8 },
+  pushOff:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 8,
+                 paddingLeft: 14, paddingRight: 4, minHeight: 48, borderRadius: radii.md, backgroundColor: C.card, ...elevation.card },
+  pushOffText: { ...type.small, color: C.textSecondary, flex: 1 },
   list:        { paddingHorizontal: 16, paddingBottom: 32 },
   card:        { backgroundColor: C.card, borderRadius: radii.md, padding: 14, marginBottom: 8,
                  flexDirection: 'row', alignItems: 'flex-start', gap: 10 },

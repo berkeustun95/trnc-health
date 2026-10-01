@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, ellipsizeSlack } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -7,6 +7,7 @@ import { Skeleton } from '../Skeleton'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../utils/dutyStatus'
 import { STRIP_CARD_H, STRIP_BAND_H } from '../../constants/homeStrip'
 import { rememberStripKind } from '../../utils/homeStripResolver'
+import { RemoteImage } from '../ui'
 
 // ─── THE TWO BUNDLED IMAGES ─────────────────────────────────────────────────
 //
@@ -103,7 +104,7 @@ function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress,
           greyscale and colour-blindness. Same principle the standalone Nöbetçi row used. */}
       {alert
         ? <View style={[s.photo, s.photoAlert]} />
-        : <Image source={imageUrl ? { uri: imageUrl } : image} style={s.photo} resizeMode="cover" />}
+        : <RemoteImage source={imageUrl ? { uri: imageUrl } : image} style={s.photo} resizeMode="cover" />}
 
       <View style={[s.badge, alert && s.badgeAlert]}>
         <Ionicons name={alert ? 'alert-circle' : icon} size={15} color={alert ? '#fff' : colors.textPrimary} />

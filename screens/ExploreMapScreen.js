@@ -14,6 +14,7 @@
 
 import { StatusBar } from 'expo-status-bar'
 import { REDESIGN } from '../constants/redesign'
+import { requestWithPrimer } from '../utils/permissionPrimer'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import FilterDropdown from '../components/FilterDropdown'
 import {
@@ -460,11 +461,18 @@ export default function ExploreMapScreen({
     if (locating) return
     setLocating(true)
     try {
-      let { status, canAskAgain } = await Location.getForegroundPermissionsAsync()
-      let justAsked = false
-      if (status !== 'granted' && canAskAgain) {
-        justAsked = true
-        ;({ status } = await Location.requestForegroundPermissionsAsync())
+      let status, canAskAgain, justAsked = false
+      if (REDESIGN) {
+        // The explanation first. "Şimdi değil" (OS can still ask) is no reason to point at Settings.
+        const r = await requestWithPrimer('location')
+        ;({ status, canAskAgain } = r)
+        justAsked = r.asked || canAskAgain
+      } else {
+        ;({ status, canAskAgain } = await Location.getForegroundPermissionsAsync())
+        if (status !== 'granted' && canAskAgain) {
+          justAsked = true
+          ;({ status } = await Location.requestForegroundPermissionsAsync())
+        }
       }
       if (status !== 'granted') {
         // Only point at Settings when the OS will no longer ask — never right after a "No".

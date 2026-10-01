@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import LocationOffRow from '../components/LocationOffRow'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, SectionList, FlatList } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
@@ -200,7 +201,7 @@ function MesaryaNoteRedesign({ lang }) {
 // region's sections to the top rather than scrolling to them: the list is short,
 // and SectionList.scrollToLocation throws when the index is out of range — which
 // it would be on any day that region has no duty pharmacy.
-export default function DutyListScreen({ onBack, lang, userLocation, locationDenied, initialRegion = null }) {
+export default function DutyListScreen({ onBack, lang, userLocation, locationDenied, locationCanAsk = true, onEnableLocation, initialRegion = null }) {
   const [rows, setRows] = useState([])
   const [facIndex, setFacIndex] = useState(() => new Map())
   const [loading, setLoading] = useState(true)
@@ -343,6 +344,10 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
               <InlineAlert message={t('dutyIncompleteNotice', lang)} />
               <ContactBar actions={ktebActions} lang={lang} style={{ marginTop: 10 }} />
             </View>
+          ) : null}
+          {/* Nearest-first needs location: offer it once, quietly (App.js enableLocation). */}
+          {!loading && locationDenied && !!onEnableLocation ? (
+            <LocationOffRow lang={lang} canAsk={locationCanAsk} onEnable={onEnableLocation} style={r.partial} />
           ) : null}
 
           {loading ? (
