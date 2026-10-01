@@ -9,10 +9,16 @@ import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { passiveFix } from './utils/locationServices'
-import {
-  useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
-} from '@expo-google-fonts/inter'
-import { PlayfairDisplay_400Regular, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display'
+// Deep imports, never the barrels: '@expo-google-fonts/inter' (and the Playfair one) is a barrel
+// of top-level requires, so importing ANY name from it bundles every face it has. These six
+// are the faces that are registered and rendered; see the note at useFonts below.
+import { useFonts } from 'expo-font'
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular'
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium'
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold'
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold'
+import { PlayfairDisplay_400Regular } from '@expo-google-fonts/playfair-display/400Regular'
+import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display/700Bold'
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
@@ -478,10 +484,12 @@ export default function App() {
   //
   // ⚠ WHICH MEANS THE REAL NUMBER IS THE ONE NOBODY WAS LOOKING FOR: 30 font faces are
   //   bundled, 8.45 MB in total, and 24 of them — 6.69 MB — are never registered and can
-  //   never render. That is dead weight in every install and every OTA. The fix is deep
-  //   imports ('@expo-google-fonts/inter/400Regular/Inter_400Regular') instead of the
-  //   barrel, which is a separate change with its own risk (six import sites, and the
-  //   Playfair barrel has the same shape) and is NOT made here.
+  //   never render. That is dead weight in every install and every OTA.
+  //   FIXED in redesign S6 (2026-10-01) with deep imports at the top of this file. Measured
+  //   by two `expo export --platform android` runs from clean copies of the same commit:
+  //   47,844 KB → 41,244 KB, 51 → 27 .ttf assets (the 24 unregistered faces; the 27 left
+  //   are the six registered faces, Manrope, Roboto and the icon fonts). App.js was the
+  //   only import site of either barrel.
   //
   // Do not restate these figures from memory — re-export and diff. The reason this
   // comment is right is that somebody ran the two exports, not that the arithmetic looked
