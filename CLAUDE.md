@@ -27,11 +27,11 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   buckets are public today, only `avatars` is private (signed URLs, `Avatar.js`).
 - ⚠ **Never raise `min_supported_version` above `'1.0.0'`** without the force-tier device pass.
 - ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`** — the wrappers are the only guard.
-- ⚠ **Production is written only from GitHub Actions** (see "Production operations"). No service key,
-  Places key or ORS key on any Mac (removed 2026-10-01). Every writer calls `prodWriteGuard()` first
-  (`npm run check:prod-writes`, pre-push). New writer = new `workflow_dispatch` workflow, dry by default.
-  ⚠ ONE local credential remains: the Supabase CLI token (Keychain "Supabase CLI"), kept until the
-  migration path is decided — `supabase db push` cannot be used as-is (see supabase/CLAUDE.md).
+- ⚠ **Production is written only from GitHub Actions** (see "Production operations"). **No production
+  credential exists on this Mac**: service key, Places key, ORS key and the Supabase CLI token were all
+  removed 2026-10-01 and live only as repo secrets. Never `supabase login` or re-add one to the Keychain.
+  Every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New writer = new
+  `workflow_dispatch` workflow, dry by default.
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
 - ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
 - ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `NOTICE_FALLBACK` in `LiveStrip.js`, rank 3b
@@ -75,8 +75,9 @@ Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; secret
 - Edge functions: `supabase-functions-deploy -f function=<name>|all`. verify_jwt comes from
   `supabase/functions/deploy-config.json` (read from prod); a new function is added there first.
 - Health: `daily-health` (05:00 UTC daily: hotels, novest health + verify, notify). A red run emails.
-- Migrations: STILL BY HAND in the SQL editor (supabase/CLAUDE.md). No workflow yet: prod has no
-  `supabase_migrations` ledger and 13 prefixes repeat, so `db push` would treat all files as pending.
+- Migrations: `supabase-migrate -f file=<FULL name>.sql` (dry: SQL + ledger check), then `-f apply=true`.
+  Stamp first (`node scripts/migration-ledger.mjs --stamp <file>`; `--verify` checks it). Never `db push`:
+  prod has no CLI ledger and 13 prefixes repeat. Details: supabase/CLAUDE.md.
 
 ## Store-update popup
 `app_versions` (20261051): `latest_version` = dismissible, `min_supported_version` BLOCKS. Raising it
