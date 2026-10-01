@@ -14,7 +14,7 @@
 //   screen is not safe; parsing the screen is. If the constant is renamed or removed,
 //   this fails loudly rather than falling back to a guess.
 
-import { execFileSync } from 'node:child_process'
+import { serviceRoleKey } from './lib/prod-write-guard.mjs'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -69,8 +69,7 @@ if (existsSync(resolve(ROOT, '.env'))) {
     if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
   }
 }
-const key = execFileSync('security', ['find-generic-password', '-s', 'ada-supabase-service-role', '-w'],
-  { encoding: 'utf8' }).trim()
+const key = serviceRoleKey()   // repo secret in CI (daily-health workflow); no Mac holds one
 const supabase = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, key,
   { auth: { persistSession: false, autoRefreshToken: false } })
 

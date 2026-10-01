@@ -1,0 +1,50 @@
+# ─── Daily content health (read-only) ────────────────────────────────────────
+#
+# The checks that used to be run by hand from a Mac holding the service key. No Mac
+# holds one now, so this is where they run. Read-only: every script here only SELECTs.
+# Each step runs even if an earlier one failed, so one email carries every red; the
+# job fails if any did — that failure IS the alert (GitHub emails on failure).
+#
+# Gişe Kıbrıs health is not here: gisekibris-feed runs it daily as its last step.
+#
+#   gh workflow run daily-health
+
+name: daily-health
+
+on:
+  schedule:
+    # 05:00 UTC = 08:00 TRNC, after the 04:15 Gişe Kıbrıs sync.
+    - cron: '0 5 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  health:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Secrets present
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+      - name: hotels:health
+        if: success() || failure()
+        run: npm run -s hotels:health
+      - name: novest:health
+        if: success() || failure()
+        run: npm run -s novest:health
+      - name: novest:verify
+        if: success() || failure()
+        run: npm run -s novest:verify
+      - name: notify:health
+        if: success() || failure()
+        run: npm run -s notify:health

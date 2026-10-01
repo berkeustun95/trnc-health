@@ -6,7 +6,9 @@
 //   node scripts/import-walking-legs.mjs --force  # re-route legs that already look current
 //
 // REQUIRES 20261049_walking_legs.sql for a write run (a --dry run works without it).
-// Key: macOS Keychain `ada-ors-api-key` (never printed). DB: Keychain `ada-supabase-service-role`.
+// Keys: ORS_API_KEY and SUPABASE_SERVICE_ROLE_KEY, repository secrets, CI only (never printed):
+//   gh workflow run walking-legs            # dry
+//   gh workflow run walking-legs -f apply=true
 //
 // ─── WHAT IT DOES ───────────────────────────────────────────────────────────
 // For every consecutive pair of stops on every route (from the places' CURRENT coordinates),
@@ -26,13 +28,12 @@
 // Attribution for the stored geometry: © openrouteservice by HeiGIT, © OpenStreetMap
 // contributors (CC-BY-SA 4.0 / ODbL) — shown on the map wherever these paths are drawn.
 
-import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { metresBetween } from '../constants/walkingRoutes.js'
-import { prodWriteGuard } from './lib/prod-write-guard.mjs'
+import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ORS_URL = 'https://api.openrouteservice.org/v2/directions/foot-walking/geojson'
@@ -51,17 +52,10 @@ const MAX_EXTRA_M = 100
 const STALE_M = 50
 const dry = process.argv.includes('--dry')
 const force = process.argv.includes('--force')
-// No workflow: needs the ORS API key, which is not a repository secret.
-prodWriteGuard({ wouldWrite: !dry, workflow: null, dryHint: 'node scripts/import-walking-legs.mjs --dry' })
+prodWriteGuard({ wouldWrite: !dry, workflow: 'walking-legs', dryHint: 'node scripts/import-walking-legs.mjs --dry' })
 
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 const sleep = ms => new Promise(r => setTimeout(r, ms))
-function keychain(service) {
-  try {
-    return execFileSync('security', ['find-generic-password', '-s', service, '-w'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-  } catch { fail(`Keychain entry "${service}" not found.`) }
-}
 function loadEnv() {
   const p = resolve(ROOT, '.env')
   if (!existsSync(p)) return
@@ -74,9 +68,9 @@ const pt = ([lng, lat]) => ({ latitude: lat, longitude: lng })
 const r5 = n => Math.round(n * 1e5) / 1e5
 
 loadEnv()
-const db = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, keychain('ada-supabase-service-role'),
+const db = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, serviceRoleKey(),
   { auth: { persistSession: false, autoRefreshToken: false } })
-const ORS_KEY = keychain('ada-ors-api-key')
+const ORS_KEY = process.env.ORS_API_KEY?.trim() || fail('ORS_API_KEY is not set — a repository secret; run: gh workflow run walking-legs')
 
 const { data: routes, error: re } = await db.from('walking_routes')
   .select('source_id, name_i18n, walking_route_stops(position, places(id, name, latitude, longitude))')

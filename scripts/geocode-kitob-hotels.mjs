@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // ─── KITOB hotels → a pin: OSM where it agrees, else the corroborated Google Place ─
 //
-//   GOOGLE_PLACES_API_KEY=… npm run hotels:geocode -- --dry-run [--limit 10]
-//   GOOGLE_PLACES_API_KEY=… npm run hotels:geocode -- --apply        (needs 20261062)
+//   gh workflow run hotels-geocode -f limit=10            # dry run (GOOGLE_PLACES_API_KEY is a repo secret)
+//   gh workflow run hotels-geocode -f apply=true          # write (needs 20261062)
 //
 // POLICY (Berke 2026-09-29, revised; CLAUDE.md "Geocoding"): Google Places pins are accepted as
 // a KNOWN RISK (Places caching terms). A corroborated Places coordinate is stored when no OSM
@@ -27,13 +27,12 @@
 // OSM data is ODbL: "© OpenStreetMap contributors" wherever these pins are shown.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { normaliseFile, fold } from './import-kitob-hotels.mjs'
 import { resolveRegion } from '../utils/resolveRegion.js'
 import { osmSnapshot } from './lib/osm-snapshot.mjs'
-import { prodWriteGuard } from './lib/prod-write-guard.mjs'
+import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CSV = 'data/kitob/kitob-2026-09-17.csv'
@@ -43,8 +42,7 @@ const args = process.argv.slice(2)
 const DRY = args.includes('--dry-run')
 const APPLY = args.includes('--apply')
 const LIMIT = args.includes('--limit') ? Number(args[args.indexOf('--limit') + 1]) : Infinity
-// No workflow: needs GOOGLE_PLACES_API_KEY, which is not a repository secret.
-prodWriteGuard({ wouldWrite: APPLY, workflow: null, dryHint: 'node scripts/geocode-kitob-hotels.mjs --dry-run' })
+prodWriteGuard({ wouldWrite: APPLY, workflow: 'hotels-geocode', dryHint: 'gh workflow run hotels-geocode (the Places key is CI-only too)' })
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 
 // Accent-insensitive, Turkish-aware, Greek-safe comparison form.
@@ -165,7 +163,7 @@ async function main() {
     const envPath = resolve(ROOT, '.env')
     if (existsSync(envPath)) for (const l of readFileSync(envPath, 'utf8').split('\n')) {
       const m = l.match(/^\s*([\w.-]+)\s*=\s*(.*)$/); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '') }
-    const key = execFileSync('security', ['find-generic-password', '-s', 'ada-supabase-service-role', '-w'], { encoding: 'utf8' }).trim()
+    const key = serviceRoleKey()
     const { createClient } = await import('@supabase/supabase-js')
     sb = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, key, { auth: { persistSession: false } })
     const { data, error, count } = await sb.from('hotels').select('id,external_id,lat', { count: 'exact' }).eq('source', 'kitob')
