@@ -77,7 +77,7 @@ const failing = writers.filter(r => !r.ok)
 
 console.log(`\nProduction writers (${writers.length}) — each must call prodWriteGuard() first:`)
 for (const r of writers) console.log(`  ${r.ok ? '✓' : '✗'} ${r.file}${r.ok ? '' : `  — ${r.why}`}`)
-console.log(`\nRead-only with a service key (${readOnly.length}) — no guard needed; they cannot run locally once the key is gone:`)
+console.log(`\nReference a service key but make no write call (${readOnly.length}) — no guard needed:`)
 for (const r of readOnly) console.log(`    ${r.file}`)
 console.log(`\n${rows.length - writers.length - readOnly.length} other script(s) reach no service key.`)
 if (failing.length) {
