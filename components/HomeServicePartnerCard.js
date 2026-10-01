@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons'
 import HomeServiceIcon from './HomeServiceIcon'
 import PartnerLogoStrip from './PartnerLogoStrip'
 import { partnerLogo } from '../constants/partnerAssets'
-import { colors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius, radii, type, elevation } from '../constants/theme'
+import { CARD_BG } from './ui/ModuleScreen'
 import { REDESIGN } from '../constants/redesign'
 import { t } from '../constants/i18n'
 import { hsCategory, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
@@ -152,7 +153,7 @@ export default function HomeServicePartnerCard({
 // 2026-10-01 for the partner surfaces (Yurtlar, TadilArt, Shiny Paw). Label, position, link unchanged.
 const WA_DARK = { backgroundColor: '#075E54' }
 
-const s = StyleSheet.create({
+const legacyS = StyleSheet.create({
   // backgroundColor is EXPLICIT, not inherited: on Android a View with both borderRadius
   // and borderWidth renders an opaque background unless one is set.
   card:          { backgroundColor: colors.cardBg, borderRadius: radius.card, padding: 16,
@@ -184,3 +185,19 @@ const s = StyleSheet.create({
                    gap: 6, backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 10 },
   btnText:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
 })
+
+// Redesign (approved by Berke 2026-10-01): the shared card shape — 93% white on the module photo,
+// radius 20, elevation.card — and the kit type scale. The 2pt orange border (the pinned-partner
+// mark) stays; logo, colours, buttons, links and pinning are unchanged. The name is 17/700, the
+// same as the Alasia dorm card's (type.sheetTitle).
+const redesignS = StyleSheet.create({
+  card:         { backgroundColor: CARD_BG, borderRadius: radii.card, padding: 16,
+                  borderWidth: 2, borderColor: colors.accent, ...elevation.card },
+  badgeText:    { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.accent },
+  name:         { ...type.sheetTitle, color: colors.textPrimary },
+  tagline:      { ...type.small, color: colors.textSecondary, marginTop: 2 },
+  chipText:     { ...type.meta, color: colors.primaryDark },
+  coverageText: { ...type.meta, flex: 1, color: colors.textSecondary },
+  btnText:      { ...type.body, fontFamily: 'Inter_700Bold', color: '#fff' },
+})
+const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS
