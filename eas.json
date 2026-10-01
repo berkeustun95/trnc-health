@@ -22,6 +22,15 @@
       },
       "environment": "preview"
     },
+    "preview-testflight": {
+      "extends": "preview",
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "simulator": false,
+        "credentialsSource": "remote"
+      }
+    },
     "production-apk": {
       "extends": "production",
       "autoIncrement": false,
