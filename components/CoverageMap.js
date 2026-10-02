@@ -110,7 +110,7 @@ const s = StyleSheet.create({
     marginTop: -7,                // centre vertically on it (half a 14px line)
     alignItems: 'center',
   },
-  label:      { fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  label:      { fontSize: 11, fontFamily: 'Inter_700Bold', textAlign: 'center' },
   labelOn:    { color: '#FFFFFF' },
   labelOff:   { color: colors.textSecondary },
 

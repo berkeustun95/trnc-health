@@ -2,7 +2,7 @@ import ExploreDetailBottomSlot from '../components/ads/ExploreDetailBottomSlot'
 import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, FlatList, Dimensions, Linking, Modal, TextInput, ActivityIndicator,
+  FlatList, Dimensions, Linking, Modal, TextInput, ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -21,6 +21,9 @@ import ContentReportMenu from '../components/ContentReportMenu'
 import BackButton from '../components/BackButton'
 import ComingSoonScreen from '../components/ComingSoonScreen'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
+import { REDESIGN } from '../constants/redesign'
+import { DetailScaffold, IconButton, Button, RemoteImage } from '../components/ui'
+import { colors as C, category as CAT, type, radii, press } from '../constants/theme'
 
 const { width: W } = Dimensions.get('window')
 const GALLERY_H    = 280
@@ -66,10 +69,10 @@ function categoryLabel(category, lang) {
 // (house rule).
 //
 // The layout notes that used to live here moved with the markup, into PhotoCredit.js.
-function PhotoAttribution({ place, url, index, lang }) {
+function PhotoAttribution({ place, url, index, lang, style }) {
   const a = resolveAttribution(place, url, index)
   if (!a) return null   // legacy row with nothing to say — render nothing, never a blank line
-  return <PhotoCredit a={a} lang={lang} style={s.creditWrap} />
+  return <PhotoCredit a={a} lang={lang} style={style || s.creditWrap} />
 }
 
 export default function ExploreProfileScreen({ place, lang, session, onBack, onRequireAccount, isFavorite, onToggleFavorite, onAdNavigate, backRef = null }) {
@@ -179,6 +182,165 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
     )
   }
 
+  // ONE mount for both layouts: the ad guard counts exactly one <ExploreDetailBottomSlot> here.
+  const adSlot = <ExploreDetailBottomSlot lang={lang} onNavigate={onAdNavigate} />
+
+  // Shared by both layouts so the claim flow is one piece of markup.
+  const claimModal = (
+      <Modal visible={claimOpen === true} transparent animationType="fade" onRequestClose={() => setClaimOpen(false)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>{t('exploreClaimCta', lang)}</Text>
+            <Text style={s.modalLabel}>{t('exploreClaimNoteLabel', lang)}</Text>
+            <TextInput
+              style={s.modalInput}
+              value={claimNote}
+              onChangeText={setClaimNote}
+              placeholder={t('exploreClaimNotePlaceholder', lang)}
+              placeholderTextColor={colors.textSecondary}
+              multiline
+            />
+            {claimErr && <Text style={s.modalErr}>{claimErr}</Text>}
+            <View style={s.modalBtnRow}>
+              <TouchableOpacity style={s.modalCancel} onPress={() => setClaimOpen(false)} disabled={claimBusy}>
+                <Text style={s.modalCancelText}>{t('cancel', lang)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.modalSubmit} onPress={submitClaim} disabled={claimBusy} activeOpacity={0.85}>
+                {claimBusy
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={s.modalSubmitText}>{t('exploreClaimSubmit', lang)}</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+  )
+
+  if (REDESIGN) {
+    const desc = placeDesc(place, lang)
+    return (
+      <View style={{ flex: 1 }}>
+        <DetailScaffold
+          photo={photos.length > 0 ? { uri: photos[imgIdx] } : null}
+          icon={GROUP_META[group]?.icon || 'location-outline'}
+          tag={{ label: categoryLabel(place.category, lang), category: 'explore' }}
+          title={placeName(place, lang)}
+          subtitle={regionLabel(place.region, lang)}
+          onBack={onBack}
+          lang={lang}
+          actions={hasCoords ? [{ kind: 'directions', onPress: openDirections }] : undefined}
+          headerRight={
+            <View style={r.headerRight}>
+              {onToggleFavorite && (
+                <IconButton variant="frosted" icon={isFavorite ? 'heart' : 'heart-outline'}
+                  color={isFavorite ? C.dangerInk : C.textPrimary}
+                  onPress={onToggleFavorite} accessibilityLabel={t('save', lang)} />
+              )}
+              <View style={r.frosted}>
+                <ContentReportMenu contentType="place" contentId={place.id} lang={lang} onRequireAccount={onRequireAccount} />
+              </View>
+            </View>
+          }
+        >
+          {/* CC BY-SA: the credit for the photo currently shown above, first thing in the sheet. */}
+          {photos.length > 0 && (
+            <PhotoAttribution place={place} url={photos[imgIdx]} index={imgIdx} lang={lang} style={r.creditWrap} />
+          )}
+
+          {/* The scaffold shows one photo; the rest of the gallery is a thumbnail strip that swaps it. */}
+          {photos.length > 1 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={r.thumbStrip} contentContainerStyle={r.thumbRow}>
+              {photos.map((u, i) => (
+                <TouchableOpacity key={i} onPress={() => setImgIdx(i)} activeOpacity={press.small}
+                  accessibilityRole="imagebutton" accessibilityState={{ selected: i === imgIdx }}
+                  accessibilityLabel={`${i + 1} / ${photos.length}`}>
+                  <RemoteImage source={{ uri: u }} style={[r.thumb, i === imgIdx && r.thumbActive]} resizeMode="cover" />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {isBeach && (place.blue_flag || place.access_type) && (
+            <View style={r.badgeRow}>
+              {place.blue_flag && (
+                <View style={r.chip}>
+                  <Ionicons name="flag" size={13} color={CAT.explore.ink} />
+                  <Text style={r.chipText}>{t('blBlueFlagLabel', lang)}</Text>
+                </View>
+              )}
+              {!!place.access_type && (
+                <View style={r.chip}>
+                  <Text style={r.chipText}>
+                    {place.access_type === 'public' ? t('blAccessPublic', lang) : t('blAccessPrivate', lang)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {!!desc && <Text style={r.desc}>{desc}</Text>}
+
+          {/* Visit NCY partner credit: handler, URL and strings unchanged from the legacy layout. */}
+          {place.source === VISITNCY_SOURCE && (
+            <TouchableOpacity style={r.partnerCredit} activeOpacity={0.7} accessibilityRole="link"
+              onPress={() => {
+                logCreditTap(place.id, place.region)
+                Linking.openURL(creditUrl(lang)).catch(() => {})
+              }}>
+              <Ionicons name="ribbon-outline" size={14} color={C.primaryDark} />
+              <Text style={r.partnerCreditText}>{t('routeCredit', lang).replace('{brand}', creditBrand(lang))}</Text>
+              <Ionicons name="open-outline" size={13} color={C.primaryDark} />
+            </TouchableOpacity>
+          )}
+
+          {place.amenities?.length > 0 && (
+            <View style={r.section}>
+              <Text style={r.sectionTitle}>{t('blFacilitiesTitle', lang)}</Text>
+              <View style={r.badgeRow}>
+                {place.amenities.map((f, i) => (
+                  <View key={i} style={r.chip}><Text style={r.chipText}>{f}</Text></View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Coming Soon + waitlist only (MODULE_FLAGS.checkins) — same page as the legacy footer button. */}
+          <Button variant="secondary" icon="location-outline" title={t('checkinCta', lang)}
+            onPress={() => setShowCheckin(true)} fullWidth style={r.section} />
+
+          {showClaim && (
+            <View style={r.ownerCard}>
+              <Text style={r.ownerCardTitle}>{t('exploreClaimTitle', lang)}</Text>
+              <Button variant="secondary" icon="ribbon-outline" title={t('exploreClaimCta', lang)} onPress={startClaim} fullWidth />
+            </View>
+          )}
+          {claimed && (
+            <View style={r.ownerNotice}>
+              <Ionicons name="checkmark-circle" size={18} color={C.success} />
+              <Text style={r.ownerNoticeText}>{t('exploreClaimDone', lang)}</Text>
+            </View>
+          )}
+          {showFeature && (
+            <View style={r.ownerCard}>
+              <Text style={r.ownerCardTitle}>{t('exploreFeatureTitle', lang)}</Text>
+              <Text style={r.ownerCardBody}>{t('exploreFeatureBody', lang)}</Text>
+              <Button title={t('exploreFeatureCta', lang)} onPress={requestFeatured} loading={featBusy} fullWidth />
+            </View>
+          )}
+          {featSent && (
+            <View style={r.ownerNotice}>
+              <Ionicons name="checkmark-circle" size={18} color={C.success} />
+              <Text style={r.ownerNoticeText}>{t('exploreFeatureDone', lang)}</Text>
+            </View>
+          )}
+
+          {adSlot}
+        </DetailScaffold>
+        {claimModal}
+      </View>
+    )
+  }
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       {/* Back button — overlaid on gallery */}
@@ -198,7 +360,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
                 setImgIdx(Math.round(e.nativeEvent.contentOffset.x / W))
               }
               renderItem={({ item }) => (
-                <Image source={{ uri: item }} style={s.galleryImg} resizeMode="cover" />
+                <RemoteImage source={{ uri: item }} style={s.galleryImg} resizeMode="cover" />
               )}
             />
             {photos.length > 1 && (
@@ -234,7 +396,9 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
             </View>
             <View style={s.pillActions}>
               {onToggleFavorite && (
-                <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} activeOpacity={0.8}>
+                <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} activeOpacity={0.8}
+                  accessibilityRole="button" accessibilityState={{ selected: !!isFavorite }}
+                  accessibilityLabel={t(isFavorite ? 'uiFavRemove' : 'uiFavAdd', lang)}>
                   <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={22} color={isFavorite ? colors.danger : colors.textSecondary} />
                 </TouchableOpacity>
               )}
@@ -348,7 +512,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
               FacilityProfileScreen instead; and mapSources drops any row whose category has
               no group. The Explore-to-health path is ExploreMapScreen — a different file,
               and a named excluded surface. */}
-          <ExploreDetailBottomSlot lang={lang} onNavigate={onAdNavigate} />
+          {adSlot}
         </View>
       </ScrollView>
 
@@ -385,33 +549,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
       </View>
 
       {/* Claim modal — optional evidence note → insert place_claims (guard: unclaimed + no dup) */}
-      <Modal visible={claimOpen} transparent animationType="fade" onRequestClose={() => setClaimOpen(false)}>
-        <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>{t('exploreClaimCta', lang)}</Text>
-            <Text style={s.modalLabel}>{t('exploreClaimNoteLabel', lang)}</Text>
-            <TextInput
-              style={s.modalInput}
-              value={claimNote}
-              onChangeText={setClaimNote}
-              placeholder={t('exploreClaimNotePlaceholder', lang)}
-              placeholderTextColor={colors.textSecondary}
-              multiline
-            />
-            {claimErr && <Text style={s.modalErr}>{claimErr}</Text>}
-            <View style={s.modalBtnRow}>
-              <TouchableOpacity style={s.modalCancel} onPress={() => setClaimOpen(false)} disabled={claimBusy}>
-                <Text style={s.modalCancelText}>{t('cancel', lang)}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.modalSubmit} onPress={submitClaim} disabled={claimBusy} activeOpacity={0.85}>
-                {claimBusy
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={s.modalSubmitText}>{t('exploreClaimSubmit', lang)}</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {claimModal}
     </SafeAreaView>
   )
 }
@@ -522,4 +660,30 @@ const s = StyleSheet.create({
   modalSubmit:    { flex: 1.4, borderRadius: radius.md, paddingVertical: 13, alignItems: 'center',
                     justifyContent: 'center', backgroundColor: colors.primary },
   modalSubmitText:{ fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+})
+
+const r = StyleSheet.create({
+  creditWrap:    { paddingTop: 8, gap: 2 },
+  headerRight:   { flexDirection: 'row', gap: 8 },
+  frosted:       { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.94)',
+                   alignItems: 'center', justifyContent: 'center' },
+  thumbStrip:    { marginTop: 12, marginHorizontal: -20, flexGrow: 0 },
+  thumbRow:      { gap: 8, paddingHorizontal: 20 },
+  thumb:         { width: 64, height: 48, borderRadius: radii.sm, backgroundColor: C.soft, opacity: 0.7 },
+  thumbActive:   { opacity: 1, borderWidth: 2, borderColor: C.primary },
+  badgeRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  chip:          { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: CAT.explore.bg,
+                   borderRadius: radii.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  chipText:      { ...type.meta, color: CAT.explore.ink },
+  desc:          { ...type.body, color: C.textPrimary, marginTop: 16 },
+  partnerCredit:     { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, marginTop: 8 },
+  partnerCreditText: { flexShrink: 1, ...type.meta, fontFamily: 'Inter_600SemiBold', color: C.primaryDark },
+  section:       { marginTop: 20 },
+  sectionTitle:  { ...type.sectionHeading, color: C.textPrimary, marginBottom: -4 },
+  ownerCard:     { backgroundColor: C.soft, borderRadius: radii.card, padding: 16, marginTop: 16, gap: 10 },
+  ownerCardTitle:{ ...type.rowTitle, color: C.textPrimary },
+  ownerCardBody: { ...type.small, color: C.textSecondary },
+  ownerNotice:   { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.soft,
+                   borderRadius: radii.md, padding: 14, marginTop: 16 },
+  ownerNoticeText:{ flex: 1, ...type.small, fontFamily: 'Inter_600SemiBold', color: C.textPrimary },
 })

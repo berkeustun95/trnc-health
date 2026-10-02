@@ -19,6 +19,17 @@ import { VEHICLE_CLASSES, DEFAULT_VEHICLE_CLASS } from '../constants/towing'
 import { openState, sortTowingCompanies } from '../utils/towingHours'
 import { logContactEvent } from '../utils/logContactEvent'
 import { resolveRegion } from '../utils/resolveRegion'
+import { REDESIGN } from '../constants/redesign'
+import { colors as C, type, radii, press } from '../constants/theme'
+import {
+  ScreenHeader as UiHeader, FilterBar, Dropdown, InfoBanner, ListCard, ContactBar, ErrorState, EmptyState, CardSkeleton,
+  ModuleScreen, OnPhotoLabel,
+} from '../components/ui'
+
+// The fallback on a failed load. A REAL number already in the app (the emergency sheet in
+// App.js and components/shell/Sheets.js lists Police 155), never an invented "towing line":
+// someone at the roadside whose list will not load must still leave with a number to call.
+const FALLBACK_POLICE = '155'
 
 // Çekici & Yol Yardım — the list.
 //
@@ -107,7 +118,7 @@ function TowingCard({ item, lang, onPress, onCall, onCallSecondary, onWhatsApp }
           <Text style={s.callText}>{t('towingCall', lang)}</Text>
         </TouchableOpacity>
         {!!item.whatsapp && (
-          <TouchableOpacity style={s.waBtn} onPress={onWhatsApp} activeOpacity={0.85}>
+          <TouchableOpacity style={s.waBtn} onPress={onWhatsApp} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="WhatsApp">
             <Ionicons name="logo-whatsapp" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
@@ -133,6 +144,61 @@ function TowingCard({ item, lang, onPress, onCall, onCallSecondary, onWhatsApp }
   )
 }
 
+// Redesign card: the equal ListCard. Ara stays ON the card and first; WhatsApp is now a
+// labelled button beside it (audit: an unlabelled icon); the second number keeps its full-width
+// outlined button under them, number in the label.
+function RTowingCard({ item, lang, onPress, onCall, onCallSecondary, onWhatsApp }) {
+  const st = openState(item)
+  const classes = (item.vehicle_classes || [])
+    .map(c => VEHICLE_CLASSES.find(v => v.key === c))
+    .filter(Boolean)
+    .map(v => t(v.labelKey, lang))
+    .join(' · ')
+  const coverage = (item.coverage_regions || [])
+    .filter(r => REGIONS.includes(r))
+    .map(r => t(REGION_LABEL_KEY[r], lang))
+    .join(' · ')
+  const hours = st.state === 'open'  ? { text: t('towingOpenNow', lang), tone: 'ok' }
+    : st.state === 'opens'           ? { text: t('towingOpensAt', lang).replace('{time}', st.at), tone: 'warn' }
+    : st.unknown                     ? { text: t('towingHoursUnknownBadge', lang) }
+    :                                  { text: t('towingClosedToday', lang), tone: 'warn' }
+  const price = item.starting_price != null
+    ? t('towingPriceFrom', lang).replace('{price}', String(item.starting_price))
+    : t('towingCallForPrice', lang)
+  return (
+    <ListCard
+      title={item.name}
+      subtitle={coverage ? `${t('towingCoverageLabel', lang)} ${coverage}` : null}
+      leading={item.logo_url ? { uri: item.logo_url } : { icon: 'car-outline', category: 'homeLife' }}
+      badge={item.is_24_7 ? t('towing247', lang) : null}
+      meta={[
+        { icon: 'time-outline', ...hours },
+        classes ? { icon: 'car-outline', text: classes } : null,
+        { icon: 'pricetag-outline', text: price },
+      ]}
+      onPress={onPress}
+      lang={lang}
+    >
+      <ContactBar
+        lang={lang}
+        style={r.actions}
+        actions={[
+          { kind: 'call', label: t('towingCall', lang), onPress: onCall },
+          item.whatsapp ? { kind: 'whatsapp', onPress: onWhatsApp, accessibilityLabel: `WhatsApp, ${item.name}` } : null,
+        ]}
+      />
+      {!!item.phone_secondary && (
+        <TouchableOpacity style={r.secondNumBtn} onPress={onCallSecondary} activeOpacity={press.small} accessibilityRole="button">
+          <Ionicons name="call-outline" size={16} color={C.primaryDark} />
+          <Text style={r.secondNumText} numberOfLines={1}>
+            {t('towingSecondNumberBtn', lang).replace('{number}', item.phone_secondary)}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </ListCard>
+  )
+}
+
 export default function TowingScreen({ lang, userLocation, onBack, backRef = null }) {
   const [companies, setCompanies] = useState([])
   const [loading, setLoading]     = useState(true)
@@ -153,6 +219,9 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
     if (r) setRegion(prev => prev ?? r)
   }, [userLocation])
 
+  // `attempt` re-runs the same query: the load error used to be a dead end with no retry.
+  const [attempt, setAttempt] = useState(0)
+  const retry = () => { setError(false); setLoading(true); setAttempt(a => a + 1) }
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -164,9 +233,9 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
       if (err) { setError(true); setLoading(false); return }
       setCompanies(data || [])
       setLoading(false)
-    })()
+    })().catch(() => { if (alive) { setError(true); setLoading(false) } })
     return () => { alive = false }
-  }, [])
+  }, [attempt])
 
   const inClass = companies.filter(c => (c.vehicle_classes || []).includes(vClass))
   const inRegionAndClass = region
@@ -211,6 +280,12 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
     Linking.openURL(`https://wa.me/${String(c.whatsapp).replace(/\D/g, '')}`)
   }, [region])
 
+  const policeFallback = {
+    icon: 'call-outline',
+    label: `${t('menuPolice', lang)} · ${FALLBACK_POLICE}`,
+    onPress: () => Linking.openURL(`tel:${FALLBACK_POLICE}`),
+  }
+
   // Android hardware back closes the DETAIL first, not the whole module. Asked by App's
   // central chain through backRef — it REPLACES a BackHandler registered here, which App's
   // own handler out-registered whenever its deps changed (then back closed all of Towing,
@@ -229,6 +304,76 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
         region={region}
         onBack={() => setSelected(null)}
       />
+    )
+  }
+
+  if (REDESIGN) {
+    return (
+      <ModuleScreen topic="towing">
+      <SafeAreaView style={r.safe} edges={['top']}>
+        <UiHeader lang={lang} title={t('menuTowing', lang)} onBack={onBack} />
+        <FilterBar>
+          <Dropdown
+            label={t('ddDistrict', lang)}
+            lang={lang}
+            allowAll={false}
+            options={REGIONS.map(rg => ({ value: rg, label: t(REGION_LABEL_KEY[rg], lang) }))}
+            value={region}
+            onChange={setRegion}
+          />
+          <Dropdown
+            label={t('towingVehiclesTitle', lang)}
+            lang={lang}
+            allowAll={false}
+            options={VEHICLE_CLASSES.map(v => ({ value: v.key, label: t(v.labelKey, lang) }))}
+            value={vClass}
+            onChange={setVClass}
+          />
+        </FilterBar>
+
+        {loading ? (
+          <View style={r.list}>
+            <CardSkeleton height={170} />
+            <CardSkeleton height={170} style={{ marginTop: 12 }} />
+          </View>
+        ) : error ? (
+          <ErrorState message={t('towingLoadError', lang)} onRetry={retry} fallback={policeFallback} lang={lang} />
+        ) : (
+          <FlatList
+            {...listMem}
+            data={sorted}
+            keyExtractor={c => c.id}
+            contentContainerStyle={r.list}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              fallback ? (
+                <InfoBanner
+                  category="homeLife"
+                  message={fallback === 'no-region'
+                    ? t('towingNoRegionNotice', lang)
+                    : t('towingNoneInRegionNotice', lang)
+                        .replace('{region}', region ? t(REGION_LABEL_KEY[region], lang) : '')}
+                />
+              ) : null
+            }
+            ListEmptyComponent={<EmptyState icon="car-outline" category="homeLife" title={t('towingEmpty', lang)} />}
+            ListFooterComponent={
+              <OnPhotoLabel numberOfLines={0} style={r.disclaimer} textStyle={r.disclaimerText}>{t('towingDisclaimer', lang)}</OnPhotoLabel>
+            }
+            renderItem={({ item }) => (
+              <RTowingCard
+                item={item}
+                lang={lang}
+                onPress={() => setSelected(item)}
+                onCall={() => dial(item.phone, item, 'call')}
+                onCallSecondary={() => dial(item.phone_secondary, item, 'call_secondary')}
+                onWhatsApp={() => whatsApp(item)}
+              />
+            )}
+          />
+        )}
+      </SafeAreaView>
+      </ModuleScreen>
     )
   }
 
@@ -279,8 +424,7 @@ export default function TowingScreen({ lang, userLocation, onBack, backRef = nul
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
       ) : error ? (
         <View style={s.center}>
-          <Ionicons name="cloud-offline-outline" size={40} color={colors.border} />
-          <Text style={s.emptyText}>{t('towingLoadError', lang)}</Text>
+          <ErrorState message={t('towingLoadError', lang)} onRetry={retry} fallback={policeFallback} lang={lang} />
         </View>
       ) : (
         <FlatList
@@ -335,8 +479,8 @@ const s = StyleSheet.create({
   regionBar:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                  backgroundColor: colors.primaryLight, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10 },
   regionLeft:  { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
-  regionText:  { fontSize: 13.5, fontWeight: '700', color: colors.primaryDark, flexShrink: 1 },
-  regionChange:{ fontSize: 12, fontWeight: '700', color: colors.primaryDark },
+  regionText:  { fontSize: 13.5, fontFamily: 'Inter_700Bold', color: colors.primaryDark, flexShrink: 1 },
+  regionChange:{ fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
 
   chipRow:     { gap: 8, paddingVertical: 2 },
   // backgroundColor is an OPAQUE fill, not 'transparent'. The Android
@@ -347,14 +491,14 @@ const s = StyleSheet.create({
                  borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg },
   chipActive:  { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   chipText:    { fontSize: 13, color: colors.textSecondary },
-  chipTextActive: { color: colors.primary, fontWeight: '700' },
+  chipTextActive: { color: colors.primary, fontFamily: 'Inter_700Bold' },
 
   segment:     { flexDirection: 'row', gap: 8 },
   segItem:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
                  borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg },
   segItemActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   segText:     { fontSize: 13, color: colors.textSecondary },
-  segTextActive: { color: '#FFFFFF', fontWeight: '700' },
+  segTextActive: { color: '#FFFFFF', fontFamily: 'Inter_700Bold' },
 
   listContent: { padding: 16, paddingTop: 4, gap: 11 },
 
@@ -367,11 +511,11 @@ const s = StyleSheet.create({
                  borderWidth: 1, borderColor: colors.border, ...shadow },
   cardHead:    { flexDirection: 'row', gap: 11, alignItems: 'flex-start' },
   cardHeadText:{ flex: 1 },
-  cardName:    { fontSize: 15, fontWeight: '800', color: colors.textPrimary, lineHeight: 20 },
+  cardName:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 20 },
 
   badgeRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 6 },
   badge:       { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  badgeText:   { fontSize: 10.5, fontWeight: '700' },
+  badgeText:   { fontSize: 10.5, fontFamily: 'Inter_700Bold' },
   badgeOpen:   { backgroundColor: colors.successLight },
   badgeOpenText: { color: colors.success },
   badgeShut:   { backgroundColor: colors.dangerLight },
@@ -389,7 +533,7 @@ const s = StyleSheet.create({
   actions:     { flexDirection: 'row', gap: 8, marginTop: 11 },
   callBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
                  backgroundColor: colors.primary, paddingVertical: 11, borderRadius: radius.sm },
-  callText:    { color: '#FFFFFF', fontSize: 14.5, fontWeight: '700' },
+  callText:    { color: '#FFFFFF', fontSize: 14.5, fontFamily: 'Inter_700Bold' },
   waBtn:       { width: 46, alignItems: 'center', justifyContent: 'center',
                  borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
                  backgroundColor: 'transparent' },
@@ -400,9 +544,24 @@ const s = StyleSheet.create({
   secondNumBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                    gap: 7, marginTop: 8, paddingVertical: 11, borderRadius: radius.sm,
                    borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
-  secondNumText: { fontSize: 14, fontWeight: '700', color: colors.primary, flexShrink: 1 },
+  secondNumText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary, flexShrink: 1 },
 
   emptyText:   { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
   disclaimer:  { fontSize: 11.5, lineHeight: 17, color: colors.textSecondary,
                  textAlign: 'center', marginTop: 14, paddingHorizontal: 8 },
+})
+
+// Redesign styles: every text style carries an Inter family (the legacy block above has
+// 17 fontWeight-only styles, which render in the system font on Android).
+const r = StyleSheet.create({
+  safe:          { flex: 1, backgroundColor: 'transparent' },
+  list:          { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40, gap: 12 },
+  actions:       { marginTop: 12 },
+  secondNumBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+                   marginTop: 8, minHeight: 44, paddingHorizontal: 10, borderRadius: radii.md,
+                   borderWidth: 1, borderColor: C.fieldBorder, backgroundColor: C.card },
+  secondNumText: { ...type.small, fontFamily: 'Inter_600SemiBold', color: C.primaryDark, flexShrink: 1 },
+  // On the module photo: a dark pill (OnPhotoLabel), white text.
+  disclaimer:    { alignSelf: 'center', marginTop: 14 },
+  disclaimerText:{ ...type.caption, fontFamily: 'Inter_400Regular', lineHeight: 17, textAlign: 'center' },
 })

@@ -90,6 +90,7 @@ const Y = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
 const rampAlpha = u => (u >= 1 ? 0 : G.BOTTOM_MAX * Math.pow(1 - u, G.RAMP_EXP))
 
 const problems = []
+let dotsContrast = null   // non-text UI (3:1), reported apart from the 4.5:1 text rows
 const rows = []
 for (const [name, file] of BACKGROUNDS) {
   let worst = Infinity, at = ''
@@ -120,6 +121,192 @@ for (const [name, file] of BACKGROUNDS) {
   }
 }
 
+// ═══ REDESIGNED HERO (feat/redesign) ═══════════════════════════════════════
+// Its only text — the district chip — sits on a dark pill, so the photo cannot decide the
+// ratio. The binding case is the pill over a PURE WHITE pixel; measured on the real photos
+// the bare text failed 4 of 6 (Karpaz 2.65), which is why the pill exists. The alpha is
+// read from source, so lowering it for looks goes red here rather than on a phone.
+{
+  const src = readFileSync(resolve(ROOT, 'components/home/redesign/RedesignHero.js'), 'utf8')
+  const m = /export const HERO_PILL_ALPHA\s*=\s*([\d.]+)/.exec(src)
+  if (!m) {
+    problems.push('redesign hero: cannot read HERO_PILL_ALPHA from RedesignHero.js — measuring nothing')
+  } else {
+    const a = parseFloat(m[1])
+    const g = 255 * (1 - a)                                  // the pill over pure white
+    const c = 1.05 / (Y(g, g, g) + 0.05)
+    rows.push({ name: 'redesign pill', worst: c, at: 'over #FFFFFF' })
+    if (c < FLOOR) problems.push(`redesign hero: white on rgba(0,0,0,${a}) over white is ${c.toFixed(2)}:1, under ${FLOOR}:1 — raise HERO_PILL_ALPHA`)
+  }
+  // Home v3: the weather chip must wear the SAME pill, or the number above says nothing about it.
+  if (!/style=\{\[s\.chip, s\.wxChip\]\}/.test(src)) {
+    problems.push('redesign hero: the weather chip is not styled with s.chip — the pill ratio above does not cover it')
+  }
+}
+
+// Home v3 Oli bar: white text on the shared ground (oli-bg.png gradient + oli-glow.png), and
+// on the glass pill (white 16%) over it. labels:check proves the text ends inside TEXT_ZONE,
+// so this renders the REAL PNGs at 320/360/393dp exactly as OliBar lays them out (bg
+// stretched to the card; glow GLOW_SIZE square centred at GLOW_CX/GLOW_CY) and takes the
+// BRIGHTEST pixel anywhere in the zone — a bound for every locale's title and pill. The art
+// never enters the zone (right 40%, and TEXT_ZONE + ART_ZONE ≤ 1 is asserted). Pill text is
+// 13/500, so 4.5:1 applies to both.
+{
+  const src = readFileSync(resolve(ROOT, 'components/home/redesign/OliBar.js'), 'utf8')
+  const k = name => parseFloat((new RegExp(`export const ${name} = ([\\d.]+)`).exec(src) || [])[1])
+  const [H, ZONE, ART, GS, GX, GY, TL, DX, DOT, DON, DB, DA] = ['OLI_BAR_H', 'TEXT_ZONE', 'ART_ZONE', 'GLOW_SIZE', 'GLOW_CX', 'GLOW_CY', 'TEXT_LEFT',
+    'DOTS_X', 'DOT', 'DOT_ON', 'DOTS_BOTTOM', 'DOT_ALPHA'].map(k)
+  if ([H, ZONE, ART, GS, GX, GY, TL, DX, DOT, DON, DB, DA].some(v => !(v >= 0)) || !/'rgba\(255,255,255,0\.16\)'/.test(src)
+      || !/source=\{BG\} resizeMode="stretch"/.test(src)) {
+    problems.push('redesign Oli bar: cannot read the ground geometry / 16% pill from OliBar.js — measuring nothing')
+  } else {
+    if (ZONE + ART > 1.0001) problems.push(`redesign Oli bar: TEXT_ZONE ${ZONE} + ART_ZONE ${ART} overlap — the art could sit under the text`)
+    let worstT = Infinity, worstP = Infinity, at = '', worstD = Infinity, atD = ''
+    for (const Wd of [320, 360, 393]) {
+      const cw = Wd - 32
+      const glow = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-glow.png')).resize(GS, GS).toBuffer()
+      const gl = Math.round(cw * GX - GS / 2), gt = Math.round(H * GY - GS / 2)
+      // extend the canvas so a glow hanging off the card still composites, then crop to the card
+      const pad = GS
+      // sharp orders its operations itself, so resize and extend are separate passes
+      const sized = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-bg.png')).resize(cw, H, { fit: 'fill' }).toBuffer()
+      const bg = await sharp(sized).extend({ top: pad, bottom: pad, left: pad, right: pad, extendWith: 'copy' }).toBuffer()
+      const lit = await sharp(bg).composite([{ input: glow, left: gl + pad, top: gt + pad }]).png().toBuffer()
+      const { data, info } = await sharp(lit).extract({ left: pad, top: pad, width: cw, height: H })
+        .removeAlpha().raw().toBuffer({ resolveWithObject: true })
+      const x1 = Math.ceil(cw * ZONE)
+      for (let y = 0; y < H; y++) for (let x = TL; x < x1; x++) {
+        const i = (y * info.width + x) * info.channels
+        const px = [data[i], data[i + 1], data[i + 2]]
+        const ct = 1.05 / (Y(...px) + 0.05)
+        const cp = 1.05 / (Y(...px.map(v => 255 * 0.16 + v * 0.84)) + 0.05)
+        if (ct < worstT) worstT = ct
+        if (cp < worstP) { worstP = cp; at = `${Wd}dp x=${x} y=${y} rgb(${px.join(',')})` }
+      }
+      // Scene dots: a vertical column that must sit BETWEEN the text zone and the art (whose
+      // left edge is ≥ cw·(1 − ART_ZONE) on every scene), never on either. The dimmest dot
+      // (white at DOT_ALPHA) must clear 3:1 against every ground pixel behind the column (WCAG 1.4.11).
+      const dl = cw * DX - DOT / 2, dr = dl + DOT
+      if (dl < cw * ZONE + 1) problems.push(`redesign Oli bar: ${Wd}dp dots start at ${dl.toFixed(1)}pt, inside the text zone (ends ${(cw * ZONE).toFixed(1)})`)
+      if (dr > cw * (1 - ART) - 1) problems.push(`redesign Oli bar: ${Wd}dp dots end at ${dr.toFixed(1)}pt, inside the art zone (starts ${(cw * (1 - ART)).toFixed(1)})`)
+      const colH = 6 * DOT + DON + 6 * 3
+      for (let y = Math.floor(H - DB - colH); y < H - DB; y++) for (let x = Math.floor(dl); x < Math.ceil(dr); x++) {
+        const i = (y * info.width + x) * info.channels
+        const px = [data[i], data[i + 1], data[i + 2]]
+        const dot = px.map(v => 255 * DA + v * (1 - DA))
+        const c = (Y(...dot) + 0.05) / (Y(...px) + 0.05)
+        if (c < worstD) { worstD = c; atD = `${Wd}dp x=${x} y=${y} rgb(${px.join(',')})` }
+      }
+    }
+    rows.push({ name: 'oli title', worst: worstT, at }, { name: 'oli pill', worst: worstP, at })
+    dotsContrast = { worst: worstD, at: atD }
+    if (worstD < 3) problems.push(`redesign Oli bar: inactive dot is ${worstD.toFixed(2)}:1 against the ground (${atD}), under 3:1`)
+    if (worstT < FLOOR) problems.push(`redesign Oli bar: title on the ground is ${worstT.toFixed(2)}:1 at worst, under ${FLOOR}:1`)
+    if (worstP < FLOOR) problems.push(`redesign Oli bar: pill text is ${worstP.toFixed(2)}:1 at worst (${at}), under ${FLOOR}:1`)
+  }
+}
+
+// S2b OliBand (welcome tagline, sign-in titles): the same ground at full width. Rendered at
+// 320/360/393dp for both band heights in use (150 welcome, 140 sign-in), brightest pixel in
+// the band's text zone, white text must clear 4.5:1. labels:check keeps the text in the zone.
+{
+  const src = readFileSync(resolve(ROOT, 'components/ui/OliBand.js'), 'utf8')
+  const k = name => parseFloat((new RegExp(`export const ${name} = ([\\d.]+)`).exec(src) || [])[1])
+  const [ZONE, TL, GS, GX, GY] = ['BAND_TEXT_ZONE', 'BAND_TEXT_LEFT', 'BAND_GLOW_SIZE', 'BAND_GLOW_CX', 'BAND_GLOW_CY'].map(k)
+  if ([ZONE, TL, GS, GX, GY].some(v => !(v >= 0))) {
+    problems.push('OliBand: cannot read its geometry from components/ui/OliBand.js — measuring nothing')
+  } else {
+    let worst = Infinity, at = ''
+    for (const H of [150, 140]) for (const Wd of [320, 360, 393]) {
+      const pad = GS
+      const sized = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-bg.png')).resize(Wd, H, { fit: 'fill' }).toBuffer()
+      const bg = await sharp(sized).extend({ top: pad, bottom: pad, left: pad, right: pad, extendWith: 'copy' }).toBuffer()
+      const glow = await sharp(resolve(ROOT, 'assets/oli-scenes/oli-glow.png')).resize(GS, GS).toBuffer()
+      const lit = await sharp(bg).composite([{ input: glow, left: Math.round(Wd * GX - GS / 2) + pad, top: Math.round(H * GY - GS / 2) + pad }]).png().toBuffer()
+      const { data, info } = await sharp(lit).extract({ left: pad, top: pad, width: Wd, height: H }).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+      for (let y = 0; y < H; y++) for (let x = TL; x < Math.ceil(Wd * ZONE); x++) {
+        const i = (y * info.width + x) * info.channels
+        const c = 1.05 / (Y(data[i], data[i + 1], data[i + 2]) + 0.05)
+        if (c < worst) { worst = c; at = `${Wd}dp×${H} x=${x} y=${y}` }
+      }
+    }
+    rows.push({ name: 'oli band', worst, at })
+    if (worst < FLOOR) problems.push(`OliBand: white text is ${worst.toFixed(2)}:1 at worst (${at}), under ${FLOOR}:1`)
+  }
+}
+
+// Photo-led Welcome A + onboarding: (1) all text sits on the SOLID teal (PhotoFade lays the
+// fade ABOVE the content block), so the number is PHOTO_TEAL vs white; (2) the language
+// button and "Atla" sit top-right on dark glass (black 0.38) over the top scrim (black 0.5 → 0
+// over 180pt) over each slide's PHOTO — measured on the real photos, cover-cropped at
+// 320×640 / 360×780 / 393×852, brightest pixel in the button box.
+{
+  const pf = readFileSync(resolve(ROOT, 'components/ui/PhotoFade.js'), 'utf8')
+  const teal = (/export const PHOTO_TEAL = '#([0-9A-Fa-f]{6})'/.exec(pf) || [])[1]
+  if (!teal || !/s_?\.solid/.test(pf)) problems.push('PhotoFade: cannot read PHOTO_TEAL / the solid layer — measuring nothing')
+  else {
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(teal.slice(i, i + 2), 16))
+    const c = 1.05 / (Y(r, g, b) + 0.05)
+    rows.push({ name: 'photo-led text', worst: c, at: `#${teal}` })
+    if (c < FLOOR) problems.push(`PhotoFade: white on #${teal} is ${c.toFixed(2)}:1`)
+  }
+  // The language / Atla buttons: white on dark glass over the PHOTO, which is no longer
+  // scrimmed (round 2). Bound over a PURE WHITE pixel, so it holds for any photo and any crop.
+  const g = parseFloat((/export const PHOTO_GLASS = ([\d.]+)/.exec(pf) || [])[1])
+  let worst = Infinity, at = ''
+  for (const f of ['screens/WelcomeScreen.js', 'screens/OnboardingScreen.js']) {
+    if (!readFileSync(resolve(ROOT, f), 'utf8').includes('rgba(0,0,0,${PHOTO_GLASS})')) problems.push(`${f}: the glass buttons do not use PHOTO_GLASS — measuring nothing`)
+  }
+  if (!(g > 0)) problems.push('PhotoFade: cannot read PHOTO_GLASS')
+  else { const v = 255 * (1 - g); worst = 1.05 / (Y(v, v, v) + 0.05); at = `glass ${g} over #FFFFFF` }
+  rows.push({ name: 'photo glass buttons', worst, at })
+  if (worst < FLOOR) problems.push(`Photo-led glass buttons: white is ${worst.toFixed(2)}:1 at worst (${at}), under ${FLOOR}:1`)
+}
+
+// Module backgrounds, option B (ModuleScreen): every number is bounded over a PURE WHITE photo
+// pixel, so it holds for every module photo, today's and any added later.
+//   header text  white over (1 − MODULE_TINT)·(1 − HEADER_SCRIM)
+//   pill text    white over (1 − MODULE_TINT)·(1 − PILL_ALPHA)          (OnPhotoLabel, SectionHeader)
+//   card text    textPrimary / textSecondary over CARD_ALPHA white over a pure BLACK pixel
+{
+  const ms = readFileSync(resolve(ROOT, 'components/ui/ModuleScreen.js'), 'utf8')
+  const num = n => parseFloat((new RegExp(`export const ${n} = ([\\d.]+)`).exec(ms) || [])[1])
+  const [tint, hs, pa, ca] = ['MODULE_TINT', 'HEADER_SCRIM', 'PILL_ALPHA', 'CARD_ALPHA'].map(num)
+  // The photo must be SIZED to its frame: a require()d Image defaults to the asset's own size
+  // (704×1520) and absolute insets don't override it — every number below would then be measured
+  // against a photo the user never sees whole (2026-10-01, ADA Preview). Same style as main's
+  // PageBackground.
+  const photoStyle = (/\bphoto:\s*\{([^}]*)\}/.exec(ms) || [])[1] || ''
+  if (!/width:\s*'100%'/.test(photoStyle) || !/height:\s*'100%'/.test(photoStyle))
+    problems.push(`ModuleScreen: the photo style must set width: '100%' and height: '100%' (found: {${photoStyle.trim()}})`)
+  if ([tint, hs, pa, ca].some(v => !(v > 0))) problems.push('ModuleScreen: cannot read MODULE_TINT / HEADER_SCRIM / PILL_ALPHA / CARD_ALPHA — measuring nothing')
+  else {
+    const over = k => { const v = 255 * k; return 1.05 / (Y(v, v, v) + 0.05) }
+    const head = over((1 - tint) * (1 - hs)), pill = over((1 - tint) * (1 - pa))
+    const cardBg = 255 * ca, yb = Y(cardBg, cardBg, cardBg)
+    const cr = rgb => (yb + 0.05) / (Y(...rgb) + 0.05)
+    const prim = cr([0x1A, 0x2B, 0x33]), sec = cr([0x55, 0x65, 0x7A])
+    rows.push({ name: 'B header', worst: head }, { name: 'B pill', worst: pill }, { name: 'B card primary', worst: prim }, { name: 'B card secondary', worst: sec })
+    for (const [n, v] of [['header text', head], ['pill text', pill], ['card textPrimary', prim], ['card textSecondary', sec]])
+      if (v < FLOOR) problems.push(`ModuleScreen ${n}: ${v.toFixed(2)}:1 at worst, under ${FLOOR}:1`)
+  }
+}
+
+// Home v3 emergency tile: white text straight on solid health red (no band, no photo).
+{
+  const w = readFileSync(resolve(ROOT, 'components/home/redesign/Widgets.js'), 'utf8')
+  const th = readFileSync(resolve(ROOT, 'constants/theme.js'), 'utf8')
+  const hex = (/health:\s*\{[^}]*ink:\s*'#([0-9A-Fa-f]{6})'/.exec(th) || [])[1]
+  if (!/export const EMERGENCY_BG = category\.health\.ink/.test(w) || !hex) {
+    problems.push('redesign emergency tile: EMERGENCY_BG is not category.health.ink, or the ink is unreadable — measuring nothing')
+  } else {
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16))
+    const c = 1.05 / (Y(r, g, b) + 0.05)
+    rows.push({ name: 'emergency tile', worst: c, at: `#${hex}` })
+    if (c < FLOOR) problems.push(`redesign emergency tile: white on #${hex} is ${c.toFixed(2)}:1, under ${FLOOR}:1`)
+  }
+}
+
 if (problems.length) {
   console.error('\n  ┌─ HERO CONTRAST CHECK FAILED ───────────────────────────────────┐')
   for (const p of problems) console.error('  │ ' + p)
@@ -130,3 +317,4 @@ console.log(`hero contrast: OK — white text on all ${rows.length} backgrounds 
 console.log(`  ramp ${G.BOTTOM_MAX}/${G.RAMP_EXP} · generic +${G.GENERIC_SCRIM} flat · text row `
   + `${CONTENT_BOTTOM}pt above the hero's bottom (read from source, not typed here)`)
 console.log('  ' + rows.map(r => `${r.name} ${r.worst.toFixed(2)}`).join(' · '))
+if (dotsContrast) console.log(`  oli scene dots (non-text, 3:1): inactive ${dotsContrast.worst.toFixed(2)}:1 worst`)

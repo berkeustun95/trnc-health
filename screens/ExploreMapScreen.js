@@ -12,6 +12,9 @@
 // Clustering is supercluster — pure JS, one pure-JS dependency (kdbush), no native module,
 // so it ships over OTA and needs no rebuild.
 
+import { StatusBar } from 'expo-status-bar'
+import { REDESIGN } from '../constants/redesign'
+import { requestWithPrimer } from '../utils/permissionPrimer'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import FilterDropdown from '../components/FilterDropdown'
 import {
@@ -240,7 +243,7 @@ function PinCard({ pin, lang, onClose, onViewProfile }) {
           <Text style={s.name} numberOfLines={1}>{title}</Text>
           {sub ? <Text style={s.sub} numberOfLines={1}>{sub}</Text> : null}
         </View>
-        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
           <Ionicons name="close-circle" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -280,6 +283,7 @@ export default function ExploreMapScreen({
   // Route medals (ROUTE_MEDALS_LIVE): who is walking, and the guest sign-in gate.
   session = null,
   onRequireAccount,
+  initialRoutesMode = false,   // Home's "Yürüyüş Rotaları" tile (redesign) opens straight into routes
 }) {
   const { width, height } = useWindowDimensions()
   const mapRef = useRef(null)
@@ -304,7 +308,7 @@ export default function ExploreMapScreen({
   const [routeRows, setRouteRows]         = useState([])
   const [legRows, setLegRows]             = useState([])
   const [routesError, setRoutesError]     = useState(false)
-  const [routesMode, setRoutesMode]       = useState(snap?.routesMode ?? false)
+  const [routesMode, setRoutesMode]       = useState(snap?.routesMode ?? initialRoutesMode)
   const [selectedRoute, setSelectedRoute] = useState(null)
   // Walk mode ("Başla"): null, or { next, armed } — see walkAdvance() in constants/walkingRoutes.
   const [walk, setWalk] = useState(null)
@@ -457,11 +461,18 @@ export default function ExploreMapScreen({
     if (locating) return
     setLocating(true)
     try {
-      let { status, canAskAgain } = await Location.getForegroundPermissionsAsync()
-      let justAsked = false
-      if (status !== 'granted' && canAskAgain) {
-        justAsked = true
-        ;({ status } = await Location.requestForegroundPermissionsAsync())
+      let status, canAskAgain, justAsked = false
+      if (REDESIGN) {
+        // The explanation first. "Şimdi değil" (OS can still ask) is no reason to point at Settings.
+        const r = await requestWithPrimer('location')
+        ;({ status, canAskAgain } = r)
+        justAsked = r.asked || canAskAgain
+      } else {
+        ;({ status, canAskAgain } = await Location.getForegroundPermissionsAsync())
+        if (status !== 'granted' && canAskAgain) {
+          justAsked = true
+          ;({ status } = await Location.requestForegroundPermissionsAsync())
+        }
       }
       if (status !== 'granted') {
         // Only point at Settings when the OS will no longer ask — never right after a "No".
@@ -594,6 +605,7 @@ export default function ExploreMapScreen({
 
   return (
     <View style={s.container}>
+      {REDESIGN && <StatusBar style="dark" />}
       {/* ─── MAP / LIST, AS A PAIR ────────────────────────────────────────────
           A segmented control rather than a lone "list" button: a pair states that there
           are two views of one thing, where a single button reads as an action leaving the

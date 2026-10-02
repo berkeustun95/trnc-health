@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
 // Google's iOS URL scheme is the iOS client ID reversed, and constants/auth.js is the one
@@ -12,13 +12,27 @@ if (!iosClientId?.endsWith('.apps.googleusercontent.com')) {
 }
 const googleIosUrlScheme = iosClientId.split('.').reverse().join('.')
 
+// ─── ADA Preview: the pre-production lane (installs NEXT TO the Play Store ADA) ──────
+// Set ONLY by eas.json's `preview` profile (env APP_VARIANT=preview). Unset — every
+// production build, every `npm run ota`, every local run — this file resolves exactly as
+// before; the redesign branch proved that by diffing `npx expo config --json` against the
+// pre-change output. It is NOT an EAS_BUILD conditional (see CLAUDE.md), and nothing here
+// touches `updates`: checkAutomatically stays 'ON_LOAD' in both variants.
+//
+// Its own applicationId/bundle id means its own Firebase app, Maps key entry and Google
+// OAuth client — see vault 10-ada/redesign-plan.md, "Preview variant: console checklist".
+// google-services.preview.json is used when present; without it the preview builds with
+// no push at all — never with production's push identity.
+const IS_PREVIEW = process.env.APP_VARIANT === 'preview'
+const APP_ID = IS_PREVIEW ? 'com.berkeustun95.ada.preview' : 'com.berkeustun95.ada'
+
 export default {
   expo: {
-    name: 'ADA',
+    name: IS_PREVIEW ? 'ADA Preview' : 'ADA',
     slug: 'trnc-health',
     version: '1.2.0',
     orientation: 'portrait',
-    icon: './assets/icon.png',
+    icon: IS_PREVIEW ? './assets/preview/icon.png' : './assets/icon.png',
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
@@ -33,9 +47,15 @@ export default {
       policy: 'appVersion',
     },
     userInterfaceStyle: 'light',
+    // Preview only, and it goes live WITH the redesign in a store release, never by OTA alone.
+    // false drops the grey scrim Android paints behind 3-button nav under edge-to-edge
+    // (expo-modules-core re-reads this theme item after RN forces it true). Only the redesign
+    // is safe without it: its FloatingTabBar lays a canvas band behind the buttons, while the
+    // legacy screens would put dark nav icons straight over scrolling content.
+    ...(IS_PREVIEW ? { androidNavigationBar: { enforceContrast: false } } : {}),
     ios: {
       supportsTablet: false,
-      bundleIdentifier: 'com.berkeustun95.ada',
+      bundleIdentifier: APP_ID,
       usesAppleSignIn: true,
       minimumOsVersion: '14.0',
       // Usage descriptions are NOT set here. Each has ONE source, its plugin option below:
@@ -44,20 +64,25 @@ export default {
       // Verify with `npx expo config --type introspect`, never by reading this file.
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
-        CFBundleDisplayName: 'ADA - North Cyprus Assistant',
+        CFBundleDisplayName: IS_PREVIEW ? 'ADA Preview' : 'ADA - North Cyprus Assistant',
         CFBundleName: 'ADANorthCyprus',
       },
     },
     android: {
-      package: 'com.berkeustun95.ada',
-      googleServicesFile: './google-services.json',
+      package: APP_ID,
+      // Preview: its own Firebase file once it exists (vault redesign-plan.md, console checklist).
+      // Until then the preview builds WITHOUT one, which only means no push in that APK —
+      // registration is try/caught in App.js. Production always gets its own file.
+      googleServicesFile: IS_PREVIEW
+        ? (existsSync(join(__dirname, 'google-services.preview.json')) ? './google-services.preview.json' : undefined)
+        : './google-services.json',
       config: {
         googleMaps: {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
         },
       },
       adaptiveIcon: {
-        foregroundImage: './assets/android-icon-foreground.png',
+        foregroundImage: IS_PREVIEW ? './assets/preview/android-icon-foreground.png' : './assets/android-icon-foreground.png',
         backgroundColor: '#FFFFFF',
         monochromeImage: './assets/android-icon-monochrome.png',
       },
@@ -134,6 +159,9 @@ export default {
       de: './locales/de.json',
     },
     extra: {
+      // Preview only — the key does not exist in the production config (diffed).
+      // constants/redesign.js reads it to turn the redesign on in ADA Preview builds.
+      ...(IS_PREVIEW ? { appVariant: 'preview' } : {}),
       eas: {
         projectId: '704d192a-1a80-41f8-ab98-cb3c8f078d7c',
       },

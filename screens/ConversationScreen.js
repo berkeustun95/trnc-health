@@ -524,7 +524,7 @@ const s = StyleSheet.create({
   notice:    { fontSize: 14, color: colors.textSecondary, lineHeight: 20, textAlign: 'center' },
   retryBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
                marginTop: 14, backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 11 },
-  retryText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
+  retryText: { color: colors.surface, fontSize: 14, fontFamily: 'Inter_700Bold' },
 
   // ► ON A SURFACE, NOT ON THE PHOTO. PageBackground paints a photo under a 0.30 black
   //   scrim, and textSecondary grey on that is barely legible. Everywhere else in ADA a
@@ -533,7 +533,7 @@ const s = StyleSheet.create({
   //   which is the treatment every other badge in this screen already uses.
   dayPill:   { alignSelf: 'center', backgroundColor: colors.surface, borderRadius: radius.sm,
                paddingHorizontal: 10, paddingVertical: 3, marginVertical: 10 },
-  dayLabel:  { fontSize: 11, fontWeight: '700', color: colors.textSecondary,
+  dayLabel:  { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
                textTransform: 'uppercase', letterSpacing: 0.6 },
 
   bubbleRow:       { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginBottom: 8 },
@@ -542,7 +542,7 @@ const s = StyleSheet.create({
   bubble:          { maxWidth: '78%', borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9 },
   bubbleMine:      { backgroundColor: colors.primary, borderBottomRightRadius: 4 },
   bubbleTheirs:    { backgroundColor: colors.surface, borderBottomLeftRadius: 4, ...shadow },
-  bubbleName:      { fontSize: 11, fontWeight: '700', color: colors.primaryDark, marginBottom: 2 },
+  bubbleName:      { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primaryDark, marginBottom: 2 },
   bubbleBody:      { fontSize: 15, color: colors.textPrimary, lineHeight: 21 },
   bubbleBodyMine:  { color: colors.surface },
   bubbleTime:      { fontSize: 10, color: colors.textSecondary, marginTop: 3, alignSelf: 'flex-end' },
@@ -554,9 +554,9 @@ const s = StyleSheet.create({
   requestText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   requestBtns: { flexDirection: 'row', gap: 10 },
   declineBtn:  { flex: 1, paddingVertical: 13, borderRadius: radius.md, backgroundColor: colors.cardBg, alignItems: 'center' },
-  declineText: { fontSize: 15, fontWeight: '700', color: colors.danger },
+  declineText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.danger },
   acceptBtn:   { flex: 1, paddingVertical: 13, borderRadius: radius.md, backgroundColor: colors.primary, alignItems: 'center' },
-  acceptText:  { fontSize: 15, fontWeight: '700', color: colors.surface },
+  acceptText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.surface },
 
   closedBar:  { paddingHorizontal: 16, paddingTop: 16, backgroundColor: colors.surface,
                 borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
@@ -571,14 +571,14 @@ const s = StyleSheet.create({
   sendBtn:     { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary,
                  alignItems: 'center', justifyContent: 'center' },
   counter:     { fontSize: 11, color: colors.textSecondary, textAlign: 'right', marginTop: 4 },
-  counterOver: { color: colors.danger, fontWeight: '700' },
+  counterOver: { color: colors.danger, fontFamily: 'Inter_700Bold' },
   error:       { fontSize: 13, color: colors.danger, marginBottom: 8, lineHeight: 18 },
 
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:      { backgroundColor: colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, ...shadow },
   actionRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, paddingHorizontal: 4 },
-  actionText: { fontSize: 16, fontWeight: '700', color: colors.danger, flex: 1 },
+  actionText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.danger, flex: 1 },
   actionTextNeutral: { color: colors.textPrimary },
   cancelBtn:  { marginTop: 8, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.cardBg, alignItems: 'center' },
-  cancelText: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  cancelText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
 })

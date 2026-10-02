@@ -71,7 +71,8 @@ if (!FONT_FILE) {
   console.error(`\n  tile labels: no font file for the active family '${ACTIVE_FAMILY}'.\n`)
   process.exit(1)
 }
-const buf = readFileSync(FONT_FILE)
+function loadFont(file) {
+const buf = readFileSync(file)
 
 const u16 = o => buf.readUInt16BE(o)
 const i16 = o => buf.readInt16BE(o)
@@ -130,7 +131,7 @@ function glyphId(cp) {
 }
 
 const advCache = new Map()
-function advance(cp) {
+function adv(cp) {
   if (advCache.has(cp)) return advCache.get(cp)
   const g = glyphId(cp)
   const idx = Math.min(g, numberOfHMetrics - 1)
@@ -138,9 +139,14 @@ function advance(cp) {
   advCache.set(cp, a)
   return a
 }
+  return adv
+}
 
 // Zero-width joiners/marks contribute nothing.
 const ZERO = new Set([0x200C, 0x200D, 0x200E, 0x200F, 0x00AD, 0xFEFF])
+// The active measurer. V2 uses ACTIVE_FAMILY; the redesign section swaps weights.
+let advance = loadFont(FONT_FILE)
+
 export function width(str, px) {
   let w = 0
   for (const ch of str) {
@@ -347,6 +353,207 @@ for (const W of WIDTHS) {
     // longer render would be the guard reporting on ghosts — it would keep passing while
     // saying nothing, which is worse than not checking.
   }
+}
+
+// ═══ REDESIGNED HOME (feat/redesign) ═══════════════════════════════════════
+// The tile label's face, derived (the dev 500/700 toggle is gone; Medium is final): unreadable = fail.
+const R_LABEL_WEIGHT = Number(((readFileSync(resolve(ROOT, 'components/home/redesign/ServicePanels.js'), 'utf8')
+  .match(/\blabel:\s*\{[^}]*fontFamily:\s*'Inter_(\d{3})/) || [])[1]))
+if (![400, 500, 600, 700].includes(R_LABEL_WEIGHT)) {
+  console.error('check-tile-labels: cannot read the redesign tile label fontFamily from ServicePanels.js — measuring nothing')
+  process.exit(1)
+}
+// Real Inter metrics, the new geometry, the tile label's weight READ from ServicePanels' style,
+// at system font scale 1.0 AND 1.3, at 320 / 360 / 393dp, in all 9 locales. Each element's
+// maxFontSizeMultiplier is READ FROM SOURCE and applied: effective px = px · min(scale, cap).
+// Everything is read from source; a renamed style or constant fails the guard rather than
+// passing on a box it no longer measures. (Berke's device showed "Exchange Rates" running
+// into "Welcome Guide" at a large system font — the 1.0-only version of this check was blind.)
+const constNum = (file, name) => {
+  const m = new RegExp(`const ${name}\\s*=\\s*(-?[\\d.]+)`).exec(read(file))
+  return m ? { v: parseFloat(m[1]) } : { err: `${file}: no numeric const ${name}` }
+}
+const RGEOM = {
+  page:       num('screens/HomeScreen.js', 'rBelow', 'paddingHorizontal'),
+  widgetGap:  num('screens/HomeScreen.js', 'rWidgets', 'gap'),
+  panelGut:   constNum('components/home/redesign/ServicePanels.js', 'PANEL_GUTTER'),
+  tilePad:    constNum('components/home/redesign/ServicePanels.js', 'TILE_PAD'),
+  labelCap:   constNum('components/home/redesign/ServicePanels.js', 'LABEL_CAP'),
+  labelCapN:  constNum('components/home/redesign/ServicePanels.js', 'LABEL_CAP_NARROW'),
+  narrowW:    constNum('components/home/redesign/ServicePanels.js', 'NARROW_W'),
+  tileCap:    constNum('components/home/redesign/Widgets.js', 'TILE_FONT_CAP'),
+  tileCapN:   constNum('components/home/redesign/Widgets.js', 'TILE_FONT_CAP_NARROW'),
+  chipCap:    constNum('components/home/redesign/RedesignHero.js', 'CHIP_CAP'),
+  chipCapN:   constNum('components/home/redesign/RedesignHero.js', 'CHIP_CAP_NARROW'),
+  chipPad:    constNum('components/home/redesign/RedesignHero.js', 'CHIP_PAD'),
+  chipGap:    constNum('components/home/redesign/RedesignHero.js', 'CHIP_GAP'),
+  infoIcon:   constNum('components/home/redesign/RedesignHero.js', 'INFO_ICON'),
+  wxPad:      constNum('components/home/redesign/RedesignHero.js', 'WX_PAD'),
+  wxIcon:     constNum('components/home/redesign/RedesignHero.js', 'WX_ICON'),
+  rowGap:     constNum('components/home/redesign/RedesignHero.js', 'ROW_GAP'),
+  bandPad:    num('components/home/redesign/Widgets.js', 'band', 'paddingHorizontal'),
+  tileH:      constNum('components/home/redesign/Widgets.js', 'TILE_H'),
+  tileHA:     constNum('components/home/redesign/Widgets.js', 'TILE_H_ALERT'),
+  arrowW:     constNum('components/home/redesign/Widgets.js', 'ARROW_W'),
+  oliH:       constNum('components/home/redesign/OliBar.js', 'OLI_BAR_H'),
+  fadeHold:   constNum('components/home/redesign/OliBar.js', 'TEXT_ZONE'),
+  textLeft:   constNum('components/home/redesign/OliBar.js', 'TEXT_LEFT'),
+  pillPad:    constNum('components/home/redesign/OliBar.js', 'PILL_PAD'),
+  oliCap:     constNum('components/home/redesign/OliBar.js', 'OLI_FONT_CAP'),
+  oliCapN:    constNum('components/home/redesign/OliBar.js', 'OLI_FONT_CAP_NARROW'),
+}
+const rErr = Object.entries(RGEOM).filter(([, r]) => r.err).map(([k, r]) => `redesign ${k}: ${r.err}`)
+if (rErr.length) { for (const e of rErr) problems.push(e) } else {
+  const R = Object.fromEntries(Object.entries(RGEOM).map(([k, r]) => [k, r.v]))
+  const WIDTHS_R = [320, 360, 393]
+  const SCALES = [1.0, 1.3]
+  const rTile   = W => (W - R.page * 2 - R.panelGut * 2) / 4               // one panel column
+  const rLabel  = W => rTile(W) - R.tilePad * 2                              // the label box
+  const rCard   = W => (W - R.page * 2 - R.widgetGap) / 2                    // duty / weather card
+  const rBand   = W => rCard(W) - R.bandPad * 2                              // full band width (alert line)
+  const rTitle  = W => rBand(W) - R.arrowW                                   // band title, beside the arrow
+  const lCap = W => (W < R.narrowW ? R.labelCapN : R.labelCap)             // width-aware caps, as rendered
+  const tCap = W => (W < 350 ? R.tileCapN : R.tileCap)
+  const fonts = {}
+  const use = w => { advance = fonts[w] ??= loadFont(FONTS[w]) }
+  const extraKeys = [...read('constants/homeGroups.js').matchAll(/labelKey:\s*'([a-zA-Z0-9_]+)'/g)].map(m => m[1])
+  const groupKeys = [...read('constants/homeGroups.js').matchAll(/titleKey:\s*'([a-zA-Z0-9_]+)'/g)].map(m => m[1])
+  if (!extraKeys.length || !groupKeys.length) problems.push('redesign: read ZERO keys from constants/homeGroups.js')
+  const BADGE_KEY = (/soonText[^>]*>\{t\('([a-zA-Z0-9_]+)'/.exec(read('components/home/redesign/ServicePanels.js')) || [])[1]
+  if (!BADGE_KEY) problems.push('redesign: could not read the Yakında badge key from ServicePanels.js')
+  const { tCount } = await import('../constants/i18n.js')
+  const { REGION_LABEL_KEY } = await import('../constants/regions.js')
+  const { untilTr } = await import('../utils/turkishTime.js')
+  const { WEATHER_LABEL_KEY } = await import('../utils/facilityUtils.js')
+  const UNTILS = ['00:00', '19:00', '20:00', '22:00']
+  // region → landmark, read from homeHero.js TEXT (it requires images, so it cannot be imported)
+  const bandSrc = read('components/ui/OliBand.js')
+  const BAND = { zone: parseFloat((/BAND_TEXT_ZONE = ([\d.]+)/.exec(bandSrc) || [])[1]),
+                 left: parseFloat((/BAND_TEXT_LEFT = ([\d.]+)/.exec(bandSrc) || [])[1]),
+                 cap: parseFloat((/BAND_FONT_CAP = ([\d.]+)/.exec(bandSrc) || [])[1]),
+                 capN: parseFloat((/BAND_FONT_CAP_NARROW = ([\d.]+)/.exec(bandSrc) || [])[1]) }
+  if (!(BAND.zone > 0) || !(BAND.left >= 0)) problems.push('redesign: cannot read OliBand text zone')
+  const HERO_LANDMARKS = {}
+  for (const m of read('constants/homeHero.js').matchAll(/^  ([a-z_]+): \{[\s\S]*?landmark: '([^']+)'/gm)) HERO_LANDMARKS[m[1]] = m[2]
+  if (Object.keys(HERO_LANDMARKS).length < 5) problems.push(`redesign: read only ${Object.keys(HERO_LANDMARKS).length} hero landmarks from homeHero.js`)
+  let rTight = { spare: Infinity }
+  const rAssess = (w, str, px, cap, scale, box, where, cursive, lines) => {
+    use(w); checked++
+    const eff = px * Math.min(scale, cap)
+    const { lines: got, midWord } = wrap(str, eff, box)
+    const spare = headroom(str, eff, box, lines)
+    if (!cursive && spare >= 0 && spare < rTight.spare) rTight = { spare, where, str, box }
+    if (midWord) problems.push(`${where}: ${JSON.stringify(str)} BREAKS MID-WORD in ${box.toFixed(1)}pt at ${eff.toFixed(1)}px -> ${got.map(l => JSON.stringify(l)).join(' / ')}`)
+    else if (got.length > lines) problems.push(`${where}: ${JSON.stringify(str)} needs ${got.length} lines, has ${lines} (${box.toFixed(1)}pt at ${eff.toFixed(1)}px)`)
+  }
+  for (const W of WIDTHS_R) for (const S of SCALES) for (const L of Object.keys(LANG_CODES)) {
+    const cur = CURSIVE.has(L), at = `redesign ${W}dp ×${S} ${L}`
+    for (const w of [R_LABEL_WEIGHT]) {
+      for (const m of HOME_MODULES) {
+        rAssess(w, t(m.labelKey, L), 11, lCap(W), S, rLabel(W), `${at} ${w} tile:${m.id}`, cur, 2)
+        if (m.gridLabel) rAssess(w, t(m.gridLabel.key, L), m.gridLabel.size, lCap(W), S, rLabel(W), `${at} ${w} gridLabel:${m.id}`, cur, m.gridLabel.lines)
+      }
+      for (const k of extraKeys) rAssess(w, t(k, L), 11, lCap(W), S, rLabel(W), `${at} ${w} tile:${k}`, cur, 2)
+    }
+    rAssess(600, t(BADGE_KEY, L), 9.5, lCap(W), S, rTile(W) - 12, `${at} badge:${BADGE_KEY}`, cur, 1)
+    for (const k of groupKeys) rAssess(600, t(k, L), 15, lCap(W), S, rTile(W) * 4 - 24 - 16, `${at} panel:${k}`, cur, 1)
+    // Home v3 tiles — px and numberOfLines MIRROR Widgets.js: titles 13/600 × 2 beside the
+    // arrow, alert line 12/600 × 2 under it, corner numbers 12/700 × 1. Change one, change both.
+    // HEIGHT too: the text block (lines as actually wrapped) + band padding must sit below the
+    // badge row (10 + 28 + 2) inside TILE_H, or TILE_H_ALERT when the alert line is present.
+    const tileText = (w, str, px, box) => { use(w); return wrap(str, px * Math.min(S, tCap(W)), box).lines.length }
+    const fitH = (H, parts, where) => {
+      const h = 40 + parts.reduce((acc, [n, lh]) => acc + n * lh * Math.min(S, tCap(W)), 0) + 1 + 8
+      if (h > H + 0.01) problems.push(`${where}: text block needs ${h.toFixed(1)}pt, tile is ${H}pt`)
+    }
+    for (const key of ['stripDutyTitle', 'menuEmergency']) {
+      rAssess(600, t(key, L), 13, tCap(W), S, rTitle(W), `${at} tile:${key}`, cur, 2)
+      fitH(R.tileH, [[tileText(600, t(key, L), 13, rTitle(W)), 17]], `${at} tile:${key} height`)
+    }
+    for (const k of ['hrDutyTileAlertPartial', 'hrDutyTileAlertDown']) {
+      rAssess(600, t(k, L), 12, tCap(W), S, rBand(W), `${at} duty:${k}`, cur, 2)
+      fitH(R.tileHA, [[tileText(600, t('stripDutyTitle', L), 13, rTitle(W)), 17], [tileText(600, t(k, L), 12, rBand(W)), 16]], `${at} duty:${k} height`)
+    }
+    rAssess(700, '112 · 155 · 199', 12, tCap(W), S, rCard(W) - 10 - 28 - 6 - 12, `${at} emergency:corner`, false, 1)
+    // Oli bar (full scene): contrast is proven only inside TEXT_ZONE (check-hero-contrast), so the
+    // title (20/700 × 1) and the pill must END inside it: zone = card · TEXT_ZONE − TEXT_LEFT, card =
+    // W − 2·page. Pill = text 13/500 + gap 4 + arrow icon 14 (icons do not scale) + 2·PILL_PAD
+    // + 2 border. Height: title 26 + gap 10 + pill (17 + 12 + 2) inside the card, 8pt clear.
+    const oCap = W < 350 ? R.oliCapN : R.oliCap
+    const zone = (W - R.page * 2) * R.fadeHold - R.textLeft
+    rAssess(700, t('hrOliBarTitle', L), 20, oCap, S, zone, `${at} oli:title`, cur, 1)
+    rAssess(500, t('hrOliAskSub', L), 13, oCap, S, zone - 4 - 14 - R.pillPad * 2 - 2, `${at} oli:pill`, cur, 1)
+    {
+      const c = Math.min(S, oCap), h = 26 * c + 10 + 17 * c + 14
+      if (h > R.oliH - 16 + 0.01) problems.push(`${at} oli: text block needs ${h.toFixed(1)}pt, the card has ${R.oliH - 16}`)
+    }
+    // Hero row (weather chip = icon + temperature only). At 360dp and up the WHOLE
+    // "{district} · {landmark}" must fit, each district with ITS OWN landmark (homeHero.js);
+    // below 360 only the landmark may ellipsize, so the district alone must fit.
+    //   location = 2·CHIP_PAD + 3·CHIP_GAP + district + "·" + landmark + INFO_ICON
+    //   weather  = 2·WX_PAD + WX_ICON + 4 + "-12°"   ·  + ROW_GAP (space-between, one gap)
+    {
+      use(600)
+      const cCap = W < 350 ? R.chipCapN : R.chipCap
+      const eff = 12 * Math.min(S, cCap)
+      const wd = str => width(str, eff)
+      const fixed = 2 * R.chipPad + 3 * R.chipGap + R.infoIcon + 2 * R.wxPad + R.wxIcon + 4 + wd('-12°') + R.rowGap
+      const box = W - 32 - fixed
+      for (const [region, key] of Object.entries(REGION_LABEL_KEY)) {
+        const lm = HERO_LANDMARKS[region]
+        // FULL text: at 360dp+ at default size, and at 393dp+ at every size. At 360dp with the
+        // largest font the landmark may ellipsize (keeping the chip's 1.2 cap for large-text
+        // users was chosen over a ~1.05 cap that would fit it) — the district must still fit.
+        if (lm && (W >= 393 || (W >= 360 && S === 1.0))) {
+          const need = wd(t(key, L)) + wd('·') + wd(lm)
+          if (need > box + 0.01) problems.push(`${at} heroRow:${region}: "${t(key, L)} · ${lm}" needs ${need.toFixed(1)}pt, has ${box.toFixed(1)}pt`)
+          checked++
+        } else {
+          rAssess(600, t(key, L), 12, cCap, S, box - wd('·') - wd('…'), `${at} heroRow:${key}`, cur, 1)
+        }
+      }
+    }
+    // S3 ContactBar: equal-width buttons. Label box = button − 2·CONTACT_PAD − icon − 6.
+    // In a list card (inner = W − 2·page − 2·14) and in the sticky detail bar (W − 2·16),
+    // rows of 1..CONTACT_MAX actions (labelledCount labelled, up to 2 lines; the rest icon-only).
+    {
+      const cs = read('components/ui/ContactBar.js')
+      const cn = name => parseFloat((new RegExp(`export const ${name} = ([\\d.]+)`).exec(cs) || [])[1])
+      const [CP, CG, CI, CC, CCN, CIB, CM] = ['CONTACT_PAD', 'CONTACT_GAP', 'CONTACT_ICON', 'CONTACT_FONT_CAP',
+        'CONTACT_FONT_CAP_NARROW', 'CONTACT_ICON_BTN', 'CONTACT_MAX'].map(cn)
+      const labelled = n => (n <= 2 ? n : 1)   // mirrors labelledCount in ContactBar.js
+      if (!/export const labelledCount = n => \(n <= 2 \? n : 1\)/.test(cs)) problems.push('redesign: ContactBar labelledCount changed — update the mirror in labels:check')
+      if ([CP, CG, CI, CC, CCN, CIB, CM].some(v => !(v > 0))) problems.push('redesign: cannot read ContactBar geometry')
+      else {
+        const labels = { call: t('call', L), getDirections: t('getDirections', L), visitWebsite: t('visitWebsite', L), whatsapp: 'WhatsApp' }
+        for (const [where, inner] of [['card', W - R.page * 2 - 28], ['sticky', W - 32]]) for (let n = 1; n <= CM; n++) {
+          // the labelled buttons share what the icon-only buttons leave
+          const lab = labelled(n), icons = n - lab
+          const box = (inner - CIB * icons - CG * (n - 1)) / lab - 2 * CP - CI - 6
+          for (const [k, v] of Object.entries(labels)) rAssess(600, v, 13, W < 350 ? CCN : CC, S, box, `${at} contact:${where}×${n}:${k}`, cur, 2)
+        }
+      }
+    }
+    // Welcome A headline: centred, full width (page 24), ≤ 3 lines, growth bandCap.
+    {
+      const ws = read('screens/WelcomeScreen.js')
+      const hp = parseFloat((/WELCOME_HEAD_PX = ([\d.]+)/.exec(ws) || [])[1])
+      if (!(hp > 0)) problems.push('redesign: cannot read the Welcome headline geometry')
+      else rAssess(700, t('hrWelcomeHeadline', L), hp, W < 350 ? BAND.capN : BAND.cap, S, W - 48, `${at} welcome:headline`, cur, 3)
+    }
+    // S2b OliBand text: welcome tagline 18/700 × 4 and the sign-in titles 18/700 × 3 (cap: bandCap)
+    // (login, signup, reset, account created), all inside BAND_TEXT_ZONE·W − BAND_TEXT_LEFT.
+    {
+      const bandZone = W * BAND.zone - BAND.left
+      const bCap = W < 350 ? BAND.capN : BAND.cap
+      rAssess(700, t('welcomeTagline', L), 18, bCap, S, bandZone, `${at} band:welcomeTagline`, cur, 4)
+      for (const k of ['login', 'signup', 'resetPassword', 'accountCreated'])
+        rAssess(700, t(k, L), 18, bCap, S, bandZone, `${at} band:${k}`, cur, 3)
+    }
+  }
+  use(WEIGHT || 700)
+  console.log(`  redesign: ${WIDTHS_R.join('/')}dp × font scale ${SCALES.join('/')}; label box ${rLabel(320).toFixed(1)}pt, `
+    + `band ${rBand(320).toFixed(1)}pt at 320dp; tightest ${JSON.stringify(rTight.str)} at ${rTight.where}, ${rTight.spare.toFixed(1)}pt headroom`)
 }
 
 if (checked === 0) {

@@ -57,6 +57,9 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const GUARDED = [
   'expo-web-browser', 'react-native-webview',
   '@react-native-google-signin/google-signin', 'expo-apple-authentication', 'expo-crypto',
+  // expo-image (2026-10-01, redesign): a native COMPONENT; components/ui/RemoteImage.js requires
+  // it only when requireOptionalNativeModule('ExpoImage') finds it, else falls back to RN Image.
+  'expo-image',
 ]
 
 const SKIP = new Set(['node_modules', '.git', 'assets', 'docs', 'web', 'supabase', 'scripts'])

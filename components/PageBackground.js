@@ -3,19 +3,19 @@ import { View, Image, StyleSheet } from 'react-native'
 const SCRIM_OPACITY = 0.30
 
 const TOPIC_CONFIG = {
-  duty_pharmacy:       { asset: require('../assets/backgrounds/ada-bg-duty-pharmacy.png') },
-  medical_facilities:  { asset: require('../assets/backgrounds/ada-bg-medical-facilities.png') },
+  duty_pharmacy:       { asset: require('../assets/backgrounds/ada-bg-duty-pharmacy.jpg') },
+  medical_facilities:  { asset: require('../assets/backgrounds/ada-bg-medical-facilities.jpg') },
   emergency:           { asset: require('../assets/backgrounds/ada-bg-emergency.png') },
-  events:              { asset: require('../assets/backgrounds/ada-bg-events.png') },
-  accommodation:       { asset: require('../assets/backgrounds/ada-bg-accommodation.png') },
+  events:              { asset: require('../assets/backgrounds/ada-bg-events.jpg') },
+  accommodation:       { asset: require('../assets/backgrounds/ada-bg-accommodation.jpg') },
   pets:                { asset: require('../assets/backgrounds/ada-bg-pets.jpg') },
-  home_services:       { asset: require('../assets/backgrounds/ada-bg-home-services.png') },
-  insurance:           { asset: require('../assets/backgrounds/ada-bg-insurance.png') },
-  beaches_landmarks:   { asset: require('../assets/backgrounds/ada-bg-beaches-landmarks.png') },
-  transportation:      { asset: require('../assets/backgrounds/ada-bg-transportation.png') },
+  home_services:       { asset: require('../assets/backgrounds/ada-bg-home-services.jpg') },
+  insurance:           { asset: require('../assets/backgrounds/ada-bg-insurance.jpg') },
+  beaches_landmarks:   { asset: require('../assets/backgrounds/ada-bg-beaches-landmarks.jpg') },
+  transportation:      { asset: require('../assets/backgrounds/ada-bg-transportation.jpg') },
   municipalities:      { asset: require('../assets/backgrounds/ada-bg-municipalities.png') },
-  newcomer_essentials: { asset: require('../assets/backgrounds/ada-bg-transportation.png') },
-  exchange_rates:      { asset: require('../assets/backgrounds/ada-bg-exchange-rates.png') },
+  newcomer_essentials: { asset: require('../assets/backgrounds/ada-bg-transportation.jpg') },
+  exchange_rates:      { asset: require('../assets/backgrounds/ada-bg-exchange-rates.jpg') },
 }
 
 export default function PageBackground({ topic, scrimOpacity = SCRIM_OPACITY }) {

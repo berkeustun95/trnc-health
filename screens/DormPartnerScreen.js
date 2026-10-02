@@ -8,7 +8,9 @@ import BackButton from '../components/BackButton'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
 import DormRoomSheet from '../components/DormRoomSheet'
 import AccommodationDetailBottomSlot from '../components/ads/AccommodationDetailBottomSlot'
-import { colors, shadow, radius, readableOn } from '../constants/theme'
+import { colors, shadow, radius, readableOn, radii, TAP } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
+import { ScreenHeader } from '../components/ui'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { dormSections, dormWaMessage, dormWebsiteUrl, SECTION_ORDER, COLLAPSIBLE } from '../constants/dorms'
@@ -304,11 +306,15 @@ export default function DormPartnerScreen({ partner, lang, region, onBack, onAdN
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.navbar}>
-        <BackButton lang={lang} onPress={onBack} />
-        <Text style={s.navTitle} numberOfLines={1}>{partner.name}</Text>
-        <View style={s.navSpacer} />
-      </View>
+      {REDESIGN ? (
+        <ScreenHeader title={partner.name} onBack={onBack} lang={lang} />
+      ) : (
+        <View style={s.navbar}>
+          <BackButton lang={lang} onPress={onBack} />
+          <Text style={s.navTitle} numberOfLines={1}>{partner.name}</Text>
+          <View style={s.navSpacer} />
+        </View>
+      )}
 
       {/* 120 clears the absolute contact bar — the same figure TowingDetailScreen,
           PropertyDetailScreen and HomeServicePartnerScreen all use for their identical
@@ -618,7 +624,7 @@ const TYPE = {
   meta:    11,   // source names, notes, captions, attribution.
 }
 
-const s = StyleSheet.create({
+const legacyS = StyleSheet.create({
   safe:        { flex: 1, backgroundColor: colors.bg },
   navbar:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 },
   navTitle:    { flex: 1, textAlign: 'center', fontSize: TYPE.body, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
@@ -733,3 +739,22 @@ const s = StyleSheet.create({
                  paddingVertical: 13, borderRadius: radius.md, backgroundColor: colors.primary },
   barBtnText:  { fontSize: TYPE.item, fontFamily: 'Inter_700Bold', color: '#fff' },
 })
+
+// REDESIGN — partner surface, so ONLY what the partner rule allows without asking: the ADA
+// header (above), the page ground, and button/row SHAPE (44pt targets, the redesign radius).
+// Every label, position, link, colour (accent, WhatsApp green, teal), photo crop and logo
+// size is unchanged.
+const redesignS = StyleSheet.create({
+  safe:          { flex: 1, backgroundColor: colors.canvas },
+  collapseHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: TAP },
+  row:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TAP + 4,
+                   paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  sourceLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TAP },
+  directionsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14,
+                   minHeight: 48, borderRadius: radii.md, backgroundColor: colors.primary },
+  waBtn:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+                   minHeight: 48, borderRadius: radii.md, backgroundColor: '#075E54' },
+  callBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+                   minHeight: 48, borderRadius: radii.md, backgroundColor: colors.primary },
+})
+const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS

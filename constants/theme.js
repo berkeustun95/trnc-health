@@ -31,7 +31,23 @@ export const colors = {
   surface:       '#FFFFFF',
   border:        '#E8EDF2',
   textPrimary:   '#1A2B33',
-  textSecondary: '#64748B',
+  // Was #64748B, which passed AA only on white (4.48 on bg, 4.22 on primaryLight). #55657A
+  // measures 5.95 white · 5.48 canvas · 5.27 primaryLight · 5.11 on the lowest category tint.
+  textSecondary: '#55657A',
+
+  // ─── Redesign roles (feat/redesign, Slice 0) ──────────────────────────────
+  // Added BESIDE the legacy names rather than over them: `bg` and friends stay until each
+  // screen is migrated in its own slice, so no untouched screen changes colour by accident.
+  canvas:        '#F4F6F5',   // page ground; white cards separate from it by elevation.card only (1.09:1)
+  card:          '#FFFFFF',
+  tileInk:       '#3F4E57',   // grid tile labels — 7.93 on canvas
+  divider:       '#EEF1F4',
+  soft:          '#F1F4F6',   // inset wells, skeleton base
+  // ALL red text. `danger` #D1495B is 4.36 on white and fails AA on every surface; this is
+  // 5.38 on white, 4.61 on the lowest category tint. `danger` stays for icons and fills.
+  dangerInk:     '#C0384A',
+  fieldBorder:   '#7A8796',   // input / control boundary on white: 3.66:1 (WCAG 1.4.11 asks 3:1; colors.border is 1.18)
+  onPrimary:     '#FFFFFF',
   success:       '#2E9E5B',
   successLight:  '#E6F5ED',
   danger:        '#D1495B',
@@ -205,6 +221,74 @@ export const radius = {
   lg:   20,
   xl:   28,
 }
+
+// ═══ Redesign foundation (feat/redesign, Slice 0) ═══════════════════════════
+//
+// NEW NAMES, not new values under old names. `radius`, `spacing` and `fontSize` above are
+// legacy and stay exactly as they were: radius.card 16 → 20 would silently re-round 68
+// cards on screens nobody has redesigned yet. Screens move onto these as their slice lands;
+// the legacy scales are retired in the S6 sweep.
+
+// Module identity, app-wide. Ink on its own bg (computed): health 5.05 · explore 6.04 ·
+// homeLife 5.24 · city 5.84. A partner's brand colour always overrides these.
+export const category = {
+  health:   { bg: '#FBEAEC', ink: '#B83246' },
+  explore:  { bg: '#F1EAFB', ink: '#6B3FB0' },   // Keşfet & Eğlence
+  homeLife: { bg: '#FBF0E0', ink: '#92560C' },   // Ev & Yaşam
+  city:     { bg: '#E7EEFB', ink: '#2F55B5' },   // Şehir & Ulaşım
+}
+
+// Inter only, and only the four registered weights. Every role carries its family, so a
+// weight can never be set without one (a bare fontWeight renders in the system font on
+// Android — 109 such styles found by the 2026-09 audit).
+export const font = {
+  regular:  'Inter_400Regular',
+  medium:   'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold:     'Inter_700Bold',
+}
+
+export const type = {
+  caption:        { fontSize: 11, lineHeight: 14, fontFamily: font.medium },
+  meta:           { fontSize: 12, lineHeight: 16, fontFamily: font.medium },
+  small:          { fontSize: 13, lineHeight: 18, fontFamily: font.regular },
+  body:           { fontSize: 14, lineHeight: 20, fontFamily: font.regular },
+  rowTitle:       { fontSize: 15, lineHeight: 20, fontFamily: font.semibold },
+  sheetTitle:     { fontSize: 17, lineHeight: 22, fontFamily: font.bold },
+  sectionHeading: { fontSize: 18, lineHeight: 24, fontFamily: font.bold },
+  detailTitle:    { fontSize: 24, lineHeight: 30, fontFamily: font.bold },
+  heroHeadline:   { fontSize: 26, lineHeight: 32, fontFamily: font.bold },
+  pageTitle:      { fontSize: 28, lineHeight: 34, fontFamily: font.bold },
+  display:        { fontSize: 30, lineHeight: 36, fontFamily: font.bold },
+}
+
+export const radii = {
+  xs: 6, sm: 10, md: 12, tile: 16, card: 20, widget: 24, sheet: 28, pill: 999,
+}
+
+export const space = { 4: 4, 8: 8, 12: 12, 16: 16, 20: 20, 24: 24 }
+
+// iOS shadow + Android elevation per level. shadowColor is textPrimary, as `shadow` above.
+const lift = (y, blur, opacity, elevation) => ({
+  shadowColor: '#1A2B33', shadowOpacity: opacity, shadowRadius: blur,
+  shadowOffset: { width: 0, height: y }, elevation,
+})
+export const elevation = {
+  none:     { shadowOpacity: 0, elevation: 0 },
+  card:     lift(3, 12, 0.07, 3),    // == legacy `shadow`
+  floating: lift(8, 24, 0.12, 8),
+  tabBar:   lift(10, 30, 0.16, 12),
+}
+
+export const motion = {
+  fast: 180, base: 250, sheetIn: 280, sheetOut: 220,
+  spring: { bounciness: 4, speed: 12 },
+}
+
+export const press = { small: 0.7, card: 0.85 }
+
+// 44pt: the floor for every tap target in components/ui.
+export const TAP = 44
 
 // ─── Readable foreground on an arbitrary colour ─────────────────────────────
 //

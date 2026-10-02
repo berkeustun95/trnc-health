@@ -9,6 +9,7 @@ import {
   adRatioFor, adSpecFor, AD_RATIO_TOLERANCE, AD_PAGE_INSET,
   AD_SHOW_SPONSORED_LABEL, AD_SPONSORED_KEY,
 } from '../constants/ads'
+import { RemoteImage } from './ui'
 
 // ─── One ad placement. Direct-sold, no SDK, no network, no targeting. ───────
 //
@@ -96,7 +97,7 @@ export default function AdSlot({ position, module, lang, onNavigate }) {
   const ratio = adRatioFor(position)
 
   const image = (
-    <Image
+    <RemoteImage
       source={{ uri: ad.image_url }}
       style={{ width: '100%', aspectRatio: ratio }}
       resizeMode="cover"

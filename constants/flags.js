@@ -190,6 +190,16 @@ export const TILE_FONT_MANROPE = false
 //   says so.
 export const HOME_V2_LIVE = true   // live 2026-09-08
 
+// The app-wide redesign (feat/redesign). false = today's app in EVERY release build and
+// OTA, whatever this branch contains. The redesign renders when REDESIGN_LIVE is true, in a
+// dev bundle (__DEV__, Expo Go), or in an ADA Preview build — see constants/redesign.js,
+// which is the ONLY thing that may read this constant. An accidental production `eas update`
+// from this branch would still ship the current app.
+//
+// Like HOME_V2_LIVE it REPLACES surfaces every user already has, so it is a scalar in
+// scripts/check-module-flags.mjs's EXPECTED_SCALARS, not a MODULE_FLAGS key.
+export const REDESIGN_LIVE = false
+
 // Banner advertising (ad_banners). false = no banner slot renders anywhere, whatever is in
 // the table — AdSlot returns null before it even reads. true = a sold, active, in-window ad
 // draws in whichever slots are placed (today: home_footer only, at the foot of the V2 hub).

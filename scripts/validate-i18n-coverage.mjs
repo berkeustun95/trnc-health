@@ -262,6 +262,27 @@ const SURFACES = [
   'components/FilterDropdown.js',
   // Events, added with its dropdowns (its filter labels are now read through them).
   'screens/EventsScreen.js',
+  // ─── Redesign (feat/redesign). Added with the redesigned Home so the guard sees its keys;
+  // before this the 24 new keys were checked only by hand. homeGroups carries labelKey /
+  // titleKey maps; the ui components carry the shared uiRetry / uiClose / uiLoadFailed.
+  'components/home/redesign/RedesignHero.js',
+  'components/home/redesign/Widgets.js',
+  'components/home/redesign/OliBar.js',
+  'components/home/redesign/ServicePanels.js',
+  'constants/homeGroups.js',
+  'components/OliSearchSheet.js',
+  'components/ui/Button.js',
+  'components/ui/IconButton.js',
+  'components/ui/ErrorState.js',
+  'components/ui/EmptyState.js',
+  'components/ui/BottomSheet.js',
+  'components/ui/ConfirmDialog.js',
+  'components/ui/ScreenHeader.js',
+  'components/ui/FloatingTabBar.js',
+  // Slice 2 (shell).
+  'components/shell/Sheets.js',
+  'components/shell/Settings.js',
+  'screens/NotificationsScreen.js',
 ]
 
 // HomeScreen's module tiles look their labels up through a variable — t(mod.labelKey) —
@@ -329,6 +350,14 @@ const HOME_TILE_LABEL_KEYS = [...new Set(TILE_LABEL_SOURCES.flatMap(f =>
 // PURPOSE. Anything not listed must differ. Removing a line is how you re-open a
 // question; adding one should feel like a decision, because it is.
 const SAME_AS_ENGLISH = {
+  // ─── Redesign (feat/redesign), 2026-09-30 ────────────────────────────────
+  'hrWeatherUv':          { Turkish: "'UV' is the international index name and {n} · {level} carries the translated level; ru/ar/fa spell the index out", Greek: "'UV' is the international index name and {n} · {level} carries the translated level; ru/ar/fa spell the index out", French: "'UV' is the international index name and {n} · {level} carries the translated level; ru/ar/fa spell the index out",
+                            Spanish: "'UV' is the international index name and {n} · {level} carries the translated level; ru/ar/fa spell the index out", German: "'UV' is the international index name and {n} · {level} carries the translated level; ru/ar/fa spell the index out" },
+  'uiMenu':               { French: 'Menu is French' },
+  'notifications':        { French: 'Notifications is French' },
+  'accomTabHotels':       { German: 'Hotels is German' },
+  'hrAboutVersion':       { French: 'Version is French', German: 'Version is German' },
+  'hrAboutUpdate':        { German: 'Update is the usual German word for an app update' },
   // Events dropdowns, 2026-09-28 — genuinely the same word in French.
   'ddDate':               { French: 'Date is French' },
   'ddDistrict':           { French: 'District is French' },

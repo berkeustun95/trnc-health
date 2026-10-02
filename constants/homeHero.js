@@ -67,9 +67,13 @@ const ALLOWED_LICENCES = new Set([
   'CC0', 'Public domain', 'CC BY 2.0', 'CC BY 3.0', 'CC BY 4.0',
 ])
 
+// `landmark` is the pictured place's Turkish name (places.name_i18n.tr for placeId, read
+// 2026-09-30). It is a proper name and stays Turkish in every locale; the redesigned hero
+// chip shows "{district} · {landmark}". Güzelyurt and Lefke have no photo, so no landmark.
 export const HOME_HERO = {
   nicosia: {
     placeId: '1100ad4c-a412-4528-b96d-c2543fd23b25',   // Büyük Han (Great Inn)
+    landmark: 'Büyük Han',
     asset:   require('../assets/hero/hero-nicosia.jpg'),
     credit: {
       author:     'ToprakM',
@@ -81,6 +85,7 @@ export const HOME_HERO = {
   },
   kyrenia: {
     placeId: 'd773e658-95ac-48ba-ae53-5936374a976f',   // St. Hilarion Castle
+    landmark: 'Aziz Hilarion Kalesi',
     asset:   require('../assets/hero/hero-kyrenia.jpg'),
     credit: {
       // CC0 waives the attribution REQUIREMENT. Credited anyway: the sheet exists, the
@@ -95,6 +100,7 @@ export const HOME_HERO = {
   },
   famagusta: {
     placeId: '28f69a7c-48f1-4a51-b84e-37beda5e29b8',   // Salamis Ancient City
+    landmark: 'Salamis Antik Kenti',
     asset:   require('../assets/hero/hero-famagusta.jpg'),
     credit: {
       author:     'George Groutas',
@@ -106,6 +112,7 @@ export const HOME_HERO = {
   },
   iskele: {
     placeId: '88def13a-3ee3-4c3b-bb7b-56bf15f27f33',   // Kantara Castle
+    landmark: 'Kantara Kalesi',
     asset:   require('../assets/hero/hero-iskele.jpg'),
     credit: {
       author:     'George Groutas',
@@ -117,6 +124,7 @@ export const HOME_HERO = {
   },
   karpaz: {
     placeId: '95b6d924-e3c0-40e4-a2bd-b55ca1a105ef',   // Golden Beach (Altın Kumsal)
+    landmark: 'Altın Kumsal',
     asset:   require('../assets/hero/hero-karpaz.jpg'),
     credit: {
       // "Golden Beach" is a name a hundred beaches share. This file's own coordinates
@@ -167,6 +175,7 @@ export function resolveHero(region) {
     source:    usable ? entry.asset : HERO_GENERIC,
     isGeneric: !usable,
     placeId:   usable ? entry.placeId : null,
+    landmark:  usable ? (entry.landmark ?? null) : null,
     // Shaped for components/PhotoCredit.js, which expects the same field names
     // resolveAttribution() produces for a place row. One renderer, one shape.
     credit: usable ? {

@@ -1,3 +1,5 @@
+import { StatusBar } from 'expo-status-bar'
+import { REDESIGN } from '../constants/redesign'
 import { useState, useEffect } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
@@ -112,10 +114,12 @@ function EnrolmentRow({ row, lang, institutions, subjects, onEdit, onRemove, dis
           {[t(STUDENT_LEVEL_LABEL_KEY[row.level], lang), subject?.label, years].filter(Boolean).join(' · ')}
         </Text>
       </View>
-      <TouchableOpacity onPress={onEdit} disabled={disabled} style={s.eduRowAction} accessibilityRole="button">
+      <TouchableOpacity onPress={onEdit} disabled={disabled} style={s.eduRowAction} accessibilityRole="button"
+        accessibilityLabel={`${t('uiEdit', lang)}: ${instLabel}`}>
         <Feather name="edit-2" size={16} color={disabled ? colors.textSecondary : colors.primary} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={onRemove} disabled={disabled} style={s.eduRowAction} accessibilityRole="button">
+      <TouchableOpacity onPress={onRemove} disabled={disabled} style={s.eduRowAction} accessibilityRole="button"
+        accessibilityLabel={`${t('uiRemove', lang)}: ${instLabel}`}>
         <Feather name="trash-2" size={16} color={disabled ? colors.textSecondary : colors.danger ?? '#C2410C'} />
       </TouchableOpacity>
     </View>
@@ -135,7 +139,7 @@ function draftFromRow(row) {
   }
 }
 
-export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange, guardRef = null }) {
+export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange, guardRef = null, settingsSlot = null }) {
   const [profile, setProfile]               = useState(null)
   const [form, setForm]                     = useState({
     first_name: '', last_name: '', display_name: '',
@@ -894,6 +898,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     //   the Android three-button navigation bar and cannot be tapped — the same failure
     //   the message composer had. ProfileSetupScreen's footer is the pattern this copies.
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      {REDESIGN && <StatusBar style="dark" />}
       <KeyboardAwareForm>
         <ScrollView
           {...profileMem}
@@ -1390,6 +1395,10 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             </View>
           )}
 
+          {/* Redesign: Profil is the one settings place. App.js passes the grouped rows
+              (Tercihler · Destek · Yasal · Hesap); Legal then mounts only in App.js, and
+              sign-out asks first. The delete modal below is still this screen's. */}
+          {settingsSlot ? settingsSlot({ onDeleteAccount: () => { setDeleteError(null); setDeleteConfirmVisible(true) } }) : (<>
           <View style={s.legalRow}>
             <TouchableOpacity onPress={() => setLegalTab('privacy')}>
               <Text style={s.legalLink}>{t('privacyPolicy', lang)}</Text>
@@ -1407,6 +1416,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           <TouchableOpacity style={s.deleteAccountBtn} onPress={() => { setDeleteError(null); setDeleteConfirmVisible(true) }}>
             <Text style={s.deleteAccountText}>{t('deleteAccount', lang)}</Text>
           </TouchableOpacity>
+          </>)}
 
           <Modal visible={deleteConfirmVisible} animationType="fade" transparent onRequestClose={() => setDeleteConfirmVisible(false)}>
             <View style={s.deleteModalBackdrop}>
@@ -1438,21 +1448,21 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               resident status other than 'student' clears the level in the SAME setForm
               call. Education has its own pickers further down, writing to the DRAFT — the
               institution is no longer a field on this form at all. */}
-          <SearchModal visible={picker === 'day'} title={t('pgDay', lang)} options={dayOptions}
+          <SearchModal lang={lang} visible={picker === 'day'} title={t('pgDay', lang)} options={dayOptions}
             value={form.dobD} onSelect={v => { set('dobD')(v); setPicker(null) }} onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'month'} title={t('pgMonth', lang)} options={monthOptions}
+          <SearchModal lang={lang} visible={picker === 'month'} title={t('pgMonth', lang)} options={monthOptions}
             value={form.dobM} onSelect={v => { set('dobM')(v); setPicker(null) }} onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'year'} title={t('pgYear', lang)} options={yearOptions}
+          <SearchModal lang={lang} visible={picker === 'year'} title={t('pgYear', lang)} options={yearOptions}
             value={form.dobY} onSelect={v => { set('dobY')(v); setPicker(null) }} onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'nat'} searchable title={t('pgNationality', lang)}
+          <SearchModal lang={lang} visible={picker === 'nat'} searchable title={t('pgNationality', lang)}
             searchPlaceholder={t('pgNationalitySearch', lang)} options={natOptions}
             value={form.nationality} onSelect={v => { set('nationality')(v); setPicker(null) }} onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'cc'} searchable title={t('pgPhoneCountry', lang)}
+          <SearchModal lang={lang} visible={picker === 'cc'} searchable title={t('pgPhoneCountry', lang)}
             searchPlaceholder={t('pgNationalitySearch', lang)} options={ccOptions}
             value={selectedCC} onSelect={v => { setSelectedCC(v); setPicker(null) }} onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'region'} title={t('pgRegion', lang)} options={regionOptions}
+          <SearchModal lang={lang} visible={picker === 'region'} title={t('pgRegion', lang)} options={regionOptions}
             value={form.region} onSelect={v => { set('region')(v); setPicker(null) }} onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'status'} title={t('pgResidentStatus', lang)} options={statusOptions}
+          <SearchModal lang={lang} visible={picker === 'status'} title={t('pgResidentStatus', lang)} options={statusOptions}
             value={form.resident_status}
             onSelect={v => {
               setForm(f => ({
@@ -1466,7 +1476,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               setPicker(null)
             }}
             onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'level'} title={t('pgStudentLevel', lang)} options={levelOptions}
+          <SearchModal lang={lang} visible={picker === 'level'} title={t('pgStudentLevel', lang)} options={levelOptions}
             value={form.student_level}
             onSelect={v => {
               setForm(f => ({ ...f, student_level: v }))
@@ -1476,22 +1486,22 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           {/* Every education picker writes to the DRAFT, never to the profile form — the
               five columns those fields used to feed are not written by this screen any
               more. `pastInst` is gone with the past-university shape it belonged to. */}
-          <SearchModal visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
+          <SearchModal lang={lang} visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
             searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
             value={draft?.institutionId ?? null}
             onSelect={v => { setDraft(d => ({ ...d, institutionId: v })); setPicker(null) }}
             onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'eduLevel'} title={t('pgStudentLevel', lang)}
+          <SearchModal lang={lang} visible={picker === 'eduLevel'} title={t('pgStudentLevel', lang)}
             options={levelOptions.filter(o => LEVELS.includes(o.value))}
             value={draft?.level ?? null}
             onSelect={v => { setDraft(d => ({ ...d, level: v })); setPicker(null) }}
             onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'subject'} searchable title={t('pgSubject', lang)}
+          <SearchModal lang={lang} visible={picker === 'subject'} searchable title={t('pgSubject', lang)}
             searchPlaceholder={t('pgSubjectSearch', lang)} options={subjectOpts}
             value={draft?.subjectId ?? null}
             onSelect={v => { setDraft(d => ({ ...d, subjectId: v })); setPicker(null) }}
             onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'startYear'} title={t('pgStudyStart', lang)} options={startYearOptions}
+          <SearchModal lang={lang} visible={picker === 'startYear'} title={t('pgStudyStart', lang)} options={startYearOptions}
             value={draft?.startYear ?? null}
             onSelect={v => {
               // student_education_years_order_check: no end without a start, and no end
@@ -1504,11 +1514,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
               setPicker(null)
             }}
             onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'endYear'} title={t('pgStudyEnd', lang)} options={endYearOptions}
+          <SearchModal lang={lang} visible={picker === 'endYear'} title={t('pgStudyEnd', lang)} options={endYearOptions}
             value={draft?.endYear ?? null}
             onSelect={v => { setDraft(d => ({ ...d, endYear: v })); setPicker(null) }}
             onClose={() => setPicker(null)} />
-          <SearchModal visible={picker === 'closeYear'} title={t('pgStudyEnd', lang)}
+          <SearchModal lang={lang} visible={picker === 'closeYear'} title={t('pgStudyEnd', lang)}
             options={studyYearOptions(studyYearMax, currentEnrol?.study_start_year ?? STUDY_YEAR_MIN)}
             value={draft?.closeYear ?? null}
             onSelect={v => { setDraft(d => ({ ...d, closeYear: v })); setPicker(null) }}
@@ -1645,7 +1655,7 @@ const s = StyleSheet.create({
 
   // ─── Education ─────────────────────────────────────────────────────────────
   eduSection:        { marginTop: 4 },
-  eduGroupLabel:     { fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+  eduGroupLabel:     { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
                        textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   eduGroupLabelSpaced: { marginTop: 20 },
   eduLoading:        { alignSelf: 'flex-start', marginBottom: 8 },
@@ -1653,13 +1663,13 @@ const s = StyleSheet.create({
   eduRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10,
                        borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   eduRowBody:        { flex: 1, gap: 2 },
-  eduRowTitle:       { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  eduRowTitle:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   eduRowMeta:        { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
   eduRowAction:      { padding: 8 },
   eduAddBtn:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
                        borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.primary,
                        paddingVertical: 10, justifyContent: 'center' },
-  eduAddText:        { fontSize: 14, fontWeight: '700', color: colors.primary },
+  eduAddText:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary },
   eduDraft:          { marginTop: 12, paddingTop: 12,
                        borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   eduConfirm:        { marginTop: 12, padding: 12, borderRadius: radius.md, backgroundColor: colors.cardBg,
@@ -1668,12 +1678,12 @@ const s = StyleSheet.create({
   eduConfirmRow:     { flexDirection: 'row', gap: 10, marginTop: 4 },
   eduCancelBtn:      { flex: 1, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border,
                        paddingVertical: 11, alignItems: 'center' },
-  eduCancelText:     { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
+  eduCancelText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.textSecondary },
   eduRemoveBtn:      { flex: 1, borderRadius: radius.md, backgroundColor: colors.danger ?? '#C2410C',
                        paddingVertical: 11, alignItems: 'center' },
-  eduRemoveText:     { fontSize: 14, fontWeight: '700', color: '#fff' },
+  eduRemoveText:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   eduSaveBtn:        { flex: 1, borderRadius: radius.md, backgroundColor: colors.primary,
                        paddingVertical: 11, alignItems: 'center' },
-  eduSaveText:       { fontSize: 14, fontWeight: '700', color: colors.surface },
+  eduSaveText:       { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.surface },
 
 })

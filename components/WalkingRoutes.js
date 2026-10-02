@@ -20,6 +20,8 @@ import { REGION_LABEL_KEY } from '../constants/regions'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import { colors, shadow, radius } from '../constants/theme'
 import { t, LANG_CODES } from '../constants/i18n'
+import { REDESIGN } from '../constants/redesign'
+import { requestWithPrimer } from '../utils/permissionPrimer'
 import { medalDate } from '../utils/routeMedals'
 import { WALK_SIM, fakeFixNear } from '../utils/walkSim'
 
@@ -213,7 +215,7 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
           <Text style={p.city}>{city}</Text>
           <Text style={p.name}>{routeName(route, lang)}</Text>
         </View>
-        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
           <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -284,7 +286,9 @@ export function useWalkPosition(active) {
         let { status: st, canAskAgain } = await Location.getForegroundPermissionsAsync()
         if (st !== 'granted' && canAskAgain && !asked) {
           asked = true
-          ;({ status: st } = await Location.requestForegroundPermissionsAsync())
+          ;({ status: st } = REDESIGN
+            ? await requestWithPrimer('location')
+            : await Location.requestForegroundPermissionsAsync())
         }
         if (gone) return
         setStatus(st === 'granted' ? 'granted' : 'denied')
@@ -377,7 +381,7 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
         <Text style={[p.city, { flex: 1 }]}>
           {done ? routeName(route, lang) : t('walkStopOf', lang).replace('{i}', String(walk.next + 1)).replace('{n}', String(n))}
         </Text>
-        <TouchableOpacity onPress={onEnd} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={onEnd} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
           <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>

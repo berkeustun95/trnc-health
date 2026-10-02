@@ -7,6 +7,9 @@ import { askedFix } from '../utils/locationServices'
 import { Feather } from '@expo/vector-icons'
 import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
+import { REDESIGN } from '../constants/redesign'
+import { requestWithPrimer, dismissPrimer } from '../utils/permissionPrimer'
+import PermissionPrimer from './PermissionPrimer'
 
 const NICOSIA = { latitude: 35.1856, longitude: 33.3823 }
 const DELTA   = { latitudeDelta: 0.012, longitudeDelta: 0.012 }
@@ -38,7 +41,9 @@ export default function MapPinPicker({ visible, initialLat, initialLng, onConfir
   async function useMyLocation() {
     setLocating(true)
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync()
+      const { status } = REDESIGN
+        ? await requestWithPrimer('location')
+        : await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') { setLocating(false); return }
       const loc = await askedFix(Location.Accuracy.High)
       if (!loc) { setLocating(false); return }
@@ -50,7 +55,7 @@ export default function MapPinPicker({ visible, initialLat, initialLng, onConfir
   }
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
+    <Modal visible={visible} animationType="slide" onRequestClose={() => { if (REDESIGN && dismissPrimer()) return; onCancel() }}>
       <SafeAreaView style={s.container} edges={['top', 'bottom']}>
         <View style={s.header}>
           <TouchableOpacity onPress={onCancel} hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}>
@@ -111,6 +116,8 @@ export default function MapPinPicker({ visible, initialLat, initialLng, onConfir
           </View>
         </View>
       </SafeAreaView>
+      {/* A root overlay cannot draw above this Modal: the explanation needs its own host here. */}
+      {REDESIGN && <PermissionPrimer lang={lang} />}
     </Modal>
   )
 }

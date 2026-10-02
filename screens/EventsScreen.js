@@ -22,6 +22,14 @@ import FilterDropdown from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { openTicketUrl } from '../utils/events'
 import BackButton from '../components/BackButton'
+import { REDESIGN } from '../constants/redesign'
+import { StatusBar } from 'expo-status-bar'
+import { formatPetDate } from '../constants/petsContent'
+import {
+  ScreenHeader as KitHeader, FilterBar, InfoBanner, EmptyState, ErrorState, CardSkeleton, InfoRow, Button, ModuleScreen,
+  RemoteImage,
+} from '../components/ui'
+import { colors as C, category as CAT, type, radii, elevation } from '../constants/theme'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 
@@ -149,25 +157,20 @@ function priceLabel(event, lang) {
   return null
 }
 
+// Detail date in the APP language (was hardcoded 'en-GB': English month names on every
+// locale). formatPetDate is the app's Gregorian-pinned, Intl-checked date formatter; times are
+// plain 24h HH:MM, which reads the same in all nine locales.
+const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 function formatEventDate(start, end, lang) {
   if (!start) return ''
   const s = new Date(start)
-  const opts = { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }
-  const startStr = s.toLocaleString('en-GB', opts)
+  const startStr = `${formatPetDate(s, lang)} · ${hhmm(s)}`
   if (!end) return startStr
   const e = new Date(end)
-  const sameDay = s.toDateString() === e.toDateString()
-  if (sameDay) {
-    return `${s.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · ${s.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} – ${e.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
-  }
-  return `${startStr} – ${e.toLocaleString('en-GB', opts)}`
+  if (s.toDateString() === e.toDateString()) return `${startStr} – ${hhmm(e)}`
+  return `${startStr} – ${formatPetDate(e, lang)} · ${hhmm(e)}`
 }
 
-// `events` has no venue/city columns — the Gişe Kıbrıs import folds them into a
-// single string as "Venue, City" (scripts/import-gisekibris-events.mjs). Split on
-// the LAST ", " because the city is always the appended final segment, while a
-// venue name may itself contain commas ("Rocks Hotel, Casino & Spa, Girne").
-// Display-only; nothing is written back.
 function venueCityLabel(location) {
   if (!location) return ''
   const i = location.lastIndexOf(', ')
@@ -190,7 +193,7 @@ function EventCard({ event, lang, onPress }) {
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.88}>
       {img
-        ? <Image source={{ uri: img }} style={s.thumb} resizeMode="cover" />
+        ? <RemoteImage source={{ uri: img }} style={s.thumb} resizeMode="cover" />
         : <View style={[s.thumb, s.thumbFallback]}>
             <Ionicons name="calendar-outline" size={32} color={colors.border} />
           </View>
@@ -230,7 +233,7 @@ function EventCard({ event, lang, onPress }) {
 // No pinch-zoom: react-native-gesture-handler is not a dependency of this app and
 // adding it would force a native build. Tap / swipe-down / Android back all close.
 // PanResponder is core RN, so this whole viewer ships over the air.
-function ImageViewer({ images, startIndex, onClose }) {
+function ImageViewer({ images, startIndex, onClose, lang }) {
   const insets = useSafeAreaInsets()
   const [page, setPage] = useState(startIndex)
   const dragY = useRef(new Animated.Value(0)).current
@@ -283,13 +286,13 @@ function ImageViewer({ images, startIndex, onClose }) {
             onMomentumScrollEnd={e => setPage(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))}
             renderItem={({ item }) => (
               <TouchableOpacity activeOpacity={1} onPress={onClose}>
-                <Image source={{ uri: item }} style={s.viewerImage} resizeMode="contain" />
+                <RemoteImage placeholderColor="transparent" source={{ uri: item }} style={s.viewerImage} resizeMode="contain" />
               </TouchableOpacity>
             )}
           />
         ) : (
           <TouchableOpacity activeOpacity={1} onPress={onClose}>
-            <Image source={{ uri: images[0] }} style={s.viewerImage} resizeMode="contain" />
+            <RemoteImage placeholderColor="transparent" source={{ uri: images[0] }} style={s.viewerImage} resizeMode="contain" />
           </TouchableOpacity>
         )}
       </Animated.View>
@@ -299,6 +302,7 @@ function ImageViewer({ images, startIndex, onClose }) {
         onPress={onClose}
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         accessibilityRole="button"
+        accessibilityLabel={t('uiClose', lang)}
       >
         <Ionicons name="close" size={24} color="#fff" />
       </TouchableOpacity>
@@ -327,6 +331,7 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
   const [viewerIndex, setViewerIndex] = useState(null)
   const [heroRatio, setHeroRatio] = useState(1)
   const images = event.images ?? []
+  const insets = useSafeAreaInsets()
 
   // Size the hero to the images themselves so nothing crops AND nothing pillarboxes.
   // The pager is one height, so with several images the container takes the TALLEST
@@ -365,31 +370,23 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
     if (event.location) Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(event.location)}`)
   }
 
-  return (
-    <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.detailHeader}>
-        <BackButton lang={lang} onPress={onBack} />
-      </View>
-
-      <FlatList
-        data={[{ key: 'detail' }]}
-        keyExtractor={i => i.key}
-        showsVerticalScrollIndicator={false}
-        ListFooterComponent={
-          // detail_bottom. A FOOTER on the single-item list rather than an extra child
-          // inside the detail body — the body is one long JSX block whose last element is
-          // conditional (Buy Ticket, else description, else price row), so appending
-          // inside it would mean picking one of those branches to sit under. This seam
-          // does not care which branch rendered.
-          //
-          // EventDetailScreen is defined INSIDE EventsScreen.js, so a file-level allowlist
-          // cannot tell this mount from the list's three. The guard pins this wrapper to
-          // this function's span; that is why the wrapper exists as its own file.
+  // detail_bottom. A FOOTER on the single-item list rather than an extra child
+  // inside the detail body — the body is one long JSX block whose last element is
+  // conditional (Buy Ticket, else description, else price row), so appending
+  // inside it would mean picking one of those branches to sit under. This seam
+  // does not care which branch rendered.
+  //
+  // EventDetailScreen is defined INSIDE EventsScreen.js, so a file-level allowlist
+  // cannot tell this mount from the list's three. The guard pins this wrapper to
+  // this function's span; that is why the wrapper exists as its own file. ONE mount,
+  // shared by both layouts (the guard counts exactly one).
+  const adSlot = (
           <EventsDetailBottomSlot lang={lang} onNavigate={onAdNavigate} />
-        }
-        renderItem={() => (
-          <View>
-            {images.length > 0 ? (
+  )
+
+  // The poster pager, identical in both layouts: measured ratio, contain, never cropped
+  // (Gişe Kıbrıs artwork runs edge to edge — see HERO_MIN_RATIO and the thumb note).
+  const posterPager = images.length > 0 ? (
               <View>
                 <FlatList
                   data={images}
@@ -406,7 +403,7 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
                       onPress={() => setViewerIndex(index)}
                       accessibilityRole="imagebutton"
                     >
-                      <Image
+                      <RemoteImage
                         source={{ uri: item }}
                         style={[s.detailImage, { aspectRatio: heroRatio }]}
                         resizeMode="contain"
@@ -422,7 +419,85 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
                   </View>
                 )}
               </View>
-            ) : (
+  ) : null
+
+  const viewer = viewerIndex != null && (
+        <ImageViewer
+          lang={lang}
+          images={images}
+          startIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+        />
+  )
+
+  // Redesign (S4): ADA header above the poster (the poster is partner artwork and keeps its
+  // measured, uncropped frame — DetailScaffold's fixed cover photo would crop it), then the
+  // white sheet with the category tag, title and InfoRows. Buy Ticket stays where it was,
+  // at the end of the body, with the same label and the same openTicketUrl().
+  if (REDESIGN) {
+    return (
+      <SafeAreaView style={rd.detailSafe} edges={['top']}>
+        <KitHeader onBack={onBack} lang={lang} />
+        <FlatList
+          data={[{ key: 'detail' }]}
+          keyExtractor={i => i.key}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          ListFooterComponent={adSlot}
+          renderItem={() => (
+            <View>
+              {posterPager || (
+                <View style={rd.posterFallback}>
+                  <Ionicons name="calendar-outline" size={56} color={CAT.explore.ink} />
+                </View>
+              )}
+              <View style={rd.sheet}>
+                {!!event.category && (
+                  <View style={rd.tag}>
+                    <Ionicons name="calendar-outline" size={13} color={CAT.explore.ink} />
+                    <Text style={rd.tagText} numberOfLines={1}>{categoryLabel(event.category, lang)}</Text>
+                  </View>
+                )}
+                <Text style={rd.title} accessibilityRole="header">{event.title}</Text>
+                <View style={rd.rows}>
+                  <InfoRow icon="business-outline" category="explore" label={t('eventOrganiser', lang)} value={event.organizer_name} />
+                  <InfoRow icon="calendar-outline" category="explore" label={t('eventDate', lang)} value={formatEventDate(event.start_date, event.end_date, lang)} />
+                  <InfoRow icon="location-outline" category="explore" label={t('eventLocation', lang)} value={event.location} onPress={openMaps} />
+                  <InfoRow icon="pricetag-outline" category="explore" label={t('eventPrice', lang)} value={price} divider={false} />
+                </View>
+                {event.description ? (
+                  <View style={rd.descBlock}>
+                    <Text style={rd.descTitle}>{t('aboutThisEvent', lang)}</Text>
+                    <Text style={rd.descText}>{event.description}</Text>
+                  </View>
+                ) : null}
+                {event.ticket_url ? (
+                  <Button icon="ticket-outline" title={t('eventBuyTicket', lang)} onPress={() => openTicketUrl(event)}
+                    fullWidth style={rd.buyBtn} />
+                ) : null}
+              </View>
+            </View>
+          )}
+        />
+        {viewer}
+      </SafeAreaView>
+    )
+  }
+
+  return (
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <View style={s.detailHeader}>
+        <BackButton lang={lang} onPress={onBack} />
+      </View>
+
+      <FlatList
+        data={[{ key: 'detail' }]}
+        keyExtractor={i => i.key}
+        showsVerticalScrollIndicator={false}
+        ListFooterComponent={adSlot}
+        renderItem={() => (
+          <View>
+            {posterPager ? posterPager : (
               <View style={s.detailImageFallback}>
                 <Ionicons name="calendar-outline" size={56} color={colors.border} />
               </View>
@@ -449,7 +524,7 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.detailRowLabel}>{t('eventDate', lang)}</Text>
-                  <Text style={s.detailRowValue}>{formatEventDate(event.start_date, event.end_date)}</Text>
+                  <Text style={s.detailRowValue}>{formatEventDate(event.start_date, event.end_date, lang)}</Text>
                 </View>
               </View>
 
@@ -497,13 +572,7 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
         )}
       />
 
-      {viewerIndex != null && (
-        <ImageViewer
-          images={images}
-          startIndex={viewerIndex}
-          onClose={() => setViewerIndex(null)}
-        />
-      )}
+      {viewer}
     </SafeAreaView>
   )
 }
@@ -511,6 +580,12 @@ function EventDetailScreen({ event, lang, onBack, onAdNavigate }) {
 // ─── Events Feed ─────────────────────────────────────────────────────────────
 
 export { EventDetailScreen }
+
+// Redesign: the list sits on the Etkinlikler photo (option B). The detail overlay is rendered
+// OUTSIDE this frame, so it keeps its own canvas look and kit colours.
+function ListFrame({ children }) {
+  return REDESIGN ? <ModuleScreen topic="events">{children}</ModuleScreen> : children
+}
 
 // `initialDistrict` is a canonical region slug, set when the user arrives from a
 // city-welcome card; it pre-selects the İlçe dropdown. The events table has no district
@@ -529,19 +604,22 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
   const [pickedDate, setPickedDate] = useState(null)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [district, setDistrict] = useState(initialDistrict)
+  const [loadError, setLoadError] = useState(false)   // fetch failed → ErrorState, never "no upcoming events"
   const insets = useSafeAreaInsets()
 
   const load = useCallback(async () => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('events')
       .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, category, ticket_url, latitude, longitude, price_from, price_text')
       .eq('status', 'approved')
       .gte('start_date', cutoff)
       .order('start_date', { ascending: true })
-    setEvents(data ?? [])
+    setLoadError(!!error)
+    setEvents(error ? [] : (data ?? []))
     setLoading(false)
   }, [])
+  const retry = () => { setLoading(true); load() }
 
   const filtered = events
     .filter(e => matchesCategory(e, category))
@@ -581,6 +659,53 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
     })
   }
 
+  // The three filters, shared by both layouts (legacy: equal-width row; redesign: FilterBar).
+  const renderDropdowns = itemStyle => (<>
+                <FilterDropdown
+                  style={itemStyle}
+                  label={t('ddCategory', lang)}
+                  lang={lang}
+                  options={CATEGORIES.filter(c => c.key !== 'all').map(c => ({ value: c.key, label: t(c.labelKey, lang) }))}
+                  value={category === 'all' ? null : category}
+                  onChange={v => setCategory(v ?? 'all')}
+                />
+                <FilterDropdown
+                  style={itemStyle}
+                  label={t('ddDate', lang)}
+                  lang={lang}
+                  options={DATE_FILTERS.filter(d => d.key !== 'all').map(d => ({ value: d.key, label: t(d.labelKey, lang) }))}
+                  value={dateFilter === 'all' || dateFilter === 'picked' ? null : dateFilter}
+                  selectedLabel={dateFilter === 'picked' && pickedDate
+                    ? formatPetDate(pickedDate, lang) : null}
+                  onChange={v => { setDateFilter(v ?? 'all'); if (v == null) setPickedDate(null) }}
+                  extraAction={{ label: t('datePickDate', lang), icon: 'calendar', onPress: openDatePicker }}
+                />
+                <FilterDropdown
+                  style={itemStyle}
+                  label={t('ddDistrict', lang)}
+                  lang={lang}
+                  options={districtOptions}
+                  value={district}
+                  onChange={setDistrict}
+                />
+  </>)
+
+  // list_top / list_bottom / list_inline: ONE mount each (the guard counts exactly one per
+  // wrapper in this file), shared by both layouts.
+  // ⚠ top and bottom are GATED ON A NON-EMPTY FEED, and that is not a nicety. `filtered` goes
+  //   to zero two ways here — a category/date filter that matches nothing, and a feed with
+  //   no approved rows at all. An ad sitting above "no upcoming events" is worse than no ad:
+  //   it is the only content on the screen, so the screen becomes an advert with an apology under it.
+  const topSlot = filtered.length > 0
+    ? <EventsListTopSlot lang={lang} onNavigate={onAdNavigate} />
+    : null
+  // The list already reserves insets+96 below its content for a FAB that is not visible on
+  // this screen, so the space exists without retuning it.
+  const bottomSlot = filtered.length > 0
+    ? <EventsListBottomSlot lang={lang} onNavigate={onAdNavigate} />
+    : null
+  const inlineSlot = <EventsListInlineSlot lang={lang} onNavigate={onAdNavigate} />
+
   async function onRefresh() {
     setRefreshing(true)
     await load()
@@ -589,12 +714,21 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
 
   return (
     <View style={s.root}>
+    <ListFrame>
     <SafeAreaView style={s.safe} edges={['top']}>
+      {REDESIGN ? (
+        <KitHeader onBack={onBack} title={t('eventsTitle', lang)} lang={lang} />
+      ) : (<>
       <PageBackground topic="events" />
       <ScreenHeader onBack={onBack} title={t('eventsTitle', lang)} lang={lang} />
+      </>)}
+      {/* Fixed above the list (FilterBar is flexShrink 0); same three filters, same meaning. */}
+      {REDESIGN && !loading && !loadError && <FilterBar>{renderDropdowns()}</FilterBar>}
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
+        REDESIGN
+          ? <View style={rd.skeletons}>{[0, 1, 2].map(i => <CardSkeleton key={i} height={CARD_H} />)}</View>
+          : <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
       ) : (
         <FlatList
           data={filtered}
@@ -602,7 +736,12 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[s.listContent, { paddingBottom: insets.bottom + 96 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          ListHeaderComponent={
+          ListHeaderComponent={REDESIGN ? (
+            <View>
+              <InfoBanner icon="calendar-outline" category="explore" message={t('eventsSubtitle', lang)} style={rd.banner} />
+              {topSlot}
+            </View>
+          ) : (
             <View>
               <MascotIntroCard
                 module="events"
@@ -613,54 +752,17 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
                   district pill — that entry now simply pre-selects İlçe). Selections are screen
                   state, so they survive opening an event and coming back (overlay). */}
               <View style={s.ddRow}>
-                <FilterDropdown
-                  style={s.ddItem}
-                  label={t('ddCategory', lang)}
-                  lang={lang}
-                  options={CATEGORIES.filter(c => c.key !== 'all').map(c => ({ value: c.key, label: t(c.labelKey, lang) }))}
-                  value={category === 'all' ? null : category}
-                  onChange={v => setCategory(v ?? 'all')}
-                />
-                <FilterDropdown
-                  style={s.ddItem}
-                  label={t('ddDate', lang)}
-                  lang={lang}
-                  options={DATE_FILTERS.filter(d => d.key !== 'all').map(d => ({ value: d.key, label: t(d.labelKey, lang) }))}
-                  value={dateFilter === 'all' || dateFilter === 'picked' ? null : dateFilter}
-                  selectedLabel={dateFilter === 'picked' && pickedDate
-                    ? pickedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : null}
-                  onChange={v => { setDateFilter(v ?? 'all'); if (v == null) setPickedDate(null) }}
-                  extraAction={{ label: t('datePickDate', lang), icon: 'calendar', onPress: openDatePicker }}
-                />
-                <FilterDropdown
-                  style={s.ddItem}
-                  label={t('ddDistrict', lang)}
-                  lang={lang}
-                  options={districtOptions}
-                  value={district}
-                  onChange={setDistrict}
-                />
+                {renderDropdowns(s.ddItem)}
               </View>
-              {/* list_top, INSIDE the existing header so it scrolls with the chips.
-                  ⚠ GATED ON A NON-EMPTY FEED, and that is not a nicety. `filtered` goes
-                    to zero two ways here — a category/date filter that matches nothing,
-                    and a feed with no approved rows at all. An ad sitting above "no
-                    upcoming events" is worse than no ad: it is the only content on the
-                    screen, so the screen becomes an advert with an apology under it. */}
-              {filtered.length > 0 && (
-                <EventsListTopSlot lang={lang} onNavigate={onAdNavigate} />
-              )}
+              {/* list_top, INSIDE the existing header so it scrolls with the chips. */}
+              {topSlot}
             </View>
-          }
-          ListFooterComponent={
-            // list_bottom. The list already reserves insets+96 below its content for a FAB
-            // that is not visible on this screen, so the space exists without retuning it.
-            filtered.length > 0
-              ? <EventsListBottomSlot lang={lang} onNavigate={onAdNavigate} />
-              : null
-          }
+          )}
+          ListFooterComponent={bottomSlot}
           ListEmptyComponent={
-            <View style={s.emptyWrap}>
+            loadError ? <ErrorState lang={lang} onRetry={retry} />
+            : REDESIGN ? <EmptyState icon="calendar-outline" category="explore" title={t('noUpcomingEvents', lang)} />
+            : <View style={s.emptyWrap}>
               <View style={s.emptyCard}>
                 <Ionicons name="calendar-outline" size={48} color={colors.border} style={{ marginBottom: 12 }} />
                 <Text style={s.emptyText}>{t('noUpcomingEvents', lang)}</Text>
@@ -671,7 +773,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
             // list_inline — ONCE, after the 8th card. A point, not a modulus.
             <>
               <EventCard event={item} lang={lang} onPress={() => onOpenEvent?.(item)} />
-              {index === 7 && <EventsListInlineSlot lang={lang} onNavigate={onAdNavigate} />}
+              {index === 7 && inlineSlot}
             </>
           )}
         />
@@ -706,6 +808,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
         </Modal>
       )}
     </SafeAreaView>
+    </ListFrame>
 
     {/* Sibling of the SafeAreaView, not a child: absolute children offset from the
         parent's PADDING box, so nesting this inside edges={['top']} would apply the
@@ -715,6 +818,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
         offset survives the round trip. */}
     {selectedEvent && (
       <View style={s.detailOverlay}>
+        {REDESIGN && <StatusBar style="dark" />}
         <EventDetailScreen event={selectedEvent} lang={lang} onBack={() => onCloseEvent?.()} onAdNavigate={onAdNavigate} />
       </View>
     )}
@@ -722,7 +826,7 @@ export default function EventsScreen({ onAdNavigate, lang, onBack, initialDistri
   )
 }
 
-const s = StyleSheet.create({
+const legacy = StyleSheet.create({
   root:               { flex: 1, backgroundColor: colors.bg },
   safe:               { flex: 1, backgroundColor: colors.bg },
   // zIndex AND elevation: Android can draw by elevation instead of paint order, and
@@ -838,3 +942,42 @@ const s = StyleSheet.create({
   emptyCard:          { backgroundColor: colors.cardBg, borderRadius: 16, paddingHorizontal: 24, paddingVertical: 20, alignItems: 'center', ...shadow },
   emptyText:          { fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.textSecondary, textAlign: 'center' },
 })
+
+// Redesign. Card GEOMETRY is unchanged (CARD_H, the square poster THUMB_W): the poster is
+// partner artwork, so only ADA chrome — surface, radius, type, label colour — moves to tokens.
+const rd = StyleSheet.create({
+  root:          { flex: 1, backgroundColor: C.canvas },
+  safe:          { flex: 1, backgroundColor: 'transparent' },
+  detailOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: C.canvas, zIndex: 10, elevation: 10 },
+  card:          { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20,
+                   overflow: 'hidden', minHeight: CARD_H, ...elevation.card },
+  thumbFallback: { backgroundColor: CAT.explore.bg, justifyContent: 'center', alignItems: 'center' },
+  catLabel:      { ...type.caption, fontFamily: 'Inter_700Bold', lineHeight: 16, color: CAT.explore.ink, letterSpacing: 0.4 },
+  divider:       { height: 1, backgroundColor: C.divider, marginVertical: 5 },
+  cardTitle:     { ...type.rowTitle, minHeight: 40, color: C.textPrimary },
+  infoText:      { ...type.meta, lineHeight: 17, color: C.textSecondary, flex: 1 },
+  detailImage:   { width: SCREEN_W, backgroundColor: C.canvas },
+  dotActive:     { backgroundColor: C.primary, width: 18 },
+
+  skeletons:     { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
+  banner:        { marginBottom: 0 },
+  detailSafe:    { flex: 1, backgroundColor: C.canvas },
+  posterFallback:{ height: 200, backgroundColor: CAT.explore.bg, justifyContent: 'center', alignItems: 'center' },
+  sheet:         { backgroundColor: C.card, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet,
+                   paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, minHeight: 300 },
+  tag:           { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radii.pill,
+                   paddingHorizontal: 10, paddingVertical: 4, marginBottom: 8, backgroundColor: CAT.explore.bg },
+  tagText:       { ...type.meta, fontFamily: 'Inter_700Bold', color: CAT.explore.ink },
+  title:         { ...type.detailTitle, color: C.textPrimary },
+  rows:          { marginTop: 12 },
+  descBlock:     { marginTop: 16, padding: 16, backgroundColor: C.soft, borderRadius: radii.tile },
+  descTitle:     { ...type.rowTitle, color: C.textPrimary, marginBottom: 6 },
+  descText:      { ...type.body, color: C.textPrimary },
+  buyBtn:        { marginTop: 20 },
+})
+
+const s = REDESIGN
+  ? { ...legacy, root: rd.root, safe: rd.safe, detailOverlay: rd.detailOverlay, card: rd.card,
+      thumbFallback: rd.thumbFallback, catLabel: rd.catLabel, divider: rd.divider, cardTitle: rd.cardTitle,
+      infoText: rd.infoText, detailImage: rd.detailImage, dotActive: rd.dotActive }
+  : legacy

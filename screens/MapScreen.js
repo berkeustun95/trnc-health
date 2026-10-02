@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
 import MapView, { Marker } from 'react-native-maps'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { colors, typeColors, shadow } from '../constants/theme'
@@ -7,6 +7,7 @@ import { t } from '../constants/i18n'
 import { parseIsOpen } from '../utils/facilityUtils'
 import FilterDropdown from '../components/FilterDropdown'
 import OsmAttribution from '../components/OsmAttribution'
+import { RemoteImage } from '../components/ui'
 
 const LEFKOSA    = { latitude: 35.1856, longitude: 33.3823, latitudeDelta: 0.08, longitudeDelta: 0.08 }
 const PIN_COLORS = { pharmacy: '#7C3AED', clinic: '#0E7C7B', hospital: '#D1495B', dentist: '#2E9E5B' }
@@ -103,7 +104,7 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
         <View style={s.card}>
           <View style={s.cardRow}>
             {selectedPin.logo_url
-              ? <Image source={{ uri: selectedPin.logo_url }} style={s.logo} resizeMode="contain" />
+              ? <RemoteImage placeholderColor="transparent" source={{ uri: selectedPin.logo_url }} style={s.logo} resizeMode="contain" />
               : <View style={[s.logo, s.logoFallback, { backgroundColor: tc.bg }]}>
                   <Text style={{ fontSize: 20 }}>{TYPE_ICONS[selectedPin.type] ?? '🏥'}</Text>
                 </View>
@@ -118,7 +119,7 @@ export default function MapScreen({ facilities, dutyFacilityId, userLocation, on
                 : null
               }
             </View>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)}
               onPress={() => setSelectedPin(null)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >

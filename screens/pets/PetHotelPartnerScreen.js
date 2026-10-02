@@ -2,8 +2,10 @@ import { View, Text, Image, ScrollView, FlatList, TouchableOpacity, StyleSheet, 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import BackButton from '../../components/BackButton'
+import { REDESIGN } from '../../constants/redesign'
+import { ScreenHeader } from '../../components/ui'
 import PartnerLogoStrip from '../../components/PartnerLogoStrip'
-import { colors, shadow, radius } from '../../constants/theme'
+import { colors, shadow, radius, radii } from '../../constants/theme'
 import { t, tCount, LANG_CODES } from '../../constants/i18n'
 import { REGION_LABEL_KEY } from '../../constants/regions'
 import { partnerAsset, partnerLogo } from '../../constants/partnerAssets'
@@ -157,11 +159,15 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.navbar}>
-        <BackButton lang={lang} onPress={onBack} />
-        <Text style={s.navTitle} numberOfLines={1}>{partner.name}</Text>
-        <View style={s.navSpacer} />
-      </View>
+      {/* S5 (partner rule, small changes only): the ADA header on the redesign. The partner's
+          logo, photos, colours, links, section order and labels are untouched. */}
+      {REDESIGN ? <ScreenHeader title={partner.name} onBack={onBack} lang={lang} /> : (
+        <View style={s.navbar}>
+          <BackButton lang={lang} onPress={onBack} />
+          <Text style={s.navTitle} numberOfLines={1}>{partner.name}</Text>
+          <View style={s.navSpacer} />
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: CONTACT_BAR_CLEARANCE + insets.bottom }]}>
         {/* ─── SECTIONS, IN CONFIG ORDER ────────────────────────────────────
@@ -342,7 +348,7 @@ export default function PetHotelPartnerScreen({ partner, lang, region, onBack })
   )
 }
 
-const s = StyleSheet.create({
+const legacyS = StyleSheet.create({
   safe:         { flex: 1, backgroundColor: colors.bg },
   navbar:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
                   paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border,
@@ -414,3 +420,17 @@ const s = StyleSheet.create({
                   gap: 8, backgroundColor: colors.primary, paddingVertical: 13, borderRadius: radius.sm },
   barBtnText:   { color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_700Bold', flexShrink: 1 },
 })
+
+// S5 redesign overrides — shape and spacing only (partner rule): the ADA page ground, 44–48pt
+// buttons on the redesign radius. Every colour, label, link and position is unchanged; the
+// WhatsApp is WhatsApp's dark green #075E54 (7.67:1; was #25D366, 1.98:1) — approved 2026-10-01.
+const redesignS = StyleSheet.create({
+  safe:     { flex: 1, backgroundColor: colors.canvas },
+  mapsBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44,
+              borderWidth: 1.5, borderColor: colors.primary, borderRadius: radii.md, marginTop: 10, backgroundColor: 'transparent' },
+  waBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48,
+              backgroundColor: '#075E54', borderRadius: radii.md },
+  callBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48,
+              backgroundColor: colors.primary, borderRadius: radii.md },
+})
+const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS

@@ -197,7 +197,7 @@ export function rampAlphaAt(max, u) {
 
 // Per-layer alphas whose PRODUCT reproduces that curve. Solved outward-in: each layer
 // only has to supply what the layers beyond it have not.
-function rampLayers(max) {
+export function rampLayers(max) {
   const d = new Array(RAMP_STEPS)
   for (let i = RAMP_STEPS - 1; i >= 0; i--) {
     let below = 1

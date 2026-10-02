@@ -39,7 +39,7 @@ export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
       <KeyboardAwareForm>
       <View style={s.container}>
         {!done && (
-          <TouchableOpacity style={s.cancelBtn} onPress={onDone}>
+          <TouchableOpacity style={s.cancelBtn} onPress={onDone} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
             <Feather name="x" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
@@ -61,7 +61,7 @@ export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
                 placeholderTextColor={colors.textSecondary}
                 secureTextEntry={!showPassword}
               />
-              <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={s.eyeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t(showPassword ? 'uiHidePassword' : 'uiShowPassword', lang)} onPress={() => setShowPassword(v => !v)} style={s.eyeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -76,7 +76,7 @@ export default function ResetPasswordScreen({ onDone, lang = 'English' }) {
                 placeholderTextColor={colors.textSecondary}
                 secureTextEntry={!showConfirm}
               />
-              <TouchableOpacity onPress={() => setShowConfirm(v => !v)} style={s.eyeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t(showConfirm ? 'uiHidePassword' : 'uiShowPassword', lang)} onPress={() => setShowConfirm(v => !v)} style={s.eyeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Feather name={showConfirm ? 'eye-off' : 'eye'} size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>

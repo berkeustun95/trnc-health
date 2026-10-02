@@ -115,6 +115,19 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs
   exit 1
 }
 
+# Redesign S6. A style with fontWeight and no fontFamily renders in the Android SYSTEM font;
+# an icon-only control with no accessibilityLabel is announced as "button" and nothing else.
+# Both were swept to zero on 2026-10-01 (109 and 24); these keep them there. Role screens are
+# allow-listed inside each script, with the reason.
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-font-family.mjs || {
+  echo "  push blocked: name the Inter face (fontFamily) instead of fontWeight alone."
+  exit 1
+}
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-icon-labels.mjs || {
+  echo "  push blocked: give the icon-only control an accessibilityLabel."
+  exit 1
+}
+
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.mjs || {
   echo "  push blocked: an advert would land on an excluded surface."
   exit 1

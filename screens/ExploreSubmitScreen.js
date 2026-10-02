@@ -288,7 +288,7 @@ export default function ExploreSubmitScreen({ session, lang, place: editPlace, o
             {existingPhotos.map((url, i) => (
               <View key={`ex-${i}`} style={s.thumbWrap}>
                 <Image source={{ uri: url }} style={s.thumb} resizeMode="cover" />
-                <TouchableOpacity style={s.thumbRemove} onPress={() => removeExisting(i)}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiRemove', lang)} style={s.thumbRemove} onPress={() => removeExisting(i)}>
                   <Ionicons name="close-circle" size={22} color="#fff" />
                 </TouchableOpacity>
               </View>
@@ -296,7 +296,7 @@ export default function ExploreSubmitScreen({ session, lang, place: editPlace, o
             {photos.map((ph, i) => (
               <View key={`new-${i}`} style={s.thumbWrap}>
                 <Image source={{ uri: ph.uri }} style={s.thumb} resizeMode="cover" />
-                <TouchableOpacity style={s.thumbRemove} onPress={() => removePhoto(i)}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiRemove', lang)} style={s.thumbRemove} onPress={() => removePhoto(i)}>
                   <Ionicons name="close-circle" size={22} color="#fff" />
                 </TouchableOpacity>
               </View>

@@ -12,6 +12,9 @@ import {
 } from '../constants/towing'
 import { openState } from '../utils/towingHours'
 import { logContactEvent } from '../utils/logContactEvent'
+import { REDESIGN } from '../constants/redesign'
+import { colors as C, category as CAT, type, radii, press } from '../constants/theme'
+import { DetailScaffold, InfoRow } from '../components/ui'
 
 // Firm detail. Secondary to the list by design — the call button is already ON the card,
 // so nobody in an actual emergency needs to reach this screen. This is for the user who
@@ -27,6 +30,16 @@ function Block({ title, children }) {
   return (
     <View style={s.block}>
       <Text style={s.blockTitle}>{title}</Text>
+      {children}
+    </View>
+  )
+}
+
+// Redesign section: title + content, Inter throughout (the legacy blocks set fontWeight only).
+function RSection({ title, children }) {
+  return (
+    <View style={r.section}>
+      <Text style={r.sectionTitle} accessibilityRole="header">{title}</Text>
       {children}
     </View>
   )
@@ -66,6 +79,122 @@ export default function TowingDetailScreen({ company, lang, region, onBack }) {
     ...(classes.includes('car')   ? CAR_SUBTYPES   : []),
     ...(classes.includes('heavy') ? HEAVY_SUBTYPES : []),
   ]
+
+  if (REDESIGN) {
+    const hours = st.state === 'open'  ? { text: t('towingOpenNow', lang), ok: true }
+      : st.state === 'opens'           ? { text: t('towingOpensAt', lang).replace('{time}', st.at), warn: true }
+      : st.unknown                     ? { text: t('towingHoursUnknownBadge', lang) }
+      :                                  { text: t('towingClosedToday', lang), warn: true }
+    return (
+      <DetailScaffold
+        icon="car-outline"
+        tag={{ label: t('menuTowing', lang), category: 'homeLife', icon: 'car-outline' }}
+        title={company?.name}
+        onBack={onBack}
+        lang={lang}
+        actions={[
+          { kind: 'call', label: t('towingCall', lang), onPress: call },
+          whatsapp ? { kind: 'whatsapp', onPress: whatsApp, accessibilityLabel: `WhatsApp, ${company?.name}` } : null,
+        ]}
+      >
+        <View style={r.identity}>
+          <TowingLogo uri={company?.logo_url} name={company?.name} size={56} />
+          <View style={r.chips}>
+            <View style={[r.chip, hours.ok && r.chipOk, hours.warn && r.chipWarn]}>
+              <Text style={[r.chipText, hours.ok && r.chipOkText, hours.warn && r.chipWarnText]}>{hours.text}</Text>
+            </View>
+            {!!company?.is_24_7 && (
+              <View style={[r.chip, r.chipHome]}>
+                <Text style={[r.chipText, r.chipHomeText]}>{t('towing247', lang)}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <RSection title={t('towingContactTitle', lang)}>
+          <InfoRow icon="call-outline" category="homeLife" label={t('towingPhone', lang)} value={phone || '—'}
+            onPress={phone ? call : undefined} />
+          {!!whatsapp && (
+            <InfoRow icon="logo-whatsapp" category="homeLife" label="WhatsApp" value={whatsapp} onPress={whatsApp} />
+          )}
+          {!!phone2 && (
+            <TouchableOpacity style={r.secondNumBtn} onPress={() => dial(phone2, 'call_secondary')} activeOpacity={press.small} accessibilityRole="button">
+              <Ionicons name="call-outline" size={16} color={C.primaryDark} />
+              <Text style={r.secondNumText} numberOfLines={1}>
+                {t('towingSecondNumberBtn', lang).replace('{number}', phone2)}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </RSection>
+
+        {services.length > 0 && (
+          <RSection title={t('towingServicesTitle', lang)}>
+            <View style={r.tagWrap}>
+              {services.map(k => (
+                <View key={k} style={r.tag}><Text style={r.tagText}>{t(serviceLabelKey(k), lang)}</Text></View>
+              ))}
+            </View>
+          </RSection>
+        )}
+
+        {classes.length > 0 && (
+          <RSection title={t('towingVehiclesTitle', lang)}>
+            <View style={r.tagWrap}>
+              {VEHICLE_CLASSES.filter(v => classes.includes(v.key)).map(v => (
+                <View key={v.key} style={[r.tag, r.tagStrong]}><Text style={[r.tagText, r.tagStrongText]}>{t(v.labelKey, lang)}</Text></View>
+              ))}
+              {subtypes.map(k => (
+                <View key={k} style={r.tag}><Text style={r.tagText}>{t(k, lang)}</Text></View>
+              ))}
+            </View>
+          </RSection>
+        )}
+
+        <RSection title={t('towingCoverageTitle', lang)}>
+          <CoverageMap regions={coverage} lang={lang} />
+          <Text style={r.coverageLine}>{coverage.map(rg => t(REGION_LABEL_KEY[rg], lang)).join(' · ')}</Text>
+        </RSection>
+
+        <RSection title={t('towingHoursTitle', lang)}>
+          {company?.is_24_7 ? (
+            <View style={r.row}>
+              <Text style={r.rowLabel}>{t('towingEveryDay', lang)}</Text>
+              <Text style={r.rowValue}>{t('towing247Open', lang)}</Text>
+            </View>
+          ) : company?.opening_hours ? (
+            DAYS.map(([key, labelKey]) => {
+              const w = company.opening_hours?.[key]
+              const open = w && typeof w === 'object' ? `${w.open} – ${w.close}` : t('towingClosed', lang)
+              return (
+                <View key={key} style={r.row}>
+                  <Text style={r.rowLabel}>{t(labelKey, lang)}</Text>
+                  <Text style={r.rowValue}>{open}</Text>
+                </View>
+              )
+            })
+          ) : (
+            <Text style={r.rowLabel}>{t('towingHoursUnknown', lang)}</Text>
+          )}
+        </RSection>
+
+        {company?.starting_price != null && (
+          <RSection title={t('towingPriceTitle', lang)}>
+            <InfoRow icon="pricetag-outline" category="homeLife" divider={false} label={t('towingStartingPrice', lang)}
+              value={t('towingPriceFrom', lang).replace('{price}', String(company.starting_price))} />
+            {!!company.price_updated_at && (
+              <Text style={r.priceStamp}>
+                {t('towingPriceUpdated', lang)
+                  .replace('{date}', new Date(company.price_updated_at)
+                    .toLocaleDateString(LANG_CODES[lang] || 'tr'))}
+              </Text>
+            )}
+          </RSection>
+        )}
+
+        <Text style={r.disclaimer}>{t('towingDisclaimer', lang)}</Text>
+      </DetailScaffold>
+    )
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -238,7 +367,7 @@ export default function TowingDetailScreen({ company, lang, region, onBack }) {
           <Text style={s.callText}>{t('towingCall', lang)}</Text>
         </TouchableOpacity>
         {!!whatsapp && (
-          <TouchableOpacity style={s.waBtn} onPress={whatsApp} activeOpacity={0.85}>
+          <TouchableOpacity style={s.waBtn} onPress={whatsApp} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="WhatsApp">
             <Ionicons name="logo-whatsapp" size={22} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
@@ -252,18 +381,18 @@ const s = StyleSheet.create({
   navbar:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
                  paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border,
                  backgroundColor: colors.cardBg, gap: 10 },
-  navTitle:    { flex: 1, fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  navTitle:    { flex: 1, fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   navSpacer:   { width: 24 },
 
   content:     { padding: 16 },
 
   hero:        { flexDirection: 'row', gap: 12, alignItems: 'center', paddingBottom: 14,
                  borderBottomWidth: 1, borderBottomColor: colors.border },
-  heroName:    { fontSize: 18, fontWeight: '800', color: colors.textPrimary, lineHeight: 23 },
+  heroName:    { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.textPrimary, lineHeight: 23 },
 
   badgeRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 7 },
   badge:       { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  badgeText:   { fontSize: 10.5, fontWeight: '700' },
+  badgeText:   { fontSize: 10.5, fontFamily: 'Inter_700Bold' },
   badgeOpen:   { backgroundColor: colors.successLight },
   badgeOpenText: { color: colors.success },
   badgeShut:   { backgroundColor: colors.dangerLight },
@@ -275,28 +404,28 @@ const s = StyleSheet.create({
 
   block:       { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: colors.border },
   blockTitle:  { fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
-                 color: colors.textSecondary, fontWeight: '800', marginBottom: 10 },
+                 color: colors.textSecondary, fontFamily: 'Inter_700Bold', marginBottom: 10 },
 
   tagWrap:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tag:         { paddingHorizontal: 9, paddingVertical: 6, borderRadius: radius.sm,
                  backgroundColor: colors.primaryLight },
   tagText:     { fontSize: 12, color: colors.primary },
   tagStrong:   { backgroundColor: colors.primary },
-  tagStrongText: { color: '#FFFFFF', fontWeight: '700' },
+  tagStrongText: { color: '#FFFFFF', fontFamily: 'Inter_700Bold' },
 
   coverageLine:{ fontSize: 12.5, color: colors.textPrimary, marginTop: 10, textAlign: 'center' },
 
   row:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                  paddingVertical: 4, gap: 12 },
   rowLabel:    { fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
-  rowValue:    { fontSize: 13, color: colors.textPrimary, fontWeight: '700' },
+  rowValue:    { fontSize: 13, color: colors.textPrimary, fontFamily: 'Inter_700Bold' },
   rowRight:    { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   // Mirrors the card's button exactly. 'transparent' is safe here — this is inside the
   // detail scroll on colors.bg, not over a PageBackground photo.
   secondNumBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                    gap: 7, marginTop: 10, paddingVertical: 11, borderRadius: radius.sm,
                    borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
-  secondNumText: { fontSize: 14, fontWeight: '700', color: colors.primary, flexShrink: 1 },
+  secondNumText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: colors.primary, flexShrink: 1 },
   rowValueLink:{ color: colors.primary },
   priceStamp:  { fontSize: 11.5, color: colors.textSecondary, marginTop: 6 },
 
@@ -309,8 +438,45 @@ const s = StyleSheet.create({
                  ...shadow },
   callBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                  gap: 8, backgroundColor: colors.primary, paddingVertical: 13, borderRadius: radius.sm },
-  callText:    { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  callText:    { color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_700Bold' },
   waBtn:       { width: 50, height: 48, alignItems: 'center', justifyContent: 'center',
                  borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
                  backgroundColor: 'transparent' },
+})
+
+const r = StyleSheet.create({
+  identity:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
+  chips:         { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radii.pill, backgroundColor: C.soft },
+  chipText:      { ...type.meta, fontFamily: 'Inter_600SemiBold', color: C.textSecondary },
+  chipOk:        { backgroundColor: C.primaryLight },
+  chipOkText:    { color: C.primaryDark },
+  chipWarn:      { backgroundColor: C.dangerLight },
+  chipWarnText:  { color: C.dangerInk },
+  chipHome:      { backgroundColor: CAT.homeLife.bg },
+  chipHomeText:  { color: CAT.homeLife.ink },
+
+  section:       { marginTop: 22 },
+  sectionTitle:  { ...type.sectionHeading, color: C.textPrimary, marginBottom: 8 },
+
+  tagWrap:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  tag:           { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.pill, backgroundColor: CAT.homeLife.bg },
+  tagText:       { ...type.meta, color: CAT.homeLife.ink },
+  tagStrong:     { backgroundColor: CAT.homeLife.ink },
+  tagStrongText: { color: '#FFFFFF', fontFamily: 'Inter_600SemiBold' },
+
+  coverageLine:  { ...type.small, color: C.textPrimary, marginTop: 10, textAlign: 'center' },
+
+  row:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                   paddingVertical: 6, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.divider },
+  rowLabel:      { ...type.body, color: C.textSecondary, flexShrink: 1 },
+  rowValue:      { ...type.body, fontFamily: 'Inter_600SemiBold', color: C.textPrimary },
+
+  secondNumBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+                   marginTop: 10, minHeight: 44, paddingHorizontal: 10, borderRadius: radii.md,
+                   borderWidth: 1, borderColor: C.fieldBorder, backgroundColor: C.card },
+  secondNumText: { ...type.small, fontFamily: 'Inter_600SemiBold', color: C.primaryDark, flexShrink: 1 },
+  priceStamp:    { ...type.meta, color: C.textSecondary, marginTop: 6 },
+  disclaimer:    { ...type.caption, fontFamily: 'Inter_400Regular', lineHeight: 17, color: C.textSecondary,
+                   textAlign: 'center', marginTop: 24, paddingHorizontal: 8 },
 })

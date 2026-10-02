@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Switch, Modal, ScrollView } from 'react-native'
 import { Feather } from '@expo/vector-icons'
-import { colors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius, radii, type } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
+import { BottomSheet } from './ui'
 import { t } from '../constants/i18n'
 import CityPicker from './CityPicker'
 import {
@@ -36,6 +38,34 @@ export default function CityWelcomeSettings({ visible, lang, onClose }) {
     setHomeCity(value)
   }
 
+  // Redesign (S2b): the shared BottomSheet (dim backdrop, swipe/back/backdrop close), the same
+  // toggle and home-city choice, 44pt visiting chip, Switch off-track at 3.66:1.
+  if (REDESIGN) {
+    return (
+      <BottomSheet visible={visible === true} onClose={onClose} title={t('cwSettingsTitle', lang)} lang={lang}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={r.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={r.rowTitle}>{t('cwSettingsToggle', lang)}</Text>
+              <Text style={r.rowSub}>{t('cwSettingsToggleBody', lang)}</Text>
+            </View>
+            <Switch value={enabled} onValueChange={onToggle} accessibilityLabel={t('cwSettingsToggle', lang)}
+              trackColor={{ true: colors.primary, false: colors.fieldBorder }} thumbColor="#FFFFFF" />
+          </View>
+          <View style={r.divider} />
+          <Text style={r.sectionTitle}>{t('cwSettingsHome', lang)}</Text>
+          <Text style={r.sectionBody}>{t('cwSettingsHomeBody', lang)}</Text>
+          <TouchableOpacity style={[r.visiting, home === VISITING && r.visitingOn]} onPress={() => choose(VISITING)}
+            activeOpacity={0.8} accessibilityRole="radio" accessibilityState={{ selected: home === VISITING }}>
+            <Feather name="map" size={15} color={home === VISITING ? colors.primaryDark : colors.textSecondary} />
+            <Text style={[r.visitingText, home === VISITING && r.visitingTextOn]}>{t('cwSettingsVisiting', lang)}</Text>
+          </TouchableOpacity>
+          <CityPicker value={home} onSelect={choose} lang={lang} />
+        </ScrollView>
+      </BottomSheet>
+    )
+  }
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={s.backdrop}>
@@ -46,6 +76,7 @@ export default function CityWelcomeSettings({ visible, lang, onClose }) {
               onPress={onClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityRole="button"
+              accessibilityLabel={t('uiClose', lang)}
             >
               <Feather name="x" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -124,4 +155,19 @@ const s = StyleSheet.create({
   visitingChipActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   visitingText:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
   visitingTextActive: { fontFamily: 'Inter_700Bold', color: colors.primary },
+})
+
+const r = StyleSheet.create({
+  row:           { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
+  rowTitle:      { ...type.rowTitle, color: colors.textPrimary },
+  rowSub:        { ...type.meta, fontFamily: 'Inter_400Regular', color: colors.textSecondary, marginTop: 2 },
+  divider:       { height: StyleSheet.hairlineWidth, backgroundColor: colors.divider, marginVertical: 16 },
+  sectionTitle:  { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, marginBottom: 4 },
+  sectionBody:   { ...type.small, color: colors.textSecondary, marginBottom: 12 },
+  visiting:      { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', minHeight: 44,
+                   paddingHorizontal: 14, marginBottom: 10, borderRadius: radii.pill, borderWidth: 1,
+                   borderColor: colors.fieldBorder, backgroundColor: colors.card },
+  visitingOn:    { backgroundColor: colors.primaryLight, borderColor: colors.primary, borderWidth: 2 },
+  visitingText:  { fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.textPrimary },
+  visitingTextOn:{ fontFamily: 'Inter_700Bold', color: colors.primaryDark },
 })

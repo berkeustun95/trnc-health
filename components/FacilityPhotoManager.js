@@ -170,7 +170,7 @@ export default function FacilityPhotoManager({
         {photos.map((url, i) => (
           <View key={i} style={styles.photoThumb}>
             <Image source={{ uri: url }} style={styles.photoThumbImg} resizeMode="cover" />
-            <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => removePhoto(url)} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiRemove', lang)} style={styles.photoRemoveBtn} onPress={() => removePhoto(url)} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
               <Feather name="x" size={11} color="#fff" />
             </TouchableOpacity>
           </View>

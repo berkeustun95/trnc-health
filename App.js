@@ -1,4 +1,4 @@
-import { Component, Fragment, useEffect, useState, useRef } from 'react'
+import { Component, Fragment, useEffect, useState, useRef, useCallback } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Pressable, Platform, TextInput, ScrollView, Linking, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
 import { addBackListener } from './utils/backHandler'
@@ -8,11 +8,19 @@ import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
-import { passiveFix } from './utils/locationServices'
-import {
-  useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
-} from '@expo-google-fonts/inter'
-import { PlayfairDisplay_400Regular, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display'
+import { passiveFix, askedFix } from './utils/locationServices'
+import { requestWithPrimer } from './utils/permissionPrimer'
+import PermissionPrimer from './components/PermissionPrimer'
+// Deep imports, never the barrels: '@expo-google-fonts/inter' (and the Playfair one) is a barrel
+// of top-level requires, so importing ANY name from it bundles every face it has. These six
+// are the faces that are registered and rendered; see the note at useFonts below.
+import { useFonts } from 'expo-font'
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular'
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium'
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold'
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold'
+import { PlayfairDisplay_400Regular } from '@expo-google-fonts/playfair-display/400Regular'
+import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display/700Bold'
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
@@ -24,6 +32,10 @@ import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE } from './constants/flags'
+import { REDESIGN } from './constants/redesign'
+import { FloatingTabBar, TabBarPad } from './components/ui'
+import { font } from './constants/theme'
+import { REGION_TO_DUTY } from './constants/regions'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
 import ScreenHeader from './components/ScreenHeader'
 import { promosAllowed } from './constants/homeStrip'
@@ -86,7 +98,7 @@ import NotificationsScreen from './screens/NotificationsScreen'
 import ResetPasswordScreen from './screens/ResetPasswordScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import { signOutGoogle } from './utils/socialAuth'
-import HomeScreen from './screens/HomeScreen'
+import HomeScreen, { PLACE_COLS } from './screens/HomeScreen'
 import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import StudentHubScreen from './screens/StudentHubScreen'
@@ -107,6 +119,10 @@ import HomeCitySheet from './components/HomeCitySheet'
 import CityWelcomeSettings from './components/CityWelcomeSettings'
 import { FacilityCardSkeleton, Skeleton } from './components/Skeleton'
 import OliGuide from './components/OliGuide'
+import OliSearchSheet from './components/OliSearchSheet'
+import { EmergencySheet, MunicipalSheet, LanguageSheet, AboutSheet } from './components/shell/Sheets'
+import { SettingsGroups, GuestProfile } from './components/shell/Settings'
+import { ConfirmDialog } from './components/ui'
 import ComingSoonScreen from './components/ComingSoonScreen'
 import * as Updates from 'expo-updates'
 import BackButton from './components/BackButton'
@@ -333,6 +349,29 @@ const tabBar = StyleSheet.create({
 
 // Gate the Welcome Video drawer row until a real video (and its playback tech)
 // exists. Kept false so the row does not render — flip to true once wired.
+// ─── Redesign helpers (module scope, so nothing here can meet the TDZ rule) ───
+// The floating bar covers content; Keşfet and Profil keep their docked-bar layout by
+// padding for it. Home scrolls under the bar and pads its own content.
+function MaybeTabBarPad({ children }) {
+  return REDESIGN ? <TabBarPad>{children}</TabBarPad> : children
+}
+
+// The closing time of the user's own duty district, else the most common one today.
+// open_until varies by district (00:00 in the four big towns, 22:00 Lefke/İskele, 20:00
+// Karpaz, 19:00 Mesarya — scripts/gen-duty-roster-sql.mjs), so one island-wide "until"
+// would be wrong somewhere.
+function dutyUntilFor(rows, region) {
+  if (!rows?.length) return null
+  const own = (REGION_TO_DUTY[region] ?? [])[0]
+  const mine = own && rows.find(r => r.region === own)?.open_until
+  const pick = mine || (() => {
+    const n = {}
+    for (const r of rows) if (r.open_until) n[r.open_until] = (n[r.open_until] || 0) + 1
+    return Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+  })()
+  return pick ? String(pick).slice(0, 5) : null
+}
+
 const WELCOME_VIDEO_LIVE = false
 
 // Garages / Auto Services dark-launch. Controls only the Home TILE's visibility;
@@ -382,18 +421,36 @@ class BLErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
+        REDESIGN ? (
+          <View style={{ flex: 1, padding: 24, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 17, lineHeight: 22, fontFamily: font.bold, color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>
+              {t('hrCrashTitle', this.props.lang)}
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: font.regular, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
+              {t('hrCrashBody', this.props.lang)}
+            </Text>
+            <TouchableOpacity onPress={() => this.setState({ hasError: false })} accessibilityRole="button"
+              style={{ minHeight: 48, paddingHorizontal: 20, justifyContent: 'center', backgroundColor: colors.primary, borderRadius: 12 }}>
+              <Text style={{ color: colors.onPrimary, fontFamily: font.semibold, fontSize: 15 }}>{t('back', this.props.lang)}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
         <View style={{ flex: 1, padding: 24, backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginBottom: 8 }}>Something went wrong</Text>
+          <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: '#1E293B', marginBottom: 8 }}>Something went wrong</Text>
           <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 24 }}>Please go back and try again.</Text>
           <TouchableOpacity onPress={() => this.setState({ hasError: false })} style={{ padding: 14, backgroundColor: '#0E7C7B', borderRadius: 12 }}>
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Go Back</Text>
+            <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold' }}>Go Back</Text>
           </TouchableOpacity>
         </View>
+        )
       )
     }
     return this.props.children
   }
 }
+
+const WX_COACH_WAIT_MS = 3000
+const WX_COACH_PENDING = '@trnc_coach_wx_pending'
 
 export default function App() {
   // ─── FOUR INTER WEIGHTS, AND TWO OF THEM ARE A BUG FIX ────────────────────
@@ -429,10 +486,12 @@ export default function App() {
   //
   // ⚠ WHICH MEANS THE REAL NUMBER IS THE ONE NOBODY WAS LOOKING FOR: 30 font faces are
   //   bundled, 8.45 MB in total, and 24 of them — 6.69 MB — are never registered and can
-  //   never render. That is dead weight in every install and every OTA. The fix is deep
-  //   imports ('@expo-google-fonts/inter/400Regular/Inter_400Regular') instead of the
-  //   barrel, which is a separate change with its own risk (six import sites, and the
-  //   Playfair barrel has the same shape) and is NOT made here.
+  //   never render. That is dead weight in every install and every OTA.
+  //   FIXED in redesign S6 (2026-10-01) with deep imports at the top of this file. Measured
+  //   by two `expo export --platform android` runs from clean copies of the same commit:
+  //   47,844 KB → 41,244 KB, 51 → 27 .ttf assets (the 24 unregistered faces; the 27 left
+  //   are the six registered faces, Manrope, Roboto and the icon fonts). App.js was the
+  //   only import site of either barrel.
   //
   // Do not restate these figures from memory — re-export and diff. The reason this
   // comment is right is that somebody ran the two exports, not that the arithmetic looked
@@ -459,11 +518,50 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [userLocation, setUserLocation] = useState(null)
   const [locationDenied, setLocationDenied] = useState(false)
+  // Redesign: can the OS still ask? false = permanently denied → the screens offer "Ayarları aç";
+  // true (never asked, or "Şimdi değil") → they offer the explanation + OS pop-up again.
+  const [locationCanAsk, setLocationCanAsk] = useState(true)
+  // Bumped by the notifications inbox's "Bildirimleri aç" (a tap → the explanation shows again).
+  const [pushRetry, setPushRetry] = useState(0)
+  const enableLocation = useCallback(async () => {
+    if (!locationCanAsk) { Linking.openSettings().catch(() => {}); return }
+    const r = await requestWithPrimer('location')
+    setLocationCanAsk(r.canAskAgain)
+    if (r.status !== 'granted') return
+    const loc = await askedFix(Location.Accuracy.Balanced)   // a tap: may ask to turn device location on
+    if (loc) { setUserLocation(loc.coords); setLocationDenied(false) }
+  }, [locationCanAsk])
+  // Back from Settings with location now allowed: pick it up without a relaunch.
+  useEffect(() => {
+    if (!REDESIGN || !locationDenied) return
+    const sub = AppState.addEventListener('change', async st => {
+      if (st !== 'active') return
+      try {
+        const { status, canAskAgain } = await Location.getForegroundPermissionsAsync()
+        setLocationCanAsk(canAskAgain !== false)
+        if (status !== 'granted') return
+        const loc = await passiveFix(Location.Accuracy.Balanced)
+        if (loc) { setUserLocation(loc.coords); setLocationDenied(false) }
+      } catch {}
+    })
+    return () => sub.remove()
+  }, [locationDenied])
   const [dutyFacilityId, setDutyFacilityId] = useState(null)
   // Roster health for the Home banner. Read from duty_list — the table DutyListScreen
   // already depends on — so the banner can stop promising a list that is not there.
   // This does NOT settle which table is authoritative; that decision is still open.
   const [dutyRosterStatus, setDutyRosterStatus] = useState(DUTY_FRESH)
+  // ─── Redesign: the duty tile's own view of the same read ────────────────────
+  // `loaded` is what the old default could not say: dutyRosterStatus STARTS as fresh, so
+  // until the query answers every consumer is told the roster is healthy. The tile shows
+  // bones until loaded, and a real error (not "0 pharmacies") when the fetch fails.
+  // Rows are today's { region, open_until } — ~13 a day — so the tile can name the closing
+  // time of the user's own district. `date` lets a foreground after midnight re-read.
+  const [dutyToday, setDutyToday] = useState({ loaded: false, error: false, rows: [], date: null })
+  const [dutyRetry, setDutyRetry] = useState(0)
+  // Home's "Yürüyüş Rotaları" tile opens the Keşfet tab straight into routes mode. Cleared
+  // whenever the tab bar is used, so a later plain visit opens the map as usual.
+  const [mapRoutesMode, setMapRoutesMode] = useState(false)
   // City welcome: the pending decision, plus the region each deep-linked screen
   // should open pre-filtered to. Cleared on that screen's back, so a later manual
   // open is not still filtered to a city the user has since left.
@@ -578,6 +676,9 @@ export default function App() {
   // Events detail overlay — hoisted like openedProperty so the Android back chain closes the
   // DETAIL (list stays mounted underneath, scroll + filters intact) instead of the module.
   const [openedEvent, setOpenedEvent] = useState(null)
+  // Redesign Home banner → one event's detail. Back from that detail returns to Home, not to the
+  // Events list the user never opened.
+  const [eventFromHome, setEventFromHome] = useState(false)
   // The dorm showcase overlay. State lives HERE and not in AccommodationScreen for one
   // reason: the Android back chain below. If it were local to that screen, hardware back
   // would fall through to `showAccommodation` and close the whole module instead of the
@@ -585,6 +686,11 @@ export default function App() {
   const [openedDorm, setOpenedDorm] = useState(null)
   const [showAgentOnboarding, setShowAgentOnboarding] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
+  // ─── Redesign Slice 2 (shell) ───────────────────────────────────────────────
+  const [showAboutSheet, setShowAboutSheet] = useState(false)
+  const [signOutAsk, setSignOutAsk] = useState(null)       // null | 'guest' | 'user'
+  const [notifClearAsk, setNotifClearAsk] = useState(false)
+  const [notifClearError, setNotifClearError] = useState(null)
   // Ask Oli's sheet is a root overlay now, not a <Modal>: the root has to know it is
   // up (to hide the app content from the a11y tree) and how to close it (hardware back).
   const [oliSheetOpen, setOliSheetOpen] = useState(false)
@@ -619,6 +725,9 @@ export default function App() {
   const filterBarRef       = useRef(null)
   const dutyBannerRef      = useRef(null)
   const mapTabRef          = useRef(null)
+  const profileTabRef      = useRef(null)   // redesign: coach mark on the Profil tab
+  const weatherChipRef     = useRef(null)   // redesign: coach mark on the hero weather chip
+  const wxCoachTriedRef    = useRef(false)  // the deferred weather coach mark: once per launch
   const menuAnim = useRef(new Animated.Value(260)).current
   const sessionRef = useRef(null)
   const toSignUpRef = useRef(false)
@@ -648,14 +757,40 @@ export default function App() {
 
     // On-screen basics only. The drawer is now settings, not navigation, so the
     // menu step just highlights the button — it never opens the drawer.
-    const [menuBtn, search, duty, map] = await Promise.all([
-      measureRef(hamburgerRef),
+    // Redesign: no drawer, so no menu step; the Profil tab (where settings now live) gets one.
+    // Home v3: the weather chip only exists once weather has loaded. Wait for it briefly;
+    // if it never comes, the tour runs without it and the chip gets its own one-step mark on
+    // a later launch (WX_COACH_PENDING), so the skip holds for this run only.
+    if (REDESIGN) {
+      wxCoachTriedRef.current = true   // a skipped weather step waits for the NEXT launch
+      for (let waited = 0; !weatherChipRef.current && waited < WX_COACH_WAIT_MS; waited += 150) {
+        await new Promise(r => setTimeout(r, 150))
+      }
+    }
+    const [menuBtn, search, duty, map, profileTab, weatherChip] = await Promise.all([
+      REDESIGN ? null : measureRef(hamburgerRef),
       measureRef(searchRef),
       measureRef(dutyBannerRef),
       measureRef(mapTabRef),
+      REDESIGN ? measureRef(profileTabRef) : null,
+      REDESIGN ? measureRef(weatherChipRef) : null,
     ])
 
     const steps = []
+    // Home v3: searchRef is the Oli bar, dutyBannerRef the duty | emergency row, and the
+    // weather chip is new. A chip that is not rendered (no weather yet) measures null and
+    // its step is skipped, like every other step here.
+    if (REDESIGN) {
+      if (search)      steps.push({ ...search,      title: t('homeOliTitle', lang),      body: t('hrCoachOliBody', lang) })
+      if (weatherChip) steps.push({ ...weatherChip, title: t('homeWeatherTitle', lang),  body: t('hrCoachWeatherBody', lang) })
+      if (duty)        steps.push({ ...duty,        title: t('hrCoachTilesTitle', lang), body: t('hrCoachTilesBody', lang) })
+      if (map)         steps.push({ ...map,         title: t(EXPLORE_MAP_LIVE ? 'coachExploreTitle' : 'coachMapTitle', lang),
+                                                    body:  t(EXPLORE_MAP_LIVE ? 'coachExploreBody'  : 'coachMapBody',  lang) })
+      if (profileTab)  steps.push({ ...profileTab,  title: t('hrCoachProfileTitle', lang), body: t('hrCoachProfileBody', lang) })
+      if (!weatherChip) AsyncStorage.setItem(WX_COACH_PENDING, '1').catch(() => {})
+      if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
+      return
+    }
     if (menuBtn) steps.push({ ...menuBtn, title: t('coachMenuTitle', lang), body: t('coachMenuBody', lang) })
     // Copy follows HOME_V2_LIVE, same reason the map step follows EXPLORE_MAP_LIVE below:
     // under V2 this ref is on a search ICON in the top bar, and V1's body describes a
@@ -668,8 +803,26 @@ export default function App() {
     // AT that tab; describing health facilities while it reads Keşfet is half-swapped.
     if (map)     steps.push({ ...map,     title: t(EXPLORE_MAP_LIVE ? 'coachExploreTitle' : 'coachMapTitle', lang),
                                           body:  t(EXPLORE_MAP_LIVE ? 'coachExploreBody'  : 'coachMapBody',  lang) })
+    if (profileTab) steps.push({ ...profileTab, title: t('hrCoachProfileTitle', lang), body: t('hrCoachProfileBody', lang) })
     if (steps.length) { setCoachSteps(steps); setShowCoachMarks(true) }
   }
+
+  // The weather step a first run had to skip (weather not loaded in time): shown alone, once,
+  // the next time Home has weather and nothing else is on screen.
+  useEffect(() => {
+    if (!REDESIGN || wxCoachTriedRef.current || !weatherData || activeTab !== 'home'
+      || showCoachMarks || showNotifs || showHomeCityAsk) return
+    wxCoachTriedRef.current = true
+    AsyncStorage.getItem(WX_COACH_PENDING).then(async pending => {
+      if (pending !== '1') return
+      await new Promise(r => setTimeout(r, 400))
+      const chip = await measureRef(weatherChipRef)
+      if (!chip) { wxCoachTriedRef.current = false; return }
+      AsyncStorage.removeItem(WX_COACH_PENDING).catch(() => {})
+      setCoachSteps([{ ...chip, title: t('homeWeatherTitle', lang), body: t('hrCoachWeatherBody', lang) }])
+      setShowCoachMarks(true)
+    }).catch(() => {})
+  }, [weatherData, activeTab, showCoachMarks, showNotifs, showHomeCityAsk])
 
   function handleCoachFinish() {
     setShowCoachMarks(false)
@@ -702,7 +855,18 @@ export default function App() {
       .then(() => setNotifications(prev => prev.map(n => ({ ...n, read: true }))))
   }
   function closeDutyList()     { setShowDutyList(false); setDutyRegion(null) }
-  function closeEvents()       { setShowEvents(false); setEventsDistrict(null); setOpenedEvent(null) }
+  function closeEvents()       { setShowEvents(false); setEventsDistrict(null); setOpenedEvent(null); setEventFromHome(false) }
+  // Same columns as EventsScreen's list query, so EventDetailScreen gets the row it expects.
+  // Not found (unapproved since, offline) → the list, which is where the generic card goes.
+  async function openEventFromHome(id) {
+    try {
+      const { data } = await supabase.from('events')
+        .select('id, title, description, images, start_date, end_date, location, location_url, organizer_name, category, ticket_url, latitude, longitude, price_from, price_text')
+        .eq('id', id).eq('status', 'approved').maybeSingle()
+      if (data) { setOpenedEvent(data); setEventFromHome(true) }
+    } catch {}
+    setShowEvents(true)
+  }
   function closeExploreBeach() { setShowExploreBeach(false); setExploreBeachRegion(null) }
 
   // Returns true if the action was gated (caller should stop). Guests only.
@@ -879,7 +1043,7 @@ export default function App() {
       // the profile is still incomplete and the gate is there again next launch. A back
       // button that does nothing at all reads as a frozen screen.
       if (gateHealthList) { setGateHealthList(false); return true }
-      if (openedEvent) { setOpenedEvent(null); return true }
+      if (openedEvent) { if (eventFromHome) closeEvents(); else setOpenedEvent(null); return true }
       if (showEvents) { closeEvents(); return true }
       if (openedDorm) { setOpenedDorm(null); return true }
       if (openedProperty) { setOpenedProperty(null); return true }
@@ -930,7 +1094,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -953,8 +1117,15 @@ export default function App() {
   }
 
   async function clearAllNotifs() {
-    await supabase.from('notifications').delete().eq('user_id', session.user.id)
+    const { error } = await supabase.from('notifications').delete().eq('user_id', session.user.id)
+    if (error) throw error
     setNotifications([])
+  }
+  // Redesign: "Clear all" asks first and reports a failure instead of pretending.
+  async function confirmClearAllNotifs() {
+    setNotifClearError(null)
+    try { await clearAllNotifs(); setNotifClearAsk(false) }
+    catch { setNotifClearError(t('hrClearFailed', lang)) }
   }
 
   async function markNotifRead(item) {
@@ -969,6 +1140,24 @@ export default function App() {
     setPolicySeen(LEGAL_VERSION)
     setPendingLang(selectedLang)
     setOnboarded(true)
+    if (REDESIGN) askLocationAfterOnboarding()
+  }
+
+  // Redesign: the location explanation comes RIGHT AFTER the onboarding slides on a new install
+  // (startup skipped it, see load()). Same handling as the startup ask from here on.
+  async function askLocationAfterOnboarding() {
+    try {
+      const r = await requestWithPrimer('location', { auto: true })
+      setLocationCanAsk(r.canAskAgain)
+      if (r.status !== 'granted') { setLocationDenied(true); return }
+      const loc = await passiveFix(Location.Accuracy.Balanced)
+      if (!loc) { setLocationDenied(true); return }
+      setUserLocation(loc.coords)
+      setLocationDenied(false)
+      fetchWeather(loc.coords)
+    } catch {
+      setLocationDenied(true)
+    }
   }
 
   async function reloadFacilities() {
@@ -1140,7 +1329,9 @@ export default function App() {
     async function registerPushToken() {
       try {
         if (!Device.isDevice) return
-        const { status } = await Notifications.requestPermissionsAsync()
+        const { status } = REDESIGN
+          ? await requestWithPrimer('notifications', { auto: pushRetry === 0 })
+          : await Notifications.requestPermissionsAsync()
         if (status !== 'granted') return
         if (Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync('default', {
@@ -1157,7 +1348,7 @@ export default function App() {
       }
     }
     registerPushToken()
-  }, [session])
+  }, [session, pushRetry])
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
@@ -1242,8 +1433,19 @@ export default function App() {
       }
 
       let resolvedCoords = { latitude: 35.1856, longitude: 33.3823 }
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync()
+      // Redesign, new install: the location ask waits until the onboarding slides are done
+      // (completeOnboarding → askLocationAfterOnboarding). Read from storage, not `onboarded`:
+      // this runs at mount, before that state has loaded. Existing users: unchanged.
+      const firstRun = REDESIGN && (await AsyncStorage.getItem('@trnc_onboarded').catch(() => null)) !== 'true'
+      if (!firstRun) try {
+        let status
+        if (REDESIGN) {
+          const r = await requestWithPrimer('location', { auto: true })
+          status = r.status
+          setLocationCanAsk(r.canAskAgain)
+        } else {
+          ;({ status } = await Location.requestForegroundPermissionsAsync())
+        }
         if (status !== 'granted') {
           setLocationDenied(true)
         } else {
@@ -1289,11 +1491,18 @@ export default function App() {
       const today = localDateKey()
       // `region`, not head:true+count. The coverage check needs the DISTRICTS, and a
       // head request returns no rows to count them from. It is ~13 rows a day.
-      const [{ data: dutyToday }, { data: dutyNewest }] = await Promise.all([
-        supabase.from('duty_list').select('region').eq('duty_date', today),
+      const [{ data: dutyToday, error: todayErr }, { data: dutyNewest, error: newestErr }] = await Promise.all([
+        supabase.from('duty_list').select('region, open_until').eq('duty_date', today),
         supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
       ])
       if (cancelled) return
+      // A failed read is NOT an empty roster. Before this, an error left both arrays null,
+      // which scored as ABSENT and blamed the roster for a network problem.
+      if (todayErr || newestErr) {
+        setDutyToday({ loaded: true, error: true, rows: [], date: today })
+        return
+      }
+      setDutyToday({ loaded: true, error: false, rows: dutyToday ?? [], date: today })
       setDutyRosterStatus(dutyStatus({
         todayCount: dutyToday?.length ?? 0,
         todayDistricts: new Set((dutyToday ?? []).map(r => r.region)).size,
@@ -1302,7 +1511,16 @@ export default function App() {
     }
     loadRosterHealth()
     return () => { cancelled = true }
-  }, [retryCount, session?.user?.id])
+  }, [retryCount, dutyRetry, session?.user?.id])
+
+  // "Bugün {n} eczane nöbette" must not survive midnight: on foreground, re-read when the
+  // local date has changed since the last read. Same-day foregrounds cost nothing.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', next => {
+      if (next === 'active' && dutyToday.date && dutyToday.date !== localDateKey()) setDutyRetry(n => n + 1)
+    })
+    return () => sub.remove()
+  }, [dutyToday.date])
 
   // Store-update check — cold start, and foreground after >30 min away.
   //
@@ -1573,7 +1791,7 @@ export default function App() {
   // FAB and PolicyUpdateNotice off the screen — the force modal can never collide with them.
   } else if (updateTier === 'force') {
     content = showDutyList
-      ? <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+      ? <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
       : <View style={styles.center} />
   } else if (ageDeletedNotice) {
     // A sign-out that failed offline would leave a session for a deleted user; retry it here.
@@ -1657,7 +1875,7 @@ export default function App() {
     // 20261004, reviews. There is no second path to close: booking was the only write
     // that did not go through onRequireAccount, and it is gone.
     if (showDutyList) {
-      content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+      content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
     } else if (showTowing) {
       content = <TowingScreen lang={lang} userLocation={userLocation} onBack={() => setShowTowing(false)} backRef={towingBackRef} />
     } else if (selectedFacility) {
@@ -1681,7 +1899,7 @@ export default function App() {
         favorites={favorites}
         notifications={notifications}
         facilityLoadError={facilityLoadError}
-        locationDenied={locationDenied}
+        locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation}
         weatherData={weatherData}
         forceFacilityList
         hideHeaderActions
@@ -1816,7 +2034,7 @@ export default function App() {
   // Duty list ABOVE Notifications: a notification opens it on top, and back returns to the
   // notifications at the same scroll (slice 10).
   } else if (showDutyList) {
-    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} initialRegion={dutyRegion} />
+    content = <DutyListScreen onBack={closeDutyList} lang={lang} userLocation={userLocation} locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation} initialRegion={dutyRegion} />
   } else if (showNotifs) {
     content = <NotificationsScreen
       notifications={notifications}
@@ -1824,14 +2042,15 @@ export default function App() {
       lang={lang}
       onBack={closeNotifs}
       onMarkAllRead={markAllNotifsRead}
-      onClearAll={clearAllNotifs}
+      onClearAll={REDESIGN ? () => { setNotifClearError(null); setNotifClearAsk(true) } : () => clearAllNotifs().catch(() => {})}
       onMarkRead={markNotifRead}
       onNotifPress={() => setShowDutyList(true)}
+      onEnablePush={() => setPushRetry(n => n + 1)}
     />
   } else if (showEvents) {
     content = (MODULE_FLAGS.events || isAdmin)
       ? <EventsScreen lang={lang} onBack={closeEvents} initialDistrict={eventsDistrict} onAdNavigate={openAdRoute}
-          selectedEvent={openedEvent} onOpenEvent={setOpenedEvent} onCloseEvent={() => setOpenedEvent(null)} />
+          selectedEvent={openedEvent} onOpenEvent={setOpenedEvent} onCloseEvent={() => (eventFromHome ? closeEvents() : setOpenedEvent(null))} />
       : <ComingSoonScreen lang={lang} moduleKey="events" titleKey="menuEvents" session={session} onBack={closeEvents} />
   // PARKED, NOT DEAD. `showAgentOnboarding` is never set to true any more: the only
   // caller was the "become an agent" CTA on AccommodationScreen, removed in Slice 3c
@@ -1896,7 +2115,7 @@ export default function App() {
             operator={connectivityOperator}
             lang={lang}
             userLocation={userLocation}
-            locationDenied={locationDenied}
+            locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation}
             onBack={() => setConnectivitySub('operator')}
           />
       : connectivitySub?.view === 'package'
@@ -1911,7 +2130,7 @@ export default function App() {
             operator={connectivityOperator}
             lang={lang}
             userLocation={userLocation}
-            locationDenied={locationDenied}
+            locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation}
             onBack={() => setConnectivitySub(null)}
             onOpenPackage={pkg => setConnectivitySub({ view: 'package', pkg })}
             onOpenStores={() => setConnectivitySub('stores')}
@@ -1926,7 +2145,7 @@ export default function App() {
     content = <LegalScreen lang={lang} onBack={() => setShowLegal(false)} />
   } else if (showExploreBeach) {
     content = (
-      <BLErrorBoundary>
+      <BLErrorBoundary lang={lang}>
         <ExploreScreen lang={lang} onBack={closeExploreBeach} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} initialCategory="beach" initialRegion={exploreBeachRegion} onAdNavigate={openAdRoute} placeOverlay={explorePlaceEl} backRef={exploreBackRef} />
       </BLErrorBoundary>
     )
@@ -1935,7 +2154,7 @@ export default function App() {
     // never reach HomeScreen so it's moot for the tile path). Dark today → Coming Soon, whose
     // Notify-me upserts module='explore' into module_waitlist (shape-guard accepts it now).
     content = (MODULE_FLAGS.explore || isAdmin) ? (
-      <BLErrorBoundary>
+      <BLErrorBoundary lang={lang}>
         <ExploreScreen lang={lang} onBack={() => setShowExplore(false)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} onAdNavigate={openAdRoute} placeOverlay={explorePlaceEl} backRef={exploreBackRef} />
       </BLErrorBoundary>
     ) : (
@@ -1968,7 +2187,7 @@ export default function App() {
     )
   } else if (adminPreview === 'explore') {
     content = (
-      <BLErrorBoundary>
+      <BLErrorBoundary lang={lang}>
         <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     )
@@ -2245,6 +2464,20 @@ export default function App() {
       { key: 'tutorial',     iconSet: 'ionicons', icon: 'compass-outline',           labelKey: 'menuTutorial',     dividerBefore: true, onPress: () => { closeMenu(); startCoachMarks() } },
       { key: 'signOut',      iconSet: 'feather',  icon: 'log-out',                   labelKey: 'signOut',          danger: true, onPress: () => supabase.auth.signOut() },
     ].filter(i => i.visible !== false)
+    // Profil's settings rows (redesign). Every handler is App's own, so a setting behaves
+    // the same wherever it is reached; the drawer that used to hold them is not rendered.
+    const settingsActions = {
+      onLanguage:      () => setShowLangModal(true),
+      onCityWelcome:   () => setShowCitySettings(true),
+      onNotifications: () => { if (requireAccount('gateNotifications')) return; setShowNotifs(true) },
+      onContact:       () => Linking.openURL(`mailto:getadaapp@gmail.com?subject=${encodeURIComponent('ADA Feedback')}`).catch(() => {}),
+      onRate:          rateApp,
+      onShare:         shareApp,
+      onTutorial:      () => startCoachMarks(),
+      onLegal:         () => setShowLegal(true),
+      onAbout:         () => setShowAboutSheet(true),
+      onSignOut:       () => setSignOutAsk(isGuest(session) ? 'guest' : 'user'),
+    }
     content = (
       <View style={{ flex: 1 }}>
 
@@ -2260,13 +2493,14 @@ export default function App() {
             favorites={favorites}
             notifications={notifications}
             facilityLoadError={facilityLoadError}
-            locationDenied={locationDenied}
+            locationDenied={locationDenied} locationCanAsk={locationCanAsk} onEnableLocation={enableLocation}
             weatherData={weatherData}
             hamburgerRef={hamburgerRef}
             searchRef={searchRef}
 
             dutyBannerRef={dutyBannerRef}
-            onOpenMenu={openMenu}
+            weatherRef={weatherChipRef}
+            onOpenMenu={REDESIGN ? undefined : openMenu}
             onShowNotifs={() => { if (requireAccount('gateNotifications')) return; setShowNotifs(true) }}
             onShowDutyList={() => setShowDutyList(true)}
             onSelectFacility={setSelectedFacility}
@@ -2274,6 +2508,7 @@ export default function App() {
             onToggleFavorite={toggleFavorite}
             onRetry={() => { setLoading(true); setRetryCount(c => c + 1) }}
             onShowEvents={() => setShowEvents(true)}
+            onOpenEvent={openEventFromHome}
             onShowAccommodation={() => setShowAccommodation(true)}
             onShowPets={() => setShowPets(true)}
             onShowHomeServices={() => setShowHomeServices(true)}
@@ -2317,11 +2552,21 @@ export default function App() {
               isGuest: isGuest(session),
               dateOfBirth: profile?.date_of_birth,
             })}
+            // ─── Redesign (dev bundles only until REDESIGN_LIVE) ─────────────────
+            dutySummary={{
+              loaded: dutyToday.loaded, error: dutyToday.error, status: dutyRosterStatus,
+              count: dutyToday.rows.length,
+              until: dutyUntilFor(dutyToday.rows, liveRegion || profile?.region || deviceRegion),
+            }}
+            onRetryDuty={() => { setDutyToday(d => ({ ...d, loaded: false })); setDutyRetry(n => n + 1) }}
+            onOpenExploreTab={() => setActiveTab('map')}
+            onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
           />
         )}
 
 
         {activeTab === 'map' && (
+          <MaybeTabBarPad>
           <SafeAreaView style={styles.safe} edges={['top']}>
             {/* MapScreen is NOT dead code and must not be deleted — it is the committed
                 behaviour of this tab and the thing users have today. EXPLORE_MAP_LIVE
@@ -2329,7 +2574,7 @@ export default function App() {
             {/* Boundary: a render throw here once unmounted the whole root — a black screen
                 with nothing to tap (walk-mode crash, 2026-09). Go Back remounts the map. */}
             {EXPLORE_MAP_LIVE ? (
-              <BLErrorBoundary>
+              <BLErrorBoundary lang={lang}>
               <ExploreMapScreen
                 // The directory's second entrance — see the prop's note in that file. It
                 // opens the SAME ExploreScreen the Home tile opens, so the tile can be
@@ -2352,6 +2597,7 @@ export default function App() {
                 lang={lang}
                 session={session}
                 onRequireAccount={requireAccount}
+                initialRoutesMode={mapRoutesMode}
               />
               </BLErrorBoundary>
             ) : (
@@ -2365,6 +2611,7 @@ export default function App() {
               />
             )}
           </SafeAreaView>
+          </MaybeTabBarPad>
         )}
 
         {/* The Kaydedilenler tab was removed on 2026-09-11 with its branch. `favorites` and
@@ -2374,8 +2621,15 @@ export default function App() {
             small number of the 208 users lose a saved list silently, and no query exists that
             could have told us whether anyone used it. */}
 
-        {activeTab === 'profile' && (
+        {activeTab === 'profile' && REDESIGN && isGuest(session) && (
+          <GuestProfile lang={lang} a={settingsActions} onCreateAccount={gateSignUp} />
+        )}
+        {activeTab === 'profile' && !(REDESIGN && isGuest(session)) && (
+          <MaybeTabBarPad>
           <ProfileScreen
+            settingsSlot={REDESIGN ? (({ onDeleteAccount }) => (
+              <SettingsGroups lang={lang} a={{ ...settingsActions, onDeleteAccount }} />
+            )) : null}
             session={session}
             lang={lang}
             onBack={() => setActiveTab('home')}
@@ -2383,21 +2637,24 @@ export default function App() {
             onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
             onAvatarChange={url => setProfile(prev => ({ ...prev, avatar_url: url }))}
           />
+          </MaybeTabBarPad>
         )}
 
-        <BottomTabBar
-          activeTab={activeTab}
-          onTabPress={tab => {
-            if (tab === 'profile' && requireAccount('gateProfile')) return
+        {(() => {
+          const onTabPress = tab => {
+            if (!REDESIGN && tab === 'profile' && requireAccount('gateProfile')) return
             // Leaving Profile with unsaved edits asks first — the same guard as its back button.
             if (activeTab === 'profile' && tab !== 'profile' && profileGuardRef.current) {
-              profileGuardRef.current.leave(() => setActiveTab(tab)); return
+              profileGuardRef.current.leave(() => { setMapRoutesMode(false); setActiveTab(tab) }); return
             }
+            setMapRoutesMode(false)
             setActiveTab(tab)
-          }}
-          mapTabRef={mapTabRef}
-          lang={lang}
-        />
+          }
+          return REDESIGN
+            ? <FloatingTabBar tabs={TAB_ITEMS} activeTab={activeTab} onTabPress={onTabPress}
+                refs={{ map: mapTabRef, profile: profileTabRef }} lang={lang} />
+            : <BottomTabBar activeTab={activeTab} onTabPress={onTabPress} mapTabRef={mapTabRef} lang={lang} />
+        })()}
 
         {showMenu && (
           <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />
@@ -2413,7 +2670,8 @@ export default function App() {
               textSize={18}
             />
             <Text style={styles.menuEmail} numberOfLines={1}>{session.user.email ?? t('guestLabel', lang)}</Text>
-            <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ flexShrink: 0 }}>
+            <TouchableOpacity onPress={closeMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ flexShrink: 0 }}
+              accessibilityRole="button" accessibilityLabel={t('uiClose', lang)}>
               <Ionicons name="close" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
@@ -2430,12 +2688,13 @@ export default function App() {
         </Animated.View>
         )}
 
-        <Modal visible={showLangModal} transparent animationType="fade" onRequestClose={() => setShowLangModal(false)}>
+        {REDESIGN && <LanguageSheet visible={showLangModal} onClose={() => setShowLangModal(false)} lang={lang} onSelect={selectLang} />}
+        <Modal visible={!REDESIGN && showLangModal} transparent animationType="fade" onRequestClose={() => setShowLangModal(false)}>
           <TouchableOpacity style={styles.emergencyBackdrop} activeOpacity={1} onPress={() => setShowLangModal(false)}>
             <View style={styles.emergencySheet} onStartShouldSetResponder={() => true}>
               <View style={styles.emergencyHeader}>
                 <Text style={styles.emergencyTitle}>{t('menuLanguage', lang)}</Text>
-                <TouchableOpacity onPress={() => setShowLangModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} onPress={() => setShowLangModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Ionicons name="close" size={22} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -2468,6 +2727,30 @@ export default function App() {
 
   // Ask Oli routing: map an intent target → the app's navigation state setters.
   // Close any open module sub-screen first so only the target renders.
+  // Redesign: a search_content row tapped in the Oli sheet. Same reset-then-open shape as
+  // oliNavigate below; the per-module routing mirrors HomeScreen's handleResultPress.
+  const openSearchResult = async (r) => {
+    oliNavigate(null)
+    switch (r?.module) {
+      case 'medical': {
+        const fac = facilities.find(f => f.id === r.id)
+        if (fac) { setActiveTab('home'); fac.provider_id ? setSelectedFacility(fac) : setUnclaimedFacility(fac) }
+        break
+      }
+      case 'events':       setShowEvents(true); break
+      case 'homeServices': setShowHomeServices(true); break
+      case 'transport':    setShowTransport(true); break
+      case 'jobPostings':  setShowJobPostings(true); break
+      case 'towing':       setShowTowing(true); break
+      case 'beach':
+      case 'landmark': {
+        const { data } = await supabase.from('places').select(PLACE_COLS).eq('id', r.id).eq('status', 'active').maybeSingle()
+        if (data) setSelectedExplorePlace(data)
+        break
+      }
+    }
+  }
+
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
@@ -2582,15 +2865,22 @@ export default function App() {
         onDismiss={() => dismissPolicyNotice(false)}
       />
       {oliVisible && (
-        <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} hideFab={HOME_V2_LIVE} />
+        REDESIGN
+          ? <OliSearchSheet lang={lang} userLocation={userLocation} onNavigate={oliNavigate} onOpenResult={openSearchResult}
+              onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} />
+          : <OliGuide lang={lang} onNavigate={oliNavigate} onOpenChange={setOliSheetOpen} closeRef={oliCloseRef} openRef={oliOpenRef} hideFab={HOME_V2_LIVE} />
       )}
 
-      {showEmergencyModal && (
+      {REDESIGN && (
+        <EmergencySheet visible={showEmergencyModal} onClose={() => setShowEmergencyModal(false)} lang={lang}
+          onShowTowing={() => setShowTowing(true)} />
+      )}
+      {!REDESIGN && showEmergencyModal && (
         <SheetOverlay onDismiss={() => setShowEmergencyModal(false)}>
           <View style={styles.emergencySheet}>
             <View style={styles.emergencyHeader}>
               <Text style={styles.emergencyTitle}>{t('menuEmergency', lang)}</Text>
-              <TouchableOpacity onPress={() => setShowEmergencyModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} onPress={() => setShowEmergencyModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -2643,12 +2933,15 @@ export default function App() {
           force block short-circuiting the selector — this one is not, so it says so itself.
           Closing the hole by construction rather than by reasoning about which deep links
           can still fire, which is the same argument the force allow-list is built on. */}
-      {showMunicipalModal && updateTier !== 'force' && (
+      {REDESIGN && (
+        <MunicipalSheet visible={showMunicipalModal && updateTier !== 'force'} onClose={() => setShowMunicipalModal(false)} lang={lang} />
+      )}
+      {!REDESIGN && showMunicipalModal && updateTier !== 'force' && (
         <SheetOverlay onDismiss={() => setShowMunicipalModal(false)}>
           <View style={[styles.emergencySheet, { maxHeight: Dimensions.get('window').height * 0.75 }]}>
             <View style={styles.emergencyHeader}>
               <Text style={styles.emergencyTitle}>{t('menuMunicipalities', lang)}</Text>
-              <TouchableOpacity onPress={() => setShowMunicipalModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} onPress={() => setShowMunicipalModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -2687,10 +2980,10 @@ export default function App() {
                           <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={13} color={colors.textSecondary} />
                         </View>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('hrMuniMapA11y', lang).replace('{name}', name)} onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: 14 }}>
                         <Ionicons name="map-outline" size={18} color={colors.textSecondary} />
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('hrMuniCallA11y', lang).replace('{name}', name)} onPress={() => { setShowMunicipalModal(false); Linking.openURL(`tel:${phone}`) }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Ionicons name="call" size={18} color={colors.primary} />
                       </TouchableOpacity>
                     </View>
@@ -2749,6 +3042,46 @@ export default function App() {
         onClose={() => setProfileGateKey(null)}
       />
 
+      {REDESIGN && (
+        <>
+          <AboutSheet visible={showAboutSheet} onClose={() => setShowAboutSheet(false)} lang={lang} />
+          {/* Sign-out asks first. A GUEST loses the anonymous account for good, so the guest
+              version leads with "Hesap oluştur" and names the loss. */}
+          <ConfirmDialog
+            visible={signOutAsk === 'guest'}
+            title={t('hrSignOutGuestTitle', lang)}
+            message={t('hrSignOutGuestBody', lang)}
+            cancelLabel={t('uiNevermind', lang)}
+            actions={[
+              { label: t('hrGuestTitle', lang), variant: 'primary', onPress: () => { setSignOutAsk(null); gateSignUp() } },
+              { label: t('hrSignOutAnyway', lang), variant: 'danger', onPress: () => { setSignOutAsk(null); supabase.auth.signOut() } },
+            ]}
+            onCancel={() => setSignOutAsk(null)}
+            lang={lang}
+          />
+          <ConfirmDialog
+            visible={signOutAsk === 'user'}
+            title={t('hrSignOutTitle', lang)}
+            confirmLabel={t('signOut', lang)}
+            destructive
+            onConfirm={() => { setSignOutAsk(null); supabase.auth.signOut() }}
+            onCancel={() => setSignOutAsk(null)}
+            lang={lang}
+          />
+          <ConfirmDialog
+            visible={notifClearAsk}
+            title={t('hrClearAllTitle', lang)}
+            message={t('hrClearAllBody', lang)}
+            error={notifClearError}
+            confirmLabel={t('clearAll', lang)}
+            destructive
+            onConfirm={confirmClearAllNotifs}
+            onCancel={() => setNotifClearAsk(false)}
+            lang={lang}
+          />
+        </>
+      )}
+
       <AccountRequiredSheet
         visible={!!gateKey}
         messageKey={gateKey}
@@ -2773,6 +3106,7 @@ export default function App() {
         onDuty={() => setShowDutyList(true)}
       />
       <EdgeSwipeStrip />
+      {REDESIGN && fontsLoaded && <PermissionPrimer lang={lang} />}
     </SafeAreaProvider>
   )
 }

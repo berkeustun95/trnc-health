@@ -1,5 +1,5 @@
 // Android back chain (App.js) — 45 cases from the "back keeps your place" slices
-// (2026-09-27). Extracts the handler body registered through addBackListener and runs it
+// (2026-09-27), +1 on 2026-10-01 for an event opened from the redesign Home banner. Extracts the handler body registered through addBackListener and runs it
 // against a Proxy scope, asserting which close each state reaches. The same body is what
 // the iOS edge swipe dispatches, so this covers both platforms' back.
 //   npm run backchain:check            (reads App.js)
@@ -81,6 +81,7 @@ const cases=[
  ['Events -> closeEvents (clears district)', {...base, showEvents:true}, null,null, r=>r.calls==='closeEvents()'],
  ['Events detail open -> closes ONLY the detail', {...base, showEvents:true, openedEvent:{id:1}}, null,null, r=>r.calls==='setOpenedEvent(null)'],
  ['Events detail closed -> closes module', {...base, showEvents:true, openedEvent:null}, null,null, r=>r.calls==='closeEvents()'],
+ ['Event opened from the Home banner -> back to Home, not the list', {...base, showEvents:true, openedEvent:{id:1}, eventFromHome:true}, null,null, r=>r.calls==='closeEvents()'],
  ['Duty -> closeDutyList (clears region)', {...base, showDutyList:true}, null,null, r=>r.calls==='closeDutyList()'],
  ['Notifs -> closeNotifs (marks read)', {...base, showNotifs:true}, null,null, r=>r.calls==='closeNotifs()'],
  ['Beach -> closeExploreBeach', {...base, showExploreBeach:true}, null,null, r=>r.calls==='closeExploreBeach()'],

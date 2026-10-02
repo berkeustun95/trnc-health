@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, shadow, ellipsizeSlack } from '../../constants/theme'
 import { t } from '../../constants/i18n'
@@ -7,6 +7,7 @@ import { Skeleton } from '../Skeleton'
 import { DUTY_FRESH, DUTY_PARTIAL } from '../../utils/dutyStatus'
 import { STRIP_CARD_H, STRIP_BAND_H } from '../../constants/homeStrip'
 import { rememberStripKind } from '../../utils/homeStripResolver'
+import { RemoteImage } from '../ui'
 
 // ─── THE TWO BUNDLED IMAGES ─────────────────────────────────────────────────
 //
@@ -18,13 +19,13 @@ import { rememberStripKind } from '../../utils/homeStripResolver'
 //   what is on, which is the one thing this section exists to report. When nothing
 //   qualifies, the card says "Events / What's on" over this image and opens the events
 //   screen — honest, and still a destination.
-const STRIP_EVENTS_IMAGE = require('../../assets/backgrounds/ada-bg-events.png')
+const STRIP_EVENTS_IMAGE = require('../../assets/backgrounds/ada-bg-events.jpg')
 
-// ⚠ PLACEHOLDER, PENDING BERKE'S IMAGE. assets/backgrounds/ada-bg-duty-pharmacy.png is an
+// ⚠ PLACEHOLDER, PENDING BERKE'S IMAGE. assets/backgrounds/ada-bg-duty-pharmacy.jpg is an
 //   existing ADA-owned asset, already used by components/PageBackground.js for the duty
 //   screen — so it is on-brand, correctly licensed, and actually depicts a pharmacy.
 //   Swapping it is this one line and nothing else.
-const STRIP_DUTY_IMAGE = require('../../assets/backgrounds/ada-bg-duty-pharmacy.png')
+const STRIP_DUTY_IMAGE = require('../../assets/backgrounds/ada-bg-duty-pharmacy.jpg')
 
 // ─── A NOTICE'S FALLBACK IMAGE FOLLOWS ITS ROUTE ────────────────────────────
 //
@@ -47,7 +48,7 @@ const STRIP_DUTY_IMAGE = require('../../assets/backgrounds/ada-bg-duty-pharmacy.
 //   is 'cover', so it centre-crops hard — roughly the middle fifth of the image is what
 //   shows at 176x120. That is a judgement to make on device, not from the file.
 const NOTICE_FALLBACK = {
-  accommodation: require('../../assets/backgrounds/ada-bg-accommodation.png'),
+  accommodation: require('../../assets/backgrounds/ada-bg-accommodation.jpg'),
 }
 
 // Bugün ADA'da — two photo cards, side by side.
@@ -80,7 +81,7 @@ const NOTICE_FALLBACK = {
 // bundle. There is no branch here that renders fewer than two cards, and no data state —
 // offline, RLS-blocked, empty database, unapplied migration — that can produce one.
 
-function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress, onDismiss, innerRef }) {
+function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress, onDismiss, innerRef, lang }) {
   return (
     <TouchableOpacity
       ref={innerRef}
@@ -103,7 +104,7 @@ function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress,
           greyscale and colour-blindness. Same principle the standalone Nöbetçi row used. */}
       {alert
         ? <View style={[s.photo, s.photoAlert]} />
-        : <Image source={imageUrl ? { uri: imageUrl } : image} style={s.photo} resizeMode="cover" />}
+        : <RemoteImage source={imageUrl ? { uri: imageUrl } : image} style={s.photo} resizeMode="cover" />}
 
       <View style={[s.badge, alert && s.badgeAlert]}>
         <Ionicons name={alert ? 'alert-circle' : icon} size={15} color={alert ? '#fff' : colors.textPrimary} />
@@ -131,6 +132,7 @@ function StripCard({ image, imageUrl, icon, title, tag, tagTone, alert, onPress,
           onPress={onDismiss}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
+          accessibilityLabel={t('uiClose', lang)}
         >
           <Ionicons name="close" size={14} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -194,6 +196,7 @@ export default function LiveStrip({
   return (
     <View style={s.row}>
       <StripCard
+        lang={lang}
         // Only a notice consults the route map; every other kind keeps the events image
         // exactly as before, and a notice WITH an image_url never reaches it either —
         // imageUrl wins inside StripCard.
@@ -219,6 +222,7 @@ export default function LiveStrip({
           dutyBannerRef lands HERE. App.js measures that exact ref to place the duty coach
           mark, and a ref that measures null drops the tutorial step silently. */}
       <StripCard
+        lang={lang}
         innerRef={dutyRef}
         image={STRIP_DUTY_IMAGE}
         icon="medkit"

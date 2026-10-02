@@ -3,7 +3,7 @@ import ExploreListInlineSlot from '../components/ads/ExploreListInlineSlot'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ScrollView, Image,
+  ActivityIndicator, ScrollView, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -27,6 +27,13 @@ import { TRNC_CENTER } from '../constants/mapSources'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import FilterDropdown from '../components/FilterDropdown'
 import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
+import { REDESIGN } from '../constants/redesign'
+import {
+  ScreenHeader as KitHeader, FilterBar, ListCard, EmptyState, ErrorState, CardSkeleton,
+  CategoryIcon, IconButton, ModuleScreen,
+  RemoteImage,
+} from '../components/ui'
+import { colors as C, type, elevation, press } from '../constants/theme'
 
 // name_i18n[lang] if present, else fall through to the plain `name` column (never '').
 function extractI18n(obj, lang) {
@@ -71,7 +78,7 @@ function PlaceCard({ item, lang, onPress, showFeatured, isSaved, onToggleSave })
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.88}>
       <View style={s.photoWrap}>
         {photo
-          ? <Image source={{ uri: photo }} style={s.photo} resizeMode="cover" />
+          ? <RemoteImage source={{ uri: photo }} style={s.photo} resizeMode="cover" />
           : <View style={[s.photoPlaceholder, { backgroundColor: pc.bg }]}>
               <Text style={s.photoEmoji}>{groupEmoji(group)}</Text>
             </View>
@@ -87,6 +94,8 @@ function PlaceCard({ item, lang, onPress, showFeatured, isSaved, onToggleSave })
             onPress={onToggleSave}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             activeOpacity={0.8}
+            accessibilityRole="button" accessibilityState={{ selected: !!isSaved }}
+            accessibilityLabel={t(isSaved ? 'uiFavRemove' : 'uiFavAdd', lang)}
           >
             <Ionicons name={isSaved ? 'heart' : 'heart-outline'} size={19} color={isSaved ? colors.danger : '#fff'} />
           </TouchableOpacity>
@@ -130,6 +139,48 @@ function PlaceCard({ item, lang, onPress, showFeatured, isSaved, onToggleSave })
   )
 }
 
+// Redesign list card (S3): the equal ListCard. Same facts as PlaceCard — photo, category,
+// region, blue flag / access, description — plus the save heart, the gated featured badge
+// and the dev-only review marker. Directions opens the same URL as the place profile's.
+function PlaceListCard({ item, lang, onPress, showFeatured, isSaved, onToggleSave }) {
+  const group = categoryToGroup(item.category)
+  const photo = item.cover_image_url || item.photos?.[0]
+  const isBeach = item.category === 'beach'
+  const hasCoords = item.latitude != null && item.longitude != null
+  const featured = showFeatured && isFeatured(item)
+  return (
+    <ListCard
+      title={placeName(item, lang)}
+      subtitle={placeDesc(item, lang)}
+      leading={photo ? { uri: photo } : { icon: GROUP_META[group]?.icon || 'location-outline', category: 'explore' }}
+      badge={categoryLabel(item.category, lang)}
+      meta={[
+        { icon: 'location-outline', text: regionLabel(item.region, lang) },
+        isBeach && item.blue_flag ? { icon: 'flag', text: t('blBlueFlagLabel', lang), tone: 'ok' } : null,
+        isBeach && item.access_type ? { text: item.access_type === 'public' ? t('blAccessPublic', lang) : t('blAccessPrivate', lang) } : null,
+      ]}
+      onPress={onPress}
+      lang={lang}
+      actions={hasCoords
+        ? [{ kind: 'directions', onPress: () => Linking.openURL(`https://maps.google.com/?q=${item.latitude},${item.longitude}`) }]
+        : undefined}
+    >
+      {(featured || item.status === 'pending' || onToggleSave) && (
+        <View style={r.cardFoot}>
+          <View style={r.cardFootLeft}>
+            {featured && <FeaturedBadge lang={lang} />}
+            {item.status === 'pending' && <Text style={s.reviewPending}>PENDING · review mode</Text>}
+          </View>
+          {onToggleSave && (
+            <IconButton icon={isSaved ? 'heart' : 'heart-outline'} color={isSaved ? C.dangerInk : C.textSecondary}
+              onPress={onToggleSave} accessibilityLabel={t('save', lang)} />
+          )}
+        </View>
+      )}
+    </ListCard>
+  )
+}
+
 // ─── Map pin bottom card ───────────────────────────────────────────────────────
 
 function BottomPinCard({ item, lang, onClose, onViewProfile }) {
@@ -141,7 +192,7 @@ function BottomPinCard({ item, lang, onClose, onViewProfile }) {
     <View style={pm.card}>
       <View style={pm.row}>
         {photo
-          ? <Image source={{ uri: photo }} style={pm.thumb} resizeMode="cover" />
+          ? <RemoteImage source={{ uri: photo }} style={pm.thumb} resizeMode="cover" />
           : <View style={[pm.thumb, pm.thumbFallback, { backgroundColor: pc.bg }]}>
               <Text style={pm.thumbEmoji}>{groupEmoji(group)}</Text>
             </View>
@@ -155,7 +206,8 @@ function BottomPinCard({ item, lang, onClose, onViewProfile }) {
           <Text style={pm.name} numberOfLines={1}>{placeName(item, lang)}</Text>
           <Text style={pm.district}>{regionLabel(item.region, lang)}</Text>
         </View>
-        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button" accessibilityLabel={t('uiClose', lang)}>
           <Ionicons name="close-circle" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -239,6 +291,20 @@ function PlacesMapView({ places, userLocation, lang, onSelectPlace, savedRegion 
 
 function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
   const tilesMem = useScrollMemory('explore:tiles')
+  if (REDESIGN) {
+    return (
+      <ScrollView {...tilesMem} contentContainerStyle={r.tilesWrap} showsVerticalScrollIndicator={false}>
+        {visibleGroups.map(g => (
+          <TouchableOpacity key={g} style={r.tile} onPress={() => onSelectGroup(g)} activeOpacity={press.card}
+            accessibilityRole="button" accessibilityLabel={`${groupLabel(g, lang)}, ${counts[g] || 0}`}>
+            <CategoryIcon icon={GROUP_META[g]?.icon || 'ellipse-outline'} category="explore" size={48} />
+            <Text style={r.tileLabel} numberOfLines={2}>{groupLabel(g, lang)}</Text>
+            <Text style={r.tileCount}>{counts[g] || 0}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    )
+  }
   return (
     <ScrollView {...tilesMem} contentContainerStyle={s.tilesWrap} showsVerticalScrollIndicator={false}>
       {visibleGroups.map(g => {
@@ -261,6 +327,12 @@ function GroupTiles({ counts, visibleGroups, lang, onSelectGroup }) {
       })}
     </ScrollView>
   )
+}
+
+// Redesign: the Keşfet list surfaces sit on the module photo (option B). The place overlay,
+// the submit form and My Submissions render outside this frame.
+function ModuleFrame({ children }) {
+  return REDESIGN ? <ModuleScreen topic="explore">{children}</ModuleScreen> : children
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -292,6 +364,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
   const rooted = initialCategory != null
   const [places,      setPlaces]      = useState([])
   const [loading,     setLoading]     = useState(true)
+  const [loadError,   setLoadError]   = useState(false)   // places fetch failed → ErrorState, never "no places"
   const [activeGroup, setActiveGroup] = useState(initialCategory ? categoryToGroup(initialCategory) : null)   // null = group-tile landing
   const [activeCat,   setActiveCat]   = useState(initialCategory)   // null = all categories in group
   const [region,      setRegion]      = useState(initialRegion)     // null = all regions
@@ -316,6 +389,9 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
         uid ? supabase.from('places').select('id', { head: true, count: 'exact' }).eq('submitted_by', uid)
             : Promise.resolve({ count: 0 }),
       ])
+      // supabase-js resolves with { error } instead of throwing: without this a failed load
+      // became an empty list ("no places") and an empty tile landing.
+      if (placesRes.error) throw placesRes.error
       // The sort KEY stays the English name deliberately: it keeps the order identical
       // in all nine locales, so a place does not move when the user switches language.
       // The COLLATOR is 'tr' because those English-field names are still Turkish proper
@@ -330,10 +406,12 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
       setPlaces(showFeatured ? partitionFeatured(sorted) : sorted)
       setRpcCatCounts(countsRes.error ? null : (countsRes.data || []))
       setHasSubs((subsRes.count || 0) > 0)
+      setLoadError(false)
     } catch (err) {
       console.error('Explore load error:', err)
       setPlaces([])
       setRpcCatCounts(null)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -443,8 +521,39 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
     return () => { backRef.current = null }
   })
 
+  // ONE mount each: the ad guard counts exactly one <ExploreListTopSlot> / <ExploreListInlineSlot>
+  // in this file, so both layouts reference these elements.
+  const listTopSlot = filtered.length > 0
+    ? <ExploreListTopSlot lang={lang} onNavigate={onAdNavigate} />
+    : null
+  const listInlineSlot = <ExploreListInlineSlot lang={lang} onNavigate={onAdNavigate} />
+  const cardProps = item => ({
+    item, lang, showFeatured,
+    isSaved: placeFavorites?.has(item.id),
+    onToggleSave: () => onTogglePlaceFavorite?.(item.id),
+    onPress: () => onSelectPlace?.(item),
+  })
+  const Card = REDESIGN ? PlaceListCard : PlaceCard
+
   let body
-  if (showSaved) {
+  if (showSaved && REDESIGN) {
+    const saved = places.filter(p => placeFavorites?.has(p.id))
+    body = (
+      <ModuleScreen topic="explore">
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <KitHeader onBack={() => setShowSaved(false)} title={t('exploreSavedTitle', lang)} lang={lang} />
+        <FlatList
+          data={saved}
+          keyExtractor={item => item.id}
+          contentContainerStyle={r.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<EmptyState icon="heart-outline" category="explore" title={t('blNoPlaces', lang)} />}
+          renderItem={({ item }) => <PlaceListCard {...cardProps(item)} />}
+        />
+      </SafeAreaView>
+      </ModuleScreen>
+    )
+  } else if (showSaved) {
     const saved = places.filter(p => placeFavorites?.has(p.id))
     body = (
       <SafeAreaView style={s.safe} edges={['top']}>
@@ -495,7 +604,22 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
       />
     )
   } else body = (
+    <ModuleFrame>
     <SafeAreaView style={s.safe} edges={['top']}>
+      {REDESIGN ? (
+        <KitHeader
+          onBack={activeGroup && !rooted ? leaveGroup : onBack}
+          title={rooted ? categoryLabel(initialCategory, lang) : (activeGroup ? groupLabel(activeGroup, lang) : t('exploreTitle', lang))}
+          lang={lang}
+          actions={activeGroup
+            ? [{ icon: view === 'list' ? 'map-outline' : 'list-outline', onPress: toggleView,
+                 accessibilityLabel: t(view === 'list' ? 'map' : 'list', lang) }]
+            : [
+                hasSavedVisible && { icon: 'heart-outline', onPress: () => setShowSaved(true), accessibilityLabel: t('exploreSavedTitle', lang) },
+                hasSubs && { icon: 'document-text-outline', onPress: () => setShowMySubs(true), accessibilityLabel: t('exploreMySubmissions', lang) },
+              ].filter(Boolean)}
+        />
+      ) : (<>
       <PageBackground topic="beaches_landmarks" />
       <ScreenHeader
         onBack={activeGroup && !rooted ? leaveGroup : onBack}
@@ -506,6 +630,8 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
             style={s.viewToggle}
             onPress={toggleView}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t(view === 'list' ? 'uiShowMap' : 'uiShowList', lang)}
           >
             <Ionicons
               name={view === 'list' ? 'map-outline' : 'list-outline'}
@@ -516,21 +642,26 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
         ) : ((hasSubs || hasSavedVisible) ? (
           <View style={s.headerActions}>
             {hasSavedVisible && (
-              <TouchableOpacity style={s.headerIconBtn} onPress={() => setShowSaved(true)} activeOpacity={0.75}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('exploreSavedTitle', lang)} style={s.headerIconBtn} onPress={() => setShowSaved(true)} activeOpacity={0.75}>
                 <Ionicons name="heart-outline" size={20} color={colors.primary} />
               </TouchableOpacity>
             )}
             {hasSubs && (
-              <TouchableOpacity style={s.headerIconBtn} onPress={() => setShowMySubs(true)} activeOpacity={0.75}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('exploreMySubmissions', lang)} style={s.headerIconBtn} onPress={() => setShowMySubs(true)} activeOpacity={0.75}>
                 <Ionicons name="document-text-outline" size={20} color={colors.primary} />
               </TouchableOpacity>
             )}
           </View>
         ) : null)}
       />
+      </>)}
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
+        REDESIGN
+          ? <View style={r.skeletons}><CardSkeleton height={96} /><CardSkeleton height={96} /><CardSkeleton height={96} /></View>
+          : <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
+      ) : loadError ? (
+        <ErrorState lang={lang} onRetry={load} />
       ) : !activeGroup ? (
         <GroupTiles
           counts={counts}
@@ -552,6 +683,26 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
           {/* Dropdowns (replacing the category and region chip rows). flexShrink 0: a fixed
               row above a scrolling list must not be squeezed (CLAUDE.md). Selections are
               screen state, so they survive a place opened over the list and closed again. */}
+          {REDESIGN ? (
+            <FilterBar>
+              {groupCats.length > 1 && (
+                <FilterDropdown
+                  label={t('ddCategory', lang)}
+                  lang={lang}
+                  options={groupCats.map(c => ({ value: c, label: categoryLabel(c, lang) }))}
+                  value={activeCat}
+                  onChange={setActiveCat}
+                />
+              )}
+              <FilterDropdown
+                label={t('ddDistrict', lang)}
+                lang={lang}
+                options={regionOptions}
+                value={region}
+                onChange={setRegion}
+              />
+            </FilterBar>
+          ) : (
           <View style={s.ddRow}>
             {groupCats.length > 1 && (
               <FilterDropdown
@@ -572,13 +723,14 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
               onChange={setRegion}
             />
           </View>
+          )}
 
           {/* List */}
           <FlatList
             ref={listRef}
             data={filtered}
             keyExtractor={item => item.id}
-            contentContainerStyle={s.listContent}
+            contentContainerStyle={REDESIGN ? r.listContent : s.listContent}
             showsVerticalScrollIndicator={false}
             onScroll={e => { listOffset.current = e.nativeEvent.contentOffset.y }}
             scrollEventThrottle={64}
@@ -598,11 +750,9 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
               //   paddingBottom is 40 — less than the FAB's footprint — so a banner at the
               //   end of the list renders underneath it. Raising the inset to make room
               //   would degrade the module to sell a placement nobody asked for.
-              filtered.length > 0
-                ? <ExploreListTopSlot lang={lang} onNavigate={onAdNavigate} />
-                : null
+              listTopSlot
             }
-            ListEmptyComponent={
+            ListEmptyComponent={REDESIGN ? <EmptyState icon="map-outline" category="explore" title={t('blNoPlaces', lang)} /> :
               <View style={s.emptyWrap}>
                 <View style={s.emptyCard}>
                   <Ionicons name="map-outline" size={44} color={colors.border} style={{ marginBottom: 10 }} />
@@ -613,15 +763,8 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
             renderItem={({ item, index }) => (
               // list_inline — ONCE, after the 8th card. A point, not a modulus.
               <>
-                <PlaceCard
-                  item={item}
-                  lang={lang}
-                  showFeatured={showFeatured}
-                  isSaved={placeFavorites?.has(item.id)}
-                  onToggleSave={() => onTogglePlaceFavorite?.(item.id)}
-                  onPress={() => onSelectPlace?.(item)}
-                />
-                {index === 7 && <ExploreListInlineSlot lang={lang} onNavigate={onAdNavigate} />}
+                <Card {...cardProps(item)} />
+                {index === 7 && listInlineSlot}
               </>
             )}
           />
@@ -634,11 +777,14 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
           style={s.fab}
           onPress={() => { if (onRequireAccount?.('gatePlaceSubmit')) return; setShowSubmit(true) }}
           activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t('blSubmitTitle', lang)}
         >
           <Ionicons name="add" size={26} color="#fff" />
         </TouchableOpacity>
       )}
     </SafeAreaView>
+    </ModuleFrame>
   )
 
   // The place profile (App state) sits OVER whichever view is showing — list, map, saved —
@@ -654,7 +800,7 @@ export default function ExploreScreen({ lang, onBack, onSelectPlace, userLocatio
 
 const PHOTO_H = 160
 
-const s = StyleSheet.create({
+const legacy = StyleSheet.create({
   ddRow:  { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 10, flexShrink: 0 },
   ddItem: { flex: 1 },
   root:   { flex: 1, backgroundColor: colors.bg },
@@ -733,6 +879,25 @@ const s = StyleSheet.create({
          backgroundColor: colors.primary,
          alignItems: 'center', justifyContent: 'center', ...shadow },
 })
+
+// Redesign styles. listContent keeps paddingHorizontal 16 = AD_PAGE_INSET (the inline ad's bleed).
+const r = StyleSheet.create({
+  root:         { flex: 1, backgroundColor: C.canvas },
+  safe:         { flex: 1, backgroundColor: 'transparent' },
+  placeOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: C.canvas },
+  listContent:  { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 96, gap: 12 },
+  skeletons:    { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
+  cardFoot:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: -8 },
+  cardFootLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  tilesWrap:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 16 },
+  tile:         { width: '47%', backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20, padding: 16, gap: 10, ...elevation.card },
+  tileLabel:    { ...type.rowTitle, color: C.textPrimary },
+  tileCount:    { ...type.meta, color: C.textSecondary, marginTop: -6 },
+  fab:          { position: 'absolute', bottom: 24, right: 16, width: 56, height: 56, borderRadius: 28,
+                  backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', ...elevation.floating },
+})
+
+const s = REDESIGN ? { ...legacy, root: r.root, safe: r.safe, placeOverlay: r.placeOverlay, fab: r.fab } : legacy
 
 // ─── Map pin card styles ───────────────────────────────────────────────────────
 

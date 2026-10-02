@@ -1,11 +1,16 @@
 import { useState, useRef } from 'react'
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
-  FlatList, Dimensions, ScrollView,
+  FlatList, Dimensions, ScrollView, useWindowDimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, shadow } from '../constants/theme'
+import { colors, shadow, type, radii } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
+import { StatusBar } from 'expo-status-bar'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import PhotoFade, { PHOTO_GLASS, CONTENT_MAX_W } from '../components/ui/PhotoFade'
+import { Button } from '../components/ui'
 import { t, LANGUAGES } from '../constants/i18n'
 
 // Module scope is safe here: app.config.js locks orientation to 'portrait', so this
@@ -114,6 +119,8 @@ function WelcomeSlide({ lang, setLang }) {
             style={[s.langChip, lang === key && s.langChipActive]}
             onPress={() => setLang(key)}
             activeOpacity={0.7}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: lang === key }}
           >
             <Text style={[s.langChipText, lang === key && s.langChipTextActive]}>
               {label}
@@ -125,10 +132,38 @@ function WelcomeSlide({ lang, setLang }) {
   )
 }
 
+// ─── Redesign (S2b): the slide's picture is an Oli & Maki scene on the teal Oli ground
+// (the Home Oli bar's gradient + glow). Picture only — no text sits on it, so it carries no
+// contrast obligation. Explore → the events scene, Settle → accommodation, Oli → emergency
+// (slide 4 is duty pharmacy + emergency numbers).
+const SCENE = {
+  explore: require('../assets/oli-scenes/events.png'),
+  settle:  require('../assets/oli-scenes/accommodation.png'),
+  oli:     require('../assets/oli-scenes/emergency.png'),
+}
+const SCENE_W = Math.min(width - 48, 340)
+const SCENE_H = Math.round(SCENE_W * 0.66)
+
+function SceneCard({ id }) {
+  const src = SCENE[id]
+  const meta = Image.resolveAssetSource(src)
+  const h = SCENE_H - 24
+  return (
+    <View style={s.sceneCard}>
+      <Image source={require('../assets/oli-scenes/oli-bg.png')} resizeMode="stretch" style={StyleSheet.absoluteFill} />
+      <Image source={require('../assets/oli-scenes/oli-glow.png')}
+        style={{ position: 'absolute', width: SCENE_H * 1.3, height: SCENE_H * 1.3, left: SCENE_W / 2 - SCENE_H * 0.65, top: -SCENE_H * 0.1 }} />
+      <Image source={src} resizeMode="contain" accessibilityIgnoresInvertColors
+        style={{ position: 'absolute', bottom: 0, alignSelf: 'center', height: h, width: h * meta.width / meta.height }} />
+    </View>
+  )
+}
+
 function FeatureSlide({ slide, lang }) {
   const tint = TINTS[slide.tint]
   return (
     <View style={s.featureSlide}>
+      {REDESIGN ? <SceneCard id={slide.id} /> : (
       <View style={[s.circle, { backgroundColor: tint.bg }]}>
         {slide.mascot
           // ─── THE OFFSETS ARE THE ARTWORK'S, NOT A NUDGE ───────────────────
@@ -147,6 +182,7 @@ function FeatureSlide({ slide, lang }) {
             />
           : <Ionicons name={slide.icon} size={68} color={tint.fg} />}
       </View>
+      )}
 
       <View style={s.featureText}>
         <Text style={s.featureTitle}>{t(slide.titleKey, lang)}</Text>
@@ -155,6 +191,77 @@ function FeatureSlide({ slide, lang }) {
           <Text style={s.featureNote}>{t(slide.noteKey, lang)}</Text>
         )}
       </View>
+    </View>
+  )
+}
+
+// ─── Redesign: onboarding in the Welcome A style ─────────────────────────────
+// Each slide: a full-screen photo of ours matching its topic, fading into the deep teal, with
+// the Oli & Maki scene and the title + text in white ON the solid teal (12.54:1). Same slides,
+// same order, same strings. "Atla" (skip) sits below the status bar; the bottom row — dots,
+// a round 52pt back button and a 52pt pill "İleri" — is fixed over every slide, and each slide
+// reserves its height on the solid teal, so there is no white strip and the (transparent,
+// edge-to-edge) system nav bar sits on teal.
+const R_PHOTO = {
+  welcome: require('../assets/backgrounds/ada-bg-transportation.jpg'),
+  explore: require('../assets/backgrounds/ada-bg-events.jpg'),
+  settle:  require('../assets/backgrounds/ada-bg-accommodation.jpg'),   // shared with Welcome + the location screen: own crop
+  oli:     require('../assets/backgrounds/ada-bg-duty-pharmacy.jpg'),
+}
+// The recognisable part of each photo (source x/y, 0–1) and how much to enlarge it, so the
+// coast, the street lights, the terrace and the pharmacy sit in the visible photo zone.
+// The Kyrenia photo is used three times (Welcome: harbour + castle · location screen: bougainvillea
+// and boats · Settle in: the terrace lounge), each on a clearly different part of it. The stone
+// houses were too thin a strip of the photo to fill the zone without heavy zoom.
+const R_FOCUS = {
+  welcome: { x: 0.5,  y: 0.64, zoom: 1.25 },   // coastal road + bus
+  explore: { x: 0.5,  y: 0.62, zoom: 1.2 },    // string lights + crowd
+  settle:  { x: 0.9,  y: 0.76, zoom: 2.0 },    // the terrace lounge: cushions, throw, lantern
+  oli:     { x: 0.55, y: 0.64, zoom: 1.15 },   // shelves + pharmacist
+}
+const R_SCENE = {
+  welcome: require('../assets/oli-scenes/welcome.png'),
+  explore: require('../assets/oli-scenes/events.png'),
+  settle:  require('../assets/oli-scenes/accommodation.png'),
+  oli:     require('../assets/oli-scenes/emergency.png'),
+}
+const R_NAV_H = 88   // the fixed bottom row: dots (7 + 14) + the 52pt buttons + its 15pt gap, reserved on every slide
+// Slide 1 also carries the 9-language picker (~560pt in all); below 720pt of screen its scene is
+// left out so the block never reaches the skip button.
+// The redesign reads the LIVE window (useWindowDimensions), never the module-load `width`: on an
+// iPad / foldable / after rotation that stale width made each slide wider than the screen, so the
+// text column ran off the right edge while the mascot (PhotoFade, live) stayed centred.
+const R_SHORT_H = 720
+
+function RedesignSlide({ slide, lang, setLang, bottomInset, pageW }) {
+  const { height: H } = useWindowDimensions()
+  const welcome = slide.id === 'welcome'
+  return (
+    <View style={{ width: pageW, height: '100%' }}>
+      <PhotoFade photo={R_PHOTO[slide.id]} focus={R_FOCUS[slide.id]}
+        mascot={welcome && H < R_SHORT_H ? null : R_SCENE[slide.id]}>
+        <View style={[rs.content, { paddingBottom: bottomInset + R_NAV_H + 12 }]}>
+          <Text style={rs.title} accessibilityRole="header">
+            {t(welcome ? 'onboardingWelcomeTitle' : slide.titleKey, lang)}
+          </Text>
+          <Text style={rs.body}>{t(welcome ? 'onboardingWelcomeBody' : slide.bodyKey, lang)}</Text>
+          {!!slide.noteKey && <Text style={rs.note}>{t(slide.noteKey, lang)}</Text>}
+          {welcome && (
+            <>
+              <Text style={rs.langLabel}>{t('chooseLanguage', lang)}</Text>
+              <View style={rs.langGrid}>
+                {LANGUAGES.map(({ key, label }) => (
+                  <TouchableOpacity key={key} onPress={() => setLang(key)} activeOpacity={0.75}
+                    style={[rs.langChip, lang === key && rs.langChipOn]}
+                    accessibilityRole="radio" accessibilityState={{ selected: lang === key }}>
+                    <Text style={[rs.langChipText, lang === key && rs.langChipTextOn]}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+      </PhotoFade>
     </View>
   )
 }
@@ -170,6 +277,11 @@ export default function OnboardingScreen({ onComplete }) {
     listRef.current?.scrollToIndex({ index: i, animated: true })
     setIndex(i)
   }
+
+  if (REDESIGN) return (
+    <OnboardingRedesign lang={lang} setLang={setLang} index={index} setIndex={setIndex}
+      listRef={listRef} goTo={goTo} isLast={isLast} onComplete={onComplete} />
+  )
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -201,7 +313,8 @@ export default function OnboardingScreen({ onComplete }) {
 
         <View style={s.navButtons}>
           {index > 0 && (
-            <TouchableOpacity style={s.backBtn} onPress={() => goTo(index - 1)} activeOpacity={0.7}>
+            <TouchableOpacity style={s.backBtn} onPress={() => goTo(index - 1)} activeOpacity={0.7}
+              accessibilityRole="button" accessibilityLabel={t('back', lang)}>
               <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
@@ -231,7 +344,7 @@ export default function OnboardingScreen({ onComplete }) {
 const CIRCLE = 156
 const MASCOT_BOX = CIRCLE * 0.875   // see the bbox note in FeatureSlide
 
-const s = StyleSheet.create({
+const legacyS = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bgWarm },
 
   // ── Slide 1 ──
@@ -381,4 +494,114 @@ const s = StyleSheet.create({
   },
   nextBtnLast: { backgroundColor: colors.primaryDark },
   nextText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.surface },
+})
+
+// Redesign overrides, key by key (the slide geometry above is unchanged, so the measured
+// Turkish worst case on slide 1 still holds). 44pt language chips with a 3.66:1 boundary,
+// dots that are visible (fieldBorder 3.66:1; colors.border was 1.18), the "coming soon"
+// note at full textSecondary (the 0.7 opacity put it under AA), 50pt next button.
+const redesignS = StyleSheet.create({
+  safe:          { flex: 1, backgroundColor: colors.canvas },
+  welcomeTitle:  { ...type.pageTitle, color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
+  welcomeBody:   { ...type.body, color: colors.textSecondary, textAlign: 'center', marginBottom: 16 },
+  divider:       { height: 1, backgroundColor: colors.divider, marginBottom: 16 },
+  langLabel:     { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.textSecondary, marginBottom: 10 },
+  langChip:      { paddingHorizontal: 14, minHeight: 44, borderRadius: radii.pill, justifyContent: 'center',
+                   backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder },
+  langChipActive:{ backgroundColor: colors.primaryLight, borderColor: colors.primary, borderWidth: 2 },
+  langChipText:  { ...type.body, color: colors.textPrimary },
+  sceneCard:     { width: SCENE_W, height: SCENE_H, borderRadius: radii.sheet, overflow: 'hidden', marginBottom: 32,
+                   backgroundColor: '#084B4A' },
+  featureTitle:  { ...type.pageTitle, color: colors.textPrimary, textAlign: 'center', marginBottom: 12 },
+  featureBody:   { ...type.body, fontSize: 16, lineHeight: 24, color: colors.textSecondary, textAlign: 'center', maxWidth: 320 },
+  featureNote:   { ...type.small, color: colors.textSecondary, textAlign: 'center', marginTop: 14, maxWidth: 300 },
+  nav:           { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 12, backgroundColor: colors.card,
+                   borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider },
+  dot:           { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.fieldBorder },
+  dotActive:     { width: 18, backgroundColor: colors.primary },
+  backBtn:       { width: 50, height: 50, borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder,
+                   backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center' },
+  nextBtn:       { flex: 1, backgroundColor: colors.primary, borderRadius: radii.md, minHeight: 50, paddingHorizontal: 24,
+                   flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  nextText:      { ...type.rowTitle, color: colors.onPrimary },
+})
+const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS
+
+// Module scope (defined outside the screen, so it never remounts on a parent render).
+function OnboardingRedesign({ lang, setLang, index, setIndex, listRef, goTo, isLast, onComplete }) {
+  const insets = useSafeAreaInsets()
+  const win = useWindowDimensions()
+  // The page width is the pager's MEASURED width, not a window reading. When it changes (rotation,
+  // split view, foldable) the list is REMOUNTED at the new width (key) and reopened at the current
+  // slide (initialScrollIndex): every slide is laid out again — a kept list showed slide 1 at the
+  // old landscape width after rotating back to portrait (iPad, 2026-10-02).
+  const [pageW, setPageW] = useState(win.width)
+  return (
+    <View style={{ flex: 1, backgroundColor: '#083A39' }}
+      onLayout={e => { const w = Math.round(e.nativeEvent.layout.width); if (w > 0 && w !== pageW) setPageW(w) }}>
+      <StatusBar style="light" />
+      <FlatList
+        key={pageW}
+        initialScrollIndex={index}
+        ref={listRef}
+        data={SLIDES}
+        keyExtractor={item => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / pageW))}
+        getItemLayout={(_, i) => ({ length: pageW, offset: pageW * i, index: i })}
+        renderItem={({ item }) => <RedesignSlide slide={item} lang={lang} setLang={setLang} bottomInset={insets.bottom} pageW={pageW} />}
+      />
+      {/* "Atla" finishes onboarding with the language chosen so far — the same onComplete the
+          last slide calls (writes @trnc_onboarded + @trnc_lang, then WelcomeScreen). */}
+      {!isLast && (
+        <TouchableOpacity style={[rs.skip, { top: insets.top + 8 }]} onPress={() => onComplete(lang)}
+          accessibilityRole="button" accessibilityLabel={t('hrSkip', lang)}>
+          <Text style={rs.skipText}>{t('hrSkip', lang)}</Text>
+        </TouchableOpacity>
+      )}
+      <View style={[rs.nav, { paddingBottom: insets.bottom + 12, paddingHorizontal: Math.max(24, (pageW - CONTENT_MAX_W) / 2) }]} pointerEvents="box-none">
+        <View style={rs.dots}>
+          {SLIDES.map((_, i) => <View key={i} style={[rs.dot, i === index && rs.dotOn]} />)}
+        </View>
+        <View style={rs.navRow}>
+          {index > 0 && (
+            <TouchableOpacity style={rs.backRound} onPress={() => goTo(index - 1)} activeOpacity={0.75}
+              accessibilityRole="button" accessibilityLabel={t('back', lang)}>
+              <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+          <Button size="lg" variant="inverse" icon="arrow-forward" style={{ flex: 1 }} fullWidth
+            title={isLast ? t('getStarted', lang) : t('next', lang)}
+            onPress={() => (isLast ? onComplete(lang) : goTo(index + 1))} />
+        </View>
+      </View>
+    </View>
+  )
+}
+
+const rs = StyleSheet.create({
+  content:      { paddingHorizontal: 24, paddingTop: 4, width: '100%', maxWidth: CONTENT_MAX_W, alignSelf: 'center' },
+  title:        { fontSize: 26, lineHeight: 32, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 8, textAlign: 'center' },
+  body:         { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', color: '#FFFFFF', textAlign: 'center' },
+  note:         { ...type.small, color: '#FFFFFF', marginTop: 10, textAlign: 'center' },
+  langLabel:    { ...type.meta, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', marginTop: 16, marginBottom: 8, textAlign: 'center' },
+  langGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  langChip:     { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', borderRadius: radii.pill,
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.55)', backgroundColor: 'rgba(255,255,255,0.10)' },
+  langChipOn:   { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
+  langChipText: { ...type.body, color: '#FFFFFF' },
+  langChipTextOn:{ fontFamily: 'Inter_700Bold', color: '#083A39' },
+  skip:         { position: 'absolute', right: 16, minHeight: 44, minWidth: 44, paddingHorizontal: 16,
+                  justifyContent: 'center', borderRadius: radii.pill, backgroundColor: `rgba(0,0,0,${PHOTO_GLASS})`,
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  skipText:     { ...type.body, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  nav:          { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 24 },
+  dots:         { flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 14 },
+  dot:          { width: 7, height: 7, borderRadius: 3.5, backgroundColor: 'rgba(255,255,255,0.45)' },
+  dotOn:        { width: 18, backgroundColor: '#FFFFFF' },
+  navRow:       { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  backRound:    { width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)',
+                  backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
 })

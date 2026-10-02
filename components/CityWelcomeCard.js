@@ -2,7 +2,9 @@ import { useEffect, useRef } from 'react'
 import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, Animated, Dimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
-import { colors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius, radii, type, category } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
+import { BottomSheet, Button } from './ui'
 import { t, tCity } from '../constants/i18n'
 
 // The city-welcome card. Mounted at the root of App.js next to OliGuide — the
@@ -22,7 +24,40 @@ const ACTIONS = [
   { target: 'duty',    labelKey: 'cwDuty',    icon: 'plus-square' },
 ]
 
-export default function CityWelcomeCard({ region, variant, lang, onNavigate, onDismiss, onTurnOff }) {
+// ─── Redesign (S2b): the shared BottomSheet — a Modal with a dim backdrop, so it sits above
+// the floating tab bar rather than beside it, and Android back / backdrop / swipe all
+// dismiss. Same three destinations, same copy, same handlers. "Turn off" is a 44pt Button
+// (was ~27pt of underlined text).
+function CityWelcomeSheet({ region, variant, lang, onNavigate, onDismiss, onTurnOff }) {
+  const isRich = variant === 'rich'
+  const title = tCity(isRich ? 'cwWelcomeTitle' : 'cwNudgeTitle', region, lang)
+  const body  = tCity(isRich ? 'cwWelcomeBody'  : 'cwNudgeBody',  region, lang)
+  return (
+    <BottomSheet visible onClose={onDismiss} title={title} lang={lang}>
+      <View style={r.head}>
+        <Image source={require('../assets/oli-button.png')} style={r.mascot} resizeMode="contain" accessibilityIgnoresInvertColors />
+        <Text style={r.body}>{body}</Text>
+      </View>
+      <View style={r.actions}>
+        {ACTIONS.map(a => (
+          <TouchableOpacity key={a.target} style={r.action} onPress={() => onNavigate(a.target)} activeOpacity={0.8}
+            accessibilityRole="button" accessibilityLabel={t(a.labelKey, lang)}>
+            <View style={r.actionIcon}><Feather name={a.icon} size={18} color={category.city.ink} /></View>
+            <Text style={r.actionText} numberOfLines={2}>{t(a.labelKey, lang)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Button variant="text" title={t('cwTurnOff', lang)} onPress={onTurnOff} fullWidth style={{ marginTop: 8 }} />
+    </BottomSheet>
+  )
+}
+
+export default function CityWelcomeCard(props) {
+  if (REDESIGN) return <CityWelcomeSheet {...props} />
+  return <CityWelcomeCardLegacy {...props} />
+}
+
+function CityWelcomeCardLegacy({ region, variant, lang, onNavigate, onDismiss, onTurnOff }) {
   const insets = useSafeAreaInsets()
   const slide = useRef(new Animated.Value(Dimensions.get('window').height)).current
 
@@ -123,4 +158,15 @@ const s = StyleSheet.create({
   turnOff:     { alignSelf: 'center', marginTop: 14, paddingVertical: 6, paddingHorizontal: 12 },
   turnOffText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary,
                  textDecorationLine: 'underline' },
+})
+
+const r = StyleSheet.create({
+  head:       { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  mascot:     { width: 64, height: 64 },
+  body:       { ...type.body, color: colors.textSecondary, flex: 1 },
+  actions:    { flexDirection: 'row', gap: 10 },
+  action:     { flex: 1, minHeight: 92, backgroundColor: category.city.bg, borderRadius: radii.tile,
+                paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  actionIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  actionText: { ...type.meta, fontFamily: 'Inter_700Bold', color: colors.textPrimary, textAlign: 'center' },
 })

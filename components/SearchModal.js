@@ -43,8 +43,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
 import { colors, radius } from '../constants/theme'
+import { t } from '../constants/i18n'
 
 export default function SearchModal({
+  lang,   // only for the close button's accessibilityLabel
   visible, title, searchPlaceholder, options, value, searchable, onSelect, onClose,
 }) {
   const [q, setQ] = useState('')
@@ -149,7 +151,7 @@ export default function SearchModal({
         <View style={[s.modalCard, { maxHeight: cardMaxHeight }]}>
           <View style={s.modalHeader}>
             <Text style={s.modalTitle}>{title}</Text>
-            <TouchableOpacity onPress={() => { Keyboard.dismiss(); onClose() }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} onPress={() => { Keyboard.dismiss(); onClose() }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Feather name="x" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
@@ -225,7 +227,7 @@ const s = StyleSheet.create({
     paddingTop: 16, paddingHorizontal: 18, paddingBottom: 24,
   },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  modalTitle: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary, flexShrink: 1, paddingRight: 10 },
+  modalTitle: { fontSize: 16.5, fontFamily: 'Inter_700Bold', color: colors.textPrimary, flexShrink: 1, paddingRight: 10 },
   search: {
     backgroundColor: colors.bg, borderRadius: radius.md, paddingHorizontal: 13,
     paddingVertical: Platform.OS === 'ios' ? 11 : 8, fontSize: 15, marginBottom: 10,
@@ -237,5 +239,5 @@ const s = StyleSheet.create({
   },
   // flex:1, not flexShrink:1 — see the note on renderItem above and f1a7b99.
   modalItemText: { fontSize: 15, color: colors.textPrimary, flex: 1, paddingRight: 10 },
-  modalItemTextOn: { color: colors.primary, fontWeight: '700' },
+  modalItemTextOn: { color: colors.primary, fontFamily: 'Inter_700Bold' },
 })

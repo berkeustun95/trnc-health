@@ -214,24 +214,24 @@ const s = StyleSheet.create({
   empty:     { fontSize: 14, color: colors.textSecondary, lineHeight: 20, textAlign: 'center' },
   retryBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
                marginTop: 14, backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 11 },
-  retryText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
+  retryText: { color: colors.surface, fontSize: 14, fontFamily: 'Inter_700Bold' },
 
   headRow:   { flexDirection: 'row', alignItems: 'center', gap: 14 },
   headBody:  { flex: 1, gap: 6 },
-  name:      { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
+  name:      { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   youPill:   { alignSelf: 'flex-start', backgroundColor: colors.primaryLight, borderRadius: radius.sm,
                paddingHorizontal: 8, paddingVertical: 2 },
   // primaryDark, not primary: `primary` on `primaryLight` is 4.44:1 and scrapes AA,
   // and this pill sits over a PageBackground photo where it reads washed out. The
   // theme carries primaryDark (6.71:1) for exactly this pairing.
-  youText:   { fontSize: 11, fontWeight: '700', color: colors.primaryDark },
+  youText:   { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
 
   messageBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
                     marginTop: 16, backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 12 },
-  messageBtnText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
+  messageBtnText: { color: colors.surface, fontSize: 15, fontFamily: 'Inter_700Bold' },
 
   historyWrap:  { marginTop: 18 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.textSecondary,
+  sectionTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary,
                   textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 },
 
   divider:   { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: 12, paddingTop: 12 },
@@ -239,8 +239,8 @@ const s = StyleSheet.create({
   enrolDot:  { width: 9, height: 9, borderRadius: 5, marginTop: 5, backgroundColor: colors.border },
   enrolDotCurrent: { backgroundColor: colors.primary },
   enrolBody: { flex: 1, gap: 3 },
-  enrolUni:  { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  enrolUni:  { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary },
   enrolMeta: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  enrolStatus:       { fontSize: 11, fontWeight: '700', color: colors.primary, marginTop: 3 },
+  enrolStatus:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary, marginTop: 3 },
   enrolStatusAlumni: { color: colors.textSecondary },
 })

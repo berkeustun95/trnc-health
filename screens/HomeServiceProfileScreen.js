@@ -6,6 +6,9 @@ import { t } from '../constants/i18n'
 import BackButton from '../components/BackButton'
 import HomeServiceIcon from '../components/HomeServiceIcon'
 import { hsCategory, HS_DISTRICT_LABEL_KEY } from '../constants/homeServices'
+import { REDESIGN } from '../constants/redesign'
+import { colors as C, category as CAT, type, radii } from '../constants/theme'
+import { DetailScaffold, InfoRow } from '../components/ui'
 
 // ⚠ UNREFERENCED AS OF THE PARTNER-ONLY CHANGE (2026-09-09). Nothing imports this file.
 //
@@ -39,6 +42,75 @@ export default function HomeServiceProfileScreen({ provider, lang, onBack }) {
   const districtKey  = HS_DISTRICT_LABEL_KEY[provider.district]
 
   const footerHeight = canCall && canWA ? 90 : 70
+
+  if (REDESIGN) {
+    return (
+      <DetailScaffold
+        icon="construct-outline"
+        tag={{ label: primaryCat ? t(primaryCat.labelKey, lang) : t('hsTitle', lang), category: 'homeLife' }}
+        title={provider.name}
+        onBack={onBack}
+        lang={lang}
+        actions={[
+          canCall ? { kind: 'call', label: t('hsCall', lang), onPress: () => Linking.openURL(`tel:${phone}`) } : null,
+          canWA ? { kind: 'whatsapp', label: t('hsWhatsApp', lang), onPress: () => Linking.openURL(`https://wa.me/${waNum}`) } : null,
+        ]}
+      >
+        {(provider.verified || districtKey) && (
+          <View style={r.badgeRow}>
+            {provider.verified && (
+              <View style={[r.badge, { backgroundColor: C.successLight }]}>
+                <Ionicons name="checkmark-circle" size={13} color={C.primaryDark} />
+                <Text style={[r.badgeText, { color: C.primaryDark }]}>{t('hsVerified', lang)}</Text>
+              </View>
+            )}
+            {districtKey && (
+              <View style={[r.badge, { backgroundColor: CAT.homeLife.bg }]}>
+                <Ionicons name="location-outline" size={12} color={CAT.homeLife.ink} />
+                <Text style={[r.badgeText, { color: CAT.homeLife.ink }]}>{t(districtKey, lang)}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {provider.service_types?.length > 0 && (
+          <View style={r.section}>
+            <Text style={r.sectionTitle}>{t('hsServicesOffered', lang)}</Text>
+            <View style={r.chipRow}>
+              {provider.service_types.map(stype => {
+                const cat = hsCategory(stype)
+                return (
+                  <View key={stype} style={r.chip}>
+                    <HomeServiceIcon category={cat} size={13} color={CAT.homeLife.ink} />
+                    <Text style={r.chipText}>{cat ? t(cat.labelKey, lang) : stype}</Text>
+                  </View>
+                )
+              })}
+            </View>
+          </View>
+        )}
+
+        {!!provider.description && (
+          <View style={r.section}>
+            <Text style={r.sectionTitle}>{t('hsAbout', lang)}</Text>
+            <Text style={r.description}>{provider.description}</Text>
+          </View>
+        )}
+
+        <View style={r.section}>
+          <Text style={r.sectionTitle}>{t('hsContact', lang)}</Text>
+          {!!provider.phone && (
+            <InfoRow icon="call-outline" category="homeLife" label={t('hsCall', lang)} value={provider.phone}
+              onPress={() => Linking.openURL(`tel:${phone}`)} />
+          )}
+          {!!provider.whatsapp && (
+            <InfoRow icon="logo-whatsapp" category="homeLife" label={t('hsWhatsApp', lang)} value={provider.whatsapp}
+              onPress={() => Linking.openURL(`https://wa.me/${waNum}`)} />
+          )}
+        </View>
+      </DetailScaffold>
+    )
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -225,4 +297,18 @@ const s = StyleSheet.create({
                     gap: 8, backgroundColor: '#25D366', borderRadius: radius.md,
                     paddingVertical: 14 },
   ctaText:        { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+})
+
+const r = StyleSheet.create({
+  badgeRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  badge:        { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4,
+                  borderRadius: radii.pill },
+  badgeText:    { ...type.meta, fontFamily: 'Inter_600SemiBold' },
+  section:      { marginTop: 22 },
+  sectionTitle: { ...type.sectionHeading, color: C.textPrimary, marginBottom: 8 },
+  chipRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:         { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: CAT.homeLife.bg,
+                  borderRadius: radii.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  chipText:     { ...type.small, color: CAT.homeLife.ink },
+  description:  { ...type.body, lineHeight: 22, color: C.textPrimary },
 })

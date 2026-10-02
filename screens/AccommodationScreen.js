@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
-  TextInput, ScrollView, Image, Dimensions, Modal, Pressable,
+  TextInput, ScrollView, Dimensions, Modal, Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
@@ -16,7 +16,13 @@ import DormPartnerScreen from './DormPartnerScreen'
 import HotelsTab from '../components/accommodation/HotelsTab'
 import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
-import { colors, shadow } from '../constants/theme'
+import { colors, shadow, radii, type, elevation, category, TAP } from '../constants/theme'
+import { REDESIGN } from '../constants/redesign'
+import { OnPhotoContext } from '../components/ui/onPhoto'
+import {
+  ScreenHeader as RScreenHeader, FilterBar, CardSkeleton, EmptyState, ErrorState, ModuleScreen,
+  RemoteImage,
+} from '../components/ui'
 import { t } from '../constants/i18n'
 import FilterDropdown, { FilterPill } from '../components/FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
@@ -248,13 +254,14 @@ function PropertyCard({ item, lang, onPress }) {
             onMomentumScrollEnd={e => setImgIdx(Math.round(e.nativeEvent.contentOffset.x / CARD_W))}
             renderItem={({ item: im }) => (
               <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
-                <Image source={{ uri: im.url }} style={cs.cardImage} resizeMode="cover" />
+                <RemoteImage source={{ uri: im.url }} style={cs.cardImage} resizeMode="cover" />
               </TouchableOpacity>
             )}
           />
         ) : (
-          <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={cs.imagePlaceholder}>
-            <Ionicons name="home-outline" size={44} color={colors.border} />
+          <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={cs.imagePlaceholder}
+            accessibilityRole="button" accessibilityLabel={item.title}>
+            <Ionicons name="home-outline" size={44} color={REDESIGN ? category.homeLife.ink : colors.border} />
           </TouchableOpacity>
         )}
 
@@ -427,6 +434,11 @@ export default function AccommodationScreen({
   const [page, setPage]             = useState(0)
   const [done, setDone]             = useState(false)
   const [total, setTotal]           = useState(0)
+  // A failed fetch is NOT an empty result. It used to fall through to "no results, widen
+  // your filters", with no way to retry. `loadError` = the first page failed (the list is
+  // replaced by ErrorState); `moreError` = a later page failed (the footer offers a retry).
+  const [loadError, setLoadError]   = useState(false)
+  const [moreError, setMoreError]   = useState(false)
 
   const [tab, setTab]           = useState(LANDING_TAB)
   const [intent, setIntent]     = useState(LANDING_INTENT)
@@ -517,15 +529,23 @@ export default function AccommodationScreen({
       setDone(true)
       setLoading(false)
       setLoadingMore(false)
+      setLoadError(false)
+      setMoreError(false)
       return
     }
-    if (pageNum === 0) setLoading(true); else setLoadingMore(true)
+    if (pageNum === 0) { setLoading(true); setLoadError(false) } else setLoadingMore(true)
+    setMoreError(false)
     const from = pageNum * PAGE
     const { data, count, error } = await buildQuery().range(from, from + PAGE - 1)
     if (!error && data) {
       setItems(prev => (pageNum === 0 ? data : [...prev, ...data]))
       setTotal(count ?? 0)
       if (data.length < PAGE) setDone(true)
+    } else if (pageNum === 0) {
+      setItems([])
+      setLoadError(true)
+    } else {
+      setMoreError(true)
     }
     if (pageNum === 0) setLoading(false); else setLoadingMore(false)
   }, [buildQuery, isDorm])
@@ -535,7 +555,7 @@ export default function AccommodationScreen({
   useEffect(() => { setPage(0); setDone(false); load(0) }, [load])
 
   function loadMore() {
-    if (loadingMore || done || loading) return
+    if (loadingMore || done || loading || moreError) return
     const next = page + 1
     setPage(next)
     load(next)
@@ -575,9 +595,16 @@ export default function AccommodationScreen({
   }
 
   return (
+    <Root>
     <SafeAreaView style={cs.safe} edges={['top']}>
-      <PageBackground topic="accommodation" />
-      <ScreenHeader onBack={onClose} title={t('accomTitle', lang)} subtitle={HEADER_SUBTITLE(lang)} lang={lang} />
+      {REDESIGN ? (
+        <RScreenHeader onBack={onClose} title={t('accomTitle', lang)} subtitle={HEADER_SUBTITLE(lang)} lang={lang} />
+      ) : (
+        <>
+          <PageBackground topic="accommodation" />
+          <ScreenHeader onBack={onClose} title={t('accomTitle', lang)} subtitle={HEADER_SUBTITLE(lang)} lang={lang} />
+        </>
+      )}
 
       {TABS.length > 1 && <TabBar tab={tab} onChange={changeTab} lang={lang} />}
 
@@ -608,8 +635,7 @@ export default function AccommodationScreen({
           comment gives for never being disabled), and sorting one partner is not a
           feature. */}
       {tab === 'property' && (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        style={cs.pillBar} contentContainerStyle={cs.pillBarContent}>
+      <PillRow>
         <FilterDropdown label={t('accomFilterDistrict', lang)} lang={lang}
           options={REGIONS.map(d => ({ value: d, label: districtLabel(d, lang) }))}
           value={district}
@@ -673,18 +699,22 @@ export default function AccommodationScreen({
 
         {activeCount > 0 && (
           <TouchableOpacity style={cs.clearPill} onPress={clearAll}>
-            <Feather name="x" size={14} color={colors.danger} />
+            <Feather name="x" size={14} color={REDESIGN ? colors.dangerInk : colors.danger} />
             <Text style={cs.clearPillText}>{t('accomClear', lang)}</Text>
           </TouchableOpacity>
         )}
-      </ScrollView>
+      </PillRow>
       )}
 
       {/* Emlak / Yurtlar list and the Oteller tab are HIDDEN, never unmounted, when you
           switch away, so each keeps its scroll position. */}
       <View style={[cs.pane, isHotel && cs.hidden]}>
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
+        REDESIGN
+          ? <View style={cs.listContent}>{[0, 1, 2].map(i => <CardSkeleton key={i} height={280} style={{ marginBottom: 12 }} />)}</View>
+          : <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
+      ) : loadError ? (
+        <ErrorState lang={lang} onRetry={() => load(0)} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={items}
@@ -728,7 +758,10 @@ export default function AccommodationScreen({
             // not signed a dorm yet. It is also unreachable today (DORM_PARTNERS holds
             // one entry and the list is not a query), so this is what the list does at
             // N=0, not something a user can currently see.
-            isDorm ? null : (
+            isDorm ? null : REDESIGN ? (
+              <EmptyState icon="home-outline" category="homeLife"
+                title={t('accomNoResults', lang)} message={t('accomNoResultsSub', lang)} style={{ marginTop: 28 }} />
+            ) : (
               <View style={cs.emptyWrap}>
                 <View style={cs.emptyCard}>
                   <Ionicons name="home-outline" size={44} color={colors.border} style={{ marginBottom: 10 }} />
@@ -741,6 +774,8 @@ export default function AccommodationScreen({
           ListFooterComponent={
             loadingMore
               ? <ActivityIndicator style={{ marginVertical: 20 }} color={colors.primary} />
+              : moreError
+                ? <ErrorState lang={lang} compact onRetry={() => load(page)} style={{ marginVertical: 16 }} />
               : items.length > 0
                 ? <>
                     {/* list_bottom. LOW-VALUE INVENTORY BY CONSTRUCTION: this list
@@ -820,14 +855,18 @@ export default function AccommodationScreen({
           correct by construction rather than by winning a registration race. */}
       {selectedDorm && (
         <View style={cs.detailOverlay}>
-          <DormPartnerScreen partner={selectedDorm} lang={lang} region={null}
-            onBack={onCloseDorm} onAdNavigate={onAdNavigate} />
+          <OffPhoto>
+            <DormPartnerScreen partner={selectedDorm} lang={lang} region={null}
+              onBack={onCloseDorm} onAdNavigate={onAdNavigate} />
+          </OffPhoto>
         </View>
       )}
 
       {selectedProperty && (
         <View style={cs.detailOverlay}>
-          <PropertyDetailScreen property={selectedProperty} lang={lang} onBack={onCloseProperty} onAdNavigate={onAdNavigate} />
+          <OffPhoto>
+            <PropertyDetailScreen property={selectedProperty} lang={lang} onBack={onCloseProperty} onAdNavigate={onAdNavigate} />
+          </OffPhoto>
         </View>
       )}
 
@@ -847,10 +886,34 @@ export default function AccommodationScreen({
         </KeyboardAwareForm>
       </Modal>
     </SafeAreaView>
+    </Root>
   )
 }
 
-const cs = StyleSheet.create({
+// Redesign: Konaklama's photo full-screen behind the module (option B, ModuleScreen).
+function Root({ children }) {
+  if (REDESIGN) return <ModuleScreen topic="accommodation">{children}</ModuleScreen>
+  return <View style={{ flex: 1 }}>{children}</View>
+}
+
+// The detail overlays are opaque full screens of their own, not content on the photo: they
+// leave the on-photo context so their kit headers and cards keep their normal colours.
+function OffPhoto({ children }) {
+  return <OnPhotoContext.Provider value={false}>{children}</OnPhotoContext.Provider>
+}
+
+// The existing pill row, or the redesign's FilterBar (same children, same flexShrink: 0).
+function PillRow({ children }) {
+  if (REDESIGN) return <FilterBar>{children}</FilterBar>
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+      style={cs.pillBar} contentContainerStyle={cs.pillBarContent}>
+      {children}
+    </ScrollView>
+  )
+}
+
+const legacyCs = StyleSheet.create({
   safe:                { flex: 1, backgroundColor: colors.bg },
   // elevation as well as zIndex: on Android a card's own elevation (shadow, 3) can draw ABOVE
   // a sibling that has only zIndex — Events carries elevation for this reason (slice 3).
@@ -947,3 +1010,44 @@ const cs = StyleSheet.create({
   applyBtn:            { backgroundColor: colors.primary, borderRadius: 14, padding: 14, alignItems: 'center' },
   applyBtnText:        { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
 })
+
+// REDESIGN: the same layout on the new tokens — on the module photo (ModuleScreen), Inter roles, 44pt targets.
+// The photo pager, the price/intent overlays and the dorm card's content are unchanged: the
+// property card stays photo-led (a 64pt ListCard thumb would hide what the listing is), and
+// the dorm card is a partner surface (logo strip, order, accent dot untouched).
+const redesignCs = StyleSheet.create({
+  safe:                { flex: 1, backgroundColor: 'transparent' },
+  detailOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: colors.canvas, zIndex: 20, elevation: 20 },
+  intentTab:           { minHeight: TAP, justifyContent: 'center', paddingHorizontal: 16, borderRadius: radii.pill,
+                         backgroundColor: colors.card, borderWidth: 1, borderColor: colors.fieldBorder },
+  intentTabActive:     { backgroundColor: colors.primary, borderColor: colors.primary },
+  intentTabText:       { ...type.small, fontFamily: 'Inter_500Medium', color: colors.textPrimary },
+  intentTabTextActive: { fontFamily: 'Inter_700Bold', color: colors.onPrimary },
+  tabBar:              { flexDirection: 'row', flexGrow: 0, flexShrink: 0, marginHorizontal: 16, marginBottom: 10,
+                         padding: 3, borderRadius: radii.tile, backgroundColor: colors.card, ...elevation.card },
+  tabSeg:              { flex: 1, minHeight: TAP - 4, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: radii.md },
+  tabSegText:          { ...type.body, fontFamily: 'Inter_500Medium', color: colors.textSecondary },
+  clearPill:           { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, minHeight: 36,
+                         borderRadius: radii.pill, backgroundColor: colors.dangerLight },
+  clearPillText:       { ...type.small, fontFamily: 'Inter_700Bold', color: colors.dangerInk },
+  listContent:         { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 24 },
+  card:                { backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20, marginBottom: 12, overflow: 'hidden', ...elevation.card },
+  dormName:            { ...type.sheetTitle, color: colors.textPrimary },
+  dormMetaText:        { flex: 1, ...type.small, color: colors.textSecondary },
+  cardBody:            { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 6 },
+  title:               { ...type.rowTitle, color: colors.textPrimary },
+  placeText:           { flex: 1, ...type.meta, color: colors.textSecondary },
+  propType:            { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.primaryDark, textTransform: 'uppercase', letterSpacing: 0.3 },
+  specChip:            { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.xs, backgroundColor: colors.soft },
+  specText:            { ...type.meta, color: colors.textSecondary },
+  agencyName:          { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.primaryDark, maxWidth: '45%' },
+  imagePlaceholder:    { width: CARD_W, height: CARD_IMAGE_H, backgroundColor: category.homeLife.bg, alignItems: 'center', justifyContent: 'center' },
+  sheet:               { backgroundColor: colors.card, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet, padding: 20, paddingBottom: 40 },
+  sheetTitle:          { ...type.sheetTitle, color: colors.textPrimary, marginBottom: 14 },
+  currencyChip:        { flex: 1, minHeight: TAP, justifyContent: 'center', borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: colors.card, alignItems: 'center' },
+  currencyChipActive:  { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  currencyChipTextActive: { color: colors.primaryDark },
+  input:               { borderWidth: 1, borderColor: colors.fieldBorder, borderRadius: radii.md, minHeight: 48, paddingHorizontal: 12, ...type.body, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.card },
+  applyBtn:            { backgroundColor: colors.primary, borderRadius: radii.md, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
+})
+const cs = REDESIGN ? { ...legacyCs, ...redesignCs } : legacyCs

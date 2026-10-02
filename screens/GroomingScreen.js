@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
-  View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -15,6 +15,13 @@ import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { areaOptions } from '../constants/areas'
 import FilterDropdown from '../components/FilterDropdown'
 import GroomingOnboardingScreen from './GroomingOnboardingScreen'
+import { REDESIGN } from '../constants/redesign'
+import { colors as C, category as CAT, type, radii, elevation, press } from '../constants/theme'
+import {
+  ScreenHeader as UiHeader, FilterBar, Dropdown, InfoBanner, ListCard, ErrorState, EmptyState, CardSkeleton,
+  ModuleScreen,
+  RemoteImage,
+} from '../components/ui'
 
 const CATEGORIES = [
   { key: 'barber',      labelKey: 'groomCatBarber' },
@@ -33,12 +40,12 @@ function ProviderCard({ item, lang, onPress }) {
   return (
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
       {!!item.cover_image_url && (
-        <Image source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
+        <RemoteImage source={{ uri: item.cover_image_url }} style={s.cardCover} resizeMode="cover" />
       )}
       <View style={s.cardBody}>
         <View style={s.cardTop}>
           {!!item.logo_url && (
-            <Image source={{ uri: item.logo_url }} style={s.cardLogo} resizeMode="cover" />
+            <RemoteImage source={{ uri: item.logo_url }} style={s.cardLogo} resizeMode="cover" />
           )}
           <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
         </View>
@@ -70,6 +77,44 @@ function ProviderCard({ item, lang, onPress }) {
         </View>
       </View>
     </TouchableOpacity>
+  )
+}
+
+// Redesign CTA row (register / manage / price compare): same targets and copy as the legacy cards.
+function RCtaRow({ icon, title, sub, onPress }) {
+  return (
+    <TouchableOpacity style={r.cta} onPress={onPress} activeOpacity={press.card} accessibilityRole="button"
+      accessibilityLabel={`${title}, ${sub}`}>
+      <View style={r.ctaIcon}><Ionicons name={icon} size={24} color={CAT.homeLife.ink} /></View>
+      <View style={{ flex: 1 }}>
+        <Text style={r.ctaTitle}>{title}</Text>
+        <Text style={r.ctaSub}>{sub}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={C.textSecondary} />
+    </TouchableOpacity>
+  )
+}
+
+// Redesign card: the equal ListCard. Call + directions use the SAME URLs the facility profile
+// opens (tel:<phone>, maps.google.com/?q=<address>).
+function RProviderCard({ item, lang, onPress }) {
+  const types = Array.isArray(item.service_types) ? item.service_types : []
+  const thumb = item.logo_url || item.cover_image_url
+  return (
+    <ListCard
+      title={item.name}
+      subtitle={types.map(ty => categoryLabel(ty, lang)).join(' · ')}
+      leading={thumb ? { uri: thumb } : { icon: 'cut-outline', category: 'homeLife' }}
+      meta={[{ icon: 'location-outline', text: item.address }]}
+      onPress={onPress}
+      lang={lang}
+      actions={[
+        item.phone ? { kind: 'call', onPress: () => Linking.openURL(`tel:${item.phone}`) } : null,
+        item.address ? { kind: 'directions', onPress: () => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(item.address)}`) } : null,
+      ]}
+    >
+      {!!item.description && <Text style={r.desc} numberOfLines={2}>{item.description}</Text>}
+    </ListCard>
   )
 }
 
@@ -143,6 +188,64 @@ export default function GroomingScreen({ lang, session, onBack, onRequireAccount
         onClose={() => setShowOnboarding(false)}
         onSubmitted={() => { setShowOnboarding(false); load(); checkMyFacility() }}
       />
+    )
+  }
+
+  if (REDESIGN) {
+    return (
+      <ModuleScreen topic="grooming">
+      <SafeAreaView style={r.safe} edges={['top']}>
+        <UiHeader onBack={onBack} title={t('groomTitle', lang)} lang={lang} />
+        <FilterBar>
+          <Dropdown
+            label={t('ddCategory', lang)}
+            options={CATEGORIES.map(c => ({ value: c.key, label: t(c.labelKey, lang) }))}
+            multi values={selected} onChange={setSelected} lang={lang}
+          />
+          <Dropdown
+            label={t('ddDistrict', lang)}
+            options={REGIONS.map(rg => ({ value: rg, label: t(REGION_LABEL_KEY[rg], lang) }))}
+            multi values={regions} onChange={arr => { setRegions(arr); setAreas([]) }} lang={lang}
+          />
+          {regions.length === 1 && (
+            <Dropdown
+              label={t('ddArea', lang)}
+              options={areaOptions(regions[0])}
+              multi values={areas} onChange={setAreas} lang={lang}
+            />
+          )}
+        </FilterBar>
+        {loading ? (
+          <View style={r.list}>
+            <CardSkeleton height={150} />
+            <CardSkeleton height={150} />
+          </View>
+        ) : error ? (
+          <ErrorState message={t('facilityLoadError', lang)} onRetry={load} lang={lang} />
+        ) : (
+          <FlatList
+            {...listMem}
+            data={providers}
+            keyExtractor={item => item.id}
+            contentContainerStyle={r.list}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={r.header}>
+                <InfoBanner icon="cut-outline" category="homeLife" title={t('groomIntroTitle', lang)} message={t('groomIntroSub', lang)} />
+                <RCtaRow
+                  icon={myFacility ? 'construct-outline' : 'add-circle-outline'}
+                  title={t(myFacility ? 'groomManageCta' : 'groomRegisterCTA', lang)}
+                  sub={t(myFacility ? 'groomManageCtaSub' : 'groomRegisterCTASub', lang)}
+                  onPress={() => { if (onRequireAccount?.('gateGrooming')) return; setShowOnboarding(true) }}
+                />
+              </View>
+            }
+            ListEmptyComponent={<EmptyState icon="cut-outline" category="homeLife" title={t('groomEmpty', lang)} message={t('groomEmptySub', lang)} />}
+            renderItem={({ item }) => <RProviderCard item={item} lang={lang} onPress={() => onOpenFacility(item)} />}
+          />
+        )}
+      </SafeAreaView>
+      </ModuleScreen>
     )
   }
 
@@ -285,4 +388,18 @@ const s = StyleSheet.create({
                     lineHeight: 19, marginBottom: 10 },
   cardCta:        { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cardCtaText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary },
+})
+
+// Redesign styles (REDESIGN only).
+const r = StyleSheet.create({
+  safe:     { flex: 1, backgroundColor: 'transparent' },
+  list:     { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40, gap: 12 },
+  desc:     { ...type.small, color: C.textSecondary, marginTop: 10 },
+  cta:      { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, backgroundColor: 'rgba(255,255,255,0.93)',
+              borderRadius: 20, padding: 14, ...elevation.card },
+  ctaIcon:  { width: 44, height: 44, borderRadius: radii.tile, backgroundColor: CAT.homeLife.bg,
+              alignItems: 'center', justifyContent: 'center' },
+  ctaTitle: { ...type.rowTitle, color: C.textPrimary },
+  ctaSub:   { ...type.small, color: C.textSecondary, marginTop: 2 },
+  header:   { gap: 12, marginBottom: 4 },
 })
