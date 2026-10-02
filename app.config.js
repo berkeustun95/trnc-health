@@ -30,7 +30,7 @@ export default {
   expo: {
     name: IS_PREVIEW ? 'ADA Preview' : 'ADA',
     slug: 'trnc-health',
-    version: '1.2.0',
+    version: '1.3.0',
     orientation: 'portrait',
     icon: IS_PREVIEW ? './assets/preview/icon.png' : './assets/icon.png',
     splash: {
@@ -47,12 +47,13 @@ export default {
       policy: 'appVersion',
     },
     userInterfaceStyle: 'light',
-    // Preview only, and it goes live WITH the redesign in a store release, never by OTA alone.
-    // false drops the grey scrim Android paints behind 3-button nav under edge-to-edge
+    // Live with the redesign from 1.3.0 (a store release, never by OTA alone — it is a native theme
+    // item). false drops the grey scrim Android paints behind 3-button nav under edge-to-edge
     // (expo-modules-core re-reads this theme item after RN forces it true). Only the redesign
     // is safe without it: its FloatingTabBar lays a canvas band behind the buttons, while the
-    // legacy screens would put dark nav icons straight over scrolling content.
-    ...(IS_PREVIEW ? { androidNavigationBar: { enforceContrast: false } } : {}),
+    // legacy screens would put dark nav icons straight over scrolling content — so a visual
+    // rollback (REDESIGN_LIVE off by OTA on 1.3.0) shows legacy screens without that scrim.
+    androidNavigationBar: { enforceContrast: false },
     ios: {
       supportsTablet: false,
       bundleIdentifier: APP_ID,
