@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
   FlatList, Dimensions, ScrollView, useWindowDimensions,
@@ -233,11 +233,11 @@ const R_NAV_H = 88   // the fixed bottom row: dots (7 + 14) + the 52pt buttons +
 // text column ran off the right edge while the mascot (PhotoFade, live) stayed centred.
 const R_SHORT_H = 720
 
-function RedesignSlide({ slide, lang, setLang, bottomInset }) {
-  const { width: W, height: H } = useWindowDimensions()
+function RedesignSlide({ slide, lang, setLang, bottomInset, pageW }) {
+  const { height: H } = useWindowDimensions()
   const welcome = slide.id === 'welcome'
   return (
-    <View style={{ width: W, height: '100%' }}>
+    <View style={{ width: pageW, height: '100%' }}>
       <PhotoFade photo={R_PHOTO[slide.id]} focus={R_FOCUS[slide.id]}
         mascot={welcome && H < R_SHORT_H ? null : R_SCENE[slide.id]}>
         <View style={[rs.content, { paddingBottom: bottomInset + R_NAV_H + 12 }]}>
@@ -530,22 +530,28 @@ const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS
 // Module scope (defined outside the screen, so it never remounts on a parent render).
 function OnboardingRedesign({ lang, setLang, index, setIndex, listRef, goTo, isLast, onComplete }) {
   const insets = useSafeAreaInsets()
-  const { width: W } = useWindowDimensions()
-  // Rotation / resize: keep the CURRENT slide in view at the new page width.
-  useEffect(() => { listRef.current?.scrollToOffset({ offset: index * W, animated: false }) }, [W])
+  const win = useWindowDimensions()
+  // The page width is the pager's MEASURED width, not a window reading. When it changes (rotation,
+  // split view, foldable) the list is REMOUNTED at the new width (key) and reopened at the current
+  // slide (initialScrollIndex): every slide is laid out again — a kept list showed slide 1 at the
+  // old landscape width after rotating back to portrait (iPad, 2026-10-02).
+  const [pageW, setPageW] = useState(win.width)
   return (
-    <View style={{ flex: 1, backgroundColor: '#083A39' }}>
+    <View style={{ flex: 1, backgroundColor: '#083A39' }}
+      onLayout={e => { const w = Math.round(e.nativeEvent.layout.width); if (w > 0 && w !== pageW) setPageW(w) }}>
       <StatusBar style="light" />
       <FlatList
+        key={pageW}
+        initialScrollIndex={index}
         ref={listRef}
         data={SLIDES}
         keyExtractor={item => item.id}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / W))}
-        getItemLayout={(_, i) => ({ length: W, offset: W * i, index: i })}
-        renderItem={({ item }) => <RedesignSlide slide={item} lang={lang} setLang={setLang} bottomInset={insets.bottom} />}
+        onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / pageW))}
+        getItemLayout={(_, i) => ({ length: pageW, offset: pageW * i, index: i })}
+        renderItem={({ item }) => <RedesignSlide slide={item} lang={lang} setLang={setLang} bottomInset={insets.bottom} pageW={pageW} />}
       />
       {/* "Atla" finishes onboarding with the language chosen so far — the same onComplete the
           last slide calls (writes @trnc_onboarded + @trnc_lang, then WelcomeScreen). */}
@@ -555,7 +561,7 @@ function OnboardingRedesign({ lang, setLang, index, setIndex, listRef, goTo, isL
           <Text style={rs.skipText}>{t('hrSkip', lang)}</Text>
         </TouchableOpacity>
       )}
-      <View style={[rs.nav, { paddingBottom: insets.bottom + 12, paddingHorizontal: Math.max(24, (W - CONTENT_MAX_W) / 2) }]} pointerEvents="box-none">
+      <View style={[rs.nav, { paddingBottom: insets.bottom + 12, paddingHorizontal: Math.max(24, (pageW - CONTENT_MAX_W) / 2) }]} pointerEvents="box-none">
         <View style={rs.dots}>
           {SLIDES.map((_, i) => <View key={i} style={[rs.dot, i === index && rs.dotOn]} />)}
         </View>
