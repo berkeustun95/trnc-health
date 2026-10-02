@@ -45,6 +45,7 @@ import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance, legKey } from '../constants/walkingRoutes'
 import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useLocationGranted, useHeading, fitRoute } from '../components/WalkingRoutes'
 import OsmAttribution from '../components/OsmAttribution'
+import { CHIP_CAP, CHIP_CAP_NARROW } from '../components/home/redesign/RedesignHero'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const TYPE_ION = { pharmacy: 'medkit-outline', clinic: 'medical-outline', hospital: 'business-outline', dentist: 'medical-outline' }
@@ -317,6 +318,10 @@ export default function ExploreMapScreen({
   initialRoutesMode = false,   // Home's "Yürüyüş Rotaları" tile (redesign) opens straight into routes
 }) {
   const { width, height } = useWindowDimensions()
+  // Harita / Liste / Check-in'ler: the chip-row cap (large system text grows the labels at most
+  // 1.2×, not at all below 350dp). Measured 2026-10-02 at 320dp, 1.0×: tr 277, ru 274, ar 275
+  // (Noto Naskh Arabic UI Bold, HarfBuzz-shaped) of 320; uncapped 1.3× left tr/ru 3–6dp spare.
+  const segCap = width < 350 ? CHIP_CAP_NARROW : CHIP_CAP
   const mapRef = useRef(null)
   // Consumed once per mount. Pending ids resolve in effects below, once routes/pins exist.
   const [snap] = useState(() => { const v = returnSnapshot; returnSnapshot = null; return v })
@@ -651,7 +656,7 @@ export default function ExploreMapScreen({
           <View style={[s.segment, REDESIGN && r.segment]}>
             <View style={[s.segItem, s.segItemActive, REDESIGN && r.segItem]}>
               <Ionicons name="map" size={15} color="#fff" />
-              <Text style={[s.segText, s.segTextActive]}>{t('exploreViewMap', lang)}</Text>
+              <Text style={[s.segText, s.segTextActive]} maxFontSizeMultiplier={segCap}>{t('exploreViewMap', lang)}</Text>
             </View>
             <TouchableOpacity
               style={[s.segItem, REDESIGN && r.segItem]}
@@ -661,7 +666,7 @@ export default function ExploreMapScreen({
               accessibilityLabel={t('exploreViewList', lang)}
             >
               <Ionicons name="list" size={15} color={colors.textPrimary} />
-              <Text style={s.segText}>{t('exploreViewList', lang)}</Text>
+              <Text style={s.segText} maxFontSizeMultiplier={segCap}>{t('exploreViewList', lang)}</Text>
             </TouchableOpacity>
             {!!onShowCheckins && (
               <TouchableOpacity
@@ -672,7 +677,7 @@ export default function ExploreMapScreen({
                 accessibilityLabel={t('checkinFeedTitle', lang)}
               >
                 <Ionicons name="location" size={15} color={colors.textPrimary} />
-                <Text style={s.segText}>{t('checkinTab', lang)}</Text>
+                <Text style={s.segText} maxFontSizeMultiplier={segCap}>{t('checkinTab', lang)}</Text>
               </TouchableOpacity>
             )}
           </View>
