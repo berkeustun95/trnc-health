@@ -258,6 +258,34 @@ function readStudentHubFlag(raw) {
   return m[1] === 'true'
 }
 
+// ─── CHECK-INS TRIPWIRE (20261069) ──────────────────────────────────────────
+// The opposite question to the one above: not "is a retracted claim gone" but "is the new
+// disclosure THERE". Flipping MODULE_FLAGS.checkins against copy that does not describe
+// check-ins would publish a feature the policy says nothing about, to a 13+ audience. The
+// markers are the facts a reader most needs, one per copy language; the wording itself is
+// Berke's (docs/checkins-privacy). Silent while the flag is off.
+const CHECKINS_MARKERS = {
+  en: [/within 150 metres of the place/, /Hide my check-ins/, /no page that lists one person's check-ins/],
+  tr: [/150 metre yakınında/, /Check-in'lerimi gizle/, /check-in'lerini listeleyen bir sayfa yoktur/],
+}
+function readModuleFlag(name, raw) {
+  const src = raw ?? readFileSync(join(ROOT, 'constants/flags.js'), 'utf8')
+  const m = src.match(new RegExp(`\\b${name}\\s*:\\s*(true|false)`))
+  if (!m) throw new Error(`could not read MODULE_FLAGS.${name} from constants/flags.js`)
+  return m[1] === 'true'
+}
+function checkCheckinsDisclosure(problems, log, flagOn, texts) {
+  log(`\n  check-ins tripwire (MODULE_FLAGS.checkins = ${flagOn})`)
+  if (!flagOn) { log('    · silent until the flag flips; then all four copies must describe check-ins'); return }
+  for (const c of GOLIVE_COPIES) {
+    const missing = CHECKINS_MARKERS[c.lang].filter(re => !re.test(texts[c.path])).map(String)
+    if (missing.length) {
+      problems.push(`check-ins are LIVE but ${c.label} does not describe them (missing ${missing.join(', ')}) — merge docs/checkins-privacy before publishing.`)
+      log(`    ✗ ${c.label.padEnd(34)} missing ${missing.join(', ')}`)
+    } else log(`    ✓ ${c.label.padEnd(34)} describes check-ins`)
+  }
+}
+
 function checkGoLive(problems, log, flagOn, texts) {
   log(`\n  go-live tripwire (MODULE_FLAGS.${GOLIVE_FLAG} = ${flagOn})`)
   for (const st of GOLIVE_STALE) {
@@ -340,6 +368,7 @@ function check(copies, columns, log = console.log, world = null) {
   const texts  = world ? world.texts  : loadGoLiveTexts()
   checkEncoding(problems, log)
   checkGoLive(problems, log, flagOn, texts)
+  checkCheckinsDisclosure(problems, log, world ? !!world.checkinsOn : readModuleFlag('checkins'), texts)
 
   // ── 1. same "Last updated" ──
   log('  dates')
@@ -394,7 +423,7 @@ function self() {
   // has flipped the module on locally to preview it — which is step 4 of the go-live SOP,
   // i.e. a normal and correct working state. The tripwire's own paths are driven by
   // flipping flagOn to true as a MUTATION in the two cases below, so nothing goes unchecked.
-  const realWorld = { flagOn: false, texts: loadGoLiveTexts() }
+  const realWorld = { flagOn: false, checkinsOn: false, texts: loadGoLiveTexts() }
   if (check(copies, columns, quiet, realWorld).length) {
     console.error('  --self cannot run: the real files are already failing.')
     return 1
@@ -449,6 +478,22 @@ function self() {
       },
       ([,,w]) => !/never visible to other customers/i.test(w.texts['web/privacy.html'])
              && /diğer müşterilere hiçbir zaman görünmez/i.test(w.texts['constants/legal/privacy.tr.js'])],
+    // ── Check-ins tripwire: the flag on, against copy WITHOUT the disclosure (injected by
+    //    stripping the English marker, so the case stays reachable after the policy lands).
+    ['check-ins go live without the disclosure',
+      () => {
+        const texts = { ...realWorld.texts }
+        texts['web/privacy.html'] = texts['web/privacy.html'].replace(/within 150 metres of the place/g, 'nearby')
+        return [copies, columns, { ...realWorld, checkinsOn: true, texts }]
+      },
+      ([,,w]) => w.checkinsOn === true && !/within 150 metres of the place/.test(w.texts['web/privacy.html'])],
+    ['check-ins live, Turkish copy missing the switch',
+      () => {
+        const texts = { ...realWorld.texts }
+        texts['constants/legal/privacy.tr.js'] = texts['constants/legal/privacy.tr.js'].replace(/Check-in'lerimi gizle/g, 'ayar')
+        return [copies, columns, { ...realWorld, checkinsOn: true, texts }]
+      },
+      ([,,w]) => w.checkinsOn === true && !/Check-in'lerimi gizle/.test(w.texts['constants/legal/privacy.tr.js'])],
   ]
   let bad = 0
   for (const [name, build, landed] of cases) {
