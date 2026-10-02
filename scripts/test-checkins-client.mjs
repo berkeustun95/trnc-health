@@ -82,7 +82,7 @@ ok('precheck 200 m -> TOO_FAR', C.precheck(place, { ...at, latitude: 35.0018 }) 
 ok('precheck acc 60 -> LOW_ACCURACY', C.precheck(place, { ...at, accuracy: 60 }) === 'LOW_ACCURACY')
 ok('client 150 m agrees with server: 145 m passes precheck', C.precheck(place, { ...at, latitude: 35.0013 }) === null)
 
-let p = await C.loadCheckinPrefs(A, U(1)); ok('prefs before notice', p && p.checkins_notice_at === null && p.checkins_public === null, p)
+let p = await C.loadCheckinPrefs(A, U(1)); ok('prefs before notice', p.ok && p.prefs.checkins_notice_at === null && p.prefs.checkins_public === null, p)
 let x = await C.checkIn(A, P(1), at); ok('checkIn before notice -> NOTICE_REQUIRED', !x.ok && x.code === 'NOTICE_REQUIRED', x)
 x = await C.acceptNotice(A); ok('adult notice -> public', x.ok && x.isPublic === true, x)
 x = await C.checkIn(A, P(1), at); ok('adult check-in', x.ok && !x.already && x.id, x)
@@ -120,4 +120,18 @@ ok('ago 3 h', JSON.stringify(C.agoParts('2026-10-02T09:00:00Z', now)) === '{"key
 ok('ago 2 d', JSON.stringify(C.agoParts('2026-09-30T12:00:00Z', now)) === '{"key":"checkinAgoDay","n":2}')
 ok('ago 9 d -> date', C.agoParts('2026-09-23T12:00:00Z', now).key === 'date')
 ok('missing fn -> UNKNOWN', C.checkinErrorCode({ message: 'Could not find the function public.check_in' }) === 'UNKNOWN')
+// "Check your connection" only for a request that never reached a server (postgrest-js: status 0).
+// The two clients below return exactly what postgrest-js 2.x returns in each case.
+const offline = { rpc: async () => ({ data: null, error: { message: 'TypeError: Network request failed', details: '', hint: '', code: '' }, status: 0 }),
+  from: () => ({ select() { return this }, eq() { return this }, maybeSingle: async () => ({ data: null, error: { message: 'TypeError: Network request failed', code: '' }, status: 0 }) }) }
+const server404 = { rpc: async () => ({ data: null, error: { message: 'Could not find the function public.check_in(p_accuracy, p_lat, p_lng, p_place_id) in the schema cache', code: 'PGRST202' }, status: 404 }) }
+const server500 = { rpc: async () => ({ data: null, error: { message: 'internal error', code: 'XX000' }, status: 500 }) }
+x = await C.checkIn(offline, P(1), at); ok('offline check-in -> NETWORK', x.code === 'NETWORK', x)
+x = await C.loadFeed(offline, {}); ok('offline feed -> NETWORK', x.code === 'NETWORK', x)
+x = await C.acceptNotice(offline); ok('offline notice -> NETWORK', x.code === 'NETWORK', x)
+x = await C.loadCheckinPrefs(offline, U(1)); ok('offline prefs -> NETWORK', !x.ok && x.code === 'NETWORK', x)
+x = await C.checkIn(server404, P(1), at); ok('missing RPC (404) -> UNKNOWN, not NETWORK', x.code === 'UNKNOWN', x)
+x = await C.loadFeed(server404, {}); ok('missing RPC feed (404) -> UNKNOWN', x.code === 'UNKNOWN', x)
+x = await C.checkIn(server500, P(1), at); ok('server 500 -> UNKNOWN, not NETWORK', x.code === 'UNKNOWN', x)
+ok('a refusal wins even at status 400', C.checkinErrorCode({ message: 'TOO_FAR' }, 400) === 'TOO_FAR')
 console.log(`${pass} pass, ${fail} fail`); process.exit(fail ? 1 : 0)

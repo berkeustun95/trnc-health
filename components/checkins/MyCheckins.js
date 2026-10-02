@@ -31,7 +31,7 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
     let gone = false
     Promise.all([loadCheckinPrefs(supabase, uid), loadMine(supabase, uid)]).then(([p, m]) => {
       if (gone) return
-      if (p) setHidden(p.checkins_public !== true)
+      if (p.ok) setHidden(p.prefs.checkins_public !== true)
       setRows(m)
     })
     return () => { gone = true }

@@ -44,6 +44,7 @@ function Outcome({ code, already, metres, lang }) {
   else if (code === 'DAILY_LIMIT') msg = t('checkinDailyLimit', lang)
   else if (code === 'BANNED' || code === 'NOT_ELIGIBLE') msg = t('checkinNotAllowed', lang)
   else if (code === 'PLACE_NOT_FOUND') msg = t('checkinPlaceGone', lang)
+  else if (code === 'NETWORK') msg = t('checkinOffline', lang)
   else msg = t('checkinFailed', lang)
   return <Text style={s.err}>{msg}</Text>
 }
@@ -59,16 +60,16 @@ export function CheckinNoticeSheet({ visible, uid, currentName, lang, onClose, o
   async function confirm() {
     setBusy(true); setError(null)
     if (needsName) {
-      const { error: err } = await supabase.from('profiles').update({ display_name: name.trim() }).eq('id', uid)
+      const { error: err, status } = await supabase.from('profiles').update({ display_name: name.trim() }).eq('id', uid)
       if (err) {
         const nameErr = await displayNameSaveError(err, name.trim())
-        if (nameErr) setNameState(nameErr); else setError(t('checkinFailed', lang))
+        if (nameErr) setNameState(nameErr); else setError(status === 0 ? t('checkinOffline', lang) : t('checkinFailed', lang))
         setBusy(false); return
       }
     }
     const res = await acceptNotice(supabase)
     setBusy(false)
-    if (!res.ok) { setError(t('checkinFailed', lang)); return }
+    if (!res.ok) { setError(res.code === 'NETWORK' ? t('checkinOffline', lang) : t('checkinFailed', lang)); return }
     onAccepted(res.isPublic)
   }
 
@@ -125,8 +126,8 @@ export default function CheckinAction({ place, session, lang, onRequireAccount, 
   async function press() {
     if (onRequireAccount?.('checkinGuestGate')) return
     setPhase('working'); setOutcome(null)
-    const prefs = await loadCheckinPrefs(supabase, uid)
-    if (!prefs) { setPhase('idle'); setOutcome({ code: 'UNKNOWN' }); return }
+    const { prefs, code } = await loadCheckinPrefs(supabase, uid)
+    if (!prefs) { setPhase('idle'); setOutcome({ code }); return }
     if (!prefs.display_name || !prefs.checkins_notice_at) { setPhase('idle'); setNotice(prefs); return }
     run()
   }
