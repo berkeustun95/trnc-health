@@ -30,7 +30,7 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  ACCOM_TABS, ACCOM_SEGMENTS, ACCOM_LANDING, ACCOM_LANDING_TAB, accomTabs, accomLandingTab,
+  ACCOM_TABS, ACCOM_SEGMENTS, ACCOM_LANDING, accomTabs, accomLandingTab,
   DORM_PARTNERS, PENDING_KEYS, GALLERY_ORDER, SECTION_ORDER, COLLAPSIBLE,
   dormDeal, dormSections, dormWaCode, dormWaMessage, dormWebsiteUrl,
 } from '../constants/dorms.js'
@@ -81,13 +81,13 @@ const darkIds = accomTabs({ dorm: false }).map(s => s.id)
 const liveIds = accomTabs({ dorm: true }).map(s => s.id)
 check(!darkIds.includes('dorm'), `dark tabs contain 'dorm': ${darkIds.join(',')}`)
 check(liveIds.includes('dorm'),  `live tabs are missing 'dorm': ${liveIds.join(',')}`)
-check(liveIds[0] === 'property' && liveIds[1] === 'dorm', `tabs are not Emlak | Yurtlar when live: ${liveIds.join(',')}`)
+check(liveIds.join(',') === 'dorm,property', `tabs are not Yurtlar | Emlak when live: ${liveIds.join(',')}`)
 check(liveIds.length === darkIds.length + 1, `live tabs should be exactly one longer than dark (${liveIds.length} vs ${darkIds.length})`)
 
 // Oteller (HOTELS_LIVE) never appears on the dorm flag alone, and all three read in order.
 const allIds = accomTabs({ dorm: true, hotel: true }).map(s => s.id)
 check(!liveIds.includes('hotel'), `'hotel' shows without its own flag: ${liveIds.join(',')}`)
-check(allIds.join(',') === 'property,dorm,hotel', `all-live tabs are not Emlak | Yurtlar | Oteller: ${allIds.join(',')}`)
+check(allIds.join(',') === 'hotel,dorm,property', `all-live tabs are not Oteller | Yurtlar | Emlak: ${allIds.join(',')}`)
 
 // Yurtlar is a TAB now, never an intent chip: 'dorm' reaching the chip row would send
 // .eq('intent', 'dorm') to a CHECK constraint that has never heard of it.
@@ -95,7 +95,9 @@ check(!ACCOM_SEGMENTS.some(s => s.id === 'dorm'), `'dorm' is back in the Emlak c
 check(ACCOM_SEGMENTS.some(s => s.id === ACCOM_LANDING), `ACCOM_LANDING '${ACCOM_LANDING}' is not an Emlak chip`)
 
 // The module must never open on a tab it is not showing.
-check(accomLandingTab({ dorm: true }) === ACCOM_LANDING_TAB, `accomLandingTab(live) is ${accomLandingTab({ dorm: true })}, expected the declared ${ACCOM_LANDING_TAB}`)
+// Opens on the first visible tab: Oteller with hotels, else Yurtlar (Berke 2026-09-29).
+check(accomLandingTab({ dorm: true }) === 'dorm', `accomLandingTab(dorm live) is ${accomLandingTab({ dorm: true })}, expected dorm`)
+check(accomLandingTab({ dorm: true, hotel: true }) === 'hotel', `accomLandingTab(all live) is ${accomLandingTab({ dorm: true, hotel: true })}, expected hotel`)
 check(darkIds.includes(accomLandingTab({ dorm: false })),
   `accomLandingTab(dark) returned '${accomLandingTab({ dorm: false })}', which is NOT a visible tab [${darkIds.join(',')}]`)
 

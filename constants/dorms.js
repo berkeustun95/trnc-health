@@ -28,8 +28,8 @@
 
 // ─── THE TOP TABS AND THE EMLAK CHIP ROW, AS DATA ────────────────────────────
 //
-// Emlak & Konaklama opens with top tabs — Emlak | Yurtlar | Oteller (hotels plan,
-// 2026-09-29) — and Emlak keeps its own intent chip row beneath them. Yurtlar
+// The module opens with top tabs — Oteller | Yurtlar | Emlak (Berke 2026-09-29, after the
+// device test; was Emlak | Yurtlar | Oteller) — and Emlak keeps its own intent chip row. Yurtlar
 // was a fifth chip in that row until 2026-09-29; it is a TAB now, because it is not a
 // filter on `properties` at all (no query, no filters, no sort).
 //
@@ -39,20 +39,18 @@
 // was promised survives the restructure. The dot is absolutely positioned in
 // AccommodationScreen so it never changes the tab's size.
 export const ACCOM_TABS = [
-  { id: 'property' },
-  { id: 'dorm', promoted: true, gated: true },
   { id: 'hotel', gated: true },
+  { id: 'dorm', promoted: true, gated: true },
+  { id: 'property' },
 ]
 
 export const accomTabs = live => ACCOM_TABS.filter(tab => !tab.gated || live[tab.id] === true)
 
-// The tab the module OPENS on: Emlak (decision 2026-09-29). Derived, never read straight
-// off the constant — if the landing tab is ever gated and dark, fall back to the first
-// VISIBLE tab rather than open on one the user can neither see nor leave.
-export const ACCOM_LANDING_TAB = 'property'
+// The module OPENS on its first visible tab (Berke 2026-09-29): Oteller when HOTELS_LIVE,
+// else Yurtlar, else Emlak. Derived from the visible list, so it can never be a tab the user
+// can neither see nor leave.
 export function accomLandingTab(live) {
-  const visible = accomTabs(live)
-  return visible.some(tab => tab.id === ACCOM_LANDING_TAB) ? ACCOM_LANDING_TAB : visible[0].id
+  return accomTabs(live)[0].id
 }
 
 // Emlak's intent chips. 'all' is a pseudo-intent (it omits the .eq() filter) and stays

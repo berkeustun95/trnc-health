@@ -25,3 +25,11 @@ export const HOTEL_CLASS_LABEL_KEY = {
 
 // Star count for the card's star row; 0 for the non-star types.
 export const HOTEL_CLASS_STARS = { star5: 5, star4: 4, star3: 3, star2: 2, star1: 1 }
+
+// The hotel card's action row, shared by HotelsTab and scripts/check-tile-labels.mjs so the
+// guard measures the box the card actually draws. Three equal buttons, icon ABOVE the label
+// (side by side, "Web sitesi" was cut to "Web sit…" on every card — 2026-09-29 device test).
+export const HOTEL_ACTIONS = {
+  listPadX: 16, cardPadX: 16, gap: 8, buttonPadX: 4, border: 1.5, fontSize: 12,
+  labelKeys: ['hotelCall', 'hotelWebsite', 'hotelMap'],
+}
