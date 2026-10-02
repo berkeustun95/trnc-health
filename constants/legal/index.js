@@ -52,7 +52,12 @@ import TERMS_TR   from './terms.tr.js'
 // check, route + date on the account, badges to other listed students with a switch, off
 // for those listed before badges), anonymous route completions reported to the Ministry of
 // Tourism as monthly totals (< 5 suppressed). Terms unchanged; the pair moves together.
-export const LEGAL_VERSION = '2026-09-27'
+// Bumped 2026-09-27 -> 2026-10-02 for check-ins (DRAFT on docs/checkins-privacy, published at
+// the check-ins go-live, step 4 — re-date this, the four privacy copies and both terms
+// lines to the publish day then): what a check-in saves (no coordinates), who sees it
+// (feeds only, signed-in users, blocks respected), under-18s hidden by default, the hide
+// switch, deletion, the one-off position check. Terms unchanged; the pair moves together.
+export const LEGAL_VERSION = '2026-10-02'
 
 // Locales with a translated body. NOT a hand-kept list — derived from what is actually
 // imported, so adding a body is one import and one map entry and this follows.

@@ -12,8 +12,8 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 48b24ec812a75ae301b657e5571e0d724d9834b67e96d02b4a970e22b2b3d646
-export default `Sürüm: 2026-09-27
-Son güncelleme: 27 Eylül 2026
+export default `Sürüm: 2026-10-02
+Son güncelleme: 2 Ekim 2026
 
 KİM OLDUĞUMUZ
 
@@ -35,7 +35,7 @@ Profil verileri. Her alan, ne için toplandığıyla birlikte aşağıda listele
 
 • Ad ve soyad — gerçek adınız. Hesabınızda saklanır; kimlerin görebileceği için 3. bölüme bakınız.
 • Görünen ad (uygulamada “Kullanıcı adı” olarak geçer) — 3 ile 20 karakter arasında, kendi seçtiğiniz bir ad. Gerçek adınız olmak zorunda değildir. Yazdığınız değerlendirmelerin, soruların ve cevapların yanında gösterilen ad budur ve diğer kullanıcıların gördüğü tek addır.
-• Doğum tarihi — 13 yaşında veya daha büyük olduğunuzu doğrulamak için. Girdiğiniz anda kontrol edilir ve bu bilgi olmadan hesap tamamlanamaz. Ayrıca 18 yaşından küçük olup olmadığınızı belirlemek için kullanılır; bu da size gösterilen reklamları etkiler (5. bölüme bakınız).
+• Doğum tarihi — 13 yaşında veya daha büyük olduğunuzu doğrulamak için. Girdiğiniz anda kontrol edilir ve bu bilgi olmadan hesap tamamlanamaz. Ayrıca 18 yaşından küçük olup olmadığınızı belirlemek için kullanılır; bu da size gösterilen reklamları (5. bölüme bakınız) ve check-in'lerinizin diğer kullanıcılardan başlangıçta gizli olup olmayacağını (3. bölüme bakınız) etkiler.
 • Uyruk — hangi ikamet, izin ve evrak bilgilerinin sizin için geçerli olduğunu ve öncelikle hangi dilleri sunmamız gerektiğini belirleyebilmek için. Henüz kullanılmıyor — uygulamada bu veriyi okuyan hiçbir bölüm yok.
 • Telefon numarası — isteğe bağlıdır. Verirseniz, hesabınızla ilgili konularda sizinle iletişime geçebilmemiz için hesabınızda saklanır. Diğer kullanıcılara gösterilmez ve hizmet sağlayıcılara verilmez. Telefon numarası vermeden ADA'yı eksiksiz kullanabilirsiniz.
 • KKTC içindeki bölgeniz — listelerin, nöbetçi eczane çizelgelerinin ve arama sonuçlarının yalnızca telefonunuzun o anda bulunduğu yere göre değil, yaşadığınız yere göre sıralanabilmesi için. Bugün Ana Sayfa'nın üstündeki bölge adını ve fotoğrafını seçer; uygulamada bu veriyi okuyan başka bir bölüm henüz yok.
@@ -56,7 +56,7 @@ Moderasyon verileri: bildirdiğiniz içerikler ve engellediğiniz kullanıcılar
 
 Reddedilen gönderimler: gönderdiğiniz bir metin içerik filtremiz tarafından reddedilirse, bu kaydı hesabınıza bağlı olarak 30 gün süreyle saklarız. 7. bölümde ayrıntılı olarak açıklanmıştır.
 
-Onay kayıtları: Kullanım Koşulları'nın ve Gizlilik Politikası'nın hangi sürümünü, hangi dilde ve ne zaman kabul ettiğiniz. Pazarlama iletilerine onay verirseniz, onayı verdiğiniz tarihi ve daha sonra geri alırsanız geri aldığınız tarihi kaydederiz.
+Onay kayıtları: Kullanım Koşulları'nın ve Gizlilik Politikası'nın hangi sürümünü, hangi dilde ve ne zaman kabul ettiğiniz. Pazarlama iletilerine onay verirseniz, onayı verdiğiniz tarihi ve daha sonra geri alırsanız geri aldığınız tarihi kaydederiz. Check-in kullanırsanız, check-in bildiriminin size ne zaman ve hangi sürümüyle gösterildiğini kaydederiz.
 
 Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bunu istediğiniz zaman cihaz ayarlarınızdan kapatabilirsiniz. Uygulama konum olmadan da çalışır. Konumunuzu satmıyoruz ve reklam için kullanmıyoruz.
 • Telefonunuzda — ADA konumunuzu, listeleri uzaklığa göre sıralamak, haritada nerede olduğunuzu göstermek, Ana Sayfa'da şehrinizi seçmek ve bir yürüyüş rotasını takip etmek için kullanır. Bu işlemler telefonunuzda gerçekleşir ve konumunuz bunlar için bize gönderilmez.
@@ -65,6 +65,7 @@ Konum: ADA cihazınızın konumunu yalnızca siz izin verirseniz kullanır ve bu
 • Yürüyüş rotaları — konumunuz açıkken bir yürüyüş rotasını takip ettiğinizde konumunuz ve sıradaki durak sunucumuza gönderilir; sunucumuz yürüyüş yolunu openrouteservice'ten (Heidelberg, Almanya'daki HeiGIT tarafından işletilir) ister. HeiGIT yalnızca sunucumuzu görür, telefonunuzu asla görmez ve istek koordinatlarını kayıtlarında yaklaşık 1 km'ye yuvarlanmış olarak tutar. Konumunuzu saklamayız.
 • Rota rozetleri — bir yürüyüş rotasını takip ederken telefonunuz her durağa yaklaşık 50 metre yaklaşıp yaklaşmadığınızı kontrol eder. Bu kontrol telefonunuzda yapılır: konumunuz bunun için bize gönderilmez ve saklanmaz. Bir rotanın duraklarının çoğuna ulaştığınızda, hesabınızda o rotayı tamamladığınızı ve tarihini saklarız — konumunuzu ya da hangi duraklara uğradığınızı asla saklamayız. ADA'yı misafir olarak kullanıyorsanız bu bilgi yalnızca telefonunuzda, 7 gün boyunca, giriş yapıp rozeti saklayabilmeniz için tutulur. Rozetleriniz hesabınızla birlikte silinir.
 • Rota tamamlamaları — bir yürüyüş rotası tamamlandığında, tamamlandığını ve rotanın bölgesini de kaydederiz; buna hiçbir hesap, cihaz veya konum eklenmez. Bunları KKTC Turizm Bakanlığı ile yalnızca rota başına aylık toplamlar olarak paylaşırız ve kişileri değil tamamlamaları sayarız; bir ayda 5'ten az tamamlanan bir rota "5'ten az" olarak bildirilir.
+• Check-in'ler — bir mekanda “Buradayım”a dokunduğunuzda, telefonunuzun konumu ve bu konumun ne kadar hassas olduğu, yalnızca mekanın 150 metre yakınında olup olmadığınızı kontrol etmek için bir kez sunucumuza gönderilir. Bunları saklamayız. Yeterince yakınsanız, check-in yaptığınızı, hangi mekanda yaptığınızı ve tarih ile saatini, o anki görünen adınızla birlikte kaydederiz — konumunuzu asla kaydetmeyiz. Çok uzaktaysanız ya da konumunuz yeterince hassas değilse hiçbir şey kaydedilmez.
 • İletişim dokunuşları — listelenen bir işletme veya iş ortağı için arama, WhatsApp, web sitesi ya da yol tarifi düğmesine dokunduğunuzda, dokunuşun gerçekleştiğini, hangi işletme için olduğunu ve ilgili olduğu KKTC'nin yedi geniş bölgesinden birini (örneğin Girne veya Lefke) kaydederiz: konumunuzun sizi yerleştirdiği bölge ya da uygulamada seçtiğiniz bölge. Bununla birlikte hesabınızı, cihazınızı veya tam konumunuzu asla kaydetmeyiz; bu nedenle size geri izlenemez. Bu sayıları, işletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini bildirmek için kullanırız.
 • Gönderdiğiniz yerler — bir yer gönderip işaretçisi için mevcut konumunuzu kullanırsanız, bu konum yerin konumu olarak kaydedilir ve yer onaylandıktan sonra herkese açık olarak gösterilir.
 
@@ -85,6 +86,8 @@ Kullanım verileri: analitik SDK'ları veya üçüncü taraf takip araçları ku
 • İşletmelerin iletişim düğmelerine yapılan dokunuşları bölgeyle birlikte saymak — İşletmelere ADA üzerinden kaç kişinin kendileriyle iletişime geçtiğini gösterebilmek için. Hukuki dayanak: Hizmeti yürütme ve finanse etmeye ilişkin meşru menfaatimiz
 • Tamamladığınız yürüyüş rotalarını kaydetmek ve rota rozetlerinizi göstermek — Kullandığınız özelliği sunabilmek için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
 • Tamamlanan yürüyüş rotalarının aylık toplamlarını Turizm Bakanlığı'na bildirmek — Bakanlıkla birlikte yürüttüğümüz yürüyüş rotaları programını desteklemek için. Hukuki dayanak: Hizmeti yürütmeye ilişkin meşru menfaatimiz
+• Bir mekanda check-in yaptığınızda orada olduğunuzu kontrol etmek ve check-in'lerinizi giriş yapmış diğer kullanıcılara göstermek — Kullandığınız özelliği sunmak için. Hukuki dayanak: Sizinle yapılan sözleşmenin ifası
+• 18 yaşından küçüklerin check-in'lerini, göstermeyi seçmedikleri sürece gizli tutmak — Küçükleri korumak için. Hukuki dayanak: Güvenli bir hizmete ilişkin meşru menfaatimiz
 
 Kişisel verilerinizi satmayız, kiralamayız ve üçüncü tarafların kendi pazarlama faaliyetleri için paylaşmayız.
 
@@ -96,6 +99,7 @@ Diğer kullanıcıların görebildikleri:
 
 • Yazdığınız değerlendirmelerin, soruların ve cevapların yanında görünen adınız.
 • Yazdığınız değerlendirmelerin, soruların ve cevapların içeriği ile verdiğiniz puanlar.
+• Görünür oldukları sürece check-in'leriniz: görünen adınız, profil fotoğrafınız, mekan ve ne kadar önce check-in yaptığınız. Bunlar mekanın son check-in'ler listesinde ve Keşfet → Check-in'ler'de, yalnızca giriş yapmış kullanıcılara görünür — misafirlere asla. Bir kişinin check-in'lerini listeleyen bir sayfa yoktur. 18 yaşında veya daha büyükseniz, profilinizdeki “Check-in'lerimi gizle” ayarını açmadığınız sürece check-in'leriniz görünür; 18 yaşından küçükseniz ya da doğum tarihinizi bilmiyorsak, bu ayarı kapatmadığınız sürece gizlidir. Bu, ilk check-in'inizde bir kez belirlenir ve 18 yaşına girdiğinizde kendiliğinden değişmez. Ayarı açmak check-in'lerinizi iki listeden de hemen kaldırır. Engellediğiniz kullanıcılar ve sizi engelleyen kullanıcılar check-in'lerinizi görmez. Check-in'lerinizden herhangi birini istediğiniz zaman profilinizden silebilirsiniz.
 
 Diğer kullanıcıların göremedikleri: adınız ve soyadınız, doğum tarihiniz, uyruğunuz, telefon numaranız, bölgeniz, ikamet durumunuz ve e-posta adresiniz.
 
@@ -136,7 +140,7 @@ Onay verirseniz:
 
 7. VERİLERİN SAKLANMASI VE SAKLAMA SÜRELERİ
 
-Tüm veriler Supabase üzerinde, bir AB bölgesinde saklanır. Satır Düzeyi Güvenlik (RLS) politikaları yalnızca kendi kayıtlarınıza erişebilmenizi sağlar. Verileriniz, üniversitenizin öğrenci listesinde görünmeyi seçmediğiniz sürece diğer kullanıcılara görünmez. Bu ayarı açarsanız, listede yer alan diğer kullanıcılar görünen adınızı, profil fotoğrafınızı, üniversitelerinizi, öğrenim düzeyinizi, bölümünüzü ve öğrenim yıllarınızı görebilir ve size mesaj isteği gönderebilir. Rota rozeti ayarınız açıkken (ayar açık başlar; rozetler kullanıma girdiğinde zaten bir öğrenci listesinde olanlar için kapalı başlar), hangi yürüyüş rotalarını tamamladığınızı da görebilirler, ancak tarihlerini asla göremezler. Ayarı istediğiniz zaman kapatabilirsiniz.
+Tüm veriler Supabase üzerinde, bir AB bölgesinde saklanır. Satır Düzeyi Güvenlik (RLS) politikaları yalnızca kendi kayıtlarınıza erişebilmenizi sağlar. Diğer kullanıcılar yalnızca 3. bölümde sayılanları görebilir. Ayrıca üniversitenizin öğrenci listesinde görünmeyi seçerseniz, listede yer alan diğer kullanıcılar görünen adınızı, profil fotoğrafınızı, üniversitelerinizi, öğrenim düzeyinizi, bölümünüzü ve öğrenim yıllarınızı görebilir ve size mesaj isteği gönderebilir. Rota rozeti ayarınız açıkken (ayar açık başlar; rozetler kullanıma girdiğinde zaten bir öğrenci listesinde olanlar için kapalı başlar), hangi yürüyüş rotalarını tamamladığınızı da görebilirler, ancak tarihlerini asla göremezler. Ayarı istediğiniz zaman kapatabilirsiniz.
 
 KKTC'den faaliyet gösterdiğimiz için yöneticilerimiz verilerinize AB/AEA dışından erişmektedir. Bu erişime, verilerin saklandığı ortama uyguladığımız korumaların aynısını uygularız.
 
@@ -147,6 +151,7 @@ Farklı veriler farklı sürelerle saklanır.
 • Sildiğiniz içerikler — 30 gün: sildiğiniz değerlendirmeler, sorular ve mesajlar hemen gizlenir ve 30 gün sonra kalıcı olarak kaldırılır. Hâlâ açık bir şikâyetin parçasıysa, şikâyet sonuçlandığında kaldırılır. Bir soruyu silmek, ona verilen yanıtları da kaldırır.
 • Kaldırdığımız içerikler: topluluk kurallarımızı ihlal ettiği için kaldırılan içerikler, aynı hesabın tekrarlayan ihlallerini tespit edebilmemiz için dâhilî olarak saklanır. Diğer kullanıcılara artık görünmez.
 • Rota rozetleri: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Misafir kullanıcının rozeti yalnızca telefonda, 7 gün boyunca tutulur.
+• Check-in'ler: hesabınız etkin olduğu sürece saklanır ve hesabınızla birlikte silinir. Sildiğiniz bir check-in hemen kaldırılır.
 • Onay kayıtları: hesabınızı elinizde tuttuğunuz sürece ve sonrasında makul bir süre boyunca saklanır; çünkü bu kayıtlar neyi kabul ettiğinizin kanıtıdır.
 
 8. YAŞ VE ÇOCUKLAR
@@ -156,6 +161,8 @@ ADA 13 yaş ve üzeri kişiler içindir ve 13 yaşın altındaki çocuklara yön
 Profilinizi oluştururken doğum tarihinizi isteriz. Girdiğiniz tarih 13 yaşın altında olduğunuzu gösteriyorsa o tarihi saklamayız. Yalnızca hesabın uygun olmadığını kaydederiz ve hesap kullanılamaz.
 
 13–17 yaş aralığındaki kişilere ait hesaplar için 5. bölümdeki reklam sınırlaması geçerlidir.
+
+13–17 yaş aralığındaki kişilerin check-in'leri, göstermeyi seçmedikleri sürece diğer kullanıcılardan gizlidir (3. bölüme bakınız).
 
 13 yaşın altındaki bir çocuğun bize kişisel veri verdiğini düşünüyorsanız lütfen bizimle iletişime geçin; veriyi derhâl sileriz.
 
