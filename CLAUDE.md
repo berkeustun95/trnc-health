@@ -270,6 +270,10 @@ Policy draft on `docs/checkins-privacy`; store-form answers in vault `2026-09-24
 4. **Publish policy + store forms, flip `MODULE_FLAGS.checkins`** (both files, one commit). Re-date the
    draft first (four copies, both terms lines, `LEGAL_VERSION`). `privacy:check` refuses the flip
    without the disclosure in all four copies.
+   **Before the flip:** give Berke a click-by-click list for Play Console (Data safety) and App Store
+   Connect (App Privacy): confirm Name, Photos and user-generated content are already declared, add
+   Precise Location on Apple (linked, no tracking, App Functionality). He enters it and confirms; no
+   flip before his confirmation.
 5. **`notify_module_waitlist('checkins')`** with before/after counts (SOP step 10) → `WAITLIST_BLAST_DONE`.
 Feeds only: no per-person check-in history anywhere (decided 2026-10-02).
 
