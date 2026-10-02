@@ -106,11 +106,14 @@ goes red when raised; that is the review moment. Pass criteria: vault "Store-upd
 - **Ask for ONE item per message** (an ID, a query result, a decision) and wait.
 - **Push the working branch after EVERY slice**, feature branches too ("push to git" still = main).
 - **Device tests never run from `~/trnc-health`** (shared with other sessions; Metro bundles its
-  folder's working tree). **The redesign (`feat/redesign`) is served from `~/trnc-health-redesign`:
-  Berke starts it himself with `npx expo start --lan --go`** — don't start one. Other branches:
-  `git -C ~/trnc-health-swipe checkout <branch>`, then `NODE_PATH=~/.npm-global/lib/node_modules
-  npx expo start -c --tunnel` there; URL from `curl 127.0.0.1:4040/api/tunnels`. iOS uses TestFlight
-  "My Expo Go" (SDK 54), not App Store Expo Go.
+  folder's working tree). **The redesign (`feat/redesign`) is served from `~/trnc-health-redesign`,
+  started by Berke** (don't start one): `EXPO_NO_REDIRECT_PAGE=1 npx expo start --lan --go`. Without
+  the env var the QR is an http `/_expo/loading` chooser (expo-dev-client is installed), which the
+  iOS camera opens in Safari. Other branches: `git -C ~/trnc-health-swipe checkout <branch>`, then
+  `EXPO_NO_REDIRECT_PAGE=1 NODE_PATH=~/.npm-global/lib/node_modules npx expo start -c --tunnel` there.
+- **iOS devices use TestFlight "My Expo Go (11d951)" (SDK 54).** Delete the App Store Expo Go from the
+  device (both claim `exp://`; iOS may pick the wrong one), allow Local Network on first open, then
+  scan the terminal QR with the Camera → "Open in My Expo Go". Never hardcode the Mac's IP (DHCP).
 
 ## Security (non-negotiable)
 Why: profiles, reviews and messages are personal data on a declared 13+ mixed-audience app, and a
