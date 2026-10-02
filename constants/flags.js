@@ -198,7 +198,7 @@ export const HOME_V2_LIVE = true   // live 2026-09-08
 //
 // Like HOME_V2_LIVE it REPLACES surfaces every user already has, so it is a scalar in
 // scripts/check-module-flags.mjs's EXPECTED_SCALARS, not a MODULE_FLAGS key.
-export const REDESIGN_LIVE = false
+export const REDESIGN_LIVE = true   // live from 1.3.0 (release/redesign-1, 2026-10-02); runtime 1.2.0 never receives it
 
 // Banner advertising (ad_banners). false = no banner slot renders anywhere, whatever is in
 // the table — AdSlot returns null before it even reads. true = a sold, active, in-window ad
