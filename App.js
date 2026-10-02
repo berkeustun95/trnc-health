@@ -25,6 +25,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 import { supabase, isGuest } from './lib/supabase'
+import { fetchNotifications } from './utils/notificationRoute'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
@@ -1246,8 +1247,7 @@ export default function App() {
         }
       })
     setNotifsLoading(true)
-    supabase.from('notifications').select('id, title, body, read, created_at')
-      .eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
+    fetchNotifications(supabase, session.user.id)
       .then(({ data }) => { if (data) setNotifications(data); setNotifsLoading(false) })
 
     // Owns a garage? Drives the dark-launched garages tile for owners onboarded

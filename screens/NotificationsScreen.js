@@ -10,6 +10,7 @@ import BackButton from '../components/BackButton'
 import { REDESIGN } from '../constants/redesign'
 import { ScreenHeader, Button, EmptyState, RowSkeleton } from '../components/ui'
 import { colors as C, type, radii, elevation, press } from '../constants/theme'
+import { notificationRoute } from '../utils/notificationRoute'
 
 function timeAgo(isoString) {
   const diff = Date.now() - new Date(isoString).getTime()
@@ -20,20 +21,9 @@ function timeAgo(isoString) {
   return `${Math.floor(hrs / 24)}d`
 }
 
-// ⚠ THE ROWS ARE NOT TAPPABLE, AND NOTHING HERE NAVIGATES ANYWHERE.
-//
-// Recorded 2026-09-19 because it is easy to assume otherwise: every row is rendered by a
-// plain View, and the only touchables on this screen are back, mark-all-read and clear-all.
-// `notifications` rows carry a title and a body and nothing to route on — no type, no
-// target id — so even a tap handler would have nowhere to send anybody.
-//
-// The PUSH path does route, as of 20261031: its payload carries
-// { screen: 'conversation', conversation_id } and App.js's two notification handlers act
-// on it. This in-app list is a separate path and did not gain that. So a message
-// notification is actionable from the lock screen and inert from inside the app, which is
-// a real inconsistency and not an oversight to be fixed casually — giving these rows a
-// destination means putting a target on the notifications table, which is a schema change
-// and a decision about every notification type, not just messages.
+// Rows route through utils/notificationRoute.js: `notifications.type` (20261066) when the
+// row has one, title keywords when it does not. Only duty rows have a destination today.
+// The PUSH path routes separately, on its payload's `screen` (App.js's two handlers).
 
 // Redesign: localised "time ago" (was hardcoded m / h / d in every language).
 function timeAgoLocal(isoString, lang) {
@@ -45,11 +35,6 @@ function timeAgoLocal(isoString, lang) {
   return t('hrAgoDay', lang).replace('{n}', String(Math.floor(hrs / 24)))
 }
 
-// Duty notices are still recognised by title keywords: notifications has no type column
-// (checked live, 2026-09-30 — every candidate name is 42703), and adding one is a migration,
-// which this branch may not make. Listed for Berke; shared by both layouts.
-const DUTY_KEYWORDS = ['duty', 'nöbetçi', 'مناوبة', 'дежурн', 'εφημερεύ', 'garde', 'guardia', 'notdienst', 'نوبتی']
-const isDutyNotice = item => DUTY_KEYWORDS.some(kw => (item.title ?? '').toLowerCase().includes(kw))
 
 // Notifications are not allowed: one quiet row, no nagging. The OS will still ask → "Bildirimleri
 // aç" (the explanation, then the OS pop-up); it will not → "Ayarları aç". Re-read on return.
@@ -100,7 +85,7 @@ function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAll
           showsVerticalScrollIndicator={false}
           contentContainerStyle={r.list}
           renderItem={({ item }) => {
-            const duty = isDutyNotice(item)
+            const duty = notificationRoute(item) === 'duty'
             return (
               <TouchableOpacity
                 style={[r.card, elevation.card]}
@@ -177,8 +162,7 @@ function NotificationsLegacy({ notifications, loading, lang, onBack, onMarkAllRe
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.list}
           renderItem={({ item }) => {
-            const title = item.title ?? ''
-            const isDuty = isDutyNotice(item)
+            const isDuty = notificationRoute(item) === 'duty'
             return (
               <TouchableOpacity
                 style={[s.card, !item.read && s.cardUnread]}
