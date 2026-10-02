@@ -93,6 +93,10 @@ BEGIN
          AND column_name IN ('latitude','longitude','status','hidden_at','name','name_i18n','category')) <> 7 THEN
     RAISE EXCEPTION 'REFUSING: places lacks one of latitude, longitude, status, hidden_at, name, name_i18n, category. Nothing applied.';
   END IF;
+  -- Remembered for 7(j): this file must add no profiles policy. The number itself belongs to
+  -- verify_schema's 0922 token, not to this file.
+  PERFORM set_config('app.m1069_profiles_policies',
+    (SELECT count(*)::text FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profiles'), true);
 END $$;
 
 -- ─── 1. Profile columns ─────────────────────────────────────────────────────
@@ -531,12 +535,10 @@ BEGIN
     RAISE EXCEPTION 'accept_checkin_notice with no caller did not raise AUTH_REQUIRED (got %)', coalesce(v_err, 'NO EXCEPTION');
   END IF;
 
-  -- (j) The derived profiles policy count (verify_schema 0922 token) is untouched: no new
-  --     profiles policy came with this file.
-  SELECT count(*) INTO v_n FROM pg_policies
-   WHERE schemaname = 'public' AND tablename = 'profiles' AND permissive = 'PERMISSIVE' AND cmd IN ('SELECT','ALL');
-  IF v_n IS DISTINCT FROM 3 THEN
-    RAISE EXCEPTION 'profiles now has % permissive SELECT/ALL policies — expected 3', v_n;
+  -- (j) No profiles policy came with this file: the count is what section 0 saw.
+  SELECT count(*) INTO v_n FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profiles';
+  IF v_n::text IS DISTINCT FROM current_setting('app.m1069_profiles_policies', true) THEN
+    RAISE EXCEPTION 'profiles policies went from % to % inside this file', current_setting('app.m1069_profiles_policies', true), v_n;
   END IF;
 END $$;
 
@@ -551,7 +553,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261069_checkins.sql', 'a665cfc046b085eb53ad6de1fea6ea62b196f324024b864bd9a20268da7d01cb')
+VALUES ('20261069_checkins.sql', 'fce48a55082b3302f046de0898b471a63f2d1b312eb3d4c7a3c3ed8511dba77f')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

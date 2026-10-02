@@ -184,7 +184,7 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261063_hotels_kitob_guide_content.sql', '9e18a23510aeadb0f397adff47c20d967641d7c1615f43ac7fb31ac93aa890ab'),
   ('20261064_hotels_gallery_and_description_cap.sql', '04a41fb55e84b5dfd17d9913544ddf38b549f9e9b0ea423548e584b81c3e453d'),
   ('20261065_hotels_commons_photo_credit.sql', '6c1f6e172fff3c22c683bc3c45bc0eb7ded17e4fd0cfa289398e89153f4a2a0d'),
-  ('20261069_checkins.sql', 'a665cfc046b085eb53ad6de1fea6ea62b196f324024b864bd9a20268da7d01cb')
+  ('20261069_checkins.sql', 'fce48a55082b3302f046de0898b471a63f2d1b312eb3d4c7a3c3ed8511dba77f')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.
