@@ -23,6 +23,9 @@ export const TOP_SCRIM = 0.35
 export const TOP_SCRIM_H = 110
 // Dark glass behind white text on the photo (language button, Atla): AA over a pure-white pixel.
 export const PHOTO_GLASS = 0.55
+// The text column on every photo-led screen (Welcome, onboarding, the permission screens): full width
+// on a phone, capped and centred on a tablet / foldable / landscape so lines stay readable.
+export const CONTENT_MAX_W = 560
 const FADE = require('../../assets/oli-scenes/teal-fade.png')
 const DARK = require('../../assets/oli-scenes/dark-fade.png')   // black 0.6 → 0; drawn at TOP_SCRIM/0.6 opacity
 const SRC_W = 704, SRC_H = 1520   // the module photos (assets/backgrounds)

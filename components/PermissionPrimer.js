@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import PhotoFade from './ui/PhotoFade'
+import PhotoFade, { CONTENT_MAX_W } from './ui/PhotoFade'
 import Button from './ui/Button'
 import { t } from '../constants/i18n'
 import { addBackListener } from '../utils/backHandler'
@@ -62,7 +62,7 @@ export default function PermissionPrimer({ lang }) {
 
 const s = StyleSheet.create({
   root:    { ...StyleSheet.absoluteFillObject, zIndex: 10000, elevation: 10000 },
-  content: { paddingHorizontal: 24, paddingTop: 4 },
+  content: { paddingHorizontal: 24, paddingTop: 4, width: '100%', maxWidth: CONTENT_MAX_W, alignSelf: 'center' },
   title:   { fontSize: 26, lineHeight: 32, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 8, textAlign: 'center' },
   body:    { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', color: '#FFFFFF', textAlign: 'center' },
   go:      { marginTop: 24 },

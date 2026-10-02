@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
-  FlatList, Dimensions, ScrollView,
+  FlatList, Dimensions, ScrollView, useWindowDimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -9,7 +9,7 @@ import { colors, shadow, type, radii } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import PhotoFade, { PHOTO_GLASS } from '../components/ui/PhotoFade'
+import PhotoFade, { PHOTO_GLASS, CONTENT_MAX_W } from '../components/ui/PhotoFade'
 import { Button } from '../components/ui'
 import { t, LANGUAGES } from '../constants/i18n'
 
@@ -228,14 +228,18 @@ const R_SCENE = {
 const R_NAV_H = 88   // the fixed bottom row: dots (7 + 14) + the 52pt buttons + its 15pt gap, reserved on every slide
 // Slide 1 also carries the 9-language picker (~560pt in all); below 720pt of screen its scene is
 // left out so the block never reaches the skip button.
-const R_SHORT = height < 720
+// The redesign reads the LIVE window (useWindowDimensions), never the module-load `width`: on an
+// iPad / foldable / after rotation that stale width made each slide wider than the screen, so the
+// text column ran off the right edge while the mascot (PhotoFade, live) stayed centred.
+const R_SHORT_H = 720
 
 function RedesignSlide({ slide, lang, setLang, bottomInset }) {
+  const { width: W, height: H } = useWindowDimensions()
   const welcome = slide.id === 'welcome'
   return (
-    <View style={{ width, height: '100%' }}>
+    <View style={{ width: W, height: '100%' }}>
       <PhotoFade photo={R_PHOTO[slide.id]} focus={R_FOCUS[slide.id]}
-        mascot={welcome && R_SHORT ? null : R_SCENE[slide.id]}>
+        mascot={welcome && H < R_SHORT_H ? null : R_SCENE[slide.id]}>
         <View style={[rs.content, { paddingBottom: bottomInset + R_NAV_H + 12 }]}>
           <Text style={rs.title} accessibilityRole="header">
             {t(welcome ? 'onboardingWelcomeTitle' : slide.titleKey, lang)}
@@ -526,6 +530,9 @@ const s = REDESIGN ? { ...legacyS, ...redesignS } : legacyS
 // Module scope (defined outside the screen, so it never remounts on a parent render).
 function OnboardingRedesign({ lang, setLang, index, setIndex, listRef, goTo, isLast, onComplete }) {
   const insets = useSafeAreaInsets()
+  const { width: W } = useWindowDimensions()
+  // Rotation / resize: keep the CURRENT slide in view at the new page width.
+  useEffect(() => { listRef.current?.scrollToOffset({ offset: index * W, animated: false }) }, [W])
   return (
     <View style={{ flex: 1, backgroundColor: '#083A39' }}>
       <StatusBar style="light" />
@@ -536,7 +543,8 @@ function OnboardingRedesign({ lang, setLang, index, setIndex, listRef, goTo, isL
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
+        onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / W))}
+        getItemLayout={(_, i) => ({ length: W, offset: W * i, index: i })}
         renderItem={({ item }) => <RedesignSlide slide={item} lang={lang} setLang={setLang} bottomInset={insets.bottom} />}
       />
       {/* "Atla" finishes onboarding with the language chosen so far — the same onComplete the
@@ -547,7 +555,7 @@ function OnboardingRedesign({ lang, setLang, index, setIndex, listRef, goTo, isL
           <Text style={rs.skipText}>{t('hrSkip', lang)}</Text>
         </TouchableOpacity>
       )}
-      <View style={[rs.nav, { paddingBottom: insets.bottom + 12 }]} pointerEvents="box-none">
+      <View style={[rs.nav, { paddingBottom: insets.bottom + 12, paddingHorizontal: Math.max(24, (W - CONTENT_MAX_W) / 2) }]} pointerEvents="box-none">
         <View style={rs.dots}>
           {SLIDES.map((_, i) => <View key={i} style={[rs.dot, i === index && rs.dotOn]} />)}
         </View>
@@ -568,7 +576,7 @@ function OnboardingRedesign({ lang, setLang, index, setIndex, listRef, goTo, isL
 }
 
 const rs = StyleSheet.create({
-  content:      { paddingHorizontal: 24, paddingTop: 4 },
+  content:      { paddingHorizontal: 24, paddingTop: 4, width: '100%', maxWidth: CONTENT_MAX_W, alignSelf: 'center' },
   title:        { fontSize: 26, lineHeight: 32, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 8, textAlign: 'center' },
   body:         { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', color: '#FFFFFF', textAlign: 'center' },
   note:         { ...type.small, color: '#FFFFFF', marginTop: 10, textAlign: 'center' },

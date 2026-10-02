@@ -1,15 +1,29 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native'
+import { useState, useEffect, useRef } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { addBackListener } from '../utils/backHandler'
 import { colors } from '../constants/theme'
 import { t } from '../constants/i18n'
 
-const { width: SW, height: SH } = Dimensions.get('window')
 const PAD = 10
+const GAP = 14          // target ↔ tooltip
+const EDGE = 20         // tooltip ↔ screen edge (inside the safe area); 20 = the phone layout as before
+const TIP_MAX_W = 420   // a phone-width card, centred on the target on tablets
+const LAYOUT_WAIT_MS = 1500
+
+// Placement uses the LIVE window (useWindowDimensions), never a size read at module load: on an
+// iPad / foldable / after rotation that stale size put the tooltip off-screen while the dimmed
+// overlay swallowed every touch — the tour froze (2026-10-02). The tooltip is clamped inside the
+// safe area, and a step that cannot be placed (target missing or off-screen, or the tooltip never
+// lays out) is SKIPPED rather than left hanging.
 
 export default function TutorialCoachMarks({ steps, visible, onFinish, onNext, lang }) {
   const [step, setStep]       = useState(0)
   const [blocked, setBlocked] = useState(false)
+  const [tipH, setTipH]       = useState(0)
+  const { width: SW, height: SH } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+  const laidOut = useRef(false)
 
   useEffect(() => {
     if (visible) setStep(0)
@@ -21,18 +35,44 @@ export default function TutorialCoachMarks({ steps, visible, onFinish, onNext, l
     return () => sub.remove()
   }, [visible])
 
-  if (!visible || !steps.length) return null
-  if (step >= steps.length) return null
+  const cur = visible ? steps[step] : null
+  const placeable = !!cur && [cur.x, cur.y, cur.w, cur.h].every(Number.isFinite) && cur.w > 0 && cur.h > 0 &&
+    cur.x < SW && cur.y < SH && cur.x + cur.w > 0 && cur.y + cur.h > 0
 
-  const cur = steps[step]
+  // Fail-safes: skip a step whose target is unplaceable, or whose tooltip never lays out.
+  useEffect(() => {
+    if (!visible || !cur) return
+    laidOut.current = false
+    setTipH(0)
+    if (!placeable) { skipStep(); return }
+    const timer = setTimeout(() => { if (!laidOut.current) skipStep() }, LAYOUT_WAIT_MS)
+    return () => clearTimeout(timer)
+  }, [visible, step, placeable])
+
+  function skipStep() {
+    if (step < steps.length - 1) setStep(s => s + 1)
+    else onFinish()
+  }
+
+  if (!visible || !steps.length) return null
+  if (step >= steps.length || !placeable) return null
+
   const { x, y, w, h, title, body } = cur
 
   const hx = Math.max(0, x - PAD)
   const hy = Math.max(0, y - PAD)
   const hw = Math.min(w + PAD * 2, SW - hx)
-  const hh = h + PAD * 2
+  const hh = Math.min(h + PAD * 2, SH - hy)
 
-  const isTopHalf = y < SH * 0.55
+  // Width: phone-card wide, centred on the target, clamped to the screen.
+  const tipW = Math.min(SW - EDGE * 2, TIP_MAX_W)
+  const tipLeft = Math.min(Math.max(EDGE, x + w / 2 - tipW / 2), SW - EDGE - tipW)
+  // Height: below the target if it fits, else above, else clamped inside the safe area
+  // (it may then overlap the highlight — visible and tappable beats hidden).
+  const minTop = insets.top + EDGE
+  const maxTop = SH - insets.bottom - EDGE - tipH
+  const below = hy + hh + GAP, above = hy - GAP - tipH
+  const tipTop = below <= maxTop ? below : above >= minTop ? above : Math.max(minTop, Math.min(below, maxTop))
 
   async function advance() {
     if (blocked) return
@@ -59,11 +99,8 @@ export default function TutorialCoachMarks({ steps, visible, onFinish, onNext, l
 
       {/* Tooltip bubble */}
       <View
-        style={[
-          s.tooltip,
-          { left: 20, right: 20 },
-          isTopHalf ? { top: hy + hh + 14 } : { bottom: SH - hy + 14 },
-        ]}
+        style={[s.tooltip, { left: tipLeft, width: tipW, top: tipTop }, !tipH && { opacity: 0 }]}
+        onLayout={e => { laidOut.current = true; setTipH(Math.ceil(e.nativeEvent.layout.height)) }}
       >
         <Text style={s.title}>{title}</Text>
         <Text style={s.body}>{body}</Text>

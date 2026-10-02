@@ -7,7 +7,7 @@ import { colors, type, radii } from '../constants/theme'
 import { t, LANG_CODES, LANGUAGES } from '../constants/i18n'
 import { REDESIGN } from '../constants/redesign'
 import { Button, InlineAlert } from '../components/ui'
-import PhotoFade, { PHOTO_GLASS } from '../components/ui/PhotoFade'
+import PhotoFade, { PHOTO_GLASS, CONTENT_MAX_W } from '../components/ui/PhotoFade'
 import { bandCap } from '../components/ui/OliBand'
 import { useWindowDimensions } from 'react-native'
 import { LanguageSheet } from '../components/shell/Sheets'
@@ -208,7 +208,7 @@ const r = StyleSheet.create({
                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   langPillText:{ ...type.meta, fontFamily: 'Inter_700Bold', color: '#fff', letterSpacing: 0.5 },
   logo:        { width: 120, height: 147, marginTop: 24 },
-  content:     { paddingHorizontal: 24, paddingTop: 4, paddingBottom: 12, gap: 12 },
+  content:     { paddingHorizontal: 24, paddingTop: 4, paddingBottom: 12, gap: 12, width: '100%', maxWidth: CONTENT_MAX_W, alignSelf: 'center' },
   headline:    { fontSize: WELCOME_HEAD_PX, lineHeight: 32, fontFamily: 'Inter_700Bold', color: '#FFFFFF',
                  textAlign: 'center', marginBottom: 4 },
 })
