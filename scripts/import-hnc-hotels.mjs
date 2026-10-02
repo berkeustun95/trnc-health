@@ -36,11 +36,15 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
 const DRY = args.includes('--dry-run'), APPLY = args.includes('--apply')
 if (DRY === APPLY) { console.error('Pass exactly one of --dry-run or --apply.'); process.exit(1) }
+// Production is written only from GitHub Actions (main, 2026-10-01). This importer has no workflow:
+// its content already landed (20261063–20261065), so --apply outside CI is refused here.
+prodWriteGuard({ wouldWrite: APPLY, workflow: null, dryHint: 'node scripts/import-hnc-hotels.mjs --dry-run' })
 const UA = 'ADA-app hotel import (KITOB-approved; contact berkeustun95 via getadaapp.com)'
 const DIR = resolve(ROOT, 'data/hnc/gallery')
 const MAX = 6
@@ -168,7 +172,7 @@ if (DRY) { console.log('DRY RUN — nothing uploaded or written.'); process.exit
 
 const env = Object.fromEntries(readFileSync(resolve(ROOT, '.env'), 'utf8').split('\n').map(l => l.match(/^\s*([\w.-]+)\s*=\s*(.*)$/)).filter(Boolean).map(m => [m[1], m[2].trim().replace(/^["']|["']$/g, '')]))
 const { createClient } = await import('@supabase/supabase-js')
-const sb = createClient(env.EXPO_PUBLIC_SUPABASE_URL, execFileSync('security', ['find-generic-password', '-s', 'ada-supabase-service-role', '-w'], { encoding: 'utf8' }).trim(), { auth: { persistSession: false } })
+const sb = createClient(env.EXPO_PUBLIC_SUPABASE_URL, serviceRoleKey(), { auth: { persistSession: false } })
 const { data: rows, error, count } = await sb.from('hotels').select('id, external_id, photo_source', { count: 'exact' })
 if (error) throw error
 if (rows.length !== count) throw new Error(`read ${rows.length} of ${count}`)
