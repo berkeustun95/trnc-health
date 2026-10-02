@@ -371,48 +371,33 @@ const CHECKS = [
     return null
   }],
 
-  ['the Home mount is in the hub body, not the search branch', ({ files, ads }) => {
-    // renderHubV2 CONTAINS the search branch — an early `if (searchOpen) return (…
-    // {renderSearchResults()} …)` sits inside it — so "inside renderHubV2" alone stayed
-    // GREEN on a mount moved onto the global search results, which are excluded. Found by
-    // --self, not by review. The rule is: inside renderHubV2, OUTSIDE the searchOpen early
-    // return, and after <ModuleGrid>, which appears only in the hub's own body.
+  ['the Home mount is in the redesign hub, after the service tiles', ({ files, ads }) => {
+    // Moved at go-live (1.3.0, REDESIGN_LIVE): the host is renderHubRedesign, and the footer slot
+    // sits after <ServicePanels> — the redesign's "all services" grid, the equivalent of the old
+    // hub's <ModuleGrid>. The old rule also kept the mount out of renderHubV2's searchOpen branch
+    // (the GLOBAL SEARCH RESULTS, permanently excluded). The redesign hub has no such branch — its
+    // search is OliSearchSheet, a separate component — so this rule REQUIRES that absence: if a
+    // search-results branch ever appears in renderHubRedesign, it goes red and the exclusion must
+    // be reinstated, rather than this check quietly measuring nothing.
     const p = ads.AD_PLACEMENTS.find(x => x.module === 'home')
     if (!p) return null
-    // hosts[0] is safe: this placement carries a span, and the vocabulary check refuses a
-    // span with anything other than exactly one host.
     const pHost = (p.hosts || [])[0]
     const clean = stripComments(files[pHost] || '')
     if (!clean) return `${pHost} is missing`
     const span = functionSpan(clean, p.span)
-    if (!span) return `renderHubV2() not found in ${pHost} — this check is measuring nothing`
+    if (!span) return `${p.span}() not found in ${pHost} — this check is measuring nothing`
     const [start, end] = span
     const body = clean.slice(start, end)
-    if (!body.includes('<ModuleGrid')) {
-      return `the renderHubV2 span (${start}..${end}) does not contain <ModuleGrid>. A slice without the hub's own grid is not the hub.`
-    }
-    const soRel = body.search(/if\s*\(\s*searchOpen\s*\)\s*\{/)
-    if (soRel < 0) {
-      return `the searchOpen early return was not found inside renderHubV2. It is what puts the global search results in this file; without locating it this check cannot tell the hub from an excluded surface.`
-    }
-    let depth = 0, soEnd = -1
-    for (let i = body.indexOf('{', soRel); i >= 0 && i < body.length; i++) {
-      if (body[i] === '{') depth++
-      else if (body[i] === '}') { depth--; if (depth === 0) { soEnd = i; break } }
-    }
-    if (soEnd < 0) return 'could not brace-match the searchOpen block'
-    if (!body.slice(soRel, soEnd).includes('renderSearchResults')) {
-      return 'the block matched as the searchOpen early return does not call renderSearchResults — wrong block, so the exclusion below measures the wrong region.'
+    const grid = body.indexOf('<ServicePanels')
+    if (grid < 0) return `the ${p.span} span (${start}..${end}) does not contain <ServicePanels>. A slice without the hub's own grid is not the hub.`
+    if (/renderSearchResults|searchOpen/.test(body)) {
+      return `${p.span}() now contains a search branch (renderSearchResults / searchOpen). The global search results are excluded from ads — reinstate that exclusion here before mounting near it.`
     }
     const n = wrapperName(p.file)
     const m = new RegExp(`<\\s*${n}\\b`).exec(body)
-    if (!m) return `<${n}> not found inside renderHubV2`
-    if (m.index >= soRel && m.index <= soEnd) {
-      return `<${n}> is inside the searchOpen early return (span-relative ${m.index}, block ${soRel}..${soEnd}).\n`
-        + `      That branch renders the GLOBAL SEARCH RESULTS, which is on the permanent exclusion list.`
-    }
-    if (m.index < body.indexOf('<ModuleGrid')) {
-      return `<${n}> is before <ModuleGrid>. list_bottom on home is the FOOTER slot; a mount above the grid is not the placement that was reviewed.`
+    if (!m) return `<${n}> not found inside ${p.span}`
+    if (m.index < grid) {
+      return `<${n}> is before <ServicePanels>. list_bottom on home is the FOOTER slot; a mount above the grid is not the placement that was reviewed.`
     }
     return null
   }],
@@ -637,13 +622,14 @@ const CASES = [
       .replace('          ListEmptyComponent={', '          ListEmptyComponent={/* moved */ null && <EventsDetailBottomSlot />}\n          ListEmptyComponentUnused={')
     return [i, s => s.files[f] !== base.files[f] && s.files[f].includes('ListEmptyComponentUnused')]
   }],
-  ['the Home mount is in the hub body, not the search branch', () => {
+  ['the Home mount is in the redesign hub, after the service tiles', () => {
+    // Move the footer slot ABOVE the service tiles, inside the same function.
     const i = clone()
     const f = 'screens/HomeScreen.js'
     i.files[f] = base.files[f]
       .replace('            <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />\n', '')
-      .replace('            {renderSearchResults()}', '            {renderSearchResults()}\n            <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />')
-    return [i, s => s.files[f].includes('{renderSearchResults()}\n            <HomeListBottomSlot')]
+      .replace('            <ServicePanels lang={lang} onPress={openModule} />', '            <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />\n            <ServicePanels lang={lang} onPress={openModule} />')
+    return [i, s => s.files[f].includes('<HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />\n            <ServicePanels')]
   }],
   ['inline hosts use the page inset the bleed assumes', () => {
     const i = clone(); i.ads.AD_PAGE_INSET = 20
