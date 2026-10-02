@@ -32,10 +32,12 @@ import {
   buildMapSources, mapFetchCategories, selectedPins, applyOpenNow, openNowApplicable,
   TRNC_CENTER,
 } from '../constants/mapSources'
-import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
+import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
-import { colors, shadow, ellipsizeSlack } from '../constants/theme'
+import { colors, shadow, ellipsizeSlack, type, radii, elevation } from '../constants/theme'
+import { Button, IconButton, CategoryIcon, RemoteImage } from '../components/ui'
+import { CARD_BG } from '../components/ui/ModuleScreen'
 import { t } from '../constants/i18n'
 import { EXPLORE_ROUTES_LIVE, ROUTE_MEDALS_LIVE } from '../constants/flags'
 import { useRouteMedal } from '../utils/routeMedals'
@@ -45,6 +47,7 @@ import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useL
 import OsmAttribution from '../components/OsmAttribution'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
+const TYPE_ION = { pharmacy: 'medkit-outline', clinic: 'medical-outline', hospital: 'business-outline', dentist: 'medical-outline' }
 
 // ─── RETURN-TO-MAP MEMORY ───────────────────────────────────────────────────
 // Opening a place or facility from this map UNMOUNTS it: App.js's content selector renders
@@ -127,16 +130,18 @@ function ClusterMarker({ cluster, onPress }) {
 function Chip({ label, count, color, colorBg, active, icon, ionicon, onPress }) {
   return (
     <TouchableOpacity
-      style={[ch.chip, active && { backgroundColor: colorBg, borderColor: color }]}
+      style={[REDESIGN ? rc.chip : ch.chip, active && { backgroundColor: colorBg, borderColor: color }]}
       onPress={onPress}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!active }}
     >
       {ionicon
         ? <Ionicons name={ionicon} size={14} color={active ? color : colors.textSecondary} />
         : icon
         ? <Feather name={icon} size={13} color={active ? color : colors.textSecondary} />
         : color ? <View style={[ch.dot, { backgroundColor: color }]} /> : null}
-      <Text style={[ch.label, active && { color }]} numberOfLines={1}>{label}</Text>
+      <Text style={[REDESIGN ? rc.label : ch.label, active && { color }]} numberOfLines={1}>{label}</Text>
       {count != null && (
         <Text style={[ch.count, active && { color }]}>{count}</Text>
       )}
@@ -226,6 +231,30 @@ function PinCard({ pin, lang, onClose, onViewProfile }) {
   const tc = { bg: pin.colorBg, text: pin.color }
 
   const { image, title, badge, sub } = pinCardContent(pin, lang)
+
+  if (REDESIGN) {
+    const icon = isHealth ? (TYPE_ION[row.type] || 'medical-outline')
+      : pin.kind === 'place' ? (GROUP_META[categoryToGroup(row.category)]?.icon || 'location-outline')
+      : 'paw-outline'
+    return (
+      <View style={r.card}>
+        <View style={r.cardRow}>
+          {image
+            ? <RemoteImage source={image} style={r.thumb} resizeMode={isHealth ? 'contain' : 'cover'} accessibilityIgnoresInvertColors />
+            : <CategoryIcon icon={icon} category={isHealth ? 'health' : 'explore'} size={56} />}
+          <View style={{ flex: 1, gap: 2 }}>
+            <View style={[r.badge, { backgroundColor: tc.bg }]}>
+              <Text style={[r.badgeText, { color: tc.text }]} numberOfLines={1}>{badge}</Text>
+            </View>
+            <Text style={r.name} numberOfLines={2}>{title}</Text>
+            {sub ? <Text style={r.sub} numberOfLines={1}>{sub}</Text> : null}
+          </View>
+          <IconButton icon="close" onPress={onClose} accessibilityLabel={t('uiClose', lang)} color={colors.textSecondary} style={r.close} />
+        </View>
+        <Button title={t('viewProfile', lang)} onPress={onViewProfile} fullWidth />
+      </View>
+    )
+  }
 
   return (
     <View style={s.card}>
@@ -617,13 +646,13 @@ export default function ExploreMapScreen({
           most sessions will not touch. */}
       {!!onShowList && (
         <View style={s.viewToggle} pointerEvents="box-none">
-          <View style={s.segment}>
-            <View style={[s.segItem, s.segItemActive]}>
+          <View style={[s.segment, REDESIGN && r.segment]}>
+            <View style={[s.segItem, s.segItemActive, REDESIGN && r.segItem]}>
               <Ionicons name="map" size={15} color="#fff" />
               <Text style={[s.segText, s.segTextActive]}>{t('exploreViewMap', lang)}</Text>
             </View>
             <TouchableOpacity
-              style={s.segItem}
+              style={[s.segItem, REDESIGN && r.segItem]}
               onPress={onShowList}
               activeOpacity={0.8}
               accessibilityRole="button"
@@ -701,7 +730,7 @@ export default function ExploreMapScreen({
               <Text style={s.recenterText}>{t('locateRecenter', lang)}</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={[s.locateBtn, walking && follow && s.locateBtnOn]} onPress={locateMe}
+          <TouchableOpacity style={[s.locateBtn, REDESIGN && r.locateBtn, walking && follow && s.locateBtnOn]} onPress={locateMe}
             activeOpacity={0.85} accessibilityRole="button"
             accessibilityLabel={walking ? t('locateRecenter', lang) : t('locateMe', lang)}>
             {locating
@@ -743,7 +772,7 @@ export default function ExploreMapScreen({
       )}
 
       {loading && (
-        <View style={s.loading} pointerEvents="none">
+        <View style={[s.loading, REDESIGN && r.loading]} pointerEvents="none">
           <ActivityIndicator color={colors.primary} />
         </View>
       )}
@@ -778,6 +807,31 @@ const ch = StyleSheet.create({
   // (89.6dp) and painted 'Kültürel Mir…' (dev text audit, 2026-09-24). See constants/theme.js.
   label:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.textSecondary, ...ellipsizeSlack },
   count:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
+})
+
+// Redesign: the floating surfaces over the map take the module-card treatment (CARD_BG, radius
+// 20, elevation.floating). The map itself is the backdrop here — no module photo behind it.
+// The chips match FilterDropdown's pill beside them: one control row, one shape.
+const rc = StyleSheet.create({
+  chip:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radii.pill,
+           backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: colors.border },
+  label: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.textPrimary, ...ellipsizeSlack },
+})
+
+const r = StyleSheet.create({
+  card:      { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: CARD_BG, borderRadius: radii.card,
+               padding: 14, gap: 12, ...elevation.floating },
+  cardRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  thumb:     { width: 56, height: 56, borderRadius: radii.tile, backgroundColor: colors.border },
+  badge:     { alignSelf: 'flex-start', borderRadius: radii.pill, paddingHorizontal: 9, paddingVertical: 3, maxWidth: '100%' },
+  badgeText: { ...type.caption, fontFamily: 'Inter_700Bold' },
+  name:      { ...type.rowTitle, color: colors.textPrimary },
+  sub:       { ...type.small, color: colors.textSecondary },
+  close:     { marginTop: -10, marginRight: -10 },
+  segment:   { backgroundColor: CARD_BG, borderRadius: radii.pill, ...elevation.floating },
+  segItem:   { borderRadius: radii.pill },
+  locateBtn: { backgroundColor: CARD_BG, ...elevation.floating },
+  loading:   { backgroundColor: CARD_BG, ...elevation.floating },
 })
 
 const cl = StyleSheet.create({
