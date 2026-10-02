@@ -90,6 +90,8 @@ WITH report AS (
     ('1051_app_versions','app_update_events'),
     -- Route medals (1056). Owner-only read; written only by award_route_medal().
     ('1056_route_medals','route_medals'),
+    -- Check-ins (1069). Owner-only read/delete; written only by check_in(). No coordinates.
+    ('1069_checkins','checkins'),
     -- KITOB hotels (1059). Dark until go-live: is_active DEFAULT false; service_role writes only.
     ('1059_hotels','hotels'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
@@ -260,6 +262,10 @@ WITH report AS (
     ('1045_places_source','places','source_id'),
     -- The owner's badge switch (1056). Read only by get_profile_route_badges (DEFINER).
     ('1056_route_medals','profiles','route_badges_public'),
+    -- Check-in visibility + the server-stamped notice (1069).
+    ('1069_checkins','profiles','checkins_public'),
+    ('1069_checkins','profiles','checkins_notice_at'),
+    ('1069_checkins','profiles','checkins_notice_version'),
     -- Gişe Kıbrıs sync liveness (1058). Stamped every run; read by check-gisekibris-staleness.
     ('1058_events_last_seen_at','events','last_seen_at'),
     -- Hotel geocode provenance (1060). HotelsTab selects none of these today; the geocoder
@@ -424,7 +430,12 @@ WITH report AS (
     ('1052_purge_status_reporter','app_update_events_purge_status'),
     ('1056_route_medals','award_route_medal'),
     ('1056_route_medals','get_profile_route_badges'),
-    ('1059_hotels','hotels_touch_updated_at')
+    ('1059_hotels','hotels_touch_updated_at'),
+    ('1069_checkins','check_in'),
+    ('1069_checkins','get_checkin_feed'),
+    ('1069_checkins','accept_checkin_notice'),
+    ('1069_checkins','metres_between'),
+    ('1069_checkins','guard_checkin_notice_columns')
   ) e(m,o)
 
   UNION ALL
@@ -478,7 +489,8 @@ WITH report AS (
     ('1029_student_messaging','msg_40_immutable'),
     ('1029_student_messaging','msg_50_touch_conversation'),
     ('1045_places_source','places_guard_source'),
-    ('1059_hotels','hotels_touch_updated_at')
+    ('1059_hotels','hotels_touch_updated_at'),
+    ('1069_checkins','guard_checkin_notice_columns')
 
   ) e(m,o)
 
@@ -701,6 +713,11 @@ WITH report AS (
     ('1056_route_medals','route_medals_pkey'),
     ('1056_route_medals','route_medals_user_id_fkey'),
     ('1056_route_medals','route_medals_route_id_fkey'),
+    -- 1069. checkins_one_per_day is CORRECTNESS: check_in()'s ON CONFLICT arbiter.
+    ('1069_checkins','checkins_pkey'),
+    ('1069_checkins','checkins_one_per_day'),
+    ('1069_checkins','checkins_user_id_fkey'),
+    ('1069_checkins','checkins_place_id_fkey'),
     -- 1059. external_id_key is CORRECTNESS: the importer's ON CONFLICT arbiter. A plain UNIQUE,
     -- never a partial index (the 20260830 lesson). The vocabularies are asserted as exact sets in H.
     ('1059_hotels','hotels_pkey'),
@@ -819,7 +836,11 @@ WITH report AS (
     ('1048_walking_routes','idx_walking_route_stops_place_id'),
     -- 1049: the CASCADE on a places delete looks legs up by to_place_id (the PK covers from).
     ('1049_walking_legs','idx_walking_legs_to_place_id'),
-    ('1051_app_versions','idx_app_update_events_created_at')
+    ('1051_app_versions','idx_app_update_events_created_at'),
+    -- 1069: the two feeds' keyset scans, and check_in()'s previous-check-in lookup.
+    ('1069_checkins','checkins_feed_idx'),
+    ('1069_checkins','checkins_place_feed_idx'),
+    ('1069_checkins','checkins_user_recent_idx')
 
   ) e(m,o)
 
@@ -893,7 +914,11 @@ WITH report AS (
     -- 1056. Without these the medal is never saved and other students never see a badge;
     -- both would read as "nobody has walked a route".
     ('1056_route_medals','award_route_medal'),
-    ('1056_route_medals','get_profile_route_badges')
+    ('1056_route_medals','get_profile_route_badges'),
+    -- 1069. Without these nobody can check in, see a feed, or get past the notice.
+    ('1069_checkins','check_in'),
+    ('1069_checkins','get_checkin_feed'),
+    ('1069_checkins','accept_checkin_notice')
   ) e(m,o)
 
   UNION ALL
@@ -3619,6 +3644,52 @@ WITH report AS (
       COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_credit_check')
                LIKE '%NOT (photo_source IS DISTINCT FROM ''commons''::text)) = (photo_credit IS NOT NULL)%', false)
+    -- ── 1069: check-ins ──────────────────────────────────────────────────────────
+    -- (1) RLS on, exactly two guest-guarded OWNER policies (read + delete), no client
+    --     INSERT/UPDATE, anon nothing. The feed is the only way to see anyone else's.
+    UNION ALL SELECT '1069_checkins','checkins: RLS on, 2 guest-guarded owner policies, no client insert/update, anon nothing',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.checkins')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='checkins') = 2
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='checkins'
+            AND qual LIKE '%auth.uid()%' AND qual LIKE '%is_anonymous_session()%') = 2
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.checkins'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.checkins'), 'INSERT,UPDATE,TRUNCATE')
+               AND has_table_privilege('authenticated', to_regclass('public.checkins'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.checkins'), 'DELETE'), false)
+    -- (2) No location column on the row, ever (derived, not a name list).
+    UNION ALL SELECT '1069_checkins','checkins has no coordinate/accuracy column',
+      (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='checkins'
+        AND (column_name ILIKE '%lat%' OR column_name ILIKE '%lng%' OR column_name ILIKE '%lon%' OR column_name ILIKE '%accura%')) = 0
+      AND to_regclass('public.checkins') IS NOT NULL
+    -- (3) Both FKs CASCADE (account deletion; never SET NULL).
+    UNION ALL SELECT '1069_checkins','checkins: user_id and place_id ON DELETE CASCADE',
+      (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.checkins') AND contype = 'f')
+      IS NOT DISTINCT FROM 'checkins_place_id_fkey=c,checkins_user_id_fkey=c'
+    -- (4) The rules live in check_in(): 150 m, accuracy (0, 50], TRNC day, guest guard.
+    UNION ALL SELECT '1069_checkins','check_in: DEFINER, guest-guarded, 150 m, accuracy <= 50, Europe/Istanbul day',
+      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%is_anonymous_session()%'
+           AND pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%v_place.longitude) > 150 THEN%'
+           AND pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%p_accuracy <= 50%'
+           AND pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%Europe/Istanbul%', false)
+    -- (5) The feed's visibility filter: the author's switch, blocks both ways, ban, guest guard.
+    UNION ALL SELECT '1069_checkins','get_checkin_feed: DEFINER, checkins_public + blocks + ban + guest guard',
+      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer)')) LIKE '%p.checkins_public IS TRUE%'
+           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer)')) LIKE '%FROM blocks b%'
+           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer)')) LIKE '%ugc_banned_until%'
+           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer)')) LIKE '%is_anonymous_session()%', false)
+    -- (6) checkins_public has NO DEFAULT (decided once, at consent, by DOB). A DEFAULT
+    --     added later would silently publish every new account. A DEFAULT creates no object.
+    UNION ALL SELECT '1069_checkins','profiles.checkins_public: nullable, NO DEFAULT',
+      COALESCE((SELECT is_nullable = 'YES' AND column_default IS NULL FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='profiles' AND column_name='checkins_public'), false)
+    -- (7) The adult-only default lives in accept_checkin_notice, and only fills a NULL.
+    UNION ALL SELECT '1069_checkins','accept_checkin_notice: DEFINER, COALESCE(checkins_public, adult by DOB)',
+      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.accept_checkin_notice(text)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.accept_checkin_notice(text)')) LIKE '%COALESCE(p.checkins_public,%'
+           AND pg_get_functiondef(to_regprocedure('public.accept_checkin_notice(text)')) LIKE '%interval ''18 years''%', false)
   ) z
 
   UNION ALL
