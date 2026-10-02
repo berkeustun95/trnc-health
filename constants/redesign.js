@@ -1,5 +1,5 @@
 import Constants from 'expo-constants'
-import { REDESIGN_LIVE } from './flags'
+import { REDESIGN_LIVE, MODULE_FLAGS } from './flags'
 
 // The one switch every redesigned surface reads. On when:
 //   • REDESIGN_LIVE is flipped (go-live, both files in one commit — the flag guard), or
@@ -11,3 +11,8 @@ import { REDESIGN_LIVE } from './flags'
 const IS_PREVIEW_BUILD = Constants.expoConfig?.extra?.appVariant === 'preview'
 
 export const REDESIGN = REDESIGN_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || IS_PREVIEW_BUILD
+
+// Check-ins (20261069) before go-live: dev bundles and ADA Preview only, the flag stays off.
+// Same shape as REDESIGN so `npm run ota` (production, no APP_VARIANT) can never switch it on;
+// `npm run ota:preview` sets APP_VARIANT=preview and does. Every Buradayım surface reads this.
+export const CHECKINS = MODULE_FLAGS.checkins || (typeof __DEV__ !== 'undefined' && __DEV__) || IS_PREVIEW_BUILD

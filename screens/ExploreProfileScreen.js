@@ -21,7 +21,9 @@ import ContentReportMenu from '../components/ContentReportMenu'
 import BackButton from '../components/BackButton'
 import ComingSoonScreen from '../components/ComingSoonScreen'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
-import { REDESIGN } from '../constants/redesign'
+import { REDESIGN, CHECKINS } from '../constants/redesign'
+import CheckinAction from '../components/checkins/CheckinAction'
+import { PlaceCheckins } from '../components/checkins/CheckinFeed'
 import { DetailScaffold, IconButton, Button, RemoteImage } from '../components/ui'
 import { colors as C, category as CAT, type, radii, press } from '../constants/theme'
 
@@ -101,6 +103,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
   const [featBusy,  setFeatBusy]  = useState(false)
   const [featSent,  setFeatSent]  = useState(false)
   const [showCheckin, setShowCheckin] = useState(false)
+  const [checkinTick, setCheckinTick] = useState(0)   // refreshes the place's feed after a check-in
   // The check-in page is an early return, so the profile's scroll view remounts behind it;
   // its offset comes back on return. Forgotten when the profile closes.
   const profileMem = useScrollMemory('place:' + place?.id)
@@ -304,9 +307,21 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
             </View>
           )}
 
-          {/* Coming Soon + waitlist only (MODULE_FLAGS.checkins) — same page as the legacy footer button. */}
-          <Button variant="secondary" icon="location-outline" title={t('checkinCta', lang)}
-            onPress={() => setShowCheckin(true)} fullWidth style={r.section} />
+          {/* Check-ins (20261069) where CHECKINS is on — dev + ADA Preview until go-live, redesign
+              layout only. Otherwise Coming Soon + waitlist, same page as the legacy footer button. */}
+          {CHECKINS ? (
+            <>
+              {hasCoords && (
+                <CheckinAction place={place} session={session} lang={lang} onRequireAccount={onRequireAccount}
+                  onCheckedIn={() => setCheckinTick(n => n + 1)} style={r.section} />
+              )}
+              <PlaceCheckins placeId={place.id} session={session} lang={lang} onRequireAccount={onRequireAccount}
+                refreshKey={checkinTick} style={r.section} />
+            </>
+          ) : (
+            <Button variant="secondary" icon="location-outline" title={t('checkinCta', lang)}
+              onPress={() => setShowCheckin(true)} fullWidth style={r.section} />
+          )}
 
           {showClaim && (
             <View style={r.ownerCard}>

@@ -309,6 +309,8 @@ export default function ExploreMapScreen({
   // This is that second entrance, and it has to ship and be checked on device BEFORE the
   // tile is hidden. Optional so the screen still renders if a caller does not pass it.
   onShowList,
+  // Keşfet → "Son Check-in'ler" (CHECKINS): a third segment, opening CheckinFeedScreen. Undefined = no segment.
+  onShowCheckins,
   // Route medals (ROUTE_MEDALS_LIVE): who is walking, and the guest sign-in gate.
   session = null,
   onRequireAccount,
@@ -661,6 +663,18 @@ export default function ExploreMapScreen({
               <Ionicons name="list" size={15} color={colors.textPrimary} />
               <Text style={s.segText}>{t('exploreViewList', lang)}</Text>
             </TouchableOpacity>
+            {!!onShowCheckins && (
+              <TouchableOpacity
+                style={[s.segItem, REDESIGN && r.segItem]}
+                onPress={onShowCheckins}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={t('checkinFeedTitle', lang)}
+              >
+                <Ionicons name="location" size={15} color={colors.textPrimary} />
+                <Text style={s.segText}>{t('checkinTab', lang)}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}

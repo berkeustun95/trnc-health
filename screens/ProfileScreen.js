@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar'
-import { REDESIGN } from '../constants/redesign'
+import { REDESIGN, CHECKINS } from '../constants/redesign'
 import { useState, useEffect } from 'react'
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import {
@@ -37,6 +37,7 @@ import { subjectOptions, studyYearOptions, studyYearCeiling } from '../utils/stu
 import LegalScreen from './LegalScreen'
 import { TERMS_CHECKBOX_LIVE, MODULE_FLAGS, ROUTE_MEDALS_LIVE } from '../constants/flags'
 import { OwnRouteBadges } from '../components/RouteBadges'
+import MyCheckins from '../components/checkins/MyCheckins'
 import { PRESET_AVATARS } from '../constants/avatars'
 import Avatar, { prefetchAvatars, invalidateAvatar } from '../components/Avatar'
 import BackButton from '../components/BackButton'
@@ -1274,6 +1275,11 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
 
           {ROUTE_MEDALS_LIVE && (
             <OwnRouteBadges session={session} lang={lang} sectionStyle={s.marketingSection}
+              titleStyle={s.sectionTitle} rowStyle={s.marketingRow} labelStyle={s.marketingLabel} hintStyle={s.fieldHint} />
+          )}
+
+          {CHECKINS && (
+            <MyCheckins session={session} lang={lang} sectionStyle={s.marketingSection}
               titleStyle={s.sectionTitle} rowStyle={s.marketingRow} labelStyle={s.marketingLabel} hintStyle={s.fieldHint} />
           )}
 

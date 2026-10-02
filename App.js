@@ -32,7 +32,7 @@ import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE } from './constants/flags'
-import { REDESIGN } from './constants/redesign'
+import { REDESIGN, CHECKINS } from './constants/redesign'
 import { FloatingTabBar, TabBarPad } from './components/ui'
 import { font } from './constants/theme'
 import { REGION_TO_DUTY } from './constants/regions'
@@ -81,6 +81,7 @@ import ConnectivityPackageScreen from './screens/ConnectivityPackageScreen'
 import ConnectivityStoresScreen from './screens/ConnectivityStoresScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import ExploreScreen from './screens/ExploreScreen'
+import CheckinFeedScreen from './screens/CheckinFeedScreen'
 import ExploreProfileScreen from './screens/ExploreProfileScreen'
 import { PET_PARTNERS } from './constants/petPartners'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
@@ -625,6 +626,7 @@ export default function App() {
   const [showJobPostings,  setShowJobPostings]  = useState(false)
   const [showExploreBeach, setShowExploreBeach] = useState(false)
   const [showExplore, setShowExplore] = useState(false)   // the full Explore module tile (dark until MODULE_FLAGS.explore)
+  const [showCheckinFeed, setShowCheckinFeed] = useState(false)   // Keşfet tab → Check-in'ler (CHECKINS)
   // Set by the wizard's Google/Apple under-13 branch AFTER delete_own_account succeeded and
   // before it signs out, so the notice replaces the welcome screen that SIGNED_OUT would show.
   // Session state is right here, unlike the flag path: the account no longer exists, so
@@ -1075,6 +1077,7 @@ export default function App() {
       if ((showExploreBeach || showExplore) && exploreBackRef.current?.()) return true
       if (showExploreBeach)     { closeExploreBeach(); return true }
       if (showExplore)          { setShowExplore(false); return true }
+      if (showCheckinFeed)      { setShowCheckinFeed(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
       if (showNewcomerEssentials) { if (guideBackRef.current?.()) return true; setShowNewcomerEssentials(false); return true }
       // Below eSIM, Welcome Guide and Exchange Rates: Student Hub opens those ON TOP of itself
@@ -1094,7 +1097,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -2160,6 +2163,13 @@ export default function App() {
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />
     )
+  } else if (showCheckinFeed) {
+    content = (
+      <BLErrorBoundary lang={lang}>
+        <CheckinFeedScreen session={session} lang={lang} onBack={() => setShowCheckinFeed(false)} onRequireAccount={requireAccount}
+          onSelectPlace={setSelectedExplorePlace} placeOverlay={explorePlaceEl} />
+      </BLErrorBoundary>
+    )
   } else if (selectedExplorePlace) {
     // Map tab (and anything else outside the Explore module): standalone, as before.
     content = explorePlaceEl
@@ -2580,6 +2590,7 @@ export default function App() {
                 // opens the SAME ExploreScreen the Home tile opens, so the tile can be
                 // hidden once this has been checked on device.
                 onShowList={() => setShowExplore(true)}
+                onShowCheckins={CHECKINS ? () => setShowCheckinFeed(true) : undefined}
                 facilities={facilities}
                 dutyFacilityId={dutyFacilityId}
                 userLocation={userLocation}
@@ -2754,7 +2765,7 @@ export default function App() {
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
@@ -2783,7 +2794,7 @@ export default function App() {
     setCityWelcome(null)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
     setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
