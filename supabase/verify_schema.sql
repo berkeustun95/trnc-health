@@ -291,7 +291,10 @@ WITH report AS (
     -- 1065. Credit for a free-licence (Commons) photo. HotelsTab selects it: MISSING = 42703 on the tab.
     ('1065_hotels_commons_credit','hotels','photo_credit'),
     -- 1066. What a notification is. App.js selects it: MISSING = 42703, the notifications list renders empty.
-    ('1066_notification_type','notifications','type')
+    ('1066_notification_type','notifications','type'),
+    -- 1071. The provider's logo URL (sync-only) and the F1 session kind.
+    ('1071_live_scores_followup','teams','source_logo_url'),
+    ('1071_live_scores_followup','f1_races','session_type')
 
   ) e(m,t,c)
 
@@ -773,7 +776,10 @@ WITH report AS (
     ('1070_live_scores','matches_external_key'),
     ('1070_live_scores','match_events_dedupe_key'),
     ('1070_live_scores','leagues_id_sport_key'),
-    ('1070_live_scores','teams_id_sport_key')
+    ('1070_live_scores','teams_id_sport_key'),
+    ('1071_live_scores_followup','teams_source_logo_check'),
+    ('1071_live_scores_followup','f1_races_session_type_check'),
+    ('1071_live_scores_followup','f1_races_api_race_id_key')
 
   ) e(m,o)
 
@@ -865,7 +871,8 @@ WITH report AS (
     ('1051_app_versions','idx_app_update_events_created_at'),
     ('1070_live_scores','matches_kickoff_idx'),
     ('1070_live_scores','matches_league_idx'),
-    ('1070_live_scores','api_request_log_at_idx')
+    ('1070_live_scores','api_request_log_at_idx'),
+    ('1071_live_scores_followup','f1_races_race_at_idx')
 
   ) e(m,o)
 
@@ -3737,6 +3744,30 @@ WITH report AS (
     UNION ALL SELECT '1070_live_scores','supabase_realtime publishes matches, match_events, f1_results',
       (SELECT count(*) FROM pg_publication_tables WHERE pubname='supabase_realtime' AND schemaname='public'
           AND tablename IN ('matches','match_events','f1_results')) = 3
+    -- ── 1071: Live Scores follow-up ─────────────────────────────────────────────
+    -- (1) A deleted KTFF fixture reaches filtered Realtime subscriptions only with the full old
+    --     row in the WAL. relreplident 'f' = FULL; 'd' (default) carries the PK alone.
+    UNION ALL SELECT '1071_live_scores_followup','matches + match_events are REPLICA IDENTITY FULL',
+      (SELECT string_agg(relname || '=' || relreplident::text, ',' ORDER BY relname) FROM pg_class
+        WHERE oid IN (to_regclass('public.matches'), to_regclass('public.match_events')))
+      IS NOT DISTINCT FROM 'match_events=f,matches=f'
+    -- (2) No phone fetches from the provider: logo_url may point at the team-logos bucket only.
+    --     Same-name DROP/ADD, so E sees the name and not the rule.
+    UNION ALL SELECT '1071_live_scores_followup','teams_logo_check admits the team-logos bucket and nothing else',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.teams') AND conname = 'teams_logo_check')
+               LIKE '%supabase\\.co/storage/v1/object/public/team-logos/%', false)
+    -- (3) The bucket is public with its limits, and no storage policy names it (only the sync,
+    --     as service_role, writes; storage.objects stays at the 1042 baseline of 36).
+    UNION ALL SELECT '1071_live_scores_followup','bucket team-logos is PUBLIC, 512 KB, png/jpeg/webp, and no storage policy names it',
+      COALESCE((SELECT public AND file_size_limit = 524288 AND allowed_mime_types = ARRAY['image/png','image/jpeg','image/webp']
+                  FROM storage.buckets WHERE id = 'team-logos'), false)
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+                      AND COALESCE(qual,'') || COALESCE(with_check,'') LIKE '%team-logos%')
+    -- (4) An F1 session has no round on the free plan: round nullable, keyed by api_race_id.
+    UNION ALL SELECT '1071_live_scores_followup','f1_races.round is nullable',
+      EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+        AND table_name='f1_races' AND column_name='round' AND is_nullable='YES')
   ) z
 
   UNION ALL
