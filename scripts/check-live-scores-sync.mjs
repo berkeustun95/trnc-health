@@ -9,7 +9,9 @@
 import {
   mapStatus, matchRowFrom, eventRowsFrom, teamRowsFrom, pollIntervalMinutes, callerIsServiceRole,
   DAILY_CAP,
+  logoPath,
 } from '../supabase/functions/_shared/live-scores.mjs'
+import { mapSessionType, mapRaceStatus, sessionRowFrom, resultRowFrom } from '../supabase/functions/_shared/live-scores-f1.mjs'
 
 const problems = []
 const check = (ok, msg) => { if (!ok) problems.push(msg) }
@@ -62,6 +64,11 @@ check(br.row && br.row.home_score === 71 && br.row.clock === '7' && br.row.perio
 const tr = teamRowsFrom('football', [fixture, fixture])
 check(tr.length === 2, `teams must be de-duplicated (got ${tr.length})`)
 check(new Set(tr.map(t => Object.keys(t).sort().join())).size === 1, 'team rows are ragged')
+check(tr.every(t => !('logo_url' in t) && t.source_logo_url?.startsWith('https://media.api-sports.io/')),
+      'the sync must write the provider URL to source_logo_url and NEVER to logo_url (phones only load our copy)')
+check(logoPath('football', '40', 'image/png') === 'football/40.png', 'logo path for a png')
+check(logoPath('football', '40', 'text/html') === null, 'a non-image response must not be stored')
+check(logoPath('football', '../x', 'image/png') === null, 'a path-traversal external_id must be refused')
 
 const ev = eventRowsFrom(fixture, 900)
 check(ev.length === 3, `3 events expected (goal, penalty, second yellow; the sub ignored), got ${ev.length}`)
@@ -81,6 +88,21 @@ const spread = pollIntervalMinutes({ used: 80, liveEndsAt: '2026-10-03T21:00:00Z
 check(spread === 14, `120 min over 9 affordable polls must give 14 min (got ${spread})`)
 const clipped = pollIntervalMinutes({ used: 80, liveEndsAt: '2026-10-04T02:00:00Z', now: '2026-10-03T23:00:00Z', dailyDone: true })
 check(clipped === 7, `the window is clipped at the 00:00 UTC quota reset (got ${clipped})`)
+
+// F1 (shapes from a real races?date response, 2026-10-03).
+check(mapSessionType('Race') === 'race' && mapSessionType('Sprint') === 'sprint', 'race / sprint')
+check(mapSessionType('1st Practice') === 'practice1' && mapSessionType('3rd Practice') === 'practice3', 'practice numbering')
+check(mapSessionType('Sprint Shootout') === 'sprint_qualifying' && mapSessionType('1st Qualifying') === 'qualifying', 'qualifying kinds')
+check(mapSessionType('Warm-up') === null, 'an unknown session type must map to null (skipped)')
+check(mapRaceStatus('Completed') === 'finished' && mapRaceStatus('Scheduled') === 'scheduled' && mapRaceStatus('??') === null, 'race status map')
+const realRace = { id: 2727, competition: { id: 2, name: 'Bahrain Grand Prix', location: { country: 'Bahrain', city: 'Sakhir' } },
+  circuit: { id: 62, name: 'Sepang International Circuit' }, season: 2026, type: 'Race', date: '2026-10-04T07:00:00+00:00', status: 'Scheduled' }
+const sr = sessionRowFrom(realRace, now)
+check(sr.row && sr.row.api_race_id === 2727 && sr.row.session_type === 'race' && sr.row.status === 'scheduled'
+      && sr.row.circuit === 'Sepang International Circuit' && sr.row.season === 2026, `f1 session row wrong: ${JSON.stringify(sr)}`)
+const rr = resultRowFrom({ position: 1, driver: { name: 'Max Verstappen', abbr: 'VER' }, team: { name: 'Red Bull Racing' }, time: '1:31:44.742', laps: 56, grid: '2' }, 9, true, now)
+check(rr && rr.position === 1 && rr.driver_code === 'VER' && rr.grid === 2 && rr.is_final === true, `f1 result row wrong: ${JSON.stringify(rr)}`)
+check(resultRowFrom({ position: 3 }, 9, false, now) === null, 'a result without a driver name is dropped')
 
 // The gate: only a service_role token passes.
 const tok = role => 'x.' + Buffer.from(JSON.stringify({ role })).toString('base64url') + '.y'

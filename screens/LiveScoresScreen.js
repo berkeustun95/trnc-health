@@ -86,8 +86,11 @@ function StatusCell({ m, sport, lang }) {
   )
 }
 
+// Our team-logos bucket and nothing else (20261071): a phone never requests the provider's
+// media host. The database enforces the same rule; this keeps it true if a row ever slips.
+const OUR_LOGOS = '/storage/v1/object/public/team-logos/'
 function TeamLogo({ uri }) {
-  if (!uri) return <View style={[s.logo, s.logoBlank]}><Ionicons name="shield-outline" size={12} color={colors.textSecondary} /></View>
+  if (!uri || !uri.includes(OUR_LOGOS)) return <View style={[s.logo, s.logoBlank]}><Ionicons name="shield-outline" size={12} color={colors.textSecondary} /></View>
   return <Image source={{ uri }} style={s.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
 }
 
@@ -226,8 +229,14 @@ function MatchesView({ sport, lang }) {
     if (!appActive) return
     load()
     const ch = supabase.channel(`ls-${sport}-${Date.now()}`)
+      // DELETE unfiltered as well: a deleted KTFF fixture must leave every screen at once.
+      // REPLICA IDENTITY FULL (20261071) lets the filtered stream carry it too; removing an
+      // id that is not on screen is a no-op, so receiving it twice is harmless.
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'matches' }, p => {
+        setMatches(ms => ms.filter(m => m.id !== p.old?.id))
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `sport=eq.${sport}` }, p => {
-        if (p.eventType === 'DELETE') { setMatches(ms => ms.filter(m => m.id !== p.old.id)); return }
+        if (p.eventType === 'DELETE') { setMatches(ms => ms.filter(m => m.id !== p.old?.id)); return }
         // A match not on screen (new, or moved into the window) needs the joined read for its teams.
         if (!idsRef.current.has(p.new.id)) { scheduleReload(); return }
         setMatches(ms => ms.map(m => (m.id === p.new.id ? { ...m, ...p.new, home: m.home, away: m.away } : m)))
@@ -281,41 +290,73 @@ function MatchesView({ sport, lang }) {
 }
 
 // ─── Formula 1 ───────────────────────────────────────────────────────────────
+// API-Sports' free plan sees yesterday/today/tomorrow only, so this tab is honest about
+// that: today's and tomorrow's sessions, and the live or last race result. No calendar and
+// no standings — there is no free source for either that a commercial app may use.
 function Countdown({ iso, lang }) {
   const ms = Math.max(0, new Date(iso).getTime() - Date.now())
   const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000)
   return <Text style={s.countdown}>{fill(t('lsF1Countdown', lang), { d, h, m })}</Text>
 }
 
+const SESSION_LABEL = {
+  race: 'lsF1Race', sprint: 'lsF1Sprint', qualifying: 'lsF1Qualifying', sprint_qualifying: 'lsF1SprintQualifying',
+}
+function sessionLabel(type, lang) {
+  const p = /^practice([123])$/.exec(type)
+  return p ? fill(t('lsF1Practice', lang), { n: p[1] }) : t(SESSION_LABEL[type] || 'lsF1Race', lang)
+}
+
+function SessionRow({ x, isNext, lang }) {
+  return (
+    <View style={s.f1Row}>
+      <Text style={s.f1Time}>{hhmm(x.race_at)}</Text>
+      <View style={s.f1Who}>
+        <Text style={s.teamName} numberOfLines={1}>{sessionLabel(x.session_type, lang)}</Text>
+        <Text style={s.f1Team} numberOfLines={1}>{x.name}</Text>
+      </View>
+      {x.status === 'live'
+        ? <View style={[s.livePill, s.f1LiveInline]}><View style={s.liveDot} /><Text style={s.livePillText}>{t('lsLive', lang)}</Text></View>
+        : x.status === 'finished'
+          ? <Text style={s.f1Right}>{t('lsF1Finished', lang)}</Text>
+          : x.status === 'cancelled' || x.status === 'postponed'
+            ? <Text style={s.f1Right}>{t(x.status === 'cancelled' ? 'lsCancelled' : 'lsPostponed', lang)}</Text>
+            : isNext ? <Countdown iso={x.race_at} lang={lang} /> : null}
+    </View>
+  )
+}
+
 function F1View({ lang }) {
-  const [races, setRaces] = useState([])
+  const [sessions, setSessions] = useState([])
+  const [race, setRace] = useState(null)
   const [results, setResults] = useState([])
-  const [standings, setStandings] = useState([])
-  const [kind, setKind] = useState('driver')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const appActive = useAppActive()
   useTicker()
 
   const load = useCallback(async () => {
-    const { data: rc, error: rErr } = await supabase.from('f1_races')
-      .select('id, season, round, name, circuit, locality, country, race_at, status, results_final')
-      .order('season', { ascending: false }).order('round', { ascending: true }).limit(40)
-    if (rErr) { setError(true); setLoading(false); return }
-    const season = rc[0]?.season
-    const mine = rc.filter(r => r.season === season)
-    setRaces(mine)
-    const last = [...mine].reverse().find(r => r.status === 'finished' || r.status === 'live')
-    const [res, st] = await Promise.all([
-      last ? supabase.from('f1_results').select('position, driver_name, driver_code, team, points, time_text, status_text')
-               .eq('race_id', last.id).order('position', { ascending: true, nullsFirst: false }).limit(10)
-           : Promise.resolve({ data: [], error: null }),
-      season ? supabase.from('f1_standings').select('kind, position, name, code, team, points, wins')
-                 .eq('season', season).order('position')
-             : Promise.resolve({ data: [], error: null }),
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const [ss, lr] = await Promise.all([
+      supabase.from('f1_races').select('id, name, circuit, session_type, race_at, status')
+        .gte('race_at', startOfToday.toISOString())
+        .lt('race_at', new Date(startOfToday.getTime() + 2 * 86400000).toISOString())
+        .order('race_at'),
+      supabase.from('f1_races').select('id, name, circuit, race_at, status')
+        .eq('session_type', 'race').in('status', ['live', 'finished'])
+        .order('race_at', { ascending: false }).limit(1),
     ])
-    if (res.error || st.error) { setError(true); setLoading(false); return }
-    setResults(res.data); setStandings(st.data); setError(false); setLoading(false)
+    if (ss.error || lr.error) { setError(true); setLoading(false); return }
+    const last = lr.data[0] || null
+    let res = []
+    if (last) {
+      const r = await supabase.from('f1_results').select('position, driver_name, driver_code, team, time_text')
+        .eq('race_id', last.id).order('position', { ascending: true, nullsFirst: false }).limit(10)
+      if (r.error) { setError(true); setLoading(false); return }
+      res = r.data
+    }
+    setSessions(ss.data); setRace(last); setResults(res); setError(false); setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -332,33 +373,42 @@ function F1View({ lang }) {
 
   if (loading) return <View style={s.pad}><CardSkeleton /><CardSkeleton /></View>
   if (error) return <ErrorState lang={lang} onRetry={() => { setLoading(true); load() }} />
-  if (!races.length) return <EmptyState icon="flag-outline" category="explore" title={t('lsF1Empty', lang)} />
+  if (!sessions.length && !race) return <EmptyState icon="flag-outline" category="explore" title={t('lsF1Empty', lang)} />
 
   const now = Date.now()
-  const next = races.find(r => r.status === 'live') || races.find(r => new Date(r.race_at).getTime() > now)
-  const last = [...races].reverse().find(r => r.status === 'finished' || r.status === 'live')
-  const table = standings.filter(x => x.kind === kind)
+  const next = sessions.find(x => x.status === 'scheduled' && new Date(x.race_at).getTime() > now)
+  const days = []
+  for (const x of sessions) {
+    const k = dayKey(new Date(x.race_at))
+    if (!days.length || days[days.length - 1].key !== k) days.push({ key: k, iso: x.race_at, list: [] })
+    days[days.length - 1].list.push(x)
+  }
 
   return (
     <ScrollView contentContainerStyle={s.scroll}>
-      {!!next && (
-        <View style={s.section}>
-          <OnPhotoLabel style={s.leaguePill} accessibilityRole="header">{t('lsF1NextRace', lang)}</OnPhotoLabel>
-          <Card>
-            <Text style={s.f1Round}>{fill(t('lsF1Round', lang), { n: next.round })}</Text>
-            <Text style={s.f1Name}>{next.name}</Text>
-            <Text style={s.f1Meta} numberOfLines={2}>{[next.circuit, next.locality, next.country].filter(Boolean).join(' · ')}</Text>
-            <Text style={s.f1Meta}>{`${dayLabel(next.race_at, lang)} · ${hhmm(next.race_at)}`}</Text>
-            {next.status === 'live'
-              ? <View style={[s.livePill, s.f1LivePill]}><View style={s.liveDot} /><Text style={s.livePillText}>{t('lsF1Live', lang)}</Text></View>
-              : <Countdown iso={next.race_at} lang={lang} />}
-          </Card>
-        </View>
-      )}
+      {days.length === 0
+        ? <Card><Text style={s.f1Meta}>{t('lsF1NoSessions', lang)}</Text></Card>
+        : days.map(d => (
+          <View key={d.key} style={s.section}>
+            <OnPhotoLabel style={s.leaguePill} accessibilityRole="header">{dayLabel(d.iso, lang)}</OnPhotoLabel>
+            <Card padding={0}>
+              {d.list.map((x, i) => (
+                <View key={x.id}>
+                  {i > 0 && <View style={s.hairline} />}
+                  <SessionRow x={x} isNext={next?.id === x.id} lang={lang} />
+                </View>
+              ))}
+            </Card>
+          </View>
+        ))}
 
-      {!!last && results.length > 0 && (
+      {!!race && results.length > 0 && (
         <View style={s.section}>
-          <OnPhotoLabel style={s.leaguePill} accessibilityRole="header">{`${t('lsF1LastRace', lang)} · ${last.name}`}</OnPhotoLabel>
+          <View style={s.sectionHead}>
+            <OnPhotoLabel style={s.leaguePill} accessibilityRole="header">
+              {`${race.status === 'live' ? t('lsF1Live', lang) : t('lsF1LastRace', lang)} · ${race.name}`}
+            </OnPhotoLabel>
+          </View>
           <Card padding={0}>
             {results.map((r, i) => (
               <View key={r.driver_name}>
@@ -369,35 +419,7 @@ function F1View({ lang }) {
                     <Text style={s.teamName} numberOfLines={1}>{r.driver_name}</Text>
                     {!!r.team && <Text style={s.f1Team} numberOfLines={1}>{r.team}</Text>}
                   </View>
-                  <Text style={s.f1Right} numberOfLines={1}>{r.time_text || r.status_text || ''}</Text>
-                </View>
-              </View>
-            ))}
-          </Card>
-        </View>
-      )}
-
-      {standings.length > 0 && (
-        <View style={s.section}>
-          <View style={s.segment}>
-            {['driver', 'constructor'].map(k => (
-              <TouchableOpacity key={k} style={[s.segBtn, kind === k && s.segBtnOn]} onPress={() => setKind(k)}
-                activeOpacity={press.small} accessibilityRole="tab" accessibilityState={{ selected: kind === k }}>
-                <Text style={[s.segText, kind === k && s.segTextOn]}>{t(k === 'driver' ? 'lsF1Drivers' : 'lsF1Constructors', lang)}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Card padding={0}>
-            {table.map((r, i) => (
-              <View key={r.name}>
-                {i > 0 && <View style={s.hairline} />}
-                <View style={s.f1Row}>
-                  <Text style={s.f1Pos}>{r.position}</Text>
-                  <View style={s.f1Who}>
-                    <Text style={s.teamName} numberOfLines={1}>{r.name}</Text>
-                    {kind === 'driver' && !!r.team && <Text style={s.f1Team} numberOfLines={1}>{r.team}</Text>}
-                  </View>
-                  <Text style={s.f1Points}>{fill(t('lsF1Points', lang), { n: Number(r.points) })}</Text>
+                  <Text style={s.f1Right} numberOfLines={1}>{r.time_text || ''}</Text>
                 </View>
               </View>
             ))}
@@ -498,21 +520,14 @@ const s = StyleSheet.create({
   scoreLive:   { color: colors.dangerInk },
   scorers:     { ...type.caption, color: colors.textSecondary, marginLeft: 28 },
 
-  f1Round:     { ...type.meta, color: colors.textSecondary },
-  f1Name:      { ...type.sheetTitle, color: colors.textPrimary, marginTop: 2 },
   f1Meta:      { ...type.small, color: colors.textSecondary, marginTop: 4 },
-  countdown:   { ...type.sectionHeading, color: colors.primaryDark, marginTop: 12, fontVariant: ['tabular-nums'] },
-  f1LivePill:  { alignSelf: 'flex-start', marginTop: 12, backgroundColor: colors.dangerInk },
+  countdown:   { ...type.meta, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark, fontVariant: ['tabular-nums'] },
+  f1Time:      { ...type.rowTitle, color: colors.textPrimary, width: 48, fontVariant: ['tabular-nums'] },
+  f1LiveInline:{ backgroundColor: colors.dangerInk },
   f1Row:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, gap: 12, minHeight: TAP },
   f1Pos:       { ...type.rowTitle, color: colors.textSecondary, width: 24, textAlign: 'right', fontVariant: ['tabular-nums'] },
   f1Who:       { flex: 1 },
   f1Team:      { ...type.meta, color: colors.textSecondary },
   f1Right:     { ...type.meta, color: colors.textSecondary, maxWidth: 110, textAlign: 'right' },
-  f1Points:    { ...type.rowTitle, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
 
-  segment:     { flexDirection: 'row', alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: radii.pill, padding: 3 },
-  segBtn:      { minHeight: 34, paddingHorizontal: 14, justifyContent: 'center', borderRadius: radii.pill },
-  segBtnOn:    { backgroundColor: colors.card },
-  segText:     { ...type.small, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
-  segTextOn:   { color: colors.textPrimary },
 })

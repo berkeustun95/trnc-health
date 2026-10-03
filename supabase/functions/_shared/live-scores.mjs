@@ -28,6 +28,7 @@ const RESERVE_FINALS = 1
 export const HOSTS = {
   football:   'https://v3.football.api-sports.io',
   basketball: 'https://v1.basketball.api-sports.io',
+  f1:         'https://v1.formula-1.api-sports.io',
 }
 
 // ─── Status vocabulary → matches.status. null = unknown code: log, leave the row alone.
@@ -69,7 +70,9 @@ export function teamRowsFrom(sport, items) {
       seen.set(String(t.id), {
         sport, source: 'api', external_id: String(t.id),
         name: String(t.name || '').trim().slice(0, 80) || '?',
-        logo_url: typeof t.logo === 'string' && t.logo.startsWith('https://') ? t.logo : null,
+        // The provider's URL is never shown to a phone (20261071): mirrorLogos copies it once
+        // into the team-logos bucket and only that copy goes in logo_url.
+        source_logo_url: typeof t.logo === 'string' && t.logo.startsWith('https://') ? t.logo : null,
       })
     }
   }
@@ -139,12 +142,12 @@ export function eventRowsFrom(fixture, matchId) {
 // ─── The poll interval: spread what is left of today's quota over what is left of the
 // live window, never faster than every 7 minutes. Quota resets at 00:00 UTC, so the window
 // is clipped there. Returns minutes, or null when nothing can be afforded today.
-export function pollIntervalMinutes({ used, liveEndsAt, now, dailyDone }) {
+export function pollIntervalMinutes({ used, liveEndsAt, now, dailyDone, dailyReserve = RESERVE_DAILY }) {
   const nowMs = new Date(now).getTime()
   const midnight = Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), new Date(now).getUTCDate() + 1)
   const windowEnd = Math.min(new Date(liveEndsAt).getTime(), midnight)
   const minutesLeft = Math.max(1, Math.ceil((windowEnd - nowMs) / 60000))
-  const budget = DAILY_CAP - used - RESERVE_FINALS - (dailyDone ? 0 : RESERVE_DAILY)
+  const budget = DAILY_CAP - used - RESERVE_FINALS - (dailyDone ? 0 : dailyReserve)
   if (budget <= 0) return null
   return Math.max(MIN_POLL_MINUTES, Math.ceil(minutesLeft / budget))
 }
@@ -199,7 +202,7 @@ export async function apiSports(sb, sport, key, path) {
   return body.response || []
 }
 
-async function usedToday(sb, sport, now) {
+export async function usedToday(sb, sport, now) {
   const { data, error } = await sb.from('api_quota_log').select('requests_used')
     .eq('day', utcDate(now)).eq('sport', sport).maybeSingle()
   if (error) throw new Error(`api_quota_log: ${error.message}`)
@@ -257,6 +260,50 @@ async function syncFootballEvents(sb, fixtures, mRows) {
   }
 }
 
+// ─── Logos: copy each provider logo ONCE into the public team-logos bucket ──────
+// Phones load logos from our bucket only (teams_logo_check). Only the provider's media host
+// is fetched — the URL comes from API data, so anything else is refused rather than proxied.
+const LOGO_HOST = 'media.api-sports.io'
+const LOGO_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
+const LOGO_MAX_BYTES = 524288
+
+export function logoPath(sport, externalId, contentType) {
+  const ext = LOGO_TYPES[contentType]
+  if (!ext || !/^[0-9a-z-]+$/i.test(String(externalId))) return null
+  return `${sport}/${String(externalId).toLowerCase()}.${ext}`
+}
+
+export async function mirrorLogos(sb, sport, say, limit = 40) {
+  const { data: todo, error } = await sb.from('teams').select('id, external_id, source_logo_url')
+    .eq('sport', sport).eq('source', 'api').is('logo_url', null).not('source_logo_url', 'is', null).limit(limit)
+  if (error) throw new Error(`teams (logos): ${error.message}`)
+  let copied = 0, failed = 0
+  for (const t of todo) {
+    try {
+      const u = new URL(t.source_logo_url)
+      if (u.protocol !== 'https:' || u.hostname !== LOGO_HOST) throw new Error(`host ${u.hostname} not allowed`)
+      const res = await fetch(u.toString())
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const type = (res.headers.get('content-type') || '').split(';')[0].trim()
+      const path = logoPath(sport, t.external_id, type)
+      if (!path) throw new Error(`content-type ${type}`)
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      if (bytes.length > LOGO_MAX_BYTES) throw new Error(`${bytes.length} bytes`)
+      const { error: upErr } = await sb.storage.from('team-logos').upload(path, bytes, { contentType: type, upsert: true })
+      if (upErr) throw new Error(`upload: ${upErr.message}`)
+      const publicUrl = sb.storage.from('team-logos').getPublicUrl(path).data.publicUrl
+      const { error: uErr } = await sb.from('teams').update({ logo_url: publicUrl }).eq('id', t.id)
+      if (uErr) throw new Error(`teams update: ${uErr.message}`)
+      copied++
+    } catch (e) {
+      failed++
+      say(`logo ${sport}/${t.external_id}: ${String(e?.message || e).slice(0, 120)}`)
+    }
+  }
+  if (todo.length) say(`${sport}: logos copied ${copied}, failed ${failed}, of ${todo.length} pending`)
+  return { copied, failed }
+}
+
 const dateQuery = (sport, d) => sport === 'football' ? `/fixtures?date=${d}` : `/games?date=${d}`
 
 // ─── daily: today's and tomorrow's games (UTC), which also covers NBA tip-offs at
@@ -273,6 +320,7 @@ export async function runDaily(sb, sport, key, say) {
   const { error } = await sb.from('api_request_log').delete().lt('at', new Date(Date.now() - 30 * 86400000).toISOString())
   if (error) say(`api_request_log purge failed: ${error.message}`)
   await sb.from('live_sync_state').update({ last_daily_on: today }).eq('sport', sport)
+  await mirrorLogos(sb, sport, say)
   return schedule(sb, sport, now, say)
 }
 
@@ -306,6 +354,7 @@ export async function runPoll(sb, sport, key, say) {
       await upsertItems(sb, sport, items, leagues, now, say)
     }
   }
+  await mirrorLogos(sb, sport, say, 10)
   return schedule(sb, sport, new Date().toISOString(), say)
 }
 
@@ -349,7 +398,7 @@ async function schedule(sb, sport, now, say) {
 }
 
 // The handler both functions export. mode: 'daily' | 'poll'.
-export async function handle(req, sport, createClient, env) {
+export async function handle(req, sport, createClient, env, runners = { daily: runDaily, poll: runPoll }) {
   if (!callerIsServiceRole(req)) return new Response('forbidden', { status: 403 })
   const log = []
   const say = s => { log.push(s); console.log(s) }
@@ -360,7 +409,7 @@ export async function handle(req, sport, createClient, env) {
   try { mode = (await req.json())?.mode === 'daily' ? 'daily' : 'poll' } catch { /* empty body = poll */ }
   try {
     if (!key) throw new Error('API_SPORTS_KEY is not set')
-    const next = mode === 'daily' ? await runDaily(sb, sport, key, say) : await runPoll(sb, sport, key, say)
+    const next = await runners[mode](sb, sport, key, say)
     return Response.json({ ok: true, mode, next_poll_at: next, log })
   } catch (e) {
     const msg = String(e?.message || e)

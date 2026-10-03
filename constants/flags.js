@@ -374,7 +374,7 @@ export const HOTELS_LIVE = false
 // KTFF fixtures before launch). NOT a MODULE_FLAGS key: there is no waitlist to collect —
 // the HOTELS_LIVE reasoning. Preconditions for flipping, in order:
 //   1. 20261070 applied, verify_schema 1070 rows OK.
-//   2. API_SPORTS_KEY set, both functions deployed, supabase/live_scores_schedule.sql run,
+//   2. API_SPORTS_KEY set, the three functions deployed, 20261072 (cron) applied,
 //      and matches populated for a full day (live_sync_state.last_error NULL).
 //   3. The F1 data source settled (licence) — or the F1 tab removed.
 //   4. Turkish device pass with this flipped LOCALLY, then BOTH files in one commit
