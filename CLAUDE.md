@@ -57,8 +57,12 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - **Permission strings:** ONE source each, its plugin option (`ios.infoPlist` is inert). Mic off, camera
   kept (accepted review risk), background location off. Verify: `npx expo config --type introspect`.
 - **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build.
-- **Maps key is restricted** (`com.berkeustun95.ada` + SHA-1). Blank map, no error = SHA-1 mismatch;
-  ADD the Play App Signing SHA-1 as a 2nd entry. Checklist: vault `play-console-status.md`.
+- **Two Maps keys, two GCP projects** (Android reads the key from the BUILD; an OTA cannot change it):
+  production EAS env = `AIzaSyDa…0Nlg` in **ada-app-499617** ("Maps Platform API Key") — ⚠ **UNRESTRICTED**
+  (no app restriction, 35 APIs), see pending; preview EAS env + local `.env` = `AIzaSyDb…uNu8` in
+  **My First Project** (`project-958a71e2-96dc-4371-942`), Android apps: `com.berkeustun95.ada.preview` +
+  preview SHA-1. Blank map, no error = the build's key refuses that package/SHA-1. Read which key a
+  build uses with `eas env:list --environment <env>`, never from `.env` (they differ). Vault `play-console-status.md`.
 - **`web/` publishes** `getadaapp.com/privacy` and `/support` (Cloudflare Worker `getadaapp`, root
   `wrangler.jsonc`); both URLs are registered with the stores. `npm run web:deploy`, never
   `npx wrangler deploy`: it runs `check-web-assets.mjs`, and wrangler REPLACES the asset manifest, so
@@ -292,6 +296,10 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
 "→ architecture.md updates needed" if structural.
 
 ## Open windows / pending (vault = `~/ObsidianVault/10-ada/`)
+- **Lock down the production Maps key `0Nlg`** (follow-up to the Explore restyle launch, 2026-10-04):
+  restrict to Android apps `com.berkeustun95.ada` + upload SHA-1 `3C:9A:…:BF:5E` + the Play App Signing
+  SHA-1 (Play Console → App integrity), API = Maps SDK for Android only. Get the Play signing SHA-1 FIRST
+  or production maps go blank. Click list for Berke; he does the console.
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.
