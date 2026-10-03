@@ -875,8 +875,6 @@ export default function HomeScreen({
 
             <Text style={s.v2SectionTitle}>{t('homeAllModules', lang)}</Text>
             <ModuleGrid lang={lang} onPress={openModule} />
-
-            <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />
           </View>
         </ScrollView>
 
@@ -961,8 +959,9 @@ export default function HomeScreen({
             <SectionHeader title={t('hrAllServices', lang)} />
             <ServicePanels lang={lang} onPress={openModule} />
 
-            {/* No ad slot here yet: check-ad-placement.mjs pins the home_footer mount to
-                renderHubV2(). Adding it to the redesign is a guard change, made at go-live. */}
+            {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
+                (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after ServicePanels. */}
+            <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />
           </View>
         </ScrollView>
 

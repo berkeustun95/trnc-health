@@ -43,7 +43,7 @@
 // and is reported below once the migration is live.
 
 import { readFileSync, existsSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { serviceRoleKey } from './lib/prod-write-guard.mjs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
@@ -120,17 +120,9 @@ if (!URL) {
   console.error(c.r('\n  EXPO_PUBLIC_SUPABASE_URL missing — expected in .env\n'))
   process.exit(2)
 }
-let KEY
-try {
-  KEY = execFileSync('security', ['find-generic-password', '-s', 'ada-supabase-service-role', '-w'],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-} catch {
-  console.error(c.r('\n  Keychain entry "ada-supabase-service-role" not found.'))
-  console.error(c.d('  The anon key cannot see appointments/questions/notifications (RLS), so it'))
-  console.error(c.d('  would report a perfect 0/0 and tell you nothing.\n'))
-  process.exit(2)
-}
-if (!KEY) { console.error(c.r('\n  Keychain entry "ada-supabase-service-role" is empty.\n')); process.exit(2) }
+// The service key, never anon: anon cannot see questions/notifications (RLS), so it
+// would report a perfect 0/0 and tell you nothing. Repo secret in CI (daily-health).
+const KEY = serviceRoleKey()
 if (KEY.startsWith('sb_publishable_')) {
   console.error(c.r('\n  Keychain holds the PUBLISHABLE key, not the secret one.'))
   console.error(c.d('  It is bound by RLS, so every flow below would read 0/0 and look healthy.\n'))

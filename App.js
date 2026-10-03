@@ -25,6 +25,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 import { supabase, isGuest } from './lib/supabase'
+import { fetchNotifications } from './utils/notificationRoute'
 import AccountRequiredSheet from './components/AccountRequiredSheet'
 import { colors, typeColors, shadow } from './constants/theme'
 import { t, LANGUAGES } from './constants/i18n'
@@ -43,7 +44,8 @@ import {
   CURRENT_PROFILE_SCHEMA_VERSION, GATE_EXEMPT_MODULES,
 } from './constants/profileGate'
 import { REGIONS } from './constants/regions'
-import { LEGAL_VERSION } from './constants/legal'
+import { LEGAL_VERSION, needsStudentHubTerms } from './constants/legal'
+import StudentHubTermsGate from './screens/StudentHubTermsGate'
 import { shouldShowPolicyNotice } from './utils/policyNoticeRules'
 import { readPendingConsent, clearPendingConsent } from './utils/pendingConsent'
 import { decidePendingConsent } from './utils/pendingConsentRules'
@@ -1249,8 +1251,7 @@ export default function App() {
         }
       })
     setNotifsLoading(true)
-    supabase.from('notifications').select('id, title, body, read, created_at')
-      .eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(50)
+    fetchNotifications(supabase, session.user.id)
       .then(({ data }) => { if (data) setNotifications(data); setNotifsLoading(false) })
 
     // Owns a garage? Drives the dark-launched garages tile for owners onboarded
@@ -2436,8 +2437,14 @@ export default function App() {
   } else if (showStudentHub) {
     // eSIM and the Welcome Guide open ON TOP of the hub rather than closing it: both render
     // earlier in this chain, so Back returns here.
+    // Terms re-ask (SOP step 6, 2026-10-02): a signed-in, non-guest account on terms older than
+    // STUDENT_HUB_TERMS_MIN sees the current terms here first; Vazgeç / back closes the hub.
+    // Inline on purpose: content may only read values defined above the selector (Hermes).
     content = (MODULE_FLAGS.studentHub || isAdmin)
-      ? <StudentHubScreen lang={lang} onBack={() => setShowStudentHub(false)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
+      ? (session && !isGuest(session) && profile && needsStudentHubTerms(profile.terms_version))
+        ? <StudentHubTermsGate lang={lang} userId={session.user.id} onCancel={() => setShowStudentHub(false)}
+            onAccepted={d => setProfile(p => ({ ...p, ...d }))} />
+        : <StudentHubScreen lang={lang} onBack={() => setShowStudentHub(false)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
           isGuest={isGuest(session)}
           // CLOSES the hub on the way to the profile, deliberately. The student list's
           // one action is "turn on the listing setting", and the hub would otherwise stay

@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 import { AGENCY_ID } from '../supabase/functions/_shared/novest-feed.mjs'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUCKET = 'property-images'
@@ -48,6 +49,8 @@ const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 
 const args = process.argv.slice(2)
 const dry = args.includes('--dry')
+// No workflow: a one-off (done 2026-08-24) that reads a file from ~/Downloads.
+prodWriteGuard({ wouldWrite: !dry, workflow: null, dryHint: 'npm run novest:logo -- <file> --dry' })
 const file = args.find(a => !a.startsWith('--'))
 if (!file) fail('Usage: npm run novest:logo -- <path-to-logo> [--dry]')
 if (!existsSync(file)) fail(`Not found: ${file}`)

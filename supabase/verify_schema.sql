@@ -283,7 +283,9 @@ WITH report AS (
     -- 1064. The card's swipeable photos, cover first. HotelsTab selects it: MISSING = 42703 on the tab.
     ('1064_hotels_gallery','hotels','gallery_urls'),
     -- 1065. Credit for a free-licence (Commons) photo. HotelsTab selects it: MISSING = 42703 on the tab.
-    ('1065_hotels_commons_credit','hotels','photo_credit')
+    ('1065_hotels_commons_credit','hotels','photo_credit'),
+    -- 1066. What a notification is. App.js selects it: MISSING = 42703, the notifications list renders empty.
+    ('1066_notification_type','notifications','type')
 
   ) e(m,t,c)
 
@@ -747,7 +749,9 @@ WITH report AS (
     -- 1064. The H token asserts the cover-first rule.
     ('1064_hotels_gallery','hotels_gallery_check'),
     -- 1065. The H token asserts the NULL-safe two-way rule.
-    ('1065_hotels_commons_credit','hotels_photo_credit_check')
+    ('1065_hotels_commons_credit','hotels_photo_credit_check'),
+    -- 1066. Its allow-list token lands after the apply, written from prod's own rendering.
+    ('1066_notification_type','notifications_type_check')
 
   ) e(m,o)
 
@@ -3644,6 +3648,41 @@ WITH report AS (
       COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_credit_check')
                LIKE '%NOT (photo_source IS DISTINCT FROM ''commons''::text)) = (photo_credit IS NOT NULL)%', false)
+    -- ── 1066: notifications.type ────────────────────────────────────────────────
+    -- (1) Every function that inserts a notification sets `type`. DERIVED: the writer set is
+    --     read from pg_proc, not named, so a seventh writer that forgets goes red here. Six
+    --     today; a legitimate new writer bumps the count in the same commit, saying why.
+    UNION ALL SELECT '1066_notification_type','6 notification writers, all six set type, none uses the 3-column INSERT',
+      COALESCE((SELECT count(*) = 6
+                   AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES%')
+                   AND NOT bool_or(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body) VALUES%')
+                  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                 WHERE n.nspname = 'public' AND p.prosrc ~* 'insert\s+into\s+(public\.)?notifications\M'), false)
+    -- ── 1067: the ledger table's comment names the supabase-migrate workflow ────
+    -- A COMMENT creates no named object. Both halves: the new sentence, and the 20260903
+    -- text it extends (what a baseline row does and does not prove) still leading it.
+    UNION ALL SELECT '1067_ledger_comment_supabase_migrate','schema_migrations_applied comment names supabase-migrate and keeps the baseline caveat',
+      COALESCE(obj_description(to_regclass('public.schema_migrations_applied'), 'pg_class')
+                 LIKE 'One row per applied migration.%Baseline rows%supabase-migrate GitHub Actions workflow%', false)
+    -- ── 1068: a live Novest listing with no photo is hidden (RESTRICTIVE policy) ──
+    -- (1) The policy: RESTRICTIVE, SELECT, and the three arms as code shapes. A PERMISSIVE
+    --     copy would OR with props_select_public and hide nothing.
+    UNION ALL SELECT '1068_novest_hide_photoless','props_hide_photoless_novest is RESTRICTIVE SELECT on novest + is_admin() + property_has_photo(id)',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='properties'
+        AND policyname='props_hide_photoless_novest' AND permissive='RESTRICTIVE' AND cmd='SELECT'
+        AND qual LIKE '%novest%' AND qual LIKE '%is_admin()%' AND qual LIKE '%property_has_photo(id)%')
+    -- (2) The FULL policy set on properties, derived: 7 before 1068 + this one. Q3 never
+    --     counted properties, so this token owns the count.
+    UNION ALL SELECT '1068_novest_hide_photoless','properties has exactly 8 policies',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='properties') = 8
+    -- (3) The helper: DEFINER (so property_images' policy, which reads properties, is never
+    --     entered — no 42P17 cycle), search_path pinned, STABLE, and EXECUTE-able by anon —
+    --     the positive control: a helper nobody can run makes every guest read error.
+    UNION ALL SELECT '1068_novest_hide_photoless','private.property_has_photo: DEFINER, search_path pinned, STABLE, anon can execute',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 's'
+                   AND EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) c WHERE c LIKE 'search_path=%')
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('private.property_has_photo(uuid)')), false)
+      AND COALESCE(has_function_privilege('anon', to_regprocedure('private.property_has_photo(uuid)'), 'EXECUTE'), false)
     -- ── 1069: check-ins ──────────────────────────────────────────────────────────
     -- (1) RLS on, exactly two guest-guarded OWNER policies (read + delete), no client
     --     INSERT/UPDATE, anon nothing. The feed is the only way to see anyone else's.

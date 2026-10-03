@@ -1,0 +1,43 @@
+# ─── Revoke an Apple user's token BEFORE deleting the user ───────────────────
+#
+# CLAUDE.md: deleting an Apple user outside the app = run this FIRST, confirm REVOKED
+# (or NOTHING STORED), THEN delete — apple_refresh_tokens cascades with auth.users,
+# after which the grant can never be revoked. CI-only since 2026-10-01.
+#
+#   gh workflow run revoke-apple-token -f user_id=<uuid>   then: gh run watch
+#
+# There is no dry run: the function either revokes or reports nothing stored. A uuid
+# with no Apple token (any non-Apple user) is the safe test.
+
+name: revoke-apple-token
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: 'auth.users id (uuid)'
+        type: string
+        required: true
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      IN_USER: ${{ inputs.user_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: Secrets and inputs
+        run: |
+          for v in SUPABASE_SECRET_KEY SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+          [[ "$IN_USER" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || { echo "::error::user_id must be a uuid"; exit 1; }
+      - name: Revoke
+        run: node scripts/revoke-apple-token.mjs "$IN_USER"

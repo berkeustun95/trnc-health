@@ -27,10 +27,13 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fold } from './import-kitob-hotels.mjs'
 import { osmSnapshot } from './lib/osm-snapshot.mjs'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
 const DRY = args.includes('--dry-run'), APPLY = args.includes('--apply')
+// No workflow: its input (data/pharmacy-hand-place-*.csv) is gitignored.
+prodWriteGuard({ wouldWrite: APPLY, workflow: null, dryHint: 'npm run pharmacies:resource -- --dry-run' })
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 if (DRY === APPLY && !args.includes('--self')) fail('Pass exactly one of --dry-run or --apply.')
 

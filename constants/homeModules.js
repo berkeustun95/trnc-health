@@ -1,3 +1,5 @@
+import { HOTELS_LIVE } from './flags.js'
+
 // Home V2 module grid — the whole grid, as data.
 //
 // ─── WHY THIS IS A CONFIG FILE AND NOT A LIST INSIDE HomeScreen ─────────────
@@ -109,6 +111,18 @@ export const HIDDEN_TILES = new Set([
   'explore',
 ])
 
+// The Emlak & Konaklama tile's two label states; AccommodationScreen's title reads the same
+// gridLabel key. MEASURED 2026-09-29 (check-tile-labels, both widths, all nine locales): neither
+// fits two lines at 11pt — "Yurt · Emlak" breaks mid-word at 320dp in ru/fr/es/de, and the
+// three-part label needs three lines in every locale even at 7.8pt. Largest sizes that fit:
+// base 8.5pt on 2 lines, hotels 8.5pt on 3 lines (Ev Hizmetleri runs 8.2pt / 3). English says
+// "Hotels" rather than "Accommodation", which breaks mid-word at 320dp even on three lines.
+// labelKey (favourites row, edit sheet: 11pt / 2 lines) stays the module name.
+export const ACCOM_TILE_STATES = {
+  base:   { labelKey: 'menuAccommodations', gridLabel: { key: 'menuAccomTile', lines: 2, size: 8.5 } },
+  hotels: { labelKey: 'menuAccommodations', gridLabel: { key: 'menuAccomTileHotels', lines: 3, size: 8.5 } },
+}
+
 export const HOME_MODULES = [
   // Urgent first. These are what somebody opens the app FOR at 2am, and the profile
   // gate's exemption list (constants/profileGate.js) names the same three concerns.
@@ -122,13 +136,11 @@ export const HOME_MODULES = [
   // browsable DIRECTORY, the one thing the map tab does not offer. Icon must not be
   // compass-outline either — that is the tab's icon.
   { id: 'explore',            icon: 'albums-outline',           tint: 'standard', labelKey: 'menuPlaces' },
-  // menuAccomTile names what is inside ("Emlak · Yurt"), NOT menuAccommodations, which stays
-  // the module's title (header, Coming Soon, V1 hub). Each '·' is bound to the word before it
-  // with U+00A0 so a wrap never starts a line with the separator. Measured 2026-09-29: fits two
-  // lines at 11pt in all nine locales (tightest Russian, 1.3pt at 320dp).
-  // ⚠ WITH HOTELS_LIVE the plan is "Emlak · Yurt · Otel", which needs THREE lines in seven
-  //   locales (max 10.2pt, Russian) — a gridLabel decision, open in the hotels plan note.
-  { id: 'accommodation',      icon: 'home-outline',             tint: 'standard', labelKey: 'menuAccomTile' },
+  // The tile names what is inside, in the module's tab order (Berke 2026-09-29): "Yurt · Emlak",
+  // and with HOTELS_LIVE "Konaklama · Yurt · Emlak". Each '·' is bound to the word before it
+  // with U+00A0 so a wrap never starts a line with the separator. BOTH states are measured by
+  // scripts/check-tile-labels.mjs whatever the flag says (ACCOM_TILE_STATES).
+  { id: 'accommodation',      icon: 'home-outline',             tint: 'standard', ...ACCOM_TILE_STATES[HOTELS_LIVE ? 'hotels' : 'base'] },
   { id: 'pets',               icon: 'paw-outline',              tint: 'standard', labelKey: 'menuPets' },   // V2 vocabulary — screens/HomeScreen.js's V1 copy says 'lifestyle'; both are correct
   { id: 'games',              icon: 'game-controller-outline',  tint: 'standard', labelKey: 'menuGames' },
 

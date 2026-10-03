@@ -31,9 +31,12 @@ import { fileURLToPath } from 'node:url'
 import { normaliseFile, fold } from './import-kitob-hotels.mjs'
 import { AREA_POINTS } from '../constants/areaPoints.js'
 import { resolveRegion } from '../utils/resolveRegion.js'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DRY = process.argv.includes('--dry')
+// SHELVED (CLAUDE.md) and interactive (a local web server): it cannot run in CI.
+prodWriteGuard({ wouldWrite: !DRY, workflow: null, dryHint: 'npm run place -- --dry' })
 const PORT = 8787
 const TOKEN = randomBytes(16).toString('hex')
 const OVERPASS = 'https://overpass-api.de/api/interpreter'

@@ -1,0 +1,115 @@
+# ─── Deploy Supabase Edge Functions ──────────────────────────────────────────
+#
+# The only deploy path: no Mac holds a Supabase access token. Manual only.
+#
+#   gh workflow run supabase-functions-deploy -f function=weather
+#   gh workflow run supabase-functions-deploy -f function=all
+#
+# verify_jwt comes from supabase/functions/deploy-config.json, which was read from
+# production. A plain `functions deploy` turns JWT verification back ON, which would
+# break apple-token, walk-leg and weather (their callers send a non-JWT key). So:
+#   1. refuse if the live verify_jwt differs from the file (drift: decide, then edit);
+#   2. deploy with --no-verify-jwt exactly where the file says false;
+#   3. assert the live setting is unchanged and the version moved;
+#   4. smoke-test any function the file gives a smoke request.
+
+name: supabase-functions-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      function:
+        description: 'Function to deploy'
+        type: choice
+        options: ['weather', 'walk-leg', 'apple-token', 'sync-novest', 'send-duty-notification', 'all']
+
+concurrency: { group: supabase-functions, cancel-in-progress: false }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      IN_FN: ${{ inputs.function }}
+      SB: npx --yes supabase@2.104.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: Secrets, project ref, targets
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_URL ANON_KEY; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+          REF=$(sed -E 's#^https://([a-z0-9]+)\.supabase\.co/?$#\1#' <<<"$SUPABASE_URL")
+          [[ "$REF" =~ ^[a-z0-9]{20}$ ]] || { echo "::error::could not derive the project ref from SUPABASE_URL"; exit 1; }
+          echo "REF=$REF" >> "$GITHUB_ENV"
+          TARGETS=$(node -e '
+            const c = require("./supabase/functions/deploy-config.json").functions
+            const want = process.env.IN_FN === "all" ? Object.keys(c) : [process.env.IN_FN]
+            for (const f of want) {
+              if (!c[f]) { console.error(`::error::${f} is not in deploy-config.json — add it (with verify_jwt) first`); process.exit(1) }
+              if (!require("fs").existsSync(`supabase/functions/${f}/index.ts`)) { console.error(`::error::supabase/functions/${f}/index.ts missing`); process.exit(1) }
+            }
+            console.log(want.join(" "))')
+          echo "TARGETS=$TARGETS" >> "$GITHUB_ENV"
+          echo "Deploying: $TARGETS"
+      - name: Before — live settings must match deploy-config.json
+        run: |
+          $SB functions list --project-ref "$REF" -o json > before.json
+          node -e '
+            const live = Object.fromEntries(require("./before.json").map(f => [f.slug, f]))
+            const c = require("./supabase/functions/deploy-config.json").functions
+            let bad = 0
+            for (const f of process.env.TARGETS.split(" ")) {
+              const l = live[f]
+              if (!l) { console.log(`  ${f}: not deployed yet (new) — will deploy with verify_jwt=${c[f].verify_jwt}`); continue }
+              const ok = l.verify_jwt === c[f].verify_jwt
+              if (!ok) bad++
+              console.log(`  ${ok ? "✓" : "✗"} ${f}: live verify_jwt=${l.verify_jwt} v${l.version}, file says ${c[f].verify_jwt}`)
+            }
+            if (bad) { console.error("::error::live verify_jwt differs from deploy-config.json — decide which is right, edit the file, re-run"); process.exit(1) }'
+      - name: Deploy
+        run: |
+          for f in $TARGETS; do
+            flag=$(node -e "process.stdout.write(require('./supabase/functions/deploy-config.json').functions['$f'].verify_jwt ? '' : '--no-verify-jwt')")
+            echo "── $f ${flag:-(verify_jwt on)}"
+            $SB functions deploy "$f" --project-ref "$REF" --use-api $flag
+          done
+      - name: After — verify_jwt unchanged, version moved
+        run: |
+          $SB functions list --project-ref "$REF" -o json > after.json
+          node -e '
+            const idx = p => Object.fromEntries(require(p).map(f => [f.slug, f]))
+            const b = idx("./before.json"), a = idx("./after.json")
+            const c = require("./supabase/functions/deploy-config.json").functions
+            let bad = 0
+            for (const f of process.env.TARGETS.split(" ")) {
+              const ok = a[f] && a[f].verify_jwt === c[f].verify_jwt && a[f].status === "ACTIVE" && (!b[f] || a[f].version > b[f].version)
+              if (!ok) bad++
+              console.log(`  ${ok ? "✓" : "✗"} ${f}: v${b[f]?.version ?? "-"} → v${a[f]?.version} · verify_jwt=${a[f]?.verify_jwt} · ${a[f]?.status}`)
+            }
+            if (bad) process.exit(1)'
+      - name: Smoke test
+        run: |
+          node -e '
+            const c = require("./supabase/functions/deploy-config.json").functions
+            ;(async () => {
+              let bad = 0
+              for (const f of process.env.TARGETS.split(" ")) {
+                const s = c[f].smoke
+                if (!s) { console.log(`  ${f}: no smoke request defined — check it by hand`); continue }
+                const r = await fetch(`${process.env.SUPABASE_URL}/functions/v1/${f}`, { method: "POST",
+                  headers: { "content-type": "application/json", apikey: process.env.ANON_KEY }, body: JSON.stringify(s.body) })
+                const j = await r.json().catch(() => ({}))
+                const ok = r.status === 200 && s.expect_key in j
+                if (!ok) bad++
+                console.log(`  ${ok ? "✓" : "✗"} ${f}: HTTP ${r.status}, "${s.expect_key}" ${s.expect_key in j ? "present" : "MISSING"}`)
+              }
+              if (bad) process.exit(1)
+            })()'

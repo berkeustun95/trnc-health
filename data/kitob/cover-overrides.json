@@ -1,0 +1,50 @@
+{
+  "_readme": "Per-hotel cover photo for the Oteller card, keyed by the hotel's KITOB name (as in the KITOB list). {\"cover\": \"<part of a source file name on hotelsofnorthcyprus.com>\"} moves that photo to the front of the gallery; {\"cover\": null} shows no photo (placeholder). Read by scripts/import-hnc-hotels.mjs; a name that matches no hotel stops the import.",
+  "overrides": {
+    "Merit Lefkoşa Hotel & Casino": {
+      "commons": {
+        "file": "Tall buildings in North Nicosia.JPG",
+        "author": "Seksen iki yüz kırk beş",
+        "license": "CC0",
+        "page": "https://commons.wikimedia.org/wiki/File:Tall_buildings_in_North_Nicosia.JPG"
+      },
+      "reason": "KITOB's page has no photo of the hotel (a museum, an event poster and stock images). Commons CC0 photo (2012), Bedrettin Demirel Avenue: the hotel on the right with the MERIT roof sign; the YAR office tower on the left. Chosen over 'Merit and YAR highrises in North Nicosia 1-3' (CC BY-SA 3.0), where the YAR tower and logo dominate.",
+      "date": "2026-09-30"
+    },
+    "Almond Holiday Village": {
+      "cover": "almond-havuz",
+      "reason": "KITOB's first photo is a bathroom; the pool and garden show the hotel.",
+      "date": "2026-09-30"
+    },
+    "Dome Hotel": {
+      "cover": "49946561_353972621855126",
+      "reason": "First photo is an interior hallway; this one shows the building.",
+      "date": "2026-09-30"
+    },
+    "Riverside Garden Resort": {
+      "cover": "AQUA-HAVUZ-2",
+      "reason": "First photo is a breakfast table; the pool area shows the resort.",
+      "date": "2026-09-30"
+    },
+    "Rocks Hotel & Casino": {
+      "cover": "rocks-1.jpg",
+      "reason": "First photo is a room; this is the building on the harbour.",
+      "date": "2026-09-30"
+    },
+    "Salamis Bay Conti Resort Hotel": {
+      "cover": "salamis-bay-conti-hotel-137",
+      "reason": "First photo is the lobby; this is the hotel and pool from outside.",
+      "date": "2026-09-30"
+    },
+    "White Pearl Hotel": {
+      "cover": "White-Pearl-Hotel.4",
+      "reason": "First photo is a restaurant terrace with guests; this is the hotel building.",
+      "date": "2026-09-30"
+    },
+    "Hamsa Hotel": {
+      "cover": null,
+      "reason": "KITOB's only image is the hotel's logo (with the Tervetuloa restaurant mark), not a photo.",
+      "date": "2026-09-30"
+    }
+  }
+}
