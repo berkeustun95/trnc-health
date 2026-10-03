@@ -2608,7 +2608,7 @@ export default function App() {
 
 
         {activeTab === 'map' && (
-          <MaybeTabBarPad>
+          <>
           <SafeAreaView style={styles.safe} edges={['top']}>
             {/* MapScreen is NOT dead code and must not be deleted — it is the committed
                 behaviour of this tab and the thing users have today. EXPLORE_MAP_LIVE
@@ -2623,6 +2623,9 @@ export default function App() {
                 // hidden once this has been checked on device.
                 onShowList={() => setShowExplore(true)}
                 onShowCheckins={CHECKINS ? () => setShowCheckinFeed(true) : undefined}
+                // The map runs full height behind the floating tab bar; the screen lifts its own
+                // bottom panels, credits and the Google logo above it (no TabBarPad here).
+                underTabBar={REDESIGN}
                 facilities={facilities}
                 dutyFacilityId={dutyFacilityId}
                 userLocation={userLocation}
@@ -2654,7 +2657,7 @@ export default function App() {
               />
             )}
           </SafeAreaView>
-          </MaybeTabBarPad>
+          </>
         )}
 
         {/* The Kaydedilenler tab was removed on 2026-09-11 with its branch. `favorites` and
