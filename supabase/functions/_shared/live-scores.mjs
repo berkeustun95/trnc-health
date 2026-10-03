@@ -277,12 +277,21 @@ export async function mirrorLogos(sb, sport, say, limit = 40) {
   const { data: todo, error } = await sb.from('teams').select('id, external_id, source_logo_url')
     .eq('sport', sport).eq('source', 'api').is('logo_url', null).not('source_logo_url', 'is', null).limit(limit)
   if (error) throw new Error(`teams (logos): ${error.message}`)
-  let copied = 0, failed = 0
+  let copied = 0, failed = 0, missing = 0
   for (const t of todo) {
     try {
       const u = new URL(t.source_logo_url)
       if (u.protocol !== 'https:' || u.hostname !== LOGO_HOST) throw new Error(`host ${u.hostname} not allowed`)
       const res = await fetch(u.toString())
+      // 404 = the provider has no image for this team (seen 2026-10-03 on two BSL teams).
+      // Clear the source so the 7-minute poll stops refetching it; the daily upsert writes the
+      // URL back, so it is retried once a day and copied if the provider ever adds the file.
+      // The app shows its placeholder meanwhile.
+      if (res.status === 404) {
+        await sb.from('teams').update({ source_logo_url: null }).eq('id', t.id)
+        missing++
+        continue
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const type = (res.headers.get('content-type') || '').split(';')[0].trim()
       const path = logoPath(sport, t.external_id, type)
@@ -300,8 +309,8 @@ export async function mirrorLogos(sb, sport, say, limit = 40) {
       say(`logo ${sport}/${t.external_id}: ${String(e?.message || e).slice(0, 120)}`)
     }
   }
-  if (todo.length) say(`${sport}: logos copied ${copied}, failed ${failed}, of ${todo.length} pending`)
-  return { copied, failed }
+  if (todo.length) say(`${sport}: logos copied ${copied}, none at provider ${missing}, failed ${failed}, of ${todo.length} pending`)
+  return { copied, missing, failed }
 }
 
 const dateQuery = (sport, d) => sport === 'football' ? `/fixtures?date=${d}` : `/games?date=${d}`

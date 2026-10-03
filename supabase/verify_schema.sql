@@ -3768,6 +3768,11 @@ WITH report AS (
     UNION ALL SELECT '1071_live_scores_followup','f1_races.round is nullable',
       EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
         AND table_name='f1_races' AND column_name='round' AND is_nullable='YES')
+    -- ── 1073: the score-editor membership is exactly Berke's customer account ──────
+    -- A second editor is a decision with its own migration; this edit is the review moment.
+    UNION ALL SELECT '1073_live_scores_editor_grant','live_score_editors is exactly the one granted account',
+      (SELECT string_agg(user_id::text, ',' ORDER BY user_id) FROM public.live_score_editors)
+      IS NOT DISTINCT FROM '412cad91-2e3b-41b9-8186-175dfb8afa35'
   ) z
 
   UNION ALL

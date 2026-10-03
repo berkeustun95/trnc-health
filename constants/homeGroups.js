@@ -50,11 +50,15 @@ const GATES = {
 
 const COMING_SOON = new Set(['jobPostings', 'transport', 'insurance', 'esim'])
 
-export function isComingSoon(id) {
-  return COMING_SOON.has(id) && !isLive(id)
+export function isComingSoon(id, unlocked) {
+  return COMING_SOON.has(id) && !isLive(id, unlocked)
 }
 
-export function isLive(id) {
+// `unlocked`: module ids this USER may see while their flag is still false — today only
+// liveScores for a score editor (live_score_editors, asked of the database by App.js), so
+// Berke can test it on a production build. Everyone else passes nothing and sees the flag.
+export function isLive(id, unlocked) {
+  if (unlocked?.has(id)) return true
   if (HIDDEN_TILES.has(id) && id !== 'explore') return false
   const gate = GATES[id]
   return gate ? gate() : true
@@ -80,13 +84,13 @@ export function moduleById(id) { return BY_ID.get(id) }
 const CATEGORY_OF = new Map(HOME_GROUPS.flatMap(g => g.ids.map(id => [id, g.key])))
 export function categoryOf(id) { return CATEGORY_OF.get(id) || 'city' }
 
-export function liveGroups() {
+export function liveGroups(unlocked) {
   return HOME_GROUPS
     .map(g => ({
       ...g,
       modules: g.ids
-        .filter(id => isLive(id) || isComingSoon(id))
-        .map(id => BY_ID.get(id) && { ...BY_ID.get(id), soon: isComingSoon(id) })
+        .filter(id => isLive(id, unlocked) || isComingSoon(id, unlocked))
+        .map(id => BY_ID.get(id) && { ...BY_ID.get(id), soon: isComingSoon(id, unlocked) })
         .filter(Boolean),
     }))
     .filter(g => g.modules.length > 0)

@@ -32,7 +32,7 @@ import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE } from './constants/flags'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE } from './constants/flags'
 import { REDESIGN } from './constants/redesign'
 import { FloatingTabBar, TabBarPad } from './components/ui'
 import { font } from './constants/theme'
@@ -659,6 +659,9 @@ export default function App() {
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
   const [showLiveScores, setShowLiveScores] = useState(false)
+  // A score editor (live_score_editors) sees the Live Scores tile while LIVE_SCORES_LIVE is false,
+  // so the module can be tested on a production build. The database answers; guests never ask.
+  const [liveScoresTester, setLiveScoresTester] = useState(false)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
   // True only while PetHotelPartnerScreen was opened from the Explore map pin, so back
   // returns to the map in one press instead of stopping on Pets home. Cleared whenever the
@@ -669,6 +672,12 @@ export default function App() {
   // Pages go at most two deep, so one slot is the whole stack (slice 5, 2026-09-28).
   const [petsFrom, setPetsFrom] = useState(null)
   useEffect(() => { if (!showPets) { setPetHotelFromMap(false); setPetsFrom(null); forgetScroll('pets:') } }, [showPets])
+  useEffect(() => {
+    if (LIVE_SCORES_LIVE || !session?.user?.id || isGuest(session)) { setLiveScoresTester(false); return }
+    let alive = true
+    supabase.rpc('is_score_editor').then(({ data, error }) => { if (alive) setLiveScoresTester(!error && data === true) })
+    return () => { alive = false }
+  }, [session?.user?.id])
   const petsSubBack = () => { setPetsSubScreen(petsFrom); setPetsFrom(null) }
   const petsNavFrom = from => dest => { setPetsFrom(from); setPetsSubScreen(dest) }
   const closePetHotel = () => {
@@ -2583,6 +2592,7 @@ export default function App() {
             onOpenExploreTab={() => setActiveTab('map')}
             onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
             onShowLiveScores={() => setShowLiveScores(true)}
+            liveScoresTester={liveScoresTester}
           />
         )}
 
