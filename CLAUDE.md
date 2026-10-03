@@ -260,6 +260,23 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
     `WAITLIST_BLAST_DONE` in `check-module-flags.mjs`.
 Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this list.
 
+## Check-ins go-live (ordered — approved 2026-10-02; code on `feat/explore-v2`)
+Policy draft on `docs/checkins-privacy`; store-form answers in vault `2026-09-24_store-privacy-forms-AS-ENTERED.md`.
+1. **Redesign live first** (`REDESIGN_LIVE`): the legacy place page keeps Coming Soon.
+2. **Show Berke the SQL** (`20261069_checkins.sql`) → wait for his "go" → apply → `verify_schema.sql`
+   → check the live-only profiles triggers (`guard_profile_ban`, `check_profile_name_content`) don't
+   block `accept_checkin_notice`'s update; report. Re-run `scripts/test-checkins-{sql,client}.mjs` first.
+3. **`npm run ota:preview`** → device pass on the preview build (Turkish; Harita / Liste / Check-in'ler at 320dp).
+4. **Publish policy + store forms, flip `MODULE_FLAGS.checkins`** (both files, one commit). Re-date the
+   draft first (four copies, both terms lines, `LEGAL_VERSION`). `privacy:check` refuses the flip
+   without the disclosure in all four copies.
+   **Before the flip:** give Berke a click-by-click list for Play Console (Data safety) and App Store
+   Connect (App Privacy): confirm Name, Photos and user-generated content are already declared, add
+   Precise Location on Apple (linked, no tracking, App Functionality). He enters it and confirms; no
+   flip before his confirmation.
+5. **`notify_module_waitlist('checkins')`** with before/after counts (SOP step 10) → `WAITLIST_BLAST_DONE`.
+Feeds only: no per-person check-in history anywhere (decided 2026-10-02).
+
 ## Advisor
 Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.
 Some sessions have no advisor tool; when absent, skip this step.
