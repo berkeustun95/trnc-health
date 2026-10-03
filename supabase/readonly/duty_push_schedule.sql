@@ -5,8 +5,8 @@ select json_build_object(
   'now_utc', to_char(now() at time zone 'utc', 'Dy YYYY-MM-DD HH24:MI'),
   'jobs', (select coalesce(json_agg(json_build_object('job', j.jobname, 'schedule', j.schedule, 'active', j.active) order by j.jobname), '[]'::json)
              from cron.job j where j.jobname ilike '%duty%' or j.command ilike '%send-duty-notification%'),
-  'last_runs', (select coalesce(json_agg(x order by x.start_time desc), '[]'::json) from (
-                  select d.jobid, d.status, to_char(d.start_time at time zone 'utc', 'Dy YYYY-MM-DD HH24:MI') as start_time
+  'last_runs', (select coalesce(json_agg(json_build_object('jobid', x.jobid, 'status', x.status, 'start_time', x.shown) order by x.ts desc), '[]'::json) from (
+                  select d.jobid, d.status, d.start_time as ts, to_char(d.start_time at time zone 'utc', 'Dy YYYY-MM-DD HH24:MI') as shown
                     from cron.job_run_details d
                    where d.jobid in (select j.jobid from cron.job j where j.jobname ilike '%duty%')
                    order by d.start_time desc limit 5) x)
