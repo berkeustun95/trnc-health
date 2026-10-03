@@ -368,6 +368,19 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //   5. hotels:health green. The list on kitob.org is dated 2023.
 export const HOTELS_LIVE = false
 
+// Live Scores (Canlı Skor): football, basketball, F1 and hand-entered KTFF football, read
+// from Supabase + Realtime (20261070; sync = supabase/functions/live-scores-*). false = no
+// Home tile and no way in; the AdminScreen score-editor entry is unaffected (admins enter
+// KTFF fixtures before launch). NOT a MODULE_FLAGS key: there is no waitlist to collect —
+// the HOTELS_LIVE reasoning. Preconditions for flipping, in order:
+//   1. 20261070 applied, verify_schema 1070 rows OK.
+//   2. API_SPORTS_KEY set, both functions deployed, supabase/live_scores_schedule.sql run,
+//      and matches populated for a full day (live_sync_state.last_error NULL).
+//   3. The F1 data source settled (licence) — or the F1 tab removed.
+//   4. Turkish device pass with this flipped LOCALLY, then BOTH files in one commit
+//      (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs), then OTA.
+export const LIVE_SCORES_LIVE = false
+
 // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar.
 //
 // ✓ LIVE 2026-09-24. Device pass done 2026-09-24 (Berke, Expo Go, guest). Pets content is

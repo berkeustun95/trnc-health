@@ -237,6 +237,7 @@ export default function HomeScreen({
   onRetryDuty,
   onOpenExploreTab,       // the Keşfet tile switches to the Keşfet tab
   onShowWalkingRoutes,    // Keşfet tab, opened in routes mode
+  onShowLiveScores,       // Canlı Skor (LIVE_SCORES_LIVE gates the tile in constants/homeGroups.js)
 }) {
   const tabFootprint = useTabBarFootprint()
   const insets = useSafeAreaInsets()
@@ -559,6 +560,7 @@ export default function HomeScreen({
     duty:               onShowDutyList,
     exploreTab:         onOpenExploreTab,
     walkingRoutes:      onShowWalkingRoutes,
+    liveScores:         onShowLiveScores,
   }
 
   if (__DEV__ && REDESIGN) {

@@ -105,6 +105,8 @@ import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import StudentHubScreen from './screens/StudentHubScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
+import LiveScoresScreen from './screens/LiveScoresScreen'
+import LiveScoresEditorScreen from './screens/LiveScoresEditorScreen'
 import GamesHubScreen from './screens/games/GamesHubScreen'
 import XoxGameScreen from './screens/games/XoxGameScreen'
 import MemoryMatchScreen from './screens/games/MemoryMatchScreen'
@@ -656,6 +658,7 @@ export default function App() {
   const [connectivityOperator, setConnectivityOperator] = useState(null)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
+  const [showLiveScores, setShowLiveScores] = useState(false)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
   // True only while PetHotelPartnerScreen was opened from the Explore map pin, so back
   // returns to the map in one press instead of stopping on Pets home. Cleared whenever the
@@ -714,6 +717,8 @@ export default function App() {
   const garagesBackRef = useRef(null)
   const facilityBackRef = useRef(null)
   const towingBackRef = useRef(null)
+  const liveScoresBackRef = useRef(null)          // LiveScoresScreen: its editor layer
+  const liveScoresEditorBackRef = useRef(null)    // admin's editor: fixture/new → list
   const profileGuardRef = useRef(null)
   // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
   // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
@@ -1078,10 +1083,12 @@ export default function App() {
       if (showExploreBeach)     { closeExploreBeach(); return true }
       if (showExplore)          { setShowExplore(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
+      if (showLiveScores) { if (liveScoresBackRef.current?.()) return true; setShowLiveScores(false); return true }
       if (showNewcomerEssentials) { if (guideBackRef.current?.()) return true; setShowNewcomerEssentials(false); return true }
       // Below eSIM, Welcome Guide and Exchange Rates: Student Hub opens those ON TOP of itself
       // (they render earlier in the content chain), so Back must pop them before the hub.
       if (showStudentHub) { if (studentHubBackRef.current?.()) return true; setShowStudentHub(false); return true }
+      if (adminPreview === 'liveScoresEditor' && liveScoresEditorBackRef.current?.()) return true
       if (adminPreview)         { setAdminPreview(null); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
       if (showGames) { setShowGames(false); return true }
@@ -1096,7 +1103,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -1939,6 +1946,7 @@ export default function App() {
     }
   } else if (profile.role === 'admin' && !adminPreview) {
     content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')}
+      onShowLiveScoresEditor={() => setAdminPreview('liveScoresEditor')}
       onShowExploreReview={EXPLORE_REVIEW ? () => setAdminPreview('exploreMap') : undefined} />
   } else if (profile.role === 'provider') {
     if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
@@ -2192,6 +2200,12 @@ export default function App() {
         <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     )
+  } else if (adminPreview === 'liveScoresEditor') {
+    // Admins enter KTFF fixtures from here (they never reach Home). Not flag-gated: fixtures
+    // are entered before LIVE_SCORES_LIVE flips.
+    content = <LiveScoresEditorScreen lang={lang} onBack={() => setAdminPreview(null)} backRef={liveScoresEditorBackRef} />
+  } else if (showLiveScores) {
+    content = <LiveScoresScreen lang={lang} session={session} onBack={() => setShowLiveScores(false)} backRef={liveScoresBackRef} />
   // Exchange Rates ABOVE the Welcome Guide: the guide's Currency card opens it on top, and
   // back returns to the guide (slice 8). Opened alone (Home), it is unaffected.
   } else if (showExchangeRates) {
@@ -2568,6 +2582,7 @@ export default function App() {
             onRetryDuty={() => { setDutyToday(d => ({ ...d, loaded: false })); setDutyRetry(n => n + 1) }}
             onOpenExploreTab={() => setActiveTab('map')}
             onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
+            onShowLiveScores={() => setShowLiveScores(true)}
           />
         )}
 
@@ -2763,7 +2778,7 @@ export default function App() {
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
-    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
+    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
       case 'pharmacy':      setActiveTab('home'); setShowDutyList(true); break
@@ -2792,7 +2807,7 @@ export default function App() {
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
     setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
-    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
+    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
       case 'beaches': setExploreBeachRegion(region); setShowExploreBeach(true); break
