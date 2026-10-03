@@ -307,12 +307,12 @@ function sessionLabel(type, lang) {
   return p ? fill(t('lsF1Practice', lang), { n: p[1] }) : t(SESSION_LABEL[type] || 'lsF1Race', lang)
 }
 
-function SessionRow({ x, isNext, lang }) {
+function SessionRow({ x, isNext, suffix, lang }) {
   return (
     <View style={s.f1Row}>
       <Text style={s.f1Time}>{hhmm(x.race_at)}</Text>
       <View style={s.f1Who}>
-        <Text style={s.teamName} numberOfLines={1}>{sessionLabel(x.session_type, lang)}</Text>
+        <Text style={s.teamName} numberOfLines={1}>{sessionLabel(x.session_type, lang)}{suffix ? ` · ${suffix}` : ''}</Text>
         <Text style={s.f1Team} numberOfLines={1}>{x.name}</Text>
       </View>
       {x.status === 'live'
@@ -324,6 +324,15 @@ function SessionRow({ x, isNext, lang }) {
             : isNext ? <Countdown iso={x.race_at} lang={lang} /> : null}
     </View>
   )
+}
+
+// API-Sports splits qualifying into three sessions; on screen they read Q1 / Q2 / Q3
+// (SQ1-SQ3 for sprint qualifying), numbered in time order within the day.
+function qualiPart(list, x) {
+  if (x.session_type !== 'qualifying' && x.session_type !== 'sprint_qualifying') return null
+  const same = list.filter(y => y.session_type === x.session_type)
+  if (same.length < 2) return null
+  return `${x.session_type === 'qualifying' ? 'Q' : 'SQ'}${same.indexOf(x) + 1}`
 }
 
 function F1View({ lang }) {
@@ -395,7 +404,7 @@ function F1View({ lang }) {
               {d.list.map((x, i) => (
                 <View key={x.id}>
                   {i > 0 && <View style={s.hairline} />}
-                  <SessionRow x={x} isNext={next?.id === x.id} lang={lang} />
+                  <SessionRow x={x} isNext={next?.id === x.id} suffix={qualiPart(d.list, x)} lang={lang} />
                 </View>
               ))}
             </Card>
