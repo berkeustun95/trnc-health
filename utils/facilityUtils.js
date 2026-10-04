@@ -78,6 +78,27 @@ export function parseIsOpen(hours, now = new Date()) {
   return nowMins >= toMins(startTime) && nowMins < toMins(endTime)
 }
 
+// Open now, counting the duty roster. A pharmacy on duty is open for its whole duty window
+// (open_from → open_until, "00:00" = midnight) whatever its regular hours say — on a duty
+// night its hours read "closed" after 17:30 and Şimdi açık would hide exactly the pharmacy
+// people are looking for. dutyWindows: Map(facilityId → { date, from, until }) from
+// dutyWindowsFor() (utils/dutyFacilityMatch.js); a window only counts on its own date, so a
+// roster loaded yesterday cannot open a pharmacy today. Otherwise parseIsOpen decides.
+export function onDutyNow(facility, dutyWindows, now = new Date()) {
+  const w = facility && dutyWindows?.get(facility.id)
+  if (!w) return false
+  const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  if (w.date !== key || !HHMM.test(w.from) || !HHMM.test(w.until)) return false
+  const m = now.getHours() * 60 + now.getMinutes()
+  const until = w.until === '00:00' ? 24 * 60 : toMins(w.until)
+  return m >= toMins(w.from) && m < until
+}
+
+export function isOpenNow(facility, dutyWindows, now = new Date()) {
+  if (onDutyNow(facility, dutyWindows, now)) return true
+  return parseIsOpen(facility?.opening_hours, now)
+}
+
 export function uvLevel(index) {
   if (index == null) return null
   if (index < 3)  return { key: 'uvLow',      color: '#22C55E', warn: false }

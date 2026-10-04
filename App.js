@@ -1,4 +1,4 @@
-import { Component, Fragment, useEffect, useState, useRef, useCallback } from 'react'
+import { Component, Fragment, useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Pressable, Platform, TextInput, ScrollView, Linking, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
 import { addBackListener } from './utils/backHandler'
@@ -56,6 +56,7 @@ import ProviderScreen from './screens/ProviderScreen'
 import ProviderOnboardingScreen from './screens/ProviderOnboardingScreen'
 import MapScreen from './screens/MapScreen'
 import ExploreMapScreen from './screens/ExploreMapScreen'
+import { dutyWindowsFor } from './utils/dutyFacilityMatch'
 import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import ProfileSetupScreen from './screens/ProfileSetupScreen'
@@ -559,6 +560,10 @@ export default function App() {
   // Rows are today's { region, open_until } — ~13 a day — so the tile can name the closing
   // time of the user's own district. `date` lets a foreground after midnight re-read.
   const [dutyToday, setDutyToday] = useState({ loaded: false, error: false, rows: [], date: null })
+  // Today's duty windows by facility id: during its window a duty pharmacy counts as OPEN for
+  // Şimdi açık and the Home open badge/filter, whatever its regular hours say (isOpenNow).
+  const dutyWindows = useMemo(() => dutyWindowsFor(dutyToday.rows, facilities, dutyToday.date),
+    [dutyToday.rows, dutyToday.date, facilities])
   const [dutyRetry, setDutyRetry] = useState(0)
   // Home's "Yürüyüş Rotaları" tile opens the Keşfet tab straight into routes mode. Cleared
   // whenever the tab bar is used, so a later plain visit opens the map as usual.
@@ -1508,7 +1513,8 @@ export default function App() {
       // `region`, not head:true+count. The coverage check needs the DISTRICTS, and a
       // head request returns no rows to count them from. It is ~13 rows a day.
       const [{ data: dutyToday, error: todayErr }, { data: dutyNewest, error: newestErr }] = await Promise.all([
-        supabase.from('duty_list').select('region, open_until').eq('duty_date', today),
+        // name + open_from too: dutyWindows matches each row to its facility (Şimdi açık).
+        supabase.from('duty_list').select('name, region, open_from, open_until').eq('duty_date', today),
         supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
       ])
       if (cancelled) return
@@ -1906,6 +1912,7 @@ export default function App() {
       />
     } else if (gateHealthList) {
       content = <HomeScreen
+            dutyWindows={dutyWindows}
         lang={lang}
         facilities={facilities}
         dutyFacilityId={dutyFacilityId}
@@ -2519,6 +2526,7 @@ export default function App() {
 
         {activeTab === 'home' && (
           <HomeScreen
+            dutyWindows={dutyWindows}
             backRef={homeBackRef}
             lang={lang}
             facilities={facilities}
@@ -2622,6 +2630,7 @@ export default function App() {
                 // The map runs full height behind the floating tab bar; the screen lifts its own
                 // bottom panels, credits and the Google logo above it (no TabBarPad here).
                 underTabBar={REDESIGN}
+                dutyWindows={dutyWindows}
                 facilities={facilities}
                 dutyFacilityId={dutyFacilityId}
                 userLocation={userLocation}

@@ -27,7 +27,7 @@
 // module and exercise the real gate against the real constants. Metro resolves both forms.
 import { MODULE_FLAGS, PET_HOTEL_LIVE } from './flags.js'
 import { HEALTH_TYPES } from './facilityTypes.js'
-import { parseIsOpen } from '../utils/facilityUtils.js'
+import { parseIsOpen, isOpenNow } from '../utils/facilityUtils.js'
 import { typeColors, placeColors } from './theme.js'
 import { PET_PARTNERS } from './petPartners.js'
 import {
@@ -103,12 +103,9 @@ function healthPins(facilities, dutyFacilityId) {
       color:   (typeColors[f.type] || typeColors.clinic).text,
       colorBg: (typeColors[f.type] || typeColors.clinic).bg,
       // Duty pharmacy keeps its accent pin so the flagship feature survives the swap.
-      // ⚠ THIS BRANCH CANNOT FIRE TODAY, AND THAT IS A DATA GAP, NOT A BUG: all 387
-      //   pharmacies have NULL latitude/longitude, so no pharmacy ever reaches this
-      //   .map() and dutyFacilityId can never match. It starts working the day the
-      //   pharmacies are geocoded — do not read the dead branch as broken and delete it.
-      //   (seed_pharmacies_geocoded.sql exists but is NOT the fix: its 387 rows carry
-      //   only 142 distinct points, 28 of them stacked on one coordinate.)
+      // Live since the pharmacy geocoding passes: 369 of 387 pharmacies carry a pin
+      // (anon count, 2026-10-04), so duty pharmacies do reach this .map(). The ones
+      // without a pin still cannot — a data gap, not a bug; do not delete the branch.
       isDuty: dutyFacilityId != null && f.id === dutyFacilityId,
     }))
 }
@@ -258,8 +255,11 @@ export function selectedPins(sources, selectedKeys) {
 // well as the legacy "Mon-Fri 09:00-18:00" text (scripts/test-open-now.mjs); before that it
 // read only the legacy form, so hours entered in the app could never show the chip. Live
 // that day: 0 of 393 active facilities had opening_hours at all. Do not delete as unused.
-export function openNowApplicable(pins) {
-  return pins.some(p => p.kind === 'health' && parseIsOpen(p.row.opening_hours) !== null)
+// A pharmacy on today's duty roster also makes the chip applicable: during its window it is
+// open whatever its hours say (isOpenNow).
+export function openNowApplicable(pins, dutyWindows = null) {
+  return pins.some(p => p.kind === 'health'
+    && (parseIsOpen(p.row.opening_hours) !== null || !!dutyWindows?.has(p.row.id)))
 }
 
 // Open-now is structurally HEALTH-ONLY: BROWSE_COLS does not select opening_hours, so a
@@ -269,7 +269,7 @@ export function openNowApplicable(pins) {
 // Non-health pins pass through UNFILTERED rather than being hidden. A beach has no opening
 // hours to be open or closed against; dropping it would turn a modifier into a mode and
 // leave the user staring at an empty map wondering which chip did it.
-export function applyOpenNow(pins, on) {
+export function applyOpenNow(pins, on, dutyWindows = null) {
   if (!on) return pins
-  return pins.filter(p => p.kind !== 'health' || parseIsOpen(p.row.opening_hours) === true)
+  return pins.filter(p => p.kind !== 'health' || isOpenNow(p.row, dutyWindows) === true)
 }

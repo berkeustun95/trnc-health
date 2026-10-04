@@ -35,7 +35,7 @@ import { resolveFavourites } from '../constants/homeFavourites'
 import { loadUsage, loadPins, savePins, recordModuleOpen } from '../utils/moduleUsage'
 import { SPECIALTIES_BY_TYPE } from '../constants/specialties'
 import {
-  haversineKm, parseIsOpen, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
+  haversineKm, isOpenNow, uvLevel, weatherIcon, weatherLabelKey, isAvailableToday, coarseCoord,
 } from '../utils/facilityUtils'
 import BackButton from '../components/BackButton'
 import LocationOffRow from '../components/LocationOffRow'
@@ -180,6 +180,7 @@ export default function HomeScreen({
   lang,
   facilities,
   dutyFacilityId,
+  dutyWindows = null,     // today's duty windows by facility id: a pharmacy on duty is open
   dutyRosterStatus = 'fresh',
   userLocation,
   facilityRatings,
@@ -650,7 +651,7 @@ export default function HomeScreen({
     // hospitals suddenly appear in Lefkoşa.
     .filter(f => !f.parent_facility_id)
     .filter(f => !activeType || f.type === activeType)
-    .filter(f => !openOnly || parseIsOpen(f.opening_hours) === true)
+    .filter(f => !openOnly || isOpenNow(f, dutyWindows) === true)
     .filter(f => !activeSpecialty || (Array.isArray(f.specialty) ? f.specialty.includes(activeSpecialty) : f.specialty === activeSpecialty))
     .filter(f => {
       if (!langFilter) return true
@@ -1231,7 +1232,7 @@ export default function HomeScreen({
               />
             )}
             renderItem={({ item }) => {
-              const isOpen = parseIsOpen(item.opening_hours)
+              const isOpen = isOpenNow(item, dutyWindows)
               const isDuty = item.id === dutyFacilityId
               const isFav  = favorites.has(item.id)
               const rating = facilityRatings[item.id]
@@ -1496,7 +1497,7 @@ export default function HomeScreen({
             </View>
           )}
           renderItem={({ item }) => {
-            const isOpen = parseIsOpen(item.opening_hours)
+            const isOpen = isOpenNow(item, dutyWindows)
             const tc     = typeColors[item.type] || typeColors.clinic
             const isDuty = item.id === dutyFacilityId
             const isFav  = favorites.has(item.id)
