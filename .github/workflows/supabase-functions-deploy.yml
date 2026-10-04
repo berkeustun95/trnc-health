@@ -21,7 +21,7 @@ on:
       function:
         description: 'Function to deploy'
         type: choice
-        options: ['weather', 'walk-leg', 'apple-token', 'sync-novest', 'send-duty-notification', 'all']
+        options: ['weather', 'walk-leg', 'apple-token', 'sync-novest', 'send-duty-notification', 'live-scores-football', 'live-scores-basketball', 'live-scores-f1', 'all']
 
 concurrency: { group: supabase-functions, cancel-in-progress: false }
 

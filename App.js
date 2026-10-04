@@ -32,8 +32,8 @@ import { t, LANGUAGES } from './constants/i18n'
 import { SPECIALTIES_BY_TYPE } from './constants/specialties'
 import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
-import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE } from './constants/flags'
-import { REDESIGN } from './constants/redesign'
+import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE } from './constants/flags'
+import { REDESIGN, CHECKINS } from './constants/redesign'
 import { FloatingTabBar, TabBarPad } from './components/ui'
 import { font } from './constants/theme'
 import { REGION_TO_DUTY } from './constants/regions'
@@ -83,6 +83,7 @@ import ConnectivityPackageScreen from './screens/ConnectivityPackageScreen'
 import ConnectivityStoresScreen from './screens/ConnectivityStoresScreen'
 import InsuranceDashboardScreen from './screens/InsuranceDashboardScreen'
 import ExploreScreen from './screens/ExploreScreen'
+import CheckinFeedScreen from './screens/CheckinFeedScreen'
 import ExploreProfileScreen from './screens/ExploreProfileScreen'
 import { PET_PARTNERS } from './constants/petPartners'
 import PetsHomeScreen from './screens/pets/PetsHomeScreen'
@@ -105,6 +106,8 @@ import LegalScreen from './screens/LegalScreen'
 import NewcomerEssentialsScreen from './screens/NewcomerEssentialsScreen'
 import StudentHubScreen from './screens/StudentHubScreen'
 import ExchangeRatesScreen from './screens/ExchangeRatesScreen'
+import LiveScoresScreen from './screens/LiveScoresScreen'
+import LiveScoresEditorScreen from './screens/LiveScoresEditorScreen'
 import GamesHubScreen from './screens/games/GamesHubScreen'
 import XoxGameScreen from './screens/games/XoxGameScreen'
 import MemoryMatchScreen from './screens/games/MemoryMatchScreen'
@@ -627,6 +630,7 @@ export default function App() {
   const [showJobPostings,  setShowJobPostings]  = useState(false)
   const [showExploreBeach, setShowExploreBeach] = useState(false)
   const [showExplore, setShowExplore] = useState(false)   // the full Explore module tile (dark until MODULE_FLAGS.explore)
+  const [showCheckinFeed, setShowCheckinFeed] = useState(false)   // Keşfet tab → Check-in'ler (CHECKINS)
   // Set by the wizard's Google/Apple under-13 branch AFTER delete_own_account succeeded and
   // before it signs out, so the notice replaces the welcome screen that SIGNED_OUT would show.
   // Session state is right here, unlike the flag path: the account no longer exists, so
@@ -656,6 +660,10 @@ export default function App() {
   const [connectivityOperator, setConnectivityOperator] = useState(null)
   const [showNewcomerEssentials, setShowNewcomerEssentials] = useState(false)
   const [showExchangeRates, setShowExchangeRates] = useState(false)
+  const [showLiveScores, setShowLiveScores] = useState(false)
+  // A score editor (live_score_editors) sees the Live Scores tile while LIVE_SCORES_LIVE is false,
+  // so the module can be tested on a production build. The database answers; guests never ask.
+  const [liveScoresTester, setLiveScoresTester] = useState(false)
   const [petsSubScreen, setPetsSubScreen] = useState(null)
   // True only while PetHotelPartnerScreen was opened from the Explore map pin, so back
   // returns to the map in one press instead of stopping on Pets home. Cleared whenever the
@@ -666,6 +674,12 @@ export default function App() {
   // Pages go at most two deep, so one slot is the whole stack (slice 5, 2026-09-28).
   const [petsFrom, setPetsFrom] = useState(null)
   useEffect(() => { if (!showPets) { setPetHotelFromMap(false); setPetsFrom(null); forgetScroll('pets:') } }, [showPets])
+  useEffect(() => {
+    if (LIVE_SCORES_LIVE || !session?.user?.id || isGuest(session)) { setLiveScoresTester(false); return }
+    let alive = true
+    supabase.rpc('is_score_editor').then(({ data, error }) => { if (alive) setLiveScoresTester(!error && data === true) })
+    return () => { alive = false }
+  }, [session?.user?.id])
   const petsSubBack = () => { setPetsSubScreen(petsFrom); setPetsFrom(null) }
   const petsNavFrom = from => dest => { setPetsFrom(from); setPetsSubScreen(dest) }
   const closePetHotel = () => {
@@ -714,6 +728,8 @@ export default function App() {
   const garagesBackRef = useRef(null)
   const facilityBackRef = useRef(null)
   const towingBackRef = useRef(null)
+  const liveScoresBackRef = useRef(null)          // LiveScoresScreen: its editor layer
+  const liveScoresEditorBackRef = useRef(null)    // admin's editor: fixture/new → list
   const profileGuardRef = useRef(null)
   // HOME_V2: the Oli ROW on Home opens the sheet, so the open call has to come from
   // outside OliGuide. Same ref idiom as oliCloseRef directly above, pointed the other
@@ -1077,11 +1093,14 @@ export default function App() {
       if ((showExploreBeach || showExplore) && exploreBackRef.current?.()) return true
       if (showExploreBeach)     { closeExploreBeach(); return true }
       if (showExplore)          { setShowExplore(false); return true }
+      if (showCheckinFeed)      { setShowCheckinFeed(false); return true }
       if (showExchangeRates) { setShowExchangeRates(false); return true }
+      if (showLiveScores) { if (liveScoresBackRef.current?.()) return true; setShowLiveScores(false); return true }
       if (showNewcomerEssentials) { if (guideBackRef.current?.()) return true; setShowNewcomerEssentials(false); return true }
       // Below eSIM, Welcome Guide and Exchange Rates: Student Hub opens those ON TOP of itself
       // (they render earlier in the content chain), so Back must pop them before the hub.
       if (showStudentHub) { if (studentHubBackRef.current?.()) return true; setShowStudentHub(false); return true }
+      if (adminPreview === 'liveScoresEditor' && liveScoresEditorBackRef.current?.()) return true
       if (adminPreview)         { setAdminPreview(null); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
       if (showGames) { setShowGames(false); return true }
@@ -1096,7 +1115,7 @@ export default function App() {
       return false
     })
     return () => sub.remove()
-  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
+  }, [updateTier, showMenu, showPasswordReset, showNotifs, showDutyList, showEvents, openedEvent, eventFromHome, unclaimedFacility, selectedFacility, activeTab, showAccommodation, openedProperty, openedDorm, showAgentOnboarding, showPets, petsSubScreen, petHotelFromMap, petsFrom, showHomeServices, showJobPostings, showTransport, showInsurance, showGrooming, showGarages, showTowing, gateHealthList, showStudentHub, showEsim, connectivitySub, showLegal, showExploreBeach, showExplore, showCheckinFeed, adminPreview, selectedExplorePlace, showNewcomerEssentials, showExchangeRates, showLiveScores, showGames, gamesSubScreen, showWelcome, showEmergencyModal, showMunicipalModal, oliSheetOpen])
 
   useEffect(() => {
     Promise.all([
@@ -1939,6 +1958,7 @@ export default function App() {
     }
   } else if (profile.role === 'admin' && !adminPreview) {
     content = <AdminScreen session={session} lang={lang} onShowExplore={() => setAdminPreview('explore')} onShowStudentHub={() => setAdminPreview('studentHub')}
+      onShowLiveScoresEditor={() => setAdminPreview('liveScoresEditor')}
       onShowExploreReview={EXPLORE_REVIEW ? () => setAdminPreview('exploreMap') : undefined} />
   } else if (profile.role === 'provider') {
     if (providerFacility === undefined || (providerFacility === null && pendingClaim === undefined)) {
@@ -2161,6 +2181,13 @@ export default function App() {
     ) : (
       <ComingSoonScreen lang={lang} moduleKey="explore" titleKey="menuExplore" session={session} onBack={() => setShowExplore(false)} />
     )
+  } else if (showCheckinFeed) {
+    content = (
+      <BLErrorBoundary lang={lang}>
+        <CheckinFeedScreen session={session} lang={lang} onBack={() => setShowCheckinFeed(false)} onRequireAccount={requireAccount}
+          onSelectPlace={setSelectedExplorePlace} placeOverlay={explorePlaceEl} />
+      </BLErrorBoundary>
+    )
   } else if (selectedExplorePlace) {
     // Map tab (and anything else outside the Explore module): standalone, as before.
     content = explorePlaceEl
@@ -2192,6 +2219,12 @@ export default function App() {
         <ExploreScreen lang={lang} onBack={() => setAdminPreview(null)} userLocation={userLocation} onSelectPlace={setSelectedExplorePlace} session={session} onRequireAccount={requireAccount} placeFavorites={placeFavorites} onTogglePlaceFavorite={togglePlaceFavorite} isAdmin={isAdmin} />
       </BLErrorBoundary>
     )
+  } else if (adminPreview === 'liveScoresEditor') {
+    // Admins enter KTFF fixtures from here (they never reach Home). Not flag-gated: fixtures
+    // are entered before LIVE_SCORES_LIVE flips.
+    content = <LiveScoresEditorScreen lang={lang} onBack={() => setAdminPreview(null)} backRef={liveScoresEditorBackRef} />
+  } else if (showLiveScores) {
+    content = <LiveScoresScreen lang={lang} session={session} onBack={() => setShowLiveScores(false)} backRef={liveScoresBackRef} />
   // Exchange Rates ABOVE the Welcome Guide: the guide's Currency card opens it on top, and
   // back returns to the guide (slice 8). Opened alone (Home), it is unaffected.
   } else if (showExchangeRates) {
@@ -2568,12 +2601,14 @@ export default function App() {
             onRetryDuty={() => { setDutyToday(d => ({ ...d, loaded: false })); setDutyRetry(n => n + 1) }}
             onOpenExploreTab={() => setActiveTab('map')}
             onShowWalkingRoutes={() => { setMapRoutesMode(true); setActiveTab('map') }}
+            onShowLiveScores={() => setShowLiveScores(true)}
+            liveScoresTester={liveScoresTester}
           />
         )}
 
 
         {activeTab === 'map' && (
-          <MaybeTabBarPad>
+          <>
           <SafeAreaView style={styles.safe} edges={['top']}>
             {/* MapScreen is NOT dead code and must not be deleted — it is the committed
                 behaviour of this tab and the thing users have today. EXPLORE_MAP_LIVE
@@ -2587,6 +2622,10 @@ export default function App() {
                 // opens the SAME ExploreScreen the Home tile opens, so the tile can be
                 // hidden once this has been checked on device.
                 onShowList={() => setShowExplore(true)}
+                onShowCheckins={CHECKINS ? () => setShowCheckinFeed(true) : undefined}
+                // The map runs full height behind the floating tab bar; the screen lifts its own
+                // bottom panels, credits and the Google logo above it (no TabBarPad here).
+                underTabBar={REDESIGN}
                 facilities={facilities}
                 dutyFacilityId={dutyFacilityId}
                 userLocation={userLocation}
@@ -2618,7 +2657,7 @@ export default function App() {
               />
             )}
           </SafeAreaView>
-          </MaybeTabBarPad>
+          </>
         )}
 
         {/* The Kaydedilenler tab was removed on 2026-09-11 with its branch. `favorites` and
@@ -2761,9 +2800,9 @@ export default function App() {
   const oliNavigate = (target) => {
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
-    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
+    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
       case 'pharmacy':      setActiveTab('home'); setShowDutyList(true); break
@@ -2790,9 +2829,9 @@ export default function App() {
     setCityWelcome(null)
     setShowDutyList(false); setShowEvents(false); setShowAccommodation(false)
     setShowPets(false); setPetsSubScreen(null); setShowHomeServices(false)
-    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowTransport(false)
+    setShowJobPostings(false); setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setShowTransport(false)
     setShowInsurance(false); setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowTowing(false)
-    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false)
+    setShowNewcomerEssentials(false); setShowStudentHub(false); setShowExchangeRates(false); setShowLiveScores(false)
     setSelectedExplorePlace(null); setShowNotifs(false)
     switch (target) {
       case 'beaches': setExploreBeachRegion(region); setShowExploreBeach(true); break

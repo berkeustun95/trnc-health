@@ -57,8 +57,12 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - **Permission strings:** ONE source each, its plugin option (`ios.infoPlist` is inert). Mic off, camera
   kept (accepted review risk), background location off. Verify: `npx expo config --type introspect`.
 - **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build.
-- **Maps key is restricted** (`com.berkeustun95.ada` + SHA-1). Blank map, no error = SHA-1 mismatch;
-  ADD the Play App Signing SHA-1 as a 2nd entry. Checklist: vault `play-console-status.md`.
+- **Two Maps keys, two GCP projects** (Android reads the key from the BUILD; an OTA cannot change it):
+  production EAS env = `AIzaSyDa…0Nlg` in **ada-app-499617** ("Maps Platform API Key") — ⚠ **UNRESTRICTED**
+  (no app restriction, 35 APIs), see pending; preview EAS env + local `.env` = `AIzaSyDb…uNu8` in
+  **My First Project** (`project-958a71e2-96dc-4371-942`), Android apps: `com.berkeustun95.ada.preview` +
+  preview SHA-1. Blank map, no error = the build's key refuses that package/SHA-1. Read which key a
+  build uses with `eas env:list --environment <env>`, never from `.env` (they differ). Vault `play-console-status.md`.
 - **`web/` publishes** `getadaapp.com/privacy` and `/support` (Cloudflare Worker `getadaapp`, root
   `wrangler.jsonc`); both URLs are registered with the stores. `npm run web:deploy`, never
   `npx wrangler deploy`: it runs `check-web-assets.mjs`, and wrangler REPLACES the asset manifest, so
@@ -260,13 +264,13 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
     `WAITLIST_BLAST_DONE` in `check-module-flags.mjs`.
 Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this list.
 
-## Check-ins go-live (ordered — approved 2026-10-02; code on `feat/explore-v2`)
+## Check-ins go-live (ordered — approved 2026-10-02; app code on main via `feat/explore-v2`, migration 20261069 + its verify_schema/ledger entries + `scripts/test-checkins-*.mjs` on `feat/checkins-db`)
 Policy draft on `docs/checkins-privacy`; store-form answers in vault `2026-09-24_store-privacy-forms-AS-ENTERED.md`.
 1. **Redesign live first** (`REDESIGN_LIVE`): the legacy place page keeps Coming Soon.
-2. **Show Berke the SQL** (`20261069_checkins.sql`) → wait for his "go" → apply → `verify_schema.sql`
+2. **Show Berke the SQL** (`20261069_checkins.sql`, on `feat/checkins-db`; lands on main by `git checkout feat/checkins-db -- <files>` the day it is applied) → wait for his "go" → apply → `verify_schema.sql`
    → check the live-only profiles triggers (`guard_profile_ban`, `check_profile_name_content`) don't
    block `accept_checkin_notice`'s update; report. Re-run `scripts/test-checkins-{sql,client}.mjs` first.
-3. **`npm run ota:preview`** → device pass on the preview build (Turkish; Harita / Liste / Check-in'ler at 320dp).
+3. Set `CHECKINS_PREVIEW = true` (`constants/redesign.js`), **`npm run ota:preview`** → device pass on the preview build (Turkish; Harita / Liste / Check-in'ler at 320dp).
 4. **Publish policy + store forms, flip `MODULE_FLAGS.checkins`** (both files, one commit). Re-date the
    draft first (four copies, both terms lines, `LEGAL_VERSION`). `privacy:check` refuses the flip
    without the disclosure in all four copies.
@@ -292,6 +296,10 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
 "→ architecture.md updates needed" if structural.
 
 ## Open windows / pending (vault = `~/ObsidianVault/10-ada/`)
+- **Lock down the production Maps key `0Nlg`** (follow-up to the Explore restyle launch, 2026-10-04):
+  restrict to Android apps `com.berkeustun95.ada` + upload SHA-1 `3C:9A:…:BF:5E` + the Play App Signing
+  SHA-1 (Play Console → App integrity), API = Maps SDK for Android only. Get the Play signing SHA-1 FIRST
+  or production maps go blank. Click list for Berke; he does the console.
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.

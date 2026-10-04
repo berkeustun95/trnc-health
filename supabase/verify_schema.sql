@@ -92,6 +92,18 @@ WITH report AS (
     ('1056_route_medals','route_medals'),
     -- KITOB hotels (1059). Dark until go-live: is_active DEFAULT false; service_role writes only.
     ('1059_hotels','hotels'),
+    -- Live Scores (1070). Public read; sync = service_role; manual KTFF rows by score editors.
+    ('1070_live_scores','leagues'),
+    ('1070_live_scores','teams'),
+    ('1070_live_scores','matches'),
+    ('1070_live_scores','match_events'),
+    ('1070_live_scores','f1_races'),
+    ('1070_live_scores','f1_results'),
+    ('1070_live_scores','f1_standings'),
+    ('1070_live_scores','api_quota_log'),
+    ('1070_live_scores','api_request_log'),
+    ('1070_live_scores','live_sync_state'),
+    ('1070_live_scores','live_score_editors'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
@@ -279,7 +291,10 @@ WITH report AS (
     -- 1065. Credit for a free-licence (Commons) photo. HotelsTab selects it: MISSING = 42703 on the tab.
     ('1065_hotels_commons_credit','hotels','photo_credit'),
     -- 1066. What a notification is. App.js selects it: MISSING = 42703, the notifications list renders empty.
-    ('1066_notification_type','notifications','type')
+    ('1066_notification_type','notifications','type'),
+    -- 1071. The provider's logo URL (sync-only) and the F1 session kind.
+    ('1071_live_scores_followup','teams','source_logo_url'),
+    ('1071_live_scores_followup','f1_races','session_type')
 
   ) e(m,t,c)
 
@@ -426,7 +441,10 @@ WITH report AS (
     ('1052_purge_status_reporter','app_update_events_purge_status'),
     ('1056_route_medals','award_route_medal'),
     ('1056_route_medals','get_profile_route_badges'),
-    ('1059_hotels','hotels_touch_updated_at')
+    ('1059_hotels','hotels_touch_updated_at'),
+    ('1070_live_scores','matches_touch_updated_at'),
+    ('1070_live_scores','is_score_editor'),
+    ('1070_live_scores','claim_api_request')
   ) e(m,o)
 
   UNION ALL
@@ -480,7 +498,8 @@ WITH report AS (
     ('1029_student_messaging','msg_40_immutable'),
     ('1029_student_messaging','msg_50_touch_conversation'),
     ('1045_places_source','places_guard_source'),
-    ('1059_hotels','hotels_touch_updated_at')
+    ('1059_hotels','hotels_touch_updated_at'),
+    ('1070_live_scores','matches_touch_updated_at')
 
   ) e(m,o)
 
@@ -734,7 +753,33 @@ WITH report AS (
     -- 1065. The H token asserts the NULL-safe two-way rule.
     ('1065_hotels_commons_credit','hotels_photo_credit_check'),
     -- 1066. Its allow-list token lands after the apply, written from prod's own rendering.
-    ('1066_notification_type','notifications_type_check')
+    ('1066_notification_type','notifications_type_check'),
+    -- 1070. api_quota_log_cap_check is the quota's SECOND fence (claim_api_request is the first).
+    ('1070_live_scores','leagues_source_check'),
+    ('1070_live_scores','leagues_sport_check'),
+    ('1070_live_scores','teams_source_check'),
+    ('1070_live_scores','teams_sport_check'),
+    ('1070_live_scores','matches_source_check'),
+    ('1070_live_scores','matches_status_check'),
+    ('1070_live_scores','matches_sport_check'),
+    ('1070_live_scores','matches_teams_check'),
+    ('1070_live_scores','matches_league_fkey'),
+    ('1070_live_scores','matches_home_team_fkey'),
+    ('1070_live_scores','matches_away_team_fkey'),
+    ('1070_live_scores','match_events_type_check'),
+    ('1070_live_scores','match_events_side_check'),
+    ('1070_live_scores','f1_races_status_check'),
+    ('1070_live_scores','f1_standings_kind_check'),
+    ('1070_live_scores','api_quota_log_cap_check'),
+    ('1070_live_scores','api_quota_log_sport_check'),
+    ('1070_live_scores','live_sync_state_sport_check'),
+    ('1070_live_scores','matches_external_key'),
+    ('1070_live_scores','match_events_dedupe_key'),
+    ('1070_live_scores','leagues_id_sport_key'),
+    ('1070_live_scores','teams_id_sport_key'),
+    ('1071_live_scores_followup','teams_source_logo_check'),
+    ('1071_live_scores_followup','f1_races_session_type_check'),
+    ('1071_live_scores_followup','f1_races_api_race_id_key')
 
   ) e(m,o)
 
@@ -823,7 +868,11 @@ WITH report AS (
     ('1048_walking_routes','idx_walking_route_stops_place_id'),
     -- 1049: the CASCADE on a places delete looks legs up by to_place_id (the PK covers from).
     ('1049_walking_legs','idx_walking_legs_to_place_id'),
-    ('1051_app_versions','idx_app_update_events_created_at')
+    ('1051_app_versions','idx_app_update_events_created_at'),
+    ('1070_live_scores','matches_kickoff_idx'),
+    ('1070_live_scores','matches_league_idx'),
+    ('1070_live_scores','api_request_log_at_idx'),
+    ('1071_live_scores_followup','f1_races_race_at_idx')
 
   ) e(m,o)
 
@@ -897,7 +946,9 @@ WITH report AS (
     -- 1056. Without these the medal is never saved and other students never see a badge;
     -- both would read as "nobody has walked a route".
     ('1056_route_medals','award_route_medal'),
-    ('1056_route_medals','get_profile_route_badges')
+    ('1056_route_medals','get_profile_route_badges'),
+    -- 1070. Without it the editor button never shows (the app asks is_score_editor()).
+    ('1070_live_scores','is_score_editor')
   ) e(m,o)
 
   UNION ALL
@@ -3658,6 +3709,70 @@ WITH report AS (
                    AND EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) c WHERE c LIKE 'search_path=%')
                   FROM pg_proc p WHERE p.oid = to_regprocedure('private.property_has_photo(uuid)')), false)
       AND COALESCE(has_function_privilege('anon', to_regprocedure('private.property_has_photo(uuid)'), 'EXECUTE'), false)
+    -- ── 1070: Live Scores ───────────────────────────────────────────────────────
+    -- (1) Pre-launch DEFAULT. A reverted DEFAULT creates no named object.
+    UNION ALL SELECT '1070_live_scores','leagues.enabled DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='leagues' AND column_name='enabled' AND column_default = 'false')
+    -- (2) The module's FULL policy set: 15 on the eleven tables (7 public SELECT, 7 editor
+    --     writes, 1 own-row editor read). This token owns that count.
+    UNION ALL SELECT '1070_live_scores','live-scores tables carry exactly 15 policies, RLS on all 11',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename IN
+         ('leagues','teams','matches','match_events','f1_races','f1_results','f1_standings',
+          'api_quota_log','api_request_log','live_sync_state','live_score_editors')) = 15
+      AND (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname='public' AND c.relrowsecurity AND c.relname IN
+              ('leagues','teams','matches','match_events','f1_races','f1_results','f1_standings',
+               'api_quota_log','api_request_log','live_sync_state','live_score_editors')) = 11
+    -- (3) Editor writes are bound to a MANUAL league, and exclude guests (via is_score_editor).
+    UNION ALL SELECT '1070_live_scores','matches_editor_insert/update bind league_id to a manual league',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='matches'
+          AND policyname IN ('matches_editor_insert','matches_editor_update')
+          AND with_check LIKE '%FROM leagues l%' AND with_check LIKE '%is_score_editor()%') = 2
+    UNION ALL SELECT '1070_live_scores','is_score_editor excludes guests, DEFINER, search_path pinned',
+      COALESCE((SELECT p.prosecdef AND p.prosrc LIKE '%NOT public.is_anonymous_session()%'
+                   AND EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) c WHERE c LIKE 'search_path=%')
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.is_score_editor()')), false)
+    -- (4) The quota fence: 90, and no client may spend it. Positive control: service_role can.
+    UNION ALL SELECT '1070_live_scores','claim_api_request caps at 90, service_role only',
+      COALESCE((SELECT p.prosrc LIKE '%requests_used < 90%' FROM pg_proc p
+                 WHERE p.oid = to_regprocedure('public.claim_api_request(text)')), false)
+      AND COALESCE(NOT has_function_privilege('anon', to_regprocedure('public.claim_api_request(text)'), 'EXECUTE')
+               AND NOT has_function_privilege('authenticated', to_regprocedure('public.claim_api_request(text)'), 'EXECUTE')
+               AND has_function_privilege('service_role', to_regprocedure('public.claim_api_request(text)'), 'EXECUTE'), false)
+    -- (5) Realtime: the app subscribes to these three; without them it shows stale scores silently.
+    UNION ALL SELECT '1070_live_scores','supabase_realtime publishes matches, match_events, f1_results',
+      (SELECT count(*) FROM pg_publication_tables WHERE pubname='supabase_realtime' AND schemaname='public'
+          AND tablename IN ('matches','match_events','f1_results')) = 3
+    -- ── 1071: Live Scores follow-up ─────────────────────────────────────────────
+    -- (1) A deleted KTFF fixture reaches filtered Realtime subscriptions only with the full old
+    --     row in the WAL. relreplident 'f' = FULL; 'd' (default) carries the PK alone.
+    UNION ALL SELECT '1071_live_scores_followup','matches + match_events are REPLICA IDENTITY FULL',
+      (SELECT string_agg(relname || '=' || relreplident::text, ',' ORDER BY relname) FROM pg_class
+        WHERE oid IN (to_regclass('public.matches'), to_regclass('public.match_events')))
+      IS NOT DISTINCT FROM 'match_events=f,matches=f'
+    -- (2) No phone fetches from the provider: logo_url may point at the team-logos bucket only.
+    --     Same-name DROP/ADD, so E sees the name and not the rule.
+    UNION ALL SELECT '1071_live_scores_followup','teams_logo_check admits the team-logos bucket and nothing else',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.teams') AND conname = 'teams_logo_check')
+               LIKE '%supabase\\.co/storage/v1/object/public/team-logos/%', false)
+    -- (3) The bucket is public with its limits, and no storage policy names it (only the sync,
+    --     as service_role, writes; storage.objects stays at the 1042 baseline of 36).
+    UNION ALL SELECT '1071_live_scores_followup','bucket team-logos is PUBLIC, 512 KB, png/jpeg/webp, and no storage policy names it',
+      COALESCE((SELECT public AND file_size_limit = 524288 AND allowed_mime_types = ARRAY['image/png','image/jpeg','image/webp']
+                  FROM storage.buckets WHERE id = 'team-logos'), false)
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+                      AND COALESCE(qual,'') || COALESCE(with_check,'') LIKE '%team-logos%')
+    -- (4) An F1 session has no round on the free plan: round nullable, keyed by api_race_id.
+    UNION ALL SELECT '1071_live_scores_followup','f1_races.round is nullable',
+      EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+        AND table_name='f1_races' AND column_name='round' AND is_nullable='YES')
+    -- ── 1073: the score-editor membership is exactly Berke's customer account ──────
+    -- A second editor is a decision with its own migration; this edit is the review moment.
+    UNION ALL SELECT '1073_live_scores_editor_grant','live_score_editors is exactly the one granted account',
+      (SELECT string_agg(user_id::text, ',' ORDER BY user_id) FROM public.live_score_editors)
+      IS NOT DISTINCT FROM '412cad91-2e3b-41b9-8186-175dfb8afa35'
   ) z
 
   UNION ALL
@@ -3737,7 +3852,7 @@ ORDER BY ord, (status IN ('OK','ON')) ASC, section, migration, object;  -- probl
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ═══ QUERY 2 / 5 — CRON JOBS — run alone ═══
 -- ═══════════════════════════════════════════════════════════════════════════
--- Errors if pg_cron isn't installed (itself the finding). Expect 5 rows present.
+-- Errors if pg_cron isn't installed (itself the finding). Expect 11 rows present.
 -- Existence is NOT enough: cron.job.active can be false, and a disabled job looks
 -- identical to a healthy one from the application's side. purge-moderation-rejections
 -- backs a 30-day retention promise published in BOTH terms copies (§8.2), so silently
@@ -3756,7 +3871,15 @@ FROM (VALUES
   -- 90-day retention on app_update_events. The table is a launch counter, not a permanent
   -- record; without this job it grows forever and quietly becomes a usage log. 03:33 UTC,
   -- clear of the three purges above it.
-  ('1051_app_versions','purge-app-update-events')
+  ('1051_app_versions','purge-app-update-events'),
+  -- Live Scores (1072). INACTIVE on a daily job = no fixtures tomorrow; on a poll job = scores
+  -- freeze mid-match. Neither errors anywhere: live_sync_state.last_run_at is the alarm.
+  ('1072_live_scores_cron','live-scores-football-daily'),
+  ('1072_live_scores_cron','live-scores-basketball-daily'),
+  ('1072_live_scores_cron','live-scores-f1-daily'),
+  ('1072_live_scores_cron','live-scores-football-poll'),
+  ('1072_live_scores_cron','live-scores-basketball-poll'),
+  ('1072_live_scores_cron','live-scores-f1-poll')
 ) e(m,o)
 
 UNION ALL

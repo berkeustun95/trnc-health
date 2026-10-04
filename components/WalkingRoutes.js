@@ -18,7 +18,8 @@ import { ROUTE_COLOR, walkingDirectionsUrl, creditUrl, creditBrand, overlapSlots
 import { logContactEvent } from '../utils/logContactEvent'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
-import { colors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius, type, radii, elevation } from '../constants/theme'
+import { IconButton } from './ui'
 import { t, LANG_CODES } from '../constants/i18n'
 import { REDESIGN } from '../constants/redesign'
 import { requestWithPrimer } from '../utils/permissionPrimer'
@@ -153,22 +154,23 @@ export const fitRoute = route => [...coordsOf(route), ...(route.legs ?? []).flat
 
 // Bottom row of route cards — the reliable way in. A dashed line at island zoom is too thin
 // to hit, and on iOS (Apple Maps) polyline taps are not guaranteed at all.
-export function RoutePicker({ routes, lang, error, onSelectRoute }) {
+export function RoutePicker({ routes, lang, error, onSelectRoute, bottom }) {
   if (error || routes.length === 0) {
     return (
-      <View style={[p.card, p.notice]}>
+      <View style={[p.card, REDESIGN && rp.card, p.notice, bottom != null && { bottom }]}>
         <Ionicons name={error ? 'alert-circle-outline' : 'walk-outline'} size={18} color={colors.textSecondary} />
         <Text style={p.noticeText}>{error ? t('routesLoadError', lang) : t('routesEmpty', lang)}</Text>
       </View>
     )
   }
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={p.row} contentContainerStyle={p.rowContent}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[p.row, bottom != null && { bottom }]} contentContainerStyle={p.rowContent}>
       {routes.map(r => (
-        <TouchableOpacity key={r.id} style={p.pick} onPress={() => onSelectRoute(r)} activeOpacity={0.85}>
+        <TouchableOpacity key={r.id} style={[p.pick, REDESIGN && rp.card]} onPress={() => onSelectRoute(r)} activeOpacity={0.85}
+          accessibilityRole="button" accessibilityLabel={routeName(r, lang)}>
           <View style={p.pickHead}>
             <View style={p.pickIcon}><Ionicons name="walk" size={15} color="#fff" /></View>
-            <Text style={p.pickName} numberOfLines={2}>{routeName(r, lang)}</Text>
+            <Text style={[p.pickName, REDESIGN && rp.pickName]} numberOfLines={2}>{routeName(r, lang)}</Text>
           </View>
           <Text style={p.pickSub} numberOfLines={2}>{routeSummary(r, lang)}</Text>
         </TouchableOpacity>
@@ -191,7 +193,12 @@ function PathsCredit({ route, lang }) {
   )
 }
 
-export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectStop, onStart, initialScrollY = 0, onScrollY }) {
+// The 44pt kit close, pulled into the panel's padding so the header row keeps its height.
+function PanelClose({ onPress, lang }) {
+  return <IconButton icon="close" onPress={onPress} accessibilityLabel={t('uiClose', lang)} color={colors.textSecondary} style={rp.close} />
+}
+
+export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectStop, onStart, initialScrollY = 0, onScrollY, bottom }) {
   const scrollRef = useRef(null)
   const restored  = useRef(initialScrollY === 0)
   useEffect(() => {
@@ -209,15 +216,16 @@ export function RoutePanel({ route, lang, maxHeight, review, onClose, onSelectSt
   }
 
   return (
-    <View style={[p.card, p.panel, { maxHeight }]}>
+    <View style={[p.card, REDESIGN && rp.card, p.panel, { maxHeight }, bottom != null && { bottom }]}>
       <View style={p.head}>
         <View style={{ flex: 1 }}>
           <Text style={p.city}>{city}</Text>
-          <Text style={p.name}>{routeName(route, lang)}</Text>
+          <Text style={[p.name, REDESIGN && rp.name]}>{routeName(route, lang)}</Text>
         </View>
+        {REDESIGN ? <PanelClose onPress={onClose} lang={lang} /> : (
         <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
           <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </TouchableOpacity>)}
       </View>
       <Text style={p.summary}>{routeSummary(route, lang)}</Text>
       <Text style={p.note}>{t('routeEstimateNote', lang)}</Text>
@@ -362,7 +370,7 @@ export function useHeading(active) {
   return heading
 }
 
-export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEnd, onSelectStop, medal = null, onKeepMedal, onSimulate = null }) {
+export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEnd, onSelectStop, medal = null, onKeepMedal, onSimulate = null, bottom }) {
   useEffect(() => {
     const sub = addBackListener(() => { onEnd(); return true })
     return () => sub.remove()
@@ -376,14 +384,15 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
   const directions = () => stop && Linking.openURL(walkingDirectionsUrl(stop)).catch(() => {})
 
   return (
-    <View style={[p.card, p.panel]}>
+    <View style={[p.card, REDESIGN && rp.card, p.panel, bottom != null && { bottom }]}>
       <View style={p.head}>
         <Text style={[p.city, { flex: 1 }]}>
           {done ? routeName(route, lang) : t('walkStopOf', lang).replace('{i}', String(walk.next + 1)).replace('{n}', String(n))}
         </Text>
+        {REDESIGN ? <PanelClose onPress={onEnd} lang={lang} /> : (
         <TouchableOpacity onPress={onEnd} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('uiClose', lang)} >
           <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </TouchableOpacity>)}
       </View>
 
       {done ? (
@@ -411,7 +420,7 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
           ) : status === 'denied' ? (
             <Text style={p.note}>{t('walkNoLocation', lang)}</Text>
           ) : null}
-          {medal && <MedalProgress lang={lang} medal={medal} />}
+          {medal && <MedalProgress lang={lang} medal={medal} total={n} />}
           {WALK_SIM && onSimulate && (
             <View style={w.simRow}>
               <TouchableOpacity style={w.simBtn} onPress={() => onSimulate(fakeFixNear(stop, 100))}>
@@ -451,15 +460,18 @@ export function WalkPanel({ route, lang, walk, pos, status, onPrev, onNext, onEn
 }
 
 // Walk-mode medal line: visits so far against the 70% the medal needs, or "earned" once met.
-// Visits only come from GPS — with location off it stays at 0, and says so.
-function MedalProgress({ lang, medal }) {
+// Visits only come from GPS — with location off it stays at 0, and says so. The text names
+// the route's total too ("any 17 of the 23"), and wraps: 17 alone read as a miscount.
+// {need} appears twice in these strings, hence split/join rather than a single replace.
+const fillMedal = (s, medal, total) => s.split('{need}').join(String(medal.need))
+  .split('{n}').join(String(medal.visited.size)).split('{total}').join(String(total))
+function MedalProgress({ lang, medal, total }) {
   const earned = !!medal.medal
   return (
     <View style={w.medalRow}>
       <Ionicons name={earned ? 'medal' : 'medal-outline'} size={15} color={earned ? colors.accent : colors.textSecondary} />
-      <Text style={[w.medalText, earned && w.medalTextOn]} numberOfLines={1}>
-        {earned ? t('medalEarned', lang)
-          : t('medalProgress', lang).replace('{n}', String(medal.visited.size)).replace('{need}', String(medal.need))}
+      <Text style={[w.medalText, earned && w.medalTextOn]} numberOfLines={2}>
+        {earned ? t('medalEarned', lang) : fillMedal(t('medalProgress', lang), medal, total)}
       </Text>
     </View>
   )
@@ -471,7 +483,7 @@ function MedalOutcome({ route, lang, medal, onKeepMedal }) {
   if (!m) {
     return (
       <Text style={p.note}>
-        {t('medalNotYet', lang).replace('{need}', String(medal.need)).replace('{n}', String(medal.visited.size))}
+        {fillMedal(t('medalNotYet', lang), medal, route.stops.length)}
       </Text>
     )
   }
@@ -536,6 +548,17 @@ const m = StyleSheet.create({
   numNext: { width: 32, height: 32, borderRadius: 16, borderWidth: 3, borderColor: colors.accent },
   start:   { width: 30, height: 30, borderRadius: 15, backgroundColor: ROUTE_COLOR, borderWidth: 2, borderColor: '#fff',
              alignItems: 'center', justifyContent: 'center' },
+})
+
+// Redesign frame only: radius 20 and the floating shadow. SOLID white, not the module
+// photo's CARD_BG: over a map, 93% lets street labels and pins read through the stop list
+// (device check, 2026-10-04). Everything inside (stops, Turizm Bakanlığı credit, Başla /
+// walk controls, medal) keeps its legacy styles.
+const rp = StyleSheet.create({
+  card:     { backgroundColor: colors.cardBg, borderRadius: radii.card, ...elevation.floating },
+  name:     { ...type.sheetTitle, color: colors.textPrimary, marginTop: 2 },
+  pickName: { ...type.rowTitle, fontSize: 14, color: colors.textPrimary },
+  close:    { marginTop: -12, marginRight: -12, marginBottom: -12 },
 })
 
 const p = StyleSheet.create({
