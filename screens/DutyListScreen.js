@@ -13,7 +13,6 @@ import { dutyStatus, localDateKey, DUTY_FRESH, DUTY_PARTIAL } from '../utils/dut
 import { buildFacilityIndex, matchDutyRow } from '../utils/dutyFacilityMatch'
 import { REDESIGN } from '../constants/redesign'
 import { ScreenHeader as KitHeader, InfoBanner, InlineAlert, ContactBar, Button, CardSkeleton, ModuleScreen, SectionHeader, BottomSheet, EmptyState, FilterBar } from '../components/ui'
-import { dutyUntilText } from '../components/home/redesign/Widgets'
 import { CARD_BG } from '../components/ui/ModuleScreen'
 import { colors as C, category, type, radii, elevation } from '../constants/theme'
 
@@ -62,8 +61,8 @@ function regionLabel(region, lang) {
   return key ? t(key, lang) : (region ?? '')
 }
 
-// Redesign: KTEB's own Turkish region name in every language (Berke: region names are proper
-// nouns), normalised the same way as regionBLKey so "GİRNE" or a stray NBSP still matches.
+// The DISTRICT_ORDER entry a roster region belongs to, normalised the same way as regionBLKey
+// so "GİRNE" or a stray NBSP still matches. For FILTERING only; display goes through regionLabel.
 function canonicalRegion(region) {
   if (!region) return null
   const trimmed = region.replace(/\u00a0/g, ' ').trim()
@@ -182,7 +181,7 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
 // Measured at 320dp (Inter Bold 14): the number needs 0.86 scale, "Cómo llegar" 0.78 — both above
 // their minimumFontScale; English uses the short "Directions" ("Get Directions" needed 0.66).
 function PharmacyCardRedesign({ item, showRegionBadge, lang }) {
-  const region = showRegionBadge && item.region ? canonicalRegion(item.region) : null
+  const region = showRegionBadge && item.region ? regionLabel(item.region, lang) : null
   const dist = item._dist != null ? `${item._dist.toFixed(1)} km ${t('dutyStraightLine', lang)}` : null
   return (
     <View style={r.pCard}>
@@ -248,7 +247,7 @@ function RegionSheet({ visible, selected, onPick, onClose, lang }) {
           return (
             <TouchableOpacity key={name} style={r.sheetRow} onPress={() => onPick(name)} activeOpacity={0.7}
               accessibilityRole="button" accessibilityState={{ selected: on }}>
-              <Text style={[r.sheetRowText, on && r.sheetRowTextOn]} numberOfLines={1}>{name}</Text>
+              <Text style={[r.sheetRowText, on && r.sheetRowTextOn]} numberOfLines={1}>{regionLabel(name, lang)}</Text>
               {on ? <Ionicons name="checkmark" size={20} color={C.primary} /> : null}
             </TouchableOpacity>
           )
@@ -406,20 +405,14 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
     // row is not: Mesarya on weekdays is normal, elsewhere it gets a short state + KTEB.
     const empty = decorated.length === 0
     const regionEmpty = !!region && !empty && shown.length === 0
-    // "Bugün · 08.00'e kadar" only when every pharmacy in view closes at the same time —
-    // open_until differs by district, so one island-wide time would be wrong somewhere
-    // (dutyUntilFor in App.js). Otherwise the date, as before; each card has its own hours.
-    const untils = new Set(shown.map(x => x.open_until).filter(Boolean).map(x => String(x).slice(0, 5)))
-    const untilText = untils.size === 1 ? dutyUntilText([...untils][0], lang) : null
-    const subtitle = untilText ? `${t('dateToday', lang)} · ${untilText}` : dateLabel
     return (
       <ModuleScreen topic="duty">
       <SafeAreaView style={r.safe} edges={['top']}>
-        <KitHeader onBack={onBack} title={t('dutyPharmacies', lang)} subtitle={subtitle} lang={lang} />
+        <KitHeader onBack={onBack} title={t('dutyPharmacies', lang)} subtitle={dateLabel} lang={lang} />
         {!loading && !empty ? (
           <FilterBar>
             <DutyChip text={t('filterAll', lang)} active={region == null} onPress={() => setRegion(null)} />
-            <DutyChip text={region ?? t('dutyPickRegion', lang)} active={region != null} chevron onPress={() => setSheetOpen(true)} />
+            <DutyChip text={region ? regionLabel(region, lang) : t('dutyPickRegion', lang)} active={region != null} chevron onPress={() => setSheetOpen(true)} />
           </FilterBar>
         ) : null}
         <RegionSheet visible={sheetOpen} selected={region} lang={lang}
@@ -463,7 +456,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
               <View style={r.listContent}><MesaryaNoteRedesign lang={lang} /></View>
             ) : (
               <EmptyState icon="medkit-outline" category="health" style={r.regionEmpty}
-                title={t('dutyRegionEmpty', lang).replace('{region}', region)}
+                title={t('dutyRegionEmpty', lang).replace('{region}', regionLabel(region, lang))}
                 action={{ label: t('dutyCallKteb', lang), onPress: () => Linking.openURL(`tel:${KTEB_TEL}`) }} />
             )
           ) : sortByDistance ? (
@@ -484,7 +477,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
               stickySectionHeadersEnabled={false}
               renderSectionHeader={({ section }) => (
                 <SectionHeader style={r.regionHeader}
-                  title={section.data.length > 0 ? `${canonicalRegion(section.title)} · ${section.data.length}` : canonicalRegion(section.title)} />
+                  title={section.data.length > 0 ? `${regionLabel(section.title, lang)} · ${section.data.length}` : regionLabel(section.title, lang)} />
               )}
               renderSectionFooter={({ section }) => (
                 section.data.length === 0 ? <MesaryaNoteRedesign lang={lang} /> : null
