@@ -1,0 +1,47 @@
+# ─── Novest properties: full import ──────────────────────────────────────────
+#
+# The metadata half also runs server-side on cron (supabase/functions/sync-novest).
+# This is the full local-pass importer, now CI-only (scripts/lib/prod-write-guard.mjs).
+# Default is --dry.
+#
+#   gh workflow run novest-import                 # dry
+#   gh workflow run novest-import -f apply=true   # write
+
+name: novest-import
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Write to production (otherwise --dry)'
+        type: boolean
+        default: false
+
+concurrency: { group: prod-novest, cancel-in-progress: false }
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      IN_APPLY: ${{ inputs.apply }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Secrets present
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+      - name: Mapping self-test (offline)
+        run: node scripts/validate-novest-mapping.mjs --self
+      - name: Import
+        run: |
+          if [ "$IN_APPLY" = "true" ]; then node scripts/import-novest-properties.mjs
+          else node scripts/import-novest-properties.mjs --dry; fi

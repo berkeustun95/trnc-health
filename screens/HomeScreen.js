@@ -158,6 +158,9 @@ const RESULT_META = {
 // Only the tab-shell Home (the one given a backRef) uses it; the gate's directory does not.
 let homeState = null
 
+// The one module a score editor may see before LIVE_SCORES_LIVE flips. Module scope: one Set, not one per render.
+const TESTER_UNLOCK = new Set(['liveScores'])
+
 export default function HomeScreen({
   // ─── Profile-gate props (Slice 2). All three DEFAULT to today's behaviour, so the
   //     normal render path is byte-identical and this screen has one code path, not two.
@@ -237,6 +240,8 @@ export default function HomeScreen({
   onRetryDuty,
   onOpenExploreTab,       // the Keşfet tile switches to the Keşfet tab
   onShowWalkingRoutes,    // Keşfet tab, opened in routes mode
+  onShowLiveScores,       // Canlı Skor (LIVE_SCORES_LIVE gates the tile in constants/homeGroups.js)
+  liveScoresTester = false, // a score editor sees the tile before the flag flips (App.js asks is_score_editor)
 }) {
   const tabFootprint = useTabBarFootprint()
   const insets = useSafeAreaInsets()
@@ -559,6 +564,7 @@ export default function HomeScreen({
     duty:               onShowDutyList,
     exploreTab:         onOpenExploreTab,
     walkingRoutes:      onShowWalkingRoutes,
+    liveScores:         onShowLiveScores,
   }
 
   if (__DEV__ && REDESIGN) {
@@ -875,8 +881,6 @@ export default function HomeScreen({
 
             <Text style={s.v2SectionTitle}>{t('homeAllModules', lang)}</Text>
             <ModuleGrid lang={lang} onPress={openModule} />
-
-            <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />
           </View>
         </ScrollView>
 
@@ -959,10 +963,11 @@ export default function HomeScreen({
             <FavouritePanel ids={favIds} modules={byId} lang={lang} onPress={openModule} />
 
             <SectionHeader title={t('hrAllServices', lang)} />
-            <ServicePanels lang={lang} onPress={openModule} />
+            <ServicePanels lang={lang} onPress={openModule} unlocked={liveScoresTester ? TESTER_UNLOCK : undefined} />
 
-            {/* No ad slot here yet: check-ad-placement.mjs pins the home_footer mount to
-                renderHubV2(). Adding it to the redesign is a guard change, made at go-live. */}
+            {/* The Home footer slot (list_bottom, home): moved here from renderHubV2 at go-live
+                (1.3.0). check-ad-placement.mjs pins it inside renderHubRedesign, after ServicePanels. */}
+            <HomeListBottomSlot lang={lang} onNavigate={openAdRoute} />
           </View>
         </ScrollView>
 

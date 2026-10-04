@@ -41,6 +41,7 @@ import { createClient } from '@supabase/supabase-js'
 import { coordsInCyprus } from '../supabase/functions/_shared/novest-feed.mjs'
 import { REGIONS } from '../constants/regions.js'
 import { EXPLORE_GROUPS } from '../constants/exploreCategories.js'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATA = join(ROOT, 'scripts/data/visitncy')
@@ -49,6 +50,9 @@ const SOURCE = 'visitncy'
 const COLLISION_M = 150
 const offline = process.argv.includes('--offline')
 const dry = process.argv.includes('--dry')
+// No workflow: its input (data/visitncy/) is not in the repo.
+prodWriteGuard({ wouldWrite: !offline && !dry && !process.argv.includes('--print'), workflow: null,
+  dryHint: 'node scripts/import-visitncy-places.mjs --offline' })
 
 // MapHub map → region. The map a stop comes from is certain; a region derived from its
 // coordinates would not be.

@@ -58,6 +58,13 @@ import TERMS_TR   from './terms.tr.js'
 // (feeds only, signed-in users, blocks respected), under-18s hidden by default, the hide
 // switch, deletion, the one-off position check. Terms unchanged; the pair moves together.
 export const LEGAL_VERSION = '2026-10-02'
+// Student Hub's terms came in with 2026-09-20 (profiles, affiliation, messaging). A signed-in,
+// non-guest account whose recorded terms_version is older — or NULL, i.e. never recorded — is
+// shown the CURRENT terms the first time it opens Student Hub and must accept to continue
+// (module go-live SOP step 6, decided 2026-10-02). Version strings compare as text ('2026-09' <
+// '2026-09-20'), which is how every recorded value sorts.
+export const STUDENT_HUB_TERMS_MIN = '2026-09-20'
+export const needsStudentHubTerms = terms => terms == null || terms < STUDENT_HUB_TERMS_MIN
 
 // Locales with a translated body. NOT a hand-kept list — derived from what is actually
 // imported, so adding a body is one import and one map entry and this follows.

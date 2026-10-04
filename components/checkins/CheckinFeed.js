@@ -57,13 +57,14 @@ function FeedRow({ row, lang, showPlace, onOpenPlace }) {
 function useFeed(placeId, enabled, refreshKey) {
   const [rows, setRows] = useState([])
   const [state, setState] = useState('loading')   // loading | ready | error
+  const [code, setCode] = useState(null)          // the error's code: 'NETWORK' = really offline
   const [more, setMore] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const first = useCallback(async () => {
     setState('loading')
     const res = await loadFeed(supabase, { placeId })
-    if (!res.ok) { setState('error'); return }
+    if (!res.ok) { setCode(res.code); setState('error'); return }
     prefetchAvatars(res.rows.map(r => r.avatar_url))
     setRows(res.rows); setMore(res.more); setState('ready')
   }, [placeId])
@@ -80,7 +81,12 @@ function useFeed(placeId, enabled, refreshKey) {
     setRows(r => [...r, ...res.rows]); setMore(res.more)
   }, [busy, more, rows, placeId])
 
-  return { rows, state, more, busy, first, next }
+  return { rows, state, code, more, busy, first, next }
+}
+
+// "Check your connection" (ErrorState's default) only when the request never reached a server.
+function FeedError({ code, lang, onRetry }) {
+  return <ErrorState lang={lang} onRetry={onRetry} message={code === 'NETWORK' ? undefined : t('checkinFeedFailed', lang)} />
 }
 
 function GuestPrompt({ lang, onRequireAccount }) {
@@ -95,13 +101,13 @@ function GuestPrompt({ lang, onRequireAccount }) {
 // Inside the place page's ScrollView: plain Views, a "show more" button instead of endless scroll.
 export function PlaceCheckins({ placeId, session, lang, onRequireAccount, refreshKey, style }) {
   const guest = !session || isGuest(session)
-  const { rows, state, more, busy, first, next } = useFeed(placeId, !guest, refreshKey)
+  const { rows, state, code, more, busy, first, next } = useFeed(placeId, !guest, refreshKey)
   return (
     <View style={style}>
       <Text style={s.title}>{t('checkinPlaceTitle', lang)}</Text>
       {guest ? <GuestPrompt lang={lang} onRequireAccount={onRequireAccount} />
         : state === 'loading' ? <ActivityIndicator color={colors.primary} style={s.spinner} />
-        : state === 'error' ? <ErrorState lang={lang} onRetry={first} />
+        : state === 'error' ? <FeedError code={code} lang={lang} onRetry={first} />
         : rows.length === 0 ? <Text style={s.empty}>{t('checkinPlaceEmpty', lang)}</Text>
         : (
           <View style={s.card}>
@@ -120,10 +126,10 @@ export function PlaceCheckins({ placeId, session, lang, onRequireAccount, refres
 // The Keşfet tab's "Son Check-in'ler": every place, endless scroll. Tapping a row opens the place.
 export function AllCheckins({ session, lang, onRequireAccount, onOpenPlace, contentStyle }) {
   const guest = !session || isGuest(session)
-  const { rows, state, more, busy, first, next } = useFeed(null, !guest, 0)
+  const { rows, state, code, more, busy, first, next } = useFeed(null, !guest, 0)
   if (guest) return <View style={contentStyle}><View style={[s.feedCard, s.guestCard]}><GuestPrompt lang={lang} onRequireAccount={onRequireAccount} /></View></View>
   if (state === 'loading') return <ActivityIndicator color={colors.primary} style={s.spinner} />
-  if (state === 'error') return <View style={contentStyle}><ErrorState lang={lang} onRetry={first} /></View>
+  if (state === 'error') return <View style={contentStyle}><FeedError code={code} lang={lang} onRetry={first} /></View>
   return (
     <FlatList
       data={rows}

@@ -1,0 +1,53 @@
+# ─── Walking legs: route every stop-to-stop leg through openrouteservice ─────
+#
+# CI-only (scripts/lib/prod-write-guard.mjs). Default is --dry. A flagged leg (quality
+# gate) is printed, never written, and makes the run exit 1 — that red is the review.
+#
+#   gh workflow run walking-legs                    # dry
+#   gh workflow run walking-legs -f apply=true      # write walking_legs
+#   gh workflow run walking-legs -f apply=true -f force=true   # re-route current legs too
+
+name: walking-legs
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Write to production (otherwise --dry)'
+        type: boolean
+        default: false
+      force:
+        description: 'Re-route legs that already look current (--force)'
+        type: boolean
+        default: false
+
+concurrency: { group: prod-walking, cancel-in-progress: false }
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
+      IN_APPLY: ${{ inputs.apply }}
+      IN_FORCE: ${{ inputs.force }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Secrets present
+        run: |
+          for v in SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL ORS_API_KEY; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+      - name: Route
+        run: |
+          args=()
+          [ "$IN_APPLY" = "true" ] || args+=(--dry)
+          [ "$IN_FORCE" = "true" ] && args+=(--force)
+          node scripts/import-walking-legs.mjs "${args[@]}"

@@ -39,8 +39,10 @@
 // treats a stored URL that merely extends the stripped one as equal, so re-running
 // never downgrades a fetchable URL to a bare path.
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
+import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { resolve, dirname, join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -48,8 +50,12 @@ const DEFAULT_OUT = resolve(ROOT, 'supabase/seed/gisekibris-events-clean.json')
 const SOURCE = 'gisekibris'
 
 // Their vocabulary → ours (events_category_check: music, nightlife, sports, arts,
-// family, other). An unmapped value is a hard error — defaulting to 'other' would
-// silently bury a whole new category of events under a chip nobody filters by.
+// family, other). An unmapped value imports as 'other' and is REPORTED, not refused:
+// a hard error here halted the whole sync for two days over one new label ("Spor",
+// 2026-09-30) while every other event went stale. The burying risk is answered by
+// noise instead — a ::warning:: per value here, and the workflow opens (or comments
+// on) a GitHub issue per value from meta.unmapped_categories. Map it and the next
+// run moves those rows out of 'other' (category is MUTABLE in the importer).
 const CATEGORY = {
   'Club & Lounge & Bar': 'nightlife',
   'Elektronik Müzik':    'nightlife',
@@ -57,6 +63,7 @@ const CATEGORY = {
   'Konser':              'music',
   'Hotel Konseri':       'music',
   'Sahne':               'arts',
+  'Spor':                'sports',
 }
 
 // The partner's city strings → the district names the rest of the app uses
@@ -237,9 +244,35 @@ if (selftest) {
   t("'Club & Lounge & Bar'",          CATEGORY_FOLDED.get(trFold('Club & Lounge & Bar')), 'nightlife')
   t("'KONSER' upper",                 CATEGORY_FOLDED.get(trFold('KONSER')), 'music')
   t("'Hotel Konseri'",                CATEGORY_FOLDED.get(trFold('Hotel Konseri')), 'music')
+  t("'Spor' (live feed, 2026-09-30)", CATEGORY_FOLDED.get(trFold('Spor')), 'sports')
+  t("'SPOR' upper",                  CATEGORY_FOLDED.get(trFold('SPOR')), 'sports')
   t('unknown stays unmapped',         CATEGORY_FOLDED.get(trFold('Tiyatro Gecesi')), undefined)
+
   // The trap itself: a naive lowercase leaves a combining dot and must NOT match.
   t('naive toLowerCase would MISS',   'ELEKTRONİK MÜZİK'.toLowerCase() === 'elektronik müzik', false)
+
+  // The transform is top-level code, so it is tested by RUNNING it on a one-row feed.
+  console.log('\n  unknown category → other, and the run does not refuse')
+  {
+    const dir = mkdtempSync(join(tmpdir(), 'gk-prepare-'))
+    const rawFile = join(dir, 'raw.json'), outFile = join(dir, 'clean.json')
+    writeFileSync(rawFile, JSON.stringify([{
+      name: 'SELFTEST EVENT', venue: 'Cage Club', city: 'Girne', category: 'Tiyatro Gecesi',
+      startdate: '2026-12-01T18:00:00.000Z', enddate: null,
+      image: 'https://img-cdn.gisekibris.com/event/SelfTest123/banner.jpg',
+      url: 'https://www.gisekibris.com/etkinlikler/selftest--SelfTest123?code=AF1',
+      description: { tr: 'x', en: 'x' },
+    }]))
+    const run = spawnSync(process.execPath, [fileURLToPath(import.meta.url), rawFile, '--out', outFile], { encoding: 'utf8' })
+    const out = run.status === 0 && existsSync(outFile) ? JSON.parse(readFileSync(outFile, 'utf8')) : null
+    t('exit code',                      run.status, 0)
+    t('row category',                   out?.events?.[0]?.category, 'other')
+    t('meta.unmapped_categories',       JSON.stringify(out?.meta?.unmapped_categories),
+      JSON.stringify([{ raw: 'Tiyatro Gecesi', folded: 'tiyatro gecesi', count: 1 }]))
+    t('emits a ::warning:: naming it',  /::warning [^\n]*::.*"Tiyatro Gecesi".*1 event/.test(run.stdout), true)
+    if (run.status !== 0) console.log(run.stderr)
+    rmSync(dir, { recursive: true, force: true })
+  }
 
   console.log('\n  id extraction — both image hosts, and the url fallback')
   t('CDN  /event/<id>/',      idFromImage('https://img-cdn.gisekibris.com/event/uewOPw8E9YKvoDpt793t/banner.jpg'), 'uewOPw8E9YKvoDpt793t')
@@ -282,6 +315,7 @@ if (!Array.isArray(feed) || !feed.length) {
 
 const errors = []
 const events = []
+const unmapped = new Map()
 const idSources = []
 const seenId = new Map()
 
@@ -337,11 +371,13 @@ feed.forEach((ev, i) => {
   }
   seenId.set(externalId, cleanTitle(ev.name))
 
-  const category = CATEGORY_FOLDED.get(trFold(ev.category))
+  let category = CATEGORY_FOLDED.get(trFold(ev.category))
   if (!category) {
-    errors.push(`${where}: unmapped category ${JSON.stringify(ev.category)} ` +
-      `(folded to ${JSON.stringify(trFold(ev.category))}) — add it to CATEGORY in this script.`)
-    return
+    category = 'other'
+    const key = trFold(ev.category)
+    const u = unmapped.get(key) ?? { raw: ev.category ?? null, folded: key, count: 0 }
+    u.count++
+    unmapped.set(key, u)
   }
 
   const title = cleanTitle(ev.name)
@@ -420,7 +456,7 @@ const seed = {
     event_count: events.length,
     venue_count: venues.length,
     date_range: [dates[0], dates[dates.length - 1]],
-    unmapped_categories: [],
+    unmapped_categories: [...unmapped.values()],
     notes: [
       'Generated by scripts/prepare-gisekibris-feed.mjs — do not hand-edit.',
       "external_id = 'gk-' + the partner's own event id, taken from the last '--' segment of their url and cross-checked against the events-v2/<id>/ image path. Ids are not fixed-width (20-char Firestore, 25-char cuid), so no length is assumed.",
@@ -450,6 +486,15 @@ console.log(`  ${String(events.length - bilingual).padStart(4)}  tr only (en ide
 console.log(`  ${String(events.filter(e => e.is_tba).length).padStart(4)}  TBA`)
 console.log(`  range: ${seed.meta.date_range.join('  →  ')}`)
 console.log(`  categories: ${Object.entries(catCount).map(([k, v]) => `${k} ${v}`).join(', ')}`)
+
+// One GitHub Actions annotation per unmapped value (plain text locally). The message
+// is escaped per the workflow-command spec so partner text cannot break the line.
+const ghEscape = v => String(v).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
+for (const u of unmapped.values()) {
+  console.log(`::warning title=Gise Kibris unmapped category::` + ghEscape(
+    `unmapped category ${JSON.stringify(u.raw)} imported as 'other' (${u.count} event${u.count === 1 ? '' : 's'}). ` +
+    `Add it to CATEGORY in scripts/prepare-gisekibris-feed.mjs.`))
+}
 
 // PRINTED EVERY RUN, deliberately. `image-only` is a correct and supported state,
 // but it is also what a partner-side url change looks like in bulk — so the count

@@ -44,7 +44,7 @@
     "check:flags": "node scripts/check-module-flags.mjs",
     "ads:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.mjs",
     "ads:selftest": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.mjs --self",
-    "ota": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ota-preflight.mjs && node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-logo.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-home-geometry.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-contrast.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-i18n-duplicates.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-pets-staleness.mjs && node scripts/check-back-listener.mjs && node scripts/check-back-chain.cjs && eas update --channel production",
+    "ota": "node scripts/check-release-freeze.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ota-preflight.mjs && node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-terms-commitment.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-privacy-parity.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-logo.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-home-geometry.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-contrast.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-i18n-duplicates.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-ad-placement.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-pets-staleness.mjs && node scripts/check-back-listener.mjs && node scripts/check-back-chain.cjs && eas update --channel production",
     "ota:preview": "node scripts/check-module-flags.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-component-refs.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-import-safety.mjs && node scripts/check-back-listener.mjs && node scripts/check-back-chain.cjs && APP_VARIANT=preview eas update --channel preview --environment preview",
     "setup:hooks": "git config core.hooksPath .githooks && echo 'hooks enabled (.githooks)'",
     "eas-build-pre-install": "node scripts/check-module-flags.mjs",
@@ -68,6 +68,7 @@
     "novest:images": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mirror-novest-images.mjs",
     "novest:verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-novest-import.mjs",
     "novest:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-novest-staleness.mjs",
+    "novest:photos": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-novest-photos.mjs",
     "novest:logo": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/upload-novest-logo.mjs",
     "map:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/validate-map-sources.mjs",
     "weather:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-weather-normalize.mjs",
@@ -108,7 +109,8 @@
     "hero:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hero-contrast.mjs",
     "labels:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs",
     "backchain:check": "node scripts/check-back-chain.cjs",
-    "backlistener:check": "node scripts/check-back-listener.mjs"
+    "backlistener:check": "node scripts/check-back-listener.mjs",
+    "check:prod-writes": "node scripts/check-prod-write-guard.mjs"
   },
   "private": true,
   "devDependencies": {

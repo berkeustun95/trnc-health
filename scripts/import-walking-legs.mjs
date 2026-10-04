@@ -6,7 +6,9 @@
 //   node scripts/import-walking-legs.mjs --force  # re-route legs that already look current
 //
 // REQUIRES 20261049_walking_legs.sql for a write run (a --dry run works without it).
-// Key: macOS Keychain `ada-ors-api-key` (never printed). DB: Keychain `ada-supabase-service-role`.
+// Keys: ORS_API_KEY and SUPABASE_SERVICE_ROLE_KEY, repository secrets, CI only (never printed):
+//   gh workflow run walking-legs            # dry
+//   gh workflow run walking-legs -f apply=true
 //
 // ─── WHAT IT DOES ───────────────────────────────────────────────────────────
 // For every consecutive pair of stops on every route (from the places' CURRENT coordinates),
@@ -18,20 +20,24 @@
 // Ratio routed/straight > MAX_RATIO, or a stop more than MAX_SNAP_M from where the router
 // joined the path network, means the router probably found a different place or a long way
 // round (a gate it could not see, a missing footpath). Those legs are printed and SKIPPED —
-// the app draws them as dashed straight lines — and the run exits 1, so a flag is a
-// decision for a person, never something a re-run quietly accepts. Very short legs (< 60 m
+// the app draws them as dashed straight lines — and listed in ONE ::warning:: annotation
+// (route + leg), exit 0: a flag is a known, standing decision for a person, never
+// something a re-run quietly accepts, but it is not an outage. (Until 2026-10-01 it
+// exited 1, which kept the workflow permanently red over six legs nobody had decided.)
+// EXIT 1 is kept for real failures: ORS HTTP errors, a rejected key, a read or write
+// error — anything that means this run did not do its job. Very short legs (< 60 m
 // straight) are exempt from the ratio: stop pins sit inside buildings, so 30 m can route 80.
 //
 // Rate: ORS Standard allows 40 directions/minute and 2,000/day; one call per 1.6 s.
 // Attribution for the stored geometry: © openrouteservice by HeiGIT, © OpenStreetMap
 // contributors (CC-BY-SA 4.0 / ODbL) — shown on the map wherever these paths are drawn.
 
-import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { metresBetween } from '../constants/walkingRoutes.js'
+import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ORS_URL = 'https://api.openrouteservice.org/v2/directions/foot-walking/geojson'
@@ -50,15 +56,10 @@ const MAX_EXTRA_M = 100
 const STALE_M = 50
 const dry = process.argv.includes('--dry')
 const force = process.argv.includes('--force')
+prodWriteGuard({ wouldWrite: !dry, workflow: 'walking-legs', dryHint: 'node scripts/import-walking-legs.mjs --dry' })
 
 const fail = (...l) => { for (const x of l) console.error(x); process.exit(1) }
 const sleep = ms => new Promise(r => setTimeout(r, ms))
-function keychain(service) {
-  try {
-    return execFileSync('security', ['find-generic-password', '-s', service, '-w'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-  } catch { fail(`Keychain entry "${service}" not found.`) }
-}
 function loadEnv() {
   const p = resolve(ROOT, '.env')
   if (!existsSync(p)) return
@@ -71,9 +72,9 @@ const pt = ([lng, lat]) => ({ latitude: lat, longitude: lng })
 const r5 = n => Math.round(n * 1e5) / 1e5
 
 loadEnv()
-const db = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, keychain('ada-supabase-service-role'),
+const db = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, serviceRoleKey(),
   { auth: { persistSession: false, autoRefreshToken: false } })
-const ORS_KEY = keychain('ada-ors-api-key')
+const ORS_KEY = process.env.ORS_API_KEY?.trim() || fail('ORS_API_KEY is not set — a repository secret; run: gh workflow run walking-legs')
 
 const { data: routes, error: re } = await db.from('walking_routes')
   .select('source_id, name_i18n, walking_route_stops(position, places(id, name, latitude, longitude))')
@@ -100,7 +101,7 @@ for (const r of routes) {
   }
 }
 
-const rows = [], flagged = [], skipped = []
+const rows = [], flagged = [], skipped = [], orsErrors = []
 let n = 0
 for (const [key, { a, b, route, leg }] of pairs) {
   const straight = metresBetween(a, b)
@@ -115,8 +116,8 @@ for (const [key, { a, b, route, leg }] of pairs) {
     body: JSON.stringify({ coordinates: [[a.longitude, a.latitude], [b.longitude, b.latitude]] }),
   })
   if (!res.ok) {
-    flagged.push({ route, leg, a: a.name, b: b.name, why: `ORS HTTP ${res.status}` })
     if (res.status === 401 || res.status === 403) fail('ORS rejected the key (HTTP ' + res.status + ').')
+    orsErrors.push({ route, leg, a: a.name, b: b.name, why: `ORS HTTP ${res.status}` })
     continue
   }
   const f = (await res.json()).features?.[0]
@@ -156,7 +157,16 @@ if (!dry && rows.length) {
 } else if (dry) console.log(`(dry) nothing written${tableReady ? '' : ' — walking_legs does not exist yet'}`)
 
 if (flagged.length) {
-  console.error(`\n${flagged.length} leg(s) NOT written — check each on a map; the app draws them dashed:`)
-  for (const f of flagged) console.error(`  • ${f.route} ${f.leg}: ${f.a} → ${f.b} — ${f.why}`)
+  console.log(`\n${flagged.length} leg(s) NOT written — check each on a map; the app draws them dashed:`)
+  for (const f of flagged) console.log(`  • ${f.route} ${f.leg}: ${f.a} → ${f.b} — ${f.why}`)
+  // One annotation, every leg named (route + leg), escaped per the workflow-command spec.
+  const esc = v => String(v).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
+  console.log(`::warning title=Walking legs not written (quality gate)::` + esc(
+    `${flagged.length} leg(s) failed the quality gate and are drawn dashed: ` +
+    flagged.map(f => `${f.route} ${f.leg} (${f.a} → ${f.b}: ${f.why})`).join('; ')))
+}
+if (orsErrors.length) {
+  console.error(`\n✗ ${orsErrors.length} leg(s) could not be routed — ORS errors, not a quality decision:`)
+  for (const f of orsErrors) console.error(`  • ${f.route} ${f.leg}: ${f.a} → ${f.b} — ${f.why}`)
   process.exit(1)
 }

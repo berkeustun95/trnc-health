@@ -13,7 +13,7 @@
 // Hand / cron, not pre-push (CLAUDE.md: expiring content ships with a staleness check).
 // Needs the service-role key: rows are invisible to anon until published.
 
-import { execFileSync } from 'node:child_process'
+import { serviceRoleKey } from './lib/prod-write-guard.mjs'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -48,8 +48,7 @@ if (existsSync(resolve(ROOT, '.env'))) {
   }
 }
 const { createClient } = await import('@supabase/supabase-js')
-const key = execFileSync('security', ['find-generic-password', '-s', 'ada-supabase-service-role', '-w'],
-  { encoding: 'utf8' }).trim()
+const key = serviceRoleKey()   // repo secret in CI (daily-health workflow); no Mac holds one
 const supabase = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, key,
   { auth: { persistSession: false, autoRefreshToken: false } })
 

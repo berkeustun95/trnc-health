@@ -10,16 +10,18 @@
 // screens — that is how a dark module collects demand ("the towing lesson",
 // constants/homeModules.js). Hotels stays HIDDEN (HOTELS_LIVE); grooming and garages stay
 // hidden (HIDDEN_TILES). A module that goes live loses its badge automatically.
-import { MODULE_FLAGS, HOTELS_LIVE, CONNECTIVITY_LIVE, EXPLORE_ROUTES_LIVE } from './flags'
+import { MODULE_FLAGS, HOTELS_LIVE, CONNECTIVITY_LIVE, EXPLORE_ROUTES_LIVE, LIVE_SCORES_LIVE } from './flags'
 import { HOME_MODULES, HIDDEN_TILES } from './homeModules'
 
-// Tiles that are not HOME_MODULES entries: the duty list, the Keşfet tab, walking routes
-// and hotels have no grid tile in V2.
+// Tiles that are not HOME_MODULES entries: the duty list, the Keşfet tab, walking routes,
+// hotels and live scores have no grid tile in V2 (so the pre-redesign ModuleGrid, which
+// deliberately shows dark modules, never shows these flag-hidden ones).
 const EXTRA = {
   duty:          { id: 'duty',          icon: 'medkit-outline',     labelKey: 'hrTileDuty' },
   exploreTab:    { id: 'exploreTab',    icon: 'compass-outline',    labelKey: 'menuExplore' },
   walkingRoutes: { id: 'walkingRoutes', icon: 'walk-outline',       labelKey: 'hrTileRoutes' },
   hotels:        { id: 'hotels',        icon: 'bed-outline',        labelKey: 'accomTabHotels' },
+  liveScores:    { id: 'liveScores',    icon: 'football-outline',   labelKey: 'menuLiveScores' },
 }
 
 // id → the gate that decides whether it is live. Anything absent here is ungated.
@@ -36,6 +38,7 @@ const GATES = {
   studentHub:    () => MODULE_FLAGS.studentHub !== false,
   towing:        () => MODULE_FLAGS.towing !== false,
   hotels:        () => HOTELS_LIVE === true,
+  liveScores:    () => LIVE_SCORES_LIVE === true,
   // eSIM is the face of Connectivity: while CONNECTIVITY_LIVE is false it only shows the
   // waitlist screen, and the brief says hidden connectivity must not show.
   esim:          () => CONNECTIVITY_LIVE === true,
@@ -47,11 +50,15 @@ const GATES = {
 
 const COMING_SOON = new Set(['jobPostings', 'transport', 'insurance', 'esim'])
 
-export function isComingSoon(id) {
-  return COMING_SOON.has(id) && !isLive(id)
+export function isComingSoon(id, unlocked) {
+  return COMING_SOON.has(id) && !isLive(id, unlocked)
 }
 
-export function isLive(id) {
+// `unlocked`: module ids this USER may see while their flag is still false — today only
+// liveScores for a score editor (live_score_editors, asked of the database by App.js), so
+// Berke can test it on a production build. Everyone else passes nothing and sees the flag.
+export function isLive(id, unlocked) {
+  if (unlocked?.has(id)) return true
   if (HIDDEN_TILES.has(id) && id !== 'explore') return false
   const gate = GATES[id]
   return gate ? gate() : true
@@ -61,7 +68,7 @@ export function isLive(id) {
 // reported at the gate rather than taken from the brief.
 export const HOME_GROUPS = [
   { key: 'health',   titleKey: 'hrGroupHealth',  ids: ['duty', 'health', 'emergency'] },
-  { key: 'explore',  titleKey: 'hrGroupExplore', ids: ['exploreTab', 'events', 'walkingRoutes', 'hotels', 'games'] },
+  { key: 'explore',  titleKey: 'hrGroupExplore', ids: ['exploreTab', 'events', 'liveScores', 'walkingRoutes', 'hotels', 'games'] },
   { key: 'homeLife', titleKey: 'hrGroupHome',    ids: ['accommodation', 'homeServices', 'pets', 'insurance',
                                                         'studentHub' /* ★ */] },
   { key: 'city',     titleKey: 'hrGroupCity',    ids: ['transport', 'esim', 'municipal',
@@ -77,13 +84,13 @@ export function moduleById(id) { return BY_ID.get(id) }
 const CATEGORY_OF = new Map(HOME_GROUPS.flatMap(g => g.ids.map(id => [id, g.key])))
 export function categoryOf(id) { return CATEGORY_OF.get(id) || 'city' }
 
-export function liveGroups() {
+export function liveGroups(unlocked) {
   return HOME_GROUPS
     .map(g => ({
       ...g,
       modules: g.ids
-        .filter(id => isLive(id) || isComingSoon(id))
-        .map(id => BY_ID.get(id) && { ...BY_ID.get(id), soon: isComingSoon(id) })
+        .filter(id => isLive(id, unlocked) || isComingSoon(id, unlocked))
+        .map(id => BY_ID.get(id) && { ...BY_ID.get(id), soon: isComingSoon(id, unlocked) })
         .filter(Boolean),
     }))
     .filter(g => g.modules.length > 0)

@@ -27,8 +27,18 @@ Incident backstories: `~/ObsidianVault/10-ada/claude-md-lessons.md`.
 - A migration file is intent, not evidence. `pg_get_functiondef`, `pg_get_constraintdef`,
   `pg_policies`, `information_schema` are the authority; quote which one you read.
 
-## Migrations (manual apply, no CI)
-- Applied by hand in the SQL editor (Role → postgres); nothing catches a committed-but-unapplied file.
+## Migrations (applied by the `supabase-migrate` workflow)
+- **Applied only by `gh workflow run supabase-migrate -f file=<FULL file name>.sql`** (dry by default:
+  prints the SQL and checks the ledger), then again with `-f apply=true`. No Mac holds a credential.
+  Order: commit the file → `node scripts/migration-ledger.mjs --stamp <file>` → regenerate the ledger
+  check (`node scripts/migration-ledger.mjs`) → register objects in `verify_schema.sql` → push → dry → apply.
+- The workflow REFUSES a file not on the dispatched ref, one `migration-ledger.mjs --verify` rejects
+  (unstamped, stale checksum, more than one `BEGIN;`/`COMMIT;`, the stamp not last, anything outside the
+  transaction but SET ROLE / RESET ROLE / NOTIFY pgrst), and one the ledger already records. It sends the
+  file UNCHANGED, so its own BEGIN…stamp…COMMIT makes migration + ledger row atomic (a mid-file failure
+  rolls back: measured 2026-10-01). After the apply it fails unless verify_schema QUERY 1 is green.
+- Never `supabase db push`: prod has no `supabase_migrations` ledger and 13 prefixes repeat, so it would
+  treat all files as pending. Nothing catches a committed-but-unapplied file except verify_schema.sql.
 - **Register every new object in `supabase/verify_schema.sql`** (A tables · B columns · C functions ·
   D triggers · E constraints · F indexes · G grants · H tokens · Q2 cron · Q3 policies). A
   behaviour-only `CREATE OR REPLACE`, a changed DEFAULT, grant or comment needs an H-section token.
@@ -42,8 +52,8 @@ Incident backstories: `~/ObsidianVault/10-ada/claude-md-lessons.md`.
 - **An applied migration lands on MAIN the same day, as a file:** `git checkout <branch> -- <file>`
   onto a branch off main (never cherry-pick a commit carrying app code), with `verify_schema.sql`
   merged and the ledger check + drift audit REGENERATED. Main's migrations folder = prod's ledger.
-- **Wrap every manual-apply migration in `BEGIN … COMMIT` with its assertions INSIDE**, even for one
-  line: a false alarm then rolls back cleanly and is re-runnable.
+- **Wrap every migration in ONE `BEGIN … COMMIT` with its assertions INSIDE**, even for one line: a false
+  alarm then rolls back cleanly and is re-runnable (and `--verify` refuses anything else).
 - **The harness is not prod's Postgres.** `scripts/migration-harness.mjs` is PGlite = PostgreSQL 18.3;
   prod is an older major (`SELECT version();`). In any in-migration `EXCEPTION WHEN`, catch every
   SQLSTATE the behaviour can raise across versions (`foreign_key_violation OR restrict_violation`).

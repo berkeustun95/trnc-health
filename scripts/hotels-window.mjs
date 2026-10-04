@@ -2,15 +2,17 @@
 // anon (the store role) before and after: how many hotels anon sees, and that search_content
 // returns no hotel rows (it has no hotels arm; MODULE_FLAGS does not gate search).
 //   node scripts/hotels-window.mjs --dry | --apply | --rollback
-import { readFileSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+// Writes (--apply / --rollback) run only in CI: gh workflow run hotels-window -f mode=--apply
+import { readFileSync, existsSync } from 'node:fs'
+import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 process.chdir(new URL('..', import.meta.url).pathname)
 const mode = process.argv[2]
-if (!['--dry', '--apply', '--rollback'].includes(mode)) throw new Error('--dry | --apply | --rollback')
-const env = Object.fromEntries(readFileSync('.env','utf8').split('\n').map(l=>l.match(/^\s*([\w.-]+)\s*=\s*(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim().replace(/^["']|["']$/g,'')]))
+if (!['--dry', '--apply', '--rollback'].includes(mode) || process.argv.length > 3) throw new Error('exactly one of --dry | --apply | --rollback')
+prodWriteGuard({ wouldWrite: mode !== '--dry', workflow: 'hotels-window', dryHint: 'node scripts/hotels-window.mjs --dry' })
+const env = { ...(existsSync('.env') ? Object.fromEntries(readFileSync('.env','utf8').split('\n').map(l=>l.match(/^\s*([\w.-]+)\s*=\s*(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim().replace(/^["']|["']$/g,'')])) : {}), ...process.env }
 const { createClient } = await import('@supabase/supabase-js')
 const anon = createClient(env.EXPO_PUBLIC_SUPABASE_URL, env.EXPO_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } })
-const svc = createClient(env.EXPO_PUBLIC_SUPABASE_URL, execFileSync('security',['find-generic-password','-s','ada-supabase-service-role','-w'],{encoding:'utf8'}).trim(), { auth: { persistSession: false } })
+const svc = createClient(env.EXPO_PUBLIC_SUPABASE_URL, serviceRoleKey(), { auth: { persistSession: false } })
 async function probe(label) {
   const { count: seen, error: e1 } = await anon.from('hotels').select('id', { count: 'exact', head: true })
   const hits = []

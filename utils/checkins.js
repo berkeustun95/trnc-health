@@ -22,11 +22,14 @@ export const FEED_PAGE = 20
 const CODES = ['AUTH_REQUIRED', 'NOT_ELIGIBLE', 'BANNED', 'NAME_REQUIRED', 'NOTICE_REQUIRED',
   'PLACE_NOT_FOUND', 'BAD_FIX', 'LOW_ACCURACY', 'TOO_FAR', 'TOO_FAST', 'DAILY_LIMIT']
 
-// The refusal code inside a PostgREST error, or 'UNKNOWN' (network, missing function, …).
-export function checkinErrorCode(error) {
+// The refusal code inside a PostgREST error; else 'NETWORK' when the request never reached a
+// server; else 'UNKNOWN' (a server error — missing function, 5xx). postgrest-js reports a
+// failed fetch (offline, DNS, timeout) as status 0 and nothing else as 0, so "check your
+// connection" is shown only for status 0 — never for a server that answered with an error.
+export function checkinErrorCode(error, status) {
   if (!error) return null
   const m = String(error.message ?? '')
-  return CODES.find(c => m.includes(c)) ?? 'UNKNOWN'
+  return CODES.find(c => m.includes(c)) ?? (status === 0 ? 'NETWORK' : 'UNKNOWN')
 }
 
 // The same refusals the server would give, decided on the phone so a fix that cannot pass
@@ -38,24 +41,25 @@ export function precheck(place, fix) {
   return null
 }
 
-// { display_name, checkins_public, checkins_notice_at } for the caller, or null on failure.
+// { ok, prefs: { display_name, checkins_public, checkins_notice_at }, code } for the caller.
 export async function loadCheckinPrefs(client, uid) {
-  const { data, error } = await client.from('profiles')
+  const { data, error, status } = await client.from('profiles')
     .select('display_name, checkins_public, checkins_notice_at').eq('id', uid).maybeSingle()
-  return error ? null : data
+  return error || !data ? { ok: false, prefs: null, code: error ? checkinErrorCode(error, status) : 'UNKNOWN' }
+    : { ok: true, prefs: data, code: null }
 }
 
 // The effective checkins_public after the stamp (the server decides it from the DOB).
 export async function acceptNotice(client) {
-  const { data, error } = await client.rpc('accept_checkin_notice', { p_version: CHECKIN_NOTICE_VERSION })
-  return error ? { ok: false, code: checkinErrorCode(error) } : { ok: true, isPublic: data === true }
+  const { data, error, status } = await client.rpc('accept_checkin_notice', { p_version: CHECKIN_NOTICE_VERSION })
+  return error ? { ok: false, code: checkinErrorCode(error, status) } : { ok: true, isPublic: data === true }
 }
 
 export async function checkIn(client, placeId, fix) {
-  const { data, error } = await client.rpc('check_in', {
+  const { data, error, status } = await client.rpc('check_in', {
     p_place_id: placeId, p_lat: fix.latitude, p_lng: fix.longitude, p_accuracy: fix.accuracy,
   })
-  if (error) return { ok: false, code: checkinErrorCode(error) }
+  if (error) return { ok: false, code: checkinErrorCode(error, status) }
   const row = Array.isArray(data) ? data[0] : data
   return { ok: true, already: row?.already === true, id: row?.checkin_id ?? null }
 }
@@ -63,13 +67,13 @@ export async function checkIn(client, placeId, fix) {
 // One page, newest first. `before` is the last row of the previous page. `more` is true when
 // the page came back full — the next call may still return zero rows, which ends the list.
 export async function loadFeed(client, { placeId = null, before = null, limit = FEED_PAGE } = {}) {
-  const { data, error } = await client.rpc('get_checkin_feed', {
+  const { data, error, status } = await client.rpc('get_checkin_feed', {
     p_place_id: placeId,
     p_before_at: before?.created_at ?? null,
     p_before_id: before?.checkin_id ?? null,
     p_limit: limit,
   })
-  if (error) return { ok: false, code: checkinErrorCode(error), rows: [], more: false }
+  if (error) return { ok: false, code: checkinErrorCode(error, status), rows: [], more: false }
   const rows = data ?? []
   return { ok: true, rows, more: rows.length === limit }
 }

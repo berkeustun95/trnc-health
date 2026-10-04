@@ -32,13 +32,13 @@
 // Only service_role can write under partner/ — storage policy property_images_upload
 // pins (storage.foldername(name))[1] <> 'partner' for authenticated users.
 
-import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 import { SOURCE, getAll, metaArray } from '../supabase/functions/_shared/novest-feed.mjs'
+import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BUCKET = 'property-images'
@@ -68,6 +68,7 @@ const args = process.argv.slice(2)
 const dry = args.includes('--dry')
 const limitArg = args.indexOf('--limit')
 const LIMIT = limitArg !== -1 ? Number(args[limitArg + 1]) : Infinity
+prodWriteGuard({ wouldWrite: !dry, workflow: 'novest-images', dryHint: 'node scripts/mirror-novest-images.mjs --dry' })
 
 // Polite to a partner's shared host. Sequential-ish: 4 in flight, each spaced.
 const CONCURRENCY = 4
@@ -83,11 +84,7 @@ if (existsSync(resolve(ROOT, '.env'))) {
     if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
   }
 }
-let KEY
-try {
-  KEY = execFileSync('security', ['find-generic-password', '-s', 'ada-supabase-service-role', '-w'],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-} catch { fail('Keychain entry "ada-supabase-service-role" not found.') }
+const KEY = serviceRoleKey()
 if (!process.env.EXPO_PUBLIC_SUPABASE_URL) fail('EXPO_PUBLIC_SUPABASE_URL missing — expected in .env')
 
 const supabase = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, KEY,

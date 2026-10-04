@@ -12,12 +12,12 @@
 // on external_id for a real UNIQUE constraint (ON CONFLICT cannot infer a partial
 // index, so the upsert fails without it).
 //
-// CREDENTIALS — macOS Keychain, never .env:
-//   security add-generic-password -a "$USER" -s ada-supabase-service-role -w
-// The service_role key bypasses RLS on every table. It is read at runtime and
-// never written to disk, never logged, and never prefixed EXPO_PUBLIC_ (Expo
-// inlines those into the client bundle). If the Keychain entry is missing this
-// exits non-zero — there is no fallback and no inline prompt.
+// CREDENTIALS — production is written only from GitHub Actions (gisekibris-feed),
+// with the repository secret SUPABASE_SERVICE_ROLE_KEY. Outside CI a write-mode run
+// stops at prodWriteGuard() before anything is read (scripts/lib/prod-write-guard.mjs).
+// The key bypasses RLS on every table: never logged, never prefixed EXPO_PUBLIC_.
+//
+//   node scripts/import-gisekibris-events.mjs --selftest   # offline: no network, no DB
 //
 // WHY service_role is required: `events` rows must land as status='approved' to be
 // publicly visible, and the ev_guard_write trigger only lets a caller set status
@@ -41,11 +41,11 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
+import { prodWriteGuard, serviceRoleKey } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SEED_PATH   = resolve(ROOT, 'supabase/seed/gisekibris-events-clean.json')
 const VENUES_PATH = resolve(ROOT, 'scripts/gisekibris-venues.json')
-const KEYCHAIN_SERVICE = 'ada-supabase-service-role'
 const SOURCE = 'gisekibris'
 
 // Reuses the existing public event-images bucket. The `events/gisekibris/…` prefix
@@ -71,6 +71,17 @@ const args = process.argv.slice(2)
 const dry = args.includes('--dry')
 // Reprocess rows that already carry an image (used to re-mirror at a new size).
 const remirror = args.includes('--remirror')
+// An unknown flag is refused, never ignored: this script WRITES by default, so a
+// mistyped `--dyr` or a `--selftest` it does not have used to run a real import
+// (2026-10-01: a `--selftest` loop over the feed scripts wrote one prod row).
+const selftest = args.includes('--selftest')
+const unknownArgs = args.filter(a => !['--dry', '--remirror', '--selftest'].includes(a))
+if (unknownArgs.length) {
+  console.error(`Unknown argument(s): ${unknownArgs.join(' ')} — this script takes only --dry, --remirror and --selftest. Nothing was run.`)
+  process.exit(1)
+}
+prodWriteGuard({ wouldWrite: !dry && !selftest, workflow: 'gisekibris-feed',
+  dryHint: 'node scripts/import-gisekibris-events.mjs --dry  (needs a service key to read)' })
 
 // ─── Credentials ─────────────────────────────────────────────────────────────
 
@@ -83,57 +94,6 @@ function loadEnv() {
     const val = m[2].trim().replace(/^["']|["']$/g, '')
     if (!(m[1] in process.env)) process.env[m[1]] = val
   }
-}
-
-// Fails loudly. Never falls back to a hardcoded value, an env var, or a prompt —
-// a silent fallback here would either fail confusingly or use the wrong key.
-function serviceRoleKey() {
-  // The Keychain is the source on this laptop and stays the preferred one — it is
-  // not readable by another process without the user's consent, which an
-  // environment variable is. SUPABASE_SERVICE_ROLE_KEY is the CI fallback, where
-  // there is no Keychain: the scheduled workflow supplies it as a repository
-  // secret. Order matters — a developer with both should get the Keychain.
-  let out
-  try {
-    out = execFileSync('security',
-      ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-w'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-  } catch {
-    out = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
-    if (!out) {
-      fail(
-        `No service-role key: Keychain entry "${KEYCHAIN_SERVICE}" not found and`,
-        'SUPABASE_SERVICE_ROLE_KEY is unset.',
-        '',
-        'On this machine, create the Keychain entry:',
-        `  security add-generic-password -a "$USER" -s ${KEYCHAIN_SERVICE} -w`,
-        '(paste the Supabase service_role key at the prompt — it is not echoed)',
-        '',
-        'In CI, set SUPABASE_SERVICE_ROLE_KEY as a repository secret.',
-      )
-    }
-  }
-  const key = out.trim()
-  if (!key) fail(`The service-role key resolved to an empty string.`)
-
-  // Reject ONLY what is unambiguously the wrong key, and let the server diagnose
-  // everything else — whether a legacy JWT still works is a project setting this
-  // script must not second-guess. A publishable key is a different matter: it is
-  // bound by RLS, so it silently cannot write status='approved' rows or mirror
-  // images, and would fail confusingly downstream rather than here.
-  if (key.startsWith('sb_publishable_')) {
-    fail(
-      `Keychain entry "${KEYCHAIN_SERVICE}" holds the PUBLISHABLE key, not the secret one.`,
-      'It is the client-side key and is bound by RLS, so it cannot write',
-      "status='approved' rows or mirror images.",
-      '',
-      'Dashboard → Project Settings → API Keys → Secret keys → reveal / create.',
-      'Copy it, then store it (the interactive -w prompt truncates at 128 chars via',
-      'macOS getpass, so pass the value as an argument instead):',
-      `  security add-generic-password -U -a "$USER" -s ${KEYCHAIN_SERVICE} -w "$(pbpaste)"`,
-    )
-  }
-  return key
 }
 
 function fail(...lines) {
@@ -163,8 +123,8 @@ function descriptionI18n(ev) {
   return Object.keys(out).length ? out : null
 }
 
-function toRow(ev, venues) {
-  const coords = resolveVenue(ev.venue) ?? {}
+function toRow(ev, resolve) {
+  const coords = resolve(ev.venue) ?? {}
   return {
     external_id:      ev.external_id,
     source:           SOURCE,
@@ -231,6 +191,131 @@ function sameValue(field, a, b) {
   return normalise(a) === normalise(b)
 }
 
+// ─── Planning — pure: no client, no network, no clock (callers pass `now`) ───
+//
+// Everything the import DECIDES lives here, so --selftest can run the same code the
+// real import runs, against a fixture.
+
+function planChanges({ feed, existing, resolve, known }) {
+  const byExternalId = new Map(existing.map(r => [r.external_id, r]))
+  const inserts = []
+  const updates = []
+  let unchanged = 0
+  for (const ev of feed) {
+    const row = toRow(ev, resolve)
+    const prev = byExternalId.get(row.external_id)
+    if (!prev) { inserts.push(row); continue }
+    const diff = MUTABLE.filter(f => !sameValue(f, prev[f], row[f]))
+    if (diff.length) updates.push({ row, diff, prev })
+    else unchanged++
+  }
+  // Reported, never deleted — the removal call is the owner's.
+  const vanished = existing.filter(r => !feed.some(ev => ev.external_id === r.external_id))
+  // ONE list, used for both the venue names and the event count, so the two can
+  // never disagree. The count once used the entry's own pin instead, and reported
+  // Lions Garden and the Rauf Denktaş venue (pinned through `aliases`) as unpinned.
+  // Alias-aware on both: a renamed venue that inherits a pin is neither missing
+  // coordinates nor unknown.
+  const unpinnedEvents = feed.filter(ev => resolve(ev.venue)?.latitude == null)
+  const missingCoords = [...new Set(unpinnedEvents.map(ev => ev.venue))].sort()
+  const unknownVenues = [...new Set(
+    feed.filter(ev => !known.has(ev.venue) && !resolve(ev.venue)).map(ev => ev.venue))].sort()
+  return { inserts, updates, unchanged, vanished, unpinnedEvents, missingCoords, unknownVenues }
+}
+
+function buildPayloads(inserts, updates, now) {
+  // New rows: status is set here and only here.
+  const insertPayload = inserts.map(r => ({ ...r, status: 'approved', updated_at: now }))
+  // Existing rows: no status (never re-approve a deliberately hidden row) and no
+  // images (the mirror pass owns that column).
+  const updatePayload = updates.map(u => ({ ...u.row, updated_at: now }))
+  assertHomogeneous('insert', insertPayload)
+  assertHomogeneous('update', updatePayload)
+  return { insertPayload, updatePayload }
+}
+
+// ─── --selftest: the planning logic on a fixture, with the network trapped ───
+//
+// Runs BEFORE .env is read, before any key is looked up and before a client exists.
+// globalThis.fetch is replaced by a trap that records and throws: supabase-js does
+// every read and write through fetch, so a single trapped call fails the test. The
+// trap is proven live first (a real supabase-js upsert must land in it), or a broken
+// trap would let a writing selftest pass.
+if (selftest) {
+  let bad = 0
+  const t = (label, got, want) => {
+    const g = JSON.stringify(got), w = JSON.stringify(want), ok = g === w
+    if (!ok) bad++
+    console.log(`    ${ok ? '✓' : '✗'} ${label.padEnd(52)} ${g}${ok ? '' : `  wanted ${w}`}`)
+  }
+  const trapped = []
+  globalThis.fetch = async (input, init) => {
+    trapped.push(`${init?.method ?? 'GET'} ${String(input?.url ?? input)}`)
+    throw new Error('SELFTEST: network is forbidden')
+  }
+
+  console.log('\n  the trap is live (positive control)')
+  {
+    const probe = createClient('https://selftest.invalid', 'selftest-not-a-key', { auth: { persistSession: false, autoRefreshToken: false } })
+    const { error } = await probe.from('events').upsert([{ external_id: 'gk-X' }])
+    t('a supabase-js upsert is caught by the trap', trapped.length === 1 && /POST/.test(trapped[0]), true)
+    t('…and surfaces as an error, not a write', Boolean(error), true)
+    trapped.length = 0
+  }
+
+  const venueFixture = [
+    { venue: 'Cage Club', latitude: 35.1, longitude: 33.1 },
+    { venue: 'Lions Garden', latitude: null, longitude: null, aliases: ['LEO Club'] },
+    { venue: 'LEO Club', latitude: 35.2, longitude: 33.2 },
+    { venue: 'Nowhere Bar', latitude: null, longitude: null },
+  ]
+  const known = new Map(venueFixture.map(v => [v.venue, v]))
+  const resolve = makeResolver(venueFixture)
+  const ev = (id, venue) => ({
+    external_id: id, title: `T ${id}`, venue, city: 'Girne', category: 'music',
+    start_date: '2026-12-01T18:00:00.000Z', end_date: null,
+    description_tr: 'açıklama', description_en: 'description',
+    source_image_url: `https://img.example/event/${id}/banner.jpg`,
+    ticket_url: `https://www.gisekibris.com/etkinlikler/x--${id}`,
+  })
+  const feedFx = [ev('gk-NEW1', 'Cage Club'), ev('gk-UPD1', 'Lions Garden'), ev('gk-SAME', 'Cage Club'),
+                  ev('gk-UNP1', 'Nowhere Bar'), ev('gk-UNK1', 'Brand New Venue')]
+  const same = toRow(feedFx[2], resolve)
+  const existingFx = [
+    // Stored before Lions Garden's pin resolved: coordinates NULL, so an update.
+    { ...toRow(feedFx[1], resolve), latitude: null, longitude: null, status: 'approved' },
+    // Postgres timestamp form + a tokenised image URL: both must read as UNCHANGED.
+    { ...same, start_date: '2026-12-01 18:00:00+00', source_image_url: same.source_image_url + '?alt=media&token=abc', status: 'approved' },
+    { external_id: 'gk-GONE', title: 'gone from the feed', status: 'approved' },
+  ]
+  const plan = planChanges({ feed: feedFx, existing: existingFx, resolve, known })
+
+  console.log('\n  planChanges')
+  t('inserts', plan.inserts.map(r => r.external_id), ['gk-NEW1', 'gk-UNP1', 'gk-UNK1'])
+  t('updates and their diff', plan.updates.map(u => [u.row.external_id, u.diff]), [['gk-UPD1', ['latitude', 'longitude']]])
+  t('the update carries the ALIAS pin', [plan.updates[0]?.row.latitude, plan.updates[0]?.row.longitude], [35.2, 33.2])
+  t('unchanged (timestamp form + token are equal)', plan.unchanged, 1)
+  t('vanished is reported, not deleted', plan.vanished.map(r => r.external_id), ['gk-GONE'])
+  t('unpinned count excludes the alias-pinned venue', plan.unpinnedEvents.length, 2)
+  t('venues needing coordinates', plan.missingCoords, ['Brand New Venue', 'Nowhere Bar'])
+  t('venues missing from the lookup', plan.unknownVenues, ['Brand New Venue'])
+
+  console.log('\n  buildPayloads')
+  const { insertPayload, updatePayload } = buildPayloads(plan.inserts, plan.updates, '2026-10-01T00:00:00.000Z')
+  t("inserts land as status='approved'", insertPayload.map(r => r.status), ['approved', 'approved', 'approved'])
+  t('updates never carry status (no silent re-approve)', updatePayload.some(r => 'status' in r), false)
+  t('nothing carries images (the mirror pass owns it)', [...insertPayload, ...updatePayload].some(r => 'images' in r), false)
+
+  console.log('\n  isolation')
+  // supabase-js is lazy and async: a stray call reaches fetch only after a few
+  // microtasks, so let pending work drain or this check passes before the write lands.
+  await new Promise(r => setTimeout(r, 100))
+  t('network calls made by the planning code', trapped, [])
+
+  console.log(bad ? `\n  ${bad} self-test failure(s).\n` : '\n  Self-test clean.\n')
+  process.exit(bad ? 1 : 0)
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 loadEnv()
@@ -269,20 +354,24 @@ const venues = new Map(venueList.map(v => [v.venue, v]))
 // Resolution: exact name; then, if that entry has no pin, the first alias that
 // does; then, for a name that has no entry at all, any entry listing it as an
 // alias. Returns undefined only for a genuinely unknown venue.
-function resolveVenue(name) {
-  const direct = venues.get(name)
-  if (direct?.latitude != null) return direct
-  for (const a of direct?.aliases ?? []) {
-    const t = venues.get(a)
-    if (t?.latitude != null) return t
-  }
-  if (!direct) {
-    for (const v of venueList) {
-      if ((v.aliases ?? []).includes(name) && v.latitude != null) return v
+function makeResolver(venueList) {
+  const venues = new Map(venueList.map(v => [v.venue, v]))
+  return function resolveVenue(name) {
+    const direct = venues.get(name)
+    if (direct?.latitude != null) return direct
+    for (const a of direct?.aliases ?? []) {
+      const t = venues.get(a)
+      if (t?.latitude != null) return t
     }
+    if (!direct) {
+      for (const v of venueList) {
+        if ((v.aliases ?? []).includes(name) && v.latitude != null) return v
+      }
+    }
+    return direct
   }
-  return direct
 }
+const resolveVenue = makeResolver(venueList)
 
 if (!feed.length) fail('Seed file contains no events.')
 
@@ -303,11 +392,8 @@ if (readErr) {
     `Could not read existing ${SOURCE} events: ${readErr.message}`,
     ...(authish ? [
       '',
-      `The Keychain entry "${KEYCHAIN_SERVICE}" was found but the key was rejected.`,
-      'Dashboard → Project Settings → API Keys → Secret keys. Copy it, then store it',
-      '(the interactive -w prompt truncates at 128 chars via macOS getpass, so pass',
-      'the value as an argument instead):',
-      `  security add-generic-password -U -a "$USER" -s ${KEYCHAIN_SERVICE} -w "$(pbpaste)"`,
+      'The service key was found but rejected: a truncated or wrong-project value in the',
+      'SUPABASE_SERVICE_ROLE_KEY repository secret (Settings → Secrets → Actions).',
     ] : []),
   )
 }
@@ -338,33 +424,8 @@ if (stale.length) {
   )
 }
 
-const byExternalId = new Map((existing ?? []).map(r => [r.external_id, r]))
-
-const inserts = []
-const updates = []
-let unchanged = 0
-
-for (const ev of feed) {
-  const row = toRow(ev, venues)
-  const prev = byExternalId.get(row.external_id)
-  if (!prev) { inserts.push(row); continue }
-  const diff = MUTABLE.filter(f => !sameValue(f, prev[f], row[f]))
-  if (diff.length) updates.push({ row, diff, prev })
-  else unchanged++
-}
-
-// Reported, never deleted — the removal call is the owner's.
-const vanished = (existing ?? []).filter(
-  r => !feed.some(ev => ev.external_id === r.external_id))
-
-// Alias-aware on both counts: a renamed venue that inherits a pin is neither
-// missing coordinates nor unknown, and reporting it as either would send somebody
-// to re-supply a pin that is already there.
-const missingCoords = [...new Set(
-  feed.filter(ev => resolveVenue(ev.venue)?.latitude == null).map(ev => ev.venue))].sort()
-
-const unknownVenues = [...new Set(
-  feed.filter(ev => !venues.has(ev.venue) && !resolveVenue(ev.venue)).map(ev => ev.venue))].sort()
+const { inserts, updates, unchanged, vanished, unpinnedEvents, missingCoords, unknownVenues } =
+  planChanges({ feed, existing: existing ?? [], resolve: resolveVenue, known: venues })
 
 // ─── Write ───────────────────────────────────────────────────────────────────
 
@@ -398,20 +459,10 @@ function assertHomogeneous(label, rows) {
 }
 
 if (inserts.length || updates.length) {
-  const now = new Date().toISOString()
-
-  // New rows: status is set here and only here.
-  const insertPayload = inserts.map(r => ({ ...r, status: 'approved', updated_at: now }))
-  // Existing rows: no status (never re-approve a deliberately hidden row) and no
-  // images (the mirror pass owns that column).
-  const updatePayload = updates.map(u => ({ ...u.row, updated_at: now }))
-
-  // Deliberately OUTSIDE the `!dry` guard. The payloads are built identically either
-  // way, so a ragged shape is fully detectable without writing anything — and a check
-  // that only runs on the real run is a check that reports damage instead of
-  // preventing it. `--dry` is where this class of bug is supposed to die.
-  assertHomogeneous('insert', insertPayload)
-  assertHomogeneous('update', updatePayload)
+  // Deliberately OUTSIDE the `!dry` guard (inside buildPayloads): the payloads are
+  // built identically either way, so a ragged shape is fully detectable without
+  // writing anything. `--dry` is where this class of bug is supposed to die.
+  const { insertPayload, updatePayload } = buildPayloads(inserts, updates, new Date().toISOString())
 
   if (dry) {
     const shape = p => (p.length ? Object.keys(p[0]).sort().join(', ') : '—')
@@ -715,9 +766,10 @@ if (unknownVenues.length) {
   console.log('    Add them there (coords may stay null) so next week inherits the entry.')
 }
 
-if (missingCoords.length) {
-  const affected = feed.filter(ev => venues.get(ev.venue)?.latitude == null).length
-  console.log(`\n  ${missingCoords.length} venue(s) still need coordinates — ${affected} event(s) affected:`)
+if (!missingCoords.length) {
+  console.log(`\n  ✓ every event has coordinates — 0 unpinned of ${feed.length}`)
+} else {
+  console.log(`\n  ${missingCoords.length} venue(s) still need coordinates — ${unpinnedEvents.length} event(s) affected:`)
   for (const v of missingCoords) console.log(`      ${v}`)
   console.log('    Imported with NULL lat/lng (correct). They are invisible under the Events')
   console.log('    district filter until coords land; they show fine with no district filter.')

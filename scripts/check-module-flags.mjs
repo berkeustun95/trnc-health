@@ -172,9 +172,10 @@ const EXPECTED_SCALARS = {
   // Putting it in that map would fail this script's own waitlist and notify-path checks
   // against a perfectly correct app.
   HOME_V2_LIVE:          true,   // live 2026-09-08 — first OTA that reaches users
-  // The app-wide redesign. false on every branch until its go-live: a working-tree flip
-  // would ship the whole redesign to every user. Dev bundles show it via __DEV__ instead.
-  REDESIGN_LIVE:         false,
+  // The app-wide redesign. Live from runtime 1.3.0 (release/redesign-1, 2026-10-02): the new
+  // binaries carry the native side (expo-image, nav-bar theme); 1.2.0 never gets a 1.3.0 update.
+  // Visual rollback = this AND flags.js back to false, one commit, OTA on 1.3.0.
+  REDESIGN_LIVE:         true,
   // Tile-label typeface experiment (Inter vs Manrope). Neither value is a launch, but it
   // is compared ON DEVICE by flipping it, and a working-tree flip is exactly what
   // `eas update` bundles. Baselined so the comparison cannot ship by accident.
@@ -216,6 +217,7 @@ const EXPECTED_SCALARS = {
   // Oteller (KITOB hotels). Baselined because a flip publishes a third-party
   // association's name and badge — permission first, see the precondition list on the flag.
   HOTELS_LIVE:           false,
+  LIVE_SCORES_LIVE:      true,   // live 2026-10-04
   // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar. Not a
   // MODULE_FLAGS key for the same mechanical reason DORMS_LIVE is not: it gates a PARTNER
   // inside a module that is already live, so there is no Coming Soon screen, no waitlist

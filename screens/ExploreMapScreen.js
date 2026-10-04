@@ -18,7 +18,7 @@ import { requestWithPrimer } from '../utils/permissionPrimer'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import FilterDropdown from '../components/FilterDropdown'
 import {
-  View, Text, TouchableOpacity, StyleSheet, Image,
+  View, Text, TouchableOpacity, StyleSheet, Image, Platform,
   ActivityIndicator, ScrollView, useWindowDimensions, Alert, Linking,
 } from 'react-native'
 import * as Location from 'expo-location'
@@ -36,8 +36,7 @@ import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup } from '../constants/ex
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
 import { colors, shadow, ellipsizeSlack, type, radii, elevation } from '../constants/theme'
-import { Button, IconButton, CategoryIcon, RemoteImage } from '../components/ui'
-import { CARD_BG } from '../components/ui/ModuleScreen'
+import { Button, IconButton, CategoryIcon, RemoteImage, useTabBarFootprint } from '../components/ui'
 import { t } from '../constants/i18n'
 import { EXPLORE_ROUTES_LIVE, ROUTE_MEDALS_LIVE } from '../constants/flags'
 import { useRouteMedal } from '../utils/routeMedals'
@@ -45,6 +44,7 @@ import { EXPLORE_REVIEW, reviewStatuses } from '../utils/exploreReview'
 import { routesLayerVisible, resolveRoutes, ROUTE_COLOR, walkStep, walkAdvance, legKey } from '../constants/walkingRoutes'
 import { RouteOverlay, RoutePicker, RoutePanel, WalkPanel, useWalkPosition, useLocationGranted, useHeading, fitRoute } from '../components/WalkingRoutes'
 import OsmAttribution from '../components/OsmAttribution'
+import { CHIP_CAP, CHIP_CAP_NARROW } from '../components/home/redesign/RedesignHero'
 
 const TYPE_EMOJI = { pharmacy: '💊', clinic: '🩺', hospital: '🏥', dentist: '🦷' }
 const TYPE_ION = { pharmacy: 'medkit-outline', clinic: 'medical-outline', hospital: 'business-outline', dentist: 'medical-outline' }
@@ -219,12 +219,19 @@ function pinCardContent(pin, lang) {
   return {
     image: photo ? { uri: photo } : null,
     title: placeName(row, lang),
-    badge: CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : row.category,
-    sub:   REGION_LABEL_KEY[row.region] ? t(REGION_LABEL_KEY[row.region], lang) : row.region,
+    // The badge speaks the Kategori filter's vocabulary — the GROUP the pin is filtered by
+    // (Kültürel Miras), not the specific category (Dini Mekan), which moves to the subtitle.
+    // Health and dog-boarding badges already equal their filter label.
+    badge: GROUP_META[categoryToGroup(row.category)]?.labelKey
+      ? t(GROUP_META[categoryToGroup(row.category)].labelKey, lang)
+      : (CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : row.category),
+    sub:   [CATEGORY_LABEL_KEY[row.category] ? t(CATEGORY_LABEL_KEY[row.category], lang) : null,
+            REGION_LABEL_KEY[row.region] ? t(REGION_LABEL_KEY[row.region], lang) : row.region]
+             .filter(Boolean).join(' · '),
   }
 }
 
-function PinCard({ pin, lang, onClose, onViewProfile }) {
+function PinCard({ pin, lang, onClose, onViewProfile, bottom }) {
   const isHealth = pin.kind === 'health'
   const row      = pin.row
 
@@ -237,7 +244,7 @@ function PinCard({ pin, lang, onClose, onViewProfile }) {
       : pin.kind === 'place' ? (GROUP_META[categoryToGroup(row.category)]?.icon || 'location-outline')
       : 'paw-outline'
     return (
-      <View style={r.card}>
+      <View style={[r.card, bottom != null && { bottom }]}>
         <View style={r.cardRow}>
           {image
             ? <RemoteImage source={image} style={r.thumb} resizeMode={isHealth ? 'contain' : 'cover'} accessibilityIgnoresInvertColors />
@@ -315,8 +322,19 @@ export default function ExploreMapScreen({
   session = null,
   onRequireAccount,
   initialRoutesMode = false,   // Home's "Yürüyüş Rotaları" tile (redesign) opens straight into routes
+  underTabBar = false,         // Keşfet tab (redesign): the floating tab bar covers the bottom of the map
 }) {
   const { width, height } = useWindowDimensions()
+  // Under the floating tab bar the map is full height; every bottom-anchored surface sits
+  // this far up instead (the bar's footprint), and the map's own padding keeps the Google
+  // logo and legal link visible above it (Maps terms: they may not be covered).
+  const tabFoot = useTabBarFootprint()
+  const mapBottom = underTabBar ? tabFoot : 0
+  const panelBottom = underTabBar ? tabFoot + 12 : undefined
+  // Harita / Liste / Check-in'ler: the chip-row cap (large system text grows the labels at most
+  // 1.2×, not at all below 350dp). Measured 2026-10-02 at 320dp, 1.0×: tr 277, ru 274, ar 275
+  // (Noto Naskh Arabic UI Bold, HarfBuzz-shaped) of 320; uncapped 1.3× left tr/ru 3–6dp spare.
+  const segCap = width < 350 ? CHIP_CAP_NARROW : CHIP_CAP
   const mapRef = useRef(null)
   // Consumed once per mount. Pending ids resolve in effects below, once routes/pins exist.
   const [snap] = useState(() => { const v = returnSnapshot; returnSnapshot = null; return v })
@@ -651,7 +669,7 @@ export default function ExploreMapScreen({
           <View style={[s.segment, REDESIGN && r.segment]}>
             <View style={[s.segItem, s.segItemActive, REDESIGN && r.segItem]}>
               <Ionicons name="map" size={15} color="#fff" />
-              <Text style={[s.segText, s.segTextActive]}>{t('exploreViewMap', lang)}</Text>
+              <Text style={[s.segText, s.segTextActive]} maxFontSizeMultiplier={segCap}>{t('exploreViewMap', lang)}</Text>
             </View>
             <TouchableOpacity
               style={[s.segItem, REDESIGN && r.segItem]}
@@ -661,7 +679,7 @@ export default function ExploreMapScreen({
               accessibilityLabel={t('exploreViewList', lang)}
             >
               <Ionicons name="list" size={15} color={colors.textPrimary} />
-              <Text style={s.segText}>{t('exploreViewList', lang)}</Text>
+              <Text style={s.segText} maxFontSizeMultiplier={segCap}>{t('exploreViewList', lang)}</Text>
             </TouchableOpacity>
             {!!onShowCheckins && (
               <TouchableOpacity
@@ -672,7 +690,7 @@ export default function ExploreMapScreen({
                 accessibilityLabel={t('checkinFeedTitle', lang)}
               >
                 <Ionicons name="location" size={15} color={colors.textPrimary} />
-                <Text style={s.segText}>{t('checkinTab', lang)}</Text>
+                <Text style={s.segText} maxFontSizeMultiplier={segCap}>{t('checkinTab', lang)}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -689,6 +707,7 @@ export default function ExploreMapScreen({
         showsMyLocationButton={false}
         onPanDrag={walking && follow ? () => setFollow(false) : undefined}
         onRegionChangeComplete={setRegion}
+        mapPadding={{ top: 0, right: 0, left: 0, bottom: mapBottom }}
         onPress={() => setSelected(null)}
       >
         {routesMode && (
@@ -721,7 +740,7 @@ export default function ExploreMapScreen({
         })}
       </MapView>
       {/* Facility pins are partly OSM-sourced (geocoding policy): ODbL credit. */}
-      <OsmAttribution lang={lang} overlay />
+      <OsmAttribution lang={lang} overlay style={underTabBar ? { bottom: (Platform.OS === 'ios' ? 26 : 6) + mapBottom } : undefined} />
 
       <ChipRow
         sources={sources}
@@ -756,6 +775,7 @@ export default function ExploreMapScreen({
 
       {routesMode && (selectedRoute && walk
         ? <WalkPanel
+            bottom={panelBottom}
             route={selectedRoute}
             lang={lang}
             walk={walk}
@@ -771,6 +791,7 @@ export default function ExploreMapScreen({
           />
         : selectedRoute
         ? <RoutePanel
+            bottom={panelBottom}
             key={selectedRoute.id}
             route={selectedRoute}
             lang={lang}
@@ -782,7 +803,7 @@ export default function ExploreMapScreen({
             initialScrollY={panelScrollY.current}
             onScrollY={y => { panelScrollY.current = y }}
           />
-        : <RoutePicker routes={routes} lang={lang} error={routesError} onSelectRoute={openRoute} />
+        : <RoutePicker routes={routes} lang={lang} error={routesError} onSelectRoute={openRoute} bottom={panelBottom} />
       )}
 
       {loading && (
@@ -793,6 +814,7 @@ export default function ExploreMapScreen({
 
       {selected && (
         <PinCard
+          bottom={panelBottom}
           pin={selected}
           lang={lang}
           onClose={() => setSelected(null)}
@@ -823,8 +845,9 @@ const ch = StyleSheet.create({
   count:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.textSecondary },
 })
 
-// Redesign: the floating surfaces over the map take the module-card treatment (CARD_BG, radius
-// 20, elevation.floating). The map itself is the backdrop here — no module photo behind it.
+// Redesign: the floating surfaces over the map take radius 20 + elevation.floating, on SOLID
+// white — a map is busier than a module photo, and CARD_BG's 93% let labels and pins read
+// through the text (device check, 2026-10-04). No module photo here; the map is the backdrop.
 // The chips match FilterDropdown's pill beside them: one control row, one shape.
 const rc = StyleSheet.create({
   chip:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radii.pill,
@@ -833,7 +856,7 @@ const rc = StyleSheet.create({
 })
 
 const r = StyleSheet.create({
-  card:      { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: CARD_BG, borderRadius: radii.card,
+  card:      { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: colors.cardBg, borderRadius: radii.card,
                padding: 14, gap: 12, ...elevation.floating },
   cardRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   thumb:     { width: 56, height: 56, borderRadius: radii.tile, backgroundColor: colors.border },
@@ -842,10 +865,10 @@ const r = StyleSheet.create({
   name:      { ...type.rowTitle, color: colors.textPrimary },
   sub:       { ...type.small, color: colors.textSecondary },
   close:     { marginTop: -10, marginRight: -10 },
-  segment:   { backgroundColor: CARD_BG, borderRadius: radii.pill, ...elevation.floating },
+  segment:   { backgroundColor: colors.cardBg, borderRadius: radii.pill, ...elevation.floating },
   segItem:   { borderRadius: radii.pill },
-  locateBtn: { backgroundColor: CARD_BG, ...elevation.floating },
-  loading:   { backgroundColor: CARD_BG, ...elevation.floating },
+  locateBtn: { backgroundColor: colors.cardBg, ...elevation.floating },
+  loading:   { backgroundColor: colors.cardBg, ...elevation.floating },
 })
 
 const cl = StyleSheet.create({

@@ -198,7 +198,7 @@ export const HOME_V2_LIVE = true   // live 2026-09-08
 //
 // Like HOME_V2_LIVE it REPLACES surfaces every user already has, so it is a scalar in
 // scripts/check-module-flags.mjs's EXPECTED_SCALARS, not a MODULE_FLAGS key.
-export const REDESIGN_LIVE = false
+export const REDESIGN_LIVE = true   // live from 1.3.0 (release/redesign-1, 2026-10-02); runtime 1.2.0 never receives it
 
 // Banner advertising (ad_banners). false = no banner slot renders anywhere, whatever is in
 // the table — AdSlot returns null before it even reads. true = a sold, active, in-window ad
@@ -310,10 +310,10 @@ export const PREVIEW_PENDING_PARTNERS = false
 // itself still dark. Same resolution as PREVIEW_PENDING_PARTNERS.
 export const HS_SELF_REGISTRATION = false
 
-// Yurtlar (dorm partners) — the second top tab of Emlak & Konaklama (a chip in the Emlak
-// row until 2026-09-29). false = the tab is absent, the showcase is unreachable, and with
-// no second tab the tab bar is not drawn at all. true = the Yurtlar tab with its accent
-// dot. The module opens on Emlak either way (ACCOM_LANDING_TAB).
+// Yurtlar (dorm partners) — a top tab of the accommodation module (a chip in the Emlak row
+// until 2026-09-29). false = the tab is absent, the showcase is unreachable, and with no
+// second tab the tab bar is not drawn at all. true = the Yurtlar tab with its accent dot.
+// The module opens on its first visible tab (Oteller | Yurtlar | Emlak — accomLandingTab).
 //
 // NOT a MODULE_FLAGS key, and the reason is mechanical rather than stylistic. A true
 // entry in that map trips three checks in scripts/check-module-flags.mjs — the
@@ -367,6 +367,19 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //      commit (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs), then OTA.
 //   5. hotels:health green. The list on kitob.org is dated 2023.
 export const HOTELS_LIVE = false
+
+// Live Scores (Canlı Skor): football, basketball, F1 and hand-entered KTFF football, read
+// from Supabase + Realtime (20261070; sync = supabase/functions/live-scores-*). false = no
+// Home tile and no way in; the AdminScreen score-editor entry is unaffected (admins enter
+// KTFF fixtures before launch). NOT a MODULE_FLAGS key: there is no waitlist to collect —
+// the HOTELS_LIVE reasoning. Preconditions for flipping, in order:
+//   1. 20261070 applied, verify_schema 1070 rows OK.
+//   2. API_SPORTS_KEY set, the three functions deployed, 20261072 (cron) applied,
+//      and matches populated for a full day (live_sync_state.last_error NULL).
+//   3. The F1 data source settled (licence) — or the F1 tab removed.
+//   4. Turkish device pass with this flipped LOCALLY, then BOTH files in one commit
+//      (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs), then OTA.
+export const LIVE_SCORES_LIVE = true   // live 2026-10-04 — football (club + internationals), basketball, F1
 
 // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar.
 //

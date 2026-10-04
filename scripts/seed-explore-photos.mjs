@@ -83,6 +83,7 @@ import sharp from 'sharp'
 import { legacyCreditString } from '../utils/photoAttribution.js'
 import { categoryToGroup, groupVisible, GROUP_ORDER, GROUP_TILE_THRESHOLD, LIVE_TILE_GROUPS }
   from '../constants/exploreCategories.js'
+import { prodWriteGuard } from './lib/prod-write-guard.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -113,6 +114,8 @@ const MAX_BYTES = (kbIdx !== -1 ? Number(process.argv[kbIdx + 1]) : 600) * 1024
 const UA = 'ADA-TRNC-Health/1.0 (berke.ustun95@gmail.com) explore-photo-mirror'
 
 const APPLY = process.argv.includes('--apply')
+// No workflow: its manifest (data/explore-photo-manifest.json) is not in the repo.
+prodWriteGuard({ wouldWrite: APPLY, workflow: null, dryHint: 'node scripts/seed-explore-photos.mjs' })
 
 // --only <uuid|name substring> narrows the run to one place. Everything downstream —
 // validation, the probe, the rollback block — then covers exactly what was written and

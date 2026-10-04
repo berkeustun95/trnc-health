@@ -54,11 +54,11 @@ export function ServiceTile({ mod, cat, lang, onPress, width = '25%' }) {
   )
 }
 
-export default function ServicePanels({ lang, onPress }) {
+export default function ServicePanels({ lang, onPress, unlocked }) {
   const cap = labelCap(useWindowDimensions().width)
   return (
     <View style={{ gap: 12 }}>
-      {liveGroups().map(g => (
+      {liveGroups(unlocked).map(g => (
         <View key={g.key} style={[s.panel, elevation.card]}>
           <View style={s.head}>
             <View style={[s.dot, { backgroundColor: CATEGORY[g.key].ink }]} />

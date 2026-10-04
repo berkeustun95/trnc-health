@@ -84,7 +84,7 @@ export const AD_DEFERRED_MODULES = {
 //   inside one file and has no meaning across two.
 export const AD_PLACEMENTS = [
   { file: 'components/ads/HomeListBottomSlot.js',            position: 'list_bottom',   module: 'home',
-    hosts: ['screens/HomeScreen.js'],            span: 'renderHubV2' },
+    hosts: ['screens/HomeScreen.js'],            span: 'renderHubRedesign' },
 
   { file: 'components/ads/AccommodationListTopSlot.js',      position: 'list_top',      module: 'accommodation',
     hosts: ['screens/AccommodationScreen.js'] },

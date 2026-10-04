@@ -1,0 +1,56 @@
+# ─── Apply ONE migration to production ───────────────────────────────────────
+#
+# The only migration path: no Mac holds a production credential. Manual only — never
+# on push. Engine and every refusal rule: scripts/supabase-migrate.mjs.
+#
+#   gh workflow run supabase-migrate -f file=<full name>.sql               # dry: SQL + ledger check
+#   gh workflow run supabase-migrate -f file=<full name>.sql -f apply=true
+#
+# Before dispatching: the file is committed on the ref you dispatch from, stamped
+# (`node scripts/migration-ledger.mjs --stamp <file>`), and its objects are registered
+# in supabase/verify_schema.sql — the apply fails unless QUERY 1 is green afterwards.
+
+name: supabase-migrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: 'FULL migration file name in supabase/migrations/ (prefixes repeat)'
+        type: string
+        required: true
+      apply:
+        description: 'Apply to production (otherwise a dry run)'
+        type: boolean
+        default: false
+
+# One at a time, and never cancel one mid-flight: a cancelled apply is a question
+# nobody can answer from the log.
+concurrency: { group: supabase-migrate, cancel-in-progress: false }
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      IN_FILE: ${{ inputs.file }}
+      IN_APPLY: ${{ inputs.apply }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: Secrets present
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_URL; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+      - name: Ledger tool self-check
+        run: node scripts/migration-ledger.mjs --verify 20261065_hotels_commons_photo_credit.sql
+      - name: Migrate
+        run: |
+          if [ "$IN_APPLY" = "true" ]; then node scripts/supabase-migrate.mjs "$IN_FILE" --apply
+          else node scripts/supabase-migrate.mjs "$IN_FILE"; fi

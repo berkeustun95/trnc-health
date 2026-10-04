@@ -1,0 +1,39 @@
+# ─── Read-only SQL against production ────────────────────────────────────────
+#
+# Runs ONE committed SQL file as `supabase_read_only_user` through the Management API's
+# read-only endpoint — it cannot write. Every run proves the role first (no INSERT/UPDATE/
+# DELETE) and prints whether it bypasses RLS. Engine: scripts/supabase-readonly.mjs.
+#
+#   gh workflow run supabase-readonly -f file=supabase/readonly/<name>.sql
+#   gh workflow run supabase-readonly -f file=supabase/probe_<name>.sql --ref <branch>
+#
+# Only supabase/readonly/*.sql and supabase/probe_*.sql are accepted, from the ref you dispatch.
+
+name: supabase-readonly
+
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: 'SQL file: supabase/readonly/<name>.sql or supabase/probe_<name>.sql'
+        type: string
+        required: true
+
+concurrency: { group: supabase-readonly, cancel-in-progress: false }
+
+jobs:
+  read:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      IN_FILE: ${{ inputs.file }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: Read (supabase_read_only_user)
+        run: node scripts/supabase-readonly.mjs "$IN_FILE"

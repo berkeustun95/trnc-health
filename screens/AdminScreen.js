@@ -4415,7 +4415,7 @@ function ModerationTab() {
   )
 }
 
-export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview }) {
+export default function AdminScreen({ session, lang, onShowExplore, onShowStudentHub, onShowExploreReview, onShowLiveScoresEditor }) {
   const [tab, setTab] = useState('Dashboard')
   const navigateTo = t => setTab(t)
 
@@ -4457,6 +4457,15 @@ export default function AdminScreen({ session, lang, onShowExplore, onShowStuden
           <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowStudentHub} activeOpacity={0.85}>
             <Ionicons name="school-outline" size={16} color={colors.primary} />
             <Text style={s.explorePreviewText}>Open Student Hub (preview)</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* KTFF fixtures and live scores are entered by hand (no API covers TRNC football).
+            Admins never reach the Live Scores screen's pencil, so the editor opens from here. */}
+        {onShowLiveScoresEditor && (
+          <TouchableOpacity style={s.explorePreviewBtn} onPress={onShowLiveScoresEditor} activeOpacity={0.85}>
+            <Ionicons name="football-outline" size={16} color={colors.primary} />
+            <Text style={s.explorePreviewText}>Live scores: KTFF score editor</Text>
           </TouchableOpacity>
         )}
 
