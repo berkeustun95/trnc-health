@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, Image, TouchableOpacity, FlatList, ActivityIndicator, Linking, StyleSheet, Platform, Dimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { colors, shadow, radii, type, elevation, category, TAP } from '../../constants/theme'
 import { REDESIGN } from '../../constants/redesign'
@@ -202,6 +203,9 @@ export default function HotelsTab({ lang }) {
   const [klass, setKlass]       = useState(null)
   const [district, setDistrict] = useState(null)
   const [area, setArea]         = useState(null)
+  // The screen's SafeAreaView pads only the top, and Android draws edge-to-edge: without the
+  // bottom inset the last card's buttons sit under the navigation bar.
+  const insets = useSafeAreaInsets()
 
   const load = useCallback(async () => {
     setLoading(true); setFailed(false)
@@ -289,7 +293,7 @@ export default function HotelsTab({ lang }) {
       <FlatList
         data={shown}
         keyExtractor={h => h.id}
-        contentContainerStyle={hs.listContent}
+        contentContainerStyle={[hs.listContent, { paddingBottom: hs.listContent.paddingBottom + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         initialNumToRender={6}
         windowSize={7}

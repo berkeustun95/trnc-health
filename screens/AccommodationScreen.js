@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
   TextInput, ScrollView, Dimensions, Modal, Pressable,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -466,6 +466,8 @@ export default function AccommodationScreen({
   const isHotel = tab === 'hotel'
   // Oteller is mounted on first visit and then only HIDDEN when you leave it, so its
   // filters and scroll survive a trip to Emlak and back — as Emlak's do.
+  // Bottom inset for the Emlak/Yurtlar list: the SafeAreaView pads only the top (edge-to-edge).
+  const insets = useSafeAreaInsets()
   const [hotelsMounted, setHotelsMounted] = useState(LANDING_TAB === 'hotel')
   function changeTab(next) { if (next === 'hotel') setHotelsMounted(true); setTab(next) }
 
@@ -720,7 +722,7 @@ export default function AccommodationScreen({
         <FlatList
           data={items}
           keyExtractor={i => i.id}
-          contentContainerStyle={cs.listContent}
+          contentContainerStyle={[cs.listContent, { paddingBottom: cs.listContent.paddingBottom + insets.bottom }]}
           ListHeaderComponent={
             // list_top — a HEADER, so it scrolls away. Mounting it above the FlatList
             // would make it sticky, and a permanently visible ad is a different product.
