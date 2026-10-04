@@ -243,4 +243,5 @@ writeFileSync(resolve(OUT, 'verify_schema.json'), JSON.stringify(verify, null, 2
 writeFileSync(resolve(OUT, 'ledger.json'), JSON.stringify({ ledger, check }, null, 2))
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + '\n')
 console.log(text)
+for (const v of verify.filter(v => v.error)) console.log(`::warning::verify_schema QUERY ${v.n} did not run: ${v.error.split('\n')[0]}`)
 if (todo.length || l2.size) console.log(`::warning::${todo.length} file(s) need action, ${l2.size} edited after applying — see the summary.`)
