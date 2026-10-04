@@ -344,6 +344,23 @@ for (const W of WIDTHS) {
     // ─── The hotel card's three action buttons (Oteller) ─────────────────────
     // ONE line each, in the box HotelsTab draws (geometry from constants/hotels.js, never
     // retyped here). "Web sitesi" was ellipsed on every card on the 2026-09-29 device test.
+    // The measurement below is only true if EVERY card style draws the button this way. The
+    // redesign card (redesignHs, live from 1.3.0) once laid the icon BESIDE the label in its own
+    // padding, and this guard stayed green while "Web sitesi" truncated at every width — it was
+    // measuring the legacy box. So each `action:` style in HotelsTab must stack icon above label
+    // and take its padding and font size from HOTEL_ACTIONS.
+    if (W === 320 && L === 'English') {
+      const src = readFileSync(resolve(ROOT, 'components/accommodation/HotelsTab.js'), 'utf8')
+      const actions = [...src.matchAll(/^\s*action:\s*\{([\s\S]*?)\},\s*$/gm)].map(m => m[1])
+      const bad = actions.filter(b => /flexDirection:\s*'row'/.test(b) || !/paddingHorizontal:\s*HOTEL_ACTIONS\.buttonPadX/.test(b))
+      const texts = [...src.matchAll(/^\s*actionText:\s*\{([\s\S]*?)\},\s*$/gm)].map(m => m[1])
+      const badText = texts.filter(b => !/fontSize:\s*HOTEL_ACTIONS\.fontSize/.test(b))
+      if (actions.length < 2 || texts.length < 2) { console.error(`check-tile-labels: expected the legacy AND redesign hotel action styles, found ${actions.length} action / ${texts.length} actionText — measuring nothing`); process.exit(1) }
+      if (bad.length || badText.length) {
+        console.error(`check-tile-labels: a HotelsTab action style does not use HOTEL_ACTIONS geometry (icon above label, buttonPadX, fontSize), so the hotel button measurement does not describe it:\n${[...bad, ...badText].map(b => '  {' + b.replace(/\s+/g, ' ').trim() + '}').join('\n')}`)
+        process.exit(1)
+      }
+    }
     {
       const A = HOTEL_ACTIONS
       const content = W - 2 * A.listPadX - 2 * A.cardPadX

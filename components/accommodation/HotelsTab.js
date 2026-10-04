@@ -372,11 +372,13 @@ const redesignHs = StyleSheet.create({
   badge:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.pill, backgroundColor: colors.tintServiceBg },
   badgeText:     { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
   placeText:     { flex: 1, ...type.small, color: colors.textSecondary },
-  action:        { flex: 1, minHeight: TAP, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-                   paddingHorizontal: 8, borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder,
-                   backgroundColor: colors.card },
+  // Icon ABOVE label in HOTEL_ACTIONS geometry (the label guard measures it): beside the
+  // label, "Web sitesi" truncated at every width.
+  action:        { flex: 1, minHeight: TAP, alignItems: 'center', justifyContent: 'center', gap: 2,
+                   paddingVertical: 6, paddingHorizontal: HOTEL_ACTIONS.buttonPadX, borderRadius: radii.md,
+                   borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: colors.card },
   actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
-  actionText:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark, flexShrink: 1 },
+  actionText:    { fontSize: HOTEL_ACTIONS.fontSize, lineHeight: 16, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark },
   actionTextPrimary: { color: colors.onPrimary },
 })
 const hs = REDESIGN ? { ...legacyHs, ...redesignHs } : legacyHs
