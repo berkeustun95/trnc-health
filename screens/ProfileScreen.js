@@ -13,7 +13,9 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { revokeGoogle, hasGoogleIdentity, revokeApple, revokeAppleWithPrompt, hasAppleIdentity } from '../utils/socialAuth'
-import { colors, shadow, radius } from '../constants/theme'
+import { colors, shadow, radius, elevation } from '../constants/theme'
+import { Button, useTabBarFootprint } from '../components/ui'
+import { FADE_H } from '../components/ui/FloatingTabBar'
 import { t } from '../constants/i18n'
 import { getNatLabel, NATIONALITIES, NATIONALITY_CODES } from '../constants/nationalityTranslations'
 import { COUNTRY_CODES } from '../constants/countryCodes'
@@ -140,7 +142,8 @@ function draftFromRow(row) {
   }
 }
 
-export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange, guardRef = null, settingsSlot = null }) {
+export default function ProfileScreen({ session, lang, onBack, onLangChange, onAvatarChange, guardRef = null, settingsSlot = null, underTabBar = false }) {
+  const tabFoot = useTabBarFootprint()
   const [profile, setProfile]               = useState(null)
   const [form, setForm]                     = useState({
     first_name: '', last_name: '', display_name: '',
@@ -898,12 +901,13 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
     // ► edges INCLUDES 'bottom' FOR THE FOOTER. Without it the save button renders under
     //   the Android three-button navigation bar and cannot be tapped — the same failure
     //   the message composer had. ProfileSetupScreen's footer is the pattern this copies.
-    <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+    // Under the floating tab bar (redesign tab) the bottom inset is inside the bar's footprint.
+    <SafeAreaView style={s.safe} edges={underTabBar ? ['top'] : ['top', 'bottom']}>
       {REDESIGN && <StatusBar style="dark" />}
       <KeyboardAwareForm>
         <ScrollView
           {...profileMem}
-          contentContainerStyle={s.container}
+          contentContainerStyle={[s.container, underTabBar && { paddingBottom: tabFoot + FADE_H + 16 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -1537,6 +1541,18 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
             shaped that way. Style and structure copied from ProfileSetupScreen's footer —
             a flex sibling of the ScrollView inside KeyboardAwareForm, so the keyboard
             lifts it instead of covering it. */}
+        {underTabBar ? (
+          // Redesign tab: a normal kit button, shown only while there is something to save
+          // (and for the "saved" flash), sitting just above the floating bar. A flex sibling
+          // of the ScrollView inside KeyboardAwareForm, so the keyboard still lifts it; the
+          // ScrollView ends above it, so nothing is ever hidden behind it.
+          (hasChanges || saving || saved) && (
+            <View style={[s.kitFooter, { marginBottom: tabFoot + 4 }]}>
+              <Button title={saved && !hasChanges ? t('saved', lang) : t('save', lang)} onPress={save}
+                loading={saving} disabled={saving || !hasChanges} fullWidth style={s.kitFooterBtn} />
+            </View>
+          )
+        ) : (
         <View style={s.footer}>
           <TouchableOpacity
             style={[s.footerBtn, (!hasChanges || saving) && s.footerBtnOff]}
@@ -1552,6 +1568,7 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
                 </Text>}
           </TouchableOpacity>
         </View>
+        )}
       </KeyboardAwareForm>
     </SafeAreaView>
   )
@@ -1578,6 +1595,8 @@ const s = StyleSheet.create({
     paddingVertical: 15, alignItems: 'center', justifyContent: 'center', ...shadow,
   },
   footerBtnOff:     { backgroundColor: colors.border, shadowOpacity: 0, elevation: 0 },
+  kitFooter:        { flexShrink: 0, paddingHorizontal: 20, paddingTop: 8 },
+  kitFooterBtn:     { ...elevation.floating },
   footerBtnText:    { color: '#fff', fontSize: 15.5, fontFamily: 'Inter_700Bold' },
 
   avatarSection:    { alignItems: 'center', marginBottom: 24 },

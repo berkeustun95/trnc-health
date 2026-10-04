@@ -34,7 +34,7 @@ import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS } from './constants/redesign'
-import { FloatingTabBar, TabBarPad } from './components/ui'
+import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
 import { REGION_TO_DUTY } from './constants/regions'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
@@ -357,10 +357,6 @@ const tabBar = StyleSheet.create({
 // ─── Redesign helpers (module scope, so nothing here can meet the TDZ rule) ───
 // The floating bar covers content; Keşfet and Profil keep their docked-bar layout by
 // padding for it. Home scrolls under the bar and pads its own content.
-function MaybeTabBarPad({ children }) {
-  return REDESIGN ? <TabBarPad>{children}</TabBarPad> : children
-}
-
 // The closing time of the user's own duty district, else the most common one today.
 // open_until varies by district (00:00 in the four big towns, 22:00 Lefke/İskele, 20:00
 // Karpaz, 19:00 Mesarya — scripts/gen-duty-roster-sql.mjs), so one island-wide "until"
@@ -2671,8 +2667,10 @@ export default function App() {
           <GuestProfile lang={lang} a={settingsActions} onCreateAccount={gateSignUp} />
         )}
         {activeTab === 'profile' && !(REDESIGN && isGuest(session)) && (
-          <MaybeTabBarPad>
           <ProfileScreen
+            // Full height behind the floating tab bar, like Home and Keşfet: the screen pads
+            // its own scroll and lifts its Save button above the bar (no TabBarPad here).
+            underTabBar={REDESIGN}
             settingsSlot={REDESIGN ? (({ onDeleteAccount }) => (
               <SettingsGroups lang={lang} a={{ ...settingsActions, onDeleteAccount }} />
             )) : null}
@@ -2683,7 +2681,6 @@ export default function App() {
             onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
             onAvatarChange={url => setProfile(prev => ({ ...prev, avatar_url: url }))}
           />
-          </MaybeTabBarPad>
         )}
 
         {(() => {
