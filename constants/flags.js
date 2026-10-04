@@ -366,7 +366,7 @@ export const DORMS_LIVE = true   // live 2026-09-13
 //   4. Turkish device pass with this flipped LOCALLY, then this in BOTH files in one
 //      commit (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs), then OTA.
 //   5. hotels:health green. The list on kitob.org is dated 2023.
-export const HOTELS_LIVE = false
+export const HOTELS_LIVE = true   // live 2026-10-04 (KITOB approved)
 
 // Live Scores (Canlı Skor): football, basketball, F1 and hand-entered KTFF football, read
 // from Supabase + Realtime (20261070; sync = supabase/functions/live-scores-*). false = no
