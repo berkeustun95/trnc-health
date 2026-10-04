@@ -106,6 +106,8 @@ WITH report AS (
     ('1070_live_scores','live_score_editors'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
+    -- pre-repo (dashboard-era), first given a policy by 20261079: the duty screen's coordinates.
+    ('pre-repo','pharmacy_coords'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
     ('pre-repo','bus_routes'),('pre-repo','estate_agencies'),('pre-repo','estate_agents')
   ) e(m,o)
@@ -3788,6 +3790,25 @@ WITH report AS (
       (SELECT count(*) FROM public.leagues WHERE sport = 'football' AND enabled AND country = 'World') = 28
       AND NOT EXISTS (SELECT 1 FROM public.leagues WHERE sport = 'football' AND country = 'World'
                        AND sort_order NOT BETWEEN 20 AND 49)
+    -- ── 1079: pharmacy_coords is readable by the app and writable by no app role ──
+    -- (1) DERIVED: RLS on, exactly one policy (a permissive SELECT to anon + authenticated; a
+    --     second would OR in), no client write privilege (inherited grants resolved), and the
+    --     positive control — both roles can still SELECT, or every duty distance silently
+    --     falls back to facilities. Through to_regclass so an absent table reads false.
+    UNION ALL SELECT '1079_pharmacy_coords_read_seed_pins','pharmacy_coords: RLS on, 1 permissive SELECT policy to anon+authenticated, no client writes, clients can read',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.pharmacy_coords')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='pharmacy_coords') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pharmacy_coords'
+                  AND policyname='pharmacy_coords_select_public' AND cmd='SELECT' AND permissive='PERMISSIVE'
+                  AND roles @> ARRAY['anon','authenticated']::name[] AND cardinality(roles) = 2)
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.pharmacy_coords'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.pharmacy_coords'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('anon', to_regclass('public.pharmacy_coords'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.pharmacy_coords'), 'SELECT'), false)
+    -- (2) KTEB's 'ÖZVOL' typo stays out of the roster. gen-duty-roster-sql.mjs fixes it at load;
+    --     a load that bypassed the generator is the only way this goes red.
+    UNION ALL SELECT '1079_pharmacy_coords_read_seed_pins','duty_list carries no ÖZVOL ECZANESİ (typo of ÖZYOL)',
+      NOT EXISTS(SELECT 1 FROM public.duty_list WHERE name = 'ÖZVOL ECZANESİ')
   ) z
 
   UNION ALL
