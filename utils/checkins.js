@@ -1,9 +1,9 @@
 // Check-ins — every network call the app makes for them, in one place.
-// Server half and who-sees-what: supabase/migrations/20261069_checkins.sql.
+// Server half and who-sees-what: supabase/migrations/20261078_checkins.sql.
 //
 // Each function takes the Supabase client as its first argument instead of importing
 // lib/supabase: that import pulls AsyncStorage and cannot load in Node, and this module is
-// exercised in Node against the real SQL (scratchpad harness, PGlite) until 20261069 is
+// exercised in Node against the real SQL (scratchpad harness, PGlite) until 20261078 is
 // applied at go-live. Screens pass `supabase`.
 //
 // Nothing here widens App.js PROFILE_COLUMNS: the three check-in columns are read in their
@@ -11,7 +11,7 @@
 // fails alone, not the profile load every screen depends on.
 import { metresBetween } from '../constants/walkingRoutes.js'
 
-// Mirrors check_in() in 20261069. The client pre-check is UX only; the server decides.
+// Mirrors check_in() in 20261078. The client pre-check is UX only; the server decides.
 export const CHECKIN_RADIUS_M   = 150
 export const CHECKIN_ACCURACY_M = 50
 // The notice text's version, stamped by accept_checkin_notice(). Bump it when the wording

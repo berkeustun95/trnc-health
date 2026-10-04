@@ -1,6 +1,6 @@
 // Recent check-ins (CHECKINS gate): one place's (inside the place page's scroll) or every
 // place's (the Keşfet tab's "Son Check-in'ler"). Who appears is decided by get_checkin_feed()
-// in 20261069 — the author's switch, blocks both ways, bans; guests are refused there, so
+// in 20261078 — the author's switch, blocks both ways, bans; guests are refused there, so
 // they get a sign-in prompt here. Feeds only: no row opens a person, by decision (2026-10-02).
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native'

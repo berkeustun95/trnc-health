@@ -12,10 +12,10 @@ const IS_PREVIEW_BUILD = Constants.expoConfig?.extra?.appVariant === 'preview'
 
 export const REDESIGN = REDESIGN_LIVE || (typeof __DEV__ !== 'undefined' && __DEV__) || IS_PREVIEW_BUILD
 
-// Check-ins (20261069) before go-live: dev bundles, and ADA Preview while CHECKINS_PREVIEW is
+// Check-ins (20261078) before go-live: dev bundles, and ADA Preview while CHECKINS_PREVIEW is
 // true; the flag stays off. `npm run ota` (production, no APP_VARIANT) can never switch it on.
 // CHECKINS_PREVIEW is FALSE for the Explore restyle launch (2026-10-03) so ADA Preview shows
 // exactly what production will — no check-in UI. Flip it to true at check-ins go-live step 3
-// (CLAUDE.md), when 20261069 is applied and preview is where check-ins get tested.
+// (CLAUDE.md), when 20261078 is applied and preview is where check-ins get tested.
 const CHECKINS_PREVIEW = false
 export const CHECKINS = MODULE_FLAGS.checkins || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && CHECKINS_PREVIEW)

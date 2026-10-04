@@ -258,7 +258,7 @@ function readStudentHubFlag(raw) {
   return m[1] === 'true'
 }
 
-// ─── CHECK-INS TRIPWIRE (20261069) ──────────────────────────────────────────
+// ─── CHECK-INS TRIPWIRE (20261078) ──────────────────────────────────────────
 // The opposite question to the one above: not "is a retracted claim gone" but "is the new
 // disclosure THERE". Flipping MODULE_FLAGS.checkins against copy that does not describe
 // check-ins would publish a feature the policy says nothing about, to a 13+ audience. The
