@@ -252,18 +252,12 @@ export function selectedPins(sources, selectedKeys) {
 
 // Should the "Open now" chip render at all?
 //
-// ⚠ THIS IS FALSE FOR THE ENTIRE LIVE DATABASE TODAY, AND THAT IS THE POINT. 393 of 394
-//   facilities have opening_hours NULL, and the one that does not holds JSON text written
-//   by HoursPicker, which parseIsOpen (a legacy "Mon-Fri 09:00-18:00" parser) cannot read.
-//   So parseIsOpen returns null for every facility that exists, and an Open-now chip would
-//   filter the map to zero pins every single time it was tapped.
-//
-//   Rendering it anyway is the dead-chip failure: the user reads an empty map as a broken
-//   app rather than as missing data. So the chip is carried, correct, and hidden until
-//   at least one facility has hours that actually parse. Do not delete this as unused.
-//
-//   (The same silence affects the SHIPPED HomeScreen and MapScreen "Open now" filters,
-//   which call parseIsOpen unguarded. Pre-existing, out of scope here, logged.)
+// The chip stays hidden until at least one facility has hours that parse, so it can never
+// filter the map to zero pins — the dead-chip failure, where an empty map reads as a broken
+// app rather than as missing data. Since 2026-10-04 parseIsOpen reads HoursPicker's JSON as
+// well as the legacy "Mon-Fri 09:00-18:00" text (scripts/test-open-now.mjs); before that it
+// read only the legacy form, so hours entered in the app could never show the chip. Live
+// that day: 0 of 393 active facilities had opening_hours at all. Do not delete as unused.
 export function openNowApplicable(pins) {
   return pins.some(p => p.kind === 'health' && parseIsOpen(p.row.opening_hours) !== null)
 }
