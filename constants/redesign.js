@@ -17,5 +17,7 @@ export const REDESIGN = REDESIGN_LIVE || (typeof __DEV__ !== 'undefined' && __DE
 // CHECKINS_PREVIEW is FALSE for the Explore restyle launch (2026-10-03) so ADA Preview shows
 // exactly what production will — no check-in UI. Flip it to true at check-ins go-live step 3
 // (CLAUDE.md), when 20261078 is applied and preview is where check-ins get tested.
-const CHECKINS_PREVIEW = false
+// TRUE on feat/checkins-ready ONLY (2026-10-04): this branch is the check-ins launch candidate,
+// tested on ADA Preview at go-live step 3 (after 20261078 is applied). main keeps it false.
+const CHECKINS_PREVIEW = true
 export const CHECKINS = MODULE_FLAGS.checkins || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && CHECKINS_PREVIEW)

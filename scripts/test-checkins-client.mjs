@@ -37,13 +37,14 @@ function client(uid) {
       return { data: rows.map(x => ({ ...x, created_at: x.created_at instanceof Date ? x.created_at.toISOString() : x.created_at })), error: null }
     },
     from: table => {
-      const q = { table, op: 'select', cols: '*', where: [], order: null, limit: null, upd: null, single: false }
+      const q = { table, op: 'select', cols: '*', where: [], order: [], limit: null, offset: null, upd: null, single: false }
       const b = {
         select(c) { if (q.op === 'select') q.cols = c; else q.ret = c; return b },
         update(o) { q.op = 'update'; q.upd = o; return b },
         delete() { q.op = 'delete'; return b },
         eq(c, v) { q.where.push(`${c} = ${lit(v)}`); return b },
-        order(c, o) { q.order = `${c} ${o?.ascending === false ? 'DESC' : 'ASC'}`; return b },
+        order(c, o) { q.order.push(`t.${c} ${o?.ascending === false ? 'DESC' : 'ASC'}`); return b },
+        range(a, z) { q.offset = a; q.limit = z - a + 1; return b },
         limit(n) { q.limit = n; return b },
         maybeSingle() { q.single = 'maybe'; return b },
         single() { q.single = 'one'; return b },
@@ -56,7 +57,7 @@ function client(uid) {
           const emb = q.cols.match(/places\(([^)]*)\)/)
           const plain = q.cols.replace(/,?\s*places\([^)]*\)/, '').split(',').map(c => `t.${c.trim()}`).join(', ')
           sql = `SELECT ${plain}${emb ? `, (SELECT row_to_json(x) FROM (SELECT ${emb[1]} FROM public.places p WHERE p.id = t.place_id) x) AS places` : ''} FROM public.${table} t${w}`
-            + (q.order ? ` ORDER BY t.${q.order}` : '') + (q.limit ? ` LIMIT ${q.limit}` : '')
+            + (q.order.length ? ` ORDER BY ${q.order.join(', ')}` : '') + (q.limit ? ` LIMIT ${q.limit}` : '') + (q.offset ? ` OFFSET ${q.offset}` : '')
         } else if (q.op === 'update') {
           sql = `UPDATE public.${table} t SET ${Object.entries(q.upd).map(([k, v]) => `${k} = ${lit(v)}`).join(', ')}${w} RETURNING ${q.ret ?? '*'}`
         } else {
@@ -113,6 +114,12 @@ const all = await C.loadFeed(V, { limit: 50 })
 const seen = []; let cur = null
 for (let i = 0; i < 10; i++) { const pg = await C.loadFeed(V, { before: cur, limit: 1 }); if (!pg.rows.length) break; seen.push(pg.rows[0].checkin_id); cur = pg.rows[0] }
 ok(`tied timestamps: paging visits all ${all.rows.length} rows once`, all.rows.length >= 2 && seen.length === all.rows.length && new Set(seen).size === seen.length, { all: all.rows.length, seen })
+// "Delete ANY of your check-ins" (the policy): the Profile list must reach every row, not a cap.
+await db.exec(`RESET ROLE; INSERT INTO public.checkins (user_id, place_id, checked_in_on, display_name_snapshot, created_at)
+  SELECT '${U(2)}', '${P(5)}', date '2026-01-01' + g, 'viewer', timestamptz '2026-01-01 10:00+00' + (g || ' days')::interval FROM generate_series(1, 65) g`)
+const total = (await db.query(`SELECT count(*)::int n FROM public.checkins WHERE user_id = '${U(2)}'`)).rows[0].n
+const seenMine = []; for (let off = 0; off < 500; off += C.MINE_PAGE) { const pg = await C.loadMine(V, U(2), off); if (!pg?.length) break; seenMine.push(...pg.map(r => r.id)) }
+ok(`loadMine pages reach all ${total} own check-ins, each once`, total >= 66 && seenMine.length === total && new Set(seenMine).size === total, { total, seen: seenMine.length })
 const now = Date.parse('2026-10-02T12:00:00Z')
 ok('ago now', C.agoParts('2026-10-02T11:59:30Z', now).key === 'checkinAgoNow')
 ok('ago 5 min', JSON.stringify(C.agoParts('2026-10-02T11:55:00Z', now)) === '{"key":"checkinAgoMin","n":5}')

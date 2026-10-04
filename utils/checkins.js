@@ -79,10 +79,14 @@ export async function loadFeed(client, { placeId = null, before = null, limit = 
 }
 
 // The caller's own check-ins (owner-only RLS), newest first, with the place for the label.
-export async function loadMine(client, uid, limit = 50) {
+// PAGED, not capped: the policy promises a user can delete ANY of their check-ins, so the list
+// must reach all of them. id breaks created_at ties so a page boundary never skips or repeats.
+export const MINE_PAGE = 30
+export async function loadMine(client, uid, offset = 0, limit = MINE_PAGE) {
   const { data, error } = await client.from('checkins')
     .select('id, created_at, place_id, places(name, name_i18n, category)')
-    .eq('user_id', uid).order('created_at', { ascending: false }).limit(limit)
+    .eq('user_id', uid).order('created_at', { ascending: false }).order('id', { ascending: false })
+    .range(offset, offset + limit - 1)
   return error ? null : data ?? []
 }
 

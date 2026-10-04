@@ -6,8 +6,8 @@
 import { useEffect, useState } from 'react'
 import { View, Text, Switch, StyleSheet } from 'react-native'
 import { supabase, isGuest } from '../../lib/supabase'
-import { loadCheckinPrefs, loadMine, deleteCheckin, setCheckinsPublic } from '../../utils/checkins'
-import { IconButton, ConfirmDialog } from '../ui'
+import { loadCheckinPrefs, loadMine, deleteCheckin, setCheckinsPublic, MINE_PAGE } from '../../utils/checkins'
+import { IconButton, ConfirmDialog, Button } from '../ui'
 import { colors, type } from '../../constants/theme'
 import { t, LANG_CODES } from '../../constants/i18n'
 
@@ -21,6 +21,8 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
   const uid = session?.user?.id
   const [hidden, setHidden] = useState(true)
   const [rows, setRows] = useState(null)
+  const [more, setMore] = useState(false)       // the last page came back full
+  const [paging, setPaging] = useState(false)
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState(null)     // the row being deleted
   const [delBusy, setDelBusy] = useState(false)
@@ -32,7 +34,7 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
     Promise.all([loadCheckinPrefs(supabase, uid), loadMine(supabase, uid)]).then(([p, m]) => {
       if (gone) return
       if (p.ok) setHidden(p.prefs.checkins_public !== true)
-      setRows(m)
+      setRows(m); setMore((m?.length ?? 0) === MINE_PAGE)
     })
     return () => { gone = true }
   }, [uid, session])
@@ -51,6 +53,15 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
     setDelBusy(false)
     if (!ok) { setDelError(t('checkinDeleteFailed', lang)); return }
     setRows(r => r.filter(x => x.id !== confirm.id)); setConfirm(null)
+  }
+
+  async function loadMore() {
+    if (paging) return
+    setPaging(true)
+    const next = await loadMine(supabase, uid, rows.length)
+    setPaging(false)
+    if (!next) return
+    setRows(r => [...r, ...next.filter(n => !r.some(x => x.id === n.id))]); setMore(next.length === MINE_PAGE)
   }
 
   if (!uid || isGuest(session) || rows === null) return null
@@ -75,6 +86,7 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
               accessibilityLabel={t('checkinDelete', lang)} />
           </View>
         ))}
+      {more && <Button variant="text" title={t('checkinShowMore', lang)} onPress={loadMore} loading={paging} />}
       <ConfirmDialog visible={!!confirm} lang={lang} destructive title={t('checkinDeleteTitle', lang)}
         message={confirm ? placeLabel(confirm.places, lang) : ''} confirmLabel={t('checkinDelete', lang)}
         onConfirm={doDelete} onCancel={() => setConfirm(null)} loading={delBusy} error={delError} />
