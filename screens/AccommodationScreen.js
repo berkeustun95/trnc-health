@@ -16,7 +16,7 @@ import DormPartnerScreen from './DormPartnerScreen'
 import HotelsTab from '../components/accommodation/HotelsTab'
 import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
-import { colors, shadow, radii, type, elevation, category, TAP } from '../constants/theme'
+import { colors, shadow, radii, type, elevation, category, TAP, listBottomPad } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
 import { OnPhotoContext } from '../components/ui/onPhoto'
 import {
@@ -722,7 +722,7 @@ export default function AccommodationScreen({
         <FlatList
           data={items}
           keyExtractor={i => i.id}
-          contentContainerStyle={[cs.listContent, { paddingBottom: cs.listContent.paddingBottom + insets.bottom }]}
+          contentContainerStyle={[cs.listContent, { paddingBottom: listBottomPad(insets) }]}
           ListHeaderComponent={
             // list_top — a HEADER, so it scrolls away. Mounting it above the FlatList
             // would make it sticky, and a permanently visible ad is a different product.

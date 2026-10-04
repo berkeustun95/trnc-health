@@ -3,7 +3,7 @@ import { View, Text, Image, TouchableOpacity, FlatList, ActivityIndicator, Linki
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
-import { colors, shadow, radii, type, elevation, category, TAP } from '../../constants/theme'
+import { colors, shadow, radii, type, elevation, category, TAP, listBottomPad } from '../../constants/theme'
 import { REDESIGN } from '../../constants/redesign'
 import { CardSkeleton, EmptyState, ErrorState, RemoteImage } from '../ui'
 import { t } from '../../constants/i18n'
@@ -293,7 +293,7 @@ export default function HotelsTab({ lang }) {
       <FlatList
         data={shown}
         keyExtractor={h => h.id}
-        contentContainerStyle={[hs.listContent, { paddingBottom: hs.listContent.paddingBottom + insets.bottom }]}
+        contentContainerStyle={[hs.listContent, { paddingBottom: listBottomPad(insets) }]}
         showsVerticalScrollIndicator={false}
         initialNumToRender={6}
         windowSize={7}

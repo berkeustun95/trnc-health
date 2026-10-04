@@ -290,6 +290,14 @@ export const press = { small: 0.7, card: 0.85 }
 // 44pt: the floor for every tap target in components/ui.
 export const TAP = 44
 
+// The last row of a list must end clearly above the Android navigation bar. The bottom inset
+// alone was not enough on the Konaklama screen on device (preview 01a10876 looked unchanged
+// after adding it, so it most likely read 0 there; unconfirmed), so a list pads by
+// max(inset, the tallest nav bar: 3-button = 48dp) + a 32pt gap.
+export const NAV_BAR_MIN = 48
+export const LIST_END_GAP = 32
+export const listBottomPad = insets => Math.max(insets.bottom, NAV_BAR_MIN) + LIST_END_GAP
+
 // ─── Readable foreground on an arbitrary colour ─────────────────────────────
 //
 // WHY THIS EXISTS. A partner supplies their own brand hex and it is drawn as a filled
