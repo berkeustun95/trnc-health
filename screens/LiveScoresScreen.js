@@ -24,6 +24,15 @@ const SPORTS = ['football', 'basketball', 'f1']
 const SPORT_LABEL = { football: 'lsTabFootball', basketball: 'lsTabBasketball', f1: 'lsTabF1' }
 const MATCH_COLS = 'id, league_id, source, status, period, minute, clock, home_score, away_score, kickoff_at, last_synced_at, updated_at, '
   + 'home:teams!matches_home_team_fkey(name, short_name, logo_url), away:teams!matches_away_team_fkey(name, short_name, logo_url)'
+// The provider's name for the national team (read 2026-10-04); 'Turkey' kept for safety.
+const TURKEY_TEAM = new Set(['Türkiye', 'Turkey'])
+const TURKEY_PIN_SORT = 15   // after Süper Lig (10), before the internationals (20–49)
+const leagueLabel = (l, lang) => l.name_i18n?.[lang] || l.name
+const byKickoff = (a, b) =>
+  (dayKey(new Date(a.kickoff_at)) === dayKey(new Date(b.kickoff_at))
+    ? (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) || a.kickoff_at.localeCompare(b.kickoff_at)
+    : a.kickoff_at.localeCompare(b.kickoff_at))
+
 const STATUS_ORDER = { live: 0, ht: 0, scheduled: 1, ft: 2, postponed: 3, suspended: 3, cancelled: 3 }
 
 const pad2 = n => String(n).padStart(2, '0')
@@ -105,7 +114,7 @@ function scorerLine(events, side, lang) {
     .join(', ')
 }
 
-function MatchRow({ m, sport, events, lang }) {
+function MatchRow({ m, sport, events, comp, lang }) {
   const started = m.status !== 'scheduled' && m.status !== 'postponed' && m.status !== 'cancelled'
   const live = m.status === 'live' || m.status === 'ht'
   const homeName = m.home?.name || '—', awayName = m.away?.name || '—'
@@ -119,6 +128,7 @@ function MatchRow({ m, sport, events, lang }) {
       accessibilityLabel={`${homeName} ${started ? m.home_score ?? 0 : ''} – ${started ? m.away_score ?? 0 : ''} ${awayName}`}>
       <StatusCell m={m} sport={sport} lang={lang} />
       <View style={s.teams}>
+        {!!comp && <Text style={s.comp} numberOfLines={1}>{comp}</Text>}
         <View style={s.teamLine}>
           <TeamLogo uri={m.home?.logo_url} />
           <Text style={[s.teamName, winHome && s.winner]} numberOfLines={1}>{homeName}</Text>
@@ -136,14 +146,14 @@ function MatchRow({ m, sport, events, lang }) {
   )
 }
 
-function LeagueSection({ league, matches, sport, eventsByMatch, connected, lang }) {
+function LeagueSection({ league, matches, sport, eventsByMatch, connected, compOf, lang }) {
   const manual = league.source === 'manual'
   const lastSync = manual ? null : matches.reduce((a, m) => (m.last_synced_at && (!a || m.last_synced_at > a) ? m.last_synced_at : a), null)
   let lastDay = null
   return (
     <View style={s.section}>
       <View style={s.sectionHead}>
-        <OnPhotoLabel style={s.leaguePill} accessibilityRole="header">{league.name}</OnPhotoLabel>
+        <OnPhotoLabel style={s.leaguePill} accessibilityRole="header">{leagueLabel(league, lang)}</OnPhotoLabel>
         {manual
           ? connected && (
             <View style={s.livePill}>
@@ -162,7 +172,7 @@ function LeagueSection({ league, matches, sport, eventsByMatch, connected, lang 
             <View key={m.id}>
               {showDay && <Text style={[s.dayDivider, i > 0 && s.dayDividerGap]}>{dayLabel(m.kickoff_at, lang)}</Text>}
               {!showDay && <View style={s.hairline} />}
-              <MatchRow m={m} sport={sport} events={eventsByMatch[m.id]} lang={lang} />
+              <MatchRow m={m} sport={sport} events={eventsByMatch[m.id]} comp={compOf?.(m)} lang={lang} />
             </View>
           )
         })}
@@ -194,7 +204,7 @@ function MatchesView({ sport, lang }) {
     const from = new Date(Math.min(startOfToday.getTime(), now.getTime() - 6 * 3600000)).toISOString()
     const to = new Date(startOfToday.getTime() + 2 * 86400000).toISOString()
     const [lg, mt] = await Promise.all([
-      supabase.from('leagues').select('id, name, source, sort_order').eq('sport', sport).eq('enabled', true).order('sort_order'),
+      supabase.from('leagues').select('id, name, name_i18n, country, source, sort_order').eq('sport', sport).eq('enabled', true).order('sort_order'),
       supabase.from('matches').select(MATCH_COLS).eq('sport', sport).gte('kickoff_at', from).lt('kickoff_at', to).order('kickoff_at'),
     ])
     if (lg.error || mt.error) { setError(true); setLoading(false); setRefreshing(false); return }
@@ -265,15 +275,23 @@ function MatchesView({ sport, lang }) {
   if (loading) return <View style={s.pad}><CardSkeleton /><CardSkeleton /><CardSkeleton /></View>
   if (error) return <ErrorState lang={lang} onRetry={() => { setLoading(true); load() }} />
 
+  // Türkiye national-team games are pinned above the other internationals (Berke, 2026-10-04):
+  // lifted out of whichever international competition they belong to, shown in one section
+  // with the competition on each row.
+  const leagueById = new Map(leagues.map(l => [l.id, l]))
+  const isTurkeyGame = m => leagueById.get(m.league_id)?.country === 'World'
+    && (TURKEY_TEAM.has(m.home?.name) || TURKEY_TEAM.has(m.away?.name))
+  const pinned = sport === 'football' ? matches.filter(isTurkeyGame) : []
+  const pinnedIds = new Set(pinned.map(m => m.id))
   const sections = leagues
-    .map(l => ({
-      league: l,
-      matches: matches.filter(m => m.league_id === l.id).sort((a, b) =>
-        (dayKey(new Date(a.kickoff_at)) === dayKey(new Date(b.kickoff_at))
-          ? (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) || a.kickoff_at.localeCompare(b.kickoff_at)
-          : a.kickoff_at.localeCompare(b.kickoff_at))),
-    }))
+    .map(l => ({ league: l, matches: matches.filter(m => m.league_id === l.id && !pinnedIds.has(m.id)).sort(byKickoff) }))
+    .concat(pinned.length ? [{
+      league: { id: 'turkey-national', name: t('lsTurkeyTeam', lang), source: 'api', sort_order: TURKEY_PIN_SORT },
+      matches: [...pinned].sort(byKickoff),
+      compOf: m => { const l = leagueById.get(m.league_id); return l ? leagueLabel(l, lang) : null },
+    }] : [])
     .filter(sec => sec.matches.length)
+    .sort((a, b) => a.league.sort_order - b.league.sort_order)
 
   return (
     <ScrollView contentContainerStyle={s.scroll}
@@ -283,7 +301,7 @@ function MatchesView({ sport, lang }) {
             title={t('lsEmptyTitle', lang)} message={t('lsEmptyBody', lang)} />
         : sections.map(sec => (
           <LeagueSection key={sec.league.id} league={sec.league} matches={sec.matches} sport={sport}
-            eventsByMatch={eventsByMatch} connected={connected} lang={lang} />
+            eventsByMatch={eventsByMatch} connected={connected} compOf={sec.compOf} lang={lang} />
         ))}
     </ScrollView>
   )
@@ -527,6 +545,7 @@ const s = StyleSheet.create({
   winner:      { fontFamily: 'Inter_700Bold' },
   score:       { ...type.rowTitle, color: colors.textPrimary, minWidth: 28, textAlign: 'right', fontVariant: ['tabular-nums'] },
   scoreLive:   { color: colors.dangerInk },
+  comp:        { ...type.caption, color: colors.textSecondary },
   scorers:     { ...type.caption, color: colors.textSecondary, marginLeft: 28 },
 
   f1Meta:      { ...type.small, color: colors.textSecondary, marginTop: 4 },
