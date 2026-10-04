@@ -295,8 +295,8 @@ WITH report AS (
     -- 1071. The provider's logo URL (sync-only) and the F1 session kind.
     ('1071_live_scores_followup','teams','source_logo_url'),
     ('1071_live_scores_followup','f1_races','session_type'),
-    -- 1076. League display names by full language name; the app falls back to name.
-    ('1076_live_scores_international','leagues','name_i18n')
+    -- 1077. League display names by full language name; the app falls back to name.
+    ('1077_live_scores_international','leagues','name_i18n')
 
   ) e(m,t,c)
 
@@ -782,7 +782,7 @@ WITH report AS (
     ('1071_live_scores_followup','teams_source_logo_check'),
     ('1071_live_scores_followup','f1_races_session_type_check'),
     ('1071_live_scores_followup','f1_races_api_race_id_key'),
-    ('1076_live_scores_international','leagues_name_i18n_check')
+    ('1077_live_scores_international','leagues_name_i18n_check')
 
   ) e(m,o)
 
@@ -3776,15 +3776,15 @@ WITH report AS (
     UNION ALL SELECT '1073_live_scores_editor_grant','live_score_editors is exactly the one granted account',
       (SELECT string_agg(user_id::text, ',' ORDER BY user_id) FROM public.live_score_editors)
       IS NOT DISTINCT FROM '412cad91-2e3b-41b9-8186-175dfb8afa35'
-    -- ── 1076: international + UEFA club football ───────────────────────────────
+    -- ── 1077: international + UEFA club football ───────────────────────────────
     -- (1) The club order the Football tab renders, derived from the rows (internationals,
     --     country = 'World', sit at 20–49 between Süper Lig and the Champions League).
-    UNION ALL SELECT '1076_live_scores_international','football club order: KTFF, Süper Lig, UCL, UEL, UECL, Super Cup, PL, La Liga, Serie A, Bundesliga, Ligue 1',
+    UNION ALL SELECT '1077_live_scores_international','football club order: KTFF, Süper Lig, UCL, UEL, UECL, Super Cup, PL, La Liga, Serie A, Bundesliga, Ligue 1',
       (SELECT string_agg(coalesce(external_id, 'KTFF'), ',' ORDER BY sort_order, external_id) FROM public.leagues
         WHERE sport = 'football' AND enabled AND country IS DISTINCT FROM 'World')
       IS NOT DISTINCT FROM 'KTFF,203,2,3,848,531,39,140,135,78,61'
     -- (2) 28 enabled internationals, all inside the 20–49 band the order relies on.
-    UNION ALL SELECT '1076_live_scores_international','28 enabled internationals (country World), sorted 20–49',
+    UNION ALL SELECT '1077_live_scores_international','28 enabled internationals (country World), sorted 20–49',
       (SELECT count(*) FROM public.leagues WHERE sport = 'football' AND enabled AND country = 'World') = 28
       AND NOT EXISTS (SELECT 1 FROM public.leagues WHERE sport = 'football' AND country = 'World'
                        AND sort_order NOT BETWEEN 20 AND 49)

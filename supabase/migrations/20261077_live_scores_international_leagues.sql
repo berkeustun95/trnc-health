@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261076 — Live Scores: international + UEFA club football, Turkish league names, new order
+-- 20261077 — Live Scores: international + UEFA club football, Turkish league names, new order
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- IDs come from the provider, not memory: 20261075 asked live-scores-football for
@@ -150,7 +150,7 @@ SELECT net.http_post(
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261076_live_scores_international_leagues.sql', 'b93670024e3f1f0e057b0a8461f89139f0893d80bee3af93927b7af89880ee3a')
+VALUES ('20261077_live_scores_international_leagues.sql', '1a39dccebf31bf8d1e2a0fd1b9778e9b2737722b295b333bf8f7539de74ffc63')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────
