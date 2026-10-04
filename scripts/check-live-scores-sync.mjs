@@ -103,6 +103,13 @@ check(sr.row && sr.row.api_race_id === 2727 && sr.row.session_type === 'race' &&
 const rr = resultRowFrom({ position: 1, driver: { name: 'Max Verstappen', abbr: 'VER' }, team: { name: 'Red Bull Racing' }, time: '1:31:44.742', laps: 56, grid: '2' }, 9, true, now)
 check(rr && rr.position === 1 && rr.driver_code === 'VER' && rr.grid === 2 && rr.is_final === true, `f1 result row wrong: ${JSON.stringify(rr)}`)
 check(resultRowFrom({ position: 3 }, 9, false, now) === null, 'a result without a driver name is dropped')
+check(rr.points === 25, `P1 scores 25 (got ${rr.points})`)
+const p11 = resultRowFrom({ position: 11, driver: { name: 'X' }, time: null, gap: '+48.2s', laps: 55 }, 9, true, now)
+check(p11.points === 0 && p11.time_text === '+48.2s', `P11: 0 points and the gap as time_text (got ${JSON.stringify(p11)})`)
+const p10 = resultRowFrom({ position: '10', driver: { name: 'Y' }, time: { time: '+1 Lap' }, grid: { position: 7 } }, 9, true, now)
+check(p10.points === 1 && p10.time_text === '+1 Lap' && p10.grid === 7, `string position, object time/grid (got ${JSON.stringify(p10)})`)
+const noPos = resultRowFrom({ position: null, driver: { name: 'Z' } }, 9, true, now)
+check(noPos.points === null && noPos.time_text === null, 'an unclassified row carries no points and no time')
 
 // The gate: only a service_role token passes.
 const tok = role => 'x.' + Buffer.from(JSON.stringify({ role })).toString('base64url') + '.y'
