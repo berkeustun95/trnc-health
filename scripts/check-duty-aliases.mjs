@@ -32,6 +32,7 @@ const EXPECTED = [
   ['SAKINER ECZANESİ',            'Karpaz',     'SAKİNER ECZANESİ'],
   ['ŞİFA BİLDİR ECZANESİ',        'Lefke',      'ŞİFA BILDIR ECZANESİ'],
   ['HÜSEYİN SAKALLI ECZANESİ',    'Lefkoşa',    'HÜSEYİN KERİM SAKALLI ECZANESİ'],
+  ['ÖZVOL ECZANESİ',              'Lefkoşa',    'ÖZYOL ECZANESİ'],
 ]
 const REGIONS = ['Lefkoşa', 'Gazimağusa', 'Girne', 'Güzelyurt', 'İskele', 'Lefke', 'Karpaz', 'Üst Mesarya', 'Alt Mesarya']
 

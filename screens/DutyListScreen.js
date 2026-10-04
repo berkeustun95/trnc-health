@@ -10,7 +10,7 @@ import { colors, shadow } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGION_TO_DUTY } from '../constants/regions'
 import { dutyStatus, localDateKey, DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
-import { buildFacilityIndex, matchDutyRow } from '../utils/dutyFacilityMatch'
+import { buildFacilityIndex, buildCoordsIndex, dutyRowCoords } from '../utils/dutyFacilityMatch'
 import { REDESIGN } from '../constants/redesign'
 import { ScreenHeader as KitHeader, InfoBanner, InlineAlert, ContactBar, Button, CardSkeleton, ModuleScreen, SectionHeader, BottomSheet, EmptyState, FilterBar } from '../components/ui'
 import { CARD_BG } from '../components/ui/ModuleScreen'
@@ -264,6 +264,7 @@ function RegionSheet({ visible, selected, onPick, onClose, lang }) {
 export default function DutyListScreen({ onBack, lang, userLocation, locationDenied, locationCanAsk = true, onEnableLocation, initialRegion = null }) {
   const [rows, setRows] = useState([])
   const [facIndex, setFacIndex] = useState(() => new Map())
+  const [coordsIndex, setCoordsIndex] = useState(() => new Map())
   const [loading, setLoading] = useState(true)
   // 'fresh' | 'stale' | 'absent' — see utils/dutyStatus.js. Only 'fresh' is a good state.
   const [status, setStatus] = useState(DUTY_FRESH)
@@ -298,7 +299,9 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
       // distance anyway, so fetching them would cost bandwidth to change nothing. 315 of
       // 387 carry coordinates today; the count guard below is what notices when that
       // crosses PostgREST's max-rows cap, which a plain .limit() cannot.
-      const [{ data, error: dutyErr }, { data: newest, error: newestErr }, { data: facs, count: facCount }] = await Promise.all([
+      // pharmacy_coords FIRST (roster-keyed, Berke's on-the-ground pins; 20261079), facilities
+      // as the per-row fallback — see dutyRowCoords. Pinned rows only, same count guard.
+      const [{ data, error: dutyErr }, { data: newest, error: newestErr }, { data: facs, count: facCount }, { data: pins, count: pinCount }] = await Promise.all([
         supabase.from('duty_list')
           .select('id, name, address, phone, open_from, open_until, region')
           .eq('duty_date', today),
@@ -307,6 +310,9 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
           .select('name, latitude, longitude', { count: 'exact' })
           .eq('type', 'pharmacy')
           .not('latitude', 'is', null),
+        supabase.from('pharmacy_coords')
+          .select('name, region, lat, lng', { count: 'exact' })
+          .not('lat', 'is', null),
       ])
       setFetchError(!!(dutyErr || newestErr))
       // District coverage, not row count — see the threshold note in utils/dutyStatus.js.
@@ -322,6 +328,10 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
       if (facs && facCount != null && facs.length < facCount) {
         console.warn(`duty: facility coords truncated (${facs.length} of ${facCount}) — some distances will be missing`)
       }
+      if (pins && pinCount != null && pins.length < pinCount) {
+        console.warn(`duty: pharmacy_coords truncated (${pins.length} of ${pinCount}) — those rows fall back to facilities`)
+      }
+      setCoordsIndex(buildCoordsIndex(pins))
       setFacIndex(buildFacilityIndex(facs))
       setRows(data ?? [])
       setLoading(false)
@@ -337,12 +347,12 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
   // can land after this screen mounts, so computing them in the fetch would leave a list
   // that never gains distances on a slow fix.
   const decorated = useMemo(() => rows.map(row => {
-    const fac = matchDutyRow(row, facIndex)
-    const dist = (sortByDistance && fac && fac.latitude != null && fac.longitude != null)
-      ? haversineKm(userLocation.latitude, userLocation.longitude, fac.latitude, fac.longitude)
+    const pos = sortByDistance ? dutyRowCoords(row, coordsIndex, facIndex) : null
+    const dist = pos
+      ? haversineKm(userLocation.latitude, userLocation.longitude, pos.latitude, pos.longitude)
       : null
     return { ...row, _dist: dist }
-  }), [rows, facIndex, sortByDistance, userLocation?.latitude, userLocation?.longitude])
+  }), [rows, coordsIndex, facIndex, sortByDistance, userLocation?.latitude, userLocation?.longitude])
 
   // Filtered BEFORE both list shapes are built, so nearest-first and the district list both
   // honour the chip. Distance stays measured from the user, not from the region.
