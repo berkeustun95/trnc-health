@@ -68,22 +68,37 @@ export function sessionRowFrom(r, now) {
   }
 }
 
+// Championship points for a RACE by classified position (FIA 2026: 25-18-15-12-10-8-6-4-2-1,
+// no fastest-lap point since 2025). The free plan's rankings carry no points field (keys seen
+// 2026-10-04: race, driver, team, position, time, laps, grid, pits, gap), so they are derived.
+// Not applied to sprints (8..1) — only race sessions are stored.
+const RACE_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
+
+// A rankings value may be a string, a number or an object ({ time } / { gap }); null-ish → null.
+function textOf(v) {
+  if (v == null || v === '') return null
+  if (typeof v === 'object') return textOf(v.time ?? v.gap ?? v.value ?? null)
+  return String(v).slice(0, 24)
+}
+
 // One rankings/races item → an f1_results row (homogeneous keys), or null.
 export function resultRowFrom(it, raceId, isFinal, now) {
   const name = it?.driver?.name
   if (!name) return null
-  const int = v => (Number.isInteger(v) ? v : (/^\d+$/.test(String(v ?? '')) ? Number(v) : null))
+  const int = v => (Number.isInteger(v) ? v : (/^\d+$/.test(String(v ?? '').trim()) ? Number(String(v).trim()) : null))
+  const position = int(it.position)
   return {
     race_id: raceId,
-    position: int(it.position),
+    position,
     driver_name: String(name).slice(0, 80),
     driver_code: it.driver?.abbr ? String(it.driver.abbr).slice(0, 4) : null,
     team: it.team?.name ? String(it.team.name).slice(0, 80) : null,
-    points: null,
+    points: position >= 1 && position <= RACE_POINTS.length ? RACE_POINTS[position - 1] : (position ? 0 : null),
     laps: int(it.laps),
-    time_text: it.time != null ? String(it.time).slice(0, 24) : null,
+    // The winner carries a race time; everyone else a gap ("+5.123s", "+1 Lap", "DNF").
+    time_text: textOf(it.time) ?? textOf(it.gap),
     status_text: null,
-    grid: int(it.grid),
+    grid: int(it.grid?.position ?? it.grid),
     is_final: isFinal,
     updated_at: now,
   }
@@ -105,7 +120,9 @@ async function upsertSessions(sb, items, now, say) {
 
 async function storeResults(sb, key, race, isFinal, now, say) {
   const items = await apiSports(sb, 'f1', key, `/rankings/races?race=${race.api_race_id}`)
-  if (items[0]) say(`f1 rankings sample keys: ${Object.keys(items[0]).join(',')}`)
+  // The raw shape of the first two items: the mapping above was written from documentation
+  // and verified against these values.
+  for (const it of items.slice(0, 2)) say(`f1 rankings sample: ${JSON.stringify({ ...it, driver: { name: it.driver?.name, abbr: it.driver?.abbr }, team: { name: it.team?.name } }).slice(0, 400)}`)
   const rows = items.map(it => resultRowFrom(it, race.id, isFinal, now)).filter(Boolean)
   if (rows.length) {
     const { error } = await sb.from('f1_results').upsert(rows, { onConflict: 'race_id,driver_name' })
