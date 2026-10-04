@@ -1,0 +1,3857 @@
+-- READ ONLY. verify_schema QUERY 1 with its 4 calls to may_initiate_by_age / is_listed_student replaced by
+-- `true`: does anything ELSE in QUERY 1 fail for supabase_read_only_user? Generated, not hand-edited.
+-- ═══ QUERY 1 / 5 — MAIN REPORT — run alone (select down to the QUERY 2 banner) ═══
+-- ═══════════════════════════════════════════════════════════════════════════
+-- tables · columns · functions · triggers · constraints · indexes · grants ·
+-- behavior/version tokens · RLS-enabled. One big statement.
+WITH report AS (
+
+  -- ── A. TABLES ─────────────────────────────────────────────────────────────
+  SELECT 'A-table' section, e.m migration, e.o object,
+         CASE WHEN to_regclass('public.'||e.o) IS NOT NULL THEN 'OK' ELSE 'MISSING' END status
+  FROM (VALUES
+    ('capture_1','profiles'),('capture_1','facilities'),
+    ('capture_1','reviews'),('capture_1','questions'),('capture_1','answers'),
+    ('capture_1','notifications'),('capture_1','claim_requests'),
+    ('capture_1','facility_change_requests'),('capture_1','duty_list'),
+    ('capture_1','duty_schedule'),('capture_1','pharmacist_scores'),
+    ('capture_1','quiz_submissions'),
+    ('0621_provider_verification','provider_documents'),
+    ('0621_provider_verification','provider_credentials'),
+    ('0702_job_postings','job_postings'),
+    ('0712_ugc_moderation','blocks'),('0712_ugc_moderation','content_reports'),
+    ('0712_ugc_moderation','blocked_terms'),
+    ('0723_insurance_companies','insurance_companies'),
+    ('0725_esim_waitlist','esim_waitlist'),
+    ('0812_module_waitlist','module_waitlist'),
+    ('0822_places_consolidation','places'),
+    ('0826_place_claims','place_claims'),
+    ('0905_towing_companies','towing_companies'),
+    ('0910_contact_events','contact_events'),
+    ('0923_server_side_notifications','push_log'),
+    ('1001_profile_completion','institutions'),
+    ('1001_profile_completion','reserved_names'),
+    ('0926_moderation_rejection_log','moderation_rejections'),
+    ('1007_home_strip_pin','home_strip_pin'),
+    ('1008_ad_banners','ad_banners'),
+    ('1009_ad_position_module','ad_modules'),
+    ('1017_student_tasks','student_tasks'),
+    ('1017_student_tasks','student_task_i18n'),
+    ('1024_student_affiliation','subjects'),
+    ('1026_student_education','student_education'),
+    -- Slice 6. The first tables two customers JOINTLY own. Nobody is granted INSERT,
+    -- UPDATE or DELETE on any of the three — see the 1029 H-token, which is the only
+    -- thing that can see that, since a missing GRANT creates no named object.
+    ('1029_student_messaging','conversations'),
+    ('1029_student_messaging','messages'),
+    ('1029_student_messaging','conversation_attempts'),
+    -- Slice 5 of social sign-in: Apple refresh tokens, service_role only. The 1044 H-tokens
+    -- are what see that nobody else can touch it; a table name cannot.
+    ('1044_apple_refresh_tokens','apple_refresh_tokens'),
+    ('1024_student_affiliation','subject_i18n'),
+    -- Visit NCY walking routes (1048). Dark until go-live: is_active DEFAULT false.
+    ('1048_walking_routes','walking_routes'),
+    ('1048_walking_routes','walking_route_stops'),
+    -- Real walking paths per place pair (1049). ORS/OSM share-alike data, kept apart from route order.
+    ('1049_walking_legs','walking_legs'),
+    -- Store-update popup thresholds (1051). Public read, no client writes, hand-seeded.
+    ('1051_app_versions','app_versions'),
+    -- The popup's backup signal: one row per popup SHOWN. Insert-only, no client SELECT.
+    ('1051_app_versions','app_update_events'),
+    -- Route medals (1056). Owner-only read; written only by award_route_medal().
+    ('1056_route_medals','route_medals'),
+    -- KITOB hotels (1059). Dark until go-live: is_active DEFAULT false; service_role writes only.
+    ('1059_hotels','hotels'),
+    -- Live Scores (1070). Public read; sync = service_role; manual KTFF rows by score editors.
+    ('1070_live_scores','leagues'),
+    ('1070_live_scores','teams'),
+    ('1070_live_scores','matches'),
+    ('1070_live_scores','match_events'),
+    ('1070_live_scores','f1_races'),
+    ('1070_live_scores','f1_results'),
+    ('1070_live_scores','f1_standings'),
+    ('1070_live_scores','api_quota_log'),
+    ('1070_live_scores','api_request_log'),
+    ('1070_live_scores','live_sync_state'),
+    ('1070_live_scores','live_score_editors'),
+    -- referenced by capture_2 constraints; created in earlier/other migrations:
+    ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
+    -- pre-repo (dashboard-era), first given a policy by 20261079: the duty screen's coordinates.
+    ('pre-repo','pharmacy_coords'),
+    ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
+    ('pre-repo','bus_routes'),('pre-repo','estate_agencies'),('pre-repo','estate_agents')
+  ) e(m,o)
+
+  UNION ALL
+  -- ── B. COLUMNS (the `area`-class risk — post-capture ALTERs) ───────────────
+  SELECT 'B-column', e.m, e.t||'.'||e.c,
+         CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns ic
+                WHERE ic.table_schema='public' AND ic.table_name=e.t AND ic.column_name=e.c)
+              THEN 'OK' ELSE 'MISSING' END
+  FROM (VALUES
+    ('0621_provider_verification','facility_change_requests','rejection_reason'),
+    ('0621_provider_verification','claim_requests','rejection_reason'),
+    ('0712_ugc_moderation','reviews','hidden_at'),
+    ('0712_ugc_moderation','reviews','hidden_reason'),
+    ('0712_ugc_moderation','questions','hidden_at'),
+    ('0712_ugc_moderation','answers','hidden_at'),
+    ('0712_ugc_moderation','profiles','ugc_banned_until'),
+    ('0926_moderation_rejection_log','blocked_terms','hit_count'),
+    ('0928_ugc_soft_delete','reviews','deleted_at'),
+    ('0928_ugc_soft_delete','questions','deleted_at'),
+    ('0926_moderation_rejection_log','blocked_terms','last_hit_at'),
+    ('0719_claim_evidence_and_guard','claim_requests','verified_by'),
+    ('0719_claim_evidence_and_guard','claim_requests','verified_at'),
+    ('0719_claim_rename_and_tax_no','claim_requests','tax_registration_no'),
+    -- DELIBERATELY ABSENT: claim_requests.kteb_confirmed and appointments.service_type.
+    -- Both columns were DROPPED on purpose by 0902_capture_schema_drift, so listing them
+    -- here reported MISSING forever. The H-version section already asserts their absence
+    -- as the PASSING state. Do not re-add them: a drift checker carrying known-false
+    -- positives teaches the reader to skim, and the next real MISSING gets skimmed too.
+    ('0722_job_postings_business_paid_tier','job_postings','poster_type'),
+    ('0722_job_postings_business_paid_tier','job_postings','payment_status'),
+    ('0722_job_postings_business_paid_tier','job_postings','paid_at'),
+    ('0722_job_postings_business_paid_tier','job_postings','payment_ref'),
+    ('0723_place_photo_credits','landmarks','photo_credits'),
+    ('0723_place_photo_credits','beaches','photo_credits'),
+    ('0725_grooming_directory','facilities','category'),
+    ('0731_garages_directory','facilities','service_types'),
+    ('0803_facility_report_moderation','facilities','hidden_at'),
+    ('0803_facility_report_moderation','facilities','hidden_reason'),
+    ('0805_facilities_city','facilities','city'),
+    ('0806_facilities_area','facilities','area'),                 -- known gap
+    ('0808_facility_featured_tier','facilities','featured_until'),
+    ('0808_facility_featured_tier','facilities','featured_requested_at'),
+    ('0809_featured_expiry_reminder','facilities','featured_reminded_at'),
+    ('0811_facilities_service_prices','facilities','service_prices'),
+    -- ── Slice 1: public health facilities. `sector` is the one that matters most
+    --    here: facilities_public_type_sector_check and the claim guard both read it,
+    --    so if it reads MISSING the guard is silently passing every claim.
+    ('0911_facilities_public_health','facilities','sector'),
+    ('0911_facilities_public_health','facilities','public_facility_type'),
+    ('0911_facilities_public_health','facilities','tier'),
+    ('0911_facilities_public_health','facilities','parent_facility_id'),
+    ('0911_facilities_public_health','facilities','name_official'),
+    -- ── Explore photo attribution. The column was applied BY HAND before its migration
+    --    file existed, which is exactly the `area`-class failure this section is for:
+    --    unregistered, so invisible to the check. Registered retroactively by 0917.
+    ('0917_place_photo_attribution','places','photo_attribution'),
+    ('0919_facilities_geocode_provenance','facilities','geocode_source'),
+    ('0919_facilities_geocode_provenance','facilities','geocode_tier'),
+    ('0919_facilities_geocode_provenance','facilities','geocode_corroboration'),
+    ('0919_facilities_geocode_provenance','facilities','geocoded_at'),
+    ('0917_place_photo_attribution','beaches','photo_attribution'),
+    ('0917_place_photo_attribution','landmarks','photo_attribution'),
+    ('0812_module_waitlist','module_waitlist','notified_at'),
+    ('0824_place_moderation','places','hidden_at'),
+    ('0824_place_moderation','places','hidden_reason'),
+    ('0825_places_column_guards','places','featured_until'),
+    ('0825_places_column_guards','places','featured_requested_at'),
+    ('0829_place_resubmit','places','resubmit_count'),
+    ('0830_events_gisekibris_import','events','source_image_url'),
+    ('0830_events_gisekibris_import','events','description_i18n'),
+    -- ── Slice 1: accommodation partner feed ──
+    ('0904_accommodation_partner_feed','properties','source'),
+    ('0904_accommodation_partner_feed','properties','external_id'),
+    ('0904_accommodation_partner_feed','properties','source_url'),
+    ('0904_accommodation_partner_feed','properties','last_seen_at'),
+    ('0904_accommodation_partner_feed','properties','content_hash'),
+    ('0904_accommodation_partner_feed','properties','updated_at'),
+    ('0904_accommodation_partner_feed','properties','published_at'),
+    ('0904_accommodation_partner_feed','properties','deed_type'),
+    ('0904_accommodation_partner_feed','properties','net_area_sqm'),
+    ('0904_accommodation_partner_feed','properties','plot_sqm'),
+    ('0904_accommodation_partner_feed','properties','covered_area_sqm'),
+    ('0904_accommodation_partner_feed','properties','floor'),
+    ('0904_accommodation_partner_feed','properties','total_floors'),
+    ('0904_accommodation_partner_feed','properties','building_age_band'),
+    ('0904_accommodation_partner_feed','properties','living_rooms'),
+    ('0904_accommodation_partner_feed','properties','ensuite_count'),
+    ('0904_accommodation_partner_feed','properties','deposit'),
+    ('0904_accommodation_partner_feed','properties','deposit_currency'),
+    ('0904_accommodation_partner_feed','properties','min_term_months'),
+    ('0904_accommodation_partner_feed','properties','bills_included'),
+    ('0904_accommodation_partner_feed','properties','amenities'),
+    ('0904_accommodation_partner_feed','properties','area'),
+    ('0904_accommodation_partner_feed','properties','development_name'),
+    ('0904_accommodation_partner_feed','properties','swap_available'),
+    ('0904_accommodation_partner_feed','properties','gated_community'),
+    ('0904_accommodation_partner_feed','properties','location_precision'),
+    ('0904_accommodation_partner_feed','property_images','source_url'),
+    ('0904_accommodation_partner_feed','property_images','content_hash'),
+    ('0904_accommodation_partner_feed','property_images','is_primary'),
+    ('0904_accommodation_partner_feed','estate_agencies','contact_name'),
+    ('0904_accommodation_partner_feed','estate_agencies','contact_phone'),
+    ('0904_accommodation_partner_feed','estate_agencies','contact_whatsapp'),
+    -- Fallback number for a towing firm. The list query selects *, so a missing column
+    -- here is not a cosmetic gap — PostgREST 42703s and the whole directory fails to load.
+    ('0908_towing_phone_secondary','towing_companies','phone_secondary'),
+    -- ── Profile completion gate (Slice 1). The wizard writes every one of these on a
+    --    single screen, so ONE missing column is a 42703 that kills the whole gate for
+    --    every user — and the gate is a HARD BLOCK, so the app becomes unusable rather
+    --    than degraded. display_name_normalized is the load-bearing one: it is the key
+    --    the unique index is built on, so if it reads MISSING while display_name exists,
+    --    duplicate names are being accepted right now.
+    ('1001_profile_completion','profiles','first_name'),
+    ('1001_profile_completion','profiles','last_name'),
+    ('1001_profile_completion','profiles','display_name'),
+    ('1001_profile_completion','profiles','display_name_normalized'),
+    ('1001_profile_completion','profiles','date_of_birth'),
+    -- ad_banners: position + module REPLACED the flat `slot` id (1009). Section A sees
+    -- the table and cannot see which shape it is in; a half-applied restructure leaves
+    -- the table present with the OLD column and every client read returns nothing,
+    -- which looks exactly like an unsold slot.
+    ('1009_ad_position_module','ad_banners','position'),
+    ('1009_ad_position_module','ad_banners','module'),
+    ('1001_profile_completion','profiles','region'),
+    ('1001_profile_completion','profiles','resident_status'),
+    ('1001_profile_completion','profiles','resident_status_updated_at'),
+    ('1001_profile_completion','profiles','student_level'),
+    ('1001_profile_completion','profiles','display_preference'),
+    ('1001_profile_completion','profiles','profile_completed_at'),
+    ('1001_profile_completion','profiles','profile_schema_version'),
+    ('1001_profile_completion','profiles','age_ineligible'),
+    ('1001_profile_completion','profiles','nationality_code'),
+    -- Consent (1016). Four columns, and the wizard does NOT write them — the signup
+    -- checkbox does. If they read MISSING the consent write fails with 42703 inside the
+    -- signup flow, which is the one place a user cannot route around.
+    ('1016_profile_consent','profiles','terms_version'),
+    ('1016_profile_consent','profiles','terms_accepted_at'),
+    ('1016_profile_consent','profiles','terms_locale'),
+    ('1016_profile_consent','profiles','marketing_opt_in_at'),
+    -- home_services gained multi-district coverage for the TadilArt partnership. If this
+    -- reads MISSING, HomeServicesScreen's district filter (.contains on this column)
+    -- matches nothing and EVERY district chip returns an empty list — which looks like
+    -- "no providers in this area", the module's own normal empty state.
+    ('1010_hs_coverage','home_services','coverage_districts'),
+    -- Partner-only visibility. If this reads MISSING, hs_select_public references a
+    -- column that is not there and EVERY read of home_services errors — the module and
+    -- the home-services arm of global search both fail, not degrade.
+    ('1012_hs_partner_only','home_services','is_partner'),
+    -- Student tasks (1017). Listed although the tables are new in the same file, because
+    -- an EARLIER DRAFT of 20261017 created both tables without these: section A would read
+    -- OK against that draft. external_url is in fetchTasks' select, so MISSING there is a
+    -- 42703 that empties the whole Tasks tab. The two source columns are read only by the
+    -- file's footer staleness query.
+    ('1017_student_tasks','student_task_i18n','external_url'),
+    ('1017_student_tasks','student_tasks','source_name'),
+    ('1017_student_tasks','student_tasks','source_checked_at'),
+    -- Student affiliation (1024). App.js PROFILE_COLUMNS is an explicit list, so these do
+    -- not break today's reads if MISSING — they break the slice-2 wizard's first write.
+    ('1024_student_affiliation','institutions','website_url'),
+    -- places provenance (1045). Written only by service_role; places_guard_source locks it.
+    ('1045_places_source','places','source'),
+    ('1045_places_source','places','source_id'),
+    -- The owner's badge switch (1056). Read only by get_profile_route_badges (DEFINER).
+    ('1056_route_medals','profiles','route_badges_public'),
+    -- Gişe Kıbrıs sync liveness (1058). Stamped every run; read by check-gisekibris-staleness.
+    ('1058_events_last_seen_at','events','last_seen_at'),
+    -- Hotel geocode provenance (1060). HotelsTab selects none of these today; the geocoder
+    -- and the importer's coordinate rule both read them.
+    ('1060_hotels_geocode_provenance','hotels','geocode_source'),
+    ('1060_hotels_geocode_provenance','hotels','geocode_tier'),
+    ('1060_hotels_geocode_provenance','hotels','geocode_corroboration'),
+    ('1060_hotels_geocode_provenance','hotels','geocoded_at'),
+    -- The Places place ID (1061). Since 1062 also the trace of every google_places pin (known risk).
+    ('1061_hotels_places_crosscheck','hotels','google_place_id'),
+    -- KITOB guide content (1063). HotelsTab selects all three once applied: MISSING = 42703 on the tab.
+    ('1063_hotels_kitob_guide','hotels','photo_source'),
+    ('1063_hotels_kitob_guide','hotels','description_i18n'),
+    ('1063_hotels_kitob_guide','hotels','kitob_page_url'),
+    -- 1064. The card's swipeable photos, cover first. HotelsTab selects it: MISSING = 42703 on the tab.
+    ('1064_hotels_gallery','hotels','gallery_urls'),
+    -- 1065. Credit for a free-licence (Commons) photo. HotelsTab selects it: MISSING = 42703 on the tab.
+    ('1065_hotels_commons_credit','hotels','photo_credit'),
+    -- 1066. What a notification is. App.js selects it: MISSING = 42703, the notifications list renders empty.
+    ('1066_notification_type','notifications','type'),
+    -- 1071. The provider's logo URL (sync-only) and the F1 session kind.
+    ('1071_live_scores_followup','teams','source_logo_url'),
+    ('1071_live_scores_followup','f1_races','session_type'),
+    -- 1077. League display names by full language name; the app falls back to name.
+    ('1077_live_scores_international','leagues','name_i18n')
+
+  ) e(m,t,c)
+
+  UNION ALL
+  -- ── C. FUNCTIONS (existence by name; overloads collapse) ───────────────────
+  SELECT 'C-function', e.m, e.o,
+         CASE WHEN EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                WHERE n.nspname='public' AND p.proname=e.o)
+              THEN 'OK' ELSE 'MISSING' END
+  FROM (VALUES
+    ('0623_cross_user_notifications','insert_notification'),
+    ('0628/0705_search_content','search_content'),
+    ('0714_block_anonymous_writes','is_anonymous_session'),
+    ('capture_3_functions','auto_hide_reported_content'),
+    ('capture_3_functions','block_content_author'),
+    ('capture_3_functions','check_question_limit'),
+    ('capture_3_functions','check_report_rate_limit'),
+    ('capture_3_functions','check_ugc_on_insert'),
+    ('capture_3_functions','contains_blocked_term'),
+    ('0925_moderation_normalization','normalize_for_moderation'),
+    ('0926_moderation_rejection_log','blocked_term_hit'),
+    ('0928_ugc_soft_delete','guard_owner_soft_delete'),
+    ('0926_moderation_rejection_log','record_moderation_rejection'),
+    ('capture_3_functions','delete_own_account'),
+    ('capture_3_functions','ev_guard_write'),
+    ('capture_3_functions','expire_job_postings'),
+    ('capture_3_functions','get_my_role'),
+    ('capture_3_functions','guard_moderation_columns'),
+    ('capture_3_functions','guard_profile_ban_column'),
+    ('capture_3_functions','handle_new_user'),
+    ('capture_3_functions','hs_guard_insert'),
+    ('capture_3_functions','hs_guard_owner_update'),
+    ('capture_3_functions','is_admin'),
+    ('capture_3_functions','is_customer_blocked'),
+    ('capture_3_functions','jp_guard_insert'),
+    ('capture_3_functions','jp_guard_owner_update'),
+    ('capture_3_functions','my_provider_facility_ids'),
+    ('capture_3_functions','tp_guard_write'),
+    ('capture_3_functions','update_pharmacist_score'),
+    ('0723_insurance_companies','ins_guard_write'),
+    ('0719_create_facility_claim_rpc','create_facility_claim'),
+    ('0725_grooming_directory','create_grooming_facility'),
+    ('0725_grooming_directory','facilities_guard_insert'),
+    ('0726_grooming_booking_lifecycle','grooming_notif_text'),
+    ('0731_garages_directory','create_garage_facility'),
+    ('0802_update_garage_facility','update_garage_facility'),
+    ('0803_grooming_owner_edit','update_grooming_facility'),
+    ('0803_facility_report_moderation','auto_hide_reported_content'),
+    ('0807_facility_content_filter','contains_payment_solicitation'),
+    ('0807_facility_content_filter','check_facility_content'),
+    ('0808_facility_featured_tier','request_featured_facility'),
+    ('0808/0809_facilities_guard_update','facilities_guard_update'),
+    ('0809_featured_expiry_reminder','featured_notif_text'),
+    ('0809_featured_expiry_reminder','process_featured_expiring'),
+    ('0810_change_request_content_filter','check_change_request_content'),
+    ('0813_notify_module_waitlist','module_notif_text'),
+    ('0813_notify_module_waitlist','notify_module_waitlist'),
+    ('0824_place_moderation','check_place_content'),
+    ('0824_place_moderation','explore_category_counts'),
+    ('0825_places_column_guards','places_guard_insert'),
+    ('0825_places_column_guards','places_guard_update'),
+    ('0826_place_claims','place_claims_guard_insert'),
+    ('0826_place_claims','approve_place_claim'),
+    ('0827_places_featured_tier','request_featured_place'),
+    ('0829_place_resubmit','resubmit_place'),
+    ('0904_accommodation_partner_feed','properties_touch_updated_at'),
+    -- towing: hours validator is called from a CHECK, so if it goes missing every
+    -- INSERT on towing_companies fails outright, not just the malformed ones.
+    ('0905_towing_companies','towing_hours_valid'),
+    ('0905_towing_companies','towing_touch_updated_at'),
+    -- Search tokeniser. These three are not decoration: search_content calls all of them
+    -- from every arm, so a missing one is a hard error on EVERY global search, for every
+    -- user, signed in or not.
+    ('0912_search_tokenised','search_fold'),
+    ('0912_search_tokenised','search_all_tokens'),
+    ('0912_search_tokenised','search_token_hits'),
+    -- Provider/admin notifications. notify_facility_owner is the ONLY path that tells a
+    -- provider a booking or question arrived; if it goes MISSING the client's rpc() call
+    -- errors into a bare catch{} and providers go silent again, exactly as before 0923.
+    ('0923_server_side_notifications','notify_owner_text'),
+    ('0923_server_side_notifications','notify_facility_owner'),
+    ('0923_server_side_notifications','notify_admins'),
+    -- Profile gate. check_profile_name_content is the ONLY content filter profiles has
+    -- ever had — before it, display_name and full_name were completely unfiltered, and
+    -- display_name renders publicly on reviews. normalize_display_name computes the key
+    -- the unique index is built on: if it goes MISSING the trigger raises on every
+    -- profile write and the wizard cannot be completed by anyone.
+    ('1001_profile_completion','normalize_display_name'),
+    ('1001_profile_completion','is_reserved_display_name'),
+    ('1001_profile_completion','check_profile_name_content'),
+    ('1002_display_name_rpc','display_name_available'),
+    -- Slice 4. get_student_list is the ONLY path by which one customer reads another
+    -- customer's row; can_see_student_lists is the reciprocity rule slices 4-6 share.
+    -- If either goes missing the student list fails closed (no rows), which is the safe
+    -- direction — but it fails closed SILENTLY, so their existence is asserted here.
+    ('1026_student_education','can_see_student_lists'),
+    ('1026_student_education','get_student_list'),
+    -- Slice 5's profile page. The SECOND surface on which one customer's data reaches
+    -- another; if it goes missing the page fails closed (no rows), which is the safe
+    -- direction — but silently, so its existence is asserted here.
+    ('1028_student_profile','get_student_profile'),
+    -- Slice 6. is_listed_student is the general form of the reciprocity rule and
+    -- can_see_student_lists now DELEGATES to it, so its absence breaks slices 4, 5 AND 6
+    -- at once. may_initiate_by_age is the age rule.
+    ('1029_student_messaging','is_listed_student'),
+    ('1029_student_messaging','may_initiate_by_age'),
+    ('1029_student_messaging','start_conversation'),
+    ('1029_student_messaging','send_message'),
+    ('1029_student_messaging','accept_conversation'),
+    ('1029_student_messaging','decline_conversation'),
+    ('1029_student_messaging','leave_conversation'),
+    ('1029_student_messaging','delete_message'),
+    ('1029_student_messaging','block_user'),
+    ('1029_student_messaging','list_conversations'),
+    ('1029_student_messaging','notify_new_message'),
+    ('1029_student_messaging','stamp_message_sender'),
+    ('1029_student_messaging','enforce_message_age_rule'),
+    ('1029_student_messaging','guard_message_immutable'),
+    ('1029_student_messaging','touch_conversation'),
+    -- The transition mirror. 20261027 drops it in the same transaction as the columns
+    -- it reads; while profiles still HAS them, its absence means an old client's write
+    -- never reaches student_education and the student list silently misses that user.
+    -- The ONLY write path the app has on ad_banners: the client is never granted UPDATE on
+    -- that table, so if this function is missing every view and tap counts ZERO — silently,
+    -- and a silent zero reads as "nobody looks at the ads", which is a conclusion somebody
+    -- would act on.
+    ('1008_ad_banners','bump_ad_counter'),
+    -- The CHECK behind student_task_i18n.steps. Missing = the CHECK cannot exist either.
+    ('1017_student_tasks','student_task_steps_valid'),
+    -- "An end year is not in the future." A trigger, not a CHECK (current_date is STABLE).
+    ('1024_student_affiliation','check_profile_study_years'),
+    -- 20261033. These two are not conveniences: they are the ONLY way the client can still
+    -- reach data that reviews.customer_id used to carry, now that SELECT on it is revoked.
+    -- If get_my_review goes missing, a user who has already reviewed a facility is shown the
+    -- composer again and their second attempt is rejected by the partial unique index — an
+    -- error with no explanation. If admin_content_author goes missing, no review report can
+    -- be banned on, and the admin queue says the content no longer exists.
+    ('1033_reviews_author_not_public','get_my_review'),
+    ('1033_reviews_author_not_public','admin_content_author'),
+    ('1045_places_source','places_guard_source'),
+    -- 1050: the nightly purge behind the policy's "removed 30 days later". Not an RPC.
+    ('1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc'),
+    ('1051_app_versions','purge_app_update_events'),
+    ('1052_purge_status_reporter','app_update_events_purge_status'),
+    ('1056_route_medals','award_route_medal'),
+    ('1056_route_medals','get_profile_route_badges'),
+    ('1059_hotels','hotels_touch_updated_at'),
+    ('1070_live_scores','matches_touch_updated_at'),
+    ('1070_live_scores','is_score_editor'),
+    ('1070_live_scores','claim_api_request')
+  ) e(m,o)
+
+  UNION ALL
+  -- ── D. TRIGGERS (existence by name) ────────────────────────────────────────
+  SELECT 'D-trigger', e.m, e.o,
+         CASE WHEN EXISTS (SELECT 1 FROM pg_trigger tg WHERE NOT tg.tgisinternal AND tg.tgname=e.o)
+              THEN 'OK' ELSE 'MISSING' END
+  FROM (VALUES
+    ('0701_rate_limits','enforce_question_limit'),
+    ('capture_4/0712','enforce_report_rate_limit'),
+    ('capture_4/0712','guard_profile_ban'),
+    ('capture_4/0712','guard_review_moderation'),
+    ('capture_4/0712','guard_question_moderation'),
+    ('capture_4/0712','guard_answer_moderation'),
+    ('0926_moderation_rejection_log','record_moderation_rejection'),
+    ('0928_ugc_soft_delete','guard_review_soft_delete'),
+    ('0928_ugc_soft_delete','guard_question_soft_delete'),
+    ('capture_4/0712','check_review_content'),
+    ('capture_4/0712','check_question_content'),
+    ('capture_4/0712','check_answer_content'),
+    ('capture_4/0712','auto_hide_on_report'),
+    ('capture_4','ev_guard_write'),
+    ('capture_4','hs_guard_insert'),
+    ('capture_4','hs_guard_owner_update'),
+    ('capture_4','jp_guard_insert'),
+    ('capture_4','jp_guard_owner_update'),
+    ('capture_4','tp_guard_write'),
+    ('capture_4','on_auth_user_created'),
+    ('capture_4','on_submission_status_change'),
+    ('0723_insurance_companies','ins_guard_write'),
+    ('0803_facility_report_moderation','guard_facility_moderation'),
+    ('0807_facility_content_filter','check_facility_content'),
+    ('0810_change_request_content_filter','check_change_request_content'),
+    ('0719_claim_evidence_and_guard','claim_requests_guard_insert'),
+    ('facilities_guard(0718→0809)','facilities_guard_update'),
+    ('facilities_guard(0718→0731)','facilities_guard_insert'),
+    ('0824_place_moderation','guard_place_moderation'),
+    ('0824_place_moderation','check_place_content'),
+    ('0825_places_column_guards','places_guard_insert'),
+    ('0825_places_column_guards','places_guard_update'),
+    ('0826_place_claims','place_claims_guard_insert'),
+    ('0904_accommodation_partner_feed','properties_touch_updated_at'),
+    ('0905_towing_companies','towing_touch_updated_at'),
+    ('1001_profile_completion','check_profile_name_content'),
+    -- Slice 6. The numeric prefixes ARE the firing order (triggers of a kind fire
+    -- alphabetically); the 1029 H-token pins the whole sequence as one string, which is
+    -- the only check that can see a rename that reorders them.
+    ('1029_student_messaging','msg_10_stamp_sender'),
+    ('1029_student_messaging','msg_20_age_rule'),
+    ('1029_student_messaging','msg_30_ugc_screen'),
+    ('1029_student_messaging','msg_40_immutable'),
+    ('1029_student_messaging','msg_50_touch_conversation'),
+    ('1045_places_source','places_guard_source'),
+    ('1059_hotels','hotels_touch_updated_at'),
+    ('1070_live_scores','matches_touch_updated_at')
+
+  ) e(m,o)
+
+  UNION ALL
+  -- ── E. CHECK CONSTRAINTS (existence by name) ───────────────────────────────
+  SELECT 'E-constraint', e.m, e.o,
+         CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname=e.o)
+              THEN 'OK' ELSE 'MISSING' END
+  FROM (VALUES
+    ('0731_garages_directory','facilities_type_check'),
+    ('0731_garages_directory','facilities_service_types_values_check'),
+    ('0804_grooming_multi_category','facilities_service_types_type_check'),
+    ('0725_grooming_directory','facilities_category_check'),
+    -- NB: facilities_grooming_category_check is intentionally DROPPED by
+    -- 0804_grooming_multi_category (grooming moved to service_types[]; grooming rows
+    -- now have category=NULL). Its absence is correct — do NOT re-add it.
+    ('0805_facilities_city','facilities_city_check'),
+    ('0911_facilities_public_health','facilities_sector_check'),
+    ('0911_facilities_public_health','facilities_public_facility_type_check'),
+    ('0911_facilities_public_health','facilities_public_type_sector_check'),
+    ('0911_facilities_public_health','facilities_tier_check'),
+    ('0911_facilities_public_health','facilities_public_tier_required_check'),
+    ('0911_facilities_public_health','facilities_parent_not_self_check'),
+    ('0911_facilities_public_health','facilities_parent_facility_id_fkey'),
+    -- Registered 2026-09-02. These two shipped with 20260919 and were never listed
+    -- here, so DROPPING either was invisible to every section of this report — the
+    -- coords_need_provenance token below covers its own two constraints and says
+    -- nothing about these. The H-tokens further down assert their CONTENT; these two
+    -- rows assert they exist at all.
+    ('0919_facilities_geocode_provenance','facilities_geocode_source_check'),
+    ('0919_facilities_geocode_provenance','facilities_geocode_tier_check'),
+    ('0724_events_category','events_category_check'),
+    -- reviews_customer_facility_unique was REMOVED here by 0928: it is no longer a
+    -- constraint but a PARTIAL UNIQUE INDEX, and its absence as a constraint is
+    -- asserted in H. Listing it here would report MISSING forever.
+    ('capture_2','facilities_status_check'),
+    ('capture_2','facilities_membership_tier_check'),
+    ('0719_fix_signup','profiles_role_check'),
+    ('0803_facility_report_moderation','content_reports_content_type_check'),
+    ('0723_insurance_companies','insurance_companies_status_check'),
+    ('0812_module_waitlist','module_waitlist_module_check'),
+    ('0822_places_consolidation','places_category_check'),
+    ('0822_places_consolidation','places_region_check'),
+    ('0822_places_consolidation','places_status_check'),
+    ('0822_places_consolidation','places_access_type_check'),
+    ('0826_place_claims','place_claims_status_check'),
+    ('0830_events_gisekibris_import','events_description_i18n_check'),
+    -- ── Slice 1. The XOR is a SECURITY control: props_select_public treats
+    --    source IS NOT NULL as a bypass of the agent-subscription paywall, and
+    --    this constraint is the only thing stopping an agent setting source on
+    --    their own row to buy it. If this reads MISSING, that bypass is OPEN.
+    ('0904_accommodation_partner_feed','properties_source_agent_xor_check'),
+    ('0904_accommodation_partner_feed','properties_deed_type_check'),
+    ('0904_accommodation_partner_feed','properties_deposit_currency_check'),
+    ('0904_accommodation_partner_feed','properties_amenities_shape_check'),
+    ('0904_accommodation_partner_feed','properties_structure_range_check'),
+    ('0904_accommodation_partner_feed','properties_location_precision_check'),
+    -- Coordinates may not exist without a declared precision. This is what makes an
+    -- 'area' centroid safe to store: no row can carry coordinates whose
+    -- trustworthiness is unstated. If MISSING, approximate pins read as exact.
+    ('0904_accommodation_partner_feed','properties_coords_precision_check'),
+    -- Forces every FEED row to declare 'area'. Without it a partner row that omits
+    -- location_precision inherits the 'exact' DEFAULT and lands as trustworthy.
+    ('0904_accommodation_partner_feed','properties_feed_precision_check'),
+    -- UNIQUE: correctness. The ON CONFLICT arbiter for the partner-feed upsert;
+    -- a partial index cannot serve that role (the 20260830 lesson).
+    ('0904_accommodation_partner_feed','properties_external_id_unique'),
+    -- ── towing (0905). The region/domain checks are the load-bearing ones: they are
+    --    what keeps the seven canonical region keys and the TWO vehicle classes from
+    --    drifting away from constants/regions.js and the coverage-map polygon keys.
+    ('0905_towing_companies','towing_slug_check'),
+    ('0905_towing_companies','towing_base_region_check'),
+    ('0905_towing_companies','towing_coverage_regions_check'),
+    -- A firm that does not cover its own base region is invisible where it lives.
+    ('0905_towing_companies','towing_base_in_coverage_check'),
+    ('0905_towing_companies','towing_vehicle_classes_check'),
+    ('0905_towing_companies','towing_services_check'),
+    ('0905_towing_companies','towing_starting_price_check'),
+    ('0905_towing_companies','towing_opening_hours_check'),
+    -- UNIQUE: correctness. slug is the stable external handle for a firm.
+    ('0905_towing_companies','towing_companies_slug_key'),
+    -- contact_events. These CHECKs are not an anti-attacker measure — they catch typos
+    -- in OUR OWN call sites. Without the action one, 'whatsApp' inserts happily and a
+    -- firm's contacts split across two values that never add up, so the figure quoted
+    -- to that firm is quietly too low forever.
+    ('0910_contact_events','contact_events_module_check'),
+    ('0910_contact_events','contact_events_action_check'),
+    ('0910_contact_events','contact_events_region_check'),
+    -- home_strip_pin (1007). home_strip_pin_kind_check is the one that matters most:
+    -- it is the structural reason a DUTY PHARMACY can never enter the strip's ladder.
+    -- Duty has a permanent row of its own precisely because anything in a ladder can
+    -- be outranked, and the row somebody opens this app for at 2am must never be the
+    -- one that lost. shape_check keeps a sponsored link from wearing an editorial
+    -- card's clothes; sponsor_check is the disclosure half.
+    ('1007_home_strip_pin','home_strip_pin_kind_check'),
+    ('1007_home_strip_pin','home_strip_pin_shape_check'),
+    ('1007_home_strip_pin','home_strip_pin_sponsor_check'),
+    ('1007_home_strip_pin','home_strip_pin_window_check'),
+    ('1007_home_strip_pin','home_strip_pin_link_scheme_check'),
+    -- ── Profile gate. profiles_completion_requires_fields_check is the one that makes
+    --    profile_completed_at MEAN something: without it the flag can be set on an empty
+    --    row and the gate is decoration a modified client walks straight past.
+    ('1001_profile_completion','profiles_region_check'),
+    ('1001_profile_completion','profiles_resident_status_check'),
+    ('1001_profile_completion','profiles_student_level_check'),
+    ('1001_profile_completion','profiles_student_level_coupling_check'),
+    ('1001_profile_completion','profiles_display_preference_check'),
+    ('1001_profile_completion','profiles_display_name_length_check'),
+    ('1001_profile_completion','profiles_dob_range_check'),
+    ('1001_profile_completion','profiles_age_ineligible_no_dob_check'),
+    ('1001_profile_completion','profiles_nationality_code_check'),
+    ('1001_profile_completion','profiles_schema_version_check'),
+    ('1001_profile_completion','profiles_completion_requires_fields_check'),
+    -- UNIQUE: correctness. institutions.name is what the seed's ON CONFLICT and any
+    -- future admin add both key on.
+    ('1001_profile_completion','institutions_name_unique'),
+    ('1001_profile_completion','institutions_city_check'),
+    -- ad_banners (1008). destination_check is the load-bearing one: EXACTLY one of
+    -- link_url / route, so a paid banner can carry neither two destinations nor none.
+    -- Zero is as much a defect as two — a banner that renders, is charged for and does
+    -- nothing when tapped reads to the advertiser as the app being broken, and nothing
+    -- in the app would report it. route_check is the second half of the permanent
+    -- exclusion list: it stops a banner being pointed INTO duty, emergency or health,
+    -- which would monetise those surfaces at one remove. The FIRST half cannot live in
+    -- the database at all — a slot id constrains what an admin may TYPE, never where a
+    -- component is MOUNTED — and is scripts/check-ad-placement.mjs.
+    -- ad_banners_slot_check was RETIRED by 1009, which drops the constraint and the
+    -- `slot` column with it. Deleted rather than left to go red: a token for a dropped
+    -- object sits MISSING forever against a database that is exactly right, and this
+    -- file already records twice what one known-stale row does to the reader's
+    -- attention — the next real MISSING gets skimmed with it. Nothing of its own is
+    -- worth keeping: the 1009 H-token 'ad_banners.slot is dropped' owns the transition,
+    -- and it asserts the stronger thing (that the old scheme is GONE, not merely that
+    -- the constraint once existed).
+    ('1008_ad_banners','ad_banners_destination_check'),
+    ('1008_ad_banners','ad_banners_route_check'),
+    ('1008_ad_banners','ad_banners_link_scheme_check'),
+    ('1008_ad_banners','ad_banners_image_scheme_check'),
+    ('1008_ad_banners','ad_banners_window_check'),
+    ('1008_ad_banners','ad_banners_advertiser_check'),
+    ('1008_ad_banners','ad_banners_counts_check'),
+    -- 1009. position_check is the vocabulary; module_fkey is what makes adding a module
+    -- a data change instead of a migration. The FK is ON DELETE RESTRICT on purpose:
+    -- deleting a module out from under a live campaign must fail loudly rather than
+    -- silently delete somebody's paid banner.
+    ('1009_ad_position_module','ad_banners_position_check'),
+    ('1009_ad_position_module','ad_banners_module_fkey'),
+    -- 1010. The vocabulary CHECK and the base-inside-coverage CHECK are ONE change:
+    -- without the second, a row can be registered in one district and serve only
+    -- another, and the directory lists it under neither in a way anyone predicts.
+    ('1010_hs_coverage','home_services_coverage_districts_check'),
+    ('1010_hs_coverage','home_services_base_in_coverage_check'),
+    -- Student Hub tasks (1017). slug_unique is correctness, not tidiness: the slug is the
+    -- device-side progress key, so two rows sharing one would share every student's ticks.
+    ('1017_student_tasks','student_tasks_slug_unique'),
+    ('1017_student_tasks','student_tasks_slug_check'),
+    ('1017_student_tasks','student_tasks_icon_check'),
+    ('1017_student_tasks','student_tasks_link_scheme_check'),
+    ('1017_student_tasks','student_task_i18n_lang_check'),
+    ('1017_student_tasks','student_task_i18n_title_check'),
+    ('1017_student_tasks','student_task_i18n_steps_check'),
+    ('1017_student_tasks','student_task_i18n_documents_check'),
+    ('1017_student_tasks','student_task_i18n_link_scheme_check'),
+    -- 1024. Names only here — the H-token below is what tells a null-safe body from one
+    -- that passes on UNKNOWN, which a name cannot.
+    ('1024_student_affiliation','subjects_slug_unique'),
+    ('1024_student_affiliation','subjects_slug_check'),
+    ('1024_student_affiliation','subject_i18n_lang_check'),
+    ('1024_student_affiliation','subject_i18n_name_check'),
+    ('1024_student_affiliation','institutions_website_url_scheme_check'),
+    ('1026_student_education','student_education_level_check'),
+    ('1026_student_education','student_education_user_inst_level_key'),
+    ('1026_student_education','student_education_start_year_range_check'),
+    ('1026_student_education','student_education_end_year_range_check'),
+    ('1026_student_education','student_education_years_order_check')
+    ,('1029_student_messaging','conversations_not_self'),
+    ('1029_student_messaging','conversations_not_both'),
+    ('1029_student_messaging','conversations_closed_pair'),
+    ('1029_student_messaging','conversation_attempts_outcome_check'),
+    ('1029_student_messaging','messages_body_check'),
+    ('1044_apple_refresh_tokens','apple_refresh_tokens_pkey'),
+    ('1044_apple_refresh_tokens','apple_refresh_tokens_user_id_fkey'),
+    -- places provenance (1045). The UNIQUE is registered here only (it is a constraint);
+    -- a plain UNIQUE is what PostgREST's ON CONFLICT (source, source_id) can infer.
+    ('1045_places_source','places_source_pair_check'),
+    ('1045_places_source','places_source_source_id_key'),
+    -- walking routes (1048). The FK delete ACTIONS are asserted in H, not here: a name survives CASCADE.
+    ('1048_walking_routes','walking_routes_pkey'),
+    ('1048_walking_routes','walking_routes_region_check'),
+    ('1048_walking_routes','walking_routes_name_check'),
+    ('1048_walking_routes','walking_routes_km_check'),
+    ('1048_walking_routes','walking_routes_source_pair_check'),
+    ('1048_walking_routes','walking_routes_source_source_id_key'),
+    ('1048_walking_routes','walking_route_stops_pkey'),
+    ('1048_walking_routes','walking_route_stops_route_place_key'),
+    ('1048_walking_routes','walking_route_stops_route_id_fkey'),
+    ('1048_walking_routes','walking_route_stops_place_id_fkey'),
+    ('1048_walking_routes','walking_route_stops_position_check'),
+    ('1048_walking_routes','walking_route_stops_leg_check'),
+    ('1049_walking_legs','walking_legs_pkey'),
+    ('1049_walking_legs','walking_legs_from_place_id_fkey'),
+    ('1049_walking_legs','walking_legs_to_place_id_fkey'),
+    ('1049_walking_legs','walking_legs_not_self_check'),
+    ('1049_walking_legs','walking_legs_path_check'),
+    ('1049_walking_legs','walking_legs_metres_check'),
+    ('1049_walking_legs','walking_legs_seconds_check'),
+    ('1049_walking_legs','walking_legs_source_check'),
+    -- 1051. The three format/order CHECKs are not decoration: compareVersions() returns NULL
+    -- for an unparseable string and every caller treats NULL as "no popup", so a seed typo
+    -- would disable the feature silently. These make it fail at the SQL editor instead.
+    ('1051_app_versions','app_versions_pkey'),
+    ('1051_app_versions','app_versions_platform_check'),
+    ('1051_app_versions','app_versions_latest_format_check'),
+    ('1051_app_versions','app_versions_min_format_check'),
+    ('1051_app_versions','app_versions_order_check'),
+    ('1051_app_versions','app_update_events_pkey'),
+    ('1051_app_versions','app_update_events_tier_check'),
+    ('1051_app_versions','app_update_events_platform_check'),
+    ('1051_app_versions','app_update_events_runtime_len_check'),
+    ('1056_route_medals','route_medals_pkey'),
+    ('1056_route_medals','route_medals_user_id_fkey'),
+    ('1056_route_medals','route_medals_route_id_fkey'),
+    -- 1059. external_id_key is CORRECTNESS: the importer's ON CONFLICT arbiter. A plain UNIQUE,
+    -- never a partial index (the 20260830 lesson). The vocabularies are asserted as exact sets in H.
+    ('1059_hotels','hotels_pkey'),
+    ('1059_hotels','hotels_external_id_key'),
+    ('1059_hotels','hotels_external_id_check'),
+    ('1059_hotels','hotels_source_check'),
+    ('1059_hotels','hotels_kitob_class_check'),
+    ('1059_hotels','hotels_region_check'),
+    ('1059_hotels','hotels_name_check'),
+    ('1059_hotels','hotels_kitob_member_check'),
+    ('1059_hotels','hotels_link_scheme_check'),
+    ('1059_hotels','hotels_coords_check'),
+    -- 1060. Names only; the H tokens assert what each one permits.
+    ('1060_hotels_geocode_provenance','hotels_geocode_source_check'),
+    ('1060_hotels_geocode_provenance','hotels_geocode_tier_check'),
+    ('1060_hotels_geocode_provenance','hotels_geocode_corroboration_check'),
+    ('1060_hotels_geocode_provenance','hotels_coords_provenance_check'),
+    -- 1061. The UNIQUE is correctness: two hotels matched to one Place is a wrong match.
+    ('1061_hotels_places_crosscheck','hotels_google_place_id_check'),
+    ('1061_hotels_places_crosscheck','hotels_google_place_id_key'),
+    -- 1062. A Google pin (known risk) must stay traceable: place id + tier 2.
+    ('1062_hotels_google_places','hotels_google_places_traceable_check'),
+    -- 1063. The H tokens assert what each permits.
+    ('1063_hotels_kitob_guide','hotels_photo_source_check'),
+    ('1063_hotels_kitob_guide','hotels_description_i18n_check'),
+    ('1063_hotels_kitob_guide','hotels_kitob_page_url_check'),
+    -- 1064. The H token asserts the cover-first rule.
+    ('1064_hotels_gallery','hotels_gallery_check'),
+    -- 1065. The H token asserts the NULL-safe two-way rule.
+    ('1065_hotels_commons_credit','hotels_photo_credit_check'),
+    -- 1066. Its allow-list token lands after the apply, written from prod's own rendering.
+    ('1066_notification_type','notifications_type_check'),
+    -- 1070. api_quota_log_cap_check is the quota's SECOND fence (claim_api_request is the first).
+    ('1070_live_scores','leagues_source_check'),
+    ('1070_live_scores','leagues_sport_check'),
+    ('1070_live_scores','teams_source_check'),
+    ('1070_live_scores','teams_sport_check'),
+    ('1070_live_scores','matches_source_check'),
+    ('1070_live_scores','matches_status_check'),
+    ('1070_live_scores','matches_sport_check'),
+    ('1070_live_scores','matches_teams_check'),
+    ('1070_live_scores','matches_league_fkey'),
+    ('1070_live_scores','matches_home_team_fkey'),
+    ('1070_live_scores','matches_away_team_fkey'),
+    ('1070_live_scores','match_events_type_check'),
+    ('1070_live_scores','match_events_side_check'),
+    ('1070_live_scores','f1_races_status_check'),
+    ('1070_live_scores','f1_standings_kind_check'),
+    ('1070_live_scores','api_quota_log_cap_check'),
+    ('1070_live_scores','api_quota_log_sport_check'),
+    ('1070_live_scores','live_sync_state_sport_check'),
+    ('1070_live_scores','matches_external_key'),
+    ('1070_live_scores','match_events_dedupe_key'),
+    ('1070_live_scores','leagues_id_sport_key'),
+    ('1070_live_scores','teams_id_sport_key'),
+    ('1071_live_scores_followup','teams_source_logo_check'),
+    ('1071_live_scores_followup','f1_races_session_type_check'),
+    ('1071_live_scores_followup','f1_races_api_race_id_key'),
+    ('1077_live_scores_international','leagues_name_i18n_check')
+
+  ) e(m,o)
+
+  UNION ALL
+  -- ── F. INDEXES (perf + the double-booking UNIQUE correctness guard) ────────
+  SELECT 'F-index', e.m, e.o,
+         CASE WHEN EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=e.o)
+              THEN 'OK' ELSE 'MISSING' END
+  FROM (VALUES
+    ('0702_job_postings','job_postings_owner_idx'),
+    ('0702_job_postings','job_postings_board_idx'),
+    ('0712_ugc_moderation','content_reports_pending_idx'),
+    ('0712_ugc_moderation','content_reports_content_idx'),
+    ('0712_ugc_moderation','reviews_customer_id_idx'),
+    ('0723_insurance_companies','idx_insurance_companies_owner_id'),
+    ('0719_add_missing_indexes','idx_facilities_provider_id'),
+    ('0911_facilities_public_health','idx_facilities_parent_facility_id'),
+    ('0719_add_missing_indexes','idx_claim_requests_facility_id'),
+    ('0719_add_missing_indexes','idx_claim_requests_requester_id'),
+    ('0719_add_missing_indexes','idx_facility_change_requests_facility_id'),
+    ('0719_add_missing_indexes','idx_facility_change_requests_provider_id'),
+    ('0719_add_missing_indexes','idx_reviews_facility_id'),
+    ('0719_add_missing_indexes','idx_questions_facility_id'),
+    ('0719_add_missing_indexes','idx_questions_customer_id'),
+    ('0719_add_missing_indexes','idx_answers_question_id'),
+    ('0719_add_missing_indexes','idx_quiz_submissions_customer_id'),
+    ('0719_add_missing_indexes','idx_quiz_submissions_assigned_facility_id'),
+    ('0719_add_missing_indexes','idx_notifications_user_id'),
+    ('0719_add_missing_indexes','idx_duty_schedule_facility_id'),
+    ('0719_add_missing_indexes','idx_home_services_owner_id'),
+    ('0719_add_missing_indexes','idx_events_organizer_id'),
+    ('0822_places_consolidation','idx_places_status'),
+    ('0822_places_consolidation','idx_places_region'),
+    ('0822_places_consolidation','idx_places_category'),
+    ('0822_places_consolidation','idx_places_provider'),
+    ('0822_places_consolidation','idx_places_submitted_by'),
+    ('0826_place_claims','idx_place_claims_place_id'),
+    ('0826_place_claims','idx_place_claims_requester_id'),
+    -- UNIQUE: correctness. Replaces the partial index events_external_id_key
+    -- (never registered here), which ON CONFLICT could not infer.
+    ('0830_events_gisekibris_import','events_external_id_unique'),
+    -- ── Slice 1. Four only; every other Slice 3 filter column was argued down
+    --    for lack of evidence of use — see the migration header.
+    ('0904_accommodation_partner_feed','properties_browse_idx'),
+    ('0904_accommodation_partner_feed','property_images_property_id_idx'),
+    -- UNIQUE: correctness — at most one primary image per property.
+    ('0904_accommodation_partner_feed','property_images_primary_unique'),
+    -- towing: ONE index by design. vehicle_classes is a two-value domain and can
+    -- never be selective, so it deliberately has none — see the migration header.
+    ('0905_towing_companies','idx_towing_companies_coverage'),
+    -- contact_events: taps for one firm over a date range — the only query that runs,
+    -- and what contact_events_monthly groups by.
+    ('0910_contact_events','idx_contact_events_module_entity_time'),
+    ('0923_server_side_notifications','idx_push_log_sent_at'),
+    ('0923_server_side_notifications','idx_push_log_user_kind'),
+    -- UNIQUE: correctness. display_name renders publicly on reviews, so a duplicate is
+    -- an impersonation vector. See the H-token below for the half that matters more:
+    -- that it is built on the NORMALIZED column and not the raw string.
+    ('1001_profile_completion','profiles_display_name_norm_uniq'),
+    ('1026_student_education','student_education_one_open_per_user'),
+    ('1026_student_education','idx_student_education_listed'),
+    -- ► conversations_one_live_per_pair is PARTIAL, and the partial-ness is the design.
+    --   A plain UNIQUE(pair_lo,pair_hi) would make LEAVING a conversation into a
+    --   permanent, invisible, mutual block: the settled row would occupy the pair's only
+    --   slot forever. Same shape and reasoning as student_education_one_open_per_user.
+    ('1029_student_messaging','conversations_one_live_per_pair'),
+    ('1029_student_messaging','conversations_pair_idx'),
+    ('1029_student_messaging','messages_conversation_idx'),
+    ('1029_student_messaging','conversation_attempts_rate_idx'),
+    -- home_strip_pin (1007). The PARTIAL UNIQUE is the load-bearing one: rank 1 of
+    -- the Home strip asks for "the pin for today", singular, and without this two
+    -- active rows on one date make that answer depend on row order — a bug that
+    -- surfaces only on the day somebody double-books.
+    ('1007_home_strip_pin','home_strip_pin_one_per_day'),
+    ('1007_home_strip_pin','idx_home_strip_pin_active_pool'),
+    -- ad_banners (1008). Perf only, and deliberately NOT unique: several ads may be live
+    -- for one slot at once and the newest wins by ORDER BY, so a takeover can be sold
+    -- over a standing placement without a gap where the slot is empty. The tie-break's
+    -- correctness lives in the client's ORDER BY, not in this index.
+    -- 1009 REPLACED idx_ad_banners_slot_live with the position/module form. The old
+    -- name is deliberately NOT registered here any more: a token for a dropped index
+    -- would sit red forever against a database that is exactly right, and this file
+    -- already records twice what a known-stale row does to the reader's attention.
+    ('1009_ad_position_module','idx_ad_banners_position_module_live'),
+    -- 1048: the RESTRICT check on a places delete looks stops up by place_id.
+    ('1048_walking_routes','idx_walking_route_stops_place_id'),
+    -- 1049: the CASCADE on a places delete looks legs up by to_place_id (the PK covers from).
+    ('1049_walking_legs','idx_walking_legs_to_place_id'),
+    ('1051_app_versions','idx_app_update_events_created_at'),
+    ('1070_live_scores','matches_kickoff_idx'),
+    ('1070_live_scores','matches_league_idx'),
+    ('1070_live_scores','api_request_log_at_idx'),
+    ('1071_live_scores_followup','f1_races_race_at_idx')
+
+  ) e(m,o)
+
+  UNION ALL
+  -- ── G. RPC EXECUTE grants to `authenticated` (function exists but app can't
+  --       call it = silent gap the client sees as a permission error) ─────────
+  SELECT 'G-grant', e.m, e.o||'()→authenticated EXECUTE',
+         CASE WHEN EXISTS (
+                SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+                LEFT JOIN pg_roles r ON r.oid=a.grantee
+                WHERE n.nspname='public' AND p.proname=e.o
+                  AND a.privilege_type='EXECUTE' AND r.rolname='authenticated')
+              THEN 'OK' ELSE 'CHECK (no explicit grant)' END
+  FROM (VALUES
+    ('0731_garages_directory','create_garage_facility'),
+    ('0802_update_garage_facility','update_garage_facility'),
+    ('0725_grooming_directory','create_grooming_facility'),
+    ('0803_grooming_owner_edit','update_grooming_facility'),
+    ('0719_create_facility_claim_rpc','create_facility_claim'),
+    ('0813_notify_module_waitlist','notify_module_waitlist'),
+    ('0824_place_moderation','explore_category_counts'),  -- also GRANTed to anon (public tile counts)
+    ('0826_place_claims','approve_place_claim'),
+    ('0829_place_resubmit','resubmit_place'),
+    -- search_content is SECURITY INVOKER, so a signed-out visitor's call is permission-
+    -- checked against these three too. Without the grants the RPC exists and every
+    -- search returns a permission error, with nothing in the app to explain it.
+    ('0912_search_tokenised','search_fold'),
+    ('0912_search_tokenised','search_all_tokens'),
+    ('0912_search_tokenised','search_token_hits'),
+    -- Without these grants the functions exist and every booking/question notification
+    -- fails with a permission error the client swallows — indistinguishable from the
+    -- silent failure 0923 exists to end.
+    ('0923_server_side_notifications','notify_facility_owner'),
+    ('0923_server_side_notifications','notify_admins'),
+    -- The ONE new RPC. Without the grant it exists and every keystroke in the wizard's
+    -- display-name field returns a permission error the user cannot act on — inside a
+    -- hard block, on the step people abandon on.
+    ('1002_display_name_rpc','display_name_available'),
+    -- Slice 4. Without the grant the student list returns a permission error to every
+    -- opted-in user, which the client cannot tell apart from an empty list.
+    ('1026_student_education','can_see_student_lists'),
+    ('1026_student_education','get_student_list'),
+    -- Without the grant the profile page returns a permission error to every opted-in
+    -- user, which the client cannot tell apart from a profile that is simply gone.
+    ('1028_student_profile','get_student_profile'),
+    -- Slice 6. Without these the messaging screens return a permission error the client
+    -- cannot distinguish from an empty inbox. notify_new_message is DELIBERATELY ABSENT:
+    -- it is revoked from every client role, and a push sender anyone can call is a push
+    -- sender anyone can aim. The 1029 H-token asserts that revocation positively.
+    ('1029_student_messaging','start_conversation'),
+    ('1029_student_messaging','send_message'),
+    ('1029_student_messaging','accept_conversation'),
+    ('1029_student_messaging','decline_conversation'),
+    ('1029_student_messaging','leave_conversation'),
+    ('1029_student_messaging','delete_message'),
+    ('1029_student_messaging','block_user'),
+    ('1029_student_messaging','list_conversations'),
+    -- bump_ad_counter is ALSO granted to anon, which this section does not check — the app
+    -- signs in anonymously on launch, so a render landing before that completes runs as
+    -- true `anon`. The migration's own DO block asserts BOTH grants via
+    -- has_function_privilege(); this row covers the `authenticated` half every other RPC
+    -- here is measured on.
+    ('1008_ad_banners','bump_ad_counter'),
+    -- 20261033. Without these grants the functions exist and every call returns a
+    -- permission error: the review composer shows itself to someone who already reviewed,
+    -- and the admin queue cannot resolve an author to ban. Both replaced a plain column
+    -- read, so the failure looks like the app forgetting something rather than a 42501.
+    ('1033_reviews_author_not_public','get_my_review'),
+    ('1033_reviews_author_not_public','admin_content_author'),
+    -- 1056. Without these the medal is never saved and other students never see a badge;
+    -- both would read as "nobody has walked a route".
+    ('1056_route_medals','award_route_medal'),
+    ('1056_route_medals','get_profile_route_badges'),
+    -- 1070. Without it the editor button never shows (the app asks is_score_editor()).
+    ('1070_live_scores','is_score_editor')
+  ) e(m,o)
+
+  UNION ALL
+  -- ── H. BEHAVIOR / VERSION TOKENS — catches a CREATE OR REPLACE that never
+  --       ran, leaving an older body/constraint (existence alone can't see it) ─
+  SELECT 'H-version', z.m, z.label, CASE WHEN z.ok THEN 'OK' ELSE 'STALE/MISSING' END
+  FROM (
+    SELECT '0705_search_content_add_jobs' m, 'search_content covers job_postings' label,
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='search_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%job_postings%') ok
+    UNION ALL SELECT '0724_events_category_widen','events_category_check = final vocab (music+concert)',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='events_category_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%music%'
+        AND pg_get_constraintdef(c.oid) ILIKE '%concert%')
+    -- The widening keeps the constraint NAME, so E-constraint existence cannot see
+    -- it. Without this token a DB still on the 500-char limit reads as OK, and the
+    -- Gişe Kıbrıs import fails at insert time.
+    --
+    -- ⚠ THE 0830 TOKEN THAT LIVED HERE IS RETIRED (2026-09-20), NOT BUMPED. It
+    -- asserted ILIKE '%2500%'. 20261037 moves both description caps to 3000, so it
+    -- would have gone STALE/MISSING against a database that is exactly right — and
+    -- keeping both would guarantee exactly ONE red row at all times, whichever side
+    -- of the apply you are on, which is the known-stale row this file warns about
+    -- three times. One fact, one owner; 20261037 owns the cap now.
+    --
+    -- BOTH constraints, because they are one change: events_description_check bounds
+    -- the legacy text column and events_description_i18n_check bounds ->>'tr' and
+    -- ->>'en' separately at the same number. Widening one and not the other still
+    -- rejects the row that prompted the change, and the half-applied state is
+    -- invisible to a token that only reads the first.
+    --
+    -- The 6000-byte TOTAL cap on the jsonb is asserted UNCHANGED on purpose: it is
+    -- the thing that stops 3000+3000 bilingual rows arriving without anyone deciding
+    -- that 9 locales x 3000 is the shape this column should grow into.
+    --
+    -- EXPECTED RED until 20261037 is applied — that is the point of registering it,
+    -- not a defect.
+    UNION ALL SELECT '1037_events_description_3000','description caps are 3000 on BOTH the text column and each jsonb key (total still 6000)',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='events_description_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%3000%')
+      AND EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='events_description_i18n_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%3000%'
+        AND pg_get_constraintdef(c.oid) ILIKE '%6000%'
+        AND pg_get_constraintdef(c.oid) ILIKE '%jsonb_typeof%')
+    -- events_status_check gains 'cancelled' (20261038). The constraint keeps its
+    -- NAME, so section E is blind to it — and section E does not list this
+    -- constraint at all, so before this token NOTHING in the report could see the
+    -- events status vocabulary.
+    --
+    -- DERIVED as a whole SET, never "does it contain cancelled": that weaker form
+    -- passes on a constraint that has quietly LOST 'rejected', which would break the
+    -- admin moderation queue while reading green. If a sixth value is ever added
+    -- legitimately, change the array here in the same commit and say why — that edit
+    -- is the review moment a substring test never creates.
+    --
+    -- EXPECTED RED until 20261038 is applied — that is the point of registering it,
+    -- not a defect.
+    --
+    -- ⚠ The first reading of the evidence here was WRONG and the correction is worth
+    -- keeping: a probe of the five vanished rows' partner pages read only the HTTP
+    -- STATUS, got 200 on all five, and concluded they were still live. A cancelled
+    -- event keeps its page and still serves 200, so that probe could never have
+    -- failed on the case it existed to detect. The pages' own "isCancelled" field
+    -- reads TRUE on all five and FALSE on every readable feed row — which is what
+    -- actually established that the five are cancelled and this vocabulary is needed.
+    UNION ALL SELECT '1038_events_status_cancelled','events_status_check vocabulary is exactly draft/pending/approved/rejected/cancelled',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.events')
+          AND c.conname = 'events_status_check')
+      = ARRAY['approved','cancelled','draft','pending','rejected']
+    -- Data migration, so it creates no named object at all and every other section
+    -- is blind to it. If it was committed but never applied, the next Gişe Kıbrıs
+    -- import matches nothing on the real key and INSERTS a duplicate of all 69 rows
+    -- alongside the originals. import-gisekibris-events.mjs aborts on the same
+    -- condition at runtime; this is the audit-time half of that guard.
+    UNION ALL SELECT '0831_events_external_id_remap','zero synthetic gisekibris external_ids remain',
+      NOT EXISTS(SELECT 1 FROM public.events
+        WHERE source='gisekibris' AND external_id ~ '^gk-[0-9a-f]{12}$')
+    -- NOT NULL is not a named constraint, so the E-constraint section is blind to it.
+    -- Without this token a DB that never got the migration reads as OK, and a ragged
+    -- upsert can silently NULL status again — which hides rows from every user,
+    -- because the read policy is status='approved'. Default must stay 'draft':
+    -- ev_guard_write rejects any non-admin INSERT whose status is not draft.
+    UNION ALL SELECT '0901_events_status_not_null','events.status is NOT NULL, default still draft',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='events' AND column_name='status'
+          AND is_nullable='NO' AND column_default LIKE '%draft%')
+    -- ── 0902 capture. Three drift items this register could not see before, because
+    -- it only checks what somebody remembered to add to it. All three are ABSENCE
+    -- facts, which no existence section can express.
+    -- ⚠ 'appointments.service_type is GONE' RETIRED 2026-08-31 by 20261004. It would
+    -- have stayed GREEN forever — the column is absent because the whole TABLE is — and
+    -- a token that can no longer fail is a decoration certifying nothing while looking
+    -- like coverage. Removed rather than left to reassure.
+    -- Resurrected by re-running 20260719_claim_evidence_and_guard AFTER the rename to
+    -- business_verified. ADD COLUMN IF NOT EXISTS is not re-run-safe across a RENAME.
+    UNION ALL SELECT '0902_capture_schema_drift','claim_requests.kteb_confirmed is GONE',
+      NOT EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='claim_requests' AND column_name='kteb_confirmed')
+    -- A 411-row snapshot of facilities with no CREATE anywhere in the repo. Unreachable
+    -- only because RLS is on with zero policies — assert both halves of that.
+    -- to_regclass, NOT ::regclass — the cast RAISES on a missing relation, and absence
+    -- is the PASSING state here, so the cast would turn the whole drift check into a
+    -- hard error the moment the migration succeeds.
+    UNION ALL SELECT '0902_capture_schema_drift','facilities_backup_20260718 is gone',
+      to_regclass('public.facilities_backup_20260718') IS NULL
+    UNION ALL SELECT '0719_fix_signup','profiles_role_check allows home_service_provider',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='profiles_role_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%home_service_provider%')
+    UNION ALL SELECT '0731_garages_directory','facilities_type_check allows garage',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='facilities_type_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%garage%')
+    -- ── 0911 public health facilities. THREE tokens, all for the same reason: each
+    -- one is a same-name DROP/ADD or a behaviour-only CREATE OR REPLACE, so the
+    -- E-constraint and C-function sections see the NAME and cannot see the CHANGE.
+    -- Without these, a database that never received this migration reads 100% OK.
+    --
+    -- (1) The 'draft' value. If this is missing, every seeded public-health row was
+    -- rejected on insert — or, worse, somebody "fixed" the rejection by seeding
+    -- 'pending' instead and quietly parked ~36 rows on the admin approval badge.
+    UNION ALL SELECT '0911_facilities_public_health','facilities_status_check allows draft',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='facilities_status_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%draft%')
+    -- (2) The claim guard's sector branch. A public facility has no owner to verify and
+    -- nothing to sell; this is the only thing standing between a provider account with a
+    -- tax number and ownership of Dr. Burhan Nalbantoğlu Devlet Hastanesi. It is invisible
+    -- to the D-trigger section, which only checks that a trigger of that NAME exists.
+    UNION ALL SELECT '0911_facilities_public_health','claim_requests_guard_insert refuses sector=public',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='claim_requests_guard_insert'
+          AND pg_get_functiondef(p.oid) ILIKE '%public health facilities cannot be claimed%')
+    -- (3) search_content matching name_official. Nobody local types the eponym, but the
+    -- eponym is what is on the building and on the paperwork a newcomer is holding. If
+    -- this reads false, searching "Dr Engin Arkan" returns nothing and the facility
+    -- looks absent from ADA. Note this ALSO catches the towing arm being clobbered: a
+    -- re-apply of the pre-0906 body would drop both at once.
+    UNION ALL SELECT '0911_facilities_public_health','search_content matches facilities.name_official',
+      (SELECT pg_get_functiondef('public.search_content(text,double precision,double precision)'::regprocedure)
+         ILIKE '%f.name_official%')
+    -- (4) The update guard's five new locks. facilities_guard_update is a DENY-LIST, so
+    -- a new column is owner-writable the moment it is added. If this reads false, any
+    -- provider can UPDATE their own row to sector='public' + a tier and become, as far
+    -- as the routing screen is concerned, a state health facility. `sector` is checked
+    -- as the sentinel — the five branches ship and are reverted together.
+    UNION ALL SELECT '0911_facilities_public_health','facilities_guard_update locks sector/tier/parent/name_official',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='facilities_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%sector is admin-only%'
+          AND pg_get_functiondef(p.oid) ILIKE '%parent_facility_id is admin-only%')
+    -- And that the 0809 reminder lock SURVIVED the 0911 rewrite — the clobber this
+    -- register exists to catch. Duplicated deliberately: 0809 has no token of its own.
+    UNION ALL SELECT '0911_facilities_public_health','facilities_guard_update still locks featured_reminded_at',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='facilities_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%featured_reminded_at is admin-only%')
+    -- (6) The seven live state hospitals are sector='public'. A DATA fact, not a schema
+    -- one, so no existence section can see it — and it is the one that closes a hole that
+    -- was open in production: all seven are status='active' with provider_id NULL, i.e.
+    -- claimable by any provider account until claim_requests_guard_insert had a `sector`
+    -- to key on. If this reads MISSING, section 6b of the migration never ran (or the
+    -- rows were renamed) and TRNC's state hospitals are claim targets again.
+    UNION ALL SELECT '0911_facilities_public_health','7 live state hospitals carry sector=public',
+      (SELECT count(*) = 7 FROM public.facilities WHERE sector = 'public'
+        AND name IN ('Dr. Burhan Nalbantoğlu Devlet Hastanesi','Gazimağusa Devlet Hastanesi',
+                     'Girne Dr. Akçiçek Devlet Hastanesi','Girne Devlet Hastanesi',
+                     'Lefke Cengiz Topel Hastanesi','Barış Ruh ve Sinir Hastalıkları Hastanesi',
+                     'Acil Durum Hastanesi'))
+    -- (7) The tier guarantee is exempted for ONE named row, not relaxed for all. Acil
+    -- Durum Hastanesi has no published basamak (ministry page carries only a link; the
+    -- hospital's own site states none), so its tier is honestly NULL. The exemption is
+    -- written into the constraint definition as a literal id, which makes it visible to
+    -- anyone reading \d facilities. If the `id = ` clause is gone while `tier IS NOT
+    -- NULL` remains, someone either supplied the tier (fine — retire this token) or
+    -- dropped the exemption and the row (not fine). If BOTH are gone, the guarantee was
+    -- relaxed globally and every future public row may be tierless.
+    -- (7) The tier enum carries 'unknown'. Acil Durum Hastanesi has no published basamak
+    -- (ministry page carries only a link; the hospital's own site states none), so it is
+    -- stored as a REAL value rather than NULL — NULL would be ambiguous between "never
+    -- set", "not applicable" and "genuinely unknown", and this column feeds tier routing.
+    -- A row-scoped CHECK exemption naming its uuid was considered and REJECTED: it would
+    -- encode a data accident in the schema.
+    UNION ALL SELECT '0911_facilities_public_health','facilities_tier_check allows unknown',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_tier_check'
+        AND pg_get_constraintdef(oid) ILIKE '%unknown%')
+    -- (8) …and the half-coupling stayed GLOBAL. If a literal id ever appears in this
+    -- constraint, the rejected carve-out idea came back.
+    UNION ALL SELECT '0911_facilities_public_health','public tier requirement is global, no uuid carve-out',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_public_tier_required_check'
+        AND pg_get_constraintdef(oid) ILIKE '%tier IS NOT NULL%'
+        AND pg_get_constraintdef(oid) NOT ILIKE '%id =%')
+    -- (9) 'unknown' has not spread. EXACTLY ONE row may carry it, and Slice 2 reconciles
+    -- ten more hospital-tier rows for which it is the easiest thing to type. No CHECK can
+    -- express "at most one"; this token is the only thing that will notice.
+    UNION ALL SELECT '0911_facilities_public_health','tier=unknown is still a one-off (exactly 1 row)',
+      (SELECT count(*) = 1 FROM public.facilities WHERE tier = 'unknown')
+    -- (10) The Girne duplicate stays HIDDEN. 91338177 and 7a1c598d are the same hospital;
+    -- the duplicate is status='draft' (invisible, unclaimable, nothing destroyed) pending
+    -- its own reviewed merge slice. If this reads false, two Girne hospitals are rendering
+    -- in the directory again — or the row was deleted, which was explicitly not the plan.
+    UNION ALL SELECT '0911_facilities_public_health','Girne duplicate 91338177 is still draft',
+      (SELECT count(*) = 1 FROM public.facilities
+        WHERE id = '91338177-85d8-4f38-8b0f-2c395638d2d4' AND status = 'draft')
+    -- ── 0912 tokenised search + Slice 2. Same-name DROP/ADD and behaviour-only
+    -- CREATE OR REPLACE throughout, so section E and C see the NAMES and not the CHANGES.
+    UNION ALL SELECT '0912_search_tokenised','facilities_tier_check allows not_applicable',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_tier_check'
+        AND pg_get_constraintdef(oid) ILIKE '%not_applicable%')
+    -- THE alarm for this slice. If search_content reverted to substring matching, the
+    -- function still exists, still runs, still returns rows — and quietly stops finding
+    -- "Girne Devlet Hastanesi" and "Lefkoşa Devlet Hastanesi" again. Nothing else notices.
+    UNION ALL SELECT '0912_search_tokenised','search_content matches by TOKEN, not substring',
+      (SELECT pg_get_functiondef('public.search_content(text,double precision,double precision)'::regprocedure)
+         ILIKE '%search_all_tokens%')
+    -- Title-first ordering. Without it a pharmacy 49 km away outranks every hospital in
+    -- the country, because unplaced rows sort last under distance-first.
+    UNION ALL SELECT '0912_search_tokenised','search_content ranks title relevance above distance',
+      (SELECT pg_get_functiondef('public.search_content(text,double precision,double precision)'::regprocedure)
+         ILIKE '%search_token_hits(title, query) DESC%')
+    -- The Turkish fold must cover the circumflex letters too (kâğıt, âlem) or the server
+    -- and the client disagree on ordinary Turkish words.
+    UNION ALL SELECT '0912_search_tokenised','search_fold covers Â Î Û as well as the base set',
+      (SELECT public.search_fold('Kâğıt Îhsan Ûlker Çağla Gökçe İzmir ılık')
+              = 'kagit ihsan ulker cagla gokce izmir ilik')
+    -- ─── search_fold MUST STAY IMMUTABLE, AND NOTHING ELSE GUARDS THE MARKER ───
+    --
+    -- The token above proves the BEHAVIOUR. This one proves the DECLARATION, and they
+    -- fail independently: a locale-aware rewrite can keep ılık → ilik working perfectly
+    -- and still have to drop to STABLE, at which point nothing goes red, no user notices,
+    -- and the only index path this search has is quietly closed. provolatile 'i' is the
+    -- marker itself, read from pg_proc rather than inferred from the body.
+    --
+    -- WHY THE FUNCTION IS AN ENUMERATED translate() MAP AND NOT unaccent(), AND WHY THAT
+    -- ARGUMENT SURVIVES EVEN IF IMMUTABILITY STOPS MATTERING:
+    --
+    --   YOU CAN READ translate's MAP AND KNOW WHAT IT DOES. 'İIıŞşĞğÇçÖöÜüÂâÎîÛû' ->
+    --   'IIiSsGgCcOoUuAaIiUu' is nineteen pairs on one line, and every one of them is
+    --   there because somebody typed it. unaccent() reads a rules file: its coverage is a
+    --   property of a file on the server, so it has to be QUERIED to be known, and the
+    --   answer can change under a Postgres upgrade with nothing in this repo to notice.
+    --
+    --   Measured 2026-09-13, and it caught us out in the reassuring direction: the default
+    --   unaccent rules DO cover ı and İ — unaccent('Kıbrıs') = 'Kibris'. Both of us
+    --   predicted they would not. The prediction being wrong is the argument: a dependency
+    --   whose behaviour you can only learn by asking it is one you cannot reason about
+    --   while writing the query.
+    --
+    --   The client's own fold (utils/searchFold.js) needed ı mapped EXPLICITLY for the
+    --   mirror-image reason: it uses NFD + strip-combining-marks, a GENERAL algorithm,
+    --   and U+0131 is its own base letter that no general rule can reach. Enumerated maps
+    --   have no blind spots to discover; general algorithms do. Same fold, opposite
+    --   failure modes, and the asymmetry is worth knowing before changing either.
+    UNION ALL SELECT '0912_search_tokenised','search_fold is still declared IMMUTABLE (the GIN index path depends on it)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public' AND p.proname = 'search_fold' AND p.provolatile = 'i')
+    -- ─── WHEN TO GIVE search_all_tokens AN INDEX, AND WHAT KIND ────────────────
+    --
+    -- Today: NONE, deliberately. search_all_tokens is STABLE (LIKE is collation-dependent)
+    -- so it cannot be indexed at all, and every arm of search_content sequential-scans.
+    -- That is correct at current size — measured 2026-09-13, as anon, which is what
+    -- search_content sees since it is SECURITY INVOKER:
+    --
+    --   facilities 393 · places 42 · landmarks 38 · beaches 4 · towing 4 · home_services 1
+    --   ~482 rows across all eight arms
+    --
+    -- A translate()+lower() per row over 482 rows is sub-millisecond. An index would take
+    -- longer to plan than the scan takes to run.
+    --
+    -- ⚠ REVISIT AT ~50,000 ROWS IN ANY SINGLE ARM, or a measured search_content p95 above
+    --   ~200ms. facilities would have to grow 127x, so the realistic trigger is a BULK
+    --   IMPORT, not organic growth — which means it arrives suddenly rather than
+    --   gradually, and nobody will be watching for it.
+    --
+    -- THE ANSWER THEN IS A GIN TRIGRAM INDEX ON search_fold(name), NOT A STORED COLUMN.
+    -- The index is available precisely because search_fold is honestly IMMUTABLE (the
+    -- token above). A stored normalized column maintained by trigger looks equivalent and
+    -- is worse here: this repo uses DISABLE TRIGGER for backfills in three migrations, and
+    -- a stored column silently goes stale for exactly those rows — producing MISSING
+    -- SEARCH RESULTS, not errors, which is the facilities.area failure class again. The
+    -- stored column only becomes the right answer if the fold ever stops being expressible
+    -- as a pure function of the input.
+    -- Both placeholder tiers are one-offs. No CHECK can express "at most one row"; Slices
+    -- 3 and 4 reconcile ~27 more rows for which both values are the easiest thing to type.
+    UNION ALL SELECT '0912_search_tokenised','tier=not_applicable is still exactly 1 row (Kronik)',
+      (SELECT count(*) = 1 FROM public.facilities
+        WHERE tier = 'not_applicable' AND id = 'a1b2c3d4-0001-4000-8000-000000000003')
+    -- The two BNDH units keep their parent. If parent_facility_id is ever nulled they
+    -- render as two more standalone hospitals in every list.
+    UNION ALL SELECT '0912_search_tokenised','Thalassaemia + Radyasyon Onkoloji are parented to BNDH',
+      (SELECT count(*) = 2 FROM public.facilities
+        WHERE parent_facility_id = 'e83f3d1d-c0c0-4e68-993c-03a8164286c1')
+    -- ── 0915 deed_type comment. A COMMENT creates no named object, so EVERY other
+    -- section of this script is blind to it — this token is the only thing that can see
+    -- whether the migration ran. It matters because the SUPERSEDED text tells the reader
+    -- that parsing deed_type is "heuristic and unreliable", which was true of 101evler
+    -- and is false of the Novest feed. A stale comment here does not fail loudly; it
+    -- quietly talks the next person out of a rule that works.
+    UNION ALL SELECT '0915_properties_deed_type_comment','properties.deed_type comment documents the anchored rule',
+      (SELECT col_description(c.oid, a.attnum) ILIKE '%ANCHORED WHOLE-<li> MATCH%'
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_attribute a ON a.attrelid = c.oid
+        WHERE n.nspname = 'public' AND c.relname = 'properties'
+          AND a.attname = 'deed_type' AND NOT a.attisdropped)
+    -- ── 0916 Novest agency + seed teardown. Pure data: no named object anywhere, so
+    -- nothing else in this script can see whether it ran. Two tokens because the two
+    -- halves fail differently and both are silent.
+    --
+    -- (1) The agency row. If it is missing, the importer either aborts or writes
+    -- agency_id NULL on all 88 rows — and a NULL agency_id renders a listing with no
+    -- agency name, which is the one attribution the partner relationship requires.
+    UNION ALL SELECT '0916_novest_agency_and_seed_teardown','Coldwell Banker Novest agency row exists and is active',
+      (SELECT count(*) = 1 FROM public.estate_agencies
+        WHERE id = '00000000-0000-4000-9000-000000000002' AND status = 'active')
+    -- (2) The teardown. Seed rows carry source='seed-slice3', which props_select_public
+    -- treats as a partner-feed bypass of the subscription paywall — so a surviving seed
+    -- row is PUBLICLY READABLE fake data sitting alongside real listings, and it is
+    -- invisible today only because the module flag is false. If this ever reads false
+    -- after the flag flips, ten Unsplash listings are live in the app.
+    UNION ALL SELECT '0916_novest_agency_and_seed_teardown','zero seed-slice3 listings remain',
+      NOT EXISTS(SELECT 1 FROM public.properties
+        WHERE source = 'seed-slice3' OR external_id LIKE 'SEED3-%')
+    UNION ALL SELECT '0804_grooming_multi_category','service_types_values_check has grooming arm',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='facilities_service_types_values_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%grooming%')
+    UNION ALL SELECT '0802_facilities_guard_garage_edit','facilities_guard_update has garage material lock',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='facilities_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%update_garage_facility%')
+    UNION ALL SELECT '0808_facility_featured_tier','facilities_guard_update knows featured_requested_at',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='facilities_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%featured%')
+    UNION ALL SELECT '0719_pin_definer_search_path','is_customer_blocked pinned search_path',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='is_customer_blocked'
+          AND array_to_string(p.proconfig,',') ILIKE '%search_path%')
+    UNION ALL SELECT '0810_change_request_content_filter','filter reuses contains_payment_solicitation',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_change_request_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%contains_payment_solicitation%')
+    UNION ALL SELECT '0814_module_waitlist_generalize_check','module_waitlist_module_check is shape guard (not enum)',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='module_waitlist_module_check'
+        AND pg_get_constraintdef(c.oid) NOT ILIKE '%homeServices%')
+    UNION ALL SELECT '0815_questions_block_blocked_customers','insert questions policy blocks is_customer_blocked',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='questions'
+        AND policyname='insert questions'
+        AND with_check ILIKE '%is_customer_blocked%')
+    UNION ALL SELECT '0818_preferred_language_nullable','profiles.preferred_language nullable + no default (unset = NULL, not code ''en'')',
+      (SELECT is_nullable='YES' AND column_default IS NULL
+         FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='profiles' AND column_name='preferred_language')
+    -- The three below close the drift-check gap on this session's most critical fixes:
+    -- the two remaining unpinned SECURITY DEFINER functions, and the S1 signup
+    -- allow-list (the token above only checks the unrelated home_service_provider role).
+    UNION ALL SELECT '0719_pin_definer_search_path','my_provider_facility_ids pinned search_path',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='my_provider_facility_ids'
+          AND array_to_string(p.proconfig,',') ILIKE '%search_path%')
+    UNION ALL SELECT '0719_pin_definer_search_path','update_pharmacist_score pinned search_path',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='update_pharmacist_score'
+          AND array_to_string(p.proconfig,',') ILIKE '%search_path%')
+    -- Signup is customer-only (0827). Supersedes the 0719 allow-list token, which asserted
+    -- ILIKE '%not in%organizer%' — that allow-list no longer exists, so it was permanently
+    -- red against a function whose behaviour is exactly right.
+    --
+    -- ⚠ THESE CLAUSES SEE THE COMMENTS TOO. pg_get_functiondef() returns the ENTIRE
+    -- definition, prose included, so a NOT ILIKE here forbids a word from the function's
+    -- COMMENTS as much as from its code. The first version of 20260827 explained itself by
+    -- naming the allow-list it replaced, putting "organizer" and "raw_user_meta_data" in its
+    -- prose while both were absent from its code — and both clauses below read false on a
+    -- correct function. It was re-applied with prose that avoids both words. If this token
+    -- ever goes red, read the BODY before assuming the behaviour regressed: a reworded
+    -- comment fails it identically to a reverted allow-list.
+    --
+    -- Three clauses, because no one of them is sufficient: 'customer' alone was true of the
+    -- old version too; the absence of 'organizer' alone would pass on an empty function.
+    -- Together they say: still writes customer, no longer knows the old roles, no longer
+    -- reads client metadata at all.
+    UNION ALL SELECT '0827_signup_customer_only','handle_new_user always inserts customer; role metadata is ignored entirely',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='handle_new_user'
+          AND pg_get_functiondef(p.oid) ILIKE '%''customer''%'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%organizer%'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%raw_user_meta_data%')
+    UNION ALL SELECT '0820_facilities_moderation_read_policy','facilities public read is moderation-gated (no USING(true))',
+      (EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='facilities'
+                AND policyname='public read live facilities'
+                AND qual ILIKE '%hidden_at%' AND qual ILIKE '%active%')
+       AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='facilities'
+                AND policyname='Anyone can read facilities'))
+    UNION ALL SELECT '0820_search_content_gate_facilities','search_content facilities arm filters status/hidden_at',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='search_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%f.hidden_at is null%')
+    UNION ALL SELECT '0821_drop_providers_read_customer','profiles over-share policy removed (providers use get_customer_contacts RPC)',
+      NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles'
+                AND policyname='providers read customer push token')
+    UNION ALL SELECT '0922_drop_grooming_profile_overshare','profiles grooming over-share policy removed (twin of 0821; full-row read for any facility owner)',
+      NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles'
+                AND policyname='owner read booking customer profile')
+    -- DERIVED, not a name list. The 0821 drop shipped with a verification comment naming
+    -- three expected SELECT policies when there were four, so the fourth (the grooming
+    -- over-share) survived unnoticed for six weeks and was still live when found.
+    -- Verified green 2026-08-27, immediately after 20260922 was applied: the live set is
+    -- exactly owner read / admin read all / admin read profiles. Before the drop this
+    -- token read 4 and went red, so it has been WATCHED failing and passing on real data —
+    -- it is a check, not a decoration.
+    -- A name check only ever catches the
+    -- policy you already thought of; this counts what is actually there, so ANY new or
+    -- returning SELECT policy on profiles fails the check and has to be looked at.
+    -- Expected set: owner read, admin read all, admin read profiles.
+    -- If you add a legitimate fourth, bump this number IN THE SAME COMMIT and say why.
+    -- GAP CLOSED 2026-09-16 (slice 4), filed 2026-09-15. This counted cmd='SELECT' only.
+    -- A policy written FOR ALL is stored with cmd='ALL' and grants SELECT just the same,
+    -- so it moved this count by ZERO and read OK — a policy-count token blind to half the
+    -- ways a policy can grant a read. Now counts SELECT *and* ALL.
+    --
+    -- permissive='PERMISSIVE' matters and is not noise: a RESTRICTIVE policy NARROWS
+    -- access (profiles carries three of them, the 20260714 anon blocks), and failing this
+    -- token because someone added a restriction would be backwards — it exists to catch
+    -- over-sharing. Restrictive FOR ALL is therefore deliberately not counted.
+    --
+    -- Watched RED before being trusted, on real PostgreSQL 15.18 and 17.10: a 4th
+    -- permissive SELECT policy takes it to 4, and so does a FOR ALL policy — which the
+    -- old form of this token could not see at all.
+    UNION ALL SELECT '0922_drop_grooming_profile_overshare','profiles has exactly 3 permissive SELECT/ALL policies (derived count, not a name list)',
+      (SELECT count(*) FROM pg_policies
+        WHERE schemaname='public' AND tablename='profiles'
+          AND permissive='PERMISSIVE' AND cmd IN ('SELECT','ALL')) = 3
+    -- ── 0923 server-side notifications. FOUR tokens. The functions' EXISTENCE is section
+    -- C's job; none of what makes them SAFE is visible there.
+    --
+    -- (1) THE INJECTION CLOSURE, as a signature assertion. This is the point of 0923:
+    -- insert_notification takes client-written p_title/p_body, so a customer with one
+    -- appointment could write "ADA: your account is suspended, tap here" into a provider's
+    -- inbox. notify_facility_owner takes an ENUM the server interprets. If anyone ever
+    -- "helpfully" adds a p_title/p_body overload for flexibility, the channel reopens and
+    -- every other check here still reads OK.
+    UNION ALL SELECT '0923_server_side_notifications','notify_facility_owner takes p_kind, NOT client title/body',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_facility_owner'
+          AND pg_get_function_arguments(p.oid) ILIKE '%p_kind%')
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_facility_owner'
+          AND pg_get_function_arguments(p.oid) ILIKE '%p_title%')
+    -- (2) The nine locales are real. A VALUES table of nine English rows would pass every
+    -- existence check and silently un-localise every provider notification — which is
+    -- exactly bug 3 (the client's dead read always fell back to English) coming back by
+    -- another route. Two languages sampled, plus the unknown-language fallback.
+    -- ⚠ Asserted by reading the function BODY, not by CALLING it. A direct
+    -- `public.notify_owner_text(...)` here is resolved at parse time, so on any database
+    -- that has not applied 0923 the whole of QUERY 1 dies with 42883 and every other
+    -- migration's status becomes unreadable — while the likeliest run order is exactly
+    -- "run verify_schema, see what is missing, then apply it." Same trap the 0910 tokens
+    -- above document for has_column_privilege. The live call-and-compare version of this
+    -- test lives in the migration's own verification block, which only ever runs after
+    -- the apply, where it is safe.
+    UNION ALL SELECT '0923_server_side_notifications','notify_owner_text is really localised (not English x9)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_owner_text'
+          AND pg_get_functiondef(p.oid) ILIKE '%Yeni Randevu Talebi%'
+          AND pg_get_functiondef(p.oid) ILIKE '%Neue Frage%'
+          AND pg_get_functiondef(p.oid) ILIKE '%Νέα Ερώτηση%')
+    -- (3) push_log is admin-read-only and has NO write policy — writes come only from the
+    -- DEFINER functions, which bypass RLS. A stray INSERT policy would let any client
+    -- forge delivery evidence, which is worse than having no log at all.
+    UNION ALL SELECT '0923_server_side_notifications','push_log: RLS on, exactly 1 policy, admin SELECT only',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.push_log')), false)
+      AND (SELECT count(*) FROM pg_policies
+            WHERE schemaname='public' AND tablename='push_log') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies
+            WHERE schemaname='public' AND tablename='push_log'
+              AND cmd='SELECT' AND qual ILIKE '%is_admin%')
+    -- (4) The senders actually RECORD. push_log is what check-notify-health.mjs and any
+    -- future delivery join read; a body that pushes without logging leaves the same blind
+    -- spot 0923 exists to close, while sections A/C/F all still read OK.
+    UNION ALL SELECT '0923_server_side_notifications','notify_facility_owner + notify_admins write push_log',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_facility_owner'
+          AND pg_get_functiondef(p.oid) ILIKE '%INSERT INTO push_log%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_admins'
+          AND pg_get_functiondef(p.oid) ILIKE '%INSERT INTO push_log%')
+    UNION ALL SELECT '0824_place_moderation','content_reports_content_type_check admits place',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='content_reports_content_type_check'
+        AND pg_get_constraintdef(c.oid) ILIKE '%place%')
+    UNION ALL SELECT '0824_place_moderation','auto_hide_reported_content has place branch',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='auto_hide_reported_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE places%')
+    UNION ALL SELECT '0824_place_moderation','check_place_content reuses contains_payment_solicitation',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_place_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%contains_payment_solicitation%')
+    UNION ALL SELECT '0825_places_column_guards','places_guard_update locks featured_requested_at (4-column body)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='places_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%featured_requested_at%')
+    UNION ALL SELECT '0826_place_claims','approve_place_claim is race-hardened (FOR UPDATE)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='approve_place_claim'
+          AND pg_get_functiondef(p.oid) ILIKE '%FOR UPDATE%')
+    UNION ALL SELECT '0827_places_featured_tier','places_guard_update trusted-write scoped to featured_requested_at only',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='places_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%trusted write may only%')
+    -- Anchored on 'studentHub' (an identifier absent from both bodies pre-apply), NOT on
+    -- 'explore' — the English/Spanish body templates already contain "explore"/"explorar",
+    -- so an '%explore%' token would pass before the migration is applied (drift-blind).
+    UNION ALL SELECT '0828_explore_waitlist','notify_module_waitlist allow-list has explore+studentHub',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_module_waitlist'
+          AND pg_get_functiondef(p.oid) ILIKE '%studentHub%')
+    UNION ALL SELECT '0828_explore_waitlist','module_notif_text name-map has explore+studentHub',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='module_notif_text'
+          AND pg_get_functiondef(p.oid) ILIKE '%studentHub%')
+    UNION ALL SELECT '0829_place_resubmit','places_guard_update honors the trusted_place_resubmit GUC',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='places_guard_update'
+          AND pg_get_functiondef(p.oid) ILIKE '%trusted_place_resubmit%')
+
+    -- ══ Slice 1: accommodation partner feed ═════════════════════════════════
+    -- The four widened CHECKs KEEP THEIR NAMES, so section E (existence by name)
+    -- cannot see the widening — a DB still on the old vocabulary reads as OK there.
+    -- Each token below asserts the NEW value is actually in the constraint body.
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties_status_check widened (+delisted)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_status_check'
+        AND pg_get_constraintdef(oid) ILIKE '%delisted%')
+    -- Without this, a partner listing priced in USD fails at INSERT time.
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties_currency_check widened (+USD)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_currency_check'
+        AND pg_get_constraintdef(oid) ILIKE '%USD%')
+    -- Was a LIVE BUG: the CHECK allowed 5 regions while constants/regions.js REGIONS
+    -- defines 7. A Novest listing in Lefke or Karpaz could not be inserted at all.
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties_district_check widened (+lefke,+karpaz)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_district_check'
+        AND pg_get_constraintdef(oid) ILIKE '%lefke%'
+        AND pg_get_constraintdef(oid) ILIKE '%karpaz%')
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties_price_period_check widened (+weekly,+yearly)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_price_period_check'
+        AND pg_get_constraintdef(oid) ILIKE '%weekly%'
+        AND pg_get_constraintdef(oid) ILIKE '%yearly%')
+
+    -- agent_id must be NULLABLE — a partner listing has no agent. Section B only
+    -- checks that a column EXISTS, so it is blind to the nullability change, and the
+    -- whole feed import fails at INSERT without it.
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties.agent_id is nullable',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='properties'
+          AND column_name='agent_id' AND is_nullable='YES')
+
+    -- ── POLICY BODIES. Q3 counts policies; it cannot see what one SAYS. ──
+    -- If this token is STALE, every partner listing is invisible to every user.
+    UNION ALL SELECT '0904_accommodation_partner_feed','props_select_public has the partner-feed branch',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='properties'
+        AND policyname='props_select_public' AND qual ILIKE '%source IS NOT NULL%')
+    -- The LEFT JOIN is load-bearing: the previous INNER JOIN to estate_agents discards
+    -- every feed row (agent_id IS NULL) BEFORE the source test runs. Mirroring the
+    -- condition without the join change yields zero visible images and a blank gallery.
+    UNION ALL SELECT '0904_accommodation_partner_feed','images_select_public uses LEFT JOIN (not INNER)',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='property_images'
+        AND policyname='images_select_public' AND qual ILIKE '%LEFT JOIN%')
+    -- Behaviour is identical with or without it (Postgres applies USING to the new row
+    -- when WITH CHECK is absent). Registered so the protection stops being IMPLICIT:
+    -- anyone later adding a WITH CHECK here for an unrelated reason would silently
+    -- remove the guard that rejects agent_id=NULL laundering.
+    UNION ALL SELECT '0904_accommodation_partner_feed','props_update_agent has an explicit WITH CHECK',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='properties'
+        AND policyname='props_update_agent' AND with_check IS NOT NULL)
+    -- Without this predicate ANY authenticated user can write under the partner/ prefix
+    -- that is supposed to be service_role-only.
+    UNION ALL SELECT '0904_accommodation_partner_feed','storage property_images_upload excludes partner/',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+        AND policyname='property_images_upload' AND with_check ILIKE '%partner%')
+    -- ── 20261039. The 0904 token above owns "excludes partner/" and is left alone —
+    -- one fact, one owner. THIS owns the two guards 0904 never had, and neither is
+    -- visible to a policy-existence check: the policy kept its NAME through the
+    -- rewrite, so QUERY 4 lists it either way and section E has no storage section
+    -- at all.
+    --
+    -- Both halves, because each fails differently and both fail SILENTLY:
+    --   • the uid pin is what stops one agent writing over another's listing photos;
+    --   • the guest guard is what stops signInAnonymously() — one tap from a cold
+    --     start, and in the `authenticated` role with a real auth.uid() — uploading
+    --     arbitrary bytes to this project's storage. `auth.role() = 'authenticated'`
+    --     does NOT exclude guests, which is exactly how the old policy admitted them.
+    --
+    -- The UPDATE policy is asserted too: INSERT alone leaves overwrite open on a
+    -- bucket whose objects are addressable by path, which is the same hole through
+    -- the back door.
+    -- ── 20261040. THE BUCKET FLAG IS THE WHOLE FIX, and nothing else in this file
+    -- can see it: `public` is a column on storage.buckets, not a named object, and a
+    -- bucket flipped back to public serves object reads WITHOUT EVALUATING RLS — so the
+    -- four policies below would still be present, still correct, and completely inert.
+    -- That is the failure this token exists for, and it is silent: every avatar keeps
+    -- rendering, for everyone, including the entire internet.
+    --
+    -- Measured before the fix (anon key only): list/avatars returned 4 folder names,
+    -- each a user id, and the object GET returned 200 with NO apikey and NO
+    -- Authorization header at all.
+    --
+    -- Four clauses, each failing differently:
+    --   1. the bucket is private — without it the rest is decoration;
+    --   2. four owner-scoped policies, DERIVED as a count so a fifth is a review moment;
+    --   3. no row still holds a public URL — such a row renders as initials forever;
+    --   4. the INSERT pins the uid and refuses guests, which is what stops one user
+    --      replacing another's photo.
+    -- ── 20261041. A DIFFERENT FACT FROM 1040's, and the split is the point. 1040 owns
+    -- "the bucket is private and my four policies exist". THIS owns "and NOTHING ELSE
+    -- reaches this bucket" — which is what 1040 could not see and what cost us: two
+    -- dashboard-era policies, created outside every migration, were still granting what
+    -- the four were written to deny. RLS is PERMISSIVE-OR; presence-of-mine can never
+    -- prove absence-of-theirs.
+    --
+    -- Clause 2 is the general form and the one that outlives this incident: a permissive
+    -- policy whose expression never mentions bucket_id applies to EVERY bucket while
+    -- naming none, so any check that finds candidates by looking for the word 'avatars'
+    -- is blind to it by construction. Zero such policies is the passing state.
+    -- ── 20261042. THE BASELINE. 36 policies on storage.objects, and this is the first
+    -- moment the repo can claim to know what they all are: 27 created by migrations and
+    -- 9 that existed ONLY in the dashboard until 2026-09-21, captured verbatim.
+    --
+    -- A COUNT ALONE WOULD NOT BE ENOUGH and that is why there are three clauses: 36 can
+    -- stay 36 while one policy vanishes and another appears. So the count is asserted,
+    -- AND no unknown name may exist, AND no known name may be missing. The first is the
+    -- cheap check; the second is the one that catches the next dashboard edit; the third
+    -- catches a deletion that a replacement disguises.
+    --
+    -- ⚠ THE NAME LIST HERE IS THE POINT, NOT AN EXCEPTION TO THE DERIVE RULE. Elsewhere
+    --   this file argues against asserting a remembered set — but a BASELINE is exactly
+    --   the case where the set IS the fact being asserted. It was derived once, from
+    --   pg_policies and from the migrations (anchored so commented-out CREATE POLICY
+    --   statements do not count), reconciled to 36 disjoint names, and 20261042 carries
+    --   the same list in its own DO block. Two copies, deliberately: this one is the
+    --   standing check, that one is the apply-time gate.
+    -- ── 20261043. The notice kind, and a CORRECTION to that file's own header.
+    --
+    -- ⚠ 20261043's header says the promo arm is unchanged — "not one character" — and
+    --   asserts "BYTE-FOR-BYTE" and "all four promo requirements, each named". None of
+    --   that is true of what it actually does:
+    --     • it ADDED `route IS NULL` to the promo arm, so the arm was TIGHTENED. Safe —
+    --       no promo ever carried a route, the column did not exist — but not unchanged.
+    --     • its DO block asserts the promo arm with ONE substring, `link_url IS NOT
+    --       NULL`. Dropping promo's `title_i18n IS NOT NULL` or `target_id IS NULL`
+    --       would have passed it.
+    --     • it proves promo can still be ACCEPTED and never that an invalid one is
+    --       REFUSED, which a constraint accepting everything would also satisfy.
+    --   The file is APPLIED and is NOT edited — amending an applied migration is what
+    --   this project's ledger rule exists to prevent. The correction lives here and in
+    --   supabase/verify_home_strip_pin.sql, which is the behavioural half: 9 rejection
+    --   cases and 2 acceptance cases, in a transaction that rolls back.
+    --
+    -- This token is the STRUCTURAL half. It names every clause the two arms must carry,
+    -- so the one-substring gap cannot recur here.
+    UNION ALL SELECT '1043_home_strip_pin_notice','shape_check: promo keeps all 4 clauses, notice keeps all 5',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='home_strip_pin_shape_check'
+        AND pg_get_constraintdef(oid) LIKE '%link_url IS NOT NULL%'
+        AND pg_get_constraintdef(oid) LIKE '%title_i18n IS NOT NULL%'
+        AND pg_get_constraintdef(oid) LIKE '%title_i18n IS NULL%'
+        AND pg_get_constraintdef(oid) LIKE '%sponsor_name IS NULL%'
+        AND pg_get_constraintdef(oid) LIKE '%route IS NOT NULL%'
+        AND pg_get_constraintdef(oid) LIKE '%route IS NULL%')
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conname='home_strip_pin_kind_check'
+        AND pg_get_constraintdef(oid) LIKE '%notice%')
+      -- The route vocabulary never admits the three surfaces that are not for sale.
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conname='home_strip_pin_route_check'
+        AND pg_get_constraintdef(oid) LIKE '%accommodation%'
+        AND pg_get_constraintdef(oid) NOT LIKE '%''duty''%'
+        AND pg_get_constraintdef(oid) NOT LIKE '%''emergency''%'
+        AND pg_get_constraintdef(oid) NOT LIKE '%''health''%')
+    UNION ALL SELECT '1042_capture_dashboard_storage_policies','storage.objects has exactly 36 policies, all named, none unknown, none missing',
+      (SELECT count(*) FROM pg_policies
+        WHERE schemaname='storage' AND tablename='objects') = 36
+      AND (SELECT count(*) FROM pg_policies
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE') = 36
+      AND (SELECT count(*) FROM pg_policies
+             WHERE schemaname='storage' AND tablename='objects'
+               AND policyname NOT IN (
+                 'ad_images_admin_delete','ad_images_admin_insert','ad_images_admin_update',
+                 'ad_images_public_read','authenticated upload event images','avatars_delete_own',
+                 'avatars_insert_own','avatars_read_authenticated','avatars_update_own',
+                 'estate_agent_documents_owner_insert','place_photos_delete','place_photos_public',
+                 'place_photos_upload','property_images_update_own','property_images_upload',
+                 'provider_credentials_owner_delete','provider_credentials_owner_insert',
+                 'provider_credentials_owner_select','provider_credentials_owner_update',
+                 'provider_documents_owner_delete','provider_documents_owner_insert',
+                 'provider_documents_owner_select','provider_documents_owner_update',
+                 'towing_logos_admin_delete','towing_logos_admin_insert','towing_logos_admin_update',
+                 'towing_logos_public_read',
+                 'Providers manage own facility images','Public facility image read',
+                 'estate_agent_documents_admin_read','organizer delete own event images',
+                 'property_images_delete','property_images_public','provider_credentials_admin_read',
+                 'provider_documents_admin_read','public read event images')) = 0
+    UNION ALL SELECT '1041_avatars_drop_dashboard_policies','exactly 4 policies reach avatars, none bucket-unscoped, the dashboard pair is gone',
+      (SELECT count(*) FROM pg_policies
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE'
+          AND COALESCE(with_check, qual, '') ILIKE '%avatars%') = 4
+      AND NOT EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE'
+          AND COALESCE(with_check, qual, '') NOT ILIKE '%bucket_id%')
+      AND NOT EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='storage' AND tablename='objects'
+          AND policyname IN ('Public avatar read','Users manage own avatar'))
+    UNION ALL SELECT '1040_avatars_private','avatars bucket is PRIVATE, 4 owner-scoped policies, no row still holds a public URL',
+      COALESCE((SELECT NOT public FROM storage.buckets WHERE id = 'avatars'), false)
+      AND (SELECT count(*) FROM pg_policies
+            WHERE schemaname='storage' AND tablename='objects' AND permissive='PERMISSIVE'
+              AND policyname IN ('avatars_read_authenticated','avatars_insert_own',
+                                 'avatars_update_own','avatars_delete_own')) = 4
+      AND NOT EXISTS(SELECT 1 FROM public.profiles
+            WHERE avatar_url LIKE '%/object/public/avatars/%')
+      AND EXISTS(SELECT 1 FROM pg_policies
+            WHERE schemaname='storage' AND tablename='objects'
+              AND policyname='avatars_insert_own'
+              AND with_check ILIKE '%foldername%'
+              AND with_check ILIKE '%uid%'
+              AND with_check ILIKE '%is_anonymous_session%')
+    UNION ALL SELECT '1039_property_images_owner_scoped','property-images writes pin the uid and refuse guests (INSERT + UPDATE)',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+        AND policyname='property_images_upload'
+        AND with_check ILIKE '%foldername%'
+        AND with_check ILIKE '%uid%'
+        AND with_check ILIKE '%is_anonymous_session%')
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+        AND policyname='property_images_update_own'
+        AND qual ILIKE '%foldername%'
+        AND with_check ILIKE '%foldername%'
+        AND with_check ILIKE '%is_anonymous_session%')
+
+    -- The trigger must IGNORE last_seen_at (stamped on every row every sync run) and
+    -- view_count. Section D only proves the trigger EXISTS; an unconditional body would
+    -- pass there while making updated_at meaningless.
+    -- building_age_band is a TEXT BAND ("6 - 10"), not an int — 101evler exposes a dropdown
+    -- of ranges. Section B only proves the column EXISTS, so an earlier int version
+    -- passes there while rejecting every real value the feed sends.
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties.building_age_band is text (a band, not a number)',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='properties'
+          AND column_name='building_age_band' AND data_type='text')
+    UNION ALL SELECT '0904_accommodation_partner_feed','structure_range_check excludes building_age_band',
+      NOT EXISTS(SELECT 1 FROM pg_constraint
+        WHERE conname='properties_structure_range_check'
+          AND pg_get_constraintdef(oid) ILIKE '%building_age_band%')
+    -- The DEFAULT is load-bearing twice over: it keeps the parked PropertySubmitScreen
+    -- INSERT legal, AND it is what makes properties_feed_precision_check bite on an
+    -- import that omits the column. If the default is missing, that trap never springs.
+    UNION ALL SELECT '0904_accommodation_partner_feed','location_precision DEFAULT is ''exact''',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='properties'
+          AND column_name='location_precision' AND column_default LIKE '%exact%')
+    -- NULL-SAFETY. `location_precision = ''area''` alone evaluates to UNKNOWN on a NULL,
+    -- and a CHECK PASSES on UNKNOWN — admitting the exact row it exists to reject. The
+    -- IS NOT NULL guard is what makes it bite; assert the guard is really in the body.
+    UNION ALL SELECT '0904_accommodation_partner_feed','feed_precision_check is NULL-safe',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='properties_feed_precision_check'
+        AND pg_get_constraintdef(oid) ILIKE '%IS NOT NULL%')
+    -- Nature and heritage places cannot be claimed. CREATE OR REPLACE adds no named
+    -- object, so only a body token distinguishes the new definition from 20260826's.
+    -- If this goes red the DB path is open again while the button stays hidden — the
+    -- silent half of the asymmetry, which is the one that does not get reported.
+    UNION ALL SELECT '0921_place_claims_category_guard','place claims refuse nature/heritage',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='place_claims_guard_insert'
+          AND pg_get_functiondef(p.oid) ILIKE '%nature and heritage places cannot be claimed%')
+    -- duty_list's natural key. Without it a chunked year-sized load (~5,100 rows) that
+    -- gets re-run duplicates a year of health data SILENTLY, and duplicates render as
+    -- separate pharmacies. If this goes red, the next roster load is unsafe to repeat.
+    UNION ALL SELECT '0920_duty_list_idempotent_load','duty_list (duty_date, name) unique',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='duty_list_date_name_unique')
+    -- Coordinates may not exist without recorded provenance. This is the "unverified
+    -- stays NULL" rule made structural, so a tired hand cannot write shaky coordinates
+    -- "to be tidied later". If it goes red, pins can be written from nowhere again —
+    -- and the 387-row Nominatim seed becomes appliable, which is the whole hazard.
+    UNION ALL SELECT '0919_facilities_geocode_provenance','coords require provenance',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_coords_need_provenance')
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_coords_both_or_neither')
+    -- The geocode_source VOCABULARY. Section E now proves the constraint exists; only a
+    -- body token can see whether it still admits the five values, because a widening is a
+    -- same-name DROP/ADD. If a sixth value were slipped in — 'nominatim', say — the 387-row
+    -- seed this whole provenance scheme exists to keep out becomes writable again.
+    -- 'partner' and 'google_places' are the sentinels: the first and last added, so a
+    -- truncated ARRAY loses one of them.
+    -- Live rendering as postgres, 2026-09-02:
+    --   CHECK (((geocode_source IS NULL) OR (geocode_source = ANY (ARRAY['osm'::text,
+    --   'google_places'::text, 'manual'::text, 'provider'::text, 'partner'::text]))))
+    UNION ALL SELECT '0919_facilities_geocode_provenance','geocode_source_check still admits all 5 values',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_geocode_source_check'
+        AND pg_get_constraintdef(oid) ILIKE '%partner%'
+        AND pg_get_constraintdef(oid) ILIKE '%google_places%'
+        AND pg_get_constraintdef(oid) ILIKE '%provider%')
+    -- The geocode_tier RANGE.
+    -- ⚠ MATCHED ON '>= 1' AND '<= 3', NEVER ON 'BETWEEN'. The migration writes
+    --   `geocode_tier BETWEEN 1 AND 3`, but Postgres NORMALISES that away — the live
+    --   rendering read as postgres on 2026-09-02 is:
+    --     CHECK (((geocode_tier IS NULL) OR ((geocode_tier >= 1) AND (geocode_tier <= 3))))
+    --   A token phrased from the migration FILE would look correct, ship, and sit
+    --   permanently red against a perfectly healthy database — the same
+    --   frame-of-reference failure as the tgargs token this file already documents.
+    --   Written from the rendering, not the file.
+    UNION ALL SELECT '0919_facilities_geocode_provenance','geocode_tier_check is still 1..3',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conname='facilities_geocode_tier_check'
+        AND pg_get_constraintdef(oid) ILIKE '%>= 1%'
+        AND pg_get_constraintdef(oid) ILIKE '%<= 3%')
+    -- The geocode_corroboration VOCABULARY. This column has NO CHECK — the vocabulary has
+    -- only ever been prose in a COMMENT — so there is no constraint to read and
+    -- col_description is the only surface that can see it. A COMMENT creates no named
+    -- object, so every other section of this file is blind to it.
+    -- Deliberately asserts values present in BOTH 20260919's text and 20261005's, so it is
+    -- green whether or not 1005 has been applied; the 1005 token below owns 'name_match'.
+    -- visual_satellite is the sentinel that matters: it carries the MANDATORY-for-tier-3
+    -- rule, which is the half a careless rewrite drops.
+    UNION ALL SELECT '0919_facilities_geocode_provenance','geocode_corroboration vocabulary is documented',
+      (SELECT col_description(c.oid, a.attnum) ILIKE '%visual_satellite%'
+          AND col_description(c.oid, a.attnum) ILIKE '%address_town%'
+          AND col_description(c.oid, a.attnum) ILIKE '%phone_exchange%'
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_attribute a ON a.attrelid = c.oid
+        WHERE n.nspname = 'public' AND c.relname = 'facilities'
+          AND a.attname = 'geocode_corroboration' AND NOT a.attisdropped)
+    -- 20261005 adds name_match to that vocabulary. EXPECTED RED until the migration is
+    -- applied — that is the point of registering it, not a defect.
+    UNION ALL SELECT '1005_geocode_corroboration_name_match','geocode_corroboration documents name_match',
+      (SELECT col_description(c.oid, a.attnum) ILIKE '%name_match%'
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_attribute a ON a.attrelid = c.oid
+        WHERE n.nspname = 'public' AND c.relname = 'facilities'
+          AND a.attname = 'geocode_corroboration' AND NOT a.attisdropped)
+    -- checkins joined the notify path. Its ENTRY POINT is ungated (the Check-in button
+    -- sits on a live place profile), so signups accumulate from the next OTA onward
+    -- whether or not this migration was ever applied — the module_waitlist CHECK is only
+    -- a shape guard. If this goes red, those signups are silently un-notifiable, and the
+    -- failure surfaces on the one day it matters: launch day.
+    UNION ALL SELECT '0918_notify_waitlist_add_checkins','notify path covers checkins',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_module_waitlist'
+          AND pg_get_functiondef(p.oid) ILIKE '%checkins%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='module_notif_text'
+          -- BOTH tables, deliberately: the whitelist alone yields a NULL title and a blast
+          -- that dies on notifications.title NOT NULL. Buradayım proves the per-language
+          -- row, Check-ins proves the English fallback the other 7 locales resolve to.
+          AND pg_get_functiondef(p.oid) ILIKE '%Buradayım%'
+          AND pg_get_functiondef(p.oid) ILIKE '%Check-ins%')
+    -- The Ev Hizmetleri display name. CREATE OR REPLACE creates NO named object, so the
+    -- rename is invisible to every other section of this file — the function keeps its
+    -- name, signature and owner whichever set of strings is inside it. Only a body token
+    -- can tell the new names from the old.
+    --
+    -- ⚠ THE NEGATIVES ARE THE LOAD-BEARING HALF, because a POSITIVE CANNOT SEE A
+    --   HALF-APPLIED PASTE. There are two VALUES tables — nine per-language rows and an
+    --   English fallback — and a paste that lands the first but not the second still
+    --   contains both new names, so both positives below would pass while the seven
+    --   locales with no row of their own quietly resolve to "Home Services". A blast that
+    --   reads correctly in Turkish and ships the old name to everyone else.
+    --
+    -- ⚠ AND THE NEGATIVES ARE ANCHORED TO A TUPLE, NOT TO THE BARE WORDS.
+    --   pg_get_functiondef RETURNS THE COMMENTS. `NOT ILIKE '%Home Services%'` would
+    --   forbid the PHRASE anywhere in the definition, so the day someone writes "renamed
+    --   from Home Services" in a comment above these tables, this token goes red against a
+    --   database that is exactly right — and the only way to green it would be to delete
+    --   the comment explaining the rename. This repo has already shipped that bug once, on
+    --   the '%appointments%' token. A tuple with its quotes and commas is a CODE SHAPE; no
+    --   prose contains it.
+    UNION ALL SELECT '1015_home_services_rename','module_notif_text carries the renamed Ev Hizmetleri',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='module_notif_text'
+          -- positives: both tables were reached
+          AND pg_get_functiondef(p.oid) ILIKE '%Tadilat · Bakım · Onarım%'
+          AND pg_get_functiondef(p.oid) ILIKE '%Renovation · Maintenance · Repair%'
+          -- negatives: neither old tuple survives. Top one is the per-language row, bottom
+          -- one the English fallback; each catches the half-paste the other cannot.
+          AND pg_get_functiondef(p.oid) NOT LIKE '%(''homeServices'',''English'',''Home Services'')%'
+          AND pg_get_functiondef(p.oid) NOT LIKE '%(''homeServices'',''Home Services'')%')
+    -- The notify path must know every module that can collect signups. CREATE OR REPLACE
+    -- adds no named object, so only a body token can tell the new lists from the old.
+    -- If this goes red, a module's waitlist can be filled but never notified.
+    UNION ALL SELECT '0909_notify_waitlist_add_modules','notify path covers explore/studentHub/towing',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_module_waitlist'
+          AND pg_get_functiondef(p.oid) ILIKE '%studentHub%'
+          AND pg_get_functiondef(p.oid) ILIKE '%towing%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='module_notif_text'
+          AND pg_get_functiondef(p.oid) ILIKE '%Çekici%')
+    -- towing_companies.is_active DEFAULTs to FALSE — a deliberate inversion (see the
+    -- migration header). No new named object, so nothing but the default value itself
+    -- can detect a revert. If this goes red, rows will start publishing themselves on
+    -- omission and become publicly searchable before the module launches.
+    UNION ALL SELECT '0907_towing_is_active_default_false','towing_companies.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='towing_companies'
+          AND column_name='is_active' AND column_default = 'false')
+    -- home_strip_pin.is_active DEFAULTs to FALSE, the same deliberate inversion for the
+    -- same reason. A revert here is worse than towing's: this table can carry a PAID
+    -- promo, so a row that publishes itself on omission is a sponsored card appearing on
+    -- every user's home screen before anyone decided it should. No named object changes
+    -- when the default does, so nothing but the value itself can detect it.
+    UNION ALL SELECT '1007_home_strip_pin','home_strip_pin.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='home_strip_pin'
+          AND column_name='is_active' AND column_default = 'false')
+    -- ── 1017 student tasks. Read through the catalogs only: naming public.student_tasks
+    --    directly would fail at plan time on a database that has not applied 1017 and take
+    --    the whole report down with it.
+    -- (1) The is_active inversion again. No named object changes when a default does.
+    UNION ALL SELECT '1017_student_tasks','student_tasks.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='student_tasks'
+          AND column_name='is_active' AND column_default = 'false')
+    -- (2) The language key. The app stores 'Turkish', never 'tr' — an ISO-keyed CHECK
+    --     would load rows no client can find, and every task would read as pending. The
+    --     constraint NAME survives such a rewrite, so section E cannot see it.
+    UNION ALL SELECT '1017_student_tasks','student_task_i18n_lang_check = full names, no ISO codes',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='student_task_i18n_lang_check'
+        AND pg_get_constraintdef(c.oid) LIKE '%''Turkish''%'
+        AND pg_get_constraintdef(c.oid) LIKE '%''Persian''%'
+        AND pg_get_constraintdef(c.oid) NOT LIKE '%''tr''%'
+        AND pg_get_constraintdef(c.oid) NOT LIKE '%''en''%')
+    -- (3) DERIVED policy counts. One read policy each; a second is almost certainly a write
+    --     policy, which makes content only postgres should author client-writable.
+    UNION ALL SELECT '1017_student_tasks','student_tasks + student_task_i18n: exactly 1 policy each, SELECT to authenticated',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='student_tasks') = 1
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='student_task_i18n') = 1
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
+        AND tablename IN ('student_tasks','student_task_i18n')
+        AND (cmd <> 'SELECT' OR roles <> '{authenticated}'::name[]))
+    -- ── 1022 profiles coupling CHECKs, hand-applied 2026-09-15. Section E lists both NAMES
+    --    under 1001, and a name survives every rewrite — including a re-run of 20261001, whose
+    --    DROP IF EXISTS / ADD restores the forms that pass on UNKNOWN and succeeds silently.
+    --    So the student_level coupling is compared to production's catalog text character for
+    --    character. pg_get_constraintdef appends " NOT VALID" to an unvalidated CHECK, so
+    --    equality also proves it is validated.
+    --    ⚠ SPLIT 2026-09-20 by 20261027. This token asserted BOTH couplings. The
+    --    INSTITUTION one is dropped with institution_id, so that clause would have sat
+    --    STALE/MISSING forever against a database that is exactly right — and this file
+    --    records twice what one known-stale row does to the reader's attention. The
+    --    student_level half is untouched by 20261027 and is entirely 22's own: a
+    --    20261001 re-run still restores the form that passes on UNKNOWN, which is the
+    --    failure this token exists for. Split, not deleted, and not bumped.
+    UNION ALL SELECT '1022_profiles_coupling_checks_null_safe','profiles_student_level_coupling_check keeps 22''s null guard (exact text)',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.profiles'::regclass
+        AND conname='profiles_student_level_coupling_check'
+        AND pg_get_constraintdef(oid) = 'CHECK (((student_level IS NULL) OR ((resident_status IS NOT NULL) AND (resident_status = ''student''::text))))')
+
+    -- ══ the affiliation leaves profiles (20261027) ══════════════════════════
+    -- Sections B/C/D/E/F lost seventeen registrations in the same commit, so they are
+    -- blind to this by construction: an object that is gone on purpose cannot be checked
+    -- by a list that no longer names it. Only a token can assert the ABSENCE, and only a
+    -- token can assert the two things that must SURVIVE the drop.
+    --
+    --   1. The five columns are gone. DERIVED, so a sixth affiliation column added later
+    --      and then dropped would also register here rather than slipping past a list.
+    --   2. mirror_profile_affiliation is gone, function and trigger both.
+    --   3. ⚠ check_profile_study_years() SURVIVES and is still bound to student_education.
+    --      One function, two triggers: 20261027 drops the profiles one only. Dropping the
+    --      function — the obvious move when its name says `profile` — would silently take
+    --      the future-end-year rule off student_education, and nothing else checks that
+    --      rule at write time.
+    --   4. ⚠ student_education.mirror_owned SURVIVES. Inert after the trigger goes, but
+    --      the shipped client SELECTs it (utils/education.js:34) and WRITES it
+    --      (ProfileScreen.js:399 — the opt-in switch), so dropping it 42703s every
+    --      enrolment read and the consent control. Asserted POSITIVELY so removing it has
+    --      to be a deliberate act with this clause to delete.
+    UNION ALL SELECT '1027_drop_profile_affiliation','the five affiliation columns and the mirror are gone; the year rule and mirror_owned survive',
+      NOT EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='profiles'
+          AND column_name IN ('institution_id','study_start_year','study_end_year',
+                              'subject_id','student_listing_opt_in'))
+      AND to_regprocedure('public.mirror_profile_affiliation()') IS NULL
+      AND NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.profiles')
+        AND tgname='mirror_profile_affiliation' AND NOT tgisinternal)
+      AND to_regprocedure('public.check_profile_study_years()') IS NOT NULL
+      AND EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.student_education')
+        AND tgname='check_student_education_years' AND NOT tgisinternal)
+      AND EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='student_education' AND column_name='mirror_owned')
+    -- ── 1024 student affiliation. Catalogs only: naming public.subjects directly would fail
+    --    at plan time on a database that has not applied 1024 and take the report down.
+    -- (1) THE PRIVACY DEFAULT. A reverted DEFAULT creates no named object, and once a
+    --     student list exists it means every write that omits the column LISTS the user.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "profiles.student_listing_opt_in NOT NULL DEFAULT false".
+    --   the column is dropped; the opt-in is per-enrolment and 1026 owns its DEFAULT token.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
+    UNION ALL SELECT '1024_student_affiliation','subjects.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='subjects'
+          AND column_name='is_active' AND column_default='false')
+    -- (3) The coupling CHECKs are NULL-SAFE — tonight's lesson from
+    --     profiles_institution_coupling_check. Section E sees the names; only the body shows
+    --     whether the IS NOT NULL arm that stops UNKNOWN from passing is still there. Each
+    --     pattern is the null guard of that specific CHECK, so a naive rewrite reads MISSING.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "study/listing coupling CHECKs keep their IS NOT NULL guards".
+    --   all three constraints are dropped with the columns they coupled.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
+    UNION ALL SELECT '1024_student_affiliation','subject_i18n_lang_check = full names, no ISO codes',
+      EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conname='subject_i18n_lang_check'
+        AND pg_get_constraintdef(c.oid) LIKE '%''Turkish''%'
+        AND pg_get_constraintdef(c.oid) LIKE '%''Persian''%'
+        AND pg_get_constraintdef(c.oid) NOT LIKE '%''tr''%'
+        AND pg_get_constraintdef(c.oid) NOT LIKE '%''en''%')
+    -- (5) DERIVED policy counts. One read policy each; a second is almost certainly a write.
+    UNION ALL SELECT '1024_student_affiliation','subjects + subject_i18n: exactly 1 policy each, SELECT to authenticated',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='subjects') = 1
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='subject_i18n') = 1
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
+        AND tablename IN ('subjects','subject_i18n')
+        AND (cmd <> 'SELECT' OR roles <> '{authenticated}'::name[]))
+    -- (6) The institution coupling as 1024 rewrote it: 22's two arms plus
+    --     "OR study_end_year IS NOT NULL", so a graduate keeps their institution. Exact text,
+    --     so both a 22 re-run (arm gone) and a 20261001 re-run (guard gone) read MISSING.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "profiles_institution_coupling_check = 1024 form (graduate arm)".
+    --   the constraint is dropped; the affiliation is not on profiles any more.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "check_profile_study_years rejects a future end year, trigger enabled on profiles".
+    --   the trigger on profiles is dropped. The FUNCTION survives and the rule is still enforced — 1026 token "check_profile_study_years is bound to student_education" owns that now. One fact, one owner.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
+    UNION ALL SELECT '1021_institutions_held_three','institutions: 25 rows, 24 active',
+      (SELECT count(*) FROM public.institutions) = 25
+      AND (SELECT count(*) FROM public.institutions WHERE is_active) = 24
+    -- (2) Netkent stays deleted. 20261001's seed is ON CONFLICT (id) DO NOTHING, so
+    --     re-running 1001 re-inserts it at sort_order 140 without a word. If this reads
+    --     MISSING: supabase/recovery_institutions_netkent.sql (not 20261018 — it refuses).
+    UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: Netkent (…000e) absent — a 20261001 re-run brings it back',
+      NOT EXISTS(SELECT 1 FROM public.institutions WHERE id = '00000000-0000-4000-b000-00000000000e')
+    -- (3) Kıbrıs İlim deactivated, NOT deleted — a profile references it and the FK is
+    --     ON DELETE SET NULL — and Final carries YÖDAK's wording.
+    UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: …0006 present and inactive, …0008 renamed',
+      EXISTS(SELECT 1 FROM public.institutions
+        WHERE id = '00000000-0000-4000-b000-000000000006' AND is_active = false)
+      AND EXISTS(SELECT 1 FROM public.institutions
+        WHERE id = '00000000-0000-4000-b000-000000000008' AND name = 'Uluslararası Final Üniversitesi')
+    UNION ALL SELECT '1018_institutions_yodak_reconcile','institutions: the 8 added ids …000f–…0016 all present',
+      (SELECT count(*) FROM public.institutions
+        WHERE id BETWEEN '00000000-0000-4000-b000-00000000000f' AND '00000000-0000-4000-b000-000000000016') = 8
+    -- The three held universities (1021), by id.
+    UNION ALL SELECT '1021_institutions_held_three','institutions: the 3 added ids …0017–…0019 all present',
+      (SELECT count(*) FROM public.institutions
+        WHERE id BETWEEN '00000000-0000-4000-b000-000000000017' AND '00000000-0000-4000-b000-000000000019') = 3
+    -- ASBÜ's confirmed city (1023). 1021's recorded INSERT is ON CONFLICT DO UPDATE with
+    --     city NULL: the file's guard refuses a re-run, but the bare statement pasted alone
+    --     puts NULL back, and a city-less row vanishes under every Student Hub region chip.
+    UNION ALL SELECT '1023_institutions_asbu_city','institutions: ASBÜ (…0017) city is nicosia',
+      EXISTS(SELECT 1 FROM public.institutions
+        WHERE id = '00000000-0000-4000-b000-000000000017' AND city = 'nicosia')
+    -- University links (1025). Counted, not listed: every ACTIVE university except Other
+    --     carries an https link and nothing else does. A university added or reactivated
+    --     without one, or a link pasted onto Kıbrıs İlim or Other, reads MISSING — add the
+    --     link or change this count in the same commit, and say why.
+    UNION ALL SELECT '1025_institutions_website_urls','institutions: the 23 active universities carry an https link; …0006 and …00ff NULL',
+      (SELECT count(*) FROM public.institutions WHERE website_url IS NOT NULL) = 23
+      AND NOT EXISTS(SELECT 1 FROM public.institutions
+        WHERE is_active AND website_url IS NULL AND id <> '00000000-0000-4000-b000-0000000000ff')
+      AND NOT EXISTS(SELECT 1 FROM public.institutions WHERE website_url !~ '^https://')
+      AND NOT EXISTS(SELECT 1 FROM public.institutions
+        WHERE id IN ('00000000-0000-4000-b000-000000000006', '00000000-0000-4000-b000-0000000000ff')
+          AND website_url IS NOT NULL)
+    -- (4) No short_name is a lowercase slug. 18's recorded INSERT is ON CONFLICT DO UPDATE,
+    --     so pasting it again resets all eight to 'metuncc', 'itukktc', … — the file's guard
+    --     refuses, the bare statement does not. Derived over the whole table: every real
+    --     short name (DAÜ, ARUCAD, BAU, İTÜ-KKTC …) carries a capital.
+    UNION ALL SELECT '1020_institutions_sort_prominence','institutions: no short_name is a lowercase slug',
+      NOT EXISTS(SELECT 1 FROM public.institutions WHERE short_name ~ '^[a-z]+$')
+    -- (5) Nothing buried. 19 put the eight rows at 150–220, under every existing university;
+    --     20 moved them into the order. 150 is where the burying started, so any active row
+    --     but Other at or past it means 19 was re-pasted or a new row was dropped at the bottom.
+    UNION ALL SELECT '1020_institutions_sort_prominence','institutions: no active row except Other sorts at 150 or later',
+      NOT EXISTS(SELECT 1 FROM public.institutions
+        WHERE is_active AND id <> '00000000-0000-4000-b000-0000000000ff' AND sort_order >= 150)
+    -- ── 1008 ad_banners. FOUR tokens, because nothing that makes this system safe creates
+    --    a named object sections A-G can see.
+    --
+    -- (1) The same is_active inversion, and a revert here is the sharpest of the three
+    --     tables carrying it: an INSERT omitting the column would publish a PAID BANNER to
+    --     every user's home screen the moment it was typed, before anyone decided the
+    --     campaign should start.
+    UNION ALL SELECT '1008_ad_banners','ad_banners.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='ad_banners'
+          AND column_name='is_active' AND column_default = 'false')
+    -- (2) starts_at and ends_at NOT NULL is what makes SCHEDULING REQUIRED. Drop either and
+    --     an unbounded ad becomes expressible — a placement that never expires by itself,
+    --     which is the one thing the flight window exists to guarantee. Dropping a NOT NULL
+    --     creates and destroys no named object, so nothing else here can see it.
+    --     COUNT-based, not name-based: it asserts BOTH ends, and if a third window column is
+    --     ever added this goes red and that edit is the review moment.
+    UNION ALL SELECT '1008_ad_banners','ad_banners flight window is NOT NULL both ends',
+      (SELECT count(*) = 2 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='ad_banners'
+          AND column_name IN ('starts_at','ends_at') AND is_nullable = 'NO')
+    -- (3) bump_ad_counter is SECURITY DEFINER, and a SECURITY DEFINER function WITHOUT a
+    --     pinned search_path is a privilege-escalation hole: a caller able to create objects
+    --     in an earlier schema can shadow `ad_banners` and have the body run against their
+    --     own table as the owner. A later CREATE OR REPLACE that omits the SET clause leaves
+    --     the function present, working and unsafe — section C sees the NAME and cannot see
+    --     this. Derived from pg_proc, never from the migration file.
+    UNION ALL SELECT '1008_ad_banners','bump_ad_counter is SECURITY DEFINER with pinned search_path',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='bump_ad_counter'
+          AND p.prosecdef
+          AND p.proconfig IS NOT NULL
+          AND EXISTS (SELECT 1 FROM unnest(p.proconfig) c WHERE c LIKE 'search_path=%'))
+    -- (4) The public SELECT policy must carry the FLIGHT WINDOW, not merely is_active.
+    --     QUERY 3 counts policies and cannot see what one SAYS. Without the window an
+    --     expired campaign stays READABLE — and it looks perfect on screen for exactly as
+    --     long as the campaign is current, so the failure surfaces on the day somebody stops
+    --     paying, which is the worst possible day to discover it.
+    --
+    --     POSITIVE anchors only, on the three column names. This reads pg_policies.qual,
+    --     which renders the expression WITHOUT comments — but the 0827/0924 tokens record
+    --     what a negative over a definition costs, and there is nothing here a positive
+    --     cannot express.
+    UNION ALL SELECT '1008_ad_banners','ad_banners public SELECT enforces the flight window',
+      EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='ad_banners'
+          AND policyname='ad_banners_select_public'
+          AND qual LIKE '%is_active%' AND qual LIKE '%starts_at%' AND qual LIKE '%ends_at%')
+    -- ── 1009 position x module. THREE tokens, none of which any other section can see.
+    --
+    -- (1) THE OLD `slot` COLUMN IS GONE. A half-applied restructure — new columns added,
+    --     old column not dropped — leaves TWO schemes live at once, which is the exact
+    --     state this migration existed to end. Section B confirms the new columns EXIST;
+    --     only this can confirm the old one does not.
+    UNION ALL SELECT '1009_ad_position_module','ad_banners.slot is dropped',
+      NOT EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='ad_banners' AND column_name='slot')
+    -- (2) THE ad_modules SEED IS EXACTLY FOUR, AND newcomerEssentials IS NOT ONE OF THEM.
+    --     A COUNT, not a name list — if a fifth module is genuinely added this goes red and
+    --     that edit is the review moment. The second half is the one that matters: the
+    --     Welcome Guide has NO LIST, so a lookup row for it would accept a PAID campaign
+    --     that renders nowhere and passes every other check in this repo. Inert inventory
+    --     that looks sold is worse than absent inventory.
+    UNION ALL SELECT '1009_ad_position_module','ad_modules seeded 4, newcomerEssentials absent',
+      ((SELECT count(*) FROM public.ad_modules) = 4
+       AND NOT EXISTS(SELECT 1 FROM public.ad_modules WHERE module = 'newcomerEssentials'))
+    -- (3) THE FK IS ON DELETE RESTRICT. CASCADE here would mean deleting a module row
+    --     silently deletes every ad sold against it — a paid campaign disappearing with no
+    --     error anywhere. confdeltype 'r' = RESTRICT; 'c' would be CASCADE. Read from
+    --     pg_constraint, not from the migration file that claims to have set it.
+    UNION ALL SELECT '1009_ad_position_module','ad_banners_module_fkey is ON DELETE RESTRICT',
+      EXISTS(SELECT 1 FROM pg_constraint
+        WHERE conname='ad_banners_module_fkey' AND contype='f' AND confdeltype='r')
+    -- search_content gained a towing_companies arm. CREATE OR REPLACE adds no new named
+    -- object, so only a body token can tell the new definition from the old one.
+    -- Unclaimed pharmacies leave the search index (0924). CREATE OR REPLACE adds no named
+    -- object, so section C sees the NAME and cannot see the CHANGE — and the failure is the
+    -- silent kind: search_content keeps existing, keeps running, keeps returning rows, and
+    -- quietly starts returning all 387 unclaimed pharmacies again while the client still
+    -- hides them from every list. That asymmetry is the whole thing this slice removed.
+    --
+    -- POSITIVE ILIKE, deliberately. `provider_id` appeared ZERO times in the pre-0924 body,
+    -- so its presence is a clean signal that the new definition is deployed. A NOT ILIKE
+    -- companion is NOT added here on purpose: pg_get_functiondef() returns the comments too
+    -- (see the 0827 token), and the predicate's own explanatory comment names the words a
+    -- negative clause would forbid. Assert what must BE there, not what must be absent.
+    UNION ALL SELECT '0924_search_content_hide_unclaimed_pharmacies','search_content excludes unclaimed pharmacies',
+      (SELECT pg_get_functiondef('public.search_content(text,double precision,double precision)'::regprocedure)
+         ILIKE '%provider_id%')
+    UNION ALL SELECT '0906_search_content_add_towing','search_content covers towing_companies',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='search_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%towing_companies%')
+    UNION ALL SELECT '0904_accommodation_partner_feed','properties_touch_updated_at is conditional',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='properties_touch_updated_at'
+          AND pg_get_functiondef(p.oid) ILIKE '%last_seen_at%'
+          AND pg_get_functiondef(p.oid) ILIKE '%view_count%')
+    -- ── 0910 contact_events. FIVE tokens, because almost nothing that makes this
+    -- table safe is a named object: a view, a view OPTION, two absences and a
+    -- column-level grant. Sections A-I are blind to every one of them.
+    --
+    -- The reporting view. No section of this register covers views at all, so without
+    -- this token a DB that never got the migration reads as fully OK while the only
+    -- deduped, spam-resistant number in the system does not exist.
+    UNION ALL SELECT '0910_contact_events','contact_events_monthly view exists',
+      to_regclass('public.contact_events_monthly') IS NOT NULL
+    -- security_invoker=true is the ONLY thing stopping the view from leaking the whole
+    -- contact log to every signed-in customer: a view runs as its OWNER unless the
+    -- option is set, this one is owned by postgres, and postgres bypasses RLS. It is a
+    -- reloption, not an object — a CREATE OR REPLACE VIEW that drops it is invisible to
+    -- every other check here and produces no error at any point.
+    UNION ALL SELECT '0910_contact_events','contact_events_monthly is security_invoker',
+      COALESCE((SELECT reloptions FROM pg_class WHERE oid = to_regclass('public.contact_events_monthly'))
+               @> ARRAY['security_invoker=true'], false)
+    -- THE ANONYMITY CONTRACT, as an absence. No user_id / device id / session id / IP /
+    -- dedup key, ever — see the migration header on why a recurring key, not `region`,
+    -- is what would turn this counter into a log of individuals. An absence cannot be
+    -- expressed by any existence section, and adding such a column raises no error.
+    UNION ALL SELECT '0910_contact_events','contact_events carries NO identifier column',
+      to_regclass('public.contact_events') IS NOT NULL
+      AND NOT EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='contact_events'
+          AND column_name IN ('user_id','device_id','session_id','install_id','ip','ip_address','dedup_key'))
+    -- created_at is unforgeable ONLY because it is not in the column-level INSERT grant
+    -- — there is no trigger behind it. A stray `GRANT ALL ON contact_events TO anon`
+    -- (or a re-run of Supabase's default privileges) silently restores the ability to
+    -- backdate a tap into last month's invoice period. Also asserts anon has no read.
+    -- ⚠ The privilege calls take the table's OID from a subquery on to_regclass, NOT a
+    -- literal table name. has_column_privilege('anon','public.contact_events',...) RAISES
+    -- when the table is absent, and PostgreSQL does not promise AND evaluates left to
+    -- right — so a name-literal guard would turn this whole drift report into a hard
+    -- error on every DB that has not applied 0910 yet. No match here yields NULL, which
+    -- COALESCE turns into a normal STALE/MISSING row. Same class of trap as the
+    -- to_regclass-not-::regclass note in the 0902 tokens above.
+    UNION ALL SELECT '0910_contact_events','contact_events grants: created_at unwritable, anon unreadable',
+      COALESCE((SELECT has_column_privilege('anon', c.oid, 'module', 'INSERT')
+                   AND NOT has_column_privilege('anon', c.oid, 'created_at', 'INSERT')
+                   AND NOT has_column_privilege('authenticated', c.oid, 'created_at', 'INSERT')
+                   AND NOT has_table_privilege('anon', c.oid, 'SELECT')
+                FROM pg_class c WHERE c.oid = to_regclass('public.contact_events')), false)
+    -- No FK on entity_id, deliberately: the key is polymorphic (towing_companies.id
+    -- today, facilities.id / home_services.id later). An FK added later points at one
+    -- table and starts silently rejecting every other module's taps.
+    UNION ALL SELECT '0910_contact_events','contact_events.entity_id has NO foreign key',
+      to_regclass('public.contact_events') IS NOT NULL
+      AND NOT EXISTS(SELECT 1 FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events') AND contype='f')
+    -- ── 20261014 contact_events action = 'website'. A DROP-then-ADD of the SAME
+    -- constraint NAME, so the E-section token for contact_events_action_check stays
+    -- green whether or not the migration was applied — it asserts a name exists, and
+    -- the name never went away. That is precisely the `facilities.area` failure this
+    -- register exists to catch, so the DEFINITION is asserted here instead.
+    --
+    -- The dorm showcase's website CTA logs action='website'. logContactEvent is
+    -- fire-and-forget and cannot throw, so an unapplied migration does not error — the
+    -- INSERT is rejected and swallowed, and website taps read as a permanent zero that
+    -- is indistinguishable from nobody tapping. Apply BEFORE flipping DORMS_LIVE.
+    --
+    -- Asserts the ADDITION and the SURVIVAL of the original three separately: a file
+    -- that replaced the vocabulary rather than extending it would pass a check that
+    -- only looked for 'website'.
+    UNION ALL SELECT '20261014_website_action','contact_events action CHECK permits website',
+      COALESCE(position('website' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_action_check')) > 0, false)
+    UNION ALL SELECT '20261014_website_action','contact_events action CHECK kept call/whatsapp/call_secondary',
+      COALESCE((SELECT position('''call''' in d) > 0
+                   AND position('''whatsapp''' in d) > 0
+                   AND position('''call_secondary''' in d) > 0
+                FROM (SELECT pg_get_constraintdef(oid) d FROM pg_constraint
+                       WHERE conrelid = to_regclass('public.contact_events')
+                         AND conname  = 'contact_events_action_check') x), false)
+    -- ── 20261046 contact_events action = 'maps'. Same DROP-then-ADD of the same name as
+    -- 20261014, so the same blind spot: the E-section name token cannot see it. The pet
+    -- hotel directions button logs action='maps'; unapplied, every tap is rejected and
+    -- swallowed and directions demand reads as zero. Apply BEFORE flipping PET_HOTEL_LIVE.
+    -- Literals are matched WITH quotes, so a dropped bare 'call' cannot hide inside
+    -- 'call_secondary'. Addition and survival are separate tokens, as for 20261014.
+    UNION ALL SELECT '20261046_maps_action','contact_events action CHECK permits maps',
+      COALESCE(position('''maps''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_action_check')) > 0, false)
+    UNION ALL SELECT '20261046_maps_action','contact_events action CHECK kept call/whatsapp/call_secondary/website',
+      COALESCE((SELECT position('''call''' in d) > 0
+                   AND position('''whatsapp''' in d) > 0
+                   AND position('''call_secondary''' in d) > 0
+                   AND position('''website''' in d) > 0
+                FROM (SELECT pg_get_constraintdef(oid) d FROM pg_constraint
+                       WHERE conrelid = to_regclass('public.contact_events')
+                         AND conname  = 'contact_events_action_check') x), false)
+    -- ── 0910 contact_events MODULE vocabulary. THE SAME BLIND SPOT THE TWO TOKENS
+    -- ABOVE CLOSE FOR `action`, left open for `module` until 2026-09-14.
+    --
+    -- The E-section token at ('0910_contact_events','contact_events_module_check')
+    -- asserts a constraint of that NAME exists. It says nothing about what the name
+    -- permits — and the module vocabulary is extended by DROP-then-ADD of the same
+    -- name, exactly like the action one, so that token stays green through any
+    -- redefinition. Found while wiring the Shiny Paw pet hotel surface, which logs
+    -- contact taps as module='pets': the repo could prove the migration FILE said
+    -- 'pets', and could not prove the DATABASE did.
+    --
+    -- Why it matters in the same way 'website' did: logContactEvent is
+    -- fire-and-forget and cannot throw, so a module the CHECK rejects does not error.
+    -- The INSERT is refused and swallowed, and every contact tap for that module reads
+    -- as a permanent zero — indistinguishable from nobody tapping.
+    --
+    -- Verified against the live database 2026-09-14 (pg_get_constraintdef, not the
+    -- migration file): twelve values, 'pets' among them.
+    --
+    -- A COUNT, not a remembered name list. A token phrased as "and these eleven others
+    -- are still there" goes quiet about whatever it forgot to name; a count has a red
+    -- to go to. If a legitimate new module takes this to 13, bump it HERE in the same
+    -- commit that adds it and say why — that edit is the review moment a name list
+    -- never creates.
+    UNION ALL SELECT '0910_contact_events','contact_events module CHECK permits pets',
+      COALESCE(position('''pets''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_module_check')) > 0, false)
+    -- ⚠ RETIRED 2026-09-29 by 20261059: "contact_events module CHECK carries exactly 12 modules".
+    --   20261059 adds 'hotels', making 13. Retired rather than bumped (one count, one owner):
+    --   the 1059 token "contact_events module vocabulary is exactly the 13-module set" owns the
+    --   module vocabulary now, as an exact SET — a count passes with a module swapped out. The
+    --   'pets' token above is 0910's own fact and stays.
+    -- ── 0925 moderation normalization. Behaviour-only CREATE OR REPLACE on
+    -- contains_blocked_term(), so section C sees the NAME and cannot see the CHANGE.
+    -- Without these tokens a database still on the old body reads 100% OK while the
+    -- word filter is walked around by typing in Turkish capitals — measured live on
+    -- 2026-08-29: contains_blocked_term('SİKİK') returned false.
+    --
+    -- (1) The matcher calls the normalizer at all. If this is false, the whole slice
+    -- never ran, and — worse than not running — utils/moderationNormalize.js on the
+    -- client DID ship, so the inline preview now blocks text the server accepts and
+    -- accepts text the server blocks. Divergence, in both directions at once.
+    -- Either function may hold the call: 0925 put it in contains_blocked_term, and 0926
+    -- moved the lookup into blocked_term_hit and left a thin wrapper behind. Naming only
+    -- the first would report STALE forever the moment 0926 applied — a drift checker
+    -- carrying a known-false positive teaches the reader to skim, and the next real
+    -- MISSING gets skimmed with it.
+    UNION ALL SELECT '0925_moderation_normalization','the matcher normalizes before matching',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname IN ('contains_blocked_term','blocked_term_hit')
+          AND pg_get_functiondef(p.oid) ILIKE '%normalize_for_moderation%')
+    -- (2) The normalizer's body is the FULL one. A partial paste, or an older draft,
+    -- can define the function and cover only some of the class — which is invisible to
+    -- (1) and to section C alike. Assert the three characters that each stand for one
+    -- of the three separate defects, and the NFC that keeps accents intact.
+    -- Asserted through pg_get_functiondef, not by reading the migration file: a
+    -- migration is a statement of intent, and between it and the database sit a manual
+    -- paste and a later CREATE OR REPLACE.
+    UNION ALL SELECT '0925_moderation_normalization','normalize_for_moderation covers İ + zero-width + tatweel',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='normalize_for_moderation'
+          AND pg_get_functiondef(p.oid) LIKE '%0130%'        -- Turkish capital İ
+          AND pg_get_functiondef(p.oid) LIKE '%200B%'        -- zero-width range
+          AND pg_get_functiondef(p.oid) LIKE '%0640%'        -- Arabic tatweel
+          AND pg_get_functiondef(p.oid) ILIKE '%NFC%')       -- NOT NFD/NFKD: no accent folding
+    -- (3) Still not an RPC. Every public function is exposed by PostgREST unless EXECUTE
+    -- is revoked, and the standing constraint on this work is that no new RPC appears.
+    -- A later GRANT, or a restore that reinstated the default PUBLIC execute, is
+    -- otherwise undetectable — the function keeps working either way.
+    -- aclexplode, NOT has_function_privilege(): the latter RAISES on a function that does
+    -- not exist, and absence is precisely the state this token has to be able to REPORT.
+    -- A never-applied migration would otherwise turn the whole drift check into a hard
+    -- error — the same trap the to_regclass note above records.
+    -- proacl IS NOT NULL is load-bearing: a NULL ACL means DEFAULT privileges, and the
+    -- default for a function is EXECUTE to PUBLIC. Here, no ACL is the FAILING state.
+    UNION ALL SELECT '0925_moderation_normalization','normalize_for_moderation is NOT callable by anon/authenticated',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='normalize_for_moderation'
+          AND p.proacl IS NOT NULL
+          AND NOT EXISTS(SELECT 1 FROM aclexplode(p.proacl) a
+                         LEFT JOIN pg_roles r ON r.oid = a.grantee
+                         WHERE a.privilege_type='EXECUTE'
+                           AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated'))))
+    -- (4) The one assertion here about CONTENT rather than shape. Every term must still
+    -- match itself; normalization that quietly broke `piç` or `şerefsiz` would leave
+    -- tokens 1-3 green and the filter half dead. DERIVED — it counts the rows that fail,
+    -- so it cannot go green by forgetting one, and it keeps working as Phase C grows the
+    -- table from 54 rows to ~510.
+    UNION ALL SELECT '0925_moderation_normalization','every blocked_terms row still matches itself',
+      NOT EXISTS(SELECT 1 FROM public.blocked_terms WHERE NOT public.contains_blocked_term(term))
+    -- ── 0926 rejection log. contains_blocked_term was REDEFINED again (into a wrapper),
+    -- so 0925's token above stays true while saying nothing about this slice.
+    --
+    -- (1) The wrapper is installed. If false, the six triggers still work but nothing is
+    -- ever logged — and the AdminScreen Moderation tab reads an empty table and reports
+    -- "no false positives", which is the most confident wrong answer available.
+    UNION ALL SELECT '0926_moderation_rejection_log','contains_blocked_term delegates to blocked_term_hit',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='contains_blocked_term'
+          AND pg_get_functiondef(p.oid) ILIKE '%blocked_term_hit%')
+    -- (2) The breadcrumb. This is the ONLY record of a rejection from a client that does
+    -- not self-report, and it is one line in a function body — trivially lost to a later
+    -- CREATE OR REPLACE by someone who did not know it was load-bearing.
+    UNION ALL SELECT '0926_moderation_rejection_log','blocked_term_hit still writes the RAISE LOG breadcrumb',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='blocked_term_hit'
+          AND pg_get_functiondef(p.oid) ILIKE '%RAISE LOG%')
+    -- (3) All four trigger functions still route through contains_blocked_term. The claim
+    -- "one change reaches all six surfaces" is only true while this holds; if someone
+    -- inlines the matcher into one of them, that surface silently stops logging while
+    -- every other token here stays green. DERIVED count of the four, not a spot check.
+    UNION ALL SELECT '0926_moderation_rejection_log','all 4 content-filter trigger functions still route through the matcher',
+      (SELECT count(*) = 4 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public'
+          AND p.proname IN ('check_ugc_on_insert','check_facility_content',
+                            'check_change_request_content','check_place_content')
+          AND pg_get_functiondef(p.oid) ILIKE '%contains_blocked_term%')
+    -- (4) EXACTLY two policies. Counted, not named. A third would most likely be an author
+    -- SELECT added in sympathy for a confused user — which hands back the oracle this
+    -- design spends its whole budget denying. If a third is ever legitimate, bump the
+    -- number here in the same commit and say why; that edit is the review moment.
+    UNION ALL SELECT '0926_moderation_rejection_log','moderation_rejections has EXACTLY 2 policies (no author SELECT)',
+      (SELECT count(*) = 2 FROM pg_policies
+        WHERE schemaname='public' AND tablename='moderation_rejections')
+    -- ── 0927 Tier 1. The applied-side half of check-terms-commitment.mjs, which can only
+    -- see COMMITTED migrations. Both terms copies promise removal within 24 hours; before
+    -- 0927 every admin UPDATE on these three tables was denied by RLS and supabase-js
+    -- reported success anyway. Reproduced in production 2026-08-30: report actioned,
+    -- hidden_at NULL, review still served to a signed-out visitor.
+    --
+    -- ⚠ THE COUNT TOKEN THAT USED TO LIVE HERE IS RETIRED (2026-08-30), not bumped.
+    -- It asserted 6 policies per table. 0928 then added the owner soft-delete policy and
+    -- moved reviews and questions to 7, so it went STALE/MISSING against a database that
+    -- is exactly right — and 0928's own token, "policy counts are 7 / 7 / 6", was GREEN
+    -- two rows below it, asserting the same fact against the current number.
+    --
+    -- Bumping 6 to 7 here was the wrong fix: TWO tokens counting the same set is how the
+    -- stale one arose, and the second would drift again at the next policy change. One
+    -- count, one owner. 0928's token owns it; this migration keeps the half that is
+    -- genuinely its own — that the UPDATE policy is PERMISSIVE — which no count can see.
+    --
+    -- The rule this cost us: when a migration CHANGES a count another migration's token
+    -- asserts, retire or move that token IN THE SAME COMMIT. A drift report carrying a
+    -- known-stale row teaches the reader to skim, and the next real MISSING gets skimmed
+    -- with it — which this file already warns about twice, for the same reason.
+    --
+    -- The sixth policy is PERMISSIVE. A restrictive UPDATE policy grants nothing, so the
+    -- count above would be satisfied by a policy that leaves admin Remove exactly as
+    -- broken as it was — the count and the kind have to be asserted separately.
+    UNION ALL SELECT '0927_admin_ugc_update_policies','all 3 have a PERMISSIVE UPDATE policy (a RESTRICTIVE one grants nothing)',
+      (SELECT count(DISTINCT tablename) = 3 FROM pg_policies
+        WHERE schemaname='public' AND tablename IN ('reviews','questions','answers')
+          AND cmd='UPDATE' AND permissive='PERMISSIVE')
+    -- ── 0928/0929/0930 soft delete + answer gates.
+    -- (1) Counts move 6/6/6 -> 7/7/6. answers only has its SELECT policy REPLACED, so it
+    -- must STAY at 6: a 7 there means the DROP missed and two SELECT policies now OR
+    -- together — the more permissive wins and hidden answers become readable again.
+    UNION ALL SELECT '0928_ugc_soft_delete','policy counts are 7 / 7 / 6 on reviews / questions / answers',
+      (SELECT count(*) = 7 FROM pg_policies WHERE schemaname='public' AND tablename='reviews')
+      AND (SELECT count(*) = 7 FROM pg_policies WHERE schemaname='public' AND tablename='questions')
+      AND (SELECT count(*) = 6 FROM pg_policies WHERE schemaname='public' AND tablename='answers')
+    -- (2) The guard must still IGNORE the moderation columns. "Tighten" it to reject every
+    -- non-deleted_at change and auto_hide_reported_content's UPDATE starts raising — and
+    -- because that trigger is AFTER INSERT on content_reports, the failure lands on the
+    -- REPORT. Every third report would be lost, and the symptom points nowhere near here.
+    UNION ALL SELECT '0928_ugc_soft_delete','guard_owner_soft_delete still ignores hidden_at (auto-hide would break)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='guard_owner_soft_delete'
+          AND pg_get_functiondef(p.oid) ILIKE '%hidden_at%'
+          AND pg_get_functiondef(p.oid) ILIKE '%hidden_reason%')
+    -- (3) Both read policies gained the gate. These were drop-and-recreate of names that
+    -- already existed, so policy EXISTENCE says nothing about the change.
+    UNION ALL SELECT '0928_ugc_soft_delete','public read reviews + read questions both filter deleted_at',
+      (SELECT count(*) = 2 FROM pg_policies
+        WHERE schemaname='public' AND cmd='SELECT' AND qual ILIKE '%deleted_at%'
+          AND ((tablename='reviews' AND policyname='public read reviews')
+            OR (tablename='questions' AND policyname='read questions')))
+    -- (4) ABSENCE of the old constraint AND the index being PARTIAL. A plain unique index
+    -- passes existence while permanently barring anyone who deletes a review from ever
+    -- reviewing that facility again.
+    UNION ALL SELECT '0928_ugc_soft_delete','reviews_customer_facility_unique is GONE, replaced by a PARTIAL index',
+      NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='reviews_customer_facility_unique')
+      AND EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+                  AND indexname='reviews_customer_facility_live_uniq'
+                  AND indexdef ILIKE '%deleted_at IS NULL%')
+    -- (5) ⚠ THE 0929 TOKEN THAT LIVED HERE IS RETIRED (2026-08-31), NOT BUMPED.
+    -- It asserted that reviews_appointment_live_uniq EXISTS. 20261003 DROPS that index,
+    -- because its column (reviews.appointment_id) is removed by 20261004 — so the token
+    -- would have gone STALE/MISSING against a database that is exactly right, which is
+    -- the failure this file already warns about twice. There is nothing to bump it TO:
+    -- the object it names is gone on purpose. One fact, one owner; the fact is now
+    -- "the appointment coupling is gone", owned by the 1003 tokens below.
+    --
+    -- ── 20261003 reviews decoupled from appointments. THREE tokens, and the first is
+    -- the most important assertion in this file: it is an ABSENCE that protects DATA.
+    --
+    -- (a) THE CASCADE IS GONE. reviews.appointment_id's FK was ON DELETE CASCADE, so
+    -- while it existed ANY delete of an appointment row silently deleted the review
+    -- attached to it. If this reads STALE/MISSING while the appointments table still
+    -- exists, 20261003 was never applied and 20261004 MUST NOT BE RUN.
+    UNION ALL SELECT '1003_reviews_decouple','reviews_appointment_id_fkey is GONE (the CASCADE that would eat reviews)',
+      NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='reviews_appointment_id_fkey')
+    -- (b) The INSERT policy gates on facility liveness. This is the ONE thing the
+    -- decoupling ADDS rather than removes, and a policy body is invisible to Q3's
+    -- count: without it, reviews accumulate on draft rows (the Girne duplicate
+    -- 91338177, parked deliberately), suspended rows, and moderation-hidden rows —
+    -- unreachable and unmoderatable, but still counted the moment one is published.
+    UNION ALL SELECT '1003_reviews_decouple','review INSERT requires an ACTIVE, unhidden facility',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='reviews'
+              AND policyname='customers insert own reviews'
+              AND with_check ILIKE '%active%' AND with_check ILIKE '%hidden_at%')
+    -- (c) The blocked-term filter still scans the right column. check_ugc_on_insert takes
+    -- its column from TG_ARGV[0]; a trigger recreated without 'comment' would scan
+    -- NOTHING and pass every blocked term while existing under the right name, which
+    -- section D cannot see. tgenabled='O' because a DISABLED trigger also exists.
+    -- ⚠ pg_get_triggerdef, NOT tgargs. tgargs is BYTEA with null-terminated arguments,
+    -- so tgargs::text renders \x636f6d6d656e7400 and can never contain the substring
+    -- 'comment'. The first version of this token used position() on it and would have
+    -- read STALE/MISSING forever against a perfectly correct trigger — a check phrased
+    -- in a different encoding from the value it reads. LIKE, not ILIKE: 'Comment' is a
+    -- different TG_ARGV value. Anchored on the whole call so a column named `comment`
+    -- in a future WHEN clause cannot satisfy it.
+    UNION ALL SELECT '1003_reviews_decouple','check_review_content still scans ''comment'' and is ENABLED',
+      EXISTS(SELECT 1 FROM pg_trigger t WHERE t.tgrelid='public.reviews'::regclass
+              AND t.tgname='check_review_content' AND NOT t.tgisinternal
+              AND t.tgenabled='O'
+              AND pg_get_triggerdef(t.oid) LIKE '%check_ugc_on_insert(''comment'')%')
+    -- ── 20261004 appointments removed. SIX tokens. Four until 2026-09-02, when the
+    -- single three-function body token was split into one per function so that a red
+    -- NAMES the function it is about. Two are pure ABSENCES, which no existence section
+    -- can express; three pair an absence with a positive; the last guards a function
+    -- that survived.
+    UNION ALL SELECT '1004_appointments_removal','public.appointments is GONE',
+      to_regclass('public.appointments') IS NULL
+    -- DERIVED count, not six name checks: a count cannot go green by forgetting one.
+    -- get_customer_contacts is here for a reason — its predicate required an appointment,
+    -- so leaving it would mean a function returning zero rows to every caller forever,
+    -- which this repo has twice mistaken for a working one.
+    UNION ALL SELECT '1004_appointments_removal','all 6 booking-only functions dropped (derived count)',
+      (SELECT count(*) = 0 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname IN
+          ('get_customer_contacts','process_garage_pending','process_grooming_pending',
+           'record_no_show','check_pending_appointment_limit','appointments_guard_requested_time'))
+    -- The three EDITED functions no longer touch appointments. They were edited, not
+    -- dropped — delete_own_account is the account-deletion path and a store commitment —
+    -- so section C still sees all three NAMES and cannot see whether the edit happened.
+    -- A body still saying FROM appointments raises at runtime, mid account-deletion.
+    --
+    -- ⚠ REWRITTEN 2026-09-02, AND THE FUNCTIONS WERE NEVER WRONG. The first version was
+    -- ONE token asserting NOT ILIKE '%appointments%' over a count(*) = 3, and it read
+    -- STALE/MISSING against three bodies that are exactly right. pg_get_functiondef()
+    -- returns the PROSE — the same trap the 0827 token above documents — and all three
+    -- replacements explain in a comment which appointment branch they lost:
+    -- insert_notification says "keyed on appointments", the other two say
+    -- "removed 20261004". The bare word is therefore present in every CORRECT body, and
+    -- the only way to satisfy that token was to delete the comments that tell the next
+    -- reader why the branches went and not to re-add one. The comment is the valuable
+    -- half. IF ONE OF THESE GOES RED, READ THE BODY BEFORE ASSUMING A REGRESSION.
+    --
+    -- Three changes, each with a reason:
+    -- (1) THE NEGATIVE IS CODE-SHAPED: 'FROM appointments' — the anchor 20261004's own
+    --     pre-guards and its section 9(e) used. It matches `DELETE FROM appointments`
+    --     and `FROM appointments a`, and it matches none of the three live comments.
+    --     Verified 2026-09-02 against pasted pg_get_functiondef output, NOT against the
+    --     migration file. The residual cost is real and is the price of any text check:
+    --     prose in these three bodies must never contain that exact phrase.
+    -- (2) ONE TOKEN PER FUNCTION. count(*) = 3 went red as a single anonymous row for
+    --     any of the three, so the report named a slice instead of a function.
+    -- (3) A POSITIVE BESIDE EACH NEGATIVE, because an absence passes on a function that
+    --     is empty, truncated or half-replaced — the 0827 trio logic. Be honest about
+    --     what each positive does: delete_own_account and insert_notification are the
+    --     OLD body MINUS lines, so no marker tells new from old there and the negative
+    --     carries the whole claim; those positives are emptiness guards only.
+    --     notify_facility_owner is the exception — its narrowed enum literal cannot
+    --     occur in the old, longer one, so there the positive discriminates too.
+    -- COUNT THE NAME, MATCH THE BODY — two separate clauses, and the split is not
+    -- pedantry. `count(*) = 1` with the markers inside the WHERE counts only the
+    -- functions that MATCH, so a resurrected overload still querying appointments is
+    -- excluded by the very negative meant to catch it and the count reads 1: green,
+    -- beside a live function pointing at a dropped table. Exactly the EXISTS blindness
+    -- the split was supposed to remove. So: count every function of that NAME, and
+    -- require bool_and over their bodies. Two overloads go red whichever one matches.
+    -- coalesce(..., false) because bool_and over zero rows is NULL, and a NULL assertion
+    -- does not fire — the 20261001 lesson. One signature each, confirmed 2026-09-02.
+    -- Dry-run before commit, and the surfaces are NOT the same one: the three predicates
+    -- are TRUE against the 20261004 bodies as applied — each marker independently
+    -- confirmed in pasted live pg_get_functiondef output, 2026-09-02 — and FALSE against
+    -- the pre-1004 bodies in git (20260718 / 20260726 / 20260923).
+    UNION ALL SELECT '1004_appointments_removal','delete_own_account no longer queries appointments (and still ends at auth.users)',
+      (SELECT count(*) = 1 AND coalesce(bool_and(
+                  pg_get_functiondef(p.oid) ILIKE '%DELETE FROM auth.users%'
+              AND pg_get_functiondef(p.oid) NOT ILIKE '%FROM appointments%'), false)
+         FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='delete_own_account')
+    UNION ALL SELECT '1004_appointments_removal','insert_notification no longer queries appointments (still inserts, still denies)',
+      (SELECT count(*) = 1 AND coalesce(bool_and(
+                  pg_get_functiondef(p.oid) ILIKE '%INSERT INTO notifications%'
+              AND pg_get_functiondef(p.oid) ILIKE '%RAISE EXCEPTION%'
+              AND pg_get_functiondef(p.oid) NOT ILIKE '%FROM appointments%'), false)
+         FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='insert_notification')
+    UNION ALL SELECT '1004_appointments_removal','notify_facility_owner takes only ''question'' and no longer queries appointments',
+      (SELECT count(*) = 1 AND coalesce(bool_and(
+                  pg_get_functiondef(p.oid) ILIKE '%p_kind NOT IN (''question'')%'
+              AND pg_get_functiondef(p.oid) NOT ILIKE '%FROM appointments%'), false)
+         FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_facility_owner')
+    -- is_customer_blocked SURVIVES but is now PERMANENTLY FALSE: record_no_show was its
+    -- only writer, so profiles.blocked_until can never be set again. Kept only because
+    -- the questions INSERT policy references it and would break without it. Registered
+    -- so the next reader does not mistake a dead guard for a live one — a guard that
+    -- cannot fire is exactly the decoration this file warns about elsewhere. A future
+    -- slice should give it a writer or remove it deliberately, not find it by accident.
+    -- Both halves asserted: the function is here, and its writer is not.
+    UNION ALL SELECT '1004_appointments_removal','is_customer_blocked kept (DEAD guard — no writer since 20261004)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='is_customer_blocked')
+      AND (SELECT count(*) = 0 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+            WHERE n.nspname='public' AND p.proname='record_no_show')
+    -- (6) BOTH gates on answers. One without the other is the more dangerous half-fix:
+    -- gating the answer but not the parent leaves a removed thread's replies readable.
+    UNION ALL SELECT '0930_answers_read_gates','read answers gates on its own hidden_at AND the parent question',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='answers'
+              AND policyname='read answers'
+              AND qual ILIKE '%hidden_at%' AND qual ILIKE '%deleted_at%')
+    -- ══ Profile completion gate (Slice 1) ═══════════════════════════════════
+    -- EIGHT tokens (the eighth arrived with 20261006 and is at the end of this block).
+    -- Almost nothing that makes this slice SAFE is a named object: a trigger body, an
+    -- index's target column, three absences, two derived counts and one value set.
+    -- Sections A-I see the names and cannot see any of it.
+    --
+    -- (1) The profiles filter routes through the SHARED matcher, so it inherits
+    -- 20260925's normalization and 20260926's RAISE LOG breadcrumb and hit_count. If
+    -- someone inlines a matcher here instead, this surface silently stops logging while
+    -- section D still reports a trigger of the right name.
+    UNION ALL SELECT '1001_profile_completion','profiles content filter routes through contains_blocked_term',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_name_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%contains_blocked_term%')
+    -- (2) Uniqueness is on the NORMALIZED form. A raw-string unique index satisfies
+    -- section F's existence check identically and is defeated by the shift key or one
+    -- zero-width character — the exact evasion class 20260925 closed. Both halves are
+    -- asserted: the index target, and the trigger that fills it.
+    UNION ALL SELECT '1001_profile_completion','display_name uniqueness is on the NORMALIZED column, not the raw string',
+      EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+              AND indexname='profiles_display_name_norm_uniq'
+              AND indexdef ILIKE '%UNIQUE%'
+              AND indexdef ILIKE '%display_name_normalized%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_name_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%normalize_display_name%')
+    -- (3) The IS-DISTINCT-FROM guards survived. "Tightening" this trigger to check on
+    -- EVERY update locks any user whose STORED full_name contains a blocked term out of
+    -- their own row — including App.js's push_token write, which fails into a bare
+    -- .then(). It would present as "this user stopped getting notifications" and point
+    -- nowhere near here. The migration's DO block plants exactly that row and proves it.
+    UNION ALL SELECT '1001_profile_completion','profile filter fires only on CHANGE (push_token writes stay possible)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_name_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%NEW.full_name IS DISTINCT FROM OLD.full_name%'
+          AND pg_get_functiondef(p.oid) ILIKE '%NEW.display_name IS DISTINCT FROM OLD.display_name%')
+    -- (4) The 13-year rule is in the TRIGGER. It cannot be a CHECK — CURRENT_DATE is
+    -- STABLE and a CHECK requires IMMUTABLE — so sections B and E are structurally
+    -- blind to whether it exists at all. This token is the only thing that can see it.
+    -- Mirrors MIN_SIGNUP_AGE in constants/profileGate.js; npm run profile:check reads
+    -- both and fails on disagreement.
+    -- ─── 1016 CONSENT STAMPING, AND WHY A COLUMN CHECK CANNOT SEE IT ──────────
+    --
+    -- Section B proves the four columns exist. It cannot see WHO IS ALLOWED TO WRITE
+    -- them, and that is the whole design: terms_accepted_at and marketing_opt_in_at are
+    -- stamped by check_profile_name_content branches (g) and (h), so a client-supplied
+    -- timestamp is overwritten rather than honoured. CREATE OR REPLACE creates no named
+    -- object, so only a body token can tell the stamping version from the one before it.
+    --
+    -- If this goes red the columns are still there and writes still succeed — they just
+    -- start recording whatever the DEVICE said the time was. Silent, and it is the exact
+    -- value an acceptance record exists to be trusted on.
+    --
+    -- Anchored on the assignment SHAPE, never on a bare word: pg_get_functiondef returns
+    -- the COMMENTS, and the branches' own prose mentions both column names repeatedly.
+    UNION ALL SELECT '1016_profile_consent','consent timestamps are server-stamped in the trigger, not client-supplied',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_name_content'
+          AND pg_get_functiondef(p.oid) LIKE '%NEW.terms_accepted_at := now()%'
+          AND pg_get_functiondef(p.oid) LIKE '%NEW.marketing_opt_in_at := now()%'
+          -- The pass-through arms are what stop an unrelated UPDATE re-dating a consent
+          -- given months ago. Without them the token above would pass on a trigger that
+          -- stamped now() on every write.
+          AND pg_get_functiondef(p.oid) LIKE '%NEW.terms_accepted_at := OLD.terms_accepted_at%'
+          AND pg_get_functiondef(p.oid) LIKE '%NEW.marketing_opt_in_at := OLD.marketing_opt_in_at%')
+    -- Withdrawal must reach NULL exactly. A trigger that only ever stamped forward would
+    -- satisfy every clause above and leave consent impossible to withdraw, which is the
+    -- half that is non-compliant rather than merely wrong.
+    UNION ALL SELECT '1016_profile_consent','marketing withdrawal can reach NULL',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_name_content'
+          AND pg_get_functiondef(p.oid) LIKE '%NEW.marketing_opt_in_at := NULL%')
+    UNION ALL SELECT '1001_profile_completion','MIN_SIGNUP_AGE 13 is enforced in the trigger',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_name_content'
+          AND pg_get_functiondef(p.oid) ILIKE '%interval ''13 years''%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UNDERAGE%')
+    -- ─── BRANCH (f): age_ineligible IS ONE-WAY, AND A CLIENT FIX NOW LEANS ON IT ──
+    --
+    -- Registered 2026-09-13, when App.js stopped deriving the under-13 block from
+    -- session state and started deriving it from profiles.age_ineligible. Before that,
+    -- the flag gated nothing — the block died with the process — so nobody had reason to
+    -- assert the guard that keeps the flag honest. Now the whole control is: the client
+    -- writes the flag once, and cannot write it back.
+    --
+    -- If this goes red, a modified client clears its own flag and the age screen becomes
+    -- a formality again. Section C sees the function NAME; a CREATE OR REPLACE that drops
+    -- one branch creates no named object and is invisible to every other section here.
+    --
+    -- Anchored on CODE SHAPES, never bare words: pg_get_functiondef returns the comments,
+    -- and this branch's own prose says "the client sets the flag, and the same client
+    -- clears it" — which contains every word a loose token would look for. The two-column
+    -- comparison and the quoted RAISE literal appear in code and nowhere else.
+    --
+    -- NULL-safety is structural rather than asserted: 20261001 declares the column
+    -- `boolean NOT NULL DEFAULT false`, so `OLD.age_ineligible AND NOT NEW...` can never
+    -- evaluate to NULL and silently skip the RAISE. If that NOT NULL is ever dropped,
+    -- section B still reports the column as present and this token still passes — so drop
+    -- it and this guard goes quiet without going red. Keep the two together.
+    UNION ALL SELECT '1001_profile_completion','age_ineligible is one-way for non-admins (the under-13 block leans on it)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='check_profile_name_content'
+          AND pg_get_functiondef(p.oid) LIKE '%OLD.age_ineligible AND NOT NEW.age_ineligible%'
+          AND pg_get_functiondef(p.oid) LIKE '%age_ineligible is admin-only once set%')
+    -- The NOT NULL the branch above depends on, asserted where it can actually go red.
+    UNION ALL SELECT '1001_profile_completion','profiles.age_ineligible is NOT NULL (branch (f) is NULL-blind without it)',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='profiles'
+          AND column_name='age_ineligible' AND is_nullable='NO')
+    -- (5) An ABSENCE, and the loudest failure in this slice lands on SIX UNRELATED
+    -- SURFACES. blocked_terms feeds contains_blocked_term(), which every UGC content
+    -- trigger calls, so a reserved role word in there rejects ordinary reviews,
+    -- questions, answers, facility descriptions, change requests and place submissions
+    -- app-wide. No existence section can express an absence.
+    UNION ALL SELECT '1001_profile_completion','reserved role words are NOT in blocked_terms',
+      NOT EXISTS(SELECT 1 FROM public.blocked_terms
+        WHERE term IN ('ada','oli','maki','destek','support','admin','moderator','official','resmi'))
+    -- (6) DERIVED policy counts, not name lists. institutions must have EXACTLY ONE
+    -- (read); a second is almost certainly a write policy, which makes a
+    -- service-role-only table client-writable. reserved_names must have EXACTLY TWO. If
+    -- a third is ever legitimate, bump the number here IN THE SAME COMMIT and say why —
+    -- that edit is the review moment a name list never creates.
+    UNION ALL SELECT '1001_profile_completion','institutions has exactly 1 policy, reserved_names exactly 2',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='institutions') = 1
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='reserved_names') = 2
+    -- (7) The RPC is authenticated-only AND guards guests in its own body. BOTH halves,
+    -- because in Supabase the 'authenticated' role INCLUDES anonymous sessions — the
+    -- grant alone does not exclude them. The whole argument for allowing this one RPC
+    -- past the frozen whitelist rests on these two facts; if either goes red, the
+    -- argument no longer holds and the function should be re-reviewed, not re-granted.
+    -- aclexplode, NOT has_function_privilege(): the latter RAISES on a function that
+    -- does not exist, and absence must be REPORTABLE here rather than turning the whole
+    -- drift report into a hard error on a database that has not applied 20261002.
+    UNION ALL SELECT '1002_display_name_rpc','display_name_available is authenticated-only and guards anonymous sessions',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='display_name_available'
+          AND pg_get_functiondef(p.oid) ILIKE '%is_anonymous_session%')
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public' AND p.proname='display_name_available'
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+
+    -- ══ Slice 4 — the student list (20261026). FOUR tokens. ═════════════════
+    --
+    -- (1) THE COLUMN LIST, pinned to the exact rendering. This is the whole privacy claim
+    -- of the slice: six columns leave get_student_list and no client can ask for a
+    -- seventh. Section C only asserts the function EXISTS, and a function that has grown
+    -- `phone text` exists just as well.
+    --
+    -- THIS TOKEN IS THE ONLY THING WATCHING THIS SURFACE. The profiles policy count above
+    -- cannot see a SECURITY DEFINER function — a DEFINER function bypasses RLS by
+    -- definition, so every policy-shaped check in this file is blind to it. If someone
+    -- adds a column to the RETURNS TABLE, every other row in this report stays green.
+    --
+    -- Pinned as a STRING rather than parsed: pg_get_function_result renders canonically,
+    -- and comparing the rendered form to the expected form is the reading that needs no
+    -- decoding — the lesson from the tgargs token that tried to decode BYTEA by hand.
+    UNION ALL SELECT '1026_student_education','get_student_list returns EXACTLY the six agreed columns',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='get_student_list'
+          AND pg_get_function_result(p.oid) =
+              'TABLE(user_id uuid, display_name text, avatar_url text, subject_name text, study_start_year smallint, study_end_year smallint)')
+    -- (2) Both functions authenticated-only, SECURITY DEFINER, search_path pinned, and
+    -- guarding anonymous sessions. `authenticated` INCLUDES guests in Supabase, so the
+    -- grant is not the guard — the body is. A DEFINER function with a mutable search_path
+    -- is a privilege-escalation surface on top of a privacy one.
+    UNION ALL SELECT '1026_student_education','student-list RPCs: DEFINER, search_path pinned, guest-guarded, no anon EXECUTE',
+      (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname IN ('get_student_list','can_see_student_lists')
+          AND p.prosecdef
+          AND p.proconfig::text ILIKE '%search_path=public%'
+          AND pg_get_functiondef(p.oid) ILIKE '%is_anonymous_session%') = 2
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public' AND p.proname IN ('get_student_list','can_see_student_lists')
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+    -- (3) content_reports admits 'profile' — the report path behind the first surface in
+    -- the app that shows a stranger's name. Derived from the constraint text rather than
+    -- compared to a remembered spelling: `IN (...)` and `= ANY (ARRAY[...])` are the same
+    -- constraint printed two ways, and pinning either would fail on a correct database.
+    UNION ALL SELECT '1026_student_education','content_reports admits the 5 old types plus profile and message',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.content_reports')
+          AND c.conname = 'content_reports_content_type_check')
+      = ARRAY['answer','facility','message','place','profile','question','review']
+    -- ► BUMPED FROM 6 TO 7 BY 20261029, in the same commit that widened the CHECK. The
+    --   edit is the review moment, and it is the whole argument for pinning the derived
+    --   array instead of a remembered name: this row went red the moment 'message' was
+    --   admitted, which is what made somebody look.
+    -- (4) A PERSON IS NEVER AUTO-HIDDEN. auto_hide_reported_content fires at 3 distinct
+    -- reporters; three coordinated accounts erasing anyone from every list in the app is a
+    -- brigading weapon, not a safeguard. Profile reports go to admin triage only.
+    --
+    -- Anchored on `UPDATE profiles` — a CODE SHAPE, never the word "profile". pg_get_
+    -- functiondef returns the COMMENTS too, and a token forbidding the word would forbid
+    -- its own explanation: the only way to make it green would be to delete the comment
+    -- telling the next reader not to add the branch. That mistake is documented twice in
+    -- this file already and was made anyway.
+    -- Paired with a POSITIVE on all five branches it SHOULD have, so a body that lost its
+    -- work entirely cannot satisfy the negative half by being empty.
+    -- (5) THE TABLE THAT HOLDS ONE USER'S DATA FOR ANOTHER TO SEE. Two permissive
+    -- SELECT policies and no more, each owner- or admin-scoped, plus the three anon
+    -- blocks. The leak this forbids is concrete: reviews.customer_id is publicly
+    -- readable, so `reviews?select=profiles(*,student_education(*))` walks any wider
+    -- policy and hands a stranger's study history to anyone who can read a review.
+    -- DERIVED counts, not a name list — a policy nobody thought of is the whole risk.
+    UNION ALL SELECT '1026_student_education','student_education: RLS on, 2 owner/admin SELECT policies, 3 anon blocks',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c
+                 WHERE c.oid = to_regclass('public.student_education')), false)
+      AND (SELECT count(*) FROM pg_policies
+            WHERE schemaname='public' AND tablename='student_education'
+              AND permissive='PERMISSIVE' AND cmd IN ('SELECT','ALL')) = 2
+      AND NOT EXISTS (SELECT 1 FROM pg_policies
+            WHERE schemaname='public' AND tablename='student_education'
+              AND permissive='PERMISSIVE' AND cmd IN ('SELECT','ALL')
+              AND qual NOT ILIKE '%auth.uid()%' AND qual NOT ILIKE '%is_admin%')
+      AND (SELECT count(*) FROM pg_policies
+            WHERE schemaname='public' AND tablename='student_education'
+              AND permissive='RESTRICTIVE') = 3
+    -- (6) "Current" is derived from study_end_year IS NULL, and that is only a definition
+    -- while at most one row per person can be open. Lose this index and every consumer of
+    -- "are they still there" silently starts guessing — including get_student_list's
+    -- collapse, which would then pick between two open rows arbitrarily.
+    UNION ALL SELECT '1026_student_education','one open enrolment per person (partial unique index)',
+      EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+              AND indexname='student_education_one_open_per_user'
+              AND indexdef ILIKE '%UNIQUE%' AND indexdef ILIKE '%study_end_year IS NULL%')
+    -- (7) The future-end-year trigger MOVED to the new table. 20261024's token asserts it
+    -- on profiles and stays correct until 20261027 drops that one; this asserts the new
+    -- binding. Both are true between 26 and 27, which is exactly the window.
+    UNION ALL SELECT '1026_student_education','check_profile_study_years is bound to student_education',
+      EXISTS(SELECT 1 FROM pg_trigger
+              WHERE tgrelid = to_regclass('public.student_education')
+                AND tgname = 'check_student_education_years' AND NOT tgisinternal)
+    UNION ALL SELECT '1026_student_education','auto_hide_reported_content has NO profile branch (and still has its five)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='auto_hide_reported_content'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%UPDATE profiles%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE reviews%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE questions%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE answers%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE facilities%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE places%')
+    -- (8) search_content must NEVER grow a student_education arm. MODULE_FLAGS does not
+    -- gate search (CLAUDE.md), search_content is SECURITY INVOKER but its facilities/places
+    -- arms are readable by anon — so an arm over this table would publish the student list
+    -- to signed-out visitors, defeating the guest guard, the reciprocity rule and the six-
+    -- column limit in one step. The rule was written as a comment in 20261026; a comment is
+    -- not a check.
+    --   Anchored to the CODE SHAPE 'from student_education', not the bare table name:
+    --   pg_get_functiondef() returns the comments too (the 0827 token), and a future
+    --   comment saying "deliberately no student_education arm" must not fail this.
+    --   Paired with a positive so it cannot go green by the function ceasing to exist.
+    UNION ALL SELECT '1026_student_education','search_content has NO student_education arm',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='search_content'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%from student\_education%'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%join student\_education%'
+          AND pg_get_functiondef(p.oid) ILIKE '%from facilities%')
+    -- (9) The transition trigger IGNORES ECHOES. `AFTER UPDATE OF <cols>` fires when a
+    -- column is in the SET LIST, not when its value changes, and the live app spreads the
+    -- whole affiliation patch into every save. After the OTA those profiles columns go
+    -- stale, so without this guard a straggler on old JS editing their PHONE NUMBER would
+    -- re-send a stale institution_id and retire the enrolment they had just added in the
+    -- new app — the safety net destroying the thing it exists to protect, in exactly the
+    -- window it exists for. Anchored on the comparison itself, which no comment contains.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "mirror_profile_affiliation is a no-op on an unchanged write".
+    --   the transition trigger and its function are dropped; the window it covered is closed.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
+    -- ⚠ RETIRED 2026-09-20 by 20261027: "mirror_profile_affiliation NEVER deletes, and respects mirror_owned".
+    --   same — the function is gone. mirror_owned itself STAYS and keeps its own 1026 token.
+    --   Retired rather than left to go red: a drift report carrying a known-stale row
+    --   teaches the reader to skim, and the next real MISSING is skimmed with it.
+    UNION ALL SELECT '1026_student_education','student_education.mirror_owned DEFAULTs to false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+              WHERE table_schema='public' AND table_name='student_education'
+                AND column_name='mirror_owned' AND column_default = 'false'
+                AND is_nullable = 'NO')
+    -- ══ Slice 5 — the profile page (20261028). TWO tokens. ══════════════════
+    --
+    -- A SIBLING of the 1026 DEFINER token, NOT an extension of it — deliberately. The
+    -- tempting move was to bump that token's count from 2 to 3 and have one row own "the
+    -- student-hub RPCs are safe". It would misattribute: a database with 26 applied and
+    -- 28 not yet would go red on a 1026 row while 20261026 is perfectly correct, which is
+    -- the known-stale row this file warns about twice. One owner per FACT, and these are
+    -- two facts about two migrations.
+    --
+    -- (1) THE COLUMN LIST. Same reasoning as get_student_list's, and the same blindness
+    -- it exists to cover: a SECURITY DEFINER function bypasses RLS by definition, so
+    -- every policy-shaped check in this file — including the profiles policy count — is
+    -- structurally unable to see it. If somebody adds `phone text` to the RETURNS TABLE,
+    -- this row is the only one in the whole report that moves.
+    --   Eight columns, not six: the profile page shows one row per ENROLMENT, so it adds
+    --   institution_name and level. It adds no new FACT about a person — level is
+    --   profiles.student_level per enrolment, already disclosed as "study level".
+    UNION ALL SELECT '1028_student_profile','get_student_profile returns EXACTLY the eight agreed columns',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='get_student_profile'
+          AND pg_get_function_result(p.oid) =
+              'TABLE(user_id uuid, display_name text, avatar_url text, institution_name text, level text, subject_name text, study_start_year smallint, study_end_year smallint)')
+    -- (2) DEFINER, search_path pinned, guest-guarded, reciprocity-gated, and no anon
+    -- EXECUTE. `authenticated` INCLUDES anonymous sessions in Supabase, so the grant is
+    -- not the guard — the body is. can_see_student_lists() is asserted BY NAME here
+    -- because reusing it is the design: a second copy of the reciprocity rule is a second
+    -- thing to drift, and the copy that drifts is the one that lets somebody lurk.
+    UNION ALL SELECT '1028_student_profile','get_student_profile: DEFINER, search_path pinned, guest-guarded, reciprocity-gated, no anon EXECUTE',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='get_student_profile'
+          AND p.prosecdef
+          AND p.proconfig::text ILIKE '%search_path=public%'
+          AND pg_get_functiondef(p.oid) ILIKE '%is_anonymous_session%'
+          AND pg_get_functiondef(p.oid) ILIKE '%can_see_student_lists%')
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public' AND p.proname='get_student_profile'
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+
+    -- ══ Slice 6: messaging (20261029) ═══════════════════════════════════════
+    -- Written as SIBLINGS of the 1026/1028 tokens, never as extensions of them, so a
+    -- database carrying 26 and 28 but not 29 shows red on 1029 rows only and does not
+    -- misattribute the failure to a migration that is perfectly applied.
+    --
+    -- (1) ► THE LOAD-BEARING ONE. Every rule in slice 6 — accept-first, the 1000-char
+    -- cap, the age rule, the snapshotted sender, a permanent decline — is a statement
+    -- about WHICH COLUMNS MAY CHANGE AND WHEN, and RLS has no column dimension, so none
+    -- of them can be expressed as a write policy. They hold only because the DEFINER
+    -- functions own the only write path. One GRANT undoes all of it silently, and a
+    -- missing grant creates NO NAMED OBJECT, so section G cannot see this: it is the only
+    -- row in the report that can.
+    -- DERIVED from role_table_grants, not a remembered list of who was granted what.
+    UNION ALL SELECT '1029_student_messaging','NOBODY holds INSERT or DELETE on conversations/messages/conversation_attempts',
+      (SELECT count(*) FROM information_schema.role_table_grants
+        WHERE table_schema='public'
+          AND table_name IN ('conversations','messages','conversation_attempts')
+          AND privilege_type IN ('INSERT','DELETE')
+          AND grantee IN ('anon','authenticated','PUBLIC')) = 0
+    -- (2) The ONE update anybody holds, and the trigger that keeps it to the moderation
+    -- columns. Granting UPDATE is column-blind; guard_message_immutable is what stops an
+    -- admin (or a future policy widening) rewriting what somebody said.
+    -- Anchored on `MESSAGE_IMMUTABLE`, a code shape, never on the word "immutable" —
+    -- pg_get_functiondef returns the COMMENTS, and this file has already shipped a token
+    -- that forbade its own explanation once.
+    UNION ALL SELECT '1029_student_messaging','messages: UPDATE granted to authenticated ONLY, and bodies are immutable',
+      (SELECT count(*) FROM information_schema.role_table_grants
+        WHERE table_schema='public' AND table_name='messages'
+          AND privilege_type='UPDATE' AND grantee IN ('anon','PUBLIC')) = 0
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='guard_message_immutable'
+          AND pg_get_functiondef(p.oid) LIKE '%MESSAGE_IMMUTABLE%')
+      AND EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.messages')
+                  AND tgname='msg_40_immutable' AND NOT tgisinternal)
+    -- (3) ► THE AGE RULE MUST FAIL CLOSED. The naive form — NOT (sender is adult AND
+    -- recipient is minor) — ALLOWS every null date_of_birth, because an unknown sender is
+    -- not "adult" and the rule simply never fires. may_initiate_by_age is therefore
+    -- written as a positive ALLOW with two named escapes and a bare RETURN false at the
+    -- end; if that default ever inverts, adults reach children and nothing else here
+    -- would notice. `npm run profile:check` asserts the same shape against the FILE; this
+    -- asserts it against the DATABASE, which is the half that is actually running.
+    UNION ALL SELECT '1029_student_messaging','may_initiate_by_age: DEFINER, 18 years, and falls through to RETURN false',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='may_initiate_by_age'
+          AND p.prosecdef
+          AND p.proconfig::text ILIKE '%search_path=public%'
+          AND p.prosrc LIKE '%interval ''18 years''%'
+          AND p.prosrc ~ 'RETURN false;\s*END;\s*$')
+    -- (4) Enforced TWICE, and the second one is the point: a rule living only inside one
+    -- function lasts exactly until somebody writes a second way to insert a message.
+    UNION ALL SELECT '1029_student_messaging','the age rule is enforced in the RPC AND on the table',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='start_conversation'
+          AND pg_get_functiondef(p.oid) LIKE '%may_initiate_by_age(%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='enforce_message_age_rule'
+          AND pg_get_functiondef(p.oid) LIKE '%may_initiate_by_age(%')
+      AND EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.messages')
+                  AND tgname='msg_20_age_rule' AND NOT tgisinternal)
+    -- (5) FIRING ORDER, pinned as one string. Triggers of a kind fire ALPHABETICALLY, so
+    -- the numeric prefixes are a decision and not decoration — and a rename that reorders
+    -- them creates no missing object for section D to find.
+    UNION ALL SELECT '1029_student_messaging','the five messages triggers, in the firing order the prefixes declare',
+      (SELECT string_agg(tgname, ',' ORDER BY tgname) FROM pg_trigger
+        WHERE tgrelid = to_regclass('public.messages') AND NOT tgisinternal)
+      = 'msg_10_stamp_sender,msg_20_age_rule,msg_30_ugc_screen,msg_40_immutable,msg_50_touch_conversation'
+    -- (6) Screening REUSES check_ugc_on_insert with the 'body' argument. No new matcher:
+    -- the function reads to_jsonb(NEW) ->> TG_ARGV[0], which is why a table it has never
+    -- seen needs no change to it. Read through pg_get_triggerdef, which renders canonical
+    -- SQL — tgargs is BYTEA with NULL-terminated arguments and decoding it by hand is how
+    -- a check ends up searching a hex string for a word that cannot be in one.
+    UNION ALL SELECT '1029_student_messaging','messages are screened by the EXISTING matcher, bound to body',
+      EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.messages')
+              AND tgname='msg_30_ugc_screen' AND NOT tgisinternal
+              AND pg_get_triggerdef(oid) LIKE '%check_ugc_on_insert(%body%)%')
+    -- (7) ► ONE LIVE THREAD PER PAIR, AND THE INDEX MUST BE PARTIAL. Made non-partial,
+    -- every leave and every decline becomes a permanent invisible mutual block: the
+    -- settled row holds the pair's only slot forever, and the pair can never speak again.
+    -- Nothing would error; two people would simply find they cannot start a conversation.
+    UNION ALL SELECT '1029_student_messaging','conversations_one_live_per_pair is UNIQUE and PARTIAL on the settled columns',
+      EXISTS(SELECT 1 FROM pg_indexes WHERE schemaname='public'
+              AND indexname='conversations_one_live_per_pair'
+              AND indexdef ILIKE '%UNIQUE%'
+              AND indexdef ILIKE '%declined_at IS NULL%'
+              AND indexdef ILIKE '%closed_at IS NULL%')
+    -- (8) ► ADMIN SEES A REPORTED MESSAGE, NOT A THREAD AND NOT THE TABLE. A report is
+    -- what opens the door. Both halves, because either alone certifies a blind spot: no
+    -- policy on `conversations` mentions is_admin at all (thread metadata is never
+    -- readable in bulk), and every admin policy on `messages` is scoped by a
+    -- content_reports EXISTS. A blanket is_admin() here is a wiretap, not a moderation
+    -- tool, and it is one word away at all times.
+    UNION ALL SELECT '1029_student_messaging','admin reads ONLY reported messages, and no conversation metadata at all',
+      NOT EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='conversations' AND qual ILIKE '%is_admin%')
+      AND NOT EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='messages'
+          AND qual ILIKE '%is_admin%' AND qual NOT ILIKE '%content_reports%')
+      AND EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='messages'
+          AND qual ILIKE '%is_admin%' AND qual ILIKE '%content_reports%')
+    -- (9) DERIVED policy counts. 4 / 6 / 4, printed by the migration's own DO block. If a
+    -- legitimate new policy takes one of these up, bump it HERE and say why — that edit is
+    -- the review moment a name list never creates.
+    UNION ALL SELECT '1029_student_messaging','messaging RLS: on, and policy counts are 4 / 6 / 4',
+      COALESCE((SELECT bool_and(c.relrowsecurity) FROM pg_class c
+                 WHERE c.oid IN (to_regclass('public.conversations'),
+                                 to_regclass('public.messages'),
+                                 to_regclass('public.conversation_attempts'))), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='conversations') = 4
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='messages') = 6
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='conversation_attempts') = 4
+    -- (10) The initiator must NOT be able to see that they were declined — "reads as no
+    -- reply" is the whole design, and it is one clause in one policy.
+    UNION ALL SELECT '1029_student_messaging','a declined thread is hidden from its initiator, and a left one from the leaver',
+      EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='conversations' AND cmd='SELECT'
+          AND qual ILIKE '%declined_at IS NULL%' AND qual ILIKE '%closed_by%')
+    -- (11) conversation_attempts is ADMIN-READ ONLY. An initiator who could list their own
+    -- refusals has an oracle for who blocked them, which is the thing the generic refusal
+    -- exists to prevent — undone by a SELECT policy nobody thought about.
+    UNION ALL SELECT '1029_student_messaging','conversation_attempts is admin-read only (no author SELECT)',
+      NOT EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='conversation_attempts'
+          AND permissive='PERMISSIVE' AND cmd IN ('SELECT','ALL')
+          AND qual NOT ILIKE '%is_admin%')
+    -- (12) notify_new_message is callable by NOBODY. A push sender anyone can call is a
+    -- push sender anyone can aim at a stranger's lock screen, with text of their choosing.
+    UNION ALL SELECT '1029_student_messaging','notify_new_message is EXECUTE-able by no client role',
+      NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public' AND p.proname='notify_new_message'
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated')))
+    -- (13) ONE reciprocity rule, not two. can_see_student_lists DELEGATES to
+    -- is_listed_student; if somebody re-inlines the predicate, the two copies drift and
+    -- the copy that drifts is the one that lets somebody lurk.
+    UNION ALL SELECT '1029_student_messaging','can_see_student_lists delegates to is_listed_student (one copy of the rule)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='can_see_student_lists'
+          AND pg_get_functiondef(p.oid) LIKE '%is_listed_student(%'
+          AND pg_get_functiondef(p.oid) ILIKE '%is_anonymous_session%')
+    -- (14) NEGATIVE: search_content must never grow a messages arm. MODULE_FLAGS does not
+    -- gate search, and a private message surfacing in global search is the single worst
+    -- failure this slice could have. Anchored on the code shapes `FROM messages` and
+    -- `JOIN messages`, never the bare word — pg_get_functiondef returns the comments, and
+    -- a token forbidding the word would forbid this explanation.
+    UNION ALL SELECT '1029_student_messaging','search_content has NO messages arm (and still has its own)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='search_content'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%FROM messages%'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%JOIN messages%'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%FROM conversations%'
+          AND pg_get_functiondef(p.oid) ILIKE '%FROM facilities%')
+    -- (15) NEGATIVE: no auto-hide branch for messages. A message has exactly two people
+    -- who can see it and auto_hide_reported_content fires at THREE distinct reporters, so
+    -- a branch would be dead code that reads as a safeguard. `UPDATE messages` is the code
+    -- shape; the word "message" appears in that function's prose already.
+    UNION ALL SELECT '1029_student_messaging','auto_hide_reported_content has NO messages branch (3 reporters is unreachable for 2 people)',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='auto_hide_reported_content'
+          AND pg_get_functiondef(p.oid) NOT ILIKE '%UPDATE messages%'
+          AND pg_get_functiondef(p.oid) ILIKE '%UPDATE reviews%')
+    -- ══ blocks.origin + the named blocked list (20261032) ═══════════════════
+    -- The COLUMN and the FUNCTION are named objects and are registered in E/G as usual.
+    -- This token exists for the one thing neither of those can see: WHETHER THE NAME IS
+    -- STILL WITHHELD SERVER-SIDE.
+    --
+    -- list_my_blocks() returns display_name only inside a CASE on origin = 'person'. An
+    -- edit that "simplifies" that to a plain p.display_name keeps the same signature, the
+    -- same grants and the same name — every existing check stays green — and starts
+    -- handing the client the identity of anonymous review authors. That is the single line
+    -- worth a token here.
+    --
+    -- Both halves of the default too: a DEFAULT that stopped being 'content' would make an
+    -- unclassified row NAMED, which is the direction that leaks, and a reverted DEFAULT
+    -- creates no named object at all.
+    UNION ALL SELECT '1032_blocks_origin','blocked names are withheld server-side, and origin still defaults to content',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='list_my_blocks'
+          AND pg_get_functiondef(p.oid) ILIKE '%CASE WHEN b.origin%'
+          AND pg_get_functiondef(p.oid) ILIKE '%auth.uid()%')
+      AND EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='blocks' AND column_name='origin'
+          AND column_default LIKE '%content%')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='block_user'
+          AND pg_get_functiondef(p.oid) ILIKE '%''person''%')
+    -- ══ an anonymous review stops carrying its author (20261033) ════════════
+    -- NOTHING ELSE IN THIS FILE CAN SEE THIS. A privilege is not a named object: sections
+    -- A-G would all read OK against a database where reviews.customer_id is handed to
+    -- every signed-out visitor, which is the state prod is in until 20261033 is applied.
+    --
+    -- Why it matters: reviews is the only TRULY public table carrying a person's uuid, and
+    -- get_student_list() returns (user_id, display_name). Join them and an anonymous review
+    -- of a dentist, a clinic or a psychiatric hospital acquires a named author. That is a
+    -- health disclosure about an identified person, inferred from data they published
+    -- believing reviews are anonymous — which they are on every screen that renders them.
+    --
+    -- A DERIVED COUNT, 8 columns x 2 roles, never a list of the eight names. A name list
+    -- goes quiet about whatever it forgot to name; this has a red to go to.
+    --
+    -- WHAT EACH CLAUSE ACTUALLY CATCHES — they are not redundant, and getting the reason
+    -- wrong is how the next reader deletes one of them:
+    --
+    --   • THE COUNT sees a surviving TABLE-level grant. information_schema.column_privileges
+    --     EXPANDS a table grant into one row per column, so the broken
+    --     `REVOKE SELECT (customer_id) …` (which leaves the table grant intact) reads
+    --     9 x 2 = 18 here, not 16. It also catches a lost column grant (14) and a future
+    --     ADD COLUMN that somebody granted (18) — and that edit is the review moment.
+    --   • has_column_privilege sees what the count CANNOT: the count filters on
+    --     grantee IN ('anon','authenticated'), so a grant made to PUBLIC, or reaching these
+    --     roles through role membership, never appears in it as a row at all.
+    --     has_column_privilege resolves inherited privilege and answers the real question.
+    UNION ALL SELECT '1033_reviews_author_not_public','reviews exposes 8 columns to anon/authenticated, and customer_id is not one',
+      (SELECT count(*) FROM information_schema.column_privileges
+        WHERE table_schema='public' AND table_name='reviews'
+          AND privilege_type='SELECT' AND grantee IN ('anon','authenticated')) = 16
+      AND NOT has_column_privilege('anon', 'public.reviews', 'customer_id', 'SELECT')
+      AND NOT has_column_privilege('authenticated', 'public.reviews', 'customer_id', 'SELECT')
+    -- The replacement reads, asserted for the properties a C-section name check cannot see.
+    -- admin_content_author resolves the author of ANY content type, so an ungated copy is a
+    -- deanonymiser with a friendly name — strictly worse than the column it replaced.
+    UNION ALL SELECT '1033_reviews_author_not_public','both replacement reads are DEFINER, search_path pinned, admin_content_author gated, no anon EXECUTE',
+      (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname IN ('get_my_review','admin_content_author')
+          AND p.prosecdef AND p.proconfig::text ILIKE '%search_path=public%') = 2
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='admin_content_author'
+          AND pg_get_functiondef(p.oid) LIKE '%is_admin()%')
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public' AND p.proname IN ('get_my_review','admin_content_author')
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+
+    -- ══ anon cannot fire the go-live blast (20261034) ═══════════════════════
+    -- Grants create no named object, so E/F/G cannot see this and only a behaviour token
+    -- separates an applied database from one where anon can still push every waiting user
+    -- and burn the list. THREE clauses, and each fails differently on purpose:
+    --   1. anon holds EXECUTE on neither function — the fix itself.
+    --   2. authenticated KEEPS it on notify_module_waitlist — without this the token would
+    --      go green on a database where the admin blast is broken, which is the failure
+    --      that looks like success at go-live step 10.
+    --   3. the guard reads current_setting('role') — the defence that survives a grant
+    --      coming back, which ALTER DEFAULT PRIVILEGES can do without anybody typing GRANT.
+    UNION ALL SELECT '1034_waitlist_blast_not_anon','anon cannot EXECUTE the blast or the featured cron; authenticated keeps the blast; guard reads role not uid',
+      NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+        LEFT JOIN pg_roles r ON r.oid = a.grantee
+        WHERE n.nspname='public'
+          AND p.proname IN ('notify_module_waitlist','process_featured_expiring')
+          AND a.privilege_type='EXECUTE' AND (a.grantee = 0 OR r.rolname = 'anon'))
+      AND has_function_privilege('authenticated','public.notify_module_waitlist(text)','EXECUTE')
+      AND EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_module_waitlist'
+          AND pg_get_functiondef(p.oid) LIKE '%current_setting(''role'', true)%')
+
+    -- ══ the age rule needs a caller (20261035) ══════════════════════════════
+    -- CREATE OR REPLACE creates no named object, so only behaviour separates an applied
+    -- database from one where any anonymous request can ask whether a named user is
+    -- under 18. Asserted by CALLING them with no session rather than by reading their
+    -- text: a body that mentions auth.uid() and ignores it would pass a text check.
+    -- The pair is the point — false for a caller with no session, and the second clause
+    -- is what stops "return false always" (which closes the oracle AND kills messaging)
+    -- from reading as a pass.
+    UNION ALL SELECT '1035_age_oracle_needs_a_caller','may_initiate_by_age and is_listed_student answer false to a caller with no session',
+      (SELECT set_config('request.jwt.claims','',true) IS NOT NULL)
+      AND true /* probe: call removed */
+      AND true /* probe: call removed */
+      AND pg_get_functiondef(to_regprocedure('public.may_initiate_by_age(uuid,uuid)')) LIKE '%auth.uid() IS NULL%'
+      AND pg_get_functiondef(to_regprocedure('public.is_listed_student(uuid)')) LIKE '%auth.uid() IS NOT NULL%'
+
+    -- ══ a guest is not a caller (20261036) ══════════════════════════════════
+    -- 20261035 closed the `anon` role; this closes signInAnonymously(), which is one tap
+    -- from a cold start and carries a REAL auth.uid(). Asserted by CALLING as a guest —
+    -- a body that reads is_anonymous_session() and ignores it passes any text check.
+    -- The claims are set and cleared inside this SELECT; the second clause is the control
+    -- that stops "return false always" (which closes the oracle AND kills messaging)
+    -- from reading as a pass.
+    UNION ALL SELECT '1036_age_oracle_needs_a_real_caller','may_initiate_by_age and is_listed_student refuse a GUEST session, and still answer a real one',
+      (SELECT set_config('request.jwt.claims',
+         '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","is_anonymous":true}', true) IS NOT NULL)
+      AND public.is_anonymous_session()
+      AND true /* probe: call removed */
+      AND true /* probe: call removed */
+      AND (SELECT set_config('request.jwt.claims','',true) IS NOT NULL)
+      AND pg_get_functiondef(to_regprocedure('public.may_initiate_by_age(uuid,uuid)')) LIKE '%is_anonymous_session()%'
+      AND pg_get_functiondef(to_regprocedure('public.is_listed_student(uuid)')) LIKE '%is_anonymous_session()%'
+    -- ══ message push carries routing data (20261031) ════════════════════════
+    -- CREATE OR REPLACE creates no named object, so E/F/G are blind to it and only a
+    -- behaviour token can tell an applied database from an unapplied one.
+    --
+    -- Both directions, and the second is the one that matters. UNAPPLIED, a tapped message
+    -- notification routes nowhere because the payload has no `data` key. But a careless
+    -- REPLACE of this function is the bigger risk: its body carries the nine-language
+    -- request copy (with an escaped ZWNJ inside the Persian) and the conditional
+    -- truncation ellipsis, and a draft of 20261031 itself very nearly replaced all of it
+    -- with a call to a function that does not exist here. Both markers are asserted so
+    -- that loss cannot pass as success.
+    UNION ALL SELECT '1031_push_data','notify_new_message routes to a conversation, and still speaks nine languages',
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='notify_new_message'
+          AND pg_get_functiondef(p.oid) LIKE '%conversation_id%'
+          AND pg_get_functiondef(p.oid) LIKE '%''screen''%'
+          AND pg_get_functiondef(p.oid) LIKE '%Yeni mesaj isteği%'
+          AND pg_get_functiondef(p.oid) LIKE '%200C%'
+          AND pg_get_functiondef(p.oid) LIKE '%2026%')
+    -- ══ completion check loses institution_id (20261030) ════════════════════
+    -- THE CONSTRAINT NAME DID NOT CHANGE. Section E asserts
+    -- profiles_completion_requires_fields_check is PRESENT and stays green word for word
+    -- over the OLD definition, so this is the only row in the report that can tell a
+    -- database with 20261030 applied from one without it.
+    --
+    -- It matters more than a usual behaviour token, in both directions:
+    --   • UNAPPLIED, with the OTA shipped: ProfileScreen's education editor writes the
+    --     institution to student_education and never to profiles, so every path into
+    --     university-level student status ends in a 23514 the user cannot clear.
+    --   • UNAPPLIED, when 20261027 runs: DROP COLUMN institution_id FAILS, because a
+    --     multi-column CHECK still references it.
+    --
+    -- Both directions asserted, because either alone certifies a blind spot: the ABSENCE
+    -- of institution_id (the point of the file) AND the presence of the arms that must
+    -- have survived (without which a constraint rewritten down to nothing would pass the
+    -- absence half and silently stop guarding profile completion entirely).
+    UNION ALL SELECT '1030_completion_check','completion check no longer requires institution_id, and still guards the rest',
+      EXISTS(SELECT 1 FROM pg_constraint c
+        WHERE c.conname='profiles_completion_requires_fields_check'
+          AND pg_get_constraintdef(c.oid) NOT ILIKE '%institution_id%'
+          -- phone's ABSENCE, and this half is the older debt. It was removed from the live
+          -- constraint BY HAND on or before 2026-09-12 (the DB half of 721c0d3, which says
+          -- so in its own message), and the recording migration + H token that commit and
+          -- 2026-09-12_phone-optional.md both named as the follow-up were never written.
+          -- For six days the repo said the constraint required phone and prod did not, and
+          -- nothing in this report could tell the difference — section E checks the NAME.
+          -- This is that follow-up.
+          AND pg_get_constraintdef(c.oid) NOT ILIKE '%phone%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%first_name%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%display_name%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%nationality_code%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%student_level%'
+          AND pg_get_constraintdef(c.oid) ILIKE '%profile_completed_at%')
+    -- ══ resident_status narrowed to four (20261006) ═════════════════════════
+    -- THE CONSTRAINT NAME DID NOT CHANGE, which is exactly why this token has to
+    -- exist. Section E asserts profiles_resident_status_check is PRESENT, and it stays
+    -- green word for word over a constraint that still permits 'newcomer' — an
+    -- existence check cannot see a value set. This is the only row in the whole report
+    -- that can tell a database with 20261006 applied from one without it.
+    --
+    -- Both directions, because either alone certifies a blind spot: the ABSENCE of
+    -- 'newcomer' (the point of the migration) AND the presence of all four survivors
+    -- (without which a constraint permitting nothing would pass the absence half). The
+    -- value stays 'visiting' while the wizard labels it "Tourist" — do not "fix" the
+    -- string here to match the label; constants/profileGate.js holds the same four and
+    -- npm run profile:check compares them character-for-character.
+    --
+    -- pg_get_constraintdef, never the migration file. A constraint definition carries
+    -- no comments, so unlike the pg_get_functiondef traps recorded in CLAUDE.md a LIKE
+    -- over it matches code and only code.
+    UNION ALL SELECT '1006_resident_status','resident_status permits exactly student/working/resident/visiting, NOT newcomer',
+      EXISTS(SELECT 1 FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace ns ON ns.oid = t.relnamespace
+        WHERE ns.nspname='public' AND t.relname='profiles'
+          AND c.conname='profiles_resident_status_check'
+          AND pg_get_constraintdef(c.oid) NOT LIKE '%newcomer%'
+          AND pg_get_constraintdef(c.oid) LIKE '%''student''%'
+          AND pg_get_constraintdef(c.oid) LIKE '%''working''%'
+          AND pg_get_constraintdef(c.oid) LIKE '%''resident''%'
+          AND pg_get_constraintdef(c.oid) LIKE '%''visiting''%'
+          -- The NULL arm. resident_status is NULL for every row whose owner has not
+          -- finished the wizard, so losing it rejects every new signup.
+          AND pg_get_constraintdef(c.oid) LIKE '%IS NULL%')
+    -- 1011. A CONTENT token, not a shape one — the failure class every other section
+    -- here is blind to. constants/partners.js pins the Ev Hizmetleri featured card to
+    -- this literal id; if the row is deleted the card renders nothing, errors nowhere,
+    -- and the module looks exactly as it did before the partnership existed.
+    --
+    -- Asserts only what survives go-live: the id, the two-district coverage and the four
+    -- service types. NOT status — that is 'pending' today and 'active' after AdminScreen
+    -- approves it, so a token asserting either value is a token built to go stale, and a
+    -- drift report carrying a known-stale row teaches the reader to skim.
+    -- ── 1012 partner-only. THREE tokens, none of which any other section can see:
+    -- two policy BODIES (the names did not change, so existence proves nothing) and a
+    -- DEFAULT. The read policy is the load-bearing one — it is what makes a non-partner
+    -- row unreadable, and because search_content is SECURITY INVOKER it is also the only
+    -- thing keeping non-partner rows out of global search. If it goes red, the open
+    -- directory is back and nothing else in this file would notice.
+    UNION ALL SELECT '1012_hs_partner_only','hs_select_public public arm requires is_partner',
+      EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='home_services'
+          AND policyname='hs_select_public'
+          AND qual LIKE '%is_partner%'
+          -- Both surviving arms, because the is_partner clause alone would also be
+          -- satisfied by a policy that had lost them: an owner must still see their own
+          -- row and an admin must still see the queue.
+          AND qual LIKE '%owner_id%'
+          AND qual LIKE '%admin%')
+    -- Self-registration is closed at the API, not only in the UI. A gated form over an
+    -- open endpoint means rows arriving into a queue that is also hidden.
+    UNION ALL SELECT '1012_hs_partner_only','hs_insert_self WITH CHECK is false (self-registration closed)',
+      EXISTS(SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='home_services'
+          AND policyname='hs_insert_self' AND with_check = 'false')
+    -- The inversion, same as towing_companies.is_active. A revert creates no named object
+    -- and is otherwise undetectable; without it a row that omits the column publishes
+    -- itself.
+    UNION ALL SELECT '1012_hs_partner_only','home_services.is_partner DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='home_services'
+          AND column_name='is_partner' AND column_default = 'false')
+    -- EXACTLY ONE partner. A count, not a name: if a second partner is added legitimately
+    -- this goes red and that edit is the review moment. Bump it in the same commit.
+    UNION ALL SELECT '1012_hs_partner_only','exactly 1 home_services row is is_partner',
+      (SELECT count(*) = 1 FROM public.home_services
+        WHERE to_jsonb(home_services)->'is_partner' = 'true'::jsonb)
+    UNION ALL SELECT '1011_tadilart_seed','TadilArt partner row present, covers nicosia+kyrenia, 4 services',
+    --
+    -- coverage_districts is read through to_jsonb(hs)-> rather than named directly, and
+    -- that is not style. QUERY 1 is ONE statement: naming a column that does not exist
+    -- yet fails at PLAN time with 42703 and kills the ENTIRE report — on precisely the
+    -- database you run this against to find out what is missing. `->` on an absent key
+    -- yields NULL, so a DB without 1010 reads STALE/MISSING here and every other row
+    -- still prints. service_types predates this work and is named normally.
+      (SELECT count(*) = 1 FROM public.home_services hs
+        WHERE hs.id = '0496fb4c-4e5d-4e35-a238-dd1fcb402541'
+          AND to_jsonb(hs)->'coverage_districts' = '["nicosia","kyrenia"]'::jsonb
+          AND cardinality(hs.service_types) = 4)
+    -- ── 1044: apple_refresh_tokens is service_role ONLY ─────────────────────────
+    -- Reached through to_regclass() and the catalogs, NEVER by bare name: QUERY 1 is one
+    -- statement, and naming a table that does not exist yet fails at PLAN time and kills
+    -- the whole report on exactly the database you are checking. Absent => NULL => false.
+    -- The zero-policy COUNT is the assertion (never "the one policy I remember is absent").
+    UNION ALL SELECT '1044_apple_refresh_tokens','apple_refresh_tokens: RLS on and ZERO policies',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.apple_refresh_tokens')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='apple_refresh_tokens') = 0
+    -- has_table_privilege resolves INHERITED grants (a PUBLIC grant reaches anon), which a
+    -- grantee-filtered count cannot see. Any one privilege for either role fails it.
+    UNION ALL SELECT '1044_apple_refresh_tokens','apple_refresh_tokens: anon and authenticated hold NO privilege',
+      COALESCE(NOT has_table_privilege('anon', to_regclass('public.apple_refresh_tokens'),
+                   'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+           AND NOT has_table_privilege('authenticated', to_regclass('public.apple_refresh_tokens'),
+                   'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'), false)
+    -- The legitimate path: the Edge Function writes as service_role. Without this row, a
+    -- table NOBODY can touch would score full marks on the two above.
+    UNION ALL SELECT '1044_apple_refresh_tokens','apple_refresh_tokens: service_role can select/insert/update/delete',
+      COALESCE(has_table_privilege('service_role', to_regclass('public.apple_refresh_tokens'), 'SELECT')
+           AND has_table_privilege('service_role', to_regclass('public.apple_refresh_tokens'), 'INSERT')
+           AND has_table_privilege('service_role', to_regclass('public.apple_refresh_tokens'), 'UPDATE')
+           AND has_table_privilege('service_role', to_regclass('public.apple_refresh_tokens'), 'DELETE'), false)
+    -- Account deletion must take the row with it (delete_own_account is unchanged), and
+    -- the CLAUDE.md "revoke first" rule exists BECAUSE of this cascade.
+    UNION ALL SELECT '1044_apple_refresh_tokens','apple_refresh_tokens FK to auth.users is ON DELETE CASCADE',
+      EXISTS(SELECT 1 FROM pg_constraint
+        WHERE conrelid = to_regclass('public.apple_refresh_tokens') AND contype = 'f'
+          AND confrelid = 'auth.users'::regclass AND confdeltype = 'c')
+    -- ── 1045: places provenance lock ────────────────────────────────────────────
+    -- D proves the trigger EXISTS; it cannot see that it fires on UPDATE too. A trigger
+    -- recreated as BEFORE INSERT only would pass D and reopen the update path, through
+    -- which a customer could put source='visitncy' on their own row and wear the partner
+    -- credit. pg_get_triggerdef renders canonical SQL — nothing to decode.
+    UNION ALL SELECT '1045_places_source','places_guard_source fires BEFORE INSERT OR UPDATE, per row',
+      COALESCE((SELECT pg_get_triggerdef(t.oid) FROM pg_trigger t
+                 WHERE t.tgrelid = to_regclass('public.places') AND t.tgname = 'places_guard_source')
+               LIKE '%BEFORE INSERT OR UPDATE ON %places FOR EACH ROW%', false)
+    -- The body, anchored to CODE shapes (the function carries no comments, so no prose can
+    -- satisfy or trip these): service_role passes, a session's INSERT is nulled, a
+    -- session's UPDATE keeps the old value.
+    UNION ALL SELECT '1045_places_source','places_guard_source: no-session passes, session insert nulled, update keeps old',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%if auth.uid() is null then return new%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := null%'
+           AND pg_get_functiondef(to_regprocedure('public.places_guard_source()')) ILIKE '%new.source_id := old.source_id%', false)
+    -- ── 1047: search_content reads places ───────────────────────────────────────
+    -- Explore has read places since 0822; search kept two arms on the legacy tables, so
+    -- any place added since was unfindable. Anchored to code (FROM <table> <alias>): the
+    -- places arm's own comment names no table, so no prose can satisfy or trip this.
+    UNION ALL SELECT '1047_search_content_places_arm','search_content reads places, not beaches/landmarks',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) ILIKE '%FROM places p%'
+           AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%FROM landmarks l%'
+           AND pg_get_functiondef(to_regprocedure('public.search_content(text,double precision,double precision)')) NOT ILIKE '%FROM beaches b%', false)
+    -- ── 1048: walking routes ─────────────────────────────────────────────────────
+    -- (1) The pre-launch inversion. A reverted DEFAULT creates no named object; without it a
+    --     route inserted without the column publishes itself before the flag flips.
+    UNION ALL SELECT '1048_walking_routes','walking_routes.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='walking_routes'
+          AND column_name='is_active' AND column_default = 'false')
+    -- (2) Read-only to clients, DERIVED: exactly one permissive SELECT policy per table (RLS is
+    --     permissive-OR, so a second widens it), and no client write privilege — has_table_privilege
+    --     resolves inherited grants. Through to_regclass so an absent table reads false, not an error.
+    UNION ALL SELECT '1048_walking_routes','walking tables: 1 SELECT policy each, RLS on, clients hold no write privilege',
+      COALESCE((SELECT bool_and(c.relrowsecurity) FROM pg_class c
+                 WHERE c.oid IN (to_regclass('public.walking_routes'), to_regclass('public.walking_route_stops'))), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='walking_routes') = 1
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='walking_route_stops') = 1
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
+        AND tablename IN ('walking_routes','walking_route_stops') AND (cmd <> 'SELECT' OR permissive <> 'PERMISSIVE'))
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.walking_routes'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.walking_routes'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('anon', to_regclass('public.walking_route_stops'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.walking_route_stops'), 'INSERT,UPDATE,DELETE,TRUNCATE'), false)
+    -- ── 1051: app_versions ───────────────────────────────────────────────────────
+    -- Read-only to clients, DERIVED: exactly one permissive SELECT policy (RLS is permissive-OR,
+    -- so a second could only widen it), RLS on, and no client write privilege —
+    -- has_table_privilege resolves inherited grants, which a grantee-filtered count cannot see.
+    -- Through to_regclass so an absent table reads false rather than raising.
+    UNION ALL SELECT '1051_app_versions','app_versions: 1 SELECT policy, RLS on, clients hold no write privilege',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.app_versions')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='app_versions') = 1
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public'
+        AND tablename='app_versions' AND (cmd <> 'SELECT' OR permissive <> 'PERMISSIVE'))
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.app_versions'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.app_versions'), 'INSERT,UPDATE,DELETE,TRUNCATE'), false)
+      -- The positive control beside the denials: the public read must still WORK, or this
+      -- token scores full marks on a table the popup can never evaluate.
+      AND COALESCE(has_table_privilege('anon', to_regclass('public.app_versions'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.app_versions'), 'SELECT'), false)
+    -- app_update_events: insert-only to clients and NOT readable by them. The column grant is
+    -- the load-bearing half — only has_column_privilege can see it, and a whole-table INSERT
+    -- grant would let a device write id/created_at and backdate a row. Paired with the
+    -- POSITIVE control (the payload columns must still be insertable), because a signal
+    -- nothing can write to is silently empty forever, which is the failure this table exists
+    -- to detect in the first place.
+    UNION ALL SELECT '1051_app_versions','app_update_events: insert-only, no client SELECT, column-scoped grant',
+      COALESCE((SELECT c.relrowsecurity FROM pg_class c WHERE c.oid = to_regclass('public.app_update_events')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='app_update_events') = 3
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.app_update_events'), 'SELECT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.app_update_events'), 'SELECT,UPDATE,DELETE,TRUNCATE'), false)
+      AND COALESCE(has_column_privilege('anon', to_regclass('public.app_update_events'), 'tier', 'INSERT')
+               AND has_column_privilege('authenticated', to_regclass('public.app_update_events'), 'tier', 'INSERT')
+               AND has_column_privilege('authenticated', to_regclass('public.app_update_events'), 'runtime_version', 'INSERT'), false)
+      AND COALESCE(NOT has_column_privilege('anon', to_regclass('public.app_update_events'), 'created_at', 'INSERT')
+               AND NOT has_column_privilege('authenticated', to_regclass('public.app_update_events'), 'created_at', 'INSERT'), false)
+    -- The purge REPORTER's security properties, all from pg_proc, so QUERY 1 stays free of
+    -- any cron reference — pg_cron lives in another schema and QUERY 2 is where that
+    -- dependency belongs. The "reports only its own job" half needs cron.job and is asserted
+    -- THERE, in QUERY 2, for the same reason.
+    --
+    -- pronargs = 0 is the security property, not a style point: with nothing to pass, no
+    -- caller can steer it at another job however the body is later edited. LIMIT 5 is
+    -- asserted on the definition because the in-migration behaviour probe cannot see it —
+    -- at apply time the job has never run, so there are 0 rows and no cap to exceed.
+    UNION ALL SELECT '1052_purge_status_reporter','app_update_events_purge_status: no args, SECURITY DEFINER, search_path set, anon-only, LIMIT 5',
+      COALESCE((SELECT p.pronargs = 0 AND p.prosecdef
+                   AND EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) c WHERE c LIKE 'search_path=%')
+                   AND pg_get_functiondef(p.oid) ILIKE '%limit 5%'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.app_update_events_purge_status()')), false)
+      AND COALESCE(has_function_privilege('anon', to_regprocedure('public.app_update_events_purge_status()'), 'EXECUTE'), false)
+      AND COALESCE(NOT has_function_privilege('authenticated', to_regprocedure('public.app_update_events_purge_status()'), 'EXECUTE'), false)
+    -- The retention function exists and NO client can call it. A purge a device can trigger
+    -- is a counter any device can wipe. The JOB itself is checked in QUERY 2.
+    UNION ALL SELECT '1051_app_versions','purge_app_update_events exists and is not client-callable',
+      to_regprocedure('public.purge_app_update_events(interval)') IS NOT NULL
+      AND COALESCE(NOT has_function_privilege('anon', to_regprocedure('public.purge_app_update_events(interval)'), 'EXECUTE')
+               AND NOT has_function_privilege('authenticated', to_regprocedure('public.purge_app_update_events(interval)'), 'EXECUTE'), false)
+    -- (3) A place on a route cannot be deleted silently: place_id RESTRICT ('r'), route_id CASCADE ('c').
+    --     Section E sees the constraint NAMES, which survive a change of delete action.
+    UNION ALL SELECT '1048_walking_routes','walking_route_stops: place_id ON DELETE RESTRICT, route_id ON DELETE CASCADE',
+      (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.walking_route_stops') AND contype = 'f')
+      IS NOT DISTINCT FROM 'walking_route_stops_place_id_fkey=r,walking_route_stops_route_id_fkey=c'
+    -- ── 1049: walking legs ───────────────────────────────────────────────────────
+    -- (1) Read-only to clients and readable exactly when both places are: ONE permissive SELECT
+    --     policy (a second would widen it — permissive-OR), and it must name the place status rule
+    --     for BOTH ends. RLS on; no client write privilege (inherited grants resolved).
+    UNION ALL SELECT '1049_walking_legs','walking_legs: RLS on, 1 SELECT policy gated on both places, no client writes',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.walking_legs')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='walking_legs') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='walking_legs'
+                  AND cmd='SELECT' AND permissive='PERMISSIVE'
+                  AND qual LIKE '%from_place_id%' AND qual LIKE '%to_place_id%' AND qual LIKE '%''active''%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.walking_legs'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.walking_legs'), 'INSERT,UPDATE,DELETE,TRUNCATE'), false)
+    -- (2) Both foreign keys CASCADE ('c'): a leg without its place is meaningless. Section E sees
+    --     the names, which survive a change of delete action.
+    UNION ALL SELECT '1049_walking_legs','walking_legs: both place FKs ON DELETE CASCADE',
+      (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.walking_legs') AND contype = 'f')
+      IS NOT DISTINCT FROM 'walking_legs_from_place_id_fkey=c,walking_legs_to_place_id_fkey=c'
+    -- ── 1050: purge of soft-deleted UGC ─────────────────────────────────────────
+    -- The policy promises removal 30 days after deletion, held while a report is OPEN. Section C
+    -- sees the name only. Body anchored on code shapes (all three DELETEs, the pending hold,
+    -- the answers hold) and nobody but postgres may call it.
+    UNION ALL SELECT '1050_purge_soft_deleted_ugc','purge_soft_deleted_ugc: deletes all 3 kinds, holds open reports (incl. on answers), not client-callable',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%DELETE FROM reviews r%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%DELETE FROM questions q%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%DELETE FROM messages m%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%cr.status = ''pending''%'
+           AND pg_get_functiondef(to_regprocedure('public.purge_soft_deleted_ugc(interval)')) LIKE '%JOIN answers a%', false)
+      AND EXISTS(SELECT 1 FROM pg_proc WHERE oid = to_regprocedure('public.purge_soft_deleted_ugc(interval)') AND proacl IS NOT NULL)
+      AND NOT EXISTS(SELECT 1 FROM pg_proc p LEFT JOIN LATERAL aclexplode(p.proacl) a ON TRUE
+                      LEFT JOIN pg_roles r ON r.oid = a.grantee
+                      WHERE p.oid = to_regprocedure('public.purge_soft_deleted_ugc(interval)')
+                        AND a.privilege_type = 'EXECUTE' AND (a.grantee = 0 OR r.rolname IN ('anon','authenticated')))
+    -- ── 1056: route medals ───────────────────────────────────────────────────────
+    -- (1) Owner-only, DERIVED: exactly one permissive SELECT policy, guest-guarded; no client
+    --     write privilege (inherited grants resolved) — the one write path is the DEFINER RPC.
+    --     Paired with the positive control: authenticated can still SELECT, or owners see nothing.
+    UNION ALL SELECT '1056_route_medals','route_medals: RLS on, 1 guest-guarded owner SELECT, no client writes, owners can read',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.route_medals')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='route_medals') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='route_medals'
+                  AND cmd='SELECT' AND permissive='PERMISSIVE'
+                  AND qual LIKE '%auth.uid()%' AND qual LIKE '%is_anonymous_session()%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.route_medals'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.route_medals'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('authenticated', to_regclass('public.route_medals'), 'SELECT'), false)
+    -- (2) "Deleted with the account": user_id CASCADE from profiles ('c'); route_id CASCADE too.
+    UNION ALL SELECT '1056_route_medals','route_medals: user_id and route_id ON DELETE CASCADE',
+      (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.route_medals') AND contype = 'f')
+      IS NOT DISTINCT FROM 'route_medals_route_id_fkey=c,route_medals_user_id_fkey=c'
+    -- (3) Both RPCs DEFINER + search_path pinned, no anon/PUBLIC EXECUTE. The badge reader
+    --     returns route ids ONLY (never dates) and is gated by CALLING get_student_profile — a
+    --     code shape, not a word a comment could carry.
+    UNION ALL SELECT '1056_route_medals','award_route_medal / get_profile_route_badges: DEFINER, pinned, not anon, ids only, gated by get_student_profile',
+      (SELECT count(*) FROM pg_proc p WHERE p.oid IN (to_regprocedure('public.award_route_medal(uuid)'),
+                                                     to_regprocedure('public.get_profile_route_badges(uuid)'))
+          AND p.prosecdef AND p.proconfig::text ILIKE '%search_path=public%'
+          AND NOT has_function_privilege('anon', p.oid, 'EXECUTE')) = 2
+      AND COALESCE(pg_get_function_result(to_regprocedure('public.get_profile_route_badges(uuid)')) = 'TABLE(route_id uuid)', false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.get_profile_route_badges(uuid)')) LIKE '%FROM get_student_profile(p_user_id)%'
+           AND pg_get_functiondef(to_regprocedure('public.get_profile_route_badges(uuid)')) LIKE '%p.route_badges_public%', false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.award_route_medal(uuid)')) LIKE '%is_anonymous_session()%'
+           AND pg_get_functiondef(to_regprocedure('public.award_route_medal(uuid)')) LIKE '%Europe/Istanbul%', false)
+    -- (4) The switch DEFAULTs to ON (product decision). A reverted DEFAULT creates no named object.
+    UNION ALL SELECT '1056_route_medals','profiles.route_badges_public: NOT NULL DEFAULT true',
+      COALESCE((SELECT is_nullable = 'NO' AND column_default = 'true' FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='profiles' AND column_name='route_badges_public'), false)
+    -- (5) The anonymous completion event: CHECK permits it (quoted literal).
+    UNION ALL SELECT '1056_route_medals','contact_events action CHECK permits route_complete',
+      COALESCE(position('''route_complete''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_action_check')) > 0, false)
+    -- (6) The Ministry view: exists, security_invoker (else it runs as postgres and bypasses
+    --     contact_events' admin-only RLS), anon cannot read it, and the under-5 suppression is
+    --     IN the view (a code shape).
+    UNION ALL SELECT '1056_route_medals','route_completions_monthly: invoker, not anon, suppresses < 5',
+      COALESCE((SELECT reloptions FROM pg_class WHERE oid = to_regclass('public.route_completions_monthly'))
+               @> ARRAY['security_invoker=true'], false)
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.route_completions_monthly'), 'SELECT'), false)
+      AND COALESCE(pg_get_viewdef(to_regclass('public.route_completions_monthly')) LIKE '%>= 5%', false)
+    -- (7) Completions must not inflate the click-through figure: the monthly contact view
+    --     filters them out (a code shape in the view definition).
+    UNION ALL SELECT '1056_route_medals','contact_events_monthly excludes route_complete',
+      COALESCE(pg_get_viewdef(to_regclass('public.contact_events_monthly')) LIKE '%<> ''route_complete''%', false)
+    -- ── 1059: KITOB hotels ───────────────────────────────────────────────────────
+    -- Every token reaches hotels through to_regclass / the catalogs: QUERY 1 is one statement
+    -- and a bare name on an unapplied database kills the whole report.
+    -- (1) The pre-launch inversion. A reverted DEFAULT creates no named object.
+    UNION ALL SELECT '1059_hotels','hotels.is_active DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='hotels'
+          AND column_name='is_active' AND column_default = 'false')
+    -- (2) Read-only to clients, DERIVED: exactly one permissive SELECT policy whose body gates on
+    --     BOTH switches (admin's is_active, the importer's delisted_at), no client write privilege
+    --     (inherited grants resolved), and the positive control — anon and authenticated can
+    --     still SELECT, or go-live shows an empty tab.
+    UNION ALL SELECT '1059_hotels','hotels: RLS on, 1 SELECT policy on is_active + delisted_at, no client writes, clients can read',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.hotels')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='hotels') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='hotels'
+                  AND cmd='SELECT' AND permissive='PERMISSIVE'
+                  AND qual LIKE '%is_active%' AND qual LIKE '%delisted_at IS NULL%')
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.hotels'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.hotels'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('anon', to_regclass('public.hotels'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.hotels'), 'SELECT'), false)
+    -- (3) The vocabularies as exact SETS (the 1038 form). Same-name DROP/ADD is invisible to E.
+    --     kitob_class must match HOTEL_CLASSES in constants/hotels.js, which the importer reads.
+    UNION ALL SELECT '1059_hotels','hotels_kitob_class_check is exactly the 10 KITOB classes',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z0-9_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_kitob_class_check')
+      IS NOT DISTINCT FROM ARRAY['apart','boutique','bungalow','holiday_village','special_certified',
+                                 'star1','star2','star3','star4','star5']
+    UNION ALL SELECT '1059_hotels','hotels_region_check is exactly the 7 REGIONS keys',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_region_check')
+      IS NOT DISTINCT FROM ARRAY['famagusta','iskele','karpaz','kyrenia','lefke','morphou','nicosia']
+    -- A second source is a decision (and hotels_kitob_member_check keys on 'kitob').
+    UNION ALL SELECT '1059_hotels','hotels_source_check is exactly {kitob}',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_source_check')
+      IS NOT DISTINCT FROM ARRAY['kitob']
+    -- (4) The touch trigger ignores last_seen_at (stamped on every row every run). An
+    --     unconditional body passes D while making updated_at meaningless.
+    UNION ALL SELECT '1059_hotels','hotels_touch_updated_at is conditional (ignores last_seen_at)',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.hotels_touch_updated_at()')) LIKE '%- ''last_seen_at''%', false)
+    -- (5) The contact_events MODULE vocabulary, owned here since 0910's count was retired.
+    --     An exact SET: a count of 13 would pass with a module swapped out. A new module
+    --     changes this array in the same commit, and that edit is the review moment.
+    UNION ALL SELECT '1059_hotels','contact_events module vocabulary is exactly the 13-module set (incl. hotels)',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-zA-Z]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.contact_events') AND c.conname = 'contact_events_module_check')
+      IS NOT DISTINCT FROM ARRAY['accommodation','events','explore','garages','grooming','homeServices',
+                                 'hotels','insurance','jobs','pets','studentHub','towing','transport']
+    -- ── 1060: hotel geocode provenance ─────────────────────────────────────────
+    -- (1) THE TWO-WAY RULE. Coordinates exist exactly when a source does (and a timestamp with
+    --     it). The half that matters most is source-without-coordinates being REFUSED: it is what
+    --     stops a KITOB list update from wiping a geocoded pin while leaving its provenance
+    --     behind. facilities' rule is one-way; loosening this one to match it would pass section
+    --     E by name and reopen exactly that clobber. Written from the live rendering.
+    UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_coords_provenance_check is two-way (lat <-> source <-> geocoded_at)',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_coords_provenance_check')
+               LIKE '%((lat IS NULL) = (geocode_source IS NULL))%((geocode_source IS NULL) = (geocoded_at IS NULL))%', false)
+    -- (2) ⚠ RETIRED 2026-09-29 by 20261061: "hotels_geocode_source_check is exactly
+    --   google_places/manual/osm/partner". 1061 removes google_places (storage policy: Places is a
+    --   cross-check only). Retired, not bumped — one fact, one owner. 1062 put google_places back;
+    --   the 1062 token owns the set now.
+    -- (3) Tier 1..3, matched on the RENDERING ('>= 1' / '<= 3'), never on BETWEEN (the 0919 trap).
+    UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_geocode_tier_check is still 1..3',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.hotels')
+        AND conname = 'hotels_geocode_tier_check'
+        AND pg_get_constraintdef(oid) LIKE '%>= 1%' AND pg_get_constraintdef(oid) LIKE '%<= 3%')
+    -- (4) The corroboration vocabulary as an exact SET. Unlike facilities this is ENFORCED, so a
+    --     rewrite that drops visual_satellite (mandatory for a hand-placed pin) goes red here.
+    UNION ALL SELECT '1060_hotels_geocode_provenance','hotels_geocode_corroboration_check is exactly the 8-term vocabulary',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_geocode_corroboration_check')
+      IS NOT DISTINCT FROM ARRAY['address_town','google_places','name_match','osm','phone_exchange',
+                                 'phone_match','region_audit','visual_satellite']
+    -- ── 1061: google_place_id ───────────────────────────────────────────────────
+    -- (1)+(2) ⚠ RETIRED 2026-09-29 by 20261062: "source set is exactly manual/osm/partner" and
+    --   "no hotel row has geocode_source = google_places". Berke reversed the policy the same day:
+    --   hotels take corroborated Google pins as a known risk. The 1062 token owns the set.
+    -- (3) google_place_id is format-checked AND unique (two hotels, one Place = a wrong match).
+    UNION ALL SELECT '1061_hotels_places_crosscheck','hotels.google_place_id: format CHECK + UNIQUE',
+      EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.hotels')
+        AND conname = 'hotels_google_place_id_check' AND pg_get_constraintdef(oid) LIKE '%google_place_id ~%')
+      AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.hotels')
+        AND conname = 'hotels_google_place_id_key' AND contype = 'u')
+    -- ── 1062: Google Places pins allowed again (known risk) ─────────────────────
+    -- (1) The source vocabulary as an exact SET. A same-name DROP/ADD that dropped a value would
+    --     pass E by name.
+    UNION ALL SELECT '1062_hotels_google_places','hotels_geocode_source_check is exactly google_places/manual/osm/partner',
+      (SELECT array_agg(DISTINCT m[1] ORDER BY m[1])
+         FROM pg_constraint c,
+              LATERAL regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') AS m
+        WHERE c.conrelid = to_regclass('public.hotels') AND c.conname = 'hotels_geocode_source_check')
+      IS NOT DISTINCT FROM ARRAY['google_places','manual','osm','partner']
+    -- (2) The traceability rule's body, not just its name: google_places ⇒ place id AND tier 2.
+    UNION ALL SELECT '1062_hotels_google_places','hotels_google_places_traceable_check requires google_place_id and tier 2',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_google_places_traceable_check')
+               LIKE '%google_places%google_place_id IS NOT NULL%geocode_tier = 2%', false)
+    -- ── 1063: KITOB guide content ───────────────────────────────────────────────
+    -- (1) THE BUCKET FLAG. Only storage.buckets.public says whether hotel photos render; a bucket
+    --     flipped private serves nothing and no named object changes. Limits asserted with it.
+    UNION ALL SELECT '1063_hotels_kitob_guide','bucket hotel-images is PUBLIC, 2 MB, jpeg/webp, and no storage policy names it',
+      COALESCE((SELECT public AND file_size_limit = 2097152 AND allowed_mime_types = ARRAY['image/jpeg','image/webp']
+                  FROM storage.buckets WHERE id = 'hotel-images'), false)
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+                      AND COALESCE(qual,'') || COALESCE(with_check,'') LIKE '%hotel-images%')
+    -- (2) Description keys are FULL language names: the allow-list carries 'English' and no ISO
+    --     code. A rewrite to 'en' keys passes E by name and matches nothing in the app, silently.
+    UNION ALL SELECT '1063_hotels_kitob_guide','hotels_description_i18n_check allows full language names only, string values',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_description_i18n_check')
+               LIKE '%''English''%''Turkish''%jsonb_path_exists%', false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_description_i18n_check')
+               NOT LIKE '%''en''%', false)
+    -- (3) A photo and its source travel together (the credit reads photo_source).
+    UNION ALL SELECT '1063_hotels_kitob_guide','hotels_photo_source_check is two-way with photo_url',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_source_check')
+               LIKE '%(photo_url IS NULL) = (photo_source IS NULL)%', false)
+    -- ── 1064: gallery + nine-language description cap ───────────────────────────
+    -- (1) The gallery is tied to the cover: present exactly with photo_url, element 1 IS
+    --     photo_url, and no NULL element (array_to_string skips NULLs, so the https regex alone
+    --     cannot see one). Read from the rendering.
+    UNION ALL SELECT '1064_hotels_gallery','hotels_gallery_check: two-way with photo_url, cover first, no NULL element',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_gallery_check')
+               LIKE '%(gallery_urls IS NULL) = (photo_url IS NULL)%gallery_urls[1] = photo_url%', false)
+      AND COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_gallery_check')
+               LIKE '%array_position(gallery_urls, NULL%) IS NULL%', false)   -- renders NULL::text
+    -- (2) The description byte cap is 40000 (nine languages; 12000 refused 37 of 95). The 1063
+    --     token owns the key allow-list; this one owns the number.
+    UNION ALL SELECT '1064_hotels_gallery','hotels_description_i18n_check caps at 40000 bytes',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_description_i18n_check')
+               LIKE '%octet_length((description_i18n)::text) <= 40000%', false)
+    -- (1) 'commons' is an allowed photo source (the 1063 token owns the two-way clause).
+    UNION ALL SELECT '1065_hotels_commons_credit','hotels_photo_source_check allows commons',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_source_check')
+               LIKE '%''commons''::text%', false)
+    -- (2) The credit travels with 'commons' and nothing else, NULL-safe: IS NOT DISTINCT FROM
+    --     renders as NOT (… IS DISTINCT FROM …). The plain `=` form lets a credit sit on a
+    --     photo-less row, because a CHECK passes on NULL.
+    UNION ALL SELECT '1065_hotels_commons_credit','hotels_photo_credit_check: credit exactly with commons, NULL-safe',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_photo_credit_check')
+               LIKE '%NOT (photo_source IS DISTINCT FROM ''commons''::text)) = (photo_credit IS NOT NULL)%', false)
+    -- ── 1066: notifications.type ────────────────────────────────────────────────
+    -- (1) Every function that inserts a notification sets `type`. DERIVED: the writer set is
+    --     read from pg_proc, not named, so a seventh writer that forgets goes red here. Six
+    --     today; a legitimate new writer bumps the count in the same commit, saying why.
+    UNION ALL SELECT '1066_notification_type','6 notification writers, all six set type, none uses the 3-column INSERT',
+      COALESCE((SELECT count(*) = 6
+                   AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES%')
+                   AND NOT bool_or(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body) VALUES%')
+                  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                 WHERE n.nspname = 'public' AND p.prosrc ~* 'insert\s+into\s+(public\.)?notifications\M'), false)
+    -- ── 1067: the ledger table's comment names the supabase-migrate workflow ────
+    -- A COMMENT creates no named object. Both halves: the new sentence, and the 20260903
+    -- text it extends (what a baseline row does and does not prove) still leading it.
+    UNION ALL SELECT '1067_ledger_comment_supabase_migrate','schema_migrations_applied comment names supabase-migrate and keeps the baseline caveat',
+      COALESCE(obj_description(to_regclass('public.schema_migrations_applied'), 'pg_class')
+                 LIKE 'One row per applied migration.%Baseline rows%supabase-migrate GitHub Actions workflow%', false)
+    -- ── 1068: a live Novest listing with no photo is hidden (RESTRICTIVE policy) ──
+    -- (1) The policy: RESTRICTIVE, SELECT, and the three arms as code shapes. A PERMISSIVE
+    --     copy would OR with props_select_public and hide nothing.
+    UNION ALL SELECT '1068_novest_hide_photoless','props_hide_photoless_novest is RESTRICTIVE SELECT on novest + is_admin() + property_has_photo(id)',
+      EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='properties'
+        AND policyname='props_hide_photoless_novest' AND permissive='RESTRICTIVE' AND cmd='SELECT'
+        AND qual LIKE '%novest%' AND qual LIKE '%is_admin()%' AND qual LIKE '%property_has_photo(id)%')
+    -- (2) The FULL policy set on properties, derived: 7 before 1068 + this one. Q3 never
+    --     counted properties, so this token owns the count.
+    UNION ALL SELECT '1068_novest_hide_photoless','properties has exactly 8 policies',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='properties') = 8
+    -- (3) The helper: DEFINER (so property_images' policy, which reads properties, is never
+    --     entered — no 42P17 cycle), search_path pinned, STABLE, and EXECUTE-able by anon —
+    --     the positive control: a helper nobody can run makes every guest read error.
+    UNION ALL SELECT '1068_novest_hide_photoless','private.property_has_photo: DEFINER, search_path pinned, STABLE, anon can execute',
+      COALESCE((SELECT p.prosecdef AND p.provolatile = 's'
+                   AND EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) c WHERE c LIKE 'search_path=%')
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('private.property_has_photo(uuid)')), false)
+      AND COALESCE(has_function_privilege('anon', to_regprocedure('private.property_has_photo(uuid)'), 'EXECUTE'), false)
+    -- ── 1070: Live Scores ───────────────────────────────────────────────────────
+    -- (1) Pre-launch DEFAULT. A reverted DEFAULT creates no named object.
+    UNION ALL SELECT '1070_live_scores','leagues.enabled DEFAULT false',
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='leagues' AND column_name='enabled' AND column_default = 'false')
+    -- (2) The module's FULL policy set: 15 on the eleven tables (7 public SELECT, 7 editor
+    --     writes, 1 own-row editor read). This token owns that count.
+    UNION ALL SELECT '1070_live_scores','live-scores tables carry exactly 15 policies, RLS on all 11',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename IN
+         ('leagues','teams','matches','match_events','f1_races','f1_results','f1_standings',
+          'api_quota_log','api_request_log','live_sync_state','live_score_editors')) = 15
+      AND (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname='public' AND c.relrowsecurity AND c.relname IN
+              ('leagues','teams','matches','match_events','f1_races','f1_results','f1_standings',
+               'api_quota_log','api_request_log','live_sync_state','live_score_editors')) = 11
+    -- (3) Editor writes are bound to a MANUAL league, and exclude guests (via is_score_editor).
+    UNION ALL SELECT '1070_live_scores','matches_editor_insert/update bind league_id to a manual league',
+      (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='matches'
+          AND policyname IN ('matches_editor_insert','matches_editor_update')
+          AND with_check LIKE '%FROM leagues l%' AND with_check LIKE '%is_score_editor()%') = 2
+    UNION ALL SELECT '1070_live_scores','is_score_editor excludes guests, DEFINER, search_path pinned',
+      COALESCE((SELECT p.prosecdef AND p.prosrc LIKE '%NOT public.is_anonymous_session()%'
+                   AND EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, ARRAY[]::text[])) c WHERE c LIKE 'search_path=%')
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.is_score_editor()')), false)
+    -- (4) The quota fence: 90, and no client may spend it. Positive control: service_role can.
+    UNION ALL SELECT '1070_live_scores','claim_api_request caps at 90, service_role only',
+      COALESCE((SELECT p.prosrc LIKE '%requests_used < 90%' FROM pg_proc p
+                 WHERE p.oid = to_regprocedure('public.claim_api_request(text)')), false)
+      AND COALESCE(NOT has_function_privilege('anon', to_regprocedure('public.claim_api_request(text)'), 'EXECUTE')
+               AND NOT has_function_privilege('authenticated', to_regprocedure('public.claim_api_request(text)'), 'EXECUTE')
+               AND has_function_privilege('service_role', to_regprocedure('public.claim_api_request(text)'), 'EXECUTE'), false)
+    -- (5) Realtime: the app subscribes to these three; without them it shows stale scores silently.
+    UNION ALL SELECT '1070_live_scores','supabase_realtime publishes matches, match_events, f1_results',
+      (SELECT count(*) FROM pg_publication_tables WHERE pubname='supabase_realtime' AND schemaname='public'
+          AND tablename IN ('matches','match_events','f1_results')) = 3
+    -- ── 1071: Live Scores follow-up ─────────────────────────────────────────────
+    -- (1) A deleted KTFF fixture reaches filtered Realtime subscriptions only with the full old
+    --     row in the WAL. relreplident 'f' = FULL; 'd' (default) carries the PK alone.
+    UNION ALL SELECT '1071_live_scores_followup','matches + match_events are REPLICA IDENTITY FULL',
+      (SELECT string_agg(relname || '=' || relreplident::text, ',' ORDER BY relname) FROM pg_class
+        WHERE oid IN (to_regclass('public.matches'), to_regclass('public.match_events')))
+      IS NOT DISTINCT FROM 'match_events=f,matches=f'
+    -- (2) No phone fetches from the provider: logo_url may point at the team-logos bucket only.
+    --     Same-name DROP/ADD, so E sees the name and not the rule.
+    UNION ALL SELECT '1071_live_scores_followup','teams_logo_check admits the team-logos bucket and nothing else',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.teams') AND conname = 'teams_logo_check')
+               LIKE '%supabase\\.co/storage/v1/object/public/team-logos/%', false)
+    -- (3) The bucket is public with its limits, and no storage policy names it (only the sync,
+    --     as service_role, writes; storage.objects stays at the 1042 baseline of 36).
+    UNION ALL SELECT '1071_live_scores_followup','bucket team-logos is PUBLIC, 512 KB, png/jpeg/webp, and no storage policy names it',
+      COALESCE((SELECT public AND file_size_limit = 524288 AND allowed_mime_types = ARRAY['image/png','image/jpeg','image/webp']
+                  FROM storage.buckets WHERE id = 'team-logos'), false)
+      AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+                      AND COALESCE(qual,'') || COALESCE(with_check,'') LIKE '%team-logos%')
+    -- (4) An F1 session has no round on the free plan: round nullable, keyed by api_race_id.
+    UNION ALL SELECT '1071_live_scores_followup','f1_races.round is nullable',
+      EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+        AND table_name='f1_races' AND column_name='round' AND is_nullable='YES')
+    -- ── 1073: the score-editor membership is exactly Berke's customer account ──────
+    -- A second editor is a decision with its own migration; this edit is the review moment.
+    UNION ALL SELECT '1073_live_scores_editor_grant','live_score_editors is exactly the one granted account',
+      (SELECT string_agg(user_id::text, ',' ORDER BY user_id) FROM public.live_score_editors)
+      IS NOT DISTINCT FROM '412cad91-2e3b-41b9-8186-175dfb8afa35'
+    -- ── 1077: international + UEFA club football ───────────────────────────────
+    -- (1) The club order the Football tab renders, derived from the rows (internationals,
+    --     country = 'World', sit at 20–49 between Süper Lig and the Champions League).
+    UNION ALL SELECT '1077_live_scores_international','football club order: KTFF, Süper Lig, UCL, UEL, UECL, Super Cup, PL, La Liga, Serie A, Bundesliga, Ligue 1',
+      (SELECT string_agg(coalesce(external_id, 'KTFF'), ',' ORDER BY sort_order, external_id) FROM public.leagues
+        WHERE sport = 'football' AND enabled AND country IS DISTINCT FROM 'World')
+      IS NOT DISTINCT FROM 'KTFF,203,2,3,848,531,39,140,135,78,61'
+    -- (2) 28 enabled internationals, all inside the 20–49 band the order relies on.
+    UNION ALL SELECT '1077_live_scores_international','28 enabled internationals (country World), sorted 20–49',
+      (SELECT count(*) FROM public.leagues WHERE sport = 'football' AND enabled AND country = 'World') = 28
+      AND NOT EXISTS (SELECT 1 FROM public.leagues WHERE sport = 'football' AND country = 'World'
+                       AND sort_order NOT BETWEEN 20 AND 49)
+    -- ── 1079: pharmacy_coords is readable by the app and writable by no app role ──
+    -- (1) DERIVED: RLS on, exactly one policy (a permissive SELECT to anon + authenticated; a
+    --     second would OR in), no client write privilege (inherited grants resolved), and the
+    --     positive control — both roles can still SELECT, or every duty distance silently
+    --     falls back to facilities. Through to_regclass so an absent table reads false.
+    UNION ALL SELECT '1079_pharmacy_coords_read_seed_pins','pharmacy_coords: RLS on, 1 permissive SELECT policy to anon+authenticated, no client writes, clients can read',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.pharmacy_coords')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='pharmacy_coords') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pharmacy_coords'
+                  AND policyname='pharmacy_coords_select_public' AND cmd='SELECT' AND permissive='PERMISSIVE'
+                  AND roles @> ARRAY['anon','authenticated']::name[] AND cardinality(roles) = 2)
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.pharmacy_coords'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.pharmacy_coords'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('anon', to_regclass('public.pharmacy_coords'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.pharmacy_coords'), 'SELECT'), false)
+    -- (2) KTEB's 'ÖZVOL' typo stays out of the roster. gen-duty-roster-sql.mjs fixes it at load;
+    --     a load that bypassed the generator is the only way this goes red.
+    UNION ALL SELECT '1079_pharmacy_coords_read_seed_pins','duty_list carries no ÖZVOL ECZANESİ (typo of ÖZYOL)',
+      NOT EXISTS(SELECT 1 FROM public.duty_list WHERE name = 'ÖZVOL ECZANESİ')
+  ) z
+
+  UNION ALL
+  -- ── I. RLS ENABLED — DERIVED over every table in `public`, not a name list ─
+  --
+  -- ⚠ REWRITTEN 2026-09-16. This section used to carry a hand-maintained
+  --   `c.relname IN (...)` of 44 names, and a new table did not join it by being
+  --   created — somebody had to remember. student_education (20261026) was missing for
+  --   exactly that reason, and the ledger table has never been in it at all.
+  --
+  --   That is the failure this whole file argues against in the 0821 note: a check
+  --   phrased as a remembered list has no red to go to. It goes green over the table
+  --   nobody thought of, which is the only table the check was ever needed for. The
+  --   privacy guard had the same shape and the same hole. So: enumerate what IS, and
+  --   let the exceptions be the thing that has to be justified.
+  --
+  -- WHAT THE ROWS MEAN. RLS is the security boundary for this app, so in `public` the
+  -- correct state is ON for every table we own, in three distinct cases:
+  --   • USER DATA — profiles, reviews, questions, notifications, claim requests. OFF
+  --     here is a customer reading another customer's row.
+  --   • ADMIN-SEEDED DIRECTORIES — towing_companies, home_strip_pin, ad_banners,
+  --     ad_modules, student_tasks, institutions, reserved_names, subjects. No user data,
+  --     but public-read + admin-write-only is TRUE SOLELY BECAUSE RLS IS ON. OFF means
+  --     world-writable. ad_banners and home_strip_pin are the sharpest: both render an
+  --     outbound link and artwork on the FIRST SCREEN of the app, so an unauthenticated
+  --     writer could put an arbitrary destination in front of every user, and it would
+  --     look exactly like a campaign we sold.
+  --   • WRITE-ONLY / LOG TABLES — contact_events is world-INSERTABLE by design and RLS
+  --     is the only thing making it not also world-READABLE; push_log holds delivery
+  --     history that RLS keeps off every signed-in customer.
+  --
+  -- EXTENSION-OWNED TABLES ARE EXCLUDED, derived from pg_depend rather than named:
+  -- PostGIS's spatial_ref_sys and anything else an extension installs into public is not
+  -- ours to police, and naming them would rebuild the list this rewrite removes.
+  --
+  -- THERE IS NO EXEMPTION LIST, deliberately. If a table legitimately needs RLS off,
+  -- that is a decision worth seeing in the report every time rather than one worth
+  -- hiding behind a name — and an exemption list is just the old list wearing a
+  -- different hat, with the same blind spot for whatever nobody classified.
+  SELECT 'I-rls-enabled', '-', c.relname,
+         CASE WHEN c.relrowsecurity THEN 'ON' ELSE 'OFF ← FIX' END
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public'
+    AND c.relkind IN ('r', 'p')
+    AND NOT EXISTS (SELECT 1 FROM pg_depend d
+                     WHERE d.classid = 'pg_class'::regclass
+                       AND d.objid = c.oid
+                       AND d.deptype = 'e')
+)
+-- ─── THE VERDICT ROW ────────────────────────────────────────────────────────
+-- Added 2026-08-30. Scanning ~700 rows by eye for `status <> 'OK'` is not an assertion,
+-- and neither is "how many rows changed state since last time": a scoped query counting
+-- headline objects reported 12 where this register carries ~47 for one slice, and the
+-- gap read like a partial apply when it was a narrow query. Both failure modes are the
+-- house rule — DERIVE what you assert, never eyeball it and never remember a count.
+--
+-- So the report now derives its own verdict and prints it as the FIRST row: either
+-- "ALL n CHECKS PASS" or the number of problems, which are listed immediately below it.
+-- READ THE TOP ROW. Do not count anything by hand.
+SELECT section, migration, object, status FROM (
+  SELECT 0 AS ord, 'Z-VERDICT' AS section, '-' AS migration,
+         CASE WHEN s.n_bad = 0
+              THEN 'ALL ' || s.n_all || ' CHECKS PASS'
+              ELSE s.n_bad || ' PROBLEM(S) of ' || s.n_all || ' — listed immediately below'
+         END AS object,
+         CASE WHEN s.n_bad = 0 THEN 'OK' ELSE 'FAIL ← FIX' END AS status
+    FROM (SELECT count(*) AS n_all,
+                 count(*) FILTER (WHERE status NOT IN ('OK','ON')) AS n_bad
+            FROM report) s
+  UNION ALL
+  SELECT 1, section, migration, object, status FROM report
+) t
+ORDER BY ord, (status IN ('OK','ON')) ASC, section, migration, object;  -- problems float to top
+
+;
