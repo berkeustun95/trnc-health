@@ -17,7 +17,7 @@ SELECT n.nspname || '.' || p.proname || '(' || pg_get_function_identity_argument
        min(f.depth) AS depth, string_agg(DISTINCT f.via, ',') AS reached_from,
        pg_get_userbyid(p.proowner) AS owner, p.prosecdef AS security_definer,
        CASE p.provolatile WHEN 'i' THEN 'IMMUTABLE' WHEN 's' THEN 'STABLE' ELSE 'VOLATILE' END AS volatility,
-       p.prolang::reglanguage::text AS lang, p.proconfig::text AS config, p.proacl::text AS acl,
+       (SELECT l.lanname::text FROM pg_language l WHERE l.oid = p.prolang) AS lang, p.proconfig::text AS config, p.proacl::text AS acl,
        has_function_privilege('supabase_read_only_user', p.oid, 'EXECUTE') AS ro_can_execute,
        p.prosrc AS body
   FROM fns f JOIN pg_proc p ON p.oid = f.oid JOIN pg_namespace n ON n.oid = p.pronamespace
