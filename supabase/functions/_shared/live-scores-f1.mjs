@@ -151,7 +151,15 @@ export async function runDailyF1(sb, _sport, key, say) {
   const { data: owed, error } = await sb.from('f1_races').select('id, api_race_id, name, race_at')
     .eq('session_type', 'race').eq('status', 'finished').eq('results_final', false)
   if (error) throw new Error(`f1_races (owed): ${error.message}`)
-  for (const race of owed) {
+  // API-Sports fills `time`/`grid` in HOURS after a race ends (2026-10-04: null at the
+  // Completed status, present by midday), so a race marked final at the flag can hold empty
+  // times. A race from the last two days with any time-less row is fetched once more.
+  const { data: recent, error: rErr } = await sb.from('f1_races').select('id, api_race_id, name, race_at, f1_results(time_text)')
+    .eq('session_type', 'race').eq('status', 'finished').eq('results_final', true)
+    .gte('race_at', new Date(Date.now() - 2 * day).toISOString())
+  if (rErr) throw new Error(`f1_races (recent): ${rErr.message}`)
+  const stale = recent.filter(r => (r.f1_results || []).some(x => x.time_text == null))
+  for (const race of [...owed, ...stale]) {
     await storeResults(sb, key, race, true, now, say)
     await markFinal(sb, race)
   }
