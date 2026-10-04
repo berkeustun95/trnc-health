@@ -9,7 +9,7 @@
 import {
   mapStatus, matchRowFrom, eventRowsFrom, teamRowsFrom, pollIntervalMinutes, callerIsServiceRole,
   DAILY_CAP,
-  logoPath,
+  logoPath, isSeniorMenFixture,
 } from '../supabase/functions/_shared/live-scores.mjs'
 import { mapSessionType, mapRaceStatus, sessionRowFrom, resultRowFrom } from '../supabase/functions/_shared/live-scores-f1.mjs'
 
@@ -88,6 +88,13 @@ const spread = pollIntervalMinutes({ used: 80, liveEndsAt: '2026-10-03T21:00:00Z
 check(spread === 14, `120 min over 9 affordable polls must give 14 min (got ${spread})`)
 const clipped = pollIntervalMinutes({ used: 80, liveEndsAt: '2026-10-04T02:00:00Z', now: '2026-10-03T23:00:00Z', dailyDone: true })
 check(clipped === 7, `the window is clipped at the 00:00 UTC quota reset (got ${clipped})`)
+
+// Men's senior only: youth and women's sides are dropped (real names seen 2026-10-04).
+const fx = (h, a) => ({ teams: { home: { name: h }, away: { name: a } } })
+for (const [h, a, want] of [['Italy', 'Türkiye', true], ['Portugal U18', 'Turkey U18', false], ['Spain U-21', 'France U-21', false],
+     ['England W', 'Wales W', false], ['Brazil Women', 'Chile Women', false], ['Turks and Caicos Islands', 'British Virgin Islands', true],
+     ['Wolves', 'Watford', true], ['Under 20 Argentina', 'Chile', false], ['Bayer 04 Leverkusen', 'FC Utrecht', true]])
+  check(isSeniorMenFixture(fx(h, a)) === want, `${h} – ${a} should be ${want ? 'kept' : 'dropped'}`)
 
 // F1 (shapes from a real races?date response, 2026-10-03).
 check(mapSessionType('Race') === 'race' && mapSessionType('Sprint') === 'sprint', 'race / sprint')

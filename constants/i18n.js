@@ -31,6 +31,7 @@ export const LANGUAGES = [
 const translations = {
   en: {
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
+    lsTurkeyTeam: "Türkiye national team",
     lsF1Race: "Race",
     lsF1Sprint: "Sprint",
     lsF1Qualifying: "Qualifying",
@@ -2027,6 +2028,7 @@ const translations = {
   },
   tr: {
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
+    lsTurkeyTeam: "A Milli Takım",
     lsF1Race: "Yarış",
     lsF1Sprint: "Sprint",
     lsF1Qualifying: "Sıralama",
@@ -3995,6 +3997,7 @@ const translations = {
   },
   ar: {
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
+    lsTurkeyTeam: "منتخب تركيا",
     lsF1Race: "السباق",
     lsF1Sprint: "السباق القصير",
     lsF1Qualifying: "التصفيات",
@@ -5739,6 +5742,7 @@ const translations = {
   },
   ru: {
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
+    lsTurkeyTeam: "Сборная Турции",
     lsF1Race: "Гонка",
     lsF1Sprint: "Спринт",
     lsF1Qualifying: "Квалификация",
@@ -7493,6 +7497,7 @@ const translations = {
   },
   el: {
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
+    lsTurkeyTeam: "Εθνική Τουρκίας",
     lsF1Race: "Αγώνας",
     lsF1Sprint: "Σπριντ",
     lsF1Qualifying: "Κατατακτήριες",
@@ -9235,6 +9240,7 @@ const translations = {
   },
   fr: {
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
+    lsTurkeyTeam: "Équipe de Turquie",
     lsF1Race: "Course",
     lsF1Sprint: "Sprint",
     lsF1Qualifying: "Qualifications",
@@ -10981,6 +10987,7 @@ const translations = {
   },
   es: {
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
+    lsTurkeyTeam: "Selección de Turquía",
     lsF1Race: "Carrera",
     lsF1Sprint: "Sprint",
     lsF1Qualifying: "Clasificación",
@@ -12724,6 +12731,7 @@ const translations = {
   },
   de: {
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
+    lsTurkeyTeam: "Türkische Nationalmannschaft",
     lsF1Race: "Rennen",
     lsF1Sprint: "Sprint",
     lsF1Qualifying: "Qualifying",
@@ -14467,6 +14475,7 @@ const translations = {
   },
   fa: {
     // ─── Live Scores (screens/LiveScoresScreen.js, LiveScoresEditorScreen.js) ───
+    lsTurkeyTeam: "تیم ملی ترکیه",
     lsF1Race: "مسابقه",
     lsF1Sprint: "اسپرینت",
     lsF1Qualifying: "تعیین خط",

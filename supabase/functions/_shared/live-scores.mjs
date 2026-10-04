@@ -218,10 +218,32 @@ async function enabledLeagues(sb, sport) {
   return new Map(data.map(l => [String(l.external_id), l.id]))
 }
 
+// Men's senior only (Berke, 2026-10-04). The provider's "Friendlies" competition (id 10) mixes
+// youth national teams into the senior one (seen: "Portugal U18 – Turkey U18"), so a fixture
+// with an age-limited or women's side is dropped, whatever competition it arrives under.
+export const NOT_SENIOR_MEN = /(^|[^a-z0-9])(u-?\d{2}|under[- ]?\d{2})($|[^0-9])|\bwomen\b|\bw$|\bfem(enil|inine|inino)?\b/i
+export function isSeniorMenFixture(it) {
+  return !NOT_SENIOR_MEN.test(String(it.teams?.home?.name || '')) && !NOT_SENIOR_MEN.test(String(it.teams?.away?.name || ''))
+}
+
+// Rows stored before the filter existed are removed the same way (DB work, no API request).
+async function pruneNonSenior(sb, sport, say) {
+  if (sport !== 'football') return
+  const { data: teams, error } = await sb.from('teams').select('id')
+    .eq('sport', sport).eq('source', 'api').filter('name', 'imatch', '(^|[^a-z0-9])(u-?[0-9]{2}|under[- ]?[0-9]{2})($|[^0-9])|women| w$')
+  if (error) throw new Error(`teams (non-senior): ${error.message}`)
+  if (!teams.length) return
+  const ids = teams.map(t => t.id).join(',')
+  const { data: gone, error: dErr } = await sb.from('matches').delete()
+    .eq('source', 'api').or(`home_team_id.in.(${ids}),away_team_id.in.(${ids})`).select('id')
+  if (dErr) throw new Error(`matches (non-senior prune): ${dErr.message}`)
+  if (gone.length) say(`${sport}: removed ${gone.length} youth/women's match(es)`)
+}
+
 // Upsert teams then matches for the items that belong to enabled leagues. Returns the
 // upserted rows' { id, external_id } so football can attach events.
 async function upsertItems(sb, sport, items, leagueIdByExt, now, say) {
-  const mine = items.filter(it => leagueIdByExt.has(String(it.league.id)))
+  const mine = items.filter(it => leagueIdByExt.has(String(it.league.id)) && (sport !== 'football' || isSeniorMenFixture(it)))
   if (!mine.length) return []
   const teams = teamRowsFrom(sport, mine)
   const { data: tRows, error: tErr } = await sb.from('teams')
@@ -331,6 +353,7 @@ export async function runDaily(sb, sport, key, say) {
   const { error } = await sb.from('api_request_log').delete().lt('at', new Date(Date.now() - 30 * 86400000).toISOString())
   if (error) say(`api_request_log purge failed: ${error.message}`)
   await sb.from('live_sync_state').update({ last_daily_on: today }).eq('sport', sport)
+  await pruneNonSenior(sb, sport, say)
   await mirrorLogos(sb, sport, say)
   return schedule(sb, sport, now, say)
 }
@@ -344,7 +367,7 @@ export async function runPoll(sb, sport, key, say) {
   const leagues = await enabledLeagues(sb, sport)
   if (sport === 'football') {
     const live = await apiSports(sb, sport, key, '/fixtures?live=all')
-    const mine = live.filter(f => leagues.has(String(f.league.id)))
+    const mine = live.filter(f => leagues.has(String(f.league.id)) && isSeniorMenFixture(f))
     const mRows = await upsertItems(sb, sport, mine, leagues, now, say)
     await syncFootballEvents(sb, mine, mRows)
     // Anything we track that is past kick-off but absent from the live list has ended,
@@ -365,6 +388,7 @@ export async function runPoll(sb, sport, key, say) {
       await upsertItems(sb, sport, items, leagues, now, say)
     }
   }
+  await pruneNonSenior(sb, sport, say)
   await mirrorLogos(sb, sport, say, 10)
   return schedule(sb, sport, new Date().toISOString(), say)
 }

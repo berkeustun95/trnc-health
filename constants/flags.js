@@ -379,7 +379,7 @@ export const HOTELS_LIVE = false
 //   3. The F1 data source settled (licence) — or the F1 tab removed.
 //   4. Turkish device pass with this flipped LOCALLY, then BOTH files in one commit
 //      (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs), then OTA.
-export const LIVE_SCORES_LIVE = false
+export const LIVE_SCORES_LIVE = true   // live 2026-10-04 — football (club + internationals), basketball, F1
 
 // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar.
 //
