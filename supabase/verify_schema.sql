@@ -3809,6 +3809,12 @@ WITH report AS (
     --     a load that bypassed the generator is the only way this goes red.
     UNION ALL SELECT '1079_pharmacy_coords_read_seed_pins','duty_list carries no ÖZVOL ECZANESİ (typo of ÖZYOL)',
       NOT EXISTS(SELECT 1 FROM public.duty_list WHERE name = 'ÖZVOL ECZANESİ')
+    -- ── 1080: pharmacy_coords speaks the roster's region vocabulary ───────────────
+    -- An exact SET (the 1059 form): a bare 'Mesarya' coming back, or any tenth value, is a
+    -- review moment. The app's region gate keeps a 'Mesarya' arm as a safety net only.
+    UNION ALL SELECT '1080_pharmacy_coords_mesarya_split','pharmacy_coords.region is exactly the 9 KTEB regions (no bare Mesarya)',
+      (SELECT array_agg(DISTINCT region COLLATE "C" ORDER BY region COLLATE "C") FROM public.pharmacy_coords)   -- C: prod's collation is linguistic
+      IS NOT DISTINCT FROM ARRAY['Alt Mesarya','Gazimağusa','Girne','Güzelyurt','Karpaz','Lefke','Lefkoşa','Üst Mesarya','İskele']
   ) z
 
   UNION ALL
