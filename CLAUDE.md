@@ -1,5 +1,15 @@
 # ADA — North Cyprus assistant
 
+> ## ⛔ RELEASE FREEZE — runtime 1.3.0 and 1.2.0 (since 2026-10-04, until Berke says "unfreeze")
+> - **NO production OTA** on 1.3.0 or 1.2.0. `npm run ota` refuses while `release-freeze.json` has
+>   `"frozen": true` (`scripts/check-release-freeze.mjs`, first in the chain). `eas update` directly
+>   was already forbidden — it would bypass the guard.
+> - Work continues normally on branches and the **PREVIEW channel** (`npm run ota:preview`).
+> - Exception: an **urgent bug fix only**, with Berke's **explicit OK in chat**, Preview first, then
+>   `FREEZE_OVERRIDE=1 npm run ota -- --message "…"` (Berke hands over the override). Log it in the journal.
+> - Why: redesign go-live — Android 1.3.0 staged at 20%, iOS 1.3.0 in review (vault `redesign-go-live-runbook.md`).
+> - Unfreeze (Berke's word only): set `"frozen": false` in `release-freeze.json` and remove this block, one commit.
+
 ## What this is
 ADA is a TRNC super-app for residents and newcomers: facilities directory and duty roster, Explore
 (places, walking routes), events, accommodation, hotels, towing, home services, pets, Student Hub and
