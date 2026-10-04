@@ -3077,19 +3077,31 @@ WITH report AS (
     -- WHAT EACH CLAUSE ACTUALLY CATCHES — they are not redundant, and getting the reason
     -- wrong is how the next reader deletes one of them:
     --
-    --   • THE COUNT sees a surviving TABLE-level grant. information_schema.column_privileges
-    --     EXPANDS a table grant into one row per column, so the broken
+    --   • THE COUNT sees a surviving TABLE-level grant. It EXPANDS a table grant (relacl)
+    --     into one row per column, as information_schema.column_privileges does, so the broken
     --     `REVOKE SELECT (customer_id) …` (which leaves the table grant intact) reads
     --     9 x 2 = 18 here, not 16. It also catches a lost column grant (14) and a future
     --     ADD COLUMN that somebody granted (18) — and that edit is the review moment.
+    --   • Read from pg_attribute.attacl / pg_class.relacl, NOT information_schema.column_privileges:
+    --     that view shows only privileges the CURRENT role grants or holds, so run as
+    --     supabase_read_only_user it counted 0 and went red on an unchanged database
+    --     (2026-10-04, migration-status workflow). The catalogs read the same for every role.
     --   • has_column_privilege sees what the count CANNOT: the count filters on
     --     grantee IN ('anon','authenticated'), so a grant made to PUBLIC, or reaching these
     --     roles through role membership, never appears in it as a row at all.
     --     has_column_privilege resolves inherited privilege and answers the real question.
     UNION ALL SELECT '1033_reviews_author_not_public','reviews exposes 8 columns to anon/authenticated, and customer_id is not one',
-      (SELECT count(*) FROM information_schema.column_privileges
-        WHERE table_schema='public' AND table_name='reviews'
-          AND privilege_type='SELECT' AND grantee IN ('anon','authenticated')) = 16
+      (SELECT count(*) FROM (
+         SELECT a.attname, r.rolname FROM pg_attribute a
+           CROSS JOIN LATERAL aclexplode(a.attacl) x JOIN pg_roles r ON r.oid = x.grantee
+          WHERE a.attrelid = to_regclass('public.reviews') AND a.attnum > 0 AND NOT a.attisdropped
+            AND x.privilege_type = 'SELECT' AND r.rolname IN ('anon','authenticated')
+         UNION
+         SELECT a.attname, r.rolname FROM pg_class c
+           CROSS JOIN LATERAL aclexplode(c.relacl) x JOIN pg_roles r ON r.oid = x.grantee
+           JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+          WHERE c.oid = to_regclass('public.reviews')
+            AND x.privilege_type = 'SELECT' AND r.rolname IN ('anon','authenticated')) s) = 16
       AND NOT has_column_privilege('anon', 'public.reviews', 'customer_id', 'SELECT')
       AND NOT has_column_privilege('authenticated', 'public.reviews', 'customer_id', 'SELECT')
     -- The replacement reads, asserted for the properties a C-section name check cannot see.
@@ -3815,6 +3827,16 @@ WITH report AS (
     UNION ALL SELECT '1080_pharmacy_coords_mesarya_split','pharmacy_coords.region is exactly the 9 KTEB regions (no bare Mesarya)',
       (SELECT array_agg(DISTINCT region COLLATE "C" ORDER BY region COLLATE "C") FROM public.pharmacy_coords)   -- C: prod's collation is linguistic
       IS NOT DISTINCT FROM ARRAY['Alt Mesarya','Gazimağusa','Girne','Güzelyurt','Karpaz','Lefke','Lefkoşa','Üst Mesarya','İskele']
+
+    -- ══ the read-only role can run QUERY 1 (20261081) ═══════════════════════
+    -- A grant creates no named object. Without it, QUERY 1 aborts with 42501 under the
+    -- migration-status workflow (supabase_read_only_user) at the 1035/1036 calls. The pair:
+    -- the role holds EXECUTE on both, and anon still holds it on neither.
+    UNION ALL SELECT '1081_readonly_role_runs_verify_schema','supabase_read_only_user can EXECUTE may_initiate_by_age + is_listed_student; anon cannot',
+      COALESCE(has_function_privilege('supabase_read_only_user', to_regprocedure('public.may_initiate_by_age(uuid,uuid)'), 'EXECUTE')
+           AND has_function_privilege('supabase_read_only_user', to_regprocedure('public.is_listed_student(uuid)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.may_initiate_by_age(uuid,uuid)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.is_listed_student(uuid)'), 'EXECUTE'), false)
   ) z
 
   UNION ALL
