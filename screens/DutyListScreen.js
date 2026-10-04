@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import LocationOffRow from '../components/LocationOffRow'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, SectionList, FlatList } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, SectionList, FlatList, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -12,7 +12,8 @@ import { REGION_TO_DUTY } from '../constants/regions'
 import { dutyStatus, localDateKey, DUTY_FRESH, DUTY_PARTIAL } from '../utils/dutyStatus'
 import { buildFacilityIndex, matchDutyRow } from '../utils/dutyFacilityMatch'
 import { REDESIGN } from '../constants/redesign'
-import { ScreenHeader as KitHeader, InfoBanner, InlineAlert, ContactBar, Button, CardSkeleton, ModuleScreen, SectionHeader } from '../components/ui'
+import { ScreenHeader as KitHeader, InfoBanner, InlineAlert, ContactBar, Button, CardSkeleton, ModuleScreen, SectionHeader, BottomSheet, EmptyState, FilterBar } from '../components/ui'
+import { dutyUntilText } from '../components/home/redesign/Widgets'
 import { CARD_BG } from '../components/ui/ModuleScreen'
 import { colors as C, category, type, radii, elevation } from '../constants/theme'
 
@@ -59,6 +60,15 @@ function regionBLKey(region) {
 function regionLabel(region, lang) {
   const key = regionBLKey(region)
   return key ? t(key, lang) : (region ?? '')
+}
+
+// Redesign: KTEB's own Turkish region name in every language (Berke: region names are proper
+// nouns), normalised the same way as regionBLKey so "GİRNE" or a stray NBSP still matches.
+function canonicalRegion(region) {
+  if (!region) return null
+  const trimmed = region.replace(/\u00a0/g, ' ').trim()
+  const lower = trimmed.toLocaleLowerCase('tr')
+  return DISTRICT_ORDER.find(d => d.toLocaleLowerCase('tr') === lower) ?? trimmed
 }
 
 // Restored verbatim from ee28b42, which a76ee97 removed on 2026-06-29. a76ee97's objection
@@ -172,7 +182,7 @@ function PharmacyCard({ item, showRegionBadge, lang }) {
 // Measured at 320dp (Inter Bold 14): the number needs 0.86 scale, "Cómo llegar" 0.78 — both above
 // their minimumFontScale; English uses the short "Directions" ("Get Directions" needed 0.66).
 function PharmacyCardRedesign({ item, showRegionBadge, lang }) {
-  const region = showRegionBadge && item.region ? regionLabel(item.region, lang) : null
+  const region = showRegionBadge && item.region ? canonicalRegion(item.region) : null
   const dist = item._dist != null ? `${item._dist.toFixed(1)} km ${t('dutyStraightLine', lang)}` : null
   return (
     <View style={r.pCard}>
@@ -218,6 +228,36 @@ function MesaryaNoteRedesign({ lang }) {
   return <InfoBanner icon="information-circle-outline" category="health" message={t('dutyMesaryaWeekdayNote', lang)} style={r.note} />
 }
 
+function DutyChip({ text, active, chevron, onPress }) {
+  return (
+    <TouchableOpacity style={[r.chip, active && r.chipOn]} onPress={onPress} activeOpacity={0.8}
+      accessibilityRole="button" accessibilityState={{ selected: active }}>
+      <Text style={[r.chipText, active && r.chipTextOn]} numberOfLines={1}>{text}</Text>
+      {chevron ? <Feather name="chevron-down" size={14} color={active ? C.primaryDark : C.textSecondary} /> : null}
+    </TouchableOpacity>
+  )
+}
+
+// The nine KTEB regions; "Tümü" is the other chip, so the sheet has no reset row.
+function RegionSheet({ visible, selected, onPick, onClose, lang }) {
+  return (
+    <BottomSheet visible={visible === true} onClose={onClose} title={t('dutyRegionSheetTitle', lang)} lang={lang}>
+      <ScrollView>
+        {DISTRICT_ORDER.map(name => {
+          const on = name === selected
+          return (
+            <TouchableOpacity key={name} style={r.sheetRow} onPress={() => onPick(name)} activeOpacity={0.7}
+              accessibilityRole="button" accessibilityState={{ selected: on }}>
+              <Text style={[r.sheetRowText, on && r.sheetRowTextOn]} numberOfLines={1}>{name}</Text>
+              {on ? <Ionicons name="checkmark" size={20} color={C.primary} /> : null}
+            </TouchableOpacity>
+          )
+        })}
+      </ScrollView>
+    </BottomSheet>
+  )
+}
+
 // `initialRegion` is a canonical region slug (from city welcome). We hoist that
 // region's sections to the top rather than scrolling to them: the list is short,
 // and SectionList.scrollToLocation throws when the index is out of range — which
@@ -231,6 +271,9 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
   // A failed READ, as opposed to a roster that is genuinely stale/absent. Both land on the
   // KTEB card; only this one is worth a retry.
   const [fetchError, setFetchError] = useState(false)
+  // Redesign region filter. Plain state on purpose: the screen always reopens on "Tümü".
+  const [region, setRegion] = useState(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   // ee28b42's condition, restored unchanged: distance sorting is on only when we actually
   // have a fix. locationDenied is checked separately from userLocation because a denied
@@ -302,14 +345,21 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
     return { ...row, _dist: dist }
   }), [rows, facIndex, sortByDistance, userLocation?.latitude, userLocation?.longitude])
 
+  // Filtered BEFORE both list shapes are built, so nearest-first and the district list both
+  // honour the chip. Distance stays measured from the user, not from the region.
+  const shown = useMemo(
+    () => region ? decorated.filter(row => canonicalRegion(row.region) === region) : decorated,
+    [decorated, region],
+  )
+
   // District SectionList — the shape when location is unavailable, unchanged from today.
   const sections = useMemo(() => {
-    if (!decorated.length) return []
+    if (!shown.length) return []
     const map = {}
     // 'tr' collator: these are Turkish pharmacy names, and the default one sorts
     // ü as u and ö as o — so "Gülhan" and "Gunay" come out in the wrong order, and
     // dotless ı interleaves with dotted İ instead of preceding it.
-    for (const row of [...decorated].sort((a, b) => a.name.localeCompare(b.name, 'tr'))) {
+    for (const row of [...shown].sort((a, b) => a.name.localeCompare(b.name, 'tr'))) {
       if (!map[row.region]) map[row.region] = []
       map[row.region].push(row)
     }
@@ -318,7 +368,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
       ...DISTRICT_ORDER.filter(d => map[d]).map(d => ({ title: d, data: map[d] })),
       ...Object.entries(map).filter(([k]) => !knownSet.has(k)).map(([k, v]) => ({ title: k, data: v })),
       // Empty Mesarya sections render the weekday note as their footer.
-      ...MESARYA_REGIONS.filter(d => !map[d]).map(d => ({ title: d, data: [] })),
+      ...(region ? [] : MESARYA_REGIONS.filter(d => !map[d]).map(d => ({ title: d, data: [] }))),
     ]
     // Arrived from a city-welcome card: float that city's sections to the top,
     // keeping DISTRICT_ORDER within each group so the rest of the list is
@@ -327,17 +377,17 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
     return hoist.size
       ? [...sorted.filter(x => hoist.has(x.title)), ...sorted.filter(x => !hoist.has(x.title))]
       : sorted
-  }, [decorated, initialRegion])
+  }, [shown, region, initialRegion])
 
   // Flat nearest-first — ee28b42's shape, including its null-last tiebreak. Rows with no
   // matched coordinate keep their place at the END rather than being dropped: an unmatched
   // duty pharmacy is still a duty pharmacy, and at 2am it is still where someone can go.
-  const nearest = useMemo(() => [...decorated].sort((a, b) => {
+  const nearest = useMemo(() => [...shown].sort((a, b) => {
     if (a._dist == null && b._dist == null) return a.name.localeCompare(b.name, 'tr')
     if (a._dist == null) return 1
     if (b._dist == null) return -1
     return a._dist - b._dist
-  }), [decorated])
+  }), [shown])
 
   const mesaryaMissing = useMemo(
     () => MESARYA_REGIONS.some(r => !decorated.some(row => row.region === r)),
@@ -352,11 +402,28 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
       { kind: 'call', label: t('dutyCallKteb', lang), onPress: () => Linking.openURL(`tel:${KTEB_TEL}`) },
       { kind: 'web', label: t('dutyOpenKteb', lang), onPress: () => Linking.openURL(KTEB_URL) },
     ]
-    const empty = (sortByDistance ? nearest : sections).length === 0
+    // Nothing at all today is an ERROR (there is always a duty pharmacy); one region with no
+    // row is not: Mesarya on weekdays is normal, elsewhere it gets a short state + KTEB.
+    const empty = decorated.length === 0
+    const regionEmpty = !!region && !empty && shown.length === 0
+    // "Bugün · 08.00'e kadar" only when every pharmacy in view closes at the same time —
+    // open_until differs by district, so one island-wide time would be wrong somewhere
+    // (dutyUntilFor in App.js). Otherwise the date, as before; each card has its own hours.
+    const untils = new Set(shown.map(x => x.open_until).filter(Boolean).map(x => String(x).slice(0, 5)))
+    const untilText = untils.size === 1 ? dutyUntilText([...untils][0], lang) : null
+    const subtitle = untilText ? `${t('dateToday', lang)} · ${untilText}` : dateLabel
     return (
       <ModuleScreen topic="duty">
       <SafeAreaView style={r.safe} edges={['top']}>
-        <KitHeader onBack={onBack} title={t('dutyPharmacies', lang)} subtitle={dateLabel} lang={lang} />
+        <KitHeader onBack={onBack} title={t('dutyPharmacies', lang)} subtitle={subtitle} lang={lang} />
+        {!loading && !empty ? (
+          <FilterBar>
+            <DutyChip text={t('filterAll', lang)} active={region == null} onPress={() => setRegion(null)} />
+            <DutyChip text={region ?? t('dutyPickRegion', lang)} active={region != null} chevron onPress={() => setSheetOpen(true)} />
+          </FilterBar>
+        ) : null}
+        <RegionSheet visible={sheetOpen} selected={region} lang={lang}
+          onPick={name => { setRegion(name); setSheetOpen(false) }} onClose={() => setSheetOpen(false)} />
         <View style={r.container}>
           {/* PARTIAL keeps its rows and its KTEB escape; flexShrink 0 for the same reason as
               the legacy notice (cropped once the list scrolls). */}
@@ -391,14 +458,22 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
                 <Text style={r.attribution}>{t('dutyKtebAttribution', lang)}</Text>
               </View>
             </View>
+          ) : regionEmpty ? (
+            MESARYA_REGIONS.includes(region) ? (
+              <View style={r.listContent}><MesaryaNoteRedesign lang={lang} /></View>
+            ) : (
+              <EmptyState icon="medkit-outline" category="health" style={r.regionEmpty}
+                title={t('dutyRegionEmpty', lang).replace('{region}', region)}
+                action={{ label: t('dutyCallKteb', lang), onPress: () => Linking.openURL(`tel:${KTEB_TEL}`) }} />
+            )
           ) : sortByDistance ? (
             <FlatList
               data={nearest}
               keyExtractor={item => item.id}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={r.listContent}
-              renderItem={({ item }) => <PharmacyCardRedesign item={item} showRegionBadge lang={lang} />}
-              ListFooterComponent={mesaryaMissing ? <MesaryaNoteRedesign lang={lang} /> : null}
+              renderItem={({ item }) => <PharmacyCardRedesign item={item} showRegionBadge={region == null} lang={lang} />}
+              ListFooterComponent={region == null && mesaryaMissing ? <MesaryaNoteRedesign lang={lang} /> : null}
             />
           ) : (
             <SectionList
@@ -409,7 +484,7 @@ export default function DutyListScreen({ onBack, lang, userLocation, locationDen
               stickySectionHeadersEnabled={false}
               renderSectionHeader={({ section }) => (
                 <SectionHeader style={r.regionHeader}
-                  title={section.data.length > 0 ? `${regionLabel(section.title, lang)} · ${section.data.length}` : regionLabel(section.title, lang)} />
+                  title={section.data.length > 0 ? `${canonicalRegion(section.title)} · ${section.data.length}` : canonicalRegion(section.title)} />
               )}
               renderSectionFooter={({ section }) => (
                 section.data.length === 0 ? <MesaryaNoteRedesign lang={lang} /> : null
@@ -638,4 +713,15 @@ const r = StyleSheet.create({
   errorTitle:   { ...type.sheetTitle, color: C.textPrimary, textAlign: 'center', marginBottom: 6 },
   errorBody:    { ...type.body, color: C.textSecondary, textAlign: 'center' },
   attribution:  { ...type.meta, color: C.textSecondary, textAlign: 'center', marginTop: 12 },
+  regionEmpty:  { marginHorizontal: 0, marginTop: 4 },
+  // Same pill as FilterDropdown's trigger; text on primaryLight is primaryDark (contrast).
+  chip:         { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 14,
+                  borderRadius: radii.pill, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.card },
+  chipOn:       { borderColor: C.primary, backgroundColor: C.primaryLight },
+  chipText:     { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.textPrimary, flexShrink: 1 },
+  chipTextOn:   { color: C.primaryDark },
+  sheetRow:     { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderBottomColor: C.border },
+  sheetRowText: { ...type.body, color: C.textPrimary, flex: 1 },
+  sheetRowTextOn: { fontFamily: 'Inter_700Bold', color: C.primaryDark },
 })
