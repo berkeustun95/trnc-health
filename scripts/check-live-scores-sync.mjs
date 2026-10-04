@@ -117,6 +117,8 @@ const req = h => ({ headers: { get: k => (k === 'authorization' ? h : null) } })
 check(callerIsServiceRole(req('Bearer ' + tok('service_role'))) === true, 'service_role token must pass')
 check(callerIsServiceRole(req('Bearer ' + tok('anon'))) === false, 'the anon key must be refused')
 check(callerIsServiceRole(req('')) === false, 'no token must be refused')
+check(callerIsServiceRole(req('Bearer sb_secret_abc'), 'sb_secret_abc') === true, 'the exact service key must pass')
+check(callerIsServiceRole(req('Bearer sb_publishable_x'), 'sb_secret_abc') === false, 'another non-JWT key must be refused')
 
 if (problems.length) {
   console.error('live-scores sync check FAILED:')

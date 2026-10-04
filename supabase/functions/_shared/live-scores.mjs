@@ -164,8 +164,10 @@ export class QuotaExhausted extends Error {}
 // Only service_role may run a sync. verify_jwt proves the token is signed by this project;
 // the anon key is ALSO such a token, so without this check anyone holding the app could
 // invoke the function and spend the day's quota.
-export function callerIsServiceRole(req) {
+export function callerIsServiceRole(req, serviceKey) {
   const tok = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
+  // The exact service key (a non-JWT secret key from CI) is accepted as itself.
+  if (serviceKey && tok === serviceKey) return true
   const part = tok.split('.')[1]
   if (!part) return false
   try {
@@ -406,16 +408,28 @@ async function schedule(sb, sport, now, say) {
   return next
 }
 
+// Ops: list the provider's CURRENT 'World' competitions (internationals + UEFA club cups) for
+// a human to choose from. One request; writes nothing. Called via the live-scores-run workflow.
+export async function runLeagueLookup(sb, sport, key, say) {
+  const items = await apiSports(sb, sport, key, '/leagues?country=World&current=true')
+  const list = items.map(x => ({ id: x.league?.id, name: x.league?.name, type: x.league?.type,
+    season: (x.seasons || []).find(z => z.current)?.year ?? null }))
+    .sort((a, b) => a.id - b.id)
+  say(`leagues: ${list.length} current World competitions`)
+  for (const l of list) say(`league ${l.id} | ${l.name} | ${l.type} | ${l.season}`)
+  return null
+}
+
 // The handler both functions export. mode: 'daily' | 'poll'.
 export async function handle(req, sport, createClient, env, runners = { daily: runDaily, poll: runPoll }) {
-  if (!callerIsServiceRole(req)) return new Response('forbidden', { status: 403 })
+  if (!callerIsServiceRole(req, env('SUPABASE_SERVICE_ROLE_KEY'))) return new Response('forbidden', { status: 403 })
   const log = []
   const say = s => { log.push(s); console.log(s) }
   const sb = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'),
     { auth: { persistSession: false, autoRefreshToken: false } })
   const key = env('API_SPORTS_KEY')
   let mode = 'poll'
-  try { mode = (await req.json())?.mode === 'daily' ? 'daily' : 'poll' } catch { /* empty body = poll */ }
+  try { const m = (await req.json())?.mode; mode = runners[m] ? m : 'poll' } catch { /* empty body = poll */ }
   try {
     if (!key) throw new Error('API_SPORTS_KEY is not set')
     const next = await runners[mode](sb, sport, key, say)

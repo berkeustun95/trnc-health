@@ -8,6 +8,7 @@
 // from Node (scripts/check-live-scores-sync.mjs). service_role callers only — see
 // callerIsServiceRole there for why verify_jwt alone is not enough.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { handle } from '../_shared/live-scores.mjs'
+import { handle, runDaily, runPoll, runLeagueLookup } from '../_shared/live-scores.mjs'
 
-Deno.serve((req: Request) => handle(req, 'football', createClient, (k: string) => Deno.env.get(k)))
+Deno.serve((req: Request) => handle(req, 'football', createClient, (k: string) => Deno.env.get(k),
+  { daily: runDaily, poll: runPoll, leagues: runLeagueLookup }))
