@@ -266,6 +266,8 @@ export default function HotelsTab({ lang }) {
 
   if (hotels.length === 0) return <HotelsComingSoon lang={lang} />
 
+  function clearFilters() { setKlass(null); setDistrict(null); setArea(null) }
+
   return (
     <View style={{ flex: 1 }}>
       <View style={hs.filterBar}>
@@ -276,6 +278,12 @@ export default function HotelsTab({ lang }) {
         {areaOpts.length > 0 && (
           <FilterDropdown label={t('accomFilterArea', lang)} lang={lang}
             options={areaOpts} value={area} onChange={setArea} />
+        )}
+        {!!(klass || district || area) && (
+          <TouchableOpacity style={hs.clearPill} onPress={clearFilters} accessibilityRole="button">
+            <Ionicons name="close" size={14} color={REDESIGN ? colors.dangerInk : colors.danger} />
+            <Text style={hs.clearPillText}>{t('accomClear', lang)}</Text>
+          </TouchableOpacity>
         )}
       </View>
       <FlatList
@@ -288,12 +296,12 @@ export default function HotelsTab({ lang }) {
         renderItem={({ item }) => <HotelCard hotel={item} lang={lang} district={district} />}
         ListEmptyComponent={REDESIGN ? (
           <EmptyState icon="bed-outline" category="homeLife" title={t('hotelsNoResults', lang)} style={{ marginTop: 28 }}
-            action={{ label: t('accomClear', lang), onPress: () => { setKlass(null); setDistrict(null); setArea(null) } }} />
+            action={{ label: t('accomClear', lang), onPress: clearFilters }} />
         ) : (
           <View style={hs.center}>
             <Ionicons name="bed-outline" size={40} color={colors.border} />
             <Text style={hs.emptyTitle}>{t('hotelsNoResults', lang)}</Text>
-            <TouchableOpacity style={hs.retry} onPress={() => { setKlass(null); setDistrict(null); setArea(null) }}>
+            <TouchableOpacity style={hs.retry} onPress={clearFilters}>
               <Text style={hs.retryText}>{t('accomClear', lang)}</Text>
             </TouchableOpacity>
           </View>
@@ -306,6 +314,9 @@ export default function HotelsTab({ lang }) {
 const legacyHs = StyleSheet.create({
   // flexShrink:0 — a fixed-height row above a scrolling list (CLAUDE.md).
   filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexShrink: 0 },
+  // Same pill as Emlak's clear-all (AccommodationScreen clearPill).
+  clearPill:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.dangerLight, backgroundColor: colors.dangerLight },
+  clearPillText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
   listContent:   { paddingHorizontal: HOTEL_ACTIONS.listPadX, paddingBottom: 32 },
 
   card:          { backgroundColor: colors.cardBg, borderRadius: 20, marginBottom: 14, overflow: 'hidden', ...shadow },
@@ -360,6 +371,9 @@ const legacyHs = StyleSheet.create({
 // hotel photo is KITOB's, so its crop stays full-width (partner rule).
 const redesignHs = StyleSheet.create({
   filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, flexShrink: 0 },
+  clearPill:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, minHeight: 36,
+                   borderRadius: radii.pill, backgroundColor: colors.dangerLight },
+  clearPillText: { ...type.small, fontFamily: 'Inter_700Bold', color: colors.dangerInk },
   listContent:   { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 },
   // On Konaklama's module photo (ModuleScreen, option B): cards at 93% white, radius 20.
   card:          { backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20, marginBottom: 12, overflow: 'hidden', ...elevation.card },
