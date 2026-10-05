@@ -298,7 +298,9 @@ WITH report AS (
     ('1071_live_scores_followup','teams','source_logo_url'),
     ('1071_live_scores_followup','f1_races','session_type'),
     -- 1077. League display names by full language name; the app falls back to name.
-    ('1077_live_scores_international','leagues','name_i18n')
+    ('1077_live_scores_international','leagues','name_i18n'),
+    -- 1083. HotelRunner booking link. HotelsTab selects it: MISSING = 42703 on the tab.
+    ('1083_hotels_hotelrunner','hotels','hotelrunner_url')
 
   ) e(m,t,c)
 
@@ -784,7 +786,9 @@ WITH report AS (
     ('1071_live_scores_followup','teams_source_logo_check'),
     ('1071_live_scores_followup','f1_races_session_type_check'),
     ('1071_live_scores_followup','f1_races_api_race_id_key'),
-    ('1077_live_scores_international','leagues_name_i18n_check')
+    ('1077_live_scores_international','leagues_name_i18n_check'),
+    -- 1083. The H token asserts what it permits.
+    ('1083_hotels_hotelrunner','hotels_hotelrunner_url_check')
 
   ) e(m,o)
 
@@ -3809,6 +3813,18 @@ WITH report AS (
     --     a load that bypassed the generator is the only way this goes red.
     UNION ALL SELECT '1079_pharmacy_coords_read_seed_pins','duty_list carries no ÖZVOL ECZANESİ (typo of ÖZYOL)',
       NOT EXISTS(SELECT 1 FROM public.duty_list WHERE name = 'ÖZVOL ECZANESİ')
+    -- ── 1083: HotelRunner booking ───────────────────────────────────────────────
+    -- (1) The 'book' action. Same DROP/ADD of the same name as 1014/1046/1056, so the E-section
+    --     name token cannot see it. Quoted literal, as the maps/route_complete tokens.
+    UNION ALL SELECT '1083_hotels_hotelrunner','contact_events action CHECK permits book',
+      COALESCE(position('''book''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_action_check')) > 0, false)
+    -- (2) The link is https-only with no whitespace, <= 2048. Written from the rendering.
+    UNION ALL SELECT '1083_hotels_hotelrunner','hotels_hotelrunner_url_check is https-only, no whitespace, <= 2048',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_hotelrunner_url_check')
+               LIKE '%''^https://\\S+$''::text%<= 2048%', false)
   ) z
 
   UNION ALL
