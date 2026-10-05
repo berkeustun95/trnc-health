@@ -306,6 +306,11 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
 "→ architecture.md updates needed" if structural.
 
 ## Open windows / pending (vault = `~/ObsidianVault/10-ada/`)
+- **Next store release (not before "unfreeze") — Play Console warnings, 2026-10-05:**
+  - **DEX code optimization below threshold** (Play deadline **Feb 2027**): enable R8 minify/obfuscation for
+    Android release builds and upload the deobfuscation mapping file with each AAB. Native change → device pass.
+  - **Deprecated edge-to-edge APIs** → address with the next Expo SDK upgrade (SDK bump = ask first).
+  - **Large-screen orientation/resizability** → part of the tablet backlog (`supportsTablet: false`, portrait-only today).
 - **Lock down the production Maps key `0Nlg`** (follow-up to the Explore restyle launch, 2026-10-04):
   restrict to Android apps `com.berkeustun95.ada` + upload SHA-1 `3C:9A:…:BF:5E` + the Play App Signing
   SHA-1 (Play Console → App integrity), API = Maps SDK for Android only. Get the Play signing SHA-1 FIRST
@@ -315,5 +320,6 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
 - Play listing pushed 2026-09-28: check Console for the review verdict.
 - Student Hub stale-affiliation recovery test (window closes when `20261027` applies) → `claude-md-lessons.md`.
 - Student Hub message push deep link, WARM and COLD, on the Play Store build → same file.
-- Student Hub terms re-ask (SOP step 6): `studentHub` is `true` in flags.js; decision unrecorded.
+- Student Hub terms re-ask (SOP step 6): DECIDED + shipped in 1.3.0 — `StudentHubTermsGate` for signed-in
+  non-guest accounts on terms < `STUDENT_HUB_TERMS_MIN` (2026-09-20); vault `redesign-go-live-runbook.md`.
 - Image messaging safety scope → `2026-09-20_image-messaging-safety-scope-PARKED.md`.
