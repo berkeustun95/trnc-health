@@ -33,3 +33,7 @@ export const HOTEL_ACTIONS = {
   listPadX: 16, cardPadX: 16, gap: 8, buttonPadX: 4, border: 1.5, fontSize: 12,
   labelKeys: ['hotelCall', 'hotelWebsite', 'hotelMap'],
 }
+
+// "Rezervasyon Yap" (HotelRunner): one full-width primary button above the three actions, on
+// hotels with hotels.hotelrunner_url only. Geometry shared with the label guard.
+export const HOTEL_BOOK = { padX: 16, icon: 18, gap: 8, fontSize: 15, labelKey: 'hotelBook' }

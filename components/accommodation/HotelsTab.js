@@ -9,8 +9,9 @@ import { CardSkeleton, EmptyState, ErrorState, RemoteImage } from '../ui'
 import { t } from '../../constants/i18n'
 import FilterDropdown from '../FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../../constants/regions'
-import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY, HOTEL_CLASS_STARS, HOTEL_ACTIONS } from '../../constants/hotels'
+import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY, HOTEL_CLASS_STARS, HOTEL_ACTIONS, HOTEL_BOOK } from '../../constants/hotels'
 import { logContactEvent } from '../../utils/logContactEvent'
+import { hotelBookingUrl } from '../../utils/hotelBooking'
 import { hotelArea } from '../../utils/hotelArea'
 import OsmAttribution from '../OsmAttribution'
 
@@ -22,7 +23,7 @@ import OsmAttribution from '../OsmAttribution'
 
 // photo_source drives the credit (KITOB, or photo_credit for a Commons photo — 20261065);
 // description_i18n the card text (20261063).
-const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, gallery_urls, photo_source, photo_credit, description_i18n, is_kitob_member'
+const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, gallery_urls, photo_source, photo_credit, description_i18n, is_kitob_member, external_id, hotelrunner_url'
 
 const CLASS_RANK = Object.fromEntries(HOTEL_CLASSES.map((k, i) => [k, i]))
 const collator = new Intl.Collator('tr')
@@ -111,6 +112,12 @@ function HotelCard({ hotel, lang, district }) {
     logContactEvent('hotels', hotel.id, 'website', district)
     Linking.openURL(hotel.website).catch(() => {})
   }
+  // HotelRunner booking (20261083). Logged on the line BEFORE the open, like call/website/maps.
+  const bookUrl = hotelBookingUrl(hotel)
+  function book() {
+    logContactEvent('hotels', hotel.id, 'book', district)
+    Linking.openURL(bookUrl).catch(() => {})
+  }
   async function map() {
     logContactEvent('hotels', hotel.id, 'maps', district)
     for (const url of mapUrls(hotel, lang)) {
@@ -152,6 +159,13 @@ function HotelCard({ hotel, lang, district }) {
             accessibilityState={{ expanded }}>
             <Text style={hs.description} numberOfLines={expanded ? undefined : 3}>{description}</Text>
             <Text style={hs.more}>{t(expanded ? 'hotelReadLess' : 'hotelReadMore', lang)}</Text>
+          </TouchableOpacity>
+        )}
+
+        {!!bookUrl && (
+          <TouchableOpacity style={hs.book} onPress={book} activeOpacity={0.85} accessibilityRole="button">
+            <Ionicons name="calendar-outline" size={HOTEL_BOOK.icon} color="#fff" />
+            <Text style={hs.bookText} numberOfLines={1}>{t(HOTEL_BOOK.labelKey, lang)}</Text>
           </TouchableOpacity>
         )}
 
@@ -352,6 +366,11 @@ const legacyHs = StyleSheet.create({
   placeText:     { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18 },
 
   actions:       { flexDirection: 'row', gap: HOTEL_ACTIONS.gap, marginTop: 14 },
+  // Full-width primary above the three actions; geometry shared with the label guard (HOTEL_BOOK).
+  book:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: HOTEL_BOOK.gap,
+                   minHeight: TAP, marginTop: 14, paddingHorizontal: HOTEL_BOOK.padX, borderRadius: 12,
+                   backgroundColor: colors.primary },
+  bookText:      { fontSize: HOTEL_BOOK.fontSize, fontFamily: 'Inter_700Bold', color: '#fff' },
   // borderWidth + borderRadius needs an explicit backgroundColor on Android (CLAUDE.md).
   // Icon ABOVE label; geometry shared with the label guard (HOTEL_ACTIONS).
   action:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -402,6 +421,10 @@ const redesignHs = StyleSheet.create({
                    paddingVertical: 6, paddingHorizontal: HOTEL_ACTIONS.buttonPadX, borderRadius: radii.md,
                    borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: colors.card },
   actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  book:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: HOTEL_BOOK.gap,
+                   minHeight: TAP, marginTop: 14, paddingHorizontal: HOTEL_BOOK.padX, borderRadius: radii.md,
+                   backgroundColor: colors.primary },
+  bookText:      { fontSize: HOTEL_BOOK.fontSize, fontFamily: 'Inter_700Bold', color: colors.onPrimary },
   actionText:    { fontSize: HOTEL_ACTIONS.fontSize, lineHeight: 16, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark },
   actionTextPrimary: { color: colors.onPrimary },
 })

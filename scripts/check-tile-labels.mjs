@@ -215,7 +215,7 @@ export function headroom(str, px, box, maxLines) {
 
 // ═══ THE CHECK ══════════════════════════════════════════════════════════════
 import { HOME_MODULES, GRID_COLUMNS, GRID_LABEL_HEIGHT, ACCOM_TILE_STATES } from '../constants/homeModules.js'
-import { HOTEL_ACTIONS } from '../constants/hotels.js'
+import { HOTEL_ACTIONS, HOTEL_BOOK } from '../constants/hotels.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
 
 // Both widths that matter: a typical modern phone, and the narrowest device in the fold
@@ -366,6 +366,10 @@ for (const W of WIDTHS) {
       const content = W - 2 * A.listPadX - 2 * A.cardPadX
       const box = (content - 2 * A.gap) / 3 - 2 * A.buttonPadX - 2 * A.border
       for (const k of A.labelKeys) assess('card', t(k, L), A.fontSize, box, `${W}dp ${L} hotelButton:${k}`, CURSIVE.has(L), 1)
+      // "Rezervasyon Yap" (HotelRunner): full card width, icon beside the label, ONE line.
+      const B = HOTEL_BOOK
+      const bookBox = content - 2 * B.padX - B.icon - B.gap
+      assess('card', t(B.labelKey, L), B.fontSize, bookBox, `${W}dp ${L} hotelBook`, CURSIVE.has(L), 1)
     }
     // ─── The strip's card copy ──────────────────────────────────────────────
     // Titles at 14pt over two lines; subtitles at 11pt, which the card renders on ONE, so a
