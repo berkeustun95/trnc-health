@@ -711,7 +711,10 @@ export default function AccommodationScreen({
 
       {/* Emlak / Yurtlar list and the Oteller tab are HIDDEN, never unmounted, when you
           switch away, so each keeps its scroll position. */}
-      <View style={[cs.pane, isHotel && cs.hidden]}>
+      {/* One container for both panes; each pane FILLS it (absoluteFill), so a pane's size never
+          depends on how the column shares space with the header and tabs. */}
+      <View style={cs.panes}>
+      <View style={[StyleSheet.absoluteFill, isHotel && cs.hidden]}>
       {loading ? (
         REDESIGN
           ? <View style={cs.listContent}>{[0, 1, 2].map(i => <CardSkeleton key={i} height={280} style={{ marginBottom: 12 }} />)}</View>
@@ -811,10 +814,11 @@ export default function AccommodationScreen({
       </View>
 
       {hotelsMounted && (
-        <View style={[cs.pane, !isHotel && cs.hidden]}>
+        <View style={[StyleSheet.absoluteFill, !isHotel && cs.hidden]}>
           <HotelsTab lang={lang} />
         </View>
       )}
+      </View>
 
       {/* Price range + currency. Currency matters here beyond filtering: a price sort
           across currencies is not a comparison, so narrowing to one makes it real. */}
@@ -951,7 +955,7 @@ const legacyCs = StyleSheet.create({
   intentDotOnActive:   { backgroundColor: '#FFFFFF' },
 
   pillBar:             { flexGrow: 0, flexShrink: 0 },
-  pane:                { flex: 1 },
+  panes:               { flex: 1 },
   hidden:              { display: 'none' },
   pillBarContent:      { paddingHorizontal: 16, gap: 8, paddingBottom: 12 },
   clearPill:           { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.dangerLight, backgroundColor: colors.dangerLight },

@@ -273,7 +273,7 @@ export default function HotelsTab({ lang }) {
   function clearFilters() { setKlass(null); setDistrict(null); setArea(null) }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={hs.root}>
       <View style={hs.filterBar}>
         <FilterDropdown label={t('hotelFilterClass', lang)} lang={lang}
           options={classOpts} value={klass} onChange={setKlass} />
@@ -293,6 +293,7 @@ export default function HotelsTab({ lang }) {
       <FlatList
         data={shown}
         keyExtractor={h => h.id}
+        style={hs.list}
         contentContainerStyle={[hs.listContent, { paddingBottom: listBottomPad(insets) }]}
         showsVerticalScrollIndicator={false}
         initialNumToRender={6}
@@ -316,6 +317,11 @@ export default function HotelsTab({ lang }) {
 }
 
 const legacyHs = StyleSheet.create({
+  // The tab fills ITS PANE, never its content: spelled out, because a plain {flex: 1} wrapper
+  // was laid out at filter bar + list content (816) inside a 686 pane on device (2026-10-05,
+  // measured), pushing the last card's buttons 130 px under the Android navigation bar.
+  root:          { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },
+  list:          { flex: 1 },
   // flexShrink:0 — a fixed-height row above a scrolling list (CLAUDE.md).
   filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexShrink: 0 },
   // Same pill as Emlak's clear-all (AccommodationScreen clearPill).
