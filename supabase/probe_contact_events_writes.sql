@@ -15,10 +15,10 @@ select json_build_object(
   'auth_insert_cols', (select json_agg(column_name order by column_name) from information_schema.columns c
                where table_schema = 'public' and table_name = 'contact_events'
                  and has_column_privilege('authenticated', 'public.contact_events', c.column_name, 'INSERT')),
-  'by_day', (select json_agg(x order by x->>'day' desc, x->>'module', x->>'action') from (
-               select json_build_object('day', to_char(created_at at time zone 'Europe/Istanbul', 'YYYY-MM-DD'),
-                      'module', module, 'action', action, 'n', count(*)) x
+  'by_day', (select json_agg(json_build_object('day', day, 'module', module, 'action', action, 'n', n)
+                      order by day desc, module, action) from (
+               select to_char(created_at at time zone 'Europe/Istanbul', 'YYYY-MM-DD') as day, module, action, count(*) as n
                from public.contact_events where created_at > now() - interval '21 days'
-               group by 1, module, action) s),
+               group by 1, 2, 3) s),
   'total', (select count(*) from public.contact_events)
 ) as contact_events_probe;
