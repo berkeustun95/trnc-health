@@ -216,7 +216,7 @@ const EXPECTED_SCALARS = {
   DORMS_LIVE:            true,   // live 2026-09-13
   // Oteller (KITOB hotels). Baselined because a flip publishes a third-party
   // association's name and badge — permission first, see the precondition list on the flag.
-  HOTELS_LIVE:           false,
+  HOTELS_LIVE:           true,   // live at unfreeze (KITOB approved 2026-10-04)
   LIVE_SCORES_LIVE:      true,   // live 2026-10-04
   // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar. Not a
   // MODULE_FLAGS key for the same mechanical reason DORMS_LIVE is not: it gates a PARTNER
