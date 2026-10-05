@@ -8,6 +8,11 @@
     "hotelrunner.com"
   ],
   "links": {
+    "Acapulco Beach Club & Resort": {
+      "url": "https://acapulco-resort-convention-spa.hotelrunner.com/bv3/search",
+      "source": "provided by Berke 2026-10-05 (official link)",
+      "confidence": "High"
+    },
     "Arkın Palm Beach Hotel": {
       "url": "https://arkin-palm-beach-hotel.hotelrunner.com/bv3/search",
       "source": "found by ADA 2026-10-05 (not from HotelRunner)",
