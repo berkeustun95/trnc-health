@@ -215,7 +215,7 @@ export function headroom(str, px, box, maxLines) {
 
 // ═══ THE CHECK ══════════════════════════════════════════════════════════════
 import { HOME_MODULES, GRID_COLUMNS, GRID_LABEL_HEIGHT, ACCOM_TILE_STATES } from '../constants/homeModules.js'
-import { HOTEL_ACTIONS } from '../constants/hotels.js'
+import { HOTEL_ACTIONS, HOTEL_BOOK } from '../constants/hotels.js'
 import { t, LANG_CODES } from '../constants/i18n.js'
 
 // Both widths that matter: a typical modern phone, and the narrowest device in the fold
@@ -344,11 +344,32 @@ for (const W of WIDTHS) {
     // ─── The hotel card's three action buttons (Oteller) ─────────────────────
     // ONE line each, in the box HotelsTab draws (geometry from constants/hotels.js, never
     // retyped here). "Web sitesi" was ellipsed on every card on the 2026-09-29 device test.
+    // The measurement below is only true if EVERY card style draws the button this way. The
+    // redesign card (redesignHs, live from 1.3.0) once laid the icon BESIDE the label in its own
+    // padding, and this guard stayed green while "Web sitesi" truncated at every width — it was
+    // measuring the legacy box. So each `action:` style in HotelsTab must stack icon above label
+    // and take its padding and font size from HOTEL_ACTIONS.
+    if (W === 320 && L === 'English') {
+      const src = readFileSync(resolve(ROOT, 'components/accommodation/HotelsTab.js'), 'utf8')
+      const actions = [...src.matchAll(/^\s*action:\s*\{([\s\S]*?)\},\s*$/gm)].map(m => m[1])
+      const bad = actions.filter(b => /flexDirection:\s*'row'/.test(b) || !/paddingHorizontal:\s*HOTEL_ACTIONS\.buttonPadX/.test(b))
+      const texts = [...src.matchAll(/^\s*actionText:\s*\{([\s\S]*?)\},\s*$/gm)].map(m => m[1])
+      const badText = texts.filter(b => !/fontSize:\s*HOTEL_ACTIONS\.fontSize/.test(b))
+      if (actions.length < 2 || texts.length < 2) { console.error(`check-tile-labels: expected the legacy AND redesign hotel action styles, found ${actions.length} action / ${texts.length} actionText — measuring nothing`); process.exit(1) }
+      if (bad.length || badText.length) {
+        console.error(`check-tile-labels: a HotelsTab action style does not use HOTEL_ACTIONS geometry (icon above label, buttonPadX, fontSize), so the hotel button measurement does not describe it:\n${[...bad, ...badText].map(b => '  {' + b.replace(/\s+/g, ' ').trim() + '}').join('\n')}`)
+        process.exit(1)
+      }
+    }
     {
       const A = HOTEL_ACTIONS
       const content = W - 2 * A.listPadX - 2 * A.cardPadX
       const box = (content - 2 * A.gap) / 3 - 2 * A.buttonPadX - 2 * A.border
       for (const k of A.labelKeys) assess('card', t(k, L), A.fontSize, box, `${W}dp ${L} hotelButton:${k}`, CURSIVE.has(L), 1)
+      // "Rezervasyon Yap" (HotelRunner): full card width, icon beside the label, ONE line.
+      const B = HOTEL_BOOK
+      const bookBox = content - 2 * B.padX - B.icon - B.gap
+      assess('card', t(B.labelKey, L), B.fontSize, bookBox, `${W}dp ${L} hotelBook`, CURSIVE.has(L), 1)
     }
     // ─── The strip's card copy ──────────────────────────────────────────────
     // Titles at 14pt over two lines; subtitles at 11pt, which the card renders on ONE, so a

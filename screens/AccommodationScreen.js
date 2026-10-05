@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
   TextInput, ScrollView, Dimensions, Modal, Pressable,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import KeyboardAwareForm from '../components/KeyboardAwareForm'
 import { Ionicons, Feather } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -16,7 +16,7 @@ import DormPartnerScreen from './DormPartnerScreen'
 import HotelsTab from '../components/accommodation/HotelsTab'
 import ScreenHeader from '../components/ScreenHeader'
 import PartnerLogoStrip from '../components/PartnerLogoStrip'
-import { colors, shadow, radii, type, elevation, category, TAP } from '../constants/theme'
+import { colors, shadow, radii, type, elevation, category, TAP, listBottomPad } from '../constants/theme'
 import { REDESIGN } from '../constants/redesign'
 import { OnPhotoContext } from '../components/ui/onPhoto'
 import {
@@ -466,6 +466,8 @@ export default function AccommodationScreen({
   const isHotel = tab === 'hotel'
   // Oteller is mounted on first visit and then only HIDDEN when you leave it, so its
   // filters and scroll survive a trip to Emlak and back — as Emlak's do.
+  // Bottom inset for the Emlak/Yurtlar list: the SafeAreaView pads only the top (edge-to-edge).
+  const insets = useSafeAreaInsets()
   const [hotelsMounted, setHotelsMounted] = useState(LANDING_TAB === 'hotel')
   function changeTab(next) { if (next === 'hotel') setHotelsMounted(true); setTab(next) }
 
@@ -709,7 +711,10 @@ export default function AccommodationScreen({
 
       {/* Emlak / Yurtlar list and the Oteller tab are HIDDEN, never unmounted, when you
           switch away, so each keeps its scroll position. */}
-      <View style={[cs.pane, isHotel && cs.hidden]}>
+      {/* One container for both panes; each pane FILLS it (absoluteFill), so a pane's size never
+          depends on how the column shares space with the header and tabs. */}
+      <View style={cs.panes}>
+      <View style={[StyleSheet.absoluteFill, isHotel && cs.hidden]}>
       {loading ? (
         REDESIGN
           ? <View style={cs.listContent}>{[0, 1, 2].map(i => <CardSkeleton key={i} height={280} style={{ marginBottom: 12 }} />)}</View>
@@ -720,7 +725,7 @@ export default function AccommodationScreen({
         <FlatList
           data={items}
           keyExtractor={i => i.id}
-          contentContainerStyle={cs.listContent}
+          contentContainerStyle={[cs.listContent, { paddingBottom: listBottomPad(insets) }]}
           ListHeaderComponent={
             // list_top — a HEADER, so it scrolls away. Mounting it above the FlatList
             // would make it sticky, and a permanently visible ad is a different product.
@@ -809,10 +814,11 @@ export default function AccommodationScreen({
       </View>
 
       {hotelsMounted && (
-        <View style={[cs.pane, !isHotel && cs.hidden]}>
+        <View style={[StyleSheet.absoluteFill, !isHotel && cs.hidden]}>
           <HotelsTab lang={lang} />
         </View>
       )}
+      </View>
 
       {/* Price range + currency. Currency matters here beyond filtering: a price sort
           across currencies is not a comparison, so narrowing to one makes it real. */}
@@ -949,7 +955,7 @@ const legacyCs = StyleSheet.create({
   intentDotOnActive:   { backgroundColor: '#FFFFFF' },
 
   pillBar:             { flexGrow: 0, flexShrink: 0 },
-  pane:                { flex: 1 },
+  panes:               { flex: 1 },
   hidden:              { display: 'none' },
   pillBarContent:      { paddingHorizontal: 16, gap: 8, paddingBottom: 12 },
   clearPill:           { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.dangerLight, backgroundColor: colors.dangerLight },

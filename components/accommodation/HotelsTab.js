@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, Image, TouchableOpacity, FlatList, ActivityIndicator, Linking, StyleSheet, Platform, Dimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
-import { colors, shadow, radii, type, elevation, category, TAP } from '../../constants/theme'
+import { colors, shadow, radii, type, elevation, category, TAP, listBottomPad } from '../../constants/theme'
 import { REDESIGN } from '../../constants/redesign'
 import { CardSkeleton, EmptyState, ErrorState, RemoteImage } from '../ui'
 import { t } from '../../constants/i18n'
 import FilterDropdown from '../FilterDropdown'
 import { REGIONS, REGION_LABEL_KEY } from '../../constants/regions'
-import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY, HOTEL_CLASS_STARS, HOTEL_ACTIONS } from '../../constants/hotels'
+import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY, HOTEL_CLASS_STARS, HOTEL_ACTIONS, HOTEL_BOOK } from '../../constants/hotels'
 import { logContactEvent } from '../../utils/logContactEvent'
+import { hotelBookingUrl } from '../../utils/hotelBooking'
 import { hotelArea } from '../../utils/hotelArea'
 import OsmAttribution from '../OsmAttribution'
 
@@ -21,7 +23,7 @@ import OsmAttribution from '../OsmAttribution'
 
 // photo_source drives the credit (KITOB, or photo_credit for a Commons photo — 20261065);
 // description_i18n the card text (20261063).
-const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, gallery_urls, photo_source, photo_credit, description_i18n, is_kitob_member'
+const COLUMNS = 'id, name, kitob_class, region, address, phone, website, lat, lng, geocode_source, photo_url, gallery_urls, photo_source, photo_credit, description_i18n, is_kitob_member, external_id, hotelrunner_url'
 
 const CLASS_RANK = Object.fromEntries(HOTEL_CLASSES.map((k, i) => [k, i]))
 const collator = new Intl.Collator('tr')
@@ -110,6 +112,12 @@ function HotelCard({ hotel, lang, district }) {
     logContactEvent('hotels', hotel.id, 'website', district)
     Linking.openURL(hotel.website).catch(() => {})
   }
+  // HotelRunner booking (20261083). Logged on the line BEFORE the open, like call/website/maps.
+  const bookUrl = hotelBookingUrl(hotel)
+  function book() {
+    logContactEvent('hotels', hotel.id, 'book', district)
+    Linking.openURL(bookUrl).catch(() => {})
+  }
   async function map() {
     logContactEvent('hotels', hotel.id, 'maps', district)
     for (const url of mapUrls(hotel, lang)) {
@@ -151,6 +159,13 @@ function HotelCard({ hotel, lang, district }) {
             accessibilityState={{ expanded }}>
             <Text style={hs.description} numberOfLines={expanded ? undefined : 3}>{description}</Text>
             <Text style={hs.more}>{t(expanded ? 'hotelReadLess' : 'hotelReadMore', lang)}</Text>
+          </TouchableOpacity>
+        )}
+
+        {!!bookUrl && (
+          <TouchableOpacity style={hs.book} onPress={book} activeOpacity={0.85} accessibilityRole="button">
+            <Ionicons name="calendar-outline" size={HOTEL_BOOK.icon} color="#fff" />
+            <Text style={hs.bookText} numberOfLines={1}>{t(HOTEL_BOOK.labelKey, lang)}</Text>
           </TouchableOpacity>
         )}
 
@@ -202,6 +217,9 @@ export default function HotelsTab({ lang }) {
   const [klass, setKlass]       = useState(null)
   const [district, setDistrict] = useState(null)
   const [area, setArea]         = useState(null)
+  // The screen's SafeAreaView pads only the top, and Android draws edge-to-edge: without the
+  // bottom inset the last card's buttons sit under the navigation bar.
+  const insets = useSafeAreaInsets()
 
   const load = useCallback(async () => {
     setLoading(true); setFailed(false)
@@ -266,8 +284,10 @@ export default function HotelsTab({ lang }) {
 
   if (hotels.length === 0) return <HotelsComingSoon lang={lang} />
 
+  function clearFilters() { setKlass(null); setDistrict(null); setArea(null) }
+
   return (
-    <View style={{ flex: 1 }}>
+    <View style={hs.root}>
       <View style={hs.filterBar}>
         <FilterDropdown label={t('hotelFilterClass', lang)} lang={lang}
           options={classOpts} value={klass} onChange={setKlass} />
@@ -277,23 +297,30 @@ export default function HotelsTab({ lang }) {
           <FilterDropdown label={t('accomFilterArea', lang)} lang={lang}
             options={areaOpts} value={area} onChange={setArea} />
         )}
+        {!!(klass || district || area) && (
+          <TouchableOpacity style={hs.clearPill} onPress={clearFilters} accessibilityRole="button">
+            <Ionicons name="close" size={14} color={REDESIGN ? colors.dangerInk : colors.danger} />
+            <Text style={hs.clearPillText}>{t('accomClear', lang)}</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <FlatList
         data={shown}
         keyExtractor={h => h.id}
-        contentContainerStyle={hs.listContent}
+        style={hs.list}
+        contentContainerStyle={[hs.listContent, { paddingBottom: listBottomPad(insets) }]}
         showsVerticalScrollIndicator={false}
         initialNumToRender={6}
         windowSize={7}
         renderItem={({ item }) => <HotelCard hotel={item} lang={lang} district={district} />}
         ListEmptyComponent={REDESIGN ? (
           <EmptyState icon="bed-outline" category="homeLife" title={t('hotelsNoResults', lang)} style={{ marginTop: 28 }}
-            action={{ label: t('accomClear', lang), onPress: () => { setKlass(null); setDistrict(null); setArea(null) } }} />
+            action={{ label: t('accomClear', lang), onPress: clearFilters }} />
         ) : (
           <View style={hs.center}>
             <Ionicons name="bed-outline" size={40} color={colors.border} />
             <Text style={hs.emptyTitle}>{t('hotelsNoResults', lang)}</Text>
-            <TouchableOpacity style={hs.retry} onPress={() => { setKlass(null); setDistrict(null); setArea(null) }}>
+            <TouchableOpacity style={hs.retry} onPress={clearFilters}>
               <Text style={hs.retryText}>{t('accomClear', lang)}</Text>
             </TouchableOpacity>
           </View>
@@ -304,8 +331,16 @@ export default function HotelsTab({ lang }) {
 }
 
 const legacyHs = StyleSheet.create({
+  // The tab fills ITS PANE, never its content: spelled out, because a plain {flex: 1} wrapper
+  // was laid out at filter bar + list content (816) inside a 686 pane on device (2026-10-05,
+  // measured), pushing the last card's buttons 130 px under the Android navigation bar.
+  root:          { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },
+  list:          { flex: 1 },
   // flexShrink:0 — a fixed-height row above a scrolling list (CLAUDE.md).
   filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexShrink: 0 },
+  // Same pill as Emlak's clear-all (AccommodationScreen clearPill).
+  clearPill:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.dangerLight, backgroundColor: colors.dangerLight },
+  clearPillText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
   listContent:   { paddingHorizontal: HOTEL_ACTIONS.listPadX, paddingBottom: 32 },
 
   card:          { backgroundColor: colors.cardBg, borderRadius: 20, marginBottom: 14, overflow: 'hidden', ...shadow },
@@ -331,6 +366,11 @@ const legacyHs = StyleSheet.create({
   placeText:     { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.textSecondary, lineHeight: 18 },
 
   actions:       { flexDirection: 'row', gap: HOTEL_ACTIONS.gap, marginTop: 14 },
+  // Full-width primary above the three actions; geometry shared with the label guard (HOTEL_BOOK).
+  book:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: HOTEL_BOOK.gap,
+                   minHeight: TAP, marginTop: 14, paddingHorizontal: HOTEL_BOOK.padX, borderRadius: 12,
+                   backgroundColor: colors.primary },
+  bookText:      { fontSize: HOTEL_BOOK.fontSize, fontFamily: 'Inter_700Bold', color: '#fff' },
   // borderWidth + borderRadius needs an explicit backgroundColor on Android (CLAUDE.md).
   // Icon ABOVE label; geometry shared with the label guard (HOTEL_ACTIONS).
   action:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -360,6 +400,9 @@ const legacyHs = StyleSheet.create({
 // hotel photo is KITOB's, so its crop stays full-width (partner rule).
 const redesignHs = StyleSheet.create({
   filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, flexShrink: 0 },
+  clearPill:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, minHeight: 36,
+                   borderRadius: radii.pill, backgroundColor: colors.dangerLight },
+  clearPillText: { ...type.small, fontFamily: 'Inter_700Bold', color: colors.dangerInk },
   listContent:   { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 },
   // On Konaklama's module photo (ModuleScreen, option B): cards at 93% white, radius 20.
   card:          { backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 20, marginBottom: 12, overflow: 'hidden', ...elevation.card },
@@ -372,11 +415,17 @@ const redesignHs = StyleSheet.create({
   badge:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.pill, backgroundColor: colors.tintServiceBg },
   badgeText:     { ...type.caption, fontFamily: 'Inter_700Bold', color: colors.primaryDark },
   placeText:     { flex: 1, ...type.small, color: colors.textSecondary },
-  action:        { flex: 1, minHeight: TAP, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-                   paddingHorizontal: 8, borderRadius: radii.md, borderWidth: 1, borderColor: colors.fieldBorder,
-                   backgroundColor: colors.card },
+  // Icon ABOVE label in HOTEL_ACTIONS geometry (the label guard measures it): beside the
+  // label, "Web sitesi" truncated at every width.
+  action:        { flex: 1, minHeight: TAP, alignItems: 'center', justifyContent: 'center', gap: 2,
+                   paddingVertical: 6, paddingHorizontal: HOTEL_ACTIONS.buttonPadX, borderRadius: radii.md,
+                   borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: colors.card },
   actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
-  actionText:    { ...type.small, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark, flexShrink: 1 },
+  book:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: HOTEL_BOOK.gap,
+                   minHeight: TAP, marginTop: 14, paddingHorizontal: HOTEL_BOOK.padX, borderRadius: radii.md,
+                   backgroundColor: colors.primary },
+  bookText:      { fontSize: HOTEL_BOOK.fontSize, fontFamily: 'Inter_700Bold', color: colors.onPrimary },
+  actionText:    { fontSize: HOTEL_ACTIONS.fontSize, lineHeight: 16, fontFamily: 'Inter_600SemiBold', color: colors.primaryDark },
   actionTextPrimary: { color: colors.onPrimary },
 })
 const hs = REDESIGN ? { ...legacyHs, ...redesignHs } : legacyHs

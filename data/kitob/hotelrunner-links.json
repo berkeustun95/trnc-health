@@ -1,0 +1,6 @@
+{
+  "_readme": "HotelRunner booking links (partner since 2026-10-04; vault 2026-10-04_hotelrunner-partner). Keyed by the hotel's name exactly as hotels.name holds it. Written to hotels.hotelrunner_url ONLY by scripts/apply-hotelrunner-links.mjs (workflow hotelrunner-links, dry by default), which also CLEARS the link on any hotel not listed here, so removing a line removes the button. A name that matches no hotel, or a host not in allowed_hosts, refuses the whole run. partner.id/param: ADA's partner/affiliate ID and the query parameter that carries it, added to every stored link by the writer (no OTA needed when HotelRunner sends it). The app adds ADA's utm_* parameters at tap time (utils/hotelBooking.js). Empty until HotelRunner sends the hotel list and link format.",
+  "partner": { "id": null, "param": null },
+  "allowed_hosts": [],
+  "links": {}
+}

@@ -83,6 +83,7 @@ Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; secret
 - Gişe Kıbrıs sync: `gisekibris-feed` (also daily 04:15 UTC). Health: its Content health step.
 - Hotels: `hotels-import -f file=data/kitob/<f>.csv -f list_date=YYYY-MM-DD`, `hotels-window -f mode=--apply|--rollback`,
   geocoding `hotels-geocode -f limit=N` (Places calls are billed; an apply commits google-pins.csv back).
+  HotelRunner links: `hotelrunner-links -f mode=--apply` (writes `data/kitob/hotelrunner-links.json`, clears unlisted hotels).
 - Walking legs: `walking-legs` (a flagged leg exits 1 by design; it is never written).
 - Novest: `novest-import`, `novest-images` (metadata also syncs on cron via the sync-novest function).
 - Apple user deletion: `revoke-apple-token -f user_id=<uuid>` BEFORE deleting the user.
