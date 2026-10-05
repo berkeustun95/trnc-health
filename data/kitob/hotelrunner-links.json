@@ -1,6 +1,182 @@
 {
   "_readme": "HotelRunner booking links (partner since 2026-10-04; vault 2026-10-04_hotelrunner-partner). Keyed by the hotel's name exactly as hotels.name holds it. Written to hotels.hotelrunner_url ONLY by scripts/apply-hotelrunner-links.mjs (workflow hotelrunner-links, dry by default), which also CLEARS the link on any hotel not listed here, so removing a line removes the button. A name that matches no hotel, or a host not in allowed_hosts, refuses the whole run. partner.id/param: ADA's partner/affiliate ID and the query parameter that carries it, added to every stored link by the writer (no OTA needed when HotelRunner sends it). The app adds ADA's utm_* parameters at tap time (utils/hotelBooking.js). Empty until HotelRunner sends the hotel list and link format.",
-  "partner": { "id": null, "param": null },
-  "allowed_hosts": [],
-  "links": {}
+  "partner": {
+    "id": null,
+    "param": null
+  },
+  "allowed_hosts": [
+    "hotelrunner.com"
+  ],
+  "links": {
+    "Arkın Palm Beach Hotel": {
+      "url": "https://arkin-palm-beach-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Bare Hill Holiday Village": {
+      "url": "https://bare-hill-holiday-village.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Bella View Hotel": {
+      "url": "https://bella-view-art-boutique-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Bellapais Gardens Hotel": {
+      "url": "https://bellapais-gardens-unique-hotel-1.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Büyük Anadolu Girne Hotel": {
+      "url": "https://buyuk-anadolu-girne-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Caddem Inn Hotel": {
+      "url": "https://caddem-inn-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Citrus Tree Gardens": {
+      "url": "https://citrus-tree-gardens-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Denizkızı Hotel": {
+      "url": "https://denizkizi-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Dome Hotel": {
+      "url": "https://dome-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Dorana Art Hotel": {
+      "url": "https://dorana-art-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Dorana Hotel": {
+      "url": "https://dorana-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "Medium"
+    },
+    "Ekor Elegance Hotel": {
+      "url": "https://ekor-elegance-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Exotic Hotel": {
+      "url": "https://exotic-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Gillham Vineyard Hotel": {
+      "url": "https://gillham-vineyard-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Grand Center Boutique Hotel": {
+      "url": "https://grand-center-boutique-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Grand Sapphire City Hotel": {
+      "url": "https://grand-sapphire-city-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Hotel Sempati": {
+      "url": "https://sempati-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Hotel Sun": {
+      "url": "https://hotel-sun-31.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Kaya Artemis Resort & Casino": {
+      "url": "https://kaya-artemis-resort-casino.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Korineum Golf & Beach Resort": {
+      "url": "https://korineum-golf-beach-resort.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Le Chateau Lambousa": {
+      "url": "https://le-chateau-lambousa-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Les Ambassadeurs Hotel & Casino": {
+      "url": "https://les-ambassadeurs.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Merit Crystal Cove Hotel": {
+      "url": "https://merit-crystal-cove-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Novel Centre Point Hotel": {
+      "url": "https://novel-centre-point-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Olivia Palm Hotel": {
+      "url": "https://olivia-palm-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "Medium"
+    },
+    "Park Palace Hotel": {
+      "url": "https://park-palace-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "Medium"
+    },
+    "Pia Bella Hotel": {
+      "url": "https://pia-bella-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Riverside Garden Resort": {
+      "url": "https://riverside-garden-resort.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Riviera Beach Bungalows": {
+      "url": "https://riviera-beach-bungalows.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "Medium"
+    },
+    "Rocks Hotel & Casino": {
+      "url": "https://rocks-hotel-casino.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "Medium"
+    },
+    "The Arkın İskele Hotel": {
+      "url": "https://the-arkin-iskele.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "The Ship Inn Hotel": {
+      "url": "https://the-ship-inn-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Topset Hotel": {
+      "url": "https://topset-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    },
+    "Çelebi Garden Hotel": {
+      "url": "https://celebi-garden-hotel.hotelrunner.com/bv3/search",
+      "source": "found by ADA 2026-10-05 (not from HotelRunner)",
+      "confidence": "High"
+    }
+  }
 }
