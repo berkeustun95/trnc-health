@@ -3853,6 +3853,16 @@ WITH report AS (
       COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_hotelrunner_url_check')
                LIKE '%''^https://\\S+$''::text%<= 2048%', false)
+    -- ── 1084: contact_events — the app writes a random per-tap id (outbox dedupe) ──
+    -- A GRANT creates no named object, so only a token sees it. The outbox (utils/logContactEvent.js)
+    -- sends its own id and treats a primary-key conflict as "delivered"; without this grant every
+    -- explicit-id insert is refused (42501) and the outbox drops the tap as un-sendable. created_at
+    -- must STAY unwritable (positive control beside the grant; 0910 owns that fact too).
+    UNION ALL SELECT '1084_contact_events_client_id','contact_events.id INSERT-able by anon + authenticated; created_at still not',
+      COALESCE(has_column_privilege('anon', to_regclass('public.contact_events'), 'id', 'INSERT')
+           AND has_column_privilege('authenticated', to_regclass('public.contact_events'), 'id', 'INSERT')
+           AND NOT has_column_privilege('anon', to_regclass('public.contact_events'), 'created_at', 'INSERT')
+           AND NOT has_column_privilege('authenticated', to_regclass('public.contact_events'), 'created_at', 'INSERT'), false)
   ) z
 
   UNION ALL
