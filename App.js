@@ -1378,7 +1378,8 @@ export default function App() {
   // left the hub hidden under whatever was open, and the tap read as doing nothing. Setters
   // only — the push listener below captures the first render's copy of this function.
   function openConversation(id) {
-    setShowMenu(false); setShowEmergencyModal(false); setShowMunicipalModal(false); setOliSheetOpen(false)
+    menuAnim.setValue(260); setShowMenu(false)   // as the auth handler does: no slide, we are leaving
+    setShowEmergencyModal(false); setShowMunicipalModal(false); setOliSheetOpen(false)
     setShowDutyList(false); setShowNotifs(false); setShowEvents(false); setOpenedEvent(null)
     setShowAgentOnboarding(false); setShowAccommodation(false); setShowHomeServices(false)
     setShowJobPostings(false); setShowTransport(false); setShowInsurance(false)
