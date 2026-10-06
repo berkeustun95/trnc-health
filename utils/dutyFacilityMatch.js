@@ -57,6 +57,9 @@ const ALIASES = [
   { from: 'SAKINER ECZANESİ',            to: 'SAKİNER ECZANESİ',               region: 'Karpaz' },
   { from: 'ŞİFA BİLDİR ECZANESİ',        to: 'ŞİFA BILDIR ECZANESİ',           region: 'Lefke' },
   { from: 'HÜSEYİN SAKALLI ECZANESİ',    to: 'HÜSEYİN KERİM SAKALLI ECZANESİ', region: 'Lefkoşa' },
+  // KTEB typo (20261079 renamed the loaded rows; gen-duty-roster-sql.mjs fixes new loads).
+  // Kept here for any load that skips the generator. Same phone and Ortaköy address.
+  { from: 'ÖZVOL ECZANESİ',              to: 'ÖZYOL ECZANESİ',                 region: 'Lefkoşa' },
 ]
 
 /** name-key -> facility, built once per load. First row wins; a duplicate name in
@@ -71,17 +74,25 @@ export function buildFacilityIndex(facilities) {
   return byKey
 }
 
-/** The matched facility, or null. Null is a normal outcome, not an error: the row
- *  simply renders without a distance, exactly as every row does today. */
-export function matchDutyRow(row, index) {
+// The keys a duty row may be found under: its own name, then each alias that applies in
+// its region.
+function candidateKeys(row) {
   const key = dutyNameKey(row?.name)
-  if (!key) return null
-  const direct = index.get(key)
-  if (direct) return direct
+  if (!key) return []
+  const keys = [key]
   for (const a of ALIASES) {
     if (dutyNameKey(a.from) !== key) continue
     if (a.region && dutyNameKey(a.region) !== dutyNameKey(row.region)) continue
-    const hit = index.get(dutyNameKey(a.to))
+    keys.push(dutyNameKey(a.to))
+  }
+  return keys
+}
+
+/** The matched facility, or null. Null is a normal outcome, not an error: the row
+ *  simply renders without a distance, exactly as every row does today. */
+export function matchDutyRow(row, index) {
+  for (const k of candidateKeys(row)) {
+    const hit = index.get(k)
     if (hit) return hit
   }
   return null
@@ -99,4 +110,38 @@ export function dutyWindowsFor(rows, facilities, date) {
     if (f && row.open_from && row.open_until) out.set(f.id, { date, from: row.open_from, until: row.open_until })
   }
   return out
+}
+
+// ─── pharmacy_coords: the duty screen's FIRST coordinate source (20261079) ────
+// Roster-keyed (one row per KTEB name) and holding Berke's on-the-ground pins, which beat
+// the facilities geocode. Same key and aliases as above — one matcher, two tables.
+//
+// ⚠ REGION-GATED, unlike the facilities lookup's direct path. pharmacy_coords is keyed by
+//   name alone, so a same-named pharmacy in another town would otherwise borrow this pin —
+//   the wrong-town failure. Its pre-repo rows say 'Mesarya' where the roster says Üst/Alt.
+const MESARYA_SUB = new Set(['Üst Mesarya', 'Alt Mesarya'])
+function sameRegion(coordRegion, dutyRegion) {
+  const c = dutyNameKey(coordRegion), d = dutyNameKey(dutyRegion)
+  if (!c || !d) return false
+  return c === d || (c === 'Mesarya' && MESARYA_SUB.has(d))
+}
+
+export function buildCoordsIndex(rows) {
+  const byKey = new Map()
+  for (const r of rows || []) {
+    const k = dutyNameKey(r.name)
+    if (k && r.lat != null && r.lng != null && !byKey.has(k)) byKey.set(k, r)
+  }
+  return byKey
+}
+
+/** { latitude, longitude } for a duty row: pharmacy_coords first, facilities fallback,
+ *  else null (no distance — never a guessed one). */
+export function dutyRowCoords(row, coordsIndex, facIndex) {
+  for (const k of candidateKeys(row)) {
+    const c = coordsIndex.get(k)
+    if (c && sameRegion(c.region, row.region)) return { latitude: c.lat, longitude: c.lng }
+  }
+  const f = matchDutyRow(row, facIndex)
+  return f && f.latitude != null && f.longitude != null ? { latitude: f.latitude, longitude: f.longitude } : null
 }
