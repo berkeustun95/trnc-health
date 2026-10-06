@@ -1,15 +1,5 @@
 # ADA — North Cyprus assistant
 
-> ## ⛔ RELEASE FREEZE — runtime 1.3.0 and 1.2.0 (since 2026-10-04, until Berke says "unfreeze")
-> - **NO production OTA** on 1.3.0 or 1.2.0. `npm run ota` refuses while `release-freeze.json` has
->   `"frozen": true` (`scripts/check-release-freeze.mjs`, first in the chain). `eas update` directly
->   was already forbidden — it would bypass the guard.
-> - Work continues normally on branches and the **PREVIEW channel** (`npm run ota:preview`).
-> - Exception: an **urgent bug fix only**, with Berke's **explicit OK in chat**, Preview first, then
->   `FREEZE_OVERRIDE=1 npm run ota -- --message "…"` (Berke hands over the override). Log it in the journal.
-> - Why: redesign go-live — Android 1.3.0 staged at 20%, iOS 1.3.0 in review (vault `redesign-go-live-runbook.md`).
-> - Unfreeze (Berke's word only): set `"frozen": false` in `release-freeze.json` and remove this block, one commit.
-
 ## What this is
 ADA is a TRNC super-app for residents and newcomers: facilities directory and duty roster, Explore
 (places, walking routes), events, accommodation, hotels, towing, home services, pets, Student Hub and
@@ -57,6 +47,9 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   wrapper runs `check-module-flags.mjs` (also `npm run check:flags`); `git push` and `eas build` are
   covered by `.githooks/pre-push` and `eas-build-pre-install`. Fresh clone: `npm run setup:hooks`.
 - **OTA only reaches the production build** — never a preview APK; test OTA on the Play Store install.
+- **Every production OTA goes to PREVIEW first** (`npm run ota:preview`) and gets Berke's device check
+  there before `npm run ota` (standing rule since the 2026-10-06 unfreeze). A freeze, when on, is
+  `release-freeze.json` `"frozen": true` — `npm run ota` then refuses (`FREEZE_OVERRIDE=1` from Berke only).
 - **Native build** only for `app.config.js`, native deps, permissions, icons, SDK: `eas build --platform
   android --profile production`, AAB to Play closed testing by hand (Play key = listing only).
 - **iOS:** `npm run ios:build` / `ios:submit`, no Apple login; they source `~/.appstoreconnect/ada-eas.env`

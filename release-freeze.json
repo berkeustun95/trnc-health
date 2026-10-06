@@ -1,7 +1,11 @@
 {
-  "frozen": true,
+  "frozen": false,
   "since": "2026-10-04",
-  "runtimes": ["1.3.0", "1.2.0"],
-  "reason": "Redesign go-live: Android 1.3.0 staged at 20%, iOS 1.3.0 in App Store review.",
-  "unfreeze": "Only when Berke says \"unfreeze\" in chat (planned: Android at 100% and iOS 1.3.0 live and calm). Set frozen to false in a commit."
+  "runtimes": [
+    "1.3.0",
+    "1.2.0"
+  ],
+  "reason": "Lifted by Berke (\"unfreeze\") after Android 1.3.0 at 100% and iOS 1.3.0 live. Set frozen true again to freeze.",
+  "unfreeze": "Only when Berke says \"unfreeze\" in chat (planned: Android at 100% and iOS 1.3.0 live and calm). Set frozen to false in a commit.",
+  "lifted": "2026-10-06"
 }

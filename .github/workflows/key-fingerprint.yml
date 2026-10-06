@@ -1,0 +1,32 @@
+# ─── Which key is a repository secret? (fingerprint only) ─────────────────────
+#
+# GitHub never shows a secret's value. To tell whether two API keys are the same key — e.g. the CI
+# Places key vs the Maps key shipped in the APK — compare fingerprints: this prints ONLY the first 16
+# hex chars of sha256(secret) and its length. Locally: printf %s "$KEY" | shasum -a 256 | cut -c1-16
+#
+#   gh workflow run key-fingerprint -f secret=GOOGLE_PLACES_API_KEY
+
+name: key-fingerprint
+
+on:
+  workflow_dispatch:
+    inputs:
+      secret:
+        description: 'Repository secret to fingerprint'
+        type: choice
+        options: ['GOOGLE_PLACES_API_KEY']
+
+jobs:
+  fingerprint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    env:
+      GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+      IN_NAME: ${{ inputs.secret }}
+    steps:
+      - name: Fingerprint
+        run: |
+          v="${!IN_NAME}"
+          [ -n "$v" ] || { echo "::error::$IN_NAME is empty"; exit 1; }
+          echo "$IN_NAME: sha256[0:16]=$(printf %s "$v" | sha256sum | cut -c1-16) length=${#v}"
