@@ -21,7 +21,7 @@ select json_build_object(
   'fks_out_of_conversations', (select json_agg(conname || ': ' || pg_get_constraintdef(oid)) from pg_constraint
                                 where contype = 'f' and conrelid = 'public.conversations'::regclass),
   'conversation_delete_paths', (select coalesce(json_agg(p.proname), '[]') from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                                 where n.nspname = 'public' and pg_get_functiondef(p.oid) ~* 'DELETE\s+FROM\s+(public\.)?conversations'),
+                                 where n.nspname = 'public' and p.prokind in ('f', 'p') and pg_get_functiondef(p.oid) ~* 'DELETE\s+FROM\s+(public\.)?conversations'),
   'delete_own_account_live', (select pg_get_functiondef('public.delete_own_account()'::regprocedure)),
   'notify_new_message_inserts', (select substring(pg_get_functiondef('public.notify_new_message(uuid)'::regprocedure)
                                    from 'INSERT INTO notifications[^;]*;')),
