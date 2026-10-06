@@ -47,7 +47,7 @@ const cases4=[
  ['Renovation layer (partner/category) -> module step, no close', {...base, showHomeServices:true}, {homeServicesBackRef:()=>true}, r=>r.calls===''],
  ['Renovation top -> closes module', {...base, showHomeServices:true}, {homeServicesBackRef:()=>false}, r=>r.calls==='setShowHomeServices(false)'],
  ['Student Hub layer (conv/profile/uni) -> hub step, no close', {...base, showStudentHub:true}, {studentHubBackRef:()=>true}, r=>r.calls===''],
- ['Student Hub top -> closes hub', {...base, showStudentHub:true}, {studentHubBackRef:()=>false}, r=>r.calls==='setShowStudentHub(false)'],
+ ['Student Hub top -> closes hub, drops a pending message tap', {...base, showStudentHub:true}, {studentHubBackRef:()=>false}, r=>r.calls==='setShowStudentHub(false) setPendingConv(null)'],
  ['eSIM over hub -> closes eSIM, not hub', {...base, showStudentHub:true, showEsim:true}, {studentHubBackRef:()=>{throw new Error('hub asked')}}, r=>r.calls.startsWith('setShowEsim(false)')],
  ['SCROLL SPOT Renovation category -> landing (module step, not close)', {...base, showHomeServices:true}, {homeServicesBackRef:()=>true}, r=>r.calls===''],
  ['SCROLL SPOT Explore Submit/Saved/MySubs -> back into Explore', {...base, showExplore:true}, {exploreBackRef:()=>true}, r=>r.calls===''],

@@ -649,9 +649,11 @@ export default function App() {
   const [showGarages, setShowGarages] = useState(false)
   const [showTowing, setShowTowing] = useState(false)
   const [showStudentHub, setShowStudentHub] = useState(false)
-  // The conversation a push asked for, held until StudentHubScreen has opened it. Cleared
-  // by the screen rather than here, so a tap that arrives before the hub mounts is not lost.
-  const [pendingConvId, setPendingConvId] = useState(null)
+  // The thread a tapped message notification asked for: null, or { id } where id may be null
+  // (an old push / row without one → the Messages tab). An object so a second tap on the same
+  // thread still re-fires the hub's effect. Held until StudentHubScreen has used it, so a tap
+  // that arrives before the hub mounts (signed out, profile or terms gate) is not lost.
+  const [pendingConv, setPendingConv] = useState(null)
   const [showEsim, setShowEsim] = useState(false)
   // Sub-screen within Bağlantı & eSIM: null = landing, 'operator' = package list,
   // { pkg } = package detail. Mirrors petsSubScreen / gamesSubScreen.
@@ -1100,7 +1102,7 @@ export default function App() {
       if (showNewcomerEssentials) { if (guideBackRef.current?.()) return true; setShowNewcomerEssentials(false); return true }
       // Below eSIM, Welcome Guide and Exchange Rates: Student Hub opens those ON TOP of itself
       // (they render earlier in the content chain), so Back must pop them before the hub.
-      if (showStudentHub) { if (studentHubBackRef.current?.()) return true; setShowStudentHub(false); return true }
+      if (showStudentHub) { if (studentHubBackRef.current?.()) return true; setShowStudentHub(false); setPendingConv(null); return true }
       if (adminPreview === 'liveScoresEditor' && liveScoresEditorBackRef.current?.()) return true
       if (adminPreview)         { setAdminPreview(null); return true }
       if (gamesSubScreen) { setGamesSubScreen(null); return true }
@@ -1371,25 +1373,54 @@ export default function App() {
     registerPushToken()
   }, [session, pushRetry])
 
+  // A message notification opens the hub on that thread from ANYWHERE. Every layer that
+  // renders above showStudentHub in the content chain is closed first: setting the flag alone
+  // left the hub hidden under whatever was open, and the tap read as doing nothing. Setters
+  // only — the push listener below captures the first render's copy of this function.
+  function openConversation(id) {
+    setShowMenu(false); setShowEmergencyModal(false); setShowMunicipalModal(false); setOliSheetOpen(false)
+    setShowDutyList(false); setShowNotifs(false); setShowEvents(false); setOpenedEvent(null)
+    setShowAgentOnboarding(false); setShowAccommodation(false); setShowHomeServices(false)
+    setShowJobPostings(false); setShowTransport(false); setShowInsurance(false)
+    setShowEsim(false); setConnectivitySub(null); setConnectivityOperator(null); setShowLegal(false)
+    setShowExploreBeach(false); setShowExplore(false); setShowCheckinFeed(false); setSelectedExplorePlace(null)
+    setShowLiveScores(false); setShowExchangeRates(false); setShowNewcomerEssentials(false)
+    setShowGames(false); setGamesSubScreen(null); setUnclaimedFacility(null); setSelectedFacility(null)
+    setShowPets(false); setPetsSubScreen(null); setShowGrooming(false); setShowGarages(false); setShowTowing(false)
+    setGateHealthList(false)
+    setPendingConv({ id: id ?? null })
+    setShowStudentHub(true)
+  }
+
+  // ► A handled message tap is CLEARED, or the next launch from the home-screen icon can
+  //   read it back from getLastNotificationResponseAsync and reopen a thread nobody tapped.
+  function forgetMessageTap() {
+    try { Notifications.clearLastNotificationResponse() } catch {}
+  }
+
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
-      if (!sessionRef.current) return
       const data   = response.notification.request.content.data ?? {}
       const screen = data.screen
+      // Before the session check: signed out, the tap is held and the hub opens once the
+      // user signs in (the chain renders the hub after the welcome/auth screens clear).
+      if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
+        // ► GATED ON THE FLAG, because a tap must never land on Coming Soon. The push that
+        //   carries this can only have been sent by 20261029's messaging, so if the module
+        //   is dark on this build the notification is from a feature this bundle does not
+        //   have — opening the hub would show a placeholder and read as the tap breaking.
+        //   Doing nothing leaves the user where they were, which is honest.
+        openConversation(data.conversation_id)
+        forgetMessageTap()
+        return
+      }
+      if (!sessionRef.current) return
       if (screen === 'duty') {
         setShowDutyList(true)
       } else if (screen === 'profile') {
         setActiveTab('profile')
       } else if (screen === 'notifications') {
         setShowNotifs(true)
-      } else if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
-        // ► GATED ON THE FLAG, because a tap must never land on Coming Soon. The push that
-        //   carries this can only have been sent by 20261029's messaging, so if the module
-        //   is dark on this build the notification is from a feature this bundle does not
-        //   have — opening the hub would show a placeholder and read as the tap breaking.
-        //   Doing nothing leaves the user where they were, which is honest.
-        setPendingConvId(data.conversation_id ?? null)
-        setShowStudentHub(true)
       }
     })
     return () => sub.remove()
@@ -1410,8 +1441,8 @@ export default function App() {
       //   The warm listener above and this one must stay in step; they are two paths to
       //   the same destination and only one of them was ever exercised.
       else if (screen === 'conversation' && MODULE_FLAGS.studentHub) {
-        setPendingConvId(data.conversation_id ?? null)
-        setShowStudentHub(true)
+        openConversation(data.conversation_id)
+        forgetMessageTap()
       }
     })
   }, [session])
@@ -2068,7 +2099,10 @@ export default function App() {
       onMarkAllRead={markAllNotifsRead}
       onClearAll={REDESIGN ? () => { setNotifClearError(null); setNotifClearAsk(true) } : () => clearAllNotifs().catch(() => {})}
       onMarkRead={markNotifRead}
-      onNotifPress={() => setShowDutyList(true)}
+      onNotifPress={(item, route) => {
+        if (route === 'duty') setShowDutyList(true)
+        else if (route === 'message' && MODULE_FLAGS.studentHub) { closeNotifs(); openConversation(item.conversation_id) }
+      }}
       onEnablePush={() => setPushRetry(n => n + 1)}
     />
   } else if (showEvents) {
@@ -2468,20 +2502,20 @@ export default function App() {
     // Inline on purpose: content may only read values defined above the selector (Hermes).
     content = (MODULE_FLAGS.studentHub || isAdmin)
       ? (session && !isGuest(session) && profile && needsStudentHubTerms(profile.terms_version))
-        ? <StudentHubTermsGate lang={lang} userId={session.user.id} onCancel={() => setShowStudentHub(false)}
+        ? <StudentHubTermsGate lang={lang} userId={session.user.id} onCancel={() => { setShowStudentHub(false); setPendingConv(null) }}
             onAccepted={d => setProfile(p => ({ ...p, ...d }))} />
-        : <StudentHubScreen lang={lang} onBack={() => setShowStudentHub(false)} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
+        : <StudentHubScreen lang={lang} onBack={() => { setShowStudentHub(false); setPendingConv(null) }} onShowEsim={() => setShowEsim(true)} onShowNewcomerEssentials={() => setShowNewcomerEssentials(true)}
           isGuest={isGuest(session)}
           // CLOSES the hub on the way to the profile, deliberately. The student list's
           // one action is "turn on the listing setting", and the hub would otherwise stay
           // mounted holding the opt-in value it read before the user changed it — showing
           // the reciprocity copy again at the exact moment the setting started working.
           // Re-entering the hub re-mounts it and re-reads the row.
-          initialConversationId={pendingConvId}
-          onConversationOpened={() => setPendingConvId(null)}
+          initialConversation={pendingConv}
+          onConversationOpened={() => setPendingConv(null)}
           onGoToProfile={() => { setShowStudentHub(false); setActiveTab('profile') }}
           backRef={studentHubBackRef} />
-      : <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => setShowStudentHub(false)} />
+      : <ComingSoonScreen lang={lang} moduleKey="studentHub" titleKey="menuStudentHub" session={session} onBack={() => { setShowStudentHub(false); setPendingConv(null) }} />
   } else if (adminPreview === 'studentHub') {
     // After showEsim and showNewcomerEssentials, not beside the Explore preview — the
     // cross-links only stack if their targets render first. Never clear adminPreview to

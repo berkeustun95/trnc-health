@@ -22,7 +22,7 @@ function timeAgo(isoString) {
 }
 
 // Rows route through utils/notificationRoute.js: `notifications.type` (20261066) when the
-// row has one, title keywords when it does not. Only duty rows have a destination today.
+// row has one, title keywords when it does not. Duty and message rows have a destination.
 // The PUSH path routes separately, on its payload's `screen` (App.js's two handlers).
 
 // Redesign: localised "time ago" (was hardcoded m / h / d in every language).
@@ -85,14 +85,14 @@ function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAll
           showsVerticalScrollIndicator={false}
           contentContainerStyle={r.list}
           renderItem={({ item }) => {
-            const duty = notificationRoute(item) === 'duty'
+            const route = notificationRoute(item)
             return (
               <TouchableOpacity
                 style={[r.card, elevation.card]}
                 activeOpacity={press.card}
                 accessibilityRole="button"
                 accessibilityState={{ selected: !item.read }}
-                onPress={() => { onMarkRead?.(item); if (duty) onNotifPress?.(item) }}
+                onPress={() => { onMarkRead?.(item); if (route) onNotifPress?.(item, route) }}
               >
                 {/* One unread colour app-wide: dangerInk, the same as the bell's badge. */}
                 <View style={[r.dot, item.read && r.dotRead]} />
@@ -102,7 +102,7 @@ function NotificationsRedesign({ notifications, loading, lang, onBack, onMarkAll
                     <Text style={r.time}>{timeAgoLocal(item.created_at, lang)}</Text>
                   </View>
                   <Text style={r.body}>{item.body}</Text>
-                  {duty && <Text style={r.hint}>{t('tapViewDuty', lang)}</Text>}
+                  {route && <Text style={r.hint}>{t(route === 'duty' ? 'tapViewDuty' : 'tapOpenChat', lang)}</Text>}
                 </View>
               </TouchableOpacity>
             )
@@ -162,12 +162,12 @@ function NotificationsLegacy({ notifications, loading, lang, onBack, onMarkAllRe
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.list}
           renderItem={({ item }) => {
-            const isDuty = notificationRoute(item) === 'duty'
+            const route = notificationRoute(item)
             return (
               <TouchableOpacity
                 style={[s.card, !item.read && s.cardUnread]}
                 activeOpacity={0.75}
-                onPress={() => { onMarkRead?.(item); if (isDuty) onNotifPress?.(item) }}
+                onPress={() => { onMarkRead?.(item); if (route) onNotifPress?.(item, route) }}
               >
                 {!item.read && <View style={s.unreadDot} />}
                 <View style={s.cardBody}>
@@ -176,8 +176,8 @@ function NotificationsLegacy({ notifications, loading, lang, onBack, onMarkAllRe
                     <Text style={s.cardTime}>{timeAgo(item.created_at)}</Text>
                   </View>
                   <Text style={s.cardBodyText}>{item.body}</Text>
-                  {isDuty && (
-                    <Text style={s.tapHint}>{t('tapViewDuty', lang)}</Text>
+                  {route && (
+                    <Text style={s.tapHint}>{t(route === 'duty' ? 'tapViewDuty' : 'tapOpenChat', lang)}</Text>
                   )}
                 </View>
               </TouchableOpacity>

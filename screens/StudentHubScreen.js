@@ -1,6 +1,6 @@
 import { useScrollMemory, forgetScroll } from '../utils/scrollMemory'
 import FilterDropdown from '../components/FilterDropdown'
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, ActivityIndicator,
   Alert, Linking, Image,
@@ -557,7 +557,7 @@ let hubLeavingVia = false
 
 export default function StudentHubScreen({
   lang, onBack, onShowEsim, onShowNewcomerEssentials, isGuest = false, onGoToProfile,
-  initialConversationId = null,   // set by a tapped push notification
+  initialConversation = null,     // { id } from a tapped message notification; id may be null
   onConversationOpened,
   backRef = null,
 }) {
@@ -679,30 +679,38 @@ export default function StudentHubScreen({
     return () => { cancelled = true }
   }, [isGuest])
 
-  // ─── A TAPPED PUSH NOTIFICATION LANDS HERE ────────────────────────────────
+  // ─── A TAPPED MESSAGE NOTIFICATION LANDS HERE ──────────────────────────────
   //
-  // The payload carries only `conversation_id` (20261031), so the row has to be resolved
-  // the same way openThreadWith does — through list_conversations(), the one sanctioned
-  // read path. A push is the ONLY way into a thread that does not pass through a profile
-  // page, which is why this cannot reuse that route.
+  // The push payload (20261031) and the in-app row (20261087) carry only `conversation_id`,
+  // so the row has to be resolved the same way openThreadWith does — through
+  // list_conversations(), the one sanctioned read path. It returns only threads the caller
+  // is in, so an id for somebody else's thread simply finds nothing.
   //
   // Cleared through onConversationOpened whatever the outcome, INCLUDING when the row is
   // not found. A thread can legitimately be gone by the time somebody taps — declined,
   // left, blocked, or the other account deleted — and leaving the id pending would retry
   // forever and re-hijack the screen every time the hub re-renders. The messages tab is
-  // opened regardless, because that is where a missing thread should leave somebody.
+  // opened regardless, because that is where a missing thread should leave somebody — and
+  // where a notification with no id at all (sent before 20261031) lands.
+  // A ref, not a dependency: App passes a fresh arrow every render, which would cancel and
+  // restart the lookup each time App re-renders.
+  const onConversationOpenedRef = useRef(onConversationOpened)
+  onConversationOpenedRef.current = onConversationOpened
   useEffect(() => {
-    if (!initialConversationId || isGuest || !MODULE_FLAGS.studentHub) return
+    if (!initialConversation || isGuest || !MODULE_FLAGS.studentHub) return
+    const id = initialConversation.id
+    showTab('messages')
+    setOpenSlug(null); setOpenUniId(null); setOpenStudentId(null)
+    if (!id) { onConversationOpenedRef.current?.(); return }
     let cancelled = false
     supabase.rpc('list_conversations').then(({ data }) => {
       if (cancelled) return
-      const row = (data ?? []).find(r => r.conversation_id === initialConversationId)
-      showTab('messages')
-      if (row) { setComposeWith(null); setOpenConv(row) }
-      onConversationOpened?.()
+      const row = (data ?? []).find(r => r.conversation_id === id)
+      if (row) { setComposeWith(null); setOpenConv(row); setConvKey(k => k + 1) }
+      onConversationOpenedRef.current?.()
     })
     return () => { cancelled = true }
-  }, [initialConversationId, isGuest, onConversationOpened])
+  }, [initialConversation, isGuest])
 
   // A conversation opened from a profile has to be resolved to a real row before it can
   // be rendered, because start_conversation returns only a status. One extra RPC on a rare
