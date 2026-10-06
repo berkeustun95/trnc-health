@@ -300,7 +300,9 @@ WITH report AS (
     -- 1077. League display names by full language name; the app falls back to name.
     ('1077_live_scores_international','leagues','name_i18n'),
     -- 1083. HotelRunner booking link. HotelsTab selects it: MISSING = 42703 on the tab.
-    ('1083_hotels_hotelrunner','hotels','hotelrunner_url')
+    ('1083_hotels_hotelrunner','hotels','hotelrunner_url'),
+    -- 1087. The thread a message row opens. utils/notificationRoute.js selects it (falls back on 42703).
+    ('1087_notifications_conversation_id','notifications','conversation_id')
 
   ) e(m,t,c)
 
@@ -788,7 +790,9 @@ WITH report AS (
     ('1071_live_scores_followup','f1_races_api_race_id_key'),
     ('1077_live_scores_international','leagues_name_i18n_check'),
     -- 1083. The H token asserts what it permits.
-    ('1083_hotels_hotelrunner','hotels_hotelrunner_url_check')
+    ('1083_hotels_hotelrunner','hotels_hotelrunner_url_check'),
+    -- 1087. A foreign key, registered here for existence; its ON DELETE action is an H token.
+    ('1087_notifications_conversation_id','notifications_conversation_id_fkey')
 
   ) e(m,o)
 
@@ -881,7 +885,9 @@ WITH report AS (
     ('1070_live_scores','matches_kickoff_idx'),
     ('1070_live_scores','matches_league_idx'),
     ('1070_live_scores','api_request_log_at_idx'),
-    ('1071_live_scores_followup','f1_races_race_at_idx')
+    ('1071_live_scores_followup','f1_races_race_at_idx'),
+    -- 1087: partial (conversation_id IS NOT NULL); serves the FK's lookup on a conversation delete.
+    ('1087_notifications_conversation_id','notifications_conversation_id_idx')
 
   ) e(m,o)
 
@@ -3699,9 +3705,11 @@ WITH report AS (
     -- (1) Every function that inserts a notification sets `type`. DERIVED: the writer set is
     --     read from pg_proc, not named, so a seventh writer that forgets goes red here. Six
     --     today; a legitimate new writer bumps the count in the same commit, saying why.
+    --     20261087 appended conversation_id to notify_new_message's column list, so the anchor
+    --     ends at `type` (`type)` or `type, conversation_id)`); 1087's own token owns the rest.
     UNION ALL SELECT '1066_notification_type','6 notification writers, all six set type, none uses the 3-column INSERT',
       COALESCE((SELECT count(*) = 6
-                   AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES%')
+                   AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type%) VALUES%')
                    AND NOT bool_or(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body) VALUES%')
                   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                  WHERE n.nspname = 'public' AND p.prosrc ~* 'insert\s+into\s+(public\.)?notifications\M'), false)
@@ -3867,6 +3875,25 @@ WITH report AS (
            AND has_column_privilege('authenticated', to_regclass('public.contact_events'), 'id', 'INSERT')
            AND NOT has_column_privilege('anon', to_regclass('public.contact_events'), 'created_at', 'INSERT')
            AND NOT has_column_privilege('authenticated', to_regclass('public.contact_events'), 'created_at', 'INSERT'), false)
+    -- ── 1087: notifications.conversation_id ──────────────────────────────────────
+    -- (1) SET NULL, never CASCADE: a deleted thread must leave the notification in place
+    --     (it then opens the Messages tab). Written from the live rendering.
+    UNION ALL SELECT '1087_notifications_conversation_id','notifications_conversation_id_fkey is ON DELETE SET NULL to conversations',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.notifications') AND conname = 'notifications_conversation_id_fkey')
+               = 'FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL', false)
+    -- (2) notify_new_message writes the thread into the row and 'type' into the push data.
+    --     Positive and negative: the 4-column INSERT (20261066) is gone from this function.
+    UNION ALL SELECT '1087_notifications_conversation_id','notify_new_message stores conversation_id and pushes type=message',
+      COALESCE((SELECT p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type, conversation_id) VALUES (v_to, v_title, v_text, ''message'', v_conv)%'
+                   AND p.prosrc LIKE '%''screen'', ''conversation'', ''type'', ''message''%'
+                   AND p.prosrc NOT LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES%'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.notify_new_message(uuid)')), false)
+    -- (3) The SET NULL above runs as an UPDATE that any trigger on notifications would see
+    --     (the 20261029 bug class). None exist; one appearing is the moment to re-run the
+    --     migration's rolled-back deletion test against it.
+    UNION ALL SELECT '1087_notifications_conversation_id','notifications has no triggers (SET NULL premise)',
+      COALESCE((SELECT count(*) = 0 FROM pg_trigger WHERE tgrelid = to_regclass('public.notifications') AND NOT tgisinternal), false)
   ) z
 
   UNION ALL
