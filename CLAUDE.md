@@ -50,9 +50,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - **Every production OTA goes to PREVIEW first** (`npm run ota:preview`) and gets Berke's device check
   there before `npm run ota` (standing rule since the 2026-10-06 unfreeze). A freeze, when on, is
   `release-freeze.json` `"frozen": true` — `npm run ota` then refuses (`FREEZE_OVERRIDE=1` from Berke only).
-- **Nothing Previewed stays off main.** Publish Preview only from a branch that contains main; before
-  `npm run ota`, every 1.3.x Preview update's commit must be an ancestor of HEAD (or explicitly dropped
-  by Berke). 2026-10-06: a Previewed Profile fix lived only on `fix/open-now-json` and production shipped without it.
+- **Nothing Previewed stays off main.** Publish Preview only from a branch that contains main. `npm run ota`
+  refuses while any Preview update on this runtime's major.minor was built from work HEAD lacks
+  (`scripts/check-preview-lineage.mjs`); a Preview Berke explicitly dropped: `PREVIEW_LINEAGE_OVERRIDE=1`
+  (he hands it over; log it). 2026-10-06: a Previewed Profile fix lived only on `fix/open-now-json`.
 - **Native build** only for `app.config.js`, native deps, permissions, icons, SDK: `eas build --platform
   android --profile production`, AAB to Play closed testing by hand (Play key = listing only).
 - **iOS:** `npm run ios:build` / `ios:submit`, no Apple login; they source `~/.appstoreconnect/ada-eas.env`
