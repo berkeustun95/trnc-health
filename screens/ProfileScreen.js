@@ -13,7 +13,7 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { revokeGoogle, hasGoogleIdentity, revokeApple, revokeAppleWithPrompt, hasAppleIdentity } from '../utils/socialAuth'
-import { colors, shadow, radius, elevation } from '../constants/theme'
+import { colors, shadow, radius, elevation, type } from '../constants/theme'
 import { Button, useTabBarFootprint } from '../components/ui'
 import { FADE_H } from '../components/ui/FloatingTabBar'
 import { t } from '../constants/i18n'
@@ -911,13 +911,18 @@ export default function ProfileScreen({ session, lang, onBack, onLangChange, onA
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={s.header}>
-            <BackButton lang={lang} onPress={() => confirmLeave(onBack)} style={s.backBtn} />
-            <Text style={s.title}>{t('profile', lang)}</Text>
-            {/* Counterweight for the back button so the title stays centred. Save used to
-                live here as a text link; it is a full-width footer button now. */}
-            <View style={s.headerSpacer} />
-          </View>
+          {underTabBar ? (
+            // A tab root, like the guest Profile (components/shell/Settings.js): page title, no back.
+            <Text style={s.pageTitle} accessibilityRole="header">{t('tabProfile', lang)}</Text>
+          ) : (
+            <View style={s.header}>
+              <BackButton lang={lang} onPress={() => confirmLeave(onBack)} style={s.backBtn} />
+              <Text style={s.title}>{t('profile', lang)}</Text>
+              {/* Counterweight for the back button so the title stays centred. Save used to
+                  live here as a text link; it is a full-width footer button now. */}
+              <View style={s.headerSpacer} />
+            </View>
+          )}
 
           <View style={s.avatarSection}>
             <TouchableOpacity style={s.avatarWrap} onPress={() => { setAvatarError(null); setShowAvatarPicker(true) }} activeOpacity={0.8}>
@@ -1586,6 +1591,7 @@ const s = StyleSheet.create({
   title:            { fontSize: 17, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   backBtn:          { flexDirection: 'row', alignItems: 'center', gap: 2 },
   headerSpacer:     { width: 52 },
+  pageTitle:        { ...type.pageTitle, color: colors.textPrimary, paddingTop: 8, marginBottom: 16 },
   footer: {
     flexShrink: 0, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
     borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg,
