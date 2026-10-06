@@ -3831,6 +3831,10 @@ WITH report AS (
     UNION ALL SELECT '1080_pharmacy_coords_mesarya_split','pharmacy_coords.region is exactly the 9 KTEB regions (no bare Mesarya)',
       (SELECT array_agg(DISTINCT region COLLATE "C" ORDER BY region COLLATE "C") FROM public.pharmacy_coords)   -- C: prod's collation is linguistic
       IS NOT DISTINCT FROM ARRAY['Alt Mesarya','Gazimağusa','Girne','Güzelyurt','Karpaz','Lefke','Lefkoşa','Üst Mesarya','İskele']
+    -- ── 1085: every pharmacy_coords row carries a pin ───────────────────────────
+    -- 20261085 pinned the last four. A new roster name without a pin turns this red: pin it.
+    UNION ALL SELECT '1085_pharmacy_coords_last_four_pins','pharmacy_coords: no row without lat/lng',
+      NOT EXISTS(SELECT 1 FROM public.pharmacy_coords WHERE lat IS NULL OR lng IS NULL)
 
     -- ══ the read-only role can run QUERY 1 (20261081) ═══════════════════════
     -- A grant creates no named object. Without it, QUERY 1 aborts with 42501 under the
