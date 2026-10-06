@@ -379,7 +379,7 @@ export const HOTELS_LIVE = true   // live at unfreeze (KITOB approved 2026-10-04
 //   3. The F1 data source settled (licence) — or the F1 tab removed.
 //   4. Turkish device pass with this flipped LOCALLY, then BOTH files in one commit
 //      (here and EXPECTED_SCALARS in scripts/check-module-flags.mjs), then OTA.
-export const LIVE_SCORES_LIVE = true   // live 2026-10-04 — football (club + internationals), basketball, F1
+export const LIVE_SCORES_LIVE = false   // HIDDEN 2026-10-06: API-Sports account suspended since 2026-10-04 15:24 UTC (was live 2026-10-04). Score editors still see it (App.js is_score_editor unlock).
 
 // Shiny Paw & Trail Hotel — the pet hotel partner surface inside Evcil Hayvanlar.
 //
