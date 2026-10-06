@@ -3909,6 +3909,17 @@ WITH report AS (
                   AND bool_or(a.attname = 'read')
                  FROM pg_attribute a
                 WHERE a.attrelid = to_regclass('public.notifications') AND a.attnum > 0 AND NOT a.attisdropped), false)
+    -- ── 1089: a signed-in user can delete their own notifications ("Clear all") ───
+    -- Before it, no PERMISSIVE DELETE policy existed and a client delete matched 0 rows with
+    -- no error. Owns the notifications policy set: 7, and exactly one permissive DELETE —
+    -- owner-scoped, TO authenticated (guests stay out via the RESTRICTIVE no_anon_delete).
+    UNION ALL SELECT '1089_notifications_delete_own','notifications: 7 policies, the only permissive DELETE is TO authenticated USING (user_id = auth.uid())',
+      COALESCE((SELECT count(*) = 7
+                   AND count(*) FILTER (WHERE permissive = 'PERMISSIVE' AND cmd IN ('DELETE', 'ALL')) = 1
+                   AND bool_or(policyname = 'users delete own notifications' AND permissive = 'PERMISSIVE' AND cmd = 'DELETE'
+                               AND roles = '{authenticated}' AND qual = '(user_id = auth.uid())')
+                   AND bool_or(policyname = 'no_anon_delete_notifications' AND permissive = 'RESTRICTIVE' AND cmd = 'DELETE')
+                  FROM pg_policies WHERE schemaname = 'public' AND tablename = 'notifications'), false)
   ) z
 
   UNION ALL

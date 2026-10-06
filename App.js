@@ -1143,6 +1143,13 @@ export default function App() {
   async function clearAllNotifs() {
     const { error } = await supabase.from('notifications').delete().eq('user_id', session.user.id)
     if (error) throw error
+    // An RLS-refused DELETE is not an error: it matches 0 rows and returns success. Until
+    // 20261089 that is exactly what happened, the list emptied here and came back on the next
+    // load. So check the outcome, not the status: anything left means it did not clear.
+    const { count, error: countError } = await supabase.from('notifications')
+      .select('id', { count: 'exact', head: true }).eq('user_id', session.user.id)
+    if (countError) throw countError
+    if (count !== 0) throw new Error(`clear all left ${count} notification(s)`)
     setNotifications([])
   }
   // Redesign: "Clear all" asks first and reports a failure instead of pretending.
@@ -2098,7 +2105,7 @@ export default function App() {
       lang={lang}
       onBack={closeNotifs}
       onMarkAllRead={markAllNotifsRead}
-      onClearAll={REDESIGN ? () => { setNotifClearError(null); setNotifClearAsk(true) } : () => clearAllNotifs().catch(() => {})}
+      onClearAll={REDESIGN ? () => { setNotifClearError(null); setNotifClearAsk(true) } : () => clearAllNotifs().catch(() => Alert.alert(t('hrClearFailed', lang)))}
       onMarkRead={markNotifRead}
       onNotifPress={(item, route) => {
         if (route === 'duty') setShowDutyList(true)
