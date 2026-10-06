@@ -28,14 +28,16 @@ export const HOTEL_SORT_LABEL_KEY = {
 }
 
 // classRank: HOTEL_CLASSES order (stars high → low, then the non-star types); stars: star count,
-// 0 for a non-star type. 'recommended' is the order the tab has always had.
-export function sortHotels(hotels, sort, { classRank, stars, compare }) {
+// 0 for a non-star type; bookable: does the card show "Rezervasyon Yap" (Berke 2026-10-06:
+// Önerilen puts those first, then the class order the tab always had).
+export function sortHotels(hotels, sort, { classRank, stars, compare, bookable }) {
   const byName = (a, b) => compare(a.name, b.name)
+  const byClass = (a, b) => (classRank[a.kitob_class] - classRank[b.kitob_class]) || byName(a, b)
   const cmp = {
-    recommended: (a, b) => (classRank[a.kitob_class] - classRank[b.kitob_class]) || byName(a, b),
+    recommended: (a, b) => (Number(!!bookable(b)) - Number(!!bookable(a))) || byClass(a, b),
     az: byName,
     za: (a, b) => byName(b, a),
     stars: (a, b) => ((stars[b.kitob_class] || 0) - (stars[a.kitob_class] || 0)) || byName(a, b),
-  }[sort] || ((a, b) => (classRank[a.kitob_class] - classRank[b.kitob_class]) || byName(a, b))
-  return [...hotels].sort(cmp)
+  }
+  return [...hotels].sort(cmp[sort] || cmp.recommended)
 }

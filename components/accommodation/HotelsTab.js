@@ -235,7 +235,7 @@ export default function HotelsTab({ lang }) {
   useEffect(() => { load() }, [load])
 
   const sorted = useMemo(() => sortHotels(hotels, sort,
-    { classRank: CLASS_RANK, stars: HOTEL_CLASS_STARS, compare: collator.compare }), [hotels, sort])
+    { classRank: CLASS_RANK, stars: HOTEL_CLASS_STARS, compare: collator.compare, bookable: hotelBookingUrl }), [hotels, sort])
 
   const classOpts = useMemo(() => HOTEL_CLASSES
     .filter(k => hotels.some(h => h.kitob_class === k))
