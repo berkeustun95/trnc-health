@@ -222,7 +222,7 @@ async function scheduleF1(sb, now, say) {
     say(`f1: idle, next poll at ${next}`)
   }
   const { error: uErr } = await sb.from('live_sync_state')
-    .update({ next_poll_at: next, last_run_at: now, last_error: null }).eq('sport', 'f1')
+    .update({ next_poll_at: next, last_run_at: now }).eq('sport', 'f1')
   if (uErr) throw new Error(`live_sync_state: ${uErr.message}`)
   return next
 }
