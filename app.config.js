@@ -71,8 +71,8 @@ export default {
     },
     android: {
       package: APP_ID,
-      // Preview: its own Firebase file once it exists (vault redesign-plan.md, console checklist).
-      // Until then the preview builds WITHOUT one, which only means no push in that APK —
+      // Preview: its own Firebase app (created 2026-10-06, same project trnc-health-58b47; vault
+      // redesign-plan.md). If the file is ever missing the preview builds WITHOUT push —
       // registration is try/caught in App.js. Production always gets its own file.
       googleServicesFile: IS_PREVIEW
         ? (existsSync(join(__dirname, 'google-services.preview.json')) ? './google-services.preview.json' : undefined)
