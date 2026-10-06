@@ -167,6 +167,24 @@ const asUser = async (db, sql) => {
   check('after: client delete unchanged by 1088 (0 rows, no error — pre-existing)', del.ok && del.n === 0, del)
   const again = await applyFile(db, REPO + '20261088_notifications_lock_client_writes.sql')
   check('1088 re-run is clean', again.ok, again.msg)
+
+  // ─── 20261089: owner delete (the "before" above is its red half: 0 rows) ────
+  await db.exec(`INSERT INTO notifications (id, user_id, title, body, type) VALUES
+    ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '${RECP}', 't', 'b', 'message'),
+    ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', '11111111-1111-4111-8111-111111111111', 't', 'b', 'message')`)
+  const r89 = await applyFile(db, REPO + '20261089_notifications_delete_own.sql')
+  check('1089 applies', r89.ok, r89.msg)
+  await db.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: RECP, role: 'authenticated', is_anonymous: true })])
+  await db.exec('SET ROLE authenticated;')
+  const guest = (await db.query(`DELETE FROM notifications WHERE id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'`)).affectedRows
+  await db.exec('RESET ROLE;')
+  check('after 1089: guest delete still 0 rows', guest === 0, guest)
+  const other = await asUser(db, `DELETE FROM notifications WHERE id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'`)
+  check("after 1089: another user's row 0 rows", other.ok && other.n === 0, other)
+  const own = await asUser(db, `DELETE FROM notifications WHERE user_id = '${RECP}'`)
+  check('after 1089: clear all deletes both own rows', own.ok && own.n === 2, own)
+  const again89 = await applyFile(db, REPO + '20261089_notifications_delete_own.sql')
+  check('1089 re-run is clean', again89.ok, again89.msg)
 }
 // RED: a 1088 that forgot the table-level REVOKE must fail its own assertion.
 {
