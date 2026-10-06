@@ -901,6 +901,8 @@ const translations = {
     hotelsSoonBody: 'Hotels will be listed here soon.',
     hotelsLoadError: 'Couldn’t load hotels',
     hotelsNoResults: 'No hotels match these filters',
+    hotelSortRecommended: 'Recommended', hotelSortAZ: 'A → Z', hotelSortZA: 'Z → A', hotelSortStars: 'Stars (high → low)',
+    hotelSearchPlaceholder: 'Search hotels…',
     accomTitle: 'Property & Accommodation', accomAll: 'All', accomRent: 'Rent', accomSale: 'Sale', accomShortTerm: 'Short-term', accomDorms: 'Dormitories',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'ADA partner',
@@ -3436,6 +3438,8 @@ const translations = {
     hotelsSoonBody: 'Oteller çok yakında burada listelenecek.',
     hotelsLoadError: 'Oteller yüklenemedi',
     hotelsNoResults: 'Bu filtrelere uyan otel yok',
+    hotelSortRecommended: 'Önerilen', hotelSortAZ: 'A → Z', hotelSortZA: 'Z → A', hotelSortStars: 'Yıldız (yüksek → düşük)',
+    hotelSearchPlaceholder: 'Otel ara…',
     accomTitle: 'Emlak ve Konaklama', accomAll: 'Tümü', accomRent: 'Kiralık', accomSale: 'Satılık', accomShortTerm: 'Kısa süreli', accomDorms: 'Yurtlar',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'ADA iş ortağı',
@@ -5215,6 +5219,8 @@ const translations = {
     hotelsSoonBody: 'ستُدرج الفنادق هنا قريباً.',
     hotelsLoadError: 'تعذّر تحميل الفنادق',
     hotelsNoResults: 'لا توجد فنادق تطابق هذه الفلاتر',
+    hotelSortRecommended: 'المقترحة', hotelSortAZ: 'A → Z', hotelSortZA: 'Z → A', hotelSortStars: 'النجوم (من الأعلى)',
+    hotelSearchPlaceholder: 'ابحث عن فندق…',
     accomTitle: 'عقارات وإقامة', accomAll: 'الكل', accomRent: 'إيجار', accomSale: 'بيع', accomShortTerm: 'إيجار قصير الأمد', accomDorms: 'سكن طلابي',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'شريك ADA',
@@ -6974,6 +6980,8 @@ const translations = {
     hotelsSoonBody: 'Скоро здесь появится список отелей.',
     hotelsLoadError: 'Не удалось загрузить отели',
     hotelsNoResults: 'Нет отелей по этим фильтрам',
+    hotelSortRecommended: 'Рекомендуемые', hotelSortAZ: 'A → Z', hotelSortZA: 'Z → A', hotelSortStars: 'Звёзды (по убыванию)',
+    hotelSearchPlaceholder: 'Поиск отеля…',
     accomTitle: 'Недвижимость и жильё', accomAll: 'Все', accomRent: 'Аренда', accomSale: 'Продажа', accomShortTerm: 'Краткосрочно', accomDorms: 'Общежития',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'Партнёр ADA',
@@ -8721,6 +8729,8 @@ const translations = {
     hotelsSoonBody: 'Τα ξενοδοχεία θα εμφανιστούν εδώ σύντομα.',
     hotelsLoadError: 'Δεν ήταν δυνατή η φόρτωση των ξενοδοχείων',
     hotelsNoResults: 'Κανένα ξενοδοχείο δεν ταιριάζει με αυτά τα φίλτρα',
+    hotelSortRecommended: 'Προτεινόμενα', hotelSortAZ: 'A → Z', hotelSortZA: 'Z → A', hotelSortStars: 'Αστέρια (φθίνουσα)',
+    hotelSearchPlaceholder: 'Αναζήτηση ξενοδοχείου…',
     accomTitle: 'Ακίνητα & Διαμονή', accomAll: 'Όλα', accomRent: 'Ενοίκιο', accomSale: 'Πώληση', accomShortTerm: 'Βραχυπρόθεσμο', accomDorms: 'Εστίες',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'Συνεργάτης ADA',
@@ -10472,6 +10482,8 @@ const translations = {
     hotelsSoonBody: 'Les hôtels seront bientôt répertoriés ici.',
     hotelsLoadError: 'Impossible de charger les hôtels',
     hotelsNoResults: 'Aucun hôtel ne correspond à ces filtres',
+    hotelSortRecommended: 'Recommandés', hotelSortAZ: 'A → Z', hotelSortZA: 'Z → A', hotelSortStars: 'Étoiles (décroissant)',
+    hotelSearchPlaceholder: 'Rechercher un hôtel…',
     accomTitle: 'Immobilier & Logement', accomAll: 'Tout', accomRent: 'Location', accomSale: 'Vente', accomShortTerm: 'Court séjour', accomDorms: 'Résidences',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'Partenaire ADA',
@@ -12220,6 +12232,8 @@ const translations = {
     hotelsSoonBody: 'Los hoteles aparecerán aquí pronto.',
     hotelsLoadError: 'No se pudieron cargar los hoteles',
     hotelsNoResults: 'Ningún hotel coincide con estos filtros',
+    hotelSortRecommended: 'Recomendados', hotelSortAZ: 'A → Z', hotelSortZA: 'Z → A', hotelSortStars: 'Estrellas (de más a menos)',
+    hotelSearchPlaceholder: 'Buscar hotel…',
     accomTitle: 'Inmuebles y Alojamiento', accomAll: 'Todo', accomRent: 'Alquiler', accomSale: 'Venta', accomShortTerm: 'Corto plazo', accomDorms: 'Residencias',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'Socio ADA',
@@ -13968,6 +13982,8 @@ const translations = {
     hotelsSoonBody: 'Hotels werden hier bald aufgeführt.',
     hotelsLoadError: 'Hotels konnten nicht geladen werden',
     hotelsNoResults: 'Keine Hotels für diese Filter',
+    hotelSortRecommended: 'Empfohlen', hotelSortAZ: 'A → Z', hotelSortZA: 'Z → A', hotelSortStars: 'Sterne (absteigend)',
+    hotelSearchPlaceholder: 'Hotel suchen…',
     accomTitle: 'Immobilien & Unterkünfte', accomAll: 'Alle', accomRent: 'Miete', accomSale: 'Kauf', accomShortTerm: 'Kurzfristig', accomDorms: 'Wohnheime',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'ADA-Partner',
@@ -15712,6 +15728,8 @@ const translations = {
     hotelsSoonBody: 'هتل‌ها به‌زودی اینجا فهرست می‌شوند.',
     hotelsLoadError: 'بارگیری هتل‌ها ممکن نشد',
     hotelsNoResults: 'هیچ هتلی با این فیلترها مطابقت ندارد',
+    hotelSortRecommended: 'پیشنهادی', hotelSortAZ: 'A → Z', hotelSortZA: 'Z → A', hotelSortStars: 'ستاره (بیشترین به کمترین)',
+    hotelSearchPlaceholder: 'جستجوی هتل…',
     accomTitle: 'املاک و اقامتگاه', accomAll: 'همه', accomRent: 'اجاره', accomSale: 'فروش', accomShortTerm: 'کوتاه‌مدت', accomDorms: 'خوابگاه‌ها',
     // ─── Yurtlar / dorm partner showcase ───
     dormPartnerBadge: 'شریک ADA',

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { View, Text, Image, TouchableOpacity, FlatList, ActivityIndicator, Linking, StyleSheet, Platform, Dimensions } from 'react-native'
+import { View, Text, Image, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Linking, StyleSheet, Platform, Dimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
@@ -13,6 +13,7 @@ import { HOTEL_CLASSES, HOTEL_CLASS_LABEL_KEY, HOTEL_CLASS_STARS, HOTEL_ACTIONS,
 import { logContactEvent } from '../../utils/logContactEvent'
 import { hotelBookingUrl } from '../../utils/hotelBooking'
 import { hotelArea } from '../../utils/hotelArea'
+import { matchesName, sortHotels, HOTEL_SORTS, HOTEL_SORT_LABEL_KEY } from '../../utils/hotelSearch'
 import OsmAttribution from '../OsmAttribution'
 
 // The Oteller tab of Emlak & Konaklama (HOTELS_LIVE). KITOB member hotels from
@@ -217,6 +218,8 @@ export default function HotelsTab({ lang }) {
   const [klass, setKlass]       = useState(null)
   const [district, setDistrict] = useState(null)
   const [area, setArea]         = useState(null)
+  const [sort, setSort]         = useState('recommended')
+  const [query, setQuery]       = useState('')
   // The screen's SafeAreaView pads only the top, and Android draws edge-to-edge: without the
   // bottom inset the last card's buttons sit under the navigation bar.
   const insets = useSafeAreaInsets()
@@ -231,8 +234,8 @@ export default function HotelsTab({ lang }) {
 
   useEffect(() => { load() }, [load])
 
-  const sorted = useMemo(() => [...hotels].sort((a, b) =>
-    (CLASS_RANK[a.kitob_class] - CLASS_RANK[b.kitob_class]) || collator.compare(a.name, b.name)), [hotels])
+  const sorted = useMemo(() => sortHotels(hotels, sort,
+    { classRank: CLASS_RANK, stars: HOTEL_CLASS_STARS, compare: collator.compare }), [hotels, sort])
 
   const classOpts = useMemo(() => HOTEL_CLASSES
     .filter(k => hotels.some(h => h.kitob_class === k))
@@ -262,7 +265,7 @@ export default function HotelsTab({ lang }) {
   }
 
   const shown = sorted.filter(h => (!klass || h.kitob_class === klass) && (!district || h.region === district)
-    && (!area || areaOf.get(h.id)?.value === area))
+    && (!area || areaOf.get(h.id)?.value === area) && matchesName(h.name, query))
 
   if (loading) {
     if (REDESIGN) return <View style={hs.listContent}>{[0, 1, 2].map(i => <CardSkeleton key={i} height={240} style={{ marginBottom: 12 }} />)}</View>
@@ -284,10 +287,23 @@ export default function HotelsTab({ lang }) {
 
   if (hotels.length === 0) return <HotelsComingSoon lang={lang} />
 
-  function clearFilters() { setKlass(null); setDistrict(null); setArea(null) }
+  // Resets the sort too, like Emlak's Temizle; shown only for a filter or a search.
+  function clearFilters() { setKlass(null); setDistrict(null); setArea(null); setQuery(''); setSort('recommended') }
 
   return (
     <View style={hs.root}>
+      <View style={hs.searchBox}>
+        <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
+        <TextInput style={hs.searchInput} value={query} onChangeText={setQuery}
+          placeholder={t('hotelSearchPlaceholder', lang)} placeholderTextColor={colors.textSecondary}
+          returnKeyType="search" autoCorrect={false} autoCapitalize="none" accessibilityLabel={t('hotelSearchPlaceholder', lang)} />
+        {!!query && (
+          <TouchableOpacity onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button"
+            accessibilityLabel={t('uiClearSearch', lang)}>
+            <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
       <View style={hs.filterBar}>
         <FilterDropdown label={t('hotelFilterClass', lang)} lang={lang}
           options={classOpts} value={klass} onChange={setKlass} />
@@ -297,7 +313,10 @@ export default function HotelsTab({ lang }) {
           <FilterDropdown label={t('accomFilterArea', lang)} lang={lang}
             options={areaOpts} value={area} onChange={setArea} />
         )}
-        {!!(klass || district || area) && (
+        <FilterDropdown label={t('accomFilterSort', lang)} lang={lang} allowAll={false}
+          options={HOTEL_SORTS.map(s => ({ value: s, label: t(HOTEL_SORT_LABEL_KEY[s], lang) }))}
+          value={sort} onChange={setSort} />
+        {!!(klass || district || area || query.trim()) && (
           <TouchableOpacity style={hs.clearPill} onPress={clearFilters} accessibilityRole="button">
             <Ionicons name="close" size={14} color={REDESIGN ? colors.dangerInk : colors.danger} />
             <Text style={hs.clearPillText}>{t('accomClear', lang)}</Text>
@@ -308,6 +327,8 @@ export default function HotelsTab({ lang }) {
         data={shown}
         keyExtractor={h => h.id}
         style={hs.list}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[hs.listContent, { paddingBottom: listBottomPad(insets) }]}
         showsVerticalScrollIndicator={false}
         initialNumToRender={6}
@@ -338,6 +359,9 @@ const legacyHs = StyleSheet.create({
   list:          { flex: 1 },
   // flexShrink:0 — a fixed-height row above a scrolling list (CLAUDE.md).
   filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexShrink: 0 },
+  searchBox:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 12,
+                   minHeight: 40, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.cardBg, flexShrink: 0 },
+  searchInput:   { flex: 1, paddingVertical: 8, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.textPrimary },
   // Same pill as Emlak's clear-all (AccommodationScreen clearPill).
   clearPill:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.dangerLight, backgroundColor: colors.dangerLight },
   clearPillText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.danger },
@@ -399,7 +423,10 @@ const legacyHs = StyleSheet.create({
 // (Harita stays a Google Maps link) — new tokens and 44pt buttons only. Not a ListCard: the
 // hotel photo is KITOB's, so its crop stays full-width (partner rule).
 const redesignHs = StyleSheet.create({
-  filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, flexShrink: 0 },
+  filterBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexShrink: 0 },
+  searchBox:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 4, marginBottom: 8, paddingHorizontal: 12,
+                   minHeight: TAP, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.fieldBorder, backgroundColor: colors.card, flexShrink: 0 },
+  searchInput:   { flex: 1, paddingVertical: 8, fontSize: type.body.fontSize, fontFamily: type.body.fontFamily, color: colors.textPrimary },
   clearPill:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, minHeight: 36,
                    borderRadius: radii.pill, backgroundColor: colors.dangerLight },
   clearPillText: { ...type.small, fontFamily: 'Inter_700Bold', color: colors.dangerInk },
