@@ -3894,6 +3894,21 @@ WITH report AS (
     --     migration's rolled-back deletion test against it.
     UNION ALL SELECT '1087_notifications_conversation_id','notifications has no triggers (SET NULL premise)',
       COALESCE((SELECT count(*) = 0 FROM pg_trigger WHERE tgrelid = to_regclass('public.notifications') AND NOT tgisinternal), false)
+    -- ── 1088: clients may mark a notification read, and nothing else ────────────
+    -- A GRANT/REVOKE creates no named object. DERIVED over every column: authenticated may
+    -- UPDATE exactly `read`; neither client role may INSERT or UPDATE anything else (so only
+    -- the postgres-owned DEFINER writers set conversation_id). Positive control beside it:
+    -- the mark-read column is still writable and service_role still inserts (duty push).
+    UNION ALL SELECT '1088_notifications_lock_client_writes','notifications: client UPDATE = {read} only, no client INSERT; service_role INSERT kept',
+      COALESCE((SELECT bool_and(
+                    NOT has_column_privilege('anon', a.attrelid, a.attname, 'INSERT')
+                AND NOT has_column_privilege('anon', a.attrelid, a.attname, 'UPDATE')
+                AND NOT has_column_privilege('authenticated', a.attrelid, a.attname, 'INSERT')
+                AND has_column_privilege('authenticated', a.attrelid, a.attname, 'UPDATE') = (a.attname = 'read'))
+                  AND has_table_privilege('service_role', to_regclass('public.notifications'), 'INSERT')
+                  AND bool_or(a.attname = 'read')
+                 FROM pg_attribute a
+                WHERE a.attrelid = to_regclass('public.notifications') AND a.attnum > 0 AND NOT a.attisdropped), false)
   ) z
 
   UNION ALL
