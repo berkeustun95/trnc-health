@@ -3999,7 +3999,7 @@ ORDER BY ord, (status IN ('OK','ON')) ASC, section, migration, object;  -- probl
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ═══ QUERY 2 / 5 — CRON JOBS — run alone ═══
 -- ═══════════════════════════════════════════════════════════════════════════
--- Errors if pg_cron isn't installed (itself the finding). Expect 11 rows present.
+-- Errors if pg_cron isn't installed (itself the finding). Expect 5 rows present.
 -- Existence is NOT enough: cron.job.active can be false, and a disabled job looks
 -- identical to a healthy one from the application's side. purge-moderation-rejections
 -- backs a 30-day retention promise published in BOTH terms copies (§8.2), so silently
@@ -4018,15 +4018,10 @@ FROM (VALUES
   -- 90-day retention on app_update_events. The table is a launch counter, not a permanent
   -- record; without this job it grows forever and quietly becomes a usage log. 03:33 UTC,
   -- clear of the three purges above it.
-  ('1051_app_versions','purge-app-update-events'),
-  -- Live Scores (1072). INACTIVE on a daily job = no fixtures tomorrow; on a poll job = scores
-  -- freeze mid-match. Neither errors anywhere: live_sync_state.last_run_at is the alarm.
-  ('1072_live_scores_cron','live-scores-football-daily'),
-  ('1072_live_scores_cron','live-scores-basketball-daily'),
-  ('1072_live_scores_cron','live-scores-f1-daily'),
-  ('1072_live_scores_cron','live-scores-football-poll'),
-  ('1072_live_scores_cron','live-scores-basketball-poll'),
-  ('1072_live_scores_cron','live-scores-f1-poll')
+  ('1051_app_versions','purge-app-update-events')
+  -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
+  -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
+  -- deliberate act: put the six rows back in the same commit.
 ) e(m,o)
 
 UNION ALL
