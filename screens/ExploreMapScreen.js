@@ -323,6 +323,7 @@ export default function ExploreMapScreen({
   onRequireAccount,
   initialRoutesMode = false,   // Home's "Yürüyüş Rotaları" tile (redesign) opens straight into routes
   underTabBar = false,         // Keşfet tab (redesign): the floating tab bar covers the bottom of the map
+  dutyWindows = null,          // today's duty windows by facility id (App, dutyWindowsFor): on duty = open
 }) {
   const { width, height } = useWindowDimensions()
   // Under the floating tab bar the map is full height; every bottom-anchored surface sits
@@ -594,14 +595,14 @@ export default function ExploreMapScreen({
 
   // Applicability is computed over ALL pins, not the current selection, so the Open-now
   // chip does not appear and vanish as the user changes chips.
-  const canOpenNow = useMemo(() => openNowApplicable(sources.flatMap(s => s.pins)), [sources])
+  const canOpenNow = useMemo(() => openNowApplicable(sources.flatMap(s => s.pins), dutyWindows), [sources, dutyWindows])
 
   // Filtering happens HERE, before the index is built — not on the rendered clusters.
   // Cluster a superset and the bubbles count content the user has filtered out, so a
   // cluster reading "12" opens onto 4 pins.
   const pins = useMemo(
-    () => applyOpenNow(selectedPins(sources, selectedKeys), openNow && canOpenNow),
-    [sources, selectedKeys, openNow, canOpenNow]
+    () => applyOpenNow(selectedPins(sources, selectedKeys), openNow && canOpenNow, dutyWindows),
+    [sources, selectedKeys, openNow, canOpenNow, dutyWindows]
   )
 
   useEffect(() => {

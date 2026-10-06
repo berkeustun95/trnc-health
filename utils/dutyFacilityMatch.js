@@ -86,3 +86,17 @@ export function matchDutyRow(row, index) {
   }
   return null
 }
+
+// Today's duty_list rows → Map(facilityId → { date, from, until }), for isOpenNow
+// (utils/facilityUtils.js). Matched by name with the same index and aliases the duty list
+// uses, so the two can never disagree about which pharmacy is on duty. Unmatched rows drop.
+export function dutyWindowsFor(rows, facilities, date) {
+  const out = new Map()
+  if (!rows?.length || !date) return out
+  const index = buildFacilityIndex(facilities)
+  for (const row of rows) {
+    const f = matchDutyRow(row, index)
+    if (f && row.open_from && row.open_until) out.set(f.id, { date, from: row.open_from, until: row.open_until })
+  }
+  return out
+}
