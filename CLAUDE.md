@@ -65,8 +65,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   kept (accepted review risk), background location off. Verify: `npx expo config --type introspect`.
 - **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build.
 - **Two Maps keys, two GCP projects** (Android reads the key from the BUILD; an OTA cannot change it):
-  production EAS env = `AIzaSyDa…0Nlg` in **ada-app-499617** ("Maps Platform API Key") — ⚠ **UNRESTRICTED**
-  (no app restriction, 35 APIs), see pending; preview EAS env + local `.env` = `AIzaSyDb…uNu8` in
+  production EAS env = `AIzaSyDa…0Nlg` in **ada-app-499617** ("Maps Platform API Key"), **restricted
+  2026-10-06**: Android apps `com.berkeustun95.ada` + upload SHA-1 + Play App Signing SHA-1, API = Maps
+  SDK for Android only (a Places call now gets 403 `API_KEY_ANDROID_APP_BLOCKED`; nothing else may use
+  this key, iOS uses Apple Maps). A new signing key needs its SHA-1 added FIRST; preview EAS env + local `.env` = `AIzaSyDb…uNu8` in
   **My First Project** (`project-958a71e2-96dc-4371-942`), Android apps: `com.berkeustun95.ada.preview` +
   preview SHA-1. Blank map, no error = the build's key refuses that package/SHA-1. Read which key a
   build uses with `eas env:list --environment <env>`, never from `.env` (they differ). Vault `play-console-status.md`.
@@ -309,10 +311,6 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
     Android release builds and upload the deobfuscation mapping file with each AAB. Native change → device pass.
   - **Deprecated edge-to-edge APIs** → address with the next Expo SDK upgrade (SDK bump = ask first).
   - **Large-screen orientation/resizability** → part of the tablet backlog (`supportsTablet: false`, portrait-only today).
-- **Lock down the production Maps key `0Nlg`** (follow-up to the Explore restyle launch, 2026-10-04):
-  restrict to Android apps `com.berkeustun95.ada` + upload SHA-1 `3C:9A:…:BF:5E` + the Play App Signing
-  SHA-1 (Play Console → App integrity), API = Maps SDK for Android only. Get the Play signing SHA-1 FIRST
-  or production maps go blank. Click list for Berke; he does the console.
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.
