@@ -38,6 +38,18 @@ END $f$;
 ${nnm}
 REVOKE ALL ON FUNCTION public.notify_new_message(uuid) FROM PUBLIC, anon, authenticated;
 
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $j$ SELECT nullif(current_setting('request.jwt.claims', true), '')::jsonb $j$;
+GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated;
+CREATE FUNCTION public.is_anonymous_session() RETURNS boolean LANGUAGE sql STABLE SET search_path TO '' AS $f$
+  SELECT coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) $f$;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "no_anon_delete_notifications" ON public.notifications AS RESTRICTIVE FOR DELETE TO authenticated USING ((NOT is_anonymous_session()));
+CREATE POLICY "no_anon_insert_notifications" ON public.notifications AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK ((NOT is_anonymous_session()));
+CREATE POLICY "service insert notifications" ON public.notifications FOR INSERT TO public WITH CHECK (false);
+CREATE POLICY "users read own notifications" ON public.notifications FOR SELECT TO public USING ((user_id = auth.uid()));
+CREATE POLICY "no_anon_update_notifications" ON public.notifications AS RESTRICTIVE FOR UPDATE TO authenticated USING ((NOT is_anonymous_session())) WITH CHECK ((NOT is_anonymous_session()));
+CREATE POLICY "users update own notifications" ON public.notifications FOR UPDATE TO public USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+
 INSERT INTO auth.users VALUES ('11111111-1111-4111-8111-111111111111'), ('22222222-2222-4222-8222-222222222222');
 INSERT INTO profiles (id, preferred_language, push_token) VALUES
   ('11111111-1111-4111-8111-111111111111', 'Turkish', NULL), ('22222222-2222-4222-8222-222222222222', 'English', 'tok');
@@ -124,6 +136,49 @@ const check = (name, ok, got) => { results.push(ok); console.log(`${ok ? 'PASS' 
     ALTER TABLE notifications ADD CONSTRAINT bad CHECK (type IS DISTINCT FROM 'message' OR conversation_id IS NOT NULL);`)
   const r = await applyFile(db, REPO + '20261087_notifications_conversation_id.sql')
   check('SET NULL tripping a CHECK → leg B named', !r.ok && /leg \[B/.test(r.msg), r.msg)
+}
+
+// ─── 20261088: clients may mark read, nothing else ───────────────────────────
+const RECP = '22222222-2222-4222-8222-222222222222', CONV = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+const asUser = async (db, sql) => {
+  await db.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: RECP, role: 'authenticated', is_anonymous: false })])
+  await db.exec('SET ROLE authenticated;')
+  try { const r = await db.query(sql); return { ok: true, n: r.affectedRows } }
+  catch (e) { return { ok: false, msg: String(e.message) } }
+  finally { await db.exec('RESET ROLE;') }
+}
+{
+  const db = await freshDb(SEED)
+  check('1087 applies (1088 fixture)', (await applyFile(db, REPO + '20261087_notifications_conversation_id.sql')).ok)
+  await db.exec(`INSERT INTO notifications (id, user_id, title, body, type) VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '${RECP}', 't', 'b', 'message')`)
+  // RED FIRST: before 1088 the owner CAN write conversation_id (the hole being closed).
+  const before = await asUser(db, `UPDATE notifications SET conversation_id = '${CONV}' WHERE id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'`)
+  check('before 1088: client UPDATE of conversation_id succeeds (the hole)', before.ok && before.n === 1, before)
+  await db.exec(`UPDATE notifications SET conversation_id = NULL`)
+  const r = await applyFile(db, REPO + '20261088_notifications_lock_client_writes.sql')
+  check('1088 applies', r.ok, r.msg)
+  const conv = await asUser(db, `UPDATE notifications SET conversation_id = '${CONV}' WHERE id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'`)
+  check('after: client UPDATE of conversation_id refused', !conv.ok && /permission denied/.test(conv.msg), conv)
+  const read = await asUser(db, `UPDATE notifications SET read = true WHERE id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'`)
+  check('after: client mark-read still works (1 row)', read.ok && read.n === 1, read)
+  const del = await asUser(db, `DELETE FROM notifications WHERE id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'`)
+  // Live has NO permissive DELETE policy (only RESTRICTIVE no_anon_delete), so a client delete
+  // matches 0 rows — before and after 1088 alike. Pre-existing ("Clear all" is cosmetic), reported, not fixed here.
+  check('after: client delete unchanged by 1088 (0 rows, no error — pre-existing)', del.ok && del.n === 0, del)
+  const again = await applyFile(db, REPO + '20261088_notifications_lock_client_writes.sql')
+  check('1088 re-run is clean', again.ok, again.msg)
+}
+// RED: a 1088 that forgot the table-level REVOKE must fail its own assertion.
+{
+  const db = await freshDb(SEED)
+  await applyFile(db, REPO + '20261087_notifications_conversation_id.sql')
+  const broken = readFileSync(REPO + '20261088_notifications_lock_client_writes.sql', 'utf8')
+  const anchor = 'REVOKE INSERT, UPDATE ON public.notifications FROM anon, authenticated;'
+  if (!broken.includes(anchor)) throw new Error('anchor missing')
+  const { writeFileSync, mkdtempSync } = await import('node:fs')
+  const dir = mkdtempSync('/tmp/t1088-'); writeFileSync(dir + '/x.sql', broken.replace(anchor, ''))
+  const r = await applyFile(db, dir + '/x.sql')
+  check('1088 without the REVOKE → its assertion fires', !r.ok && /client column privileges wrong/.test(r.msg), r.msg)
 }
 
 console.log(results.every(Boolean) ? `\nALL ${results.length} PASS` : `\n${results.filter(x => !x).length} FAILED`)
