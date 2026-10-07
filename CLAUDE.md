@@ -293,22 +293,34 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
     `WAITLIST_BLAST_DONE` in `check-module-flags.mjs`.
 Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this list.
 
-## Check-ins go-live (ordered — approved 2026-10-02; everything on `feat/checkins-ready`: app code, migration 20261092 + its verify_schema/ledger entries, `scripts/test-checkins-*.mjs`)
-Policy draft on `docs/checkins-privacy`; store-form answers in vault `2026-09-24_store-privacy-forms-AS-ENTERED.md`.
-1. **Redesign live first** (`REDESIGN_LIVE`): the legacy place page keeps Coming Soon.
-2. **Show Berke the SQL** (`20261092_checkins.sql` — renumbered from 20261069 on 2026-10-04 so file order = apply order; lands on main with the branch the day it is applied) → wait for his "go" → apply → `verify_schema.sql`
-   → check the live-only profiles triggers (`guard_profile_ban`, `check_profile_name_content`) don't
-   block `accept_checkin_notice`'s update; report. Re-run `scripts/test-checkins-{sql,client}.mjs` first.
-3. Set `CHECKINS_PREVIEW = true` (`constants/redesign.js`), **`npm run ota:preview`** → device pass on the preview build (Turkish; Harita / Liste / Check-in'ler at 320dp).
+## Check-ins go-live (ordered — approved 2026-10-02; app code on `feat/explore-v2`)
+**DB LIVE, FEATURE DARK (Berke, 2026-10-07 — replaces "migration only at go-live").** `20261092_checkins`
++ `20261093_checkins_google_places` APPLIED 2026-10-07 (QUERY 1: 1018/1018); `google-places` deployed
+(v1, verify_jwt on); `GOOGLE_PLACES_SERVER_KEY` set. `MODULE_FLAGS.checkins` stays false until step 4.
+Until then check_in / get_checkin_feed / accept_checkin_notice / get_google_place_pins are callable
+through the API by signed-in non-guests; no production bundle calls them. ⚠ Never dispatch the stale
+`20261078_checkins.sql` (feat/checkins-ready) or `20261069_checkins.sql` (feat/checkins-db): it would
+put check_in back to the pre-helper body and add a second get_checkin_feed overload (ambiguous call).
+Test data from preview testing: `supabase/readonly/checkins_test_data.sql` — remove before the flip.
+Policy draft on `docs/checkins-privacy` (Google lines in); store-form answers + Google addendum + the
+pending ToS §4.4 legal item in vault `2026-09-24_store-privacy-forms-AS-ENTERED.md`.
+1. **Redesign live first** (`REDESIGN_LIVE`) ✓.
+2. ✓ 2026-10-07: applied; prod's live profiles triggers re-checked verbatim
+   (`scripts/test-checkins-live-triggers.mjs` + fixture, 10/10).
+3. `CHECKINS_PREVIEW = true` (`constants/redesign.js`, feat/explore-v2), **`npm run ota:preview`** →
+   device pass on the preview build (Turkish; Harita / Liste / Check-in'ler at 320dp). ⚠ While
+   explore-v2 is on Preview, `npm run ota` from main is refused by the preview-lineage guard until
+   explore-v2 lands on main (or Berke hands over `PREVIEW_LINEAGE_OVERRIDE=1`).
 4. **Publish policy + store forms, flip `MODULE_FLAGS.checkins`** (both files, one commit). Re-date the
    draft first (four copies, both terms lines, `LEGAL_VERSION`). `privacy:check` refuses the flip
-   without the disclosure in all four copies.
-   **Before the flip:** give Berke a click-by-click list for Play Console (Data safety) and App Store
-   Connect (App Privacy): confirm Name, Photos and user-generated content are already declared, add
-   Precise Location on Apple (linked, no tracking, App Functionality). He enters it and confirms; no
-   flip before his confirmation.
+   without the disclosure (incl. the Google lines) in all four copies.
+   **Before the flip:** give Berke a click-by-click list for Play Console (Data safety: Precise
+   location **Shared: yes**) and App Store Connect (App Privacy: Precise Location, linked, no
+   tracking, App Functionality; plus the Google Maps SDK's declarations on the iOS Google build).
+   He enters it and confirms; no flip before his confirmation. Remove the test data first.
 5. **`notify_module_waitlist('checkins')`** with before/after counts (SOP step 10) → `WAITLIST_BLAST_DONE`.
-Feeds only: no per-person check-in history anywhere (decided 2026-10-02).
+Feeds only: no per-person check-in history anywhere (decided 2026-10-02). EEA Maps terms apply
+(billing Cyprus): no Google place name on or next to a map.
 
 ## Advisor
 Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.
