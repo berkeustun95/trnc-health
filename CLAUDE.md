@@ -35,7 +35,8 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   Long-term login in the Keychain ("Supabase CLI"), token scoped to trnc-health only: Project Settings
   read; Database, Edge Functions, Edge Function Secrets read-write; NO API-keys read (so `supabase link`
   fails — not needed, and it keeps the service key unreadable). Always through `scripts/sb.sh` (token +
-  `--project-ref`; CLI 2.104.0's `secrets` ignores the Keychain). Claude sets function secrets itself
+  `--project-ref`; CLI 2.104.0's `secrets` ignores the Keychain; allowlist: `functions`/`secrets` only).
+  Claude sets function secrets itself
   (`scripts/sb.sh secrets set --env-file <600 file>`, never the value on a command line; check by digest:
   `secrets list` value = sha256) and deploys functions itself with `scripts/fn-deploy.sh <fn> --go`
   (verify_jwt from deploy-config.json) — **only after Berke's go**, like every migration and OTA.
