@@ -2,9 +2,12 @@
 // (the key never ships in the app). Server half: supabase/functions/google-places,
 // supabase/migrations/20261091_checkins_google_places.sql.
 //
-// NOTHING HERE CACHES GOOGLE CONTENT. Names live in the calling component's state for as long
-// as it is mounted (display only) and are never written to AsyncStorage or a module-level map:
-// the Maps Platform terms allow storing a place ID, and lat/lng for < 30 days, and nothing else.
+// GOOGLE CONTENT IS NEVER STORED. Place names are held in memory only — sessionNames below,
+// so a place is not looked up twice while the app is open (Berke, 2026-10-07) — and dropped
+// when the app goes to the background. Never AsyncStorage, never our database: the Maps
+// Platform terms allow storing a place ID, and lat/lng for < 30 days. ⚠ ToS §3.2.3(b) ("will
+// not cache Google Maps Content except as expressly permitted") read literally covers even
+// this in-memory reuse; accepted as a known risk, the same class as the per-screen state.
 //
 // Like utils/checkins.js, each function takes the Supabase client first so Node can test it.
 import { useEffect, useRef, useState } from 'react'
@@ -55,15 +58,40 @@ export async function nearbyAda(client, fix) {
 }
 
 // { [placeId]: name | null } for up to GOOGLE_NAMES_BATCH ids per call.
+// Per-session names, by language. Only real names are kept: a null (unknown place, Google
+// error) is asked again next time.
+const sessionNames = new Map()
+const nameKey = (lang, id) => `${lang}|${id}`
+export function clearGoogleNames() { sessionNames.clear() }
+
 export async function googleNames(client, ids, lang) {
   const out = {}
   const uniq = [...new Set(ids.filter(Boolean))]
-  for (let i = 0; i < uniq.length; i += GOOGLE_NAMES_BATCH) {
-    const res = await invoke(client, { action: 'details', ids: uniq.slice(i, i + GOOGLE_NAMES_BATCH), lang })
+  const missing = []
+  for (const id of uniq) {
+    const k = nameKey(lang, id)
+    if (sessionNames.has(k)) out[id] = sessionNames.get(k)
+    else missing.push(id)
+  }
+  for (let i = 0; i < missing.length; i += GOOGLE_NAMES_BATCH) {
+    const res = await invoke(client, { action: 'details', ids: missing.slice(i, i + GOOGLE_NAMES_BATCH), lang })
     if (!res.ok) break
-    Object.assign(out, res.data?.names ?? {})
+    for (const [id, name] of Object.entries(res.data?.names ?? {})) {
+      out[id] = name
+      if (name) sessionNames.set(nameKey(lang, id), name)
+    }
   }
   return out
+}
+
+// "While the app is open": the first hook to mount drops the names whenever the app is
+// backgrounded. require() here, not an import, so Node (the tests) never loads react-native.
+let lifetimeHooked = false
+function hookLifetime() {
+  if (lifetimeHooked) return
+  lifetimeHooked = true
+  const { AppState } = require('react-native')
+  AppState.addEventListener('change', s => { if (s === 'background') clearGoogleNames() })
 }
 
 // Same result shape as checkIn() in utils/checkins.js, so one Outcome renders both.
@@ -93,6 +121,7 @@ export function googleMapsUrl(placeId, name) {
 // Names for the Google ids in `ids`, fetched once per id for as long as the caller is mounted.
 // Component state only (see the note at the top): nothing outlives the screen.
 export function useGoogleNames(client, ids, lang) {
+  hookLifetime()
   const [names, setNames] = useState({})
   const asked = useRef(new Set())
   const key = ids.filter(Boolean).join(',')

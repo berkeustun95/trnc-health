@@ -46,6 +46,19 @@ x = await G.nearbyAda({ from }, fix)
 ok('ADA: box corner beyond 100 m dropped; active + unhidden asked', x.ok && x.places.map(p => p.id).join() === 'in'
   && q.f.some(f => f[0] === 'eq' && f[1] === 'status' && f[2] === 'active') && q.f.some(f => f[0] === 'is' && f[1] === 'hidden_at'), { x, q })
 
+G.clearGoogleNames()
+let asked = []
+const counting = fn(b => { asked.push(...b.ids); return { data: { names: Object.fromEntries(b.ids.map(i => [i, i === 'gone' ? null : 'n' + i])) }, error: null } })
+await G.googleNames(counting, ['a', 'b', 'gone'], 'Turkish')
+x = await G.googleNames(counting, ['a', 'b', 'c', 'gone'], 'Turkish')
+ok('session cache: second call asks only c and the unknown one', asked.join() === 'a,b,gone,c,gone' && x.a === 'na' && x.c === 'nc', { asked, x })
+asked = []
+await G.googleNames(counting, ['a'], 'English')
+ok('cache is per language', asked.join() === 'a', asked)
+G.clearGoogleNames(); asked = []
+await G.googleNames(counting, ['a'], 'Turkish')
+ok('cleared (app backgrounded) -> asked again', asked.join() === 'a', asked)
+
 ok('googleWithinReach 140 m yes / 160 m no', G.googleWithinReach({ lat: 35.10126, lng: 33.1 }, fix) && !G.googleWithinReach({ lat: 35.10144, lng: 33.1 }, fix), null)
 console.log(`${pass} pass, ${fail} fail`)
 process.exit(fail ? 1 : 0)
