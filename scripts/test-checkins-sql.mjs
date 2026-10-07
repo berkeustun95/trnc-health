@@ -1,12 +1,26 @@
 // 20261078 check-ins, behaviour as each role, in PGlite (scripts/migration-harness.mjs).
 //   node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-checkins-sql.mjs [migration.sql]
+//   WITH_1091=1 … applies 20261091 (Google places) on top: every 1078 rule must still hold.
 // The optional path is for red-first runs against a deliberately broken copy. PGlite is PG 18;
 // prod is older, and the fixture has none of prod's profiles triggers (guard_profile_ban,
 // check_profile_name_content) — check those live at apply time.
 import { fileURLToPath } from 'node:url'
 import { freshDb, applyFile } from './migration-harness.mjs'
 const FILE = process.argv[2] || fileURLToPath(new URL('../supabase/migrations/20261078_checkins.sql', import.meta.url))
+const FILE_1091 = fileURLToPath(new URL('../supabase/migrations/20261091_checkins_google_places.sql', import.meta.url))
 const SEED = `
+ALTER TABLE auth.users ADD COLUMN is_anonymous boolean NOT NULL DEFAULT false;
+CREATE SCHEMA cron;
+CREATE TABLE cron.job (jobid serial PRIMARY KEY, jobname text UNIQUE, schedule text, command text, active boolean NOT NULL DEFAULT true);
+CREATE FUNCTION cron.schedule(n text, s text, c text) RETURNS bigint LANGUAGE sql AS $f$
+  INSERT INTO cron.job (jobname, schedule, command) VALUES (n, s, c) RETURNING jobid $f$;
+CREATE FUNCTION cron.unschedule(n text) RETURNS boolean LANGUAGE sql AS $f$ DELETE FROM cron.job WHERE jobname = n RETURNING true $f$;
+CREATE SCHEMA net;
+CREATE FUNCTION net.http_post(url text, headers jsonb, body jsonb) RETURNS bigint LANGUAGE sql AS $f$ SELECT 1::bigint $f$;
+CREATE SCHEMA vault;
+CREATE TABLE vault.secrets (name text);
+INSERT INTO vault.secrets VALUES ('novest_sync_key');
+CREATE VIEW vault.decrypted_secrets AS SELECT name, 'stub'::text AS decrypted_secret FROM vault.secrets;
 CREATE FUNCTION public.is_anonymous_session() RETURNS boolean LANGUAGE sql STABLE AS $f$
   SELECT coalesce((nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'is_anonymous')::boolean, false) $f$;
 CREATE TABLE public.profiles (id uuid PRIMARY KEY, display_name text, date_of_birth date,
@@ -40,6 +54,11 @@ const r = await applyFile(db, FILE)
 let pass = 0, fail = 0
 const ok = (name, cond, got) => { if (cond) pass++; else { fail++; console.log('FAIL', name, JSON.stringify(got)) } }
 if (!r.ok) { console.log('APPLY FAILED', r.msg); process.exit(1) }
+if (process.env.WITH_1091) {
+  const r2 = await applyFile(db, FILE_1091)
+  if (!r2.ok) { console.log('APPLY 1091 FAILED', r2.msg); process.exit(1) }
+  console.log('(with 20261091 applied on top)')
+}
 async function as(uid, sql, anon = false) {
   await db.exec('RESET ROLE;')
   await db.query("SELECT set_config('request.jwt.claims', $1, false)", [uid ? JSON.stringify({ sub: uid, role: 'authenticated', is_anonymous: anon }) : ''])
