@@ -112,7 +112,8 @@
     "labels:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-tile-labels.mjs",
     "backchain:check": "node scripts/check-back-chain.cjs",
     "backlistener:check": "node scripts/check-back-listener.mjs",
-    "check:prod-writes": "node scripts/check-prod-write-guard.mjs"
+    "check:prod-writes": "node scripts/check-prod-write-guard.mjs",
+    "googleplaces:edge": "deno run -A scripts/test-google-places-edge.ts"
   },
   "private": true,
   "devDependencies": {
