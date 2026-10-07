@@ -72,3 +72,6 @@ data/pharmacy-hand-place-*.csv
 data/osm/
 data/placement-progress.json
 data/hnc/
+
+# supabase link state (project ref, CLI versions) — per checkout, never committed
+supabase/.temp/
