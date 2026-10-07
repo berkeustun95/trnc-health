@@ -17,7 +17,10 @@ export const REDESIGN = REDESIGN_LIVE || (typeof __DEV__ !== 'undefined' && __DE
 // CHECKINS_PREVIEW is FALSE for the Explore restyle launch (2026-10-03) so ADA Preview shows
 // exactly what production will — no check-in UI. Flip it to true at check-ins go-live step 3
 // (CLAUDE.md), when 20261078 is applied and preview is where check-ins get tested.
-// TRUE on feat/checkins-ready ONLY (2026-10-04): this branch is the check-ins launch candidate,
-// tested on ADA Preview at go-live step 3 (after 20261078 is applied). main keeps it false.
-const CHECKINS_PREVIEW = true
+// FALSE again on feat/explore-v2 (2026-10-07): it arrived true from feat/checkins-ready, and this
+// branch merges to main before go-live. Production cannot see it either way (IS_PREVIEW_BUILD is
+// false without APP_VARIANT=preview, and check-ota-preflight.mjs (c) refuses a production publish
+// that resolves to the Preview config), but on main it would put check-ins on ADA Preview before
+// 20261078/20261091 exist. Go-live step 3 flips it, in its own commit.
+const CHECKINS_PREVIEW = false
 export const CHECKINS = MODULE_FLAGS.checkins || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && CHECKINS_PREVIEW)
