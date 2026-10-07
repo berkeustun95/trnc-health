@@ -22,5 +22,7 @@ export const REDESIGN = REDESIGN_LIVE || (typeof __DEV__ !== 'undefined' && __DE
 // false without APP_VARIANT=preview, and check-ota-preflight.mjs (c) refuses a production publish
 // that resolves to the Preview config), but on main it would put check-ins on ADA Preview before
 // 20261092/20261093 exist. Go-live step 3 flips it, in its own commit.
-const CHECKINS_PREVIEW = false
+// TRUE from 2026-10-07 (go-live step 3, Berke's go): 20261092 + 20261093 are applied and
+// google-places is deployed; ADA Preview tests check-ins. Production cannot see it (preflight (c)).
+const CHECKINS_PREVIEW = true
 export const CHECKINS = MODULE_FLAGS.checkins || (typeof __DEV__ !== 'undefined' && __DEV__) || (IS_PREVIEW_BUILD && CHECKINS_PREVIEW)
