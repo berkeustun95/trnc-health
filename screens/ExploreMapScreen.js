@@ -75,7 +75,7 @@ const FOLLOW_ZOOM = 17, FOLLOW_ALTITUDE = 600   // zoom for Google, altitude (m)
 // styled off, and Google places with a visible ADA check-in appear as pins. Those pins MUST
 // NOT appear on an Apple map (Maps Platform SST §14.2), hence GOOGLE_MAP_OK in the gate. No
 // Google API call happens while browsing: pins come from our own get_google_place_pins();
-// the name is fetched only when a pin is tapped (GooglePlaceSheet).
+// and a tapped pin shows NO Google name (EEA SST §15.1: nothing but lat/lng/place_id with a map).
 const GOOGLE_LAYER = CHECKINS && GOOGLE_MAP_OK
 const GOOGLE_PIN_COLOR = placeColors.googlePlace.text
 
@@ -865,8 +865,9 @@ export default function ExploreMapScreen({
         />
       )}
       {GOOGLE_LAYER && (
+        // showName={false}: over a map, EEA SST §15.1 — see GooglePlaceSheet.
         <GooglePlaceSheet place={googlePlace} session={session} lang={lang} onRequireAccount={onRequireAccount}
-          onClose={() => setGooglePlace(null)} />
+          showName={false} onClose={() => setGooglePlace(null)} />
       )}
     </View>
   )

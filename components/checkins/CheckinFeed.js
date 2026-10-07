@@ -108,12 +108,12 @@ function GuestPrompt({ lang, onRequireAccount }) {
 
 // Inside the place page's ScrollView: plain Views, a "show more" button instead of endless scroll.
 // googlePlaceId instead of placeId = a Google place's check-ins (GooglePlaceSheet).
-export function PlaceCheckins({ placeId = null, googlePlaceId = null, session, lang, onRequireAccount, refreshKey, style }) {
+export function PlaceCheckins({ placeId = null, googlePlaceId = null, session, lang, onRequireAccount, refreshKey, style, showTitle = true }) {
   const guest = !session || isGuest(session)
   const { rows, state, code, more, busy, first, next } = useFeed(placeId, googlePlaceId, !guest, refreshKey)
   return (
     <View style={style}>
-      <Text style={s.title}>{t('checkinPlaceTitle', lang)}</Text>
+      {showTitle && <Text style={s.title}>{t('checkinPlaceTitle', lang)}</Text>}
       {guest ? <GuestPrompt lang={lang} onRequireAccount={onRequireAccount} />
         : state === 'loading' ? <ActivityIndicator color={colors.primary} style={s.spinner} />
         : state === 'error' ? <FeedError code={code} lang={lang} onRetry={first} />
