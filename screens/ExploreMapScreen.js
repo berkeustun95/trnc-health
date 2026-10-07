@@ -69,7 +69,7 @@ let returnSnapshot = null
 // "locate me" (or starts a walk). Every watch is foreground-only and ends with the screen.
 const FOLLOW_ZOOM = 17, FOLLOW_ALTITUDE = 600   // zoom for Google, altitude (m) for Apple (iOS before 1.4.0)
 
-// ─── GOOGLE LAYER (check-ins, 20261091) ─────────────────────────────────────
+// ─── GOOGLE LAYER (check-ins, 20261093) ─────────────────────────────────────
 // With CHECKINS on, the map is Google on both platforms where the binary can draw it
 // (utils/googleMap.js: Android always, iOS when the binary carries the Google Maps SDK), Google's own business/POI labels are
 // styled off, and Google places with a visible ADA check-in appear as pins. Those pins MUST

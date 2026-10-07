@@ -258,13 +258,13 @@ function readStudentHubFlag(raw) {
   return m[1] === 'true'
 }
 
-// ─── CHECK-INS TRIPWIRE (20261078) ──────────────────────────────────────────
+// ─── CHECK-INS TRIPWIRE (20261092) ──────────────────────────────────────────
 // The opposite question to the one above: not "is a retracted claim gone" but "is the new
 // disclosure THERE". Flipping MODULE_FLAGS.checkins against copy that does not describe
 // check-ins would publish a feature the policy says nothing about, to a 13+ audience. The
 // markers are the facts a reader most needs, one per copy language; the wording itself is
 // Berke's (docs/checkins-privacy). Silent while the flag is off.
-// The last two per language (2026-10-07, 20261091): Google as the recipient of the position on
+// The last two per language (2026-10-07, 20261093): Google as the recipient of the position on
 // "Buradayım" in Explore → Check-ins, at the precision the google-places function sends
 // (r4 ≈ 10 m), and Google as an independent controller (Maps Platform ToS §4.4).
 const CHECKINS_MARKERS = {

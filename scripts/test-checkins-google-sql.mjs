@@ -1,5 +1,5 @@
-// 20261091 Google-place check-ins, behaviour as each role, in PGlite, on top of 20261078.
-//   node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-checkins-google-sql.mjs [1091.sql]
+// 20261093 Google-place check-ins, behaviour as each role, in PGlite, on top of 20261092.
+//   node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-checkins-google-sql.mjs [1093.sql]
 // The optional path is for red-first runs against a deliberately broken copy. Shares the
 // fixture with scripts/test-checkins-sql.mjs (read from its SEED literal). The Edge Function's
 // half (JWT → uid, Google's location, pharmacy → p_pin=false) is NOT exercised here.
@@ -8,8 +8,8 @@ import { fileURLToPath } from 'node:url'
 import { freshDb, applyFile } from './migration-harness.mjs'
 const base = readFileSync(new URL('./test-checkins-sql.mjs', import.meta.url), 'utf8')
 const SEED = base.match(/const SEED = `([\s\S]*?)`\.replace/)[1].replace(/'u0000000[^']*'::text::uuid/, "'b0000000-0000-4000-8000-000000000009'")
-const F1078 = fileURLToPath(new URL('../supabase/migrations/20261078_checkins.sql', import.meta.url))
-const F1091 = process.argv[2] || fileURLToPath(new URL('../supabase/migrations/20261091_checkins_google_places.sql', import.meta.url))
+const F1092 = fileURLToPath(new URL('../supabase/migrations/20261092_checkins.sql', import.meta.url))
+const F1093 = process.argv[2] || fileURLToPath(new URL('../supabase/migrations/20261093_checkins_google_places.sql', import.meta.url))
 const U = n => `b0000000-0000-4000-8000-00000000000${n}`
 const P = n => `a0000000-0000-4000-8000-00000000000${n}`
 const G = n => `ChIJgooglePlace00000${n}`   // valid shape
@@ -18,7 +18,7 @@ await db.exec(`INSERT INTO public.profiles (id, display_name, date_of_birth) VAL
  ('${U(1)}','adult','1990-01-01'), ('${U(2)}','viewer','1990-01-01'), ('${U(3)}','minor', current_date - interval '15 years'),
  ('${U(4)}','guest', null), ('${U(5)}','nonotice','1990-01-01');
  INSERT INTO auth.users (id, is_anonymous) SELECT id, id = '${U(4)}' FROM public.profiles;`)
-for (const f of [F1078, F1091]) {
+for (const f of [F1092, F1093]) {
   const r = await applyFile(db, f)
   if (!r.ok) { console.log('APPLY FAILED', f.split('/').pop(), r.msg); process.exit(1) }
 }
@@ -48,7 +48,7 @@ ok('authenticated cannot call check_in_google', !x.ok && /permission denied/.tes
 x = await as('authenticated', U(1), `SELECT public.claim_google_places_call('${U(1)}', 'nearby', 1)`)
 ok('authenticated cannot claim quota', !x.ok && /permission denied/.test(x.msg), x)
 x = await cig(4, 1, 35.1, 33.1); ok('guest user -> AUTH_REQUIRED', x.msg === 'AUTH_REQUIRED', x)
-x = await cig(5, 1, 35.1, 33.1); ok('no notice -> NOTICE_REQUIRED (1078 rule via helper)', x.msg === 'NOTICE_REQUIRED', x)
+x = await cig(5, 1, 35.1, 33.1); ok('no notice -> NOTICE_REQUIRED (1092 rule via helper)', x.msg === 'NOTICE_REQUIRED', x)
 x = await svc(`SELECT * FROM public.check_in_google('${U(1)}', 'bad id with spaces', 35.1, 33.1, 35.1, 33.1, 10, true)`)
 ok('bad place id -> PLACE_NOT_FOUND', x.msg === 'PLACE_NOT_FOUND', x)
 
@@ -90,7 +90,7 @@ ok('feed by Google place: adult row, no place name, id set', x.ok && x.rows.leng
 x = await as('authenticated', U(2), `SELECT google_place_id FROM public.get_checkin_feed()`)
 ok('all-places feed includes Google rows', x.ok && x.rows.some(r => r.google_place_id === G(1)), x)
 x = await as('authenticated', U(2), `SELECT checkin_id FROM public.get_checkin_feed(null, null, null, 1)`)
-ok('1078 positional call still works', x.ok && x.rows.length === 1, x)
+ok('1092 positional call still works', x.ok && x.rows.length === 1, x)
 
 // ── impossible travel across kinds ──
 await db.exec(`INSERT INTO public.google_place_pins VALUES ('${G(1)}', 35.1, 33.1, now()) ON CONFLICT (google_place_id) DO UPDATE SET fetched_at = now()`)

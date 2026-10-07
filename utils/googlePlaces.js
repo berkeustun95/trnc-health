@@ -1,6 +1,6 @@
 // Google places for check-ins — every call goes through the google-places Edge Function
 // (the key never ships in the app). Server half: supabase/functions/google-places,
-// supabase/migrations/20261091_checkins_google_places.sql.
+// supabase/migrations/20261093_checkins_google_places.sql.
 //
 // GOOGLE CONTENT IS NEVER STORED. Place names are held in memory only — sessionNames below,
 // so a place is not looked up twice while the app is open (Berke, 2026-10-07) — and dropped

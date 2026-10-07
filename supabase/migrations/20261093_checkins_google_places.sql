@@ -1,10 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261091 — check-ins at Google places ("Buradayım" nearby list)
+-- 20261093 — check-ins at Google places ("Buradayım" nearby list)
 -- ═══════════════════════════════════════════════════════════════════════════
 --
--- REQUIRES 20261078 (check-ins) APPLIED FIRST. Both are unapplied as of 2026-10-07 and
--- launch together at check-ins go-live; expect both to be renumbered at apply time so file
--- order = apply order (1078 now sorts before the already-applied 1079-1090).
+-- REQUIRES 20261092 (check-ins) APPLIED FIRST. Renumbered 2026-10-07 from 20261078/20261091
+-- (written before 1079-1090 were applied) so that file order = apply order. Applied 2026-10-07
+-- with the feature still dark: MODULE_FLAGS.checkins stays false until the flip (Berke).
 --
 -- What changes:
 --   • a check-in is at EITHER an ADA place (place_id) OR a Google place (google_place_id).
@@ -27,7 +27,7 @@
 -- check-in/refresh time and recorded only as the ABSENCE of a pin row.
 --
 -- ─── WHO CAN SEE WHAT (plain English) ───────────────────────────────────────
---   checkins.google_place_id — same owner-only RLS as 1078 (no policy change).
+--   checkins.google_place_id — same owner-only RLS as 1092 (no policy change).
 --   google_place_pins        — no client role can read or write the table. Everyone signed
 --                              in (guests included) reads pins through get_google_place_pins(),
 --                              which returns only (place id, lat, lng) for places with at
@@ -37,7 +37,7 @@
 --   google_places_usage      — per-user and global daily call counters for the Edge Function
 --                              (Google bills per call). service_role only; rows older than
 --                              2 days are purged nightly. Holds user id + counts, nothing else.
---   check_in_google()        — service_role only. Re-runs every 1078 rule for p_user_id.
+--   check_in_google()        — service_role only. Re-runs every 1092 rule for p_user_id.
 --   get_checkin_feed()       — also returns Google check-ins (name resolved live by the app).
 --
 -- ─── CRON ───────────────────────────────────────────────────────────────────
@@ -49,8 +49,8 @@
 --                                          refresh means the pin is purged at day 29 and
 --                                          returns on the next check-in — never kept stale.
 --
--- Apply: gh workflow run supabase-migrate -f file=20261091_checkins_google_places.sql
--- PRECONDITION: 20261078 applied; google-places deployed; GOOGLE_PLACES_SERVER_KEY set.
+-- Apply: gh workflow run supabase-migrate -f file=20261093_checkins_google_places.sql
+-- PRECONDITION: 20261092 applied; google-places deployed; GOOGLE_PLACES_SERVER_KEY set.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 SET ROLE postgres;
@@ -65,7 +65,7 @@ BEGIN
   IF to_regclass('public.checkins') IS NULL
      OR to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)') IS NULL
      OR to_regprocedure('public.metres_between(double precision,double precision,double precision,double precision)') IS NULL THEN
-    RAISE EXCEPTION 'REFUSING: 20261078 (check-ins) is not applied. Nothing applied.';
+    RAISE EXCEPTION 'REFUSING: 20261092 (check-ins) is not applied. Nothing applied.';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                   WHERE table_schema = 'auth' AND table_name = 'users' AND column_name = 'is_anonymous') THEN
@@ -74,9 +74,9 @@ BEGIN
   IF (SELECT count(*) FROM vault.secrets WHERE name = 'novest_sync_key') IS DISTINCT FROM 1 THEN
     RAISE EXCEPTION 'REFUSING: Vault secret novest_sync_key is missing — the refresh job would POST without a key.';
   END IF;
-  PERFORM set_config('app.m1091_profiles_policies',
+  PERFORM set_config('app.m1093_profiles_policies',
     (SELECT count(*)::text FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profiles'), true);
-  PERFORM set_config('app.m1091_checkins_policies',
+  PERFORM set_config('app.m1093_checkins_policies',
     (SELECT count(*)::text FROM pg_policies WHERE schemaname = 'public' AND tablename = 'checkins'), true);
 END $$;
 
@@ -93,7 +93,7 @@ ALTER TABLE public.checkins DROP CONSTRAINT IF EXISTS checkins_google_place_id_s
 ALTER TABLE public.checkins ADD CONSTRAINT checkins_google_place_id_shape
   CHECK (google_place_id IS NULL OR google_place_id ~ '^[A-Za-z0-9_-]{16,255}$');
 
--- 1078's UNIQUE (user_id, place_id, checked_in_on) never fires when place_id is NULL.
+-- 1092's UNIQUE (user_id, place_id, checked_in_on) never fires when place_id is NULL.
 CREATE UNIQUE INDEX IF NOT EXISTS checkins_one_per_day_google
   ON public.checkins (user_id, google_place_id, checked_in_on) WHERE google_place_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS checkins_google_feed_idx
@@ -101,7 +101,7 @@ CREATE INDEX IF NOT EXISTS checkins_google_feed_idx
 
 COMMENT ON COLUMN public.checkins.google_place_id IS
   'Google Places place ID (stored indefinitely, permitted by the Places policies). Exactly one '
-  'of place_id / google_place_id is set. Written only by check_in_google(). 20261091.';
+  'of place_id / google_place_id is set. Written only by check_in_google(). 20261093.';
 
 -- ─── 2. Pins (lat/lng only, ≤ 29 days) ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.google_place_pins (
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS public.google_place_pins (
 COMMENT ON TABLE public.google_place_pins IS
   'Map pins for Google places with a visible ADA check-in. Google Maps Content: ONLY lat/lng, '
   'cached < 30 days (SST §14.3) — read filter and nightly purge at 29 days. No names/types. '
-  'No pharmacy-type place ever has a row. service_role only. 20261091.';
+  'No pharmacy-type place ever has a row. service_role only. 20261093.';
 
 ALTER TABLE public.google_place_pins ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.google_place_pins FROM PUBLIC, anon, authenticated;
@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS public.google_places_usage (
 );
 COMMENT ON TABLE public.google_places_usage IS
   'Daily Google Places call counters per user (and one global row, nil uuid) for the '
-  'google-places Edge Function. No FK on purpose (the global row); purged after 2 days. 20261091.';
+  'google-places Edge Function. No FK on purpose (the global row); purged after 2 days. 20261093.';
 
 ALTER TABLE public.google_places_usage ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.google_places_usage FROM PUBLIC, anon, authenticated;
@@ -181,7 +181,7 @@ REVOKE ALL ON FUNCTION public.claim_google_places_call(uuid, text, integer) FROM
 GRANT EXECUTE ON FUNCTION public.claim_google_places_call(uuid, text, integer) TO service_role;
 
 -- ─── 4. The rules, once, for both kinds of place ────────────────────────────
--- 1078's check_in() held every rule inline. They move into two helpers so the ADA path and
+-- 1092's check_in() held every rule inline. They move into two helpers so the ADA path and
 -- the Google path cannot drift; check_in() keeps its signature, refusal order and codes.
 -- Neither helper is callable by any API role: they trust the uid they are handed.
 CREATE OR REPLACE FUNCTION public.checkin_guard_person(p_user_id uuid)
@@ -370,7 +370,7 @@ $function$;
 COMMENT ON FUNCTION public.check_in_google(uuid, text, double precision, double precision, double precision, double precision, double precision, boolean) IS
   'Google-place check-in for the google-places Edge Function (service_role only). Same rules as '
   'check_in() via checkin_guard_person + checkin_write. Place coordinates come from Google, not '
-  'the app. Upserts the pin unless p_pin is false (pharmacy), which removes it. 20261091.';
+  'the app. Upserts the pin unless p_pin is false (pharmacy), which removes it. 20261093.';
 
 REVOKE ALL ON FUNCTION public.check_in_google(uuid, text, double precision, double precision, double precision, double precision, double precision, boolean)
   FROM PUBLIC, anon, authenticated;
@@ -378,7 +378,7 @@ GRANT EXECUTE ON FUNCTION public.check_in_google(uuid, text, double precision, d
   TO service_role;
 
 -- ─── 7. The feed, with Google rows ──────────────────────────────────────────
--- The signature gains p_google_place_id LAST, so 1078's positional order still works; the
+-- The signature gains p_google_place_id LAST, so 1092's positional order still works; the
 -- old 4-argument function is dropped (two overloads would make named calls ambiguous).
 -- Google rows: place_* columns are NULL and google_place_id is set; the app resolves the name
 -- live (it may not be stored).
@@ -435,7 +435,7 @@ COMMENT ON FUNCTION public.get_checkin_feed(uuid, timestamptz, uuid, integer, te
   'Recent check-ins, newest first, keyset-paginated, max 50 per page; all places, one ADA place '
   'or one Google place. Others'' rows only when checkins_public, named, unbanned, not blocked '
   'either way, ADA place active and unhidden; the caller''s own rows always (is_mine). Google '
-  'rows carry google_place_id and NULL place_*. Guests raise AUTH_REQUIRED. 20261078/20261091.';
+  'rows carry google_place_id and NULL place_*. Guests raise AUTH_REQUIRED. 20261092/20261093.';
 
 REVOKE ALL ON FUNCTION public.get_checkin_feed(uuid, timestamptz, uuid, integer, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_checkin_feed(uuid, timestamptz, uuid, integer, text) TO authenticated;
@@ -461,7 +461,7 @@ $function$;
 
 COMMENT ON FUNCTION public.get_google_place_pins() IS
   'Google place pins (id, lat, lng) with a cached position younger than 29 days and at least '
-  'one check-in by a visible author. No names, no counts, no people. 20261091.';
+  'one check-in by a visible author. No names, no counts, no people. 20261093.';
 
 REVOKE ALL ON FUNCTION public.get_google_place_pins() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_google_place_pins() TO authenticated;
@@ -526,7 +526,7 @@ BEGIN
   IF v_def NOT LIKE 'CREATE UNIQUE INDEX%(user_id, google_place_id, checked_in_on) WHERE (google_place_id IS NOT NULL)' THEN
     RAISE EXCEPTION 'checkins_one_per_day_google is %', coalesce(v_def, '<missing>');
   END IF;
-  -- Still no device-location column (1078's rule; derived, not a name list).
+  -- Still no device-location column (1092's rule; derived, not a name list).
   SELECT count(*), string_agg(column_name, ',') INTO v_n, v_names FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = 'checkins'
      AND (column_name ILIKE '%lat%' OR column_name ILIKE '%lng%' OR column_name ILIKE '%lon%' OR column_name ILIKE '%accura%');
@@ -629,9 +629,9 @@ BEGIN
 
   -- (g) No policy was added to profiles or checkins by this file.
   IF (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profiles')::text
-       IS DISTINCT FROM current_setting('app.m1091_profiles_policies', true)
+       IS DISTINCT FROM current_setting('app.m1093_profiles_policies', true)
      OR (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'checkins')::text
-       IS DISTINCT FROM current_setting('app.m1091_checkins_policies', true) THEN
+       IS DISTINCT FROM current_setting('app.m1093_checkins_policies', true) THEN
     RAISE EXCEPTION 'a profiles or checkins policy changed inside this file';
   END IF;
 END $$;
@@ -647,7 +647,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261091_checkins_google_places.sql', '1b4504efb0befa5fe45e4029cbe26eae8c904a48850f046799b7bc4f0d0da23d')
+VALUES ('20261093_checkins_google_places.sql', 'de646ea056400cc96c550ce190a9d0a436093a205d55395d9a177af5fe521d9f')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

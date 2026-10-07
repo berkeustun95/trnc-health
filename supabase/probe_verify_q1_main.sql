@@ -1,36 +1,6 @@
--- ═══════════════════════════════════════════════════════════════════════════
--- ADA schema drift audit — "committed but never applied" gap detector.
--- Manual-apply workflow has no CI, so this checks the LIVE DB against every
--- object the repo migrations claim to create. Run in Supabase SQL editor
--- (Role → postgres). Scan for status <> 'OK'. The `migration` column tells you
--- which file to apply.
---
--- ▶ THE ANSWER IS THE FIRST ROW OF QUERY 1. It reads either "ALL n CHECKS PASS" or
---   "k PROBLEM(S) of n", derived from the report itself. Anything else — a count of
---   rows that changed state, a scan by eye — is not the assertion.
---
--- ▶ HOW TO RUN — the SQL editor shows only the LAST result set, so run the five
---   queries ONE AT A TIME. Each is a standalone statement under a
---   `═══ QUERY n / 5 ═══` banner: select from a banner down to the next banner
---   (or end of file) and run just that block.  1 = main report · 2 = cron ·
---   3 = RLS policy counts · 4 = storage.objects policies ·
---   5 = store-update blocking gate.
---
--- CONVENTION (keep this file the source of truth for schema drift):
---   • Every new migration MUST register the objects it creates into the relevant
---     section below (A tables · B columns · C functions · D triggers ·
---     E constraints · F indexes · G RPC grants · H behavior/version tokens ·
---     Q2 cron · Q3 policies). A migration whose objects aren't listed here is
---     invisible to the drift check.
---   • For a CREATE OR REPLACE that changes behavior without adding a new named
---     object, add an H-section token (a body/constraint substring) — existence
---     alone can't tell an old body from the new one.
---   • Every ADD COLUMN migration ends with `NOTIFY pgrst, 'reload schema';` so a
---     stale PostgREST cache can't mask a missing column as a 42703 query error.
--- ═══════════════════════════════════════════════════════════════════════════
-
--- ═══════════════════════════════════════════════════════════════════════════
--- ═══ QUERY 1 / 5 — MAIN REPORT — run alone (select down to the QUERY 2 banner) ═══
+-- Read-only baseline (2026-10-07): QUERY 1 of origin/main's verify_schema.sql, sliced between its
+-- banners as scripts/supabase-migrate.mjs does, BEFORE the check-ins applies. Any FAIL here
+-- pre-exists the migrations.
 -- ═══════════════════════════════════════════════════════════════════════════
 -- tables · columns · functions · triggers · constraints · indexes · grants ·
 -- behavior/version tokens · RLS-enabled. One big statement.
@@ -40,11 +10,6 @@ WITH report AS (
   SELECT 'A-table' section, e.m migration, e.o object,
          CASE WHEN to_regclass('public.'||e.o) IS NOT NULL THEN 'OK' ELSE 'MISSING' END status
   FROM (VALUES
-    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
-    ('1093_checkins_google_places','google_place_pins'),
-    ('1093_checkins_google_places','google_places_usage'),
-    -- Check-ins (1092): registered ahead of the apply; red until it runs.
-    ('1092_checkins','checkins'),
     ('capture_1','profiles'),('capture_1','facilities'),
     ('capture_1','reviews'),('capture_1','questions'),('capture_1','answers'),
     ('capture_1','notifications'),('capture_1','claim_requests'),
@@ -124,12 +89,6 @@ WITH report AS (
                 WHERE ic.table_schema='public' AND ic.table_name=e.t AND ic.column_name=e.c)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
-    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
-    ('1093_checkins_google_places','checkins','google_place_id'),
-    -- Check-ins (1092): registered ahead of the apply; red until it runs.
-    ('1092_checkins','profiles','checkins_public'),
-    ('1092_checkins','profiles','checkins_notice_at'),
-    ('1092_checkins','profiles','checkins_notice_version'),
     ('0621_provider_verification','facility_change_requests','rejection_reason'),
     ('0621_provider_verification','claim_requests','rejection_reason'),
     ('0712_ugc_moderation','reviews','hidden_at'),
@@ -324,19 +283,6 @@ WITH report AS (
                 WHERE n.nspname='public' AND p.proname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
-    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
-    ('1093_checkins_google_places','check_in_google'),
-    ('1093_checkins_google_places','checkin_guard_person'),
-    ('1093_checkins_google_places','checkin_write'),
-    ('1093_checkins_google_places','get_google_place_pins'),
-    ('1093_checkins_google_places','claim_google_places_call'),
-    ('1093_checkins_google_places','purge_google_places_cache'),
-    -- Check-ins (1092): registered ahead of the apply; red until it runs.
-    ('1092_checkins','check_in'),
-    ('1092_checkins','get_checkin_feed'),
-    ('1092_checkins','accept_checkin_notice'),
-    ('1092_checkins','metres_between'),
-    ('1092_checkins','guard_checkin_notice_columns'),
     ('0623_cross_user_notifications','insert_notification'),
     ('0628/0705_search_content','search_content'),
     ('0714_block_anonymous_writes','is_anonymous_session'),
@@ -485,8 +431,6 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_trigger tg WHERE NOT tg.tgisinternal AND tg.tgname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
-    -- Check-ins (1092): registered ahead of the apply; red until it runs.
-    ('1092_checkins','guard_checkin_notice_columns'),
     ('0701_rate_limits','enforce_question_limit'),
     ('capture_4/0712','enforce_report_rate_limit'),
     ('capture_4/0712','guard_profile_ban'),
@@ -543,16 +487,6 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
-    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
-    ('1093_checkins_google_places','checkins_one_place'),
-    ('1093_checkins_google_places','checkins_google_place_id_shape'),
-    ('1093_checkins_google_places','google_place_pins_id_shape'),
-    ('1093_checkins_google_places','google_places_usage_kind_check'),
-    -- Check-ins (1092): registered ahead of the apply; red until it runs.
-    ('1092_checkins','checkins_pkey'),
-    ('1092_checkins','checkins_one_per_day'),
-    ('1092_checkins','checkins_user_id_fkey'),
-    ('1092_checkins','checkins_place_id_fkey'),
     ('0731_garages_directory','facilities_type_check'),
     ('0731_garages_directory','facilities_service_types_values_check'),
     ('0804_grooming_multi_category','facilities_service_types_type_check'),
@@ -838,13 +772,6 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
-    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
-    ('1093_checkins_google_places','checkins_one_per_day_google'),
-    ('1093_checkins_google_places','checkins_google_feed_idx'),
-    -- Check-ins (1092): registered ahead of the apply; red until it runs.
-    ('1092_checkins','checkins_feed_idx'),
-    ('1092_checkins','checkins_place_feed_idx'),
-    ('1092_checkins','checkins_user_recent_idx'),
     ('0702_job_postings','job_postings_owner_idx'),
     ('0702_job_postings','job_postings_board_idx'),
     ('0712_ugc_moderation','content_reports_pending_idx'),
@@ -946,12 +873,6 @@ WITH report AS (
                   AND a.privilege_type='EXECUTE' AND r.rolname='authenticated')
               THEN 'OK' ELSE 'CHECK (no explicit grant)' END
   FROM (VALUES
-    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
-    ('1093_checkins_google_places','get_google_place_pins'),
-    -- Check-ins (1092): registered ahead of the apply; red until it runs.
-    ('1092_checkins','check_in'),
-    ('1092_checkins','get_checkin_feed'),
-    ('1092_checkins','accept_checkin_notice'),
     ('0731_garages_directory','create_garage_facility'),
     ('0802_update_garage_facility','update_garage_facility'),
     ('0725_grooming_directory','create_grooming_facility'),
@@ -3969,101 +3890,6 @@ WITH report AS (
                                AND roles = '{authenticated}' AND qual = '(user_id = auth.uid())')
                    AND bool_or(policyname = 'no_anon_delete_notifications' AND permissive = 'RESTRICTIVE' AND cmd = 'DELETE')
                   FROM pg_policies WHERE schemaname = 'public' AND tablename = 'notifications'), false)
-    -- ── 1092: check-ins ──────────────────────────────────────────────────────────
-    -- (1) RLS on, exactly two guest-guarded OWNER policies (read + delete), no client
-    --     INSERT/UPDATE, anon nothing. The feed is the only way to see anyone else's.
-    UNION ALL SELECT '1092_checkins','checkins: RLS on, 2 guest-guarded owner policies, no client insert/update, anon nothing',
-      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.checkins')), false)
-      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='checkins') = 2
-      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='checkins'
-            AND qual LIKE '%auth.uid()%' AND qual LIKE '%is_anonymous_session()%') = 2
-      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.checkins'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
-               AND NOT has_table_privilege('authenticated', to_regclass('public.checkins'), 'INSERT,UPDATE,TRUNCATE')
-               AND has_table_privilege('authenticated', to_regclass('public.checkins'), 'SELECT')
-               AND has_table_privilege('authenticated', to_regclass('public.checkins'), 'DELETE'), false)
-    -- (2) No location column on the row, ever (derived, not a name list).
-    UNION ALL SELECT '1092_checkins','checkins has no coordinate/accuracy column',
-      (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='checkins'
-        AND (column_name ILIKE '%lat%' OR column_name ILIKE '%lng%' OR column_name ILIKE '%lon%' OR column_name ILIKE '%accura%')) = 0
-      AND to_regclass('public.checkins') IS NOT NULL
-    -- (3) Both FKs CASCADE (account deletion; never SET NULL).
-    UNION ALL SELECT '1092_checkins','checkins: user_id and place_id ON DELETE CASCADE',
-      (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
-        WHERE conrelid = to_regclass('public.checkins') AND contype = 'f')
-      IS NOT DISTINCT FROM 'checkins_place_id_fkey=c,checkins_user_id_fkey=c'
-    -- (4) The rules. 1092 held them inline in check_in(); 20261093 moved them into
-    --     checkin_guard_person + checkin_write so the ADA and Google paths share one copy.
-    --     Rewritten 2026-10-07 against the 1093 shape (both files apply together): check_in
-    --     keeps the guest guard and calls both helpers; the helpers carry 150 m, (0, 50],
-    --     the TRNC day and the 30/day cap. Neither helper is callable by any API role.
-    UNION ALL SELECT '1092_checkins','check_in: DEFINER, guest-guarded, via checkin_guard_person + checkin_write (150 m, accuracy <= 50, Europe/Istanbul day)',
-      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')), false)
-      AND COALESCE(pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%is_anonymous_session()%'
-           AND pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%checkin_guard_person(v_me)%'
-           AND pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%FROM checkin_write(%'
-           AND pg_get_functiondef(to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)')) LIKE '%p_place_lng) > 150 THEN%'
-           AND pg_get_functiondef(to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)')) LIKE '%p_accuracy <= 50%'
-           AND pg_get_functiondef(to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)')) LIKE '%Europe/Istanbul%'
-           AND pg_get_functiondef(to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)')) LIKE '%>= 30 THEN%'
-           AND pg_get_functiondef(to_regprocedure('public.checkin_guard_person(uuid)')) LIKE '%NOTICE_REQUIRED%', false)
-    -- (5) The feed's visibility filter: the author's switch, blocks both ways, ban, guest guard.
-    --     Signature is 1093's (p_google_place_id appended; the 4-argument form is dropped).
-    UNION ALL SELECT '1092_checkins','get_checkin_feed: DEFINER, checkins_public + blocks + ban + guest guard',
-      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer,text)')), false)
-      AND COALESCE(pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer,text)')) LIKE '%p.checkins_public IS TRUE%'
-           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer,text)')) LIKE '%FROM blocks b%'
-           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer,text)')) LIKE '%ugc_banned_until%'
-           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer,text)')) LIKE '%is_anonymous_session()%', false)
-    -- (6) checkins_public has NO DEFAULT (decided once, at consent, by DOB). A DEFAULT
-    --     added later would silently publish every new account. A DEFAULT creates no object.
-    UNION ALL SELECT '1092_checkins','profiles.checkins_public: nullable, NO DEFAULT',
-      COALESCE((SELECT is_nullable = 'YES' AND column_default IS NULL FROM information_schema.columns
-                 WHERE table_schema='public' AND table_name='profiles' AND column_name='checkins_public'), false)
-    -- (7) The adult-only default lives in accept_checkin_notice, and only fills a NULL.
-    UNION ALL SELECT '1092_checkins','accept_checkin_notice: DEFINER, COALESCE(checkins_public, adult by DOB)',
-      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.accept_checkin_notice(text)')), false)
-      AND COALESCE(pg_get_functiondef(to_regprocedure('public.accept_checkin_notice(text)')) LIKE '%COALESCE(p.checkins_public,%'
-           AND pg_get_functiondef(to_regprocedure('public.accept_checkin_notice(text)')) LIKE '%interval ''18 years''%', false)
-    -- ── 1093: check-ins at Google places ─────────────────────────────────────────
-    -- (1) Exactly one of the two place columns; the per-day UNIQUE for Google rows.
-    UNION ALL SELECT '1093_checkins_google_places','checkins: num_nonnulls(place_id, google_place_id) = 1 + partial UNIQUE per Google place per day',
-      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = to_regclass('public.checkins') AND conname = 'checkins_one_place')
-               = 'CHECK ((num_nonnulls(place_id, google_place_id) = 1))', false)
-      AND COALESCE((SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'checkins_one_per_day_google')
-               LIKE 'CREATE UNIQUE INDEX%(user_id, google_place_id, checked_in_on) WHERE (google_place_id IS NOT NULL)', false)
-    -- (2) Google Maps Content: the pins table holds ONLY id + lat/lng + fetched_at (SST §14.3).
-    --     DERIVED from the catalog: a name/types/address column appearing turns this red.
-    UNION ALL SELECT '1093_checkins_google_places','google_place_pins columns are exactly fetched_at, google_place_id, latitude, longitude',
-      (SELECT string_agg(column_name, ',' ORDER BY column_name) FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = 'google_place_pins')
-      IS NOT DISTINCT FROM 'fetched_at,google_place_id,latitude,longitude'
-    -- (3) Both new tables: RLS on, no policies, no client privilege; service_role writes.
-    UNION ALL SELECT '1093_checkins_google_places','google_place_pins + google_places_usage: RLS on, 0 policies, no anon/authenticated privilege, service_role writes',
-      COALESCE((SELECT bool_and(c.relrowsecurity) AND count(*) = 2 FROM pg_class c
-                 WHERE c.oid IN (to_regclass('public.google_place_pins'), to_regclass('public.google_places_usage'))), false)
-      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('google_place_pins','google_places_usage')) = 0
-      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.google_place_pins'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
-               AND NOT has_table_privilege('authenticated', to_regclass('public.google_place_pins'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
-               AND NOT has_table_privilege('anon', to_regclass('public.google_places_usage'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
-               AND NOT has_table_privilege('authenticated', to_regclass('public.google_places_usage'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
-               AND has_table_privilege('service_role', to_regclass('public.google_place_pins'), 'SELECT,INSERT,UPDATE,DELETE')
-               AND has_table_privilege('service_role', to_regclass('public.google_places_usage'), 'SELECT,INSERT,UPDATE,DELETE'), false)
-    -- (4) check_in_google is the Edge Function's alone (service_role, no client role), and
-    --     reuses the shared rules. Positive control beside it: service_role CAN execute.
-    UNION ALL SELECT '1093_checkins_google_places','check_in_google: service_role only, guest check via auth.users, shared helpers',
-      COALESCE(has_function_privilege('service_role', to_regprocedure('public.check_in_google(uuid,text,double precision,double precision,double precision,double precision,double precision,boolean)'), 'EXECUTE')
-           AND NOT has_function_privilege('authenticated', to_regprocedure('public.check_in_google(uuid,text,double precision,double precision,double precision,double precision,double precision,boolean)'), 'EXECUTE')
-           AND NOT has_function_privilege('anon', to_regprocedure('public.check_in_google(uuid,text,double precision,double precision,double precision,double precision,double precision,boolean)'), 'EXECUTE')
-           AND NOT has_function_privilege('authenticated', to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)'), 'EXECUTE')
-           AND NOT has_function_privilege('service_role', to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)'), 'EXECUTE')
-           AND pg_get_functiondef(to_regprocedure('public.check_in_google(uuid,text,double precision,double precision,double precision,double precision,double precision,boolean)')) LIKE '%u.is_anonymous IS NOT TRUE%'
-           AND pg_get_functiondef(to_regprocedure('public.check_in_google(uuid,text,double precision,double precision,double precision,double precision,double precision,boolean)')) LIKE '%FROM checkin_write(%', false)
-    -- (5) Pins: 29-day read filter + only VISIBLE authors' check-ins make a pin.
-    UNION ALL SELECT '1093_checkins_google_places','get_google_place_pins: 29-day filter, visible authors only, no anon',
-      COALESCE(pg_get_functiondef(to_regprocedure('public.get_google_place_pins()')) LIKE '%interval ''29 days''%'
-           AND pg_get_functiondef(to_regprocedure('public.get_google_place_pins()')) LIKE '%p.checkins_public IS TRUE%'
-           AND NOT has_function_privilege('anon', to_regprocedure('public.get_google_place_pins()'), 'EXECUTE')
-           AND has_function_privilege('authenticated', to_regprocedure('public.get_google_place_pins()'), 'EXECUTE'), false)
   ) z
 
   UNION ALL
@@ -4141,166 +3967,4 @@ ORDER BY ord, (status IN ('OK','ON')) ASC, section, migration, object;  -- probl
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- ═══ QUERY 2 / 5 — CRON JOBS — run alone ═══
--- ═══════════════════════════════════════════════════════════════════════════
--- Errors if pg_cron isn't installed (itself the finding). Expect 5 rows present.
--- Existence is NOT enough: cron.job.active can be false, and a disabled job looks
--- identical to a healthy one from the application's side. purge-moderation-rejections
--- backs a 30-day retention promise published in BOTH terms copies (§8.2), so silently
--- inactive there is a broken written commitment, not a nagging warning.
-SELECT e.m migration, e.o job,
-       CASE WHEN EXISTS (SELECT 1 FROM cron.job WHERE jobname=e.o AND active) THEN 'OK'
-            WHEN EXISTS (SELECT 1 FROM cron.job WHERE jobname=e.o)            THEN 'INACTIVE ← FIX'
-            ELSE 'MISSING' END status
-FROM (VALUES
-  ('0705_job_postings_auto_expire','expire-job-postings'),
-  ('0809_featured_expiry_reminder','featured-expiry-reminder'),
-  ('0926_moderation_rejection_log','purge-moderation-rejections'),
-  -- Backs "permanently removed 30 days later" in the policy. INACTIVE here is a broken
-  -- written commitment, same as purge-moderation-rejections.
-  ('1050_purge_soft_deleted_ugc','purge-soft-deleted-ugc'),
-  -- 90-day retention on app_update_events. The table is a launch counter, not a permanent
-  -- record; without this job it grows forever and quietly becomes a usage log. 03:33 UTC,
-  -- clear of the three purges above it.
-  ('1051_app_versions','purge-app-update-events'),
-  ('1093_checkins_google_places','purge-google-places-cache'),
-  ('1093_checkins_google_places','google-places-refresh')
-  -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
-  -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
-  -- deliberate act: put the six rows back in the same commit.
-) e(m,o)
-
-UNION ALL
--- ─── 1052: the reporter must be able to report on NOTHING BUT its own job ───
--- DERIVED FROM cron.job, never from a list written here: a remembered list goes green on
--- the one job somebody forgot to name. Every jobname on this server except its own is
--- checked against the function's definition.
--- ⚠ pg_get_functiondef() returns the COMMENTS too, so a comment inside that function that
--- mentioned a neighbouring job BY NAME would fail this — and the tempting fix would be to
--- delete the comment rather than the reference. The function's own header warns about it.
-SELECT '1052_purge_status_reporter', 'app_update_events_purge_status: reports ONLY its own job',
-       CASE
-         WHEN to_regprocedure('public.app_update_events_purge_status()') IS NULL THEN 'MISSING'
-         WHEN EXISTS (SELECT 1 FROM cron.job j
-                       WHERE j.jobname IS DISTINCT FROM 'purge-app-update-events'
-                         AND position(j.jobname in pg_get_functiondef(to_regprocedure('public.app_update_events_purge_status()'))) > 0)
-           THEN 'LEAKS OTHER JOBS ← FIX'
-         WHEN position('purge-app-update-events' in pg_get_functiondef(to_regprocedure('public.app_update_events_purge_status()'))) = 0
-           THEN 'NAMES NO JOB ← FIX'
-         ELSE 'OK' END
-ORDER BY status ASC, migration;
-
-
--- ═══════════════════════════════════════════════════════════════════════════
--- ═══ QUERY 3 / 5 — RLS POLICY COUNT per table — run alone ═══
--- ═══════════════════════════════════════════════════════════════════════════
--- Sanity vs capture_5's 172 policies. A table that should be locked down but
--- shows 0 = a gap.
-SELECT tablename, count(*) AS policies
-FROM pg_policies WHERE schemaname='public'
-GROUP BY tablename ORDER BY tablename;
-
-
--- ═══════════════════════════════════════════════════════════════════════════
--- ═══ QUERY 4 / 5 — STORAGE.OBJECTS POLICIES — run alone (down to the QUERY 5 banner) ═══
--- ═══════════════════════════════════════════════════════════════════════════
--- Bucket ACLs live OUTSIDE migrations/ (dashboard / Slices 1-2), so nothing else
--- catches drift on them. Listing, not pass/fail — eyeball each policy's
--- cmd / roles / qual / with_check. Reference after Slices 1-2:
---                • provider-documents / provider-credentials: *_owner_{insert,select,
---                  update,delete} (writes carry NOT is_anonymous_session()) + the
---                  pre-existing *_admin_read SELECT. No public/anon rows.
---                • estate-agent-documents INSERT + event-images INSERT pin the
---                  uploader UID by folder segment ([1] and [2] respectively).
---                • public image buckets — SEE THE NEXT PARAGRAPH, THIS IS NOW PARTLY CLOSED.
---                  facility-images / property-images / event-images keep their broad
---                  `USING (bucket_id=…)` SELECT and remain enumerable; their content is
---                  business and place photos, not people.
---                ✅ CLOSED 2026-09-20 FOR avatars, by 20261040 — the one bucket whose
---                  path was IDENTITY-DERIVED (`{user_id}/avatar.{ext}`), so enumerating
---                  it returned a face WITH its owner's uuid, on a declared 13-17 app.
---                  Fixed by making the bucket PRIVATE (public = false) plus four
---                  owner-scoped policies and signed URLs on the client — NOT by
---                  tightening a SELECT policy, for the reason stated immediately below.
---                  Also closed 2026-09-20: property-images writes, by 20261039 — they
---                  pinned no uid and admitted GUESTS.
---                ── OPEN, KNOWN, AND DELIBERATELY UNFIXED (captured 2026-09-21) ──
---                  20261042 made all 36 policies drift-checkable by capturing the nine
---                  that existed only in the dashboard. It captured them VERBATIM,
---                  defects included, so that each fix below lands as a visible diff
---                  against a known baseline rather than as an untraceable improvement.
---                  All of these belong to the PLACE-PHOTOS SLICE:
---                    • "Providers manage own facility images" — FOR ALL TO **public**,
---                      gated only on facility ownership. The widest grant in the set:
---                      every command, to `public` rather than `authenticated`.
---                    • "organizer delete own event images"    — uid-pinned at segment
---                      [2], NO is_anonymous_session() guard. A guest carries a real
---                      auth.uid(), so the pin admits guests.
---                    • property_images_delete                 — uid-pinned at segment
---                      [1], NO guest guard, AND granted TO **public**. Both at once.
---                    • place_photos_upload (20260823)         — guest-guarded but NOT
---                      uid-pinned: the mirror-image defect.
---                    • ad-images / event-images / place-photos / property-images /
---                      towing-logos carry NO file_size_limit and NO allowed_mime_types.
---                  Two captured policies also reference UNQUALIFIED `facilities` and
---                  `is_admin()`, so they bind against search_path at CREATE time.
---                  Qualifying them is part of the same slice.
---                  ⚠ AND NOTE (measured 2026-08-23 against towing-logos): for a bucket
---                  with public = true, Storage serves reads WITHOUT evaluating RLS at
---                  all — a request with no apikey and no Authorization header still
---                  returns 200 and the bytes. So those broad SELECT policies are not
---                  what grants anon read, and TIGHTENING THEM WOULD NOT CLOSE THE
---                  ENUMERATION FOLLOW-UP. Only flipping a bucket to private makes its
---                  SELECT policy load-bearing. Do not mistake a green public-URL fetch
---                  for evidence that a bucket's read policy works.
---                • place-photos (0823): place_photos_public (SELECT, bucket-scoped) +
---                  place_photos_upload (INSERT authenticated, bucket-scoped, anon-guarded) +
---                  place_photos_delete (DELETE, foldername[1]=uid OR is_admin(), anon-guarded).
---                  Expect exactly these 3 (no UPDATE — uploads are upsert:false).
---                • towing-logos (0905): towing_logos_public_read (SELECT, bucket-scoped)
---                  + towing_logos_admin_{insert,update,delete} (authenticated, is_admin(),
---                  anon-guarded). Expect exactly these 4. This bucket is created BY the
---                  migration, not by hand — the provider-documents/estate-agent-documents
---                  lesson was that a dashboard-made bucket with un-applied policies looks
---                  identical to a working one until somebody tries to upload. ─────
-SELECT policyname, cmd, roles, qual, with_check
-FROM pg_policies
-WHERE schemaname='storage' AND tablename='objects'
-ORDER BY policyname;
-
-
--- ═══ QUERY 5 / 5 — STORE-UPDATE BLOCKING GATE — run alone (to end of file) ═══
---
--- ⚠ THIS IS A POLICY GATE, NOT A DRIFT CHECK, AND IT IS DELIBERATELY NOT IN QUERY 1.
---
--- It reads ROW DATA from app_versions, which only exists once 20261051 is applied. A bare
--- reference to a missing relation is resolved at PARSE time, so putting it in QUERY 1 would
--- make the whole main report die with 42P01 on any database that has not applied 20261051 —
--- and the likeliest run order is exactly "run verify_schema, see what is missing, then apply
--- it". Same trap the 0923 notify_owner_text token documents. Out here it can only fail
--- itself.
---
--- WHAT IT GUARDS: min_supported_version BLOCKS the app. '1.0.0' blocks nobody — 1.0.0
--- binaries carry no expo-updates and can never receive the OTA, so no reachable install sits
--- below it. Raising it on either row switches blocking ON for real users.
---
--- Before that happens, an iOS build containing the popup must pass the force-tier checks on
--- a device, on BOTH platforms. Android: the modal blocks, both escapes open and return, and
--- hardware back cannot escape. iOS adds the native Modal against the emergency ROOT OVERLAY,
--- the absence of hardware back, and the itms-apps:// link. See "Store-update popup" in
--- CLAUDE.md; the 2026-09-25 release shipped soft-only and exercised neither force path.
---
--- A 'BLOCKING ON' verdict is not automatically wrong — it is a question. Answer it by
--- doing the device pass on BOTH Android and iOS, and saying so in the commit that raises
--- the value. The 2026-09-25 pass was soft-tier only; nothing about blocking was exercised.
-SELECT
-  CASE
-    WHEN count(*) FILTER (WHERE platform IN ('ios','android')) <> 2
-      THEN 'INCOMPLETE — expected one ios and one android row; found ' || count(*)::text
-    WHEN bool_and(min_supported_version = '1.0.0')
-      THEN 'OK — blocking OFF on both platforms (min_supported_version = 1.0.0)'
-    ELSE 'BLOCKING ON ← force-tier device pass required on BOTH Android and iOS (CLAUDE.md: Store-update popup)'
-  END AS verdict,
-  string_agg(platform || ': latest=' || latest_version || ' min=' || min_supported_version,
-             ' · ' ORDER BY platform) AS rows_read
-FROM public.app_versions;
+-- 

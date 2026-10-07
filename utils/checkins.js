@@ -1,9 +1,9 @@
 // Check-ins — every network call the app makes for them, in one place.
-// Server half and who-sees-what: supabase/migrations/20261078_checkins.sql.
+// Server half and who-sees-what: supabase/migrations/20261092_checkins.sql.
 //
 // Each function takes the Supabase client as its first argument instead of importing
 // lib/supabase: that import pulls AsyncStorage and cannot load in Node, and this module is
-// exercised in Node against the real SQL (scratchpad harness, PGlite) until 20261078 is
+// exercised in Node against the real SQL (scratchpad harness, PGlite) until 20261092 is
 // applied at go-live. Screens pass `supabase`.
 //
 // Nothing here widens App.js PROFILE_COLUMNS: the three check-in columns are read in their
@@ -11,11 +11,11 @@
 // fails alone, not the profile load every screen depends on.
 import { metresBetween } from '../constants/walkingRoutes.js'
 
-// Mirrors check_in() in 20261078. The client pre-check is UX only; the server decides.
+// Mirrors check_in() in 20261092. The client pre-check is UX only; the server decides.
 export const CHECKIN_RADIUS_M   = 150
 export const CHECKIN_ACCURACY_M = 50
 // The notice text's version, stamped by accept_checkin_notice(). Bump it when the wording
-// of checkinNoticeBody changes in any language. 2026-10-07: + the Google line (20261091).
+// of checkinNoticeBody changes in any language. 2026-10-07: + the Google line (20261093).
 export const CHECKIN_NOTICE_VERSION = '2026-10-07'
 export const FEED_PAGE = 20
 
@@ -66,7 +66,7 @@ export async function checkIn(client, placeId, fix) {
 
 // One page, newest first. `before` is the last row of the previous page. `more` is true when
 // the page came back full — the next call may still return zero rows, which ends the list.
-// A Google row (20261091) has google_place_id set and no place_* — its name is looked up live.
+// A Google row (20261093) has google_place_id set and no place_* — its name is looked up live.
 export async function loadFeed(client, { placeId = null, googlePlaceId = null, before = null, limit = FEED_PAGE } = {}) {
   const { data, error, status } = await client.rpc('get_checkin_feed', {
     p_place_id: placeId,

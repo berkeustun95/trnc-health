@@ -4,7 +4,7 @@
 // idiom), so back returns to the same scroll position and loaded pages. A Google place's row
 // opens GooglePlaceSheet instead (ADA has no page for it).
 //
-// "Buradayım" at the top checks in wherever the phone is (NearbyCheckin, 20261091); its
+// "Buradayım" at the top checks in wherever the phone is (NearbyCheckin, 20261093); its
 // "Not here? Add this place" opens the existing place form (pending → admin moderation) over
 // this screen. backRef: Android back / iOS edge swipe closes that form before the feed.
 import { useState, useEffect } from 'react'

@@ -1,5 +1,5 @@
 // "Buradayım" on a place page (CHECKINS gate). Who may check in and from how far is decided
-// by check_in() in 20261078; this file asks for location, pre-checks the fix and explains
+// by check_in() in 20261092; this file asks for location, pre-checks the fix and explains
 // each refusal. The first check-in goes through CheckinNoticeSheet: a username and the
 // "others will see this" notice, or nothing is saved (approved 2026-10-02).
 import { useState } from 'react'

@@ -1,7 +1,7 @@
 // "Buradayım" without a place (CHECKINS gate): one GPS fix, then the places within 100 m —
 // ADA's own first, then Google's (google-places Edge Function), each nearest first — and a
 // check-in on the one you are at. Google is called ONLY on this tap, never while browsing.
-// The rules are the server's (20261078 check_in, 20261091 check_in_google); the distance shown
+// The rules are the server's (20261092 check_in, 20261093 check_in_google); the distance shown
 // and the pre-check are UX only. "Not here?" hands the fix to the add-place form.
 import { useState, useEffect } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native'

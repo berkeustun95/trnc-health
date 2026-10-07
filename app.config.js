@@ -26,7 +26,7 @@ const googleIosUrlScheme = iosClientId.split('.').reverse().join('.')
 const IS_PREVIEW = process.env.APP_VARIANT === 'preview'
 const APP_ID = IS_PREVIEW ? 'com.berkeustun95.ada.preview' : 'com.berkeustun95.ada'
 
-// ─── Google Maps on iOS (Keşfet map, check-ins 20261091) ─────────────────────────────
+// ─── Google Maps on iOS (Keşfet map, check-ins 20261093) ─────────────────────────────
 // Set => Expo's withMaps adds the react-native-google-maps pod + GMSServices.provideAPIKey, and
 // the Keşfet map renders with PROVIDER_GOOGLE (utils/googleMap.js tests for the native view, so
 // a build WITHOUT it simply stays on Apple Maps). Unset — every build and OTA before the iOS

@@ -195,7 +195,6 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261075_live_scores_league_lookup.sql', '74e444f4199e0ee6d5b563145790f68d580fa08c05b1848873875a750aa1a8bd'),
   ('20261076_akdeniz_opening_hours.sql', 'ad8f1c478ac7d533627c5fbf4a0baade2dd8f3a87be943ba5d34afe145299c0e'),
   ('20261077_live_scores_international_leagues.sql', '1a39dccebf31bf8d1e2a0fd1b9778e9b2737722b295b333bf8f7539de74ffc63'),
-  ('20261078_checkins.sql', 'eba9c2ed8e5a66e0287b84469d554f43a9779ad851c742e152055a351c12911c'),
   ('20261079_pharmacy_coords_read_seed_pins.sql', 'ddc51870e6e7449ca761082159729caf6b89a26fad630562e5d45eb7e2a029c0'),
   ('20261080_pharmacy_coords_mesarya_split.sql', 'ff5a341afccb393175cce3b6a0d34d5154183dcb8c8538a16cc2270434a22777'),
   ('20261081_readonly_role_runs_verify_schema.sql', '715207d812695ab857f38093872136b2699b7308caef64978cc2a6a67c9a94d0'),
@@ -208,7 +207,8 @@ WITH ondisk (filename, checksum) AS (VALUES
   ('20261088_notifications_lock_client_writes.sql', 'b4ae3960489db005519c44d95107992c37a5b96bf433ba0b66c03f9fc4ff1546'),
   ('20261089_notifications_delete_own.sql', '1c5efa3a859f02a38e1495a7ee6aea1dc97c144f1e0c7b72eb24077b1a1a15ed'),
   ('20261090_live_scores_pause_cron.sql', '808dbb0bd62831cc7e42d4b726f83389bb1e0d4e02675049661c1915240e277a'),
-  ('20261091_checkins_google_places.sql', '1b4504efb0befa5fe45e4029cbe26eae8c904a48850f046799b7bc4f0d0da23d')
+  ('20261092_checkins.sql', '44ba6864216ce0c04aa0d18e0af5844d571504fb76fe95a2d5b6e49a09cce903'),
+  ('20261093_checkins_google_places.sql', 'de646ea056400cc96c550ce190a9d0a436093a205d55395d9a177af5fe521d9f')
 )
 SELECT * FROM (
   -- NEVER APPLIED — committed and forgotten. Apply it, or delete the file.

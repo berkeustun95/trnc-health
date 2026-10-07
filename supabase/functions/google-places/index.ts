@@ -8,11 +8,11 @@
 // Who: verify_jwt = true, and the caller's uid comes from auth.getUser() on THAT JWT — never
 // from the body. nearby and checkin refuse guests (is_anonymous); details serves guests too
 // (a pin tap on the map). Every Google call is counted first by claim_google_places_call()
-// (per-user and global daily caps, 20261091): Google bills per call.
+// (per-user and global daily caps, 20261093): Google bills per call.
 //
 // ─── GOOGLE MAPS PLATFORM TERMS (Service Specific Terms §14, read 2026-10-07) ────────
 // Nothing Google returns is stored except a place ID and, for a pin, lat/lng (< 30 days,
-// 20261091 purges at 29). Names/types go to the phone for display and are dropped here.
+// 20261093 purges at 29). Names/types go to the phone for display and are dropped here.
 // "Pharmacy" is decided from types at check-in/refresh time and stored only as the absence
 // of a pin (p_pin = false). Field masks keep each call on the cheapest SKU that serves it:
 //   nearby  places.id,displayName,location,types,primaryType  — Nearby Search Pro (displayName)

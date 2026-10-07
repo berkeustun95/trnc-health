@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 20261078 — check-ins ("Buradayım"): at the place, signed in, named, consented
+-- 20261092 — check-ins ("Buradayım"): at the place, signed in, named, consented
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- Plan: feat/explore-v2, Part 2. Decisions approved by Berke 2026-10-02:
@@ -107,12 +107,12 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS checkins_notice_version tex
 COMMENT ON COLUMN public.profiles.checkins_public IS
   'Whether other signed-in users see this person''s check-ins in the feeds. NO DEFAULT: '
   'NULL until accept_checkin_notice() sets it once (adult by DOB → true, else false). '
-  'Owner-writable (the Profile switch). NULL reads as hidden. 20261078.';
+  'Owner-writable (the Profile switch). NULL reads as hidden. 20261092.';
 COMMENT ON COLUMN public.profiles.checkins_notice_at IS
   'When the person saw the "others will see this" check-in notice. SERVER-stamped by '
-  'accept_checkin_notice(); direct writes refused by guard_checkin_notice_columns. 20261078.';
+  'accept_checkin_notice(); direct writes refused by guard_checkin_notice_columns. 20261092.';
 COMMENT ON COLUMN public.profiles.checkins_notice_version IS
-  'Which notice text they saw (client-supplied, shape-checked). 20261078.';
+  'Which notice text they saw (client-supplied, shape-checked). 20261092.';
 
 -- ─── 2. The notice stamp: server-only ───────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.guard_checkin_notice_columns()
@@ -178,7 +178,7 @@ $function$;
 COMMENT ON FUNCTION public.accept_checkin_notice(text) IS
   'Stamps that the caller saw the check-in visibility notice (server time) and, if still '
   'unset, sets checkins_public: adult by DOB → true, under-18 or unknown DOB → false. '
-  'Returns the effective checkins_public. Guests raise AUTH_REQUIRED. 20261078.';
+  'Returns the effective checkins_public. Guests raise AUTH_REQUIRED. 20261092.';
 
 REVOKE ALL ON FUNCTION public.accept_checkin_notice(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.accept_checkin_notice(text) FROM anon;
@@ -197,7 +197,7 @@ CREATE TABLE IF NOT EXISTS public.checkins (
 );
 COMMENT ON TABLE public.checkins IS
   'One row per (person, place, TRNC day). No coordinates, ever. Written only by check_in(); '
-  'owner-only read and delete; others read through get_checkin_feed(). 20261078.';
+  'owner-only read and delete; others read through get_checkin_feed(). 20261092.';
 
 CREATE INDEX IF NOT EXISTS checkins_feed_idx       ON public.checkins (created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS checkins_place_feed_idx ON public.checkins (place_id, created_at DESC, id DESC);
@@ -335,7 +335,7 @@ COMMENT ON FUNCTION public.check_in(uuid, double precision, double precision, do
   'Checks the caller in at a place. Refuses unless signed in (not a guest), eligible, '
   'unbanned, named, notice accepted, the place active, accuracy in (0, 50] m and the claimed '
   'fix within 150 m. One per place per TRNC day (returns already=true), 30 per day, no '
-  'impossible travel. Stores no coordinates. 20261078.';
+  'impossible travel. Stores no coordinates. 20261092.';
 
 REVOKE ALL ON FUNCTION public.check_in(uuid, double precision, double precision, double precision) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.check_in(uuid, double precision, double precision, double precision) FROM anon;
@@ -393,7 +393,7 @@ COMMENT ON FUNCTION public.get_checkin_feed(uuid, timestamptz, uuid, integer) IS
   'Recent check-ins, newest first, keyset-paginated, max 50 per page; all places or one. '
   'Others'' rows only when checkins_public, named, unbanned, not blocked either way, place '
   'active and unhidden; the caller''s own rows always (is_mine). Snapshotted names. Guests '
-  'raise AUTH_REQUIRED. No coordinates. 20261078.';
+  'raise AUTH_REQUIRED. No coordinates. 20261092.';
 
 REVOKE ALL ON FUNCTION public.get_checkin_feed(uuid, timestamptz, uuid, integer) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_checkin_feed(uuid, timestamptz, uuid, integer) FROM anon;
@@ -553,7 +553,7 @@ END $$;
 -- This is also the LAST statement inside BEGIN/COMMIT: if a paste is truncated before
 -- it, COMMIT is never reached and nothing applies.
 INSERT INTO public.schema_migrations_applied (filename, checksum)
-VALUES ('20261078_checkins.sql', 'eba9c2ed8e5a66e0287b84469d554f43a9779ad851c742e152055a351c12911c')
+VALUES ('20261092_checkins.sql', '44ba6864216ce0c04aa0d18e0af5844d571504fb76fe95a2d5b6e49a09cce903')
 ON CONFLICT (filename) DO UPDATE
   SET checksum = excluded.checksum, applied_at = now(), applied_by = current_user;
 -- ─── ledger:stamp:end ────────────────────────────────────────────────

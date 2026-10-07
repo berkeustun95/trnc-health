@@ -307,7 +307,7 @@ export default function ExploreProfileScreen({ place, lang, session, onBack, onR
             </View>
           )}
 
-          {/* Check-ins (20261078) where CHECKINS is on — dev + ADA Preview until go-live, redesign
+          {/* Check-ins (20261092) where CHECKINS is on — dev + ADA Preview until go-live, redesign
               layout only. Otherwise Coming Soon + waitlist, same page as the legacy footer button. */}
           {CHECKINS ? (
             <>

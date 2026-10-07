@@ -5,7 +5,7 @@
 // globalThis.fetch is replaced so that:
 //   • https://supa.test/auth/v1/user        → the user for a fake bearer token
 //   • https://supa.test/rest/v1/rpc/<fn>    → SELECT public.<fn>(named args) AS service_role, in
-//                                              PGlite with 20261078 + 20261091 applied
+//                                              PGlite with 20261092 + 20261093 applied
 //   • https://supa.test/rest/v1/google_place_pins → the select / update / delete the refresh uses
 //   • https://places.googleapis.com/…       → a fake Google that records every request
 // Nothing leaves this machine. NOT covered: the gateway's verify_jwt (tokens here are unsigned),
@@ -22,7 +22,7 @@ const db = await freshDb(SEED)
 await db.exec(`INSERT INTO public.profiles (id, display_name, date_of_birth) VALUES
   ('${U(1)}','adult','1990-01-01'), ('${U(2)}','guest',null), ('${U(3)}','nonotice','1990-01-01');
   INSERT INTO auth.users (id, is_anonymous) SELECT id, id = '${U(2)}' FROM public.profiles;`)
-for (const f of ['20261078_checkins.sql', '20261091_checkins_google_places.sql']) {
+for (const f of ['20261092_checkins.sql', '20261093_checkins_google_places.sql']) {
   const r = await applyFile(db, ROOT + 'supabase/migrations/' + f)
   if (!r.ok) { console.log('APPLY FAILED', f, r.msg); Deno.exit(1) }
 }

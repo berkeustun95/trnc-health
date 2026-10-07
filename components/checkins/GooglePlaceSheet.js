@@ -1,6 +1,6 @@
 // A Google place ADA does not list (CHECKINS gate): opened from a Google pin on the Keşfet
 // map or a Google row in a feed. Below: who checked in here, through the same feed rules as an
-// ADA place (get_checkin_feed, 20261091).
+// ADA place (get_checkin_feed, 20261093).
 //
 // ⚠ NAME ONLY AWAY FROM A MAP. The billing account is in Cyprus, so the Maps Platform EEA terms
 // apply (Berke, 2026-10-07): EEA Service Specific Terms §15.1 forbid showing Places content
