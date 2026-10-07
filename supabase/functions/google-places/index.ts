@@ -21,7 +21,7 @@
 //
 // ─── PRIVACY: NOTHING IS LOGGED ────────────────────────────────────────────
 // The caller's position arrives in the POST body (invocation logs record the URL, never the
-// body), goes to Google once (nearby, rounded to ~1 m) or into check_in_google() for the
+// body), goes to Google once (nearby, rounded to 4 decimals ≈ 10 m — the policy's figure) or into check_in_google() for the
 // distance check (never stored), and is dropped. Failures log a status code only.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -47,7 +47,8 @@ const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE
 })
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
-const r5 = (n: number) => Math.round(n * 1e5) / 1e5
+// ~11 m at this latitude: the precision the privacy policy states ("about 10 metres").
+const r4 = (n: number) => Math.round(n * 1e4) / 1e4
 function jwtRole(jwt: string) {
   try {
     const p = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
@@ -126,7 +127,7 @@ Deno.serve(async req => {
       'places.id,places.displayName,places.location,places.types,places.primaryType', {
         method: 'POST',
         body: JSON.stringify({
-          locationRestriction: { circle: { center: { latitude: r5(lat), longitude: r5(lng) }, radius: RADIUS_M } },
+          locationRestriction: { circle: { center: { latitude: r4(lat), longitude: r4(lng) }, radius: RADIUS_M } },
           rankPreference: 'DISTANCE', maxResultCount: 20, languageCode,
         }),
       })

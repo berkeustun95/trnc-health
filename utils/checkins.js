@@ -15,8 +15,8 @@ import { metresBetween } from '../constants/walkingRoutes.js'
 export const CHECKIN_RADIUS_M   = 150
 export const CHECKIN_ACCURACY_M = 50
 // The notice text's version, stamped by accept_checkin_notice(). Bump it when the wording
-// of checkinNoticeBody changes in any language.
-export const CHECKIN_NOTICE_VERSION = '2026-10-02'
+// of checkinNoticeBody changes in any language. 2026-10-07: + the Google line (20261091).
+export const CHECKIN_NOTICE_VERSION = '2026-10-07'
 export const FEED_PAGE = 20
 
 const CODES = ['AUTH_REQUIRED', 'NOT_ELIGIBLE', 'BANNED', 'NAME_REQUIRED', 'NOTICE_REQUIRED',
