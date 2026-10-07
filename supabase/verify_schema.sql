@@ -40,6 +40,11 @@ WITH report AS (
   SELECT 'A-table' section, e.m migration, e.o object,
          CASE WHEN to_regclass('public.'||e.o) IS NOT NULL THEN 'OK' ELSE 'MISSING' END status
   FROM (VALUES
+    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
+    ('1093_checkins_google_places','google_place_pins'),
+    ('1093_checkins_google_places','google_places_usage'),
+    -- Check-ins (1092): registered ahead of the apply; red until it runs.
+    ('1092_checkins','checkins'),
     ('capture_1','profiles'),('capture_1','facilities'),
     ('capture_1','reviews'),('capture_1','questions'),('capture_1','answers'),
     ('capture_1','notifications'),('capture_1','claim_requests'),
@@ -119,6 +124,12 @@ WITH report AS (
                 WHERE ic.table_schema='public' AND ic.table_name=e.t AND ic.column_name=e.c)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
+    ('1093_checkins_google_places','checkins','google_place_id'),
+    -- Check-ins (1092): registered ahead of the apply; red until it runs.
+    ('1092_checkins','profiles','checkins_public'),
+    ('1092_checkins','profiles','checkins_notice_at'),
+    ('1092_checkins','profiles','checkins_notice_version'),
     ('0621_provider_verification','facility_change_requests','rejection_reason'),
     ('0621_provider_verification','claim_requests','rejection_reason'),
     ('0712_ugc_moderation','reviews','hidden_at'),
@@ -313,6 +324,19 @@ WITH report AS (
                 WHERE n.nspname='public' AND p.proname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
+    ('1093_checkins_google_places','check_in_google'),
+    ('1093_checkins_google_places','checkin_guard_person'),
+    ('1093_checkins_google_places','checkin_write'),
+    ('1093_checkins_google_places','get_google_place_pins'),
+    ('1093_checkins_google_places','claim_google_places_call'),
+    ('1093_checkins_google_places','purge_google_places_cache'),
+    -- Check-ins (1092): registered ahead of the apply; red until it runs.
+    ('1092_checkins','check_in'),
+    ('1092_checkins','get_checkin_feed'),
+    ('1092_checkins','accept_checkin_notice'),
+    ('1092_checkins','metres_between'),
+    ('1092_checkins','guard_checkin_notice_columns'),
     ('0623_cross_user_notifications','insert_notification'),
     ('0628/0705_search_content','search_content'),
     ('0714_block_anonymous_writes','is_anonymous_session'),
@@ -461,6 +485,8 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_trigger tg WHERE NOT tg.tgisinternal AND tg.tgname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Check-ins (1092): registered ahead of the apply; red until it runs.
+    ('1092_checkins','guard_checkin_notice_columns'),
     ('0701_rate_limits','enforce_question_limit'),
     ('capture_4/0712','enforce_report_rate_limit'),
     ('capture_4/0712','guard_profile_ban'),
@@ -517,6 +543,16 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
+    ('1093_checkins_google_places','checkins_one_place'),
+    ('1093_checkins_google_places','checkins_google_place_id_shape'),
+    ('1093_checkins_google_places','google_place_pins_id_shape'),
+    ('1093_checkins_google_places','google_places_usage_kind_check'),
+    -- Check-ins (1092): registered ahead of the apply; red until it runs.
+    ('1092_checkins','checkins_pkey'),
+    ('1092_checkins','checkins_one_per_day'),
+    ('1092_checkins','checkins_user_id_fkey'),
+    ('1092_checkins','checkins_place_id_fkey'),
     ('0731_garages_directory','facilities_type_check'),
     ('0731_garages_directory','facilities_service_types_values_check'),
     ('0804_grooming_multi_category','facilities_service_types_type_check'),
@@ -802,6 +838,13 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
+    ('1093_checkins_google_places','checkins_one_per_day_google'),
+    ('1093_checkins_google_places','checkins_google_feed_idx'),
+    -- Check-ins (1092): registered ahead of the apply; red until it runs.
+    ('1092_checkins','checkins_feed_idx'),
+    ('1092_checkins','checkins_place_feed_idx'),
+    ('1092_checkins','checkins_user_recent_idx'),
     ('0702_job_postings','job_postings_owner_idx'),
     ('0702_job_postings','job_postings_board_idx'),
     ('0712_ugc_moderation','content_reports_pending_idx'),
@@ -903,6 +946,12 @@ WITH report AS (
                   AND a.privilege_type='EXECUTE' AND r.rolname='authenticated')
               THEN 'OK' ELSE 'CHECK (no explicit grant)' END
   FROM (VALUES
+    -- Check-ins at Google places (1093): registered ahead of the apply; red until it runs.
+    ('1093_checkins_google_places','get_google_place_pins'),
+    -- Check-ins (1092): registered ahead of the apply; red until it runs.
+    ('1092_checkins','check_in'),
+    ('1092_checkins','get_checkin_feed'),
+    ('1092_checkins','accept_checkin_notice'),
     ('0731_garages_directory','create_garage_facility'),
     ('0802_update_garage_facility','update_garage_facility'),
     ('0725_grooming_directory','create_grooming_facility'),
@@ -3920,6 +3969,101 @@ WITH report AS (
                                AND roles = '{authenticated}' AND qual = '(user_id = auth.uid())')
                    AND bool_or(policyname = 'no_anon_delete_notifications' AND permissive = 'RESTRICTIVE' AND cmd = 'DELETE')
                   FROM pg_policies WHERE schemaname = 'public' AND tablename = 'notifications'), false)
+    -- ── 1092: check-ins ──────────────────────────────────────────────────────────
+    -- (1) RLS on, exactly two guest-guarded OWNER policies (read + delete), no client
+    --     INSERT/UPDATE, anon nothing. The feed is the only way to see anyone else's.
+    UNION ALL SELECT '1092_checkins','checkins: RLS on, 2 guest-guarded owner policies, no client insert/update, anon nothing',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.checkins')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='checkins') = 2
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='checkins'
+            AND qual LIKE '%auth.uid()%' AND qual LIKE '%is_anonymous_session()%') = 2
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.checkins'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.checkins'), 'INSERT,UPDATE,TRUNCATE')
+               AND has_table_privilege('authenticated', to_regclass('public.checkins'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.checkins'), 'DELETE'), false)
+    -- (2) No location column on the row, ever (derived, not a name list).
+    UNION ALL SELECT '1092_checkins','checkins has no coordinate/accuracy column',
+      (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='checkins'
+        AND (column_name ILIKE '%lat%' OR column_name ILIKE '%lng%' OR column_name ILIKE '%lon%' OR column_name ILIKE '%accura%')) = 0
+      AND to_regclass('public.checkins') IS NOT NULL
+    -- (3) Both FKs CASCADE (account deletion; never SET NULL).
+    UNION ALL SELECT '1092_checkins','checkins: user_id and place_id ON DELETE CASCADE',
+      (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.checkins') AND contype = 'f')
+      IS NOT DISTINCT FROM 'checkins_place_id_fkey=c,checkins_user_id_fkey=c'
+    -- (4) The rules. 1092 held them inline in check_in(); 20261093 moved them into
+    --     checkin_guard_person + checkin_write so the ADA and Google paths share one copy.
+    --     Rewritten 2026-10-07 against the 1093 shape (both files apply together): check_in
+    --     keeps the guest guard and calls both helpers; the helpers carry 150 m, (0, 50],
+    --     the TRNC day and the 30/day cap. Neither helper is callable by any API role.
+    UNION ALL SELECT '1092_checkins','check_in: DEFINER, guest-guarded, via checkin_guard_person + checkin_write (150 m, accuracy <= 50, Europe/Istanbul day)',
+      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%is_anonymous_session()%'
+           AND pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%checkin_guard_person(v_me)%'
+           AND pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%FROM checkin_write(%'
+           AND pg_get_functiondef(to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)')) LIKE '%p_place_lng) > 150 THEN%'
+           AND pg_get_functiondef(to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)')) LIKE '%p_accuracy <= 50%'
+           AND pg_get_functiondef(to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)')) LIKE '%Europe/Istanbul%'
+           AND pg_get_functiondef(to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)')) LIKE '%>= 30 THEN%'
+           AND pg_get_functiondef(to_regprocedure('public.checkin_guard_person(uuid)')) LIKE '%NOTICE_REQUIRED%', false)
+    -- (5) The feed's visibility filter: the author's switch, blocks both ways, ban, guest guard.
+    --     Signature is 1093's (p_google_place_id appended; the 4-argument form is dropped).
+    UNION ALL SELECT '1092_checkins','get_checkin_feed: DEFINER, checkins_public + blocks + ban + guest guard',
+      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer,text)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer,text)')) LIKE '%p.checkins_public IS TRUE%'
+           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer,text)')) LIKE '%FROM blocks b%'
+           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer,text)')) LIKE '%ugc_banned_until%'
+           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer,text)')) LIKE '%is_anonymous_session()%', false)
+    -- (6) checkins_public has NO DEFAULT (decided once, at consent, by DOB). A DEFAULT
+    --     added later would silently publish every new account. A DEFAULT creates no object.
+    UNION ALL SELECT '1092_checkins','profiles.checkins_public: nullable, NO DEFAULT',
+      COALESCE((SELECT is_nullable = 'YES' AND column_default IS NULL FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='profiles' AND column_name='checkins_public'), false)
+    -- (7) The adult-only default lives in accept_checkin_notice, and only fills a NULL.
+    UNION ALL SELECT '1092_checkins','accept_checkin_notice: DEFINER, COALESCE(checkins_public, adult by DOB)',
+      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.accept_checkin_notice(text)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.accept_checkin_notice(text)')) LIKE '%COALESCE(p.checkins_public,%'
+           AND pg_get_functiondef(to_regprocedure('public.accept_checkin_notice(text)')) LIKE '%interval ''18 years''%', false)
+    -- ── 1093: check-ins at Google places ─────────────────────────────────────────
+    -- (1) Exactly one of the two place columns; the per-day UNIQUE for Google rows.
+    UNION ALL SELECT '1093_checkins_google_places','checkins: num_nonnulls(place_id, google_place_id) = 1 + partial UNIQUE per Google place per day',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = to_regclass('public.checkins') AND conname = 'checkins_one_place')
+               = 'CHECK ((num_nonnulls(place_id, google_place_id) = 1))', false)
+      AND COALESCE((SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'checkins_one_per_day_google')
+               LIKE 'CREATE UNIQUE INDEX%(user_id, google_place_id, checked_in_on) WHERE (google_place_id IS NOT NULL)', false)
+    -- (2) Google Maps Content: the pins table holds ONLY id + lat/lng + fetched_at (SST §14.3).
+    --     DERIVED from the catalog: a name/types/address column appearing turns this red.
+    UNION ALL SELECT '1093_checkins_google_places','google_place_pins columns are exactly fetched_at, google_place_id, latitude, longitude',
+      (SELECT string_agg(column_name, ',' ORDER BY column_name) FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'google_place_pins')
+      IS NOT DISTINCT FROM 'fetched_at,google_place_id,latitude,longitude'
+    -- (3) Both new tables: RLS on, no policies, no client privilege; service_role writes.
+    UNION ALL SELECT '1093_checkins_google_places','google_place_pins + google_places_usage: RLS on, 0 policies, no anon/authenticated privilege, service_role writes',
+      COALESCE((SELECT bool_and(c.relrowsecurity) AND count(*) = 2 FROM pg_class c
+                 WHERE c.oid IN (to_regclass('public.google_place_pins'), to_regclass('public.google_places_usage'))), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('google_place_pins','google_places_usage')) = 0
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.google_place_pins'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.google_place_pins'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('anon', to_regclass('public.google_places_usage'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.google_places_usage'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('service_role', to_regclass('public.google_place_pins'), 'SELECT,INSERT,UPDATE,DELETE')
+               AND has_table_privilege('service_role', to_regclass('public.google_places_usage'), 'SELECT,INSERT,UPDATE,DELETE'), false)
+    -- (4) check_in_google is the Edge Function's alone (service_role, no client role), and
+    --     reuses the shared rules. Positive control beside it: service_role CAN execute.
+    UNION ALL SELECT '1093_checkins_google_places','check_in_google: service_role only, guest check via auth.users, shared helpers',
+      COALESCE(has_function_privilege('service_role', to_regprocedure('public.check_in_google(uuid,text,double precision,double precision,double precision,double precision,double precision,boolean)'), 'EXECUTE')
+           AND NOT has_function_privilege('authenticated', to_regprocedure('public.check_in_google(uuid,text,double precision,double precision,double precision,double precision,double precision,boolean)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.check_in_google(uuid,text,double precision,double precision,double precision,double precision,double precision,boolean)'), 'EXECUTE')
+           AND NOT has_function_privilege('authenticated', to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)'), 'EXECUTE')
+           AND NOT has_function_privilege('service_role', to_regprocedure('public.checkin_write(uuid,text,uuid,text,double precision,double precision,double precision,double precision,double precision)'), 'EXECUTE')
+           AND pg_get_functiondef(to_regprocedure('public.check_in_google(uuid,text,double precision,double precision,double precision,double precision,double precision,boolean)')) LIKE '%u.is_anonymous IS NOT TRUE%'
+           AND pg_get_functiondef(to_regprocedure('public.check_in_google(uuid,text,double precision,double precision,double precision,double precision,double precision,boolean)')) LIKE '%FROM checkin_write(%', false)
+    -- (5) Pins: 29-day read filter + only VISIBLE authors' check-ins make a pin.
+    UNION ALL SELECT '1093_checkins_google_places','get_google_place_pins: 29-day filter, visible authors only, no anon',
+      COALESCE(pg_get_functiondef(to_regprocedure('public.get_google_place_pins()')) LIKE '%interval ''29 days''%'
+           AND pg_get_functiondef(to_regprocedure('public.get_google_place_pins()')) LIKE '%p.checkins_public IS TRUE%'
+           AND NOT has_function_privilege('anon', to_regprocedure('public.get_google_place_pins()'), 'EXECUTE')
+           AND has_function_privilege('authenticated', to_regprocedure('public.get_google_place_pins()'), 'EXECUTE'), false)
   ) z
 
   UNION ALL
@@ -4018,7 +4162,9 @@ FROM (VALUES
   -- 90-day retention on app_update_events. The table is a launch counter, not a permanent
   -- record; without this job it grows forever and quietly becomes a usage log. 03:33 UTC,
   -- clear of the three purges above it.
-  ('1051_app_versions','purge-app-update-events')
+  ('1051_app_versions','purge-app-update-events'),
+  ('1093_checkins_google_places','purge-google-places-cache'),
+  ('1093_checkins_google_places','google-places-refresh')
   -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
   -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
   -- deliberate act: put the six rows back in the same commit.
