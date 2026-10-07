@@ -27,6 +27,22 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   buckets are public today, only `avatars` is private (signed URLs, `Avatar.js`).
 - ⚠ **Never raise `min_supported_version` above `'1.0.0'`** without the force-tier device pass.
 - ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`** — the wrappers are the only guard.
+- ⚠ **Production DATA is written only from GitHub Actions** (see "Production operations"). The service
+  key, Places/geocoding key and ORS key live only as repo secrets — never on this Mac, never in the
+  Keychain. Every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New
+  writer = new `workflow_dispatch` workflow, dry by default.
+- ⚠ **Supabase CLI on this Mac (Berke, 2026-10-07; replaces the 2026-10-01 "never `supabase login`").**
+  Long-term login in the Keychain ("Supabase CLI"), token scoped to trnc-health only: Project Settings
+  read; Database, Edge Functions, Edge Function Secrets read-write; NO API-keys read (so `supabase link`
+  fails — not needed, and it keeps the service key unreadable). Always through `scripts/sb.sh` (token +
+  `--project-ref`; CLI 2.104.0's `secrets` ignores the Keychain; allowlist: `functions`/`secrets` only).
+  Claude sets function secrets itself (`scripts/sb.sh secrets set --env-file <600 file>`, never the value
+  on a command line; check by digest: `secrets list` value = sha256) and deploys functions itself with
+  `scripts/fn-deploy.sh <fn> --go` (verify_jwt from deploy-config.json) — **only after Berke's go**, like
+  every migration and OTA. Still never from the CLI: `db push`, `db reset`, `db query`/SQL against prod —
+  migrations only via `supabase-migrate`. Fallback without this Mac: `supabase-functions-deploy` (and the
+  `supabase-function-secrets` workflow, which lands with feat/explore-v2). Lost Mac → revoke the token
+  (Supabase → Account → Access Tokens).
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
 - ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
 - ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `NOTICE_FALLBACK` in `LiveStrip.js`, rank 3b
@@ -42,6 +58,13 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   wrapper runs `check-module-flags.mjs` (also `npm run check:flags`); `git push` and `eas build` are
   covered by `.githooks/pre-push` and `eas-build-pre-install`. Fresh clone: `npm run setup:hooks`.
 - **OTA only reaches the production build** — never a preview APK; test OTA on the Play Store install.
+- **Every production OTA goes to PREVIEW first** (`npm run ota:preview`) and gets Berke's device check
+  there before `npm run ota` (standing rule since the 2026-10-06 unfreeze). A freeze, when on, is
+  `release-freeze.json` `"frozen": true` — `npm run ota` then refuses (`FREEZE_OVERRIDE=1` from Berke only).
+- **Nothing Previewed stays off main.** Publish Preview only from a branch that contains main. `npm run ota`
+  refuses while any Preview update on this runtime's major.minor was built from work HEAD lacks
+  (`scripts/check-preview-lineage.mjs`); a Preview Berke explicitly dropped: `PREVIEW_LINEAGE_OVERRIDE=1`
+  (he hands it over; log it). 2026-10-06: a Previewed Profile fix lived only on `fix/open-now-json`.
 - **Native build** only for `app.config.js`, native deps, permissions, icons, SDK: `eas build --platform
   android --profile production`, AAB to Play closed testing by hand (Play key = listing only).
 - **iOS:** `npm run ios:build` / `ios:submit`, no Apple login; they source `~/.appstoreconnect/ada-eas.env`
@@ -52,12 +75,37 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
 - **Permission strings:** ONE source each, its plugin option (`ios.infoPlist` is inert). Mic off, camera
   kept (accepted review risk), background location off. Verify: `npx expo config --type introspect`.
 - **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build.
-- **Maps key is restricted** (`com.berkeustun95.ada` + SHA-1). Blank map, no error = SHA-1 mismatch;
-  ADD the Play App Signing SHA-1 as a 2nd entry. Checklist: vault `play-console-status.md`.
+- **Two Maps keys, two GCP projects** (Android reads the key from the BUILD; an OTA cannot change it):
+  production EAS env = `AIzaSyDa…0Nlg` in **ada-app-499617** ("Maps Platform API Key"), **restricted
+  2026-10-06**: Android apps `com.berkeustun95.ada` + upload SHA-1 + Play App Signing SHA-1, API = Maps
+  SDK for Android only (a Places call now gets 403 `API_KEY_ANDROID_APP_BLOCKED`; nothing else may use
+  this key, iOS uses Apple Maps). A new signing key needs its SHA-1 added FIRST; preview EAS env + local `.env` = `AIzaSyDb…uNu8` in
+  **My First Project** (`project-958a71e2-96dc-4371-942`), Android apps: `com.berkeustun95.ada.preview` +
+  preview SHA-1. Blank map, no error = the build's key refuses that package/SHA-1. Read which key a
+  build uses with `eas env:list --environment <env>`, never from `.env` (they differ). Vault `play-console-status.md`.
 - **`web/` publishes** `getadaapp.com/privacy` and `/support` (Cloudflare Worker `getadaapp`, root
   `wrangler.jsonc`); both URLs are registered with the stores. `npm run web:deploy`, never
   `npx wrangler deploy`: it runs `check-web-assets.mjs`, and wrangler REPLACES the asset manifest, so
   a missing `support.html` silently 404s. `git push` does not publish `web/` (`docs/` is GitHub Pages).
+
+## Production operations (`gh workflow run <name>`, then `gh run watch`)
+Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; secrets are repo secrets only.
+- Gişe Kıbrıs sync: `gisekibris-feed` (also daily 04:15 UTC). Health: its Content health step.
+- Hotels: `hotels-import -f file=data/kitob/<f>.csv -f list_date=YYYY-MM-DD`, `hotels-window -f mode=--apply|--rollback`,
+  geocoding `hotels-geocode -f limit=N` (Places calls are billed; an apply commits google-pins.csv back).
+  HotelRunner links: `hotelrunner-links -f mode=--apply` (writes `data/kitob/hotelrunner-links.json`, clears unlisted hotels).
+- Walking legs: `walking-legs` (a flagged leg exits 1 by design; it is never written).
+- Novest: `novest-import`, `novest-images` (metadata also syncs on cron via the sync-novest function).
+- Apple user deletion: `revoke-apple-token -f user_id=<uuid>` BEFORE deleting the user.
+- Edge functions: `scripts/fn-deploy.sh <name> --go` from this Mac, or `supabase-functions-deploy -f
+  function=<name>|all`. verify_jwt comes from `supabase/functions/deploy-config.json` (read from prod);
+  a new function is added there first (and to the workflow's choice list). Secrets: `scripts/sb.sh
+  secrets …`.
+- Health: `daily-health` (05:00 UTC daily: hotels, novest health, novest photos (fails > 10% of live
+  listings photo-less), notify). A red run emails. `npm run novest:verify` is post-import only, by hand in CI.
+- Migrations: `supabase-migrate -f file=<FULL name>.sql` (dry: SQL + ledger check), then `-f apply=true`.
+  Stamp first (`node scripts/migration-ledger.mjs --stamp <file>`; `--verify` checks it). Never `db push`:
+  prod has no CLI ledger and 13 prefixes repeat. Details: supabase/CLAUDE.md.
 
 ## Store-update popup
 `app_versions` (20261051): `latest_version` = dismissible, `min_supported_version` BLOCKS. Raising it
@@ -143,6 +191,9 @@ name joined to a clinic review is a health disclosure about an identified person
 - **`MODULE_FLAGS` does not gate search** (`search_content`). Pre-launch content is seeded in its
   table's unpublished state and published in the same step as the flag.
 - New admin-seeded directories DEFAULT to unpublished (`is_active DEFAULT false`), with an H token.
+- **A live Novest listing with no `property_images` row is hidden from app users** by the RESTRICTIVE
+  policy `props_hide_photoless_novest` (20261068) and reappears on the next read once a photo row exists:
+  no flag, no job, no OTA. Never delete or delist a listing to hide it. `daily-health` lists the hidden ones.
 - EXPIRING content ships with a staleness check (`check-*-staleness.mjs`, hand/cron, not pre-push); a
   table that cannot legitimately be empty renders empty as an ERROR STATE.
 - All back handlers register via `addBackListener` (`utils/backHandler.js`), never
@@ -208,7 +259,7 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
 - A name the provider gave is never asked for again (App Store 4.0); Apple sends it once.
 - `display_name` is labelled "Username" in all nine locales, never "name".
 - The three native modules are `require()`d inside functions (`check-native-import-safety.mjs`).
-- Deleting an Apple user outside the app: `node scripts/revoke-apple-token.mjs <user-id>` FIRST,
+- Deleting an Apple user outside the app: `gh workflow run revoke-apple-token -f user_id=<id>` FIRST,
   confirm revoked, THEN delete (`apple_refresh_tokens` cascades with `auth.users`).
 - `handle_new_user` reads no metadata; names reach `profiles` from the client only.
 
@@ -236,6 +287,23 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
     `WAITLIST_BLAST_DONE` in `check-module-flags.mjs`.
 Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this list.
 
+## Check-ins go-live (ordered — approved 2026-10-02; app code on main via `feat/explore-v2`, migration 20261069 + its verify_schema/ledger entries + `scripts/test-checkins-*.mjs` on `feat/checkins-db`)
+Policy draft on `docs/checkins-privacy`; store-form answers in vault `2026-09-24_store-privacy-forms-AS-ENTERED.md`.
+1. **Redesign live first** (`REDESIGN_LIVE`): the legacy place page keeps Coming Soon.
+2. **Show Berke the SQL** (`20261069_checkins.sql`, on `feat/checkins-db`; lands on main by `git checkout feat/checkins-db -- <files>` the day it is applied) → wait for his "go" → apply → `verify_schema.sql`
+   → check the live-only profiles triggers (`guard_profile_ban`, `check_profile_name_content`) don't
+   block `accept_checkin_notice`'s update; report. Re-run `scripts/test-checkins-{sql,client}.mjs` first.
+3. Set `CHECKINS_PREVIEW = true` (`constants/redesign.js`), **`npm run ota:preview`** → device pass on the preview build (Turkish; Harita / Liste / Check-in'ler at 320dp).
+4. **Publish policy + store forms, flip `MODULE_FLAGS.checkins`** (both files, one commit). Re-date the
+   draft first (four copies, both terms lines, `LEGAL_VERSION`). `privacy:check` refuses the flip
+   without the disclosure in all four copies.
+   **Before the flip:** give Berke a click-by-click list for Play Console (Data safety) and App Store
+   Connect (App Privacy): confirm Name, Photos and user-generated content are already declared, add
+   Precise Location on Apple (linked, no tracking, App Functionality). He enters it and confirms; no
+   flip before his confirmation.
+5. **`notify_module_waitlist('checkins')`** with before/after counts (SOP step 10) → `WAITLIST_BLAST_DONE`.
+Feeds only: no per-person check-in history anywhere (decided 2026-10-02).
+
 ## Advisor
 Consult the advisor before writing any Supabase migration, RLS policy, or module flag change, and before declaring a task done.
 Some sessions have no advisor tool; when absent, skip this step.
@@ -251,10 +319,16 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
 "→ architecture.md updates needed" if structural.
 
 ## Open windows / pending (vault = `~/ObsidianVault/10-ada/`)
+- **Next store release (not before "unfreeze") — Play Console warnings, 2026-10-05:**
+  - **DEX code optimization below threshold** (Play deadline **Feb 2027**): enable R8 minify/obfuscation for
+    Android release builds and upload the deobfuscation mapping file with each AAB. Native change → device pass.
+  - **Deprecated edge-to-edge APIs** → address with the next Expo SDK upgrade (SDK bump = ask first).
+  - **Large-screen orientation/resizability** → part of the tablet backlog (`supportsTablet: false`, portrait-only today).
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.
 - Student Hub stale-affiliation recovery test (window closes when `20261027` applies) → `claude-md-lessons.md`.
 - Student Hub message push deep link, WARM and COLD, on the Play Store build → same file.
-- Student Hub terms re-ask (SOP step 6): `studentHub` is `true` in flags.js; decision unrecorded.
+- Student Hub terms re-ask (SOP step 6): DECIDED + shipped in 1.3.0 — `StudentHubTermsGate` for signed-in
+  non-guest accounts on terms < `STUDENT_HUB_TERMS_MIN` (2026-09-20); vault `redesign-go-live-runbook.md`.
 - Image messaging safety scope → `2026-09-20_image-messaging-safety-scope-PARKED.md`.

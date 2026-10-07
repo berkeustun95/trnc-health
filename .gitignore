@@ -71,3 +71,6 @@ data/kitob/geocode-*.csv
 data/pharmacy-hand-place-*.csv
 data/osm/
 data/placement-progress.json
+
+# supabase link state (project ref, CLI versions) — per checkout, never committed
+supabase/.temp/
