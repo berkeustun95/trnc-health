@@ -17,7 +17,7 @@ import { colors, type, radii } from '../../constants/theme'
 import { t } from '../../constants/i18n'
 
 // A first fix is often coarse; one more try at the best accuracy before giving up.
-async function bestFix() {
+export async function bestFix() {
   let best = null
   for (let i = 0; i < 2; i++) {
     const loc = await askedFix(Location.Accuracy.Highest)
@@ -30,7 +30,7 @@ async function bestFix() {
 }
 
 // One line per outcome. Literal t() calls, so the i18n coverage scan sees every key.
-function Outcome({ code, already, metres, lang }) {
+export function Outcome({ code, already, metres, lang }) {
   if (already) return <Text style={s.ok}>{t('checkinAlready', lang)}</Text>
   if (code === 'DONE') return <Text style={s.ok}>{t('checkinDone', lang)}</Text>
   let msg

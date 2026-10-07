@@ -26,6 +26,15 @@ const googleIosUrlScheme = iosClientId.split('.').reverse().join('.')
 const IS_PREVIEW = process.env.APP_VARIANT === 'preview'
 const APP_ID = IS_PREVIEW ? 'com.berkeustun95.ada.preview' : 'com.berkeustun95.ada'
 
+// ─── Google Maps on iOS (Keşfet map, check-ins 20261091) ─────────────────────────────
+// Set => Expo's withMaps adds the react-native-google-maps pod + GMSServices.provideAPIKey, and
+// the Keşfet map renders with PROVIDER_GOOGLE (utils/googleMap.js tests for the native view, so
+// a build WITHOUT it simply stays on Apple Maps). Unset — every build and OTA before the iOS
+// Google build — this file resolves exactly as before (no `ios.config` key at all).
+// An EAS env var per environment (eas env:create), never in the repo: an iOS key restricted to
+// the two bundle ids and to "Maps SDK for iOS". A change needs a native build.
+const IOS_GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_IOS_API_KEY
+
 export default {
   expo: {
     name: IS_PREVIEW ? 'ADA Preview' : 'ADA',
@@ -59,6 +68,7 @@ export default {
       bundleIdentifier: APP_ID,
       usesAppleSignIn: true,
       minimumOsVersion: '14.0',
+      ...(IOS_GOOGLE_MAPS_KEY ? { config: { googleMapsApiKey: IOS_GOOGLE_MAPS_KEY } } : {}),
       // Usage descriptions are NOT set here. Each has ONE source, its plugin option below:
       // applyPermissions resolves `plugin option || ios.infoPlist || plugin default`, so a
       // copy here is inert while it matches and silently ignored the moment it doesn't.

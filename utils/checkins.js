@@ -66,9 +66,11 @@ export async function checkIn(client, placeId, fix) {
 
 // One page, newest first. `before` is the last row of the previous page. `more` is true when
 // the page came back full — the next call may still return zero rows, which ends the list.
-export async function loadFeed(client, { placeId = null, before = null, limit = FEED_PAGE } = {}) {
+// A Google row (20261091) has google_place_id set and no place_* — its name is looked up live.
+export async function loadFeed(client, { placeId = null, googlePlaceId = null, before = null, limit = FEED_PAGE } = {}) {
   const { data, error, status } = await client.rpc('get_checkin_feed', {
     p_place_id: placeId,
+    p_google_place_id: googlePlaceId,
     p_before_at: before?.created_at ?? null,
     p_before_id: before?.checkin_id ?? null,
     p_limit: limit,
@@ -78,13 +80,14 @@ export async function loadFeed(client, { placeId = null, before = null, limit = 
   return { ok: true, rows, more: rows.length === limit }
 }
 
-// The caller's own check-ins (owner-only RLS), newest first, with the place for the label.
+// The caller's own check-ins (owner-only RLS), newest first, with the place for the label
+// (ADA places; a Google row carries google_place_id and a null `places`).
 // PAGED, not capped: the policy promises a user can delete ANY of their check-ins, so the list
 // must reach all of them. id breaks created_at ties so a page boundary never skips or repeats.
 export const MINE_PAGE = 30
 export async function loadMine(client, uid, offset = 0, limit = MINE_PAGE) {
   const { data, error } = await client.from('checkins')
-    .select('id, created_at, place_id, places(name, name_i18n, category)')
+    .select('id, created_at, place_id, google_place_id, places(name, name_i18n, category)')
     .eq('user_id', uid).order('created_at', { ascending: false }).order('id', { ascending: false })
     .range(offset, offset + limit - 1)
   return error ? null : data ?? []

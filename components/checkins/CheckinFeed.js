@@ -8,12 +8,15 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase, isGuest } from '../../lib/supabase'
 import Avatar, { prefetchAvatars } from '../Avatar'
 import { loadFeed, agoParts } from '../../utils/checkins'
+import { useGoogleNames } from '../../utils/googlePlaces'
+import GoogleMapsAttribution from './GoogleMapsAttribution'
 import { Button, EmptyState, ErrorState } from '../ui'
 import { CARD_BG } from '../ui/ModuleScreen'
 import { colors, type, radii, press } from '../../constants/theme'
 import { t, tCount, LANG_CODES } from '../../constants/i18n'
 
-function placeLabel(row, lang) {
+function placeLabel(row, lang, names) {
+  if (row.google_place_id) return names?.[row.google_place_id] ?? '…'
   const code = LANG_CODES[lang] ?? lang
   const i18n = row.place_name_i18n
   return (i18n && (i18n[code] ?? i18n.en)) || row.place_name || ''
@@ -26,7 +29,8 @@ function ago(iso, lang) {
   return tCount(key, n, lang)
 }
 
-function FeedRow({ row, lang, showPlace, onOpenPlace }) {
+function FeedRow({ row, lang, showPlace, onOpenPlace, onOpenGooglePlace, names }) {
+  const label = showPlace ? placeLabel(row, lang, names) : ''
   const name = row.is_mine ? `${row.display_name} · ${t('checkinYou', lang)}` : row.display_name
   const when = ago(row.created_at, lang)
   const body = (
@@ -37,24 +41,28 @@ function FeedRow({ row, lang, showPlace, onOpenPlace }) {
         {showPlace && (
           <View style={s.placeLine}>
             <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
-            <Text style={s.place} numberOfLines={1}>{placeLabel(row, lang)}</Text>
+            <Text style={s.place} numberOfLines={1}>{label}</Text>
+            {!!row.google_place_id && <GoogleMapsAttribution style={s.rowAttribution} />}
           </View>
         )}
       </View>
       <Text style={s.when}>{when}</Text>
     </View>
   )
-  if (!showPlace || !onOpenPlace) return body
+  const open = row.google_place_id
+    ? (onOpenGooglePlace && (() => onOpenGooglePlace(row.google_place_id, names?.[row.google_place_id] ?? null)))
+    : (onOpenPlace && (() => onOpenPlace(row.place_id)))
+  if (!showPlace || !open) return body
   return (
-    <TouchableOpacity onPress={() => onOpenPlace(row.place_id)} activeOpacity={press.card} accessibilityRole="button"
-      accessibilityLabel={`${row.display_name}, ${placeLabel(row, lang)}, ${when}`}>
+    <TouchableOpacity onPress={open} activeOpacity={press.card} accessibilityRole="button"
+      accessibilityLabel={`${row.display_name}, ${label}, ${when}`}>
       {body}
     </TouchableOpacity>
   )
 }
 
 // Page state shared by both layouts. A page that comes back full may have more behind it.
-function useFeed(placeId, enabled, refreshKey) {
+function useFeed(placeId, googlePlaceId, enabled, refreshKey) {
   const [rows, setRows] = useState([])
   const [state, setState] = useState('loading')   // loading | ready | error
   const [code, setCode] = useState(null)          // the error's code: 'NETWORK' = really offline
@@ -63,23 +71,23 @@ function useFeed(placeId, enabled, refreshKey) {
 
   const first = useCallback(async () => {
     setState('loading')
-    const res = await loadFeed(supabase, { placeId })
+    const res = await loadFeed(supabase, { placeId, googlePlaceId })
     if (!res.ok) { setCode(res.code); setState('error'); return }
     prefetchAvatars(res.rows.map(r => r.avatar_url))
     setRows(res.rows); setMore(res.more); setState('ready')
-  }, [placeId])
+  }, [placeId, googlePlaceId])
 
   useEffect(() => { if (enabled) first() }, [enabled, first, refreshKey])
 
   const next = useCallback(async () => {
     if (busy || !more || !rows.length) return
     setBusy(true)
-    const res = await loadFeed(supabase, { placeId, before: rows[rows.length - 1] })
+    const res = await loadFeed(supabase, { placeId, googlePlaceId, before: rows[rows.length - 1] })
     setBusy(false)
     if (!res.ok) return
     prefetchAvatars(res.rows.map(r => r.avatar_url))
     setRows(r => [...r, ...res.rows]); setMore(res.more)
-  }, [busy, more, rows, placeId])
+  }, [busy, more, rows, placeId, googlePlaceId])
 
   return { rows, state, code, more, busy, first, next }
 }
@@ -99,9 +107,10 @@ function GuestPrompt({ lang, onRequireAccount }) {
 }
 
 // Inside the place page's ScrollView: plain Views, a "show more" button instead of endless scroll.
-export function PlaceCheckins({ placeId, session, lang, onRequireAccount, refreshKey, style }) {
+// googlePlaceId instead of placeId = a Google place's check-ins (GooglePlaceSheet).
+export function PlaceCheckins({ placeId = null, googlePlaceId = null, session, lang, onRequireAccount, refreshKey, style }) {
   const guest = !session || isGuest(session)
-  const { rows, state, code, more, busy, first, next } = useFeed(placeId, !guest, refreshKey)
+  const { rows, state, code, more, busy, first, next } = useFeed(placeId, googlePlaceId, !guest, refreshKey)
   return (
     <View style={style}>
       <Text style={s.title}>{t('checkinPlaceTitle', lang)}</Text>
@@ -124,9 +133,10 @@ export function PlaceCheckins({ placeId, session, lang, onRequireAccount, refres
 }
 
 // The Keşfet tab's "Son Check-in'ler": every place, endless scroll. Tapping a row opens the place.
-export function AllCheckins({ session, lang, onRequireAccount, onOpenPlace, contentStyle }) {
+export function AllCheckins({ session, lang, onRequireAccount, onOpenPlace, onOpenGooglePlace, contentStyle, refreshKey = 0 }) {
   const guest = !session || isGuest(session)
-  const { rows, state, code, more, busy, first, next } = useFeed(null, !guest, 0)
+  const { rows, state, code, more, busy, first, next } = useFeed(null, null, !guest, refreshKey)
+  const names = useGoogleNames(supabase, rows.map(r => r.google_place_id), lang)
   if (guest) return <View style={contentStyle}><View style={[s.feedCard, s.guestCard]}><GuestPrompt lang={lang} onRequireAccount={onRequireAccount} /></View></View>
   if (state === 'loading') return <ActivityIndicator color={colors.primary} style={s.spinner} />
   if (state === 'error') return <View style={contentStyle}><FeedError code={code} lang={lang} onRetry={first} /></View>
@@ -144,7 +154,7 @@ export function AllCheckins({ session, lang, onRequireAccount, onOpenPlace, cont
       ListFooterComponent={busy ? <ActivityIndicator color={colors.primary} style={s.spinner} /> : null}
       renderItem={({ item }) => (
         <View style={s.feedCard}>
-          <FeedRow row={item} lang={lang} showPlace onOpenPlace={onOpenPlace} />
+          <FeedRow row={item} lang={lang} showPlace onOpenPlace={onOpenPlace} onOpenGooglePlace={onOpenGooglePlace} names={names} />
         </View>
       )}
     />
@@ -162,6 +172,7 @@ const s = StyleSheet.create({
   name:      { ...type.rowTitle, color: colors.textPrimary },
   placeLine: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   place:     { ...type.small, color: colors.textSecondary, flexShrink: 1 },
+  rowAttribution: { marginLeft: 6 },
   when:      { ...type.meta, color: colors.textSecondary },
   empty:     { ...type.body, color: colors.textSecondary },
   spinner:   { marginVertical: 20 },

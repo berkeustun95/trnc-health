@@ -7,11 +7,15 @@ import { useEffect, useState } from 'react'
 import { View, Text, Switch, StyleSheet } from 'react-native'
 import { supabase, isGuest } from '../../lib/supabase'
 import { loadCheckinPrefs, loadMine, deleteCheckin, setCheckinsPublic, MINE_PAGE } from '../../utils/checkins'
+import { useGoogleNames } from '../../utils/googlePlaces'
+import GoogleMapsAttribution from './GoogleMapsAttribution'
 import { IconButton, ConfirmDialog, Button } from '../ui'
 import { colors, type } from '../../constants/theme'
 import { t, LANG_CODES } from '../../constants/i18n'
 
-function placeLabel(place, lang) {
+function placeLabel(row, lang, names) {
+  if (row.google_place_id) return names[row.google_place_id] ?? '…'
+  const place = row.places
   if (!place) return t('checkinPlaceGone', lang)
   const code = LANG_CODES[lang] ?? lang
   return (place.name_i18n && (place.name_i18n[code] ?? place.name_i18n.en)) || place.name || ''
@@ -27,6 +31,7 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
   const [confirm, setConfirm] = useState(null)     // the row being deleted
   const [delBusy, setDelBusy] = useState(false)
   const [delError, setDelError] = useState(null)
+  const names = useGoogleNames(supabase, (rows ?? []).map(r => r.google_place_id), lang)
 
   useEffect(() => {
     if (!uid || isGuest(session)) return
@@ -79,7 +84,8 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
         : rows.map(r => (
           <View key={r.id} style={s.row}>
             <View style={s.text}>
-              <Text style={s.place} numberOfLines={1}>{placeLabel(r.places, lang)}</Text>
+              <Text style={s.place} numberOfLines={1}>{placeLabel(r, lang, names)}</Text>
+              {!!r.google_place_id && <GoogleMapsAttribution />}
               <Text style={s.date}>{new Date(r.created_at).toLocaleDateString(LANG_CODES[lang] ?? 'en', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
             </View>
             <IconButton icon="trash-outline" color={colors.textSecondary} onPress={() => { setDelError(null); setConfirm(r) }}
@@ -88,7 +94,7 @@ export default function MyCheckins({ session, lang, sectionStyle, titleStyle, la
         ))}
       {more && <Button variant="text" title={t('checkinShowMore', lang)} onPress={loadMore} loading={paging} />}
       <ConfirmDialog visible={!!confirm} lang={lang} destructive title={t('checkinDeleteTitle', lang)}
-        message={confirm ? placeLabel(confirm.places, lang) : ''} confirmLabel={t('checkinDelete', lang)}
+        message={confirm ? placeLabel(confirm, lang, names) : ''} confirmLabel={t('checkinDelete', lang)}
         onConfirm={doDelete} onCancel={() => setConfirm(null)} loading={delBusy} error={delError} />
     </View>
   )

@@ -15,6 +15,7 @@ import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { SUBMITTABLE_CATEGORIES, CATEGORY_LABEL_KEY } from '../constants/exploreCategories'
 import MapPinPicker from '../components/MapPinPicker'
 import BackButton from '../components/BackButton'
+import { resolveRegion } from '../utils/resolveRegion'
 
 function decode(base64) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -60,12 +61,13 @@ function SectionLabel({ text }) {
 
 // ─── Success state ────────────────────────────────────────────────────────────
 
-function SuccessState({ lang, onBack }) {
+function SuccessState({ lang, onBack, note }) {
   return (
     <View style={s.stateWrap}>
       <Text style={s.stateEmoji}>✅</Text>
       <Text style={s.stateTitle}>{t('blSubmitSuccess', lang)}</Text>
       <Text style={s.stateSub}>{t('blSubmitSuccessSub', lang)}</Text>
+      {!!note && <Text style={s.stateSub}>{note}</Text>}
       <TouchableOpacity style={s.doneBtn} onPress={onBack} activeOpacity={0.85}>
         <Text style={s.doneBtnText}>{t('back', lang)}</Text>
       </TouchableOpacity>
@@ -75,17 +77,19 @@ function SuccessState({ lang, onBack }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function ExploreSubmitScreen({ session, lang, place: editPlace, onBack, onSubmitted }) {
+// initialFix: { latitude, longitude } from check-in's "Not here? Add this place" — the pin and
+// the region start where the phone is (both still editable).
+export default function ExploreSubmitScreen({ session, lang, place: editPlace, initialFix = null, onBack, onSubmitted }) {
   const isEdit = !!editPlace   // edit mode = resubmit a rejected place (calls resubmit_place)
   const [category, setCategory] = useState(editPlace?.category || 'beach')
   const [name,     setName]     = useState(editPlace?.name || '')
-  const [region,   setRegion]   = useState(editPlace?.region || null)
+  const [region,   setRegion]   = useState(editPlace?.region || (initialFix ? resolveRegion(initialFix.latitude, initialFix.longitude) : null))
   const [desc,     setDesc]     = useState(() => {
     const d = editPlace?.description_i18n
     return d ? (d[lang] ?? Object.values(d)[0] ?? '') : ''
   })
-  const [lat,      setLat]      = useState(editPlace?.latitude ?? null)
-  const [lng,      setLng]      = useState(editPlace?.longitude ?? null)
+  const [lat,      setLat]      = useState(editPlace?.latitude ?? initialFix?.latitude ?? null)
+  const [lng,      setLng]      = useState(editPlace?.longitude ?? initialFix?.longitude ?? null)
   const [photos,   setPhotos]   = useState([])                              // NEW photos { uri, base64 }
   const [existingPhotos, setExistingPhotos] = useState(editPlace?.photos || [])  // kept existing URLs (edit)
 
@@ -205,7 +209,7 @@ export default function ExploreSubmitScreen({ session, lang, place: editPlace, o
   if (done) {
     return (
       <SafeAreaView style={[s.safe, s.safeCenter]} edges={['top', 'bottom']}>
-        <SuccessState lang={lang} onBack={onBack} />
+        <SuccessState lang={lang} onBack={onBack} note={initialFix ? t('checkinAddedNote', lang) : null} />
       </SafeAreaView>
     )
   }

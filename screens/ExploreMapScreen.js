@@ -13,7 +13,10 @@
 // so it ships over OTA and needs no rebuild.
 
 import { StatusBar } from 'expo-status-bar'
-import { REDESIGN } from '../constants/redesign'
+import { REDESIGN, CHECKINS } from '../constants/redesign'
+import { MAP_PROVIDER, NO_POI_STYLE, GOOGLE_MAP_OK } from '../utils/googleMap'
+import { loadGooglePins } from '../utils/googlePlaces'
+import GooglePlaceSheet from '../components/checkins/GooglePlaceSheet'
 import { requestWithPrimer } from '../utils/permissionPrimer'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import FilterDropdown from '../components/FilterDropdown'
@@ -35,7 +38,7 @@ import {
 import { CATEGORY_LABEL_KEY, GROUP_META, categoryToGroup } from '../constants/exploreCategories'
 import { REGION_LABEL_KEY } from '../constants/regions'
 import { partnerAsset } from '../constants/partnerAssets'
-import { colors, shadow, ellipsizeSlack, type, radii, elevation } from '../constants/theme'
+import { colors, shadow, ellipsizeSlack, type, radii, elevation, placeColors } from '../constants/theme'
 import { Button, IconButton, CategoryIcon, RemoteImage, useTabBarFootprint } from '../components/ui'
 import { t } from '../constants/i18n'
 import { EXPLORE_ROUTES_LIVE, ROUTE_MEDALS_LIVE } from '../constants/flags'
@@ -64,7 +67,17 @@ let returnSnapshot = null
 // NO LOCATION PERMISSION IS REQUESTED ON OPEN — still true. With EXPLORE_ROUTES_LIVE the map
 // shows the dot when permission is ALREADY granted, and asks only when the user taps
 // "locate me" (or starts a walk). Every watch is foreground-only and ends with the screen.
-const FOLLOW_ZOOM = 17, FOLLOW_ALTITUDE = 600   // zoom for Google (Android), altitude (m) for Apple (iOS)
+const FOLLOW_ZOOM = 17, FOLLOW_ALTITUDE = 600   // zoom for Google, altitude (m) for Apple (iOS before 1.4.0)
+
+// ─── GOOGLE LAYER (check-ins, 20261091) ─────────────────────────────────────
+// With CHECKINS on, the map is Google on both platforms where the binary can draw it
+// (utils/googleMap.js: Android always, iOS when the binary carries the Google Maps SDK), Google's own business/POI labels are
+// styled off, and Google places with a visible ADA check-in appear as pins. Those pins MUST
+// NOT appear on an Apple map (Maps Platform SST §14.2), hence GOOGLE_MAP_OK in the gate. No
+// Google API call happens while browsing: pins come from our own get_google_place_pins();
+// the name is fetched only when a pin is tapped (GooglePlaceSheet).
+const GOOGLE_LAYER = CHECKINS && GOOGLE_MAP_OK
+const GOOGLE_PIN_COLOR = placeColors.googlePlace.text
 
 // Supercluster's radius/extent are tile-space pixels; the zoom we feed it is computed
 // below at Google's 256px tile scale. minPoints 3 keeps a lone pair of neighbours as two
@@ -418,6 +431,15 @@ export default function ExploreMapScreen({
 
   const [region, setRegion] = useState(initialRegion)
 
+  const [googlePins, setGooglePins] = useState([])
+  const [googlePlace, setGooglePlace] = useState(null)   // { id } → GooglePlaceSheet
+  useEffect(() => {
+    if (!GOOGLE_LAYER || !session) return
+    let gone = false
+    loadGooglePins(supabase).then(rows => { if (!gone) setGooglePins(rows) })
+    return () => { gone = true }
+  }, [session?.user?.id])
+
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -701,6 +723,8 @@ export default function ExploreMapScreen({
       <MapView
         ref={mapRef}
         style={s.map}
+        provider={GOOGLE_LAYER ? MAP_PROVIDER : undefined}
+        customMapStyle={GOOGLE_LAYER ? NO_POI_STYLE : undefined}
         initialRegion={initialRegion}
         // In walk mode the dot follows the walk's own permission, never asks for it: on iOS
         // showsUserLocation alone would raise the permission prompt.
@@ -724,6 +748,15 @@ export default function ExploreMapScreen({
             onSelectStop={p => handOff(() => onSelectPlace?.(p))}
           />
         )}
+        {!routesMode && GOOGLE_LAYER && googlePins.map(g => (
+          <Marker
+            key={`g:${g.google_place_id}`}
+            coordinate={{ latitude: g.latitude, longitude: g.longitude }}
+            pinColor={GOOGLE_PIN_COLOR}
+            tracksViewChanges={false}
+            onPress={e => { e.stopPropagation(); setSelected(null); setGooglePlace({ id: g.google_place_id }) }}
+          />
+        ))}
         {!routesMode && clusters.map(c => {
           if (c.properties.cluster) {
             return <ClusterMarker key={`c:${c.properties.cluster_id}`} cluster={c} onPress={expandCluster} />
@@ -830,6 +863,10 @@ export default function ExploreMapScreen({
             else handOff(() => onSelectUnclaimed?.(pin.row), pin.id)
           }}
         />
+      )}
+      {GOOGLE_LAYER && (
+        <GooglePlaceSheet place={googlePlace} session={session} lang={lang} onRequireAccount={onRequireAccount}
+          onClose={() => setGooglePlace(null)} />
       )}
     </View>
   )

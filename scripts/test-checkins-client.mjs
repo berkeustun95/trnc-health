@@ -1,4 +1,4 @@
-// utils/checkins.js (the shipped client module) against 20261078 in PGlite, through a fake
+// utils/checkins.js (the shipped client module) against 20261078 + 20261091 in PGlite, through a fake
 // supabase client that turns each call into the SQL PostgREST would run, as the caller's role.
 //   node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-checkins-client.mjs
 // Shares the fixture with scripts/test-checkins-sql.mjs (read from its SEED literal).
@@ -13,8 +13,11 @@ const db = await freshDb(seed)
 await db.exec(`INSERT INTO public.profiles (id, display_name, date_of_birth) VALUES
  ('${U(1)}','adult','1990-01-01'), ('${U(2)}','viewer','1990-01-01'), ('${U(3)}', null, current_date - interval '15 years');
  GRANT SELECT ON public.places TO authenticated; GRANT SELECT, UPDATE ON public.profiles TO authenticated;`)
-const r = await applyFile(db, fileURLToPath(new URL('../supabase/migrations/20261078_checkins.sql', import.meta.url)))
-if (!r.ok) { console.log('apply', r.msg); process.exit(1) }
+// 1078 + 1091 together: the shape the client ships against (loadFeed sends p_google_place_id).
+for (const f of ['20261078_checkins.sql', '20261091_checkins_google_places.sql']) {
+  const r = await applyFile(db, fileURLToPath(new URL(`../supabase/migrations/${f}`, import.meta.url)))
+  if (!r.ok) { console.log('apply', f, r.msg); process.exit(1) }
+}
 
 async function as(uid, sql, params = []) {
   await db.exec('RESET ROLE;')
