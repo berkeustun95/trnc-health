@@ -12,6 +12,14 @@
 # unless the caller gave one. Pinned to the CI version (supabase@2.104.0 in the workflows).
 set -euo pipefail
 REF=jeihxnwqytnxtytgkzgf
+
+# ALLOWLIST. The token can write the database; this wrapper is what keeps the CLI to functions and
+# secrets. Migrations go only through the supabase-migrate workflow (supabase/CLAUDE.md); never
+# `db push` (no CLI ledger in prod, 13 repeated prefixes), never SQL from here.
+case "${1:-}" in
+  functions|secrets|link|--version|--help|-h) ;;
+  *) echo "sb.sh: '${1:-}' is not allowed from this Mac — only functions / secrets. Migrations: gh workflow run supabase-migrate (supabase/CLAUDE.md)." >&2; exit 2 ;;
+esac
 raw=$(security find-generic-password -s "Supabase CLI" -a supabase -w 2>/dev/null) \
   || { echo "sb.sh: no Supabase CLI login in the Keychain — run: supabase login" >&2; exit 1; }
 case "$raw" in
