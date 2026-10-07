@@ -37,11 +37,22 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   buckets are public today, only `avatars` is private (signed URLs, `Avatar.js`).
 - ⚠ **Never raise `min_supported_version` above `'1.0.0'`** without the force-tier device pass.
 - ⚠ **OTA only via `npm run ota`; web only via `npm run web:deploy`** — the wrappers are the only guard.
-- ⚠ **Production is written only from GitHub Actions** (see "Production operations"). **No production
-  credential exists on this Mac**: service key, Places key, ORS key and the Supabase CLI token were all
-  removed 2026-10-01 and live only as repo secrets. Never `supabase login` or re-add one to the Keychain.
-  Every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New writer = new
-  `workflow_dispatch` workflow, dry by default.
+- ⚠ **Production DATA is written only from GitHub Actions** (see "Production operations"). The service
+  key, Places/geocoding key and ORS key live only as repo secrets — never on this Mac, never in the
+  Keychain. Every writer calls `prodWriteGuard()` first (`npm run check:prod-writes`, pre-push). New
+  writer = new `workflow_dispatch` workflow, dry by default.
+- ⚠ **Supabase CLI on this Mac (Berke, 2026-10-07; replaces the 2026-10-01 "never `supabase login`").**
+  Long-term login in the Keychain ("Supabase CLI"), token scoped to trnc-health only: Project Settings
+  read; Database, Edge Functions, Edge Function Secrets read-write; NO API-keys read (so `supabase link`
+  fails — not needed, and it keeps the service key unreadable). Always through `scripts/sb.sh` (token +
+  `--project-ref`; CLI 2.104.0's `secrets` ignores the Keychain; allowlist: `functions`/`secrets` only).
+  Claude sets function secrets itself (`scripts/sb.sh secrets set --env-file <600 file>`, never the value
+  on a command line; check by digest: `secrets list` value = sha256) and deploys functions itself with
+  `scripts/fn-deploy.sh <fn> --go` (verify_jwt from deploy-config.json) — **only after Berke's go**, like
+  every migration and OTA. Still never from the CLI: `db push`, `db reset`, `db query`/SQL against prod —
+  migrations only via `supabase-migrate`. Fallback without this Mac: `supabase-functions-deploy` (and the
+  `supabase-function-secrets` workflow, which lands with feat/explore-v2). Lost Mac → revoke the token
+  (Supabase → Account → Access Tokens).
 - ⚠ **`eas-cli@24.7.0` pin in the iOS wrappers is load-bearing** — never swap back to bare `eas`.
 - ⚠ **No RLS or storage policy changes through the Supabase dashboard. Migrations only.**
 - ⚠ **Live-strip notice card is DORMANT, not dead** (`kind='notice'`, `NOTICE_FALLBACK` in `LiveStrip.js`, rank 3b
@@ -86,8 +97,10 @@ Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; secret
 - Walking legs: `walking-legs` (a flagged leg exits 1 by design; it is never written).
 - Novest: `novest-import`, `novest-images` (metadata also syncs on cron via the sync-novest function).
 - Apple user deletion: `revoke-apple-token -f user_id=<uuid>` BEFORE deleting the user.
-- Edge functions: `supabase-functions-deploy -f function=<name>|all`. verify_jwt comes from
-  `supabase/functions/deploy-config.json` (read from prod); a new function is added there first.
+- Edge functions: `scripts/fn-deploy.sh <name> --go` from this Mac, or `supabase-functions-deploy -f
+  function=<name>|all`. verify_jwt comes from `supabase/functions/deploy-config.json` (read from prod);
+  a new function is added there first (and to the workflow's choice list). Secrets: `scripts/sb.sh
+  secrets …`.
 - Health: `daily-health` (05:00 UTC daily: hotels, novest health, novest photos (fails > 10% of live
   listings photo-less), notify). A red run emails. `npm run novest:verify` is post-import only, by hand in CI.
 - Migrations: `supabase-migrate -f file=<FULL name>.sql` (dry: SQL + ledger check), then `-f apply=true`.
