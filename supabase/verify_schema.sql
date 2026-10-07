@@ -106,6 +106,8 @@ WITH report AS (
     ('1070_live_scores','live_score_editors'),
     -- referenced by capture_2 constraints; created in earlier/other migrations:
     ('pre-repo','events'),('pre-repo','home_services'),('pre-repo','transport_providers'),
+    -- pre-repo (dashboard-era), first given a policy by 20261079: the duty screen's coordinates.
+    ('pre-repo','pharmacy_coords'),
     ('pre-repo','properties'),('pre-repo','beaches'),('pre-repo','landmarks'),
     ('pre-repo','bus_routes'),('pre-repo','estate_agencies'),('pre-repo','estate_agents')
   ) e(m,o)
@@ -296,7 +298,11 @@ WITH report AS (
     ('1071_live_scores_followup','teams','source_logo_url'),
     ('1071_live_scores_followup','f1_races','session_type'),
     -- 1077. League display names by full language name; the app falls back to name.
-    ('1077_live_scores_international','leagues','name_i18n')
+    ('1077_live_scores_international','leagues','name_i18n'),
+    -- 1083. HotelRunner booking link. HotelsTab selects it: MISSING = 42703 on the tab.
+    ('1083_hotels_hotelrunner','hotels','hotelrunner_url'),
+    -- 1087. The thread a message row opens. utils/notificationRoute.js selects it (falls back on 42703).
+    ('1087_notifications_conversation_id','notifications','conversation_id')
 
   ) e(m,t,c)
 
@@ -782,7 +788,11 @@ WITH report AS (
     ('1071_live_scores_followup','teams_source_logo_check'),
     ('1071_live_scores_followup','f1_races_session_type_check'),
     ('1071_live_scores_followup','f1_races_api_race_id_key'),
-    ('1077_live_scores_international','leagues_name_i18n_check')
+    ('1077_live_scores_international','leagues_name_i18n_check'),
+    -- 1083. The H token asserts what it permits.
+    ('1083_hotels_hotelrunner','hotels_hotelrunner_url_check'),
+    -- 1087. A foreign key, registered here for existence; its ON DELETE action is an H token.
+    ('1087_notifications_conversation_id','notifications_conversation_id_fkey')
 
   ) e(m,o)
 
@@ -875,7 +885,9 @@ WITH report AS (
     ('1070_live_scores','matches_kickoff_idx'),
     ('1070_live_scores','matches_league_idx'),
     ('1070_live_scores','api_request_log_at_idx'),
-    ('1071_live_scores_followup','f1_races_race_at_idx')
+    ('1071_live_scores_followup','f1_races_race_at_idx'),
+    -- 1087: partial (conversation_id IS NOT NULL); serves the FK's lookup on a conversation delete.
+    ('1087_notifications_conversation_id','notifications_conversation_id_idx')
 
   ) e(m,o)
 
@@ -3075,19 +3087,31 @@ WITH report AS (
     -- WHAT EACH CLAUSE ACTUALLY CATCHES — they are not redundant, and getting the reason
     -- wrong is how the next reader deletes one of them:
     --
-    --   • THE COUNT sees a surviving TABLE-level grant. information_schema.column_privileges
-    --     EXPANDS a table grant into one row per column, so the broken
+    --   • THE COUNT sees a surviving TABLE-level grant. It EXPANDS a table grant (relacl)
+    --     into one row per column, as information_schema.column_privileges does, so the broken
     --     `REVOKE SELECT (customer_id) …` (which leaves the table grant intact) reads
     --     9 x 2 = 18 here, not 16. It also catches a lost column grant (14) and a future
     --     ADD COLUMN that somebody granted (18) — and that edit is the review moment.
+    --   • Read from pg_attribute.attacl / pg_class.relacl, NOT information_schema.column_privileges:
+    --     that view shows only privileges the CURRENT role grants or holds, so run as
+    --     supabase_read_only_user it counted 0 and went red on an unchanged database
+    --     (2026-10-04, migration-status workflow). The catalogs read the same for every role.
     --   • has_column_privilege sees what the count CANNOT: the count filters on
     --     grantee IN ('anon','authenticated'), so a grant made to PUBLIC, or reaching these
     --     roles through role membership, never appears in it as a row at all.
     --     has_column_privilege resolves inherited privilege and answers the real question.
     UNION ALL SELECT '1033_reviews_author_not_public','reviews exposes 8 columns to anon/authenticated, and customer_id is not one',
-      (SELECT count(*) FROM information_schema.column_privileges
-        WHERE table_schema='public' AND table_name='reviews'
-          AND privilege_type='SELECT' AND grantee IN ('anon','authenticated')) = 16
+      (SELECT count(*) FROM (
+         SELECT a.attname, r.rolname FROM pg_attribute a
+           CROSS JOIN LATERAL aclexplode(a.attacl) x JOIN pg_roles r ON r.oid = x.grantee
+          WHERE a.attrelid = to_regclass('public.reviews') AND a.attnum > 0 AND NOT a.attisdropped
+            AND x.privilege_type = 'SELECT' AND r.rolname IN ('anon','authenticated')
+         UNION
+         SELECT a.attname, r.rolname FROM pg_class c
+           CROSS JOIN LATERAL aclexplode(c.relacl) x JOIN pg_roles r ON r.oid = x.grantee
+           JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+          WHERE c.oid = to_regclass('public.reviews')
+            AND x.privilege_type = 'SELECT' AND r.rolname IN ('anon','authenticated')) s) = 16
       AND NOT has_column_privilege('anon', 'public.reviews', 'customer_id', 'SELECT')
       AND NOT has_column_privilege('authenticated', 'public.reviews', 'customer_id', 'SELECT')
     -- The replacement reads, asserted for the properties a C-section name check cannot see.
@@ -3681,9 +3705,11 @@ WITH report AS (
     -- (1) Every function that inserts a notification sets `type`. DERIVED: the writer set is
     --     read from pg_proc, not named, so a seventh writer that forgets goes red here. Six
     --     today; a legitimate new writer bumps the count in the same commit, saying why.
+    --     20261087 appended conversation_id to notify_new_message's column list, so the anchor
+    --     ends at `type` (`type)` or `type, conversation_id)`); 1087's own token owns the rest.
     UNION ALL SELECT '1066_notification_type','6 notification writers, all six set type, none uses the 3-column INSERT',
       COALESCE((SELECT count(*) = 6
-                   AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES%')
+                   AND bool_and(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type%) VALUES%')
                    AND NOT bool_or(p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body) VALUES%')
                   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                  WHERE n.nspname = 'public' AND p.prosrc ~* 'insert\s+into\s+(public\.)?notifications\M'), false)
@@ -3788,6 +3814,112 @@ WITH report AS (
       (SELECT count(*) FROM public.leagues WHERE sport = 'football' AND enabled AND country = 'World') = 28
       AND NOT EXISTS (SELECT 1 FROM public.leagues WHERE sport = 'football' AND country = 'World'
                        AND sort_order NOT BETWEEN 20 AND 49)
+    -- ── 1079: pharmacy_coords is readable by the app and writable by no app role ──
+    -- (1) DERIVED: RLS on, exactly one policy (a permissive SELECT to anon + authenticated; a
+    --     second would OR in), no client write privilege (inherited grants resolved), and the
+    --     positive control — both roles can still SELECT, or every duty distance silently
+    --     falls back to facilities. Through to_regclass so an absent table reads false.
+    UNION ALL SELECT '1079_pharmacy_coords_read_seed_pins','pharmacy_coords: RLS on, 1 permissive SELECT policy to anon+authenticated, no client writes, clients can read',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.pharmacy_coords')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='pharmacy_coords') = 1
+      AND EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pharmacy_coords'
+                  AND policyname='pharmacy_coords_select_public' AND cmd='SELECT' AND permissive='PERMISSIVE'
+                  AND roles @> ARRAY['anon','authenticated']::name[] AND cardinality(roles) = 2)
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.pharmacy_coords'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.pharmacy_coords'), 'INSERT,UPDATE,DELETE,TRUNCATE')
+               AND has_table_privilege('anon', to_regclass('public.pharmacy_coords'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.pharmacy_coords'), 'SELECT'), false)
+    -- (2) KTEB's 'ÖZVOL' typo stays out of the roster. gen-duty-roster-sql.mjs fixes it at load;
+    --     a load that bypassed the generator is the only way this goes red.
+    UNION ALL SELECT '1079_pharmacy_coords_read_seed_pins','duty_list carries no ÖZVOL ECZANESİ (typo of ÖZYOL)',
+      NOT EXISTS(SELECT 1 FROM public.duty_list WHERE name = 'ÖZVOL ECZANESİ')
+    -- ── 1080: pharmacy_coords speaks the roster's region vocabulary ───────────────
+    -- An exact SET (the 1059 form): a bare 'Mesarya' coming back, or any tenth value, is a
+    -- review moment. The app's region gate keeps a 'Mesarya' arm as a safety net only.
+    UNION ALL SELECT '1080_pharmacy_coords_mesarya_split','pharmacy_coords.region is exactly the 9 KTEB regions (no bare Mesarya)',
+      (SELECT array_agg(DISTINCT region COLLATE "C" ORDER BY region COLLATE "C") FROM public.pharmacy_coords)   -- C: prod's collation is linguistic
+      IS NOT DISTINCT FROM ARRAY['Alt Mesarya','Gazimağusa','Girne','Güzelyurt','Karpaz','Lefke','Lefkoşa','Üst Mesarya','İskele']
+    -- ── 1085: every pharmacy_coords row carries a pin ───────────────────────────
+    -- 20261085 pinned the last four. A new roster name without a pin turns this red: pin it.
+    UNION ALL SELECT '1085_pharmacy_coords_last_four_pins','pharmacy_coords: no row without lat/lng',
+      NOT EXISTS(SELECT 1 FROM public.pharmacy_coords WHERE lat IS NULL OR lng IS NULL)
+
+    -- ══ the read-only role can run QUERY 1 (20261081) ═══════════════════════
+    -- A grant creates no named object. Without it, QUERY 1 aborts with 42501 under the
+    -- migration-status workflow (supabase_read_only_user) at the 1035/1036 calls. The pair:
+    -- the role holds EXECUTE on both, and anon still holds it on neither.
+    UNION ALL SELECT '1081_readonly_role_runs_verify_schema','supabase_read_only_user can EXECUTE may_initiate_by_age + is_listed_student; anon cannot',
+      COALESCE(has_function_privilege('supabase_read_only_user', to_regprocedure('public.may_initiate_by_age(uuid,uuid)'), 'EXECUTE')
+           AND has_function_privilege('supabase_read_only_user', to_regprocedure('public.is_listed_student(uuid)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.may_initiate_by_age(uuid,uuid)'), 'EXECUTE')
+           AND NOT has_function_privilege('anon', to_regprocedure('public.is_listed_student(uuid)'), 'EXECUTE'), false)
+    -- ── 1083: HotelRunner booking ───────────────────────────────────────────────
+    -- (1) The 'book' action. Same DROP/ADD of the same name as 1014/1046/1056, so the E-section
+    --     name token cannot see it. Quoted literal, as the maps/route_complete tokens.
+    UNION ALL SELECT '1083_hotels_hotelrunner','contact_events action CHECK permits book',
+      COALESCE(position('''book''' in (SELECT pg_get_constraintdef(oid) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.contact_events')
+          AND conname  = 'contact_events_action_check')) > 0, false)
+    -- (2) The link is https-only with no whitespace, <= 2048. Written from the rendering.
+    UNION ALL SELECT '1083_hotels_hotelrunner','hotels_hotelrunner_url_check is https-only, no whitespace, <= 2048',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.hotels') AND conname = 'hotels_hotelrunner_url_check')
+               LIKE '%''^https://\\S+$''::text%<= 2048%', false)
+    -- ── 1084: contact_events — the app writes a random per-tap id (outbox dedupe) ──
+    -- A GRANT creates no named object, so only a token sees it. The outbox (utils/logContactEvent.js)
+    -- sends its own id and treats a primary-key conflict as "delivered"; without this grant every
+    -- explicit-id insert is refused (42501) and the outbox drops the tap as un-sendable. created_at
+    -- must STAY unwritable (positive control beside the grant; 0910 owns that fact too).
+    UNION ALL SELECT '1084_contact_events_client_id','contact_events.id INSERT-able by anon + authenticated; created_at still not',
+      COALESCE(has_column_privilege('anon', to_regclass('public.contact_events'), 'id', 'INSERT')
+           AND has_column_privilege('authenticated', to_regclass('public.contact_events'), 'id', 'INSERT')
+           AND NOT has_column_privilege('anon', to_regclass('public.contact_events'), 'created_at', 'INSERT')
+           AND NOT has_column_privilege('authenticated', to_regclass('public.contact_events'), 'created_at', 'INSERT'), false)
+    -- ── 1087: notifications.conversation_id ──────────────────────────────────────
+    -- (1) SET NULL, never CASCADE: a deleted thread must leave the notification in place
+    --     (it then opens the Messages tab). Written from the live rendering.
+    UNION ALL SELECT '1087_notifications_conversation_id','notifications_conversation_id_fkey is ON DELETE SET NULL to conversations',
+      COALESCE((SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                 WHERE conrelid = to_regclass('public.notifications') AND conname = 'notifications_conversation_id_fkey')
+               = 'FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL', false)
+    -- (2) notify_new_message writes the thread into the row and 'type' into the push data.
+    --     Positive and negative: the 4-column INSERT (20261066) is gone from this function.
+    UNION ALL SELECT '1087_notifications_conversation_id','notify_new_message stores conversation_id and pushes type=message',
+      COALESCE((SELECT p.prosrc LIKE '%INSERT INTO notifications (user_id, title, body, type, conversation_id) VALUES (v_to, v_title, v_text, ''message'', v_conv)%'
+                   AND p.prosrc LIKE '%''screen'', ''conversation'', ''type'', ''message''%'
+                   AND p.prosrc NOT LIKE '%INSERT INTO notifications (user_id, title, body, type) VALUES%'
+                  FROM pg_proc p WHERE p.oid = to_regprocedure('public.notify_new_message(uuid)')), false)
+    -- (3) The SET NULL above runs as an UPDATE that any trigger on notifications would see
+    --     (the 20261029 bug class). None exist; one appearing is the moment to re-run the
+    --     migration's rolled-back deletion test against it.
+    UNION ALL SELECT '1087_notifications_conversation_id','notifications has no triggers (SET NULL premise)',
+      COALESCE((SELECT count(*) = 0 FROM pg_trigger WHERE tgrelid = to_regclass('public.notifications') AND NOT tgisinternal), false)
+    -- ── 1088: clients may mark a notification read, and nothing else ────────────
+    -- A GRANT/REVOKE creates no named object. DERIVED over every column: authenticated may
+    -- UPDATE exactly `read`; neither client role may INSERT or UPDATE anything else (so only
+    -- the postgres-owned DEFINER writers set conversation_id). Positive control beside it:
+    -- the mark-read column is still writable and service_role still inserts (duty push).
+    UNION ALL SELECT '1088_notifications_lock_client_writes','notifications: client UPDATE = {read} only, no client INSERT; service_role INSERT kept',
+      COALESCE((SELECT bool_and(
+                    NOT has_column_privilege('anon', a.attrelid, a.attname, 'INSERT')
+                AND NOT has_column_privilege('anon', a.attrelid, a.attname, 'UPDATE')
+                AND NOT has_column_privilege('authenticated', a.attrelid, a.attname, 'INSERT')
+                AND has_column_privilege('authenticated', a.attrelid, a.attname, 'UPDATE') = (a.attname = 'read'))
+                  AND has_table_privilege('service_role', to_regclass('public.notifications'), 'INSERT')
+                  AND bool_or(a.attname = 'read')
+                 FROM pg_attribute a
+                WHERE a.attrelid = to_regclass('public.notifications') AND a.attnum > 0 AND NOT a.attisdropped), false)
+    -- ── 1089: a signed-in user can delete their own notifications ("Clear all") ───
+    -- Before it, no PERMISSIVE DELETE policy existed and a client delete matched 0 rows with
+    -- no error. Owns the notifications policy set: 7, and exactly one permissive DELETE —
+    -- owner-scoped, TO authenticated (guests stay out via the RESTRICTIVE no_anon_delete).
+    UNION ALL SELECT '1089_notifications_delete_own','notifications: 7 policies, the only permissive DELETE is TO authenticated USING (user_id = auth.uid())',
+      COALESCE((SELECT count(*) = 7
+                   AND count(*) FILTER (WHERE permissive = 'PERMISSIVE' AND cmd IN ('DELETE', 'ALL')) = 1
+                   AND bool_or(policyname = 'users delete own notifications' AND permissive = 'PERMISSIVE' AND cmd = 'DELETE'
+                               AND roles = '{authenticated}' AND qual = '(user_id = auth.uid())')
+                   AND bool_or(policyname = 'no_anon_delete_notifications' AND permissive = 'RESTRICTIVE' AND cmd = 'DELETE')
+                  FROM pg_policies WHERE schemaname = 'public' AND tablename = 'notifications'), false)
   ) z
 
   UNION ALL
@@ -3867,7 +3999,7 @@ ORDER BY ord, (status IN ('OK','ON')) ASC, section, migration, object;  -- probl
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ═══ QUERY 2 / 5 — CRON JOBS — run alone ═══
 -- ═══════════════════════════════════════════════════════════════════════════
--- Errors if pg_cron isn't installed (itself the finding). Expect 11 rows present.
+-- Errors if pg_cron isn't installed (itself the finding). Expect 5 rows present.
 -- Existence is NOT enough: cron.job.active can be false, and a disabled job looks
 -- identical to a healthy one from the application's side. purge-moderation-rejections
 -- backs a 30-day retention promise published in BOTH terms copies (§8.2), so silently
@@ -3886,15 +4018,10 @@ FROM (VALUES
   -- 90-day retention on app_update_events. The table is a launch counter, not a permanent
   -- record; without this job it grows forever and quietly becomes a usage log. 03:33 UTC,
   -- clear of the three purges above it.
-  ('1051_app_versions','purge-app-update-events'),
-  -- Live Scores (1072). INACTIVE on a daily job = no fixtures tomorrow; on a poll job = scores
-  -- freeze mid-match. Neither errors anywhere: live_sync_state.last_run_at is the alarm.
-  ('1072_live_scores_cron','live-scores-football-daily'),
-  ('1072_live_scores_cron','live-scores-basketball-daily'),
-  ('1072_live_scores_cron','live-scores-f1-daily'),
-  ('1072_live_scores_cron','live-scores-football-poll'),
-  ('1072_live_scores_cron','live-scores-basketball-poll'),
-  ('1072_live_scores_cron','live-scores-f1-poll')
+  ('1051_app_versions','purge-app-update-events')
+  -- Live Scores (1072): the six live-scores-* jobs are PAUSED by 20261090 (API-Sports account
+  -- suspended, Berke 2026-10-06), so they are not expected active here. Re-enabling them is a
+  -- deliberate act: put the six rows back in the same commit.
 ) e(m,o)
 
 UNION ALL

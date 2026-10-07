@@ -160,6 +160,11 @@ export function nextUtcMidnight(now) {
 // ─── IO ─────────────────────────────────────────────────────────────────────
 
 export class QuotaExhausted extends Error {}
+// The provider refused the ACCOUNT (suspended / invalid key), not this request. Seen 2026-10-04
+// 15:24 UTC: {"access":"Your account is suspended…"} on all three sports. Retrying every 7 minutes
+// only burns the day's cap on errors, so the caller backs off for hours instead.
+export class ProviderBlocked extends Error {}
+export const BLOCKED_BACKOFF_HOURS = 6
 
 // Only service_role may run a sync. verify_jwt proves the token is signed by this project;
 // the anon key is ALSO such a token, so without this check anyone holding the app could
@@ -200,7 +205,13 @@ export async function apiSports(sb, sport, key, path) {
     err = String(e?.message || e).slice(0, 500)
   }
   await logRequest(sb, { sport, provider: 'api-sports', endpoint: path, http_status: status, results, error: err })
-  if (err) throw new Error(`${sport} ${path}: ${err}`)
+  if (err) {
+    const errs = body?.errors
+    const blocked = errs && !Array.isArray(errs) && (errs.access || errs.token || errs.key)
+    throw new (blocked ? ProviderBlocked : Error)(`${sport} ${path}: ${err}`)
+  }
+  // A successful call is the only thing that clears the state's error: an idle run proves nothing.
+  await sb.from('live_sync_state').update({ last_error: null }).eq('sport', sport)
   return body.response || []
 }
 
@@ -427,7 +438,7 @@ async function schedule(sb, sport, now, say) {
     say(`${sport}: idle, next poll at ${next}`)
   }
   const { error: uErr } = await sb.from('live_sync_state')
-    .update({ next_poll_at: next, last_run_at: now, last_error: null }).eq('sport', sport)
+    .update({ next_poll_at: next, last_run_at: now }).eq('sport', sport)
   if (uErr) throw new Error(`live_sync_state: ${uErr.message}`)
   return next
 }
@@ -464,6 +475,7 @@ export async function handle(req, sport, createClient, env, runners = { daily: r
     // Quota exhausted: sleep until the UTC reset rather than re-firing every 7 minutes.
     const patch = { last_error: msg.slice(0, 500), last_run_at: new Date().toISOString() }
     if (e instanceof QuotaExhausted) patch.next_poll_at = nextUtcMidnight(new Date())
+    if (e instanceof ProviderBlocked) patch.next_poll_at = new Date(Date.now() + BLOCKED_BACKOFF_HOURS * 3600000).toISOString()
     await sb.from('live_sync_state').update(patch).eq('sport', sport)
     return Response.json({ ok: false, mode, error: msg, log }, { status: e instanceof QuotaExhausted ? 429 : 500 })
   }

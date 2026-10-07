@@ -1,0 +1,41 @@
+# ─── One test push to one account's device ────────────────────────────────────
+#
+#   gh workflow run push-test -f email=<account email> [-f kind=plain|messages]
+#
+# Reads the token read-only (never printed), sends one push, prints the Expo ticket and the
+# FCM/APNs receipt. Writes nothing. Engine: scripts/push-test.mjs.
+
+name: push-test
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: 'Account email whose device gets the push'
+        type: string
+        required: true
+      kind:
+        description: 'plain, or messages (Student Hub payload without a thread → Messages tab)'
+        type: choice
+        options: [plain, messages]
+        default: plain
+
+concurrency: { group: push-test, cancel-in-progress: false }
+
+jobs:
+  push:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      IN_EMAIL: ${{ inputs.email }}
+      IN_KIND: ${{ inputs.kind }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with: { node-version: '24' }
+      - name: Send
+        run: node scripts/push-test.mjs "$IN_EMAIL" "$IN_KIND"

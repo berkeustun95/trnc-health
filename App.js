@@ -1,4 +1,4 @@
-import { Component, Fragment, useEffect, useState, useRef, useCallback } from 'react'
+import { Component, Fragment, useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Pressable, Platform, TextInput, ScrollView, Linking, Animated, Share, Alert, Modal, Dimensions, AppState } from 'react-native'
 import { addBackListener } from './utils/backHandler'
@@ -34,7 +34,7 @@ import { claimPendingMedals } from './utils/routeMedals'
 import { forgetScroll } from './utils/scrollMemory'
 import { MODULE_FLAGS, EXPLORE_MAP_LIVE, PROFILE_GATE_LIVE, HOME_V2_LIVE, HS_SELF_REGISTRATION, CONNECTIVITY_LIVE, PET_HOTEL_LIVE , PETS_TIMELINE_LIVE, ROUTE_MEDALS_LIVE, LIVE_SCORES_LIVE } from './constants/flags'
 import { REDESIGN, CHECKINS } from './constants/redesign'
-import { FloatingTabBar, TabBarPad } from './components/ui'
+import { FloatingTabBar } from './components/ui'
 import { font } from './constants/theme'
 import { REGION_TO_DUTY } from './constants/regions'
 import { EXPLORE_REVIEW } from './utils/exploreReview'
@@ -56,6 +56,7 @@ import ProviderScreen from './screens/ProviderScreen'
 import ProviderOnboardingScreen from './screens/ProviderOnboardingScreen'
 import MapScreen from './screens/MapScreen'
 import ExploreMapScreen from './screens/ExploreMapScreen'
+import { dutyWindowsFor } from './utils/dutyFacilityMatch'
 import AdminScreen from './screens/AdminScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import ProfileSetupScreen from './screens/ProfileSetupScreen'
@@ -357,10 +358,6 @@ const tabBar = StyleSheet.create({
 // ─── Redesign helpers (module scope, so nothing here can meet the TDZ rule) ───
 // The floating bar covers content; Keşfet and Profil keep their docked-bar layout by
 // padding for it. Home scrolls under the bar and pads its own content.
-function MaybeTabBarPad({ children }) {
-  return REDESIGN ? <TabBarPad>{children}</TabBarPad> : children
-}
-
 // The closing time of the user's own duty district, else the most common one today.
 // open_until varies by district (00:00 in the four big towns, 22:00 Lefke/İskele, 20:00
 // Karpaz, 19:00 Mesarya — scripts/gen-duty-roster-sql.mjs), so one island-wide "until"
@@ -563,6 +560,10 @@ export default function App() {
   // Rows are today's { region, open_until } — ~13 a day — so the tile can name the closing
   // time of the user's own district. `date` lets a foreground after midnight re-read.
   const [dutyToday, setDutyToday] = useState({ loaded: false, error: false, rows: [], date: null })
+  // Today's duty windows by facility id: during its window a duty pharmacy counts as OPEN for
+  // Şimdi açık and the Home open badge/filter, whatever its regular hours say (isOpenNow).
+  const dutyWindows = useMemo(() => dutyWindowsFor(dutyToday.rows, facilities, dutyToday.date),
+    [dutyToday.rows, dutyToday.date, facilities])
   const [dutyRetry, setDutyRetry] = useState(0)
   // Home's "Yürüyüş Rotaları" tile opens the Keşfet tab straight into routes mode. Cleared
   // whenever the tab bar is used, so a later plain visit opens the map as usual.
@@ -1512,7 +1513,8 @@ export default function App() {
       // `region`, not head:true+count. The coverage check needs the DISTRICTS, and a
       // head request returns no rows to count them from. It is ~13 rows a day.
       const [{ data: dutyToday, error: todayErr }, { data: dutyNewest, error: newestErr }] = await Promise.all([
-        supabase.from('duty_list').select('region, open_until').eq('duty_date', today),
+        // name + open_from too: dutyWindows matches each row to its facility (Şimdi açık).
+        supabase.from('duty_list').select('name, region, open_from, open_until').eq('duty_date', today),
         supabase.from('duty_list').select('duty_date').order('duty_date', { ascending: false }).limit(1),
       ])
       if (cancelled) return
@@ -1910,6 +1912,7 @@ export default function App() {
       />
     } else if (gateHealthList) {
       content = <HomeScreen
+            dutyWindows={dutyWindows}
         lang={lang}
         facilities={facilities}
         dutyFacilityId={dutyFacilityId}
@@ -2523,6 +2526,7 @@ export default function App() {
 
         {activeTab === 'home' && (
           <HomeScreen
+            dutyWindows={dutyWindows}
             backRef={homeBackRef}
             lang={lang}
             facilities={facilities}
@@ -2626,6 +2630,7 @@ export default function App() {
                 // The map runs full height behind the floating tab bar; the screen lifts its own
                 // bottom panels, credits and the Google logo above it (no TabBarPad here).
                 underTabBar={REDESIGN}
+                dutyWindows={dutyWindows}
                 facilities={facilities}
                 dutyFacilityId={dutyFacilityId}
                 userLocation={userLocation}
@@ -2671,8 +2676,10 @@ export default function App() {
           <GuestProfile lang={lang} a={settingsActions} onCreateAccount={gateSignUp} />
         )}
         {activeTab === 'profile' && !(REDESIGN && isGuest(session)) && (
-          <MaybeTabBarPad>
           <ProfileScreen
+            // Full height behind the floating tab bar, like Home and Keşfet: the screen pads
+            // its own scroll and lifts its Save button above the bar (no TabBarPad here).
+            underTabBar={REDESIGN}
             settingsSlot={REDESIGN ? (({ onDeleteAccount }) => (
               <SettingsGroups lang={lang} a={{ ...settingsActions, onDeleteAccount }} />
             )) : null}
@@ -2683,7 +2690,6 @@ export default function App() {
             onLangChange={newLang => setProfile(prev => ({ ...prev, preferred_language: newLang }))}
             onAvatarChange={url => setProfile(prev => ({ ...prev, avatar_url: url }))}
           />
-          </MaybeTabBarPad>
         )}
 
         {(() => {

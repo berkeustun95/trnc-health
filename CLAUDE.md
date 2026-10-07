@@ -1,15 +1,5 @@
 # ADA — North Cyprus assistant
 
-> ## ⛔ RELEASE FREEZE — runtime 1.3.0 and 1.2.0 (since 2026-10-04, until Berke says "unfreeze")
-> - **NO production OTA** on 1.3.0 or 1.2.0. `npm run ota` refuses while `release-freeze.json` has
->   `"frozen": true` (`scripts/check-release-freeze.mjs`, first in the chain). `eas update` directly
->   was already forbidden — it would bypass the guard.
-> - Work continues normally on branches and the **PREVIEW channel** (`npm run ota:preview`).
-> - Exception: an **urgent bug fix only**, with Berke's **explicit OK in chat**, Preview first, then
->   `FREEZE_OVERRIDE=1 npm run ota -- --message "…"` (Berke hands over the override). Log it in the journal.
-> - Why: redesign go-live — Android 1.3.0 staged at 20%, iOS 1.3.0 in review (vault `redesign-go-live-runbook.md`).
-> - Unfreeze (Berke's word only): set `"frozen": false` in `release-freeze.json` and remove this block, one commit.
-
 ## What this is
 ADA is a TRNC super-app for residents and newcomers: facilities directory and duty roster, Explore
 (places, walking routes), events, accommodation, hotels, towing, home services, pets, Student Hub and
@@ -57,6 +47,13 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   wrapper runs `check-module-flags.mjs` (also `npm run check:flags`); `git push` and `eas build` are
   covered by `.githooks/pre-push` and `eas-build-pre-install`. Fresh clone: `npm run setup:hooks`.
 - **OTA only reaches the production build** — never a preview APK; test OTA on the Play Store install.
+- **Every production OTA goes to PREVIEW first** (`npm run ota:preview`) and gets Berke's device check
+  there before `npm run ota` (standing rule since the 2026-10-06 unfreeze). A freeze, when on, is
+  `release-freeze.json` `"frozen": true` — `npm run ota` then refuses (`FREEZE_OVERRIDE=1` from Berke only).
+- **Nothing Previewed stays off main.** Publish Preview only from a branch that contains main. `npm run ota`
+  refuses while any Preview update on this runtime's major.minor was built from work HEAD lacks
+  (`scripts/check-preview-lineage.mjs`); a Preview Berke explicitly dropped: `PREVIEW_LINEAGE_OVERRIDE=1`
+  (he hands it over; log it). 2026-10-06: a Previewed Profile fix lived only on `fix/open-now-json`.
 - **Native build** only for `app.config.js`, native deps, permissions, icons, SDK: `eas build --platform
   android --profile production`, AAB to Play closed testing by hand (Play key = listing only).
 - **iOS:** `npm run ios:build` / `ios:submit`, no Apple login; they source `~/.appstoreconnect/ada-eas.env`
@@ -68,8 +65,10 @@ Incident backstories for the rules below: `~/ObsidianVault/10-ada/claude-md-less
   kept (accepted review risk), background location off. Verify: `npx expo config --type introspect`.
 - **EAS env vars:** `eas env:create` (not `secret:create`); changes need a native build.
 - **Two Maps keys, two GCP projects** (Android reads the key from the BUILD; an OTA cannot change it):
-  production EAS env = `AIzaSyDa…0Nlg` in **ada-app-499617** ("Maps Platform API Key") — ⚠ **UNRESTRICTED**
-  (no app restriction, 35 APIs), see pending; preview EAS env + local `.env` = `AIzaSyDb…uNu8` in
+  production EAS env = `AIzaSyDa…0Nlg` in **ada-app-499617** ("Maps Platform API Key"), **restricted
+  2026-10-06**: Android apps `com.berkeustun95.ada` + upload SHA-1 + Play App Signing SHA-1, API = Maps
+  SDK for Android only (a Places call now gets 403 `API_KEY_ANDROID_APP_BLOCKED`; nothing else may use
+  this key, iOS uses Apple Maps). A new signing key needs its SHA-1 added FIRST; preview EAS env + local `.env` = `AIzaSyDb…uNu8` in
   **My First Project** (`project-958a71e2-96dc-4371-942`), Android apps: `com.berkeustun95.ada.preview` +
   preview SHA-1. Blank map, no error = the build's key refuses that package/SHA-1. Read which key a
   build uses with `eas env:list --environment <env>`, never from `.env` (they differ). Vault `play-console-status.md`.
@@ -83,6 +82,7 @@ Every one is manual (`workflow_dispatch`) and dry unless `-f apply=true`; secret
 - Gişe Kıbrıs sync: `gisekibris-feed` (also daily 04:15 UTC). Health: its Content health step.
 - Hotels: `hotels-import -f file=data/kitob/<f>.csv -f list_date=YYYY-MM-DD`, `hotels-window -f mode=--apply|--rollback`,
   geocoding `hotels-geocode -f limit=N` (Places calls are billed; an apply commits google-pins.csv back).
+  HotelRunner links: `hotelrunner-links -f mode=--apply` (writes `data/kitob/hotelrunner-links.json`, clears unlisted hotels).
 - Walking legs: `walking-legs` (a flagged leg exits 1 by design; it is never written).
 - Novest: `novest-import`, `novest-images` (metadata also syncs on cron via the sync-novest function).
 - Apple user deletion: `revoke-apple-token -f user_id=<uuid>` BEFORE deleting the user.
@@ -306,14 +306,16 @@ Headline + type (OTA / native / hotfix / refactor) · "What changed" by area · 
 "→ architecture.md updates needed" if structural.
 
 ## Open windows / pending (vault = `~/ObsidianVault/10-ada/`)
-- **Lock down the production Maps key `0Nlg`** (follow-up to the Explore restyle launch, 2026-10-04):
-  restrict to Android apps `com.berkeustun95.ada` + upload SHA-1 `3C:9A:…:BF:5E` + the Play App Signing
-  SHA-1 (Play Console → App integrity), API = Maps SDK for Android only. Get the Play signing SHA-1 FIRST
-  or production maps go blank. Click list for Berke; he does the console.
+- **Next store release (not before "unfreeze") — Play Console warnings, 2026-10-05:**
+  - **DEX code optimization below threshold** (Play deadline **Feb 2027**): enable R8 minify/obfuscation for
+    Android release builds and upload the deobfuscation mapping file with each AAB. Native change → device pass.
+  - **Deprecated edge-to-edge APIs** → address with the next Expo SDK upgrade (SDK bump = ask first).
+  - **Large-screen orientation/resizability** → part of the tablet backlog (`supportsTablet: false`, portrait-only today).
 - 1.2.0 permission strings (Play health declaration drafted when the build is scheduled; Android RTL device check) → `2026-09-20_native-permission-strings-PARKED.md`.
 - Store-update force tier untested on both platforms → vault `claude-md-lessons.md`.
 - Play listing pushed 2026-09-28: check Console for the review verdict.
 - Student Hub stale-affiliation recovery test (window closes when `20261027` applies) → `claude-md-lessons.md`.
 - Student Hub message push deep link, WARM and COLD, on the Play Store build → same file.
-- Student Hub terms re-ask (SOP step 6): `studentHub` is `true` in flags.js; decision unrecorded.
+- Student Hub terms re-ask (SOP step 6): DECIDED + shipped in 1.3.0 — `StudentHubTermsGate` for signed-in
+  non-guest accounts on terms < `STUDENT_HUB_TERMS_MIN` (2026-09-20); vault `redesign-go-live-runbook.md`.
 - Image messaging safety scope → `2026-09-20_image-messaging-safety-scope-PARKED.md`.

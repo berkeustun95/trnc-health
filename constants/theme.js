@@ -290,6 +290,13 @@ export const press = { small: 0.7, card: 0.85 }
 // 44pt: the floor for every tap target in components/ui.
 export const TAP = 44
 
+// Android draws edge-to-edge: a list that fills its screen runs under the navigation bar, so
+// its last row needs the bottom inset plus a normal gap to end above it. (The Konaklama
+// cut-off of 2026-10-04/05 was NOT the inset, which read 48 on device: Oteller's wrapper
+// was 130 px taller than its pane; see HotelsTab `root`.)
+export const LIST_END_GAP = 24
+export const listBottomPad = insets => insets.bottom + LIST_END_GAP
+
 // ─── Readable foreground on an arbitrary colour ─────────────────────────────
 //
 // WHY THIS EXISTS. A partner supplies their own brand hex and it is drawn as a filled

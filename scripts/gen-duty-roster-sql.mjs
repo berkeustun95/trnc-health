@@ -33,6 +33,12 @@ export const REGION_MAP = {
 const lines = readFileSync(csvPath, 'utf8').replace(/^﻿/, '').split(/\r?\n/).filter(l => l !== '')
 if (lines[0] !== 'duty_date,region,pharmacy_name,source_page') throw new Error(`unexpected header: ${lines[0]}`)
 
+// KTEB roster typos, corrected at load so duty_list carries the pharmacy's real name and the
+// app's coordinate lookup (pharmacy_coords, facilities) matches it. Same phone and address.
+const NAME_FIXES = new Map([
+  ['ÖZVOL ECZANESİ', 'ÖZYOL ECZANESİ'],   // 20261079 renamed the 2026-27 rows already loaded
+])
+
 const rows = []
 const skipped = []
 for (const [i, line] of lines.slice(1).entries()) {
@@ -42,7 +48,8 @@ for (const [i, line] of lines.slice(1).entries()) {
   const [date, code, rawName] = f
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`line ${i + 2}: bad date ${date}`)
   if (!REGION_MAP[code]) throw new Error(`line ${i + 2}: unknown region code ${code}`)
-  const name = rawName.normalize('NFC').replace(/\s+/g, ' ').trim()
+  const cleaned = rawName.normalize('NFC').replace(/\s+/g, ' ').trim()
+  const name = NAME_FIXES.get(cleaned) ?? cleaned
   if (!name) { skipped.push(`${date} ${code}`); continue }
   rows.push({ date, code, name })
 }
