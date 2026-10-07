@@ -1507,7 +1507,7 @@ const translations = {
     //   slug, but English text on an RTL surface. This key sits on a LIVE screen (the
     //   beaches path), so it is an OTA blocker, not a nice-to-have.
     checkinCta: 'Check in',
-    // Check-ins (20261069, CHECKINS gate).
+    // Check-ins (20261078, CHECKINS gate).
     checkinTab: "Check-ins",
     checkinFeedTitle: "Recent check-ins",
     checkinPlaceTitle: "Recent check-ins",
@@ -3322,7 +3322,7 @@ const translations = {
     // "I'm here" — a status, not a transaction, which is what a check-in is.
     // Not 'Giriş yap' (collides with log-in) and not 'Check-in yap' (half-English).
     checkinCta: 'Buradayım',
-    // Check-ins (20261069, CHECKINS gate).
+    // Check-ins (20261078, CHECKINS gate).
     checkinTab: "Check-in'ler",
     checkinFeedTitle: "Son Check-in'ler",
     checkinPlaceTitle: "Son check-in'ler",
@@ -5110,7 +5110,7 @@ const translations = {
     // "I am here" — a status. NOT تسجيل الوصول ("register arrival"), the
     // transactional framing rejected in Turkish.
     checkinCta: 'أنا هنا',
-    // Check-ins (20261069, CHECKINS gate).
+    // Check-ins (20261078, CHECKINS gate).
     checkinTab: "تسجيلات الحضور",
     checkinFeedTitle: "أحدث تسجيلات الحضور",
     checkinPlaceTitle: "أحدث تسجيلات الحضور",
@@ -6862,7 +6862,7 @@ const translations = {
     exploreSavedTitle: 'Сохранённые места',
     // "I am here" — a status, matching Buradayım.
     checkinCta: 'Я здесь',
-    // Check-ins (20261069, CHECKINS gate).
+    // Check-ins (20261078, CHECKINS gate).
     checkinTab: "Отметки",
     checkinFeedTitle: "Последние отметки",
     checkinPlaceTitle: "Последние отметки",
@@ -8617,7 +8617,7 @@ const translations = {
     exploreSavedTitle: 'Αποθηκευμένα μέρη',
     // "I am here" — a status, matching Buradayım.
     checkinCta: 'Είμαι εδώ',
-    // Check-ins (20261069, CHECKINS gate).
+    // Check-ins (20261078, CHECKINS gate).
     checkinTab: "Check-in",
     checkinFeedTitle: "Πρόσφατα check-in",
     checkinPlaceTitle: "Πρόσφατα check-in",
@@ -10370,7 +10370,7 @@ const translations = {
     // "I am here". NOT « Je suis là » — colloquially commoner, but « là »
     // also means "there", and that ambiguity is wrong on a presence button.
     checkinCta: 'Je suis ici',
-    // Check-ins (20261069, CHECKINS gate).
+    // Check-ins (20261078, CHECKINS gate).
     checkinTab: "Check-ins",
     checkinFeedTitle: "Check-ins récents",
     checkinPlaceTitle: "Check-ins récents",
@@ -12120,7 +12120,7 @@ const translations = {
     exploreSavedTitle: 'Lugares guardados',
     // "I am here" — a status, matching Buradayım.
     checkinCta: 'Estoy aquí',
-    // Check-ins (20261069, CHECKINS gate).
+    // Check-ins (20261078, CHECKINS gate).
     checkinTab: "Check-ins",
     checkinFeedTitle: "Check-ins recientes",
     checkinPlaceTitle: "Check-ins recientes",
@@ -13870,7 +13870,7 @@ const translations = {
     // "I am here". NOT "Einchecken" — the transactional framing rejected
     // in Turkish.
     checkinCta: 'Ich bin hier',
-    // Check-ins (20261069, CHECKINS gate).
+    // Check-ins (20261078, CHECKINS gate).
     checkinTab: "Check-ins",
     checkinFeedTitle: "Neueste Check-ins",
     checkinPlaceTitle: "Neueste Check-ins",
@@ -15619,7 +15619,7 @@ const translations = {
     exploreSavedTitle: 'مکان‌های ذخیره‌شده',
     // "I am here", pronoun dropped — natural and shorter for a button.
     checkinCta: 'اینجا هستم',
-    // Check-ins (20261069, CHECKINS gate).
+    // Check-ins (20261078, CHECKINS gate).
     checkinTab: "ثبت حضورها",
     checkinFeedTitle: "تازه‌ترین ثبت حضورها",
     checkinPlaceTitle: "تازه‌ترین ثبت حضورها",

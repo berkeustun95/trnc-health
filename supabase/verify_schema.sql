@@ -40,6 +40,8 @@ WITH report AS (
   SELECT 'A-table' section, e.m migration, e.o object,
          CASE WHEN to_regclass('public.'||e.o) IS NOT NULL THEN 'OK' ELSE 'MISSING' END status
   FROM (VALUES
+    -- Check-ins (1078): registered ahead of the apply; red until it runs.
+    ('1078_checkins','checkins'),
     ('capture_1','profiles'),('capture_1','facilities'),
     ('capture_1','reviews'),('capture_1','questions'),('capture_1','answers'),
     ('capture_1','notifications'),('capture_1','claim_requests'),
@@ -119,6 +121,10 @@ WITH report AS (
                 WHERE ic.table_schema='public' AND ic.table_name=e.t AND ic.column_name=e.c)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Check-ins (1078): registered ahead of the apply; red until it runs.
+    ('1078_checkins','profiles','checkins_public'),
+    ('1078_checkins','profiles','checkins_notice_at'),
+    ('1078_checkins','profiles','checkins_notice_version'),
     ('0621_provider_verification','facility_change_requests','rejection_reason'),
     ('0621_provider_verification','claim_requests','rejection_reason'),
     ('0712_ugc_moderation','reviews','hidden_at'),
@@ -313,6 +319,12 @@ WITH report AS (
                 WHERE n.nspname='public' AND p.proname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Check-ins (1078): registered ahead of the apply; red until it runs.
+    ('1078_checkins','check_in'),
+    ('1078_checkins','get_checkin_feed'),
+    ('1078_checkins','accept_checkin_notice'),
+    ('1078_checkins','metres_between'),
+    ('1078_checkins','guard_checkin_notice_columns'),
     ('0623_cross_user_notifications','insert_notification'),
     ('0628/0705_search_content','search_content'),
     ('0714_block_anonymous_writes','is_anonymous_session'),
@@ -461,6 +473,8 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_trigger tg WHERE NOT tg.tgisinternal AND tg.tgname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Check-ins (1078): registered ahead of the apply; red until it runs.
+    ('1078_checkins','guard_checkin_notice_columns'),
     ('0701_rate_limits','enforce_question_limit'),
     ('capture_4/0712','enforce_report_rate_limit'),
     ('capture_4/0712','guard_profile_ban'),
@@ -517,6 +531,11 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Check-ins (1078): registered ahead of the apply; red until it runs.
+    ('1078_checkins','checkins_pkey'),
+    ('1078_checkins','checkins_one_per_day'),
+    ('1078_checkins','checkins_user_id_fkey'),
+    ('1078_checkins','checkins_place_id_fkey'),
     ('0731_garages_directory','facilities_type_check'),
     ('0731_garages_directory','facilities_service_types_values_check'),
     ('0804_grooming_multi_category','facilities_service_types_type_check'),
@@ -802,6 +821,10 @@ WITH report AS (
          CASE WHEN EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=e.o)
               THEN 'OK' ELSE 'MISSING' END
   FROM (VALUES
+    -- Check-ins (1078): registered ahead of the apply; red until it runs.
+    ('1078_checkins','checkins_feed_idx'),
+    ('1078_checkins','checkins_place_feed_idx'),
+    ('1078_checkins','checkins_user_recent_idx'),
     ('0702_job_postings','job_postings_owner_idx'),
     ('0702_job_postings','job_postings_board_idx'),
     ('0712_ugc_moderation','content_reports_pending_idx'),
@@ -903,6 +926,10 @@ WITH report AS (
                   AND a.privilege_type='EXECUTE' AND r.rolname='authenticated')
               THEN 'OK' ELSE 'CHECK (no explicit grant)' END
   FROM (VALUES
+    -- Check-ins (1078): registered ahead of the apply; red until it runs.
+    ('1078_checkins','check_in'),
+    ('1078_checkins','get_checkin_feed'),
+    ('1078_checkins','accept_checkin_notice'),
     ('0731_garages_directory','create_garage_facility'),
     ('0802_update_garage_facility','update_garage_facility'),
     ('0725_grooming_directory','create_grooming_facility'),
@@ -3920,6 +3947,52 @@ WITH report AS (
                                AND roles = '{authenticated}' AND qual = '(user_id = auth.uid())')
                    AND bool_or(policyname = 'no_anon_delete_notifications' AND permissive = 'RESTRICTIVE' AND cmd = 'DELETE')
                   FROM pg_policies WHERE schemaname = 'public' AND tablename = 'notifications'), false)
+    -- ── 1078: check-ins ──────────────────────────────────────────────────────────
+    -- (1) RLS on, exactly two guest-guarded OWNER policies (read + delete), no client
+    --     INSERT/UPDATE, anon nothing. The feed is the only way to see anyone else's.
+    UNION ALL SELECT '1078_checkins','checkins: RLS on, 2 guest-guarded owner policies, no client insert/update, anon nothing',
+      COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.checkins')), false)
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='checkins') = 2
+      AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='checkins'
+            AND qual LIKE '%auth.uid()%' AND qual LIKE '%is_anonymous_session()%') = 2
+      AND COALESCE(NOT has_table_privilege('anon', to_regclass('public.checkins'), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+               AND NOT has_table_privilege('authenticated', to_regclass('public.checkins'), 'INSERT,UPDATE,TRUNCATE')
+               AND has_table_privilege('authenticated', to_regclass('public.checkins'), 'SELECT')
+               AND has_table_privilege('authenticated', to_regclass('public.checkins'), 'DELETE'), false)
+    -- (2) No location column on the row, ever (derived, not a name list).
+    UNION ALL SELECT '1078_checkins','checkins has no coordinate/accuracy column',
+      (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='checkins'
+        AND (column_name ILIKE '%lat%' OR column_name ILIKE '%lng%' OR column_name ILIKE '%lon%' OR column_name ILIKE '%accura%')) = 0
+      AND to_regclass('public.checkins') IS NOT NULL
+    -- (3) Both FKs CASCADE (account deletion; never SET NULL).
+    UNION ALL SELECT '1078_checkins','checkins: user_id and place_id ON DELETE CASCADE',
+      (SELECT string_agg(conname || '=' || confdeltype::text, ',' ORDER BY conname) FROM pg_constraint
+        WHERE conrelid = to_regclass('public.checkins') AND contype = 'f')
+      IS NOT DISTINCT FROM 'checkins_place_id_fkey=c,checkins_user_id_fkey=c'
+    -- (4) The rules live in check_in(): 150 m, accuracy (0, 50], TRNC day, guest guard.
+    UNION ALL SELECT '1078_checkins','check_in: DEFINER, guest-guarded, 150 m, accuracy <= 50, Europe/Istanbul day',
+      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%is_anonymous_session()%'
+           AND pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%v_place.longitude) > 150 THEN%'
+           AND pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%p_accuracy <= 50%'
+           AND pg_get_functiondef(to_regprocedure('public.check_in(uuid,double precision,double precision,double precision)')) LIKE '%Europe/Istanbul%', false)
+    -- (5) The feed's visibility filter: the author's switch, blocks both ways, ban, guest guard.
+    UNION ALL SELECT '1078_checkins','get_checkin_feed: DEFINER, checkins_public + blocks + ban + guest guard',
+      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer)')) LIKE '%p.checkins_public IS TRUE%'
+           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer)')) LIKE '%FROM blocks b%'
+           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer)')) LIKE '%ugc_banned_until%'
+           AND pg_get_functiondef(to_regprocedure('public.get_checkin_feed(uuid,timestamp with time zone,uuid,integer)')) LIKE '%is_anonymous_session()%', false)
+    -- (6) checkins_public has NO DEFAULT (decided once, at consent, by DOB). A DEFAULT
+    --     added later would silently publish every new account. A DEFAULT creates no object.
+    UNION ALL SELECT '1078_checkins','profiles.checkins_public: nullable, NO DEFAULT',
+      COALESCE((SELECT is_nullable = 'YES' AND column_default IS NULL FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='profiles' AND column_name='checkins_public'), false)
+    -- (7) The adult-only default lives in accept_checkin_notice, and only fills a NULL.
+    UNION ALL SELECT '1078_checkins','accept_checkin_notice: DEFINER, COALESCE(checkins_public, adult by DOB)',
+      COALESCE((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.accept_checkin_notice(text)')), false)
+      AND COALESCE(pg_get_functiondef(to_regprocedure('public.accept_checkin_notice(text)')) LIKE '%COALESCE(p.checkins_public,%'
+           AND pg_get_functiondef(to_regprocedure('public.accept_checkin_notice(text)')) LIKE '%interval ''18 years''%', false)
   ) z
 
   UNION ALL

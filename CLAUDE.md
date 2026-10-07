@@ -274,10 +274,10 @@ Plan: `~/ObsidianVault/10-ada/2026-09-21_social-auth.md`.
     `WAITLIST_BLAST_DONE` in `check-module-flags.mjs`.
 Steps 6 and 10 are enforced by `check-module-flags.mjs`; the rest rely on this list.
 
-## Check-ins go-live (ordered — approved 2026-10-02; app code on main via `feat/explore-v2`, migration 20261069 + its verify_schema/ledger entries + `scripts/test-checkins-*.mjs` on `feat/checkins-db`)
+## Check-ins go-live (ordered — approved 2026-10-02; everything on `feat/checkins-ready`: app code, migration 20261078 + its verify_schema/ledger entries, `scripts/test-checkins-*.mjs`)
 Policy draft on `docs/checkins-privacy`; store-form answers in vault `2026-09-24_store-privacy-forms-AS-ENTERED.md`.
 1. **Redesign live first** (`REDESIGN_LIVE`): the legacy place page keeps Coming Soon.
-2. **Show Berke the SQL** (`20261069_checkins.sql`, on `feat/checkins-db`; lands on main by `git checkout feat/checkins-db -- <files>` the day it is applied) → wait for his "go" → apply → `verify_schema.sql`
+2. **Show Berke the SQL** (`20261078_checkins.sql` — renumbered from 20261069 on 2026-10-04 so file order = apply order; lands on main with the branch the day it is applied) → wait for his "go" → apply → `verify_schema.sql`
    → check the live-only profiles triggers (`guard_profile_ban`, `check_profile_name_content`) don't
    block `accept_checkin_notice`'s update; report. Re-run `scripts/test-checkins-{sql,client}.mjs` first.
 3. Set `CHECKINS_PREVIEW = true` (`constants/redesign.js`), **`npm run ota:preview`** → device pass on the preview build (Turkish; Harita / Liste / Check-in'ler at 320dp).
