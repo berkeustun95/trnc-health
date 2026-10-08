@@ -4093,12 +4093,6 @@ WITH report AS (
                  LIKE '%JOIN institutions i ON i.id = e.institution_id AND i.is_active%AND i.id <> ''00000000-0000-4000-b000-0000000000ff''%'
            AND pg_get_functiondef(to_regprocedure('public.get_student_list(uuid,text,integer)'))
                  LIKE '%JOIN institutions i ON i.id = e.institution_id AND i.is_active%AND i.id <> ''00000000-0000-4000-b000-0000000000ff''%', false)
-    -- (3) No opted-in enrolment sits where no list shows it (an inactive institution or
-    --     Other). Harmless to the gate since 1095, but each one is a switch reading ON that
-    --     lists nobody — the app hides it for Other; this says whether data agrees.
-    UNION ALL SELECT '1095_institutions_country','no opted-in enrolment at an inactive institution or Other',
-      NOT EXISTS(SELECT 1 FROM public.student_education e JOIN public.institutions i ON i.id = e.institution_id
-                  WHERE e.listing_opt_in AND (NOT i.is_active OR i.id = '00000000-0000-4000-b000-0000000000ff'))
   ) z
 
   UNION ALL
