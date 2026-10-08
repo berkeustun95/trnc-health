@@ -293,9 +293,6 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('profiles', 'terms_locale', false, NULL, 'text'),
     ('profiles', 'marketing_opt_in_at', false, NULL, 'timestamp with time zone'),
     ('profiles', 'route_badges_public', true, 'true', 'boolean'),
-    ('profiles', 'checkins_public', false, NULL, 'boolean'),
-    ('profiles', 'checkins_notice_at', false, NULL, 'timestamp with time zone'),
-    ('profiles', 'checkins_notice_version', false, NULL, 'text'),
     ('facilities', 'id', true, 'gen_random_uuid()', 'uuid'),
     ('facilities', 'name', true, NULL, 'text'),
     ('facilities', 'type', true, NULL, 'text'),
@@ -696,13 +693,7 @@ WITH expected (tbl, col, is_notnull, dflt, typ) AS (VALUES
     ('hotels', 'description_i18n', false, NULL, 'jsonb'),
     ('hotels', 'kitob_page_url', false, NULL, 'text'),
     ('hotels', 'gallery_urls', false, NULL, 'text[]'),
-    ('hotels', 'photo_credit', false, NULL, 'text'),
-    ('checkins', 'id', true, 'gen_random_uuid()', 'uuid'),
-    ('checkins', 'user_id', true, NULL, 'uuid'),
-    ('checkins', 'place_id', true, NULL, 'uuid'),
-    ('checkins', 'checked_in_on', true, NULL, 'date'),
-    ('checkins', 'created_at', true, 'now()', 'timestamp with time zone'),
-    ('checkins', 'display_name_snapshot', true, NULL, 'text')
+    ('hotels', 'photo_credit', false, NULL, 'text')
 ),
 expected_constraint (cname, litsig, colsig) AS (VALUES
     ('ad_banners_advertiser_check', '0', 'advertiser_name'),
@@ -745,10 +736,6 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('bus_routes_destination_district_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'destination_district'),
     ('bus_routes_origin_district_check', 'famagusta|iskele|karpaz|kyrenia|lefke|morphou|nicosia', 'origin_district'),
     ('bus_routes_pkey', '', ''),
-    ('checkins_one_per_day', '', 'checked_in_on|place_id|user_id'),
-    ('checkins_pkey', '', 'id'),
-    ('checkins_place_id_fkey', '', ''),
-    ('checkins_user_id_fkey', '', ''),
     ('claim_requests_facility_id_fkey', '', 'facility_id|id'),
     ('claim_requests_pkey', '', 'id'),
     ('claim_requests_requester_id_fkey', '', 'id|requester_id'),
@@ -1042,9 +1029,6 @@ expected_constraint (cname, litsig, colsig) AS (VALUES
     ('walking_routes_source_source_id_key', '', 'source|source_id')
 ),
 expected_index (iname) AS (VALUES
-    ('checkins_feed_idx'),
-    ('checkins_place_feed_idx'),
-    ('checkins_user_recent_idx'),
     ('content_reports_content_idx'),
     ('content_reports_pending_idx'),
     ('conversation_attempts_rate_idx'),
