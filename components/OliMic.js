@@ -43,6 +43,10 @@ export function useVoiceInput({ lang, getText, onText }) {
   const session = useRef({ locale: null, onDevice: false, base: '' })
 
   useEffect(() => {
+    // A language change re-probes from scratch: never keep the previous language's locale.
+    setAvailable(false)
+    setListening(false)
+    session.current = { locale: null, onDevice: false, base: '' }
     const mod = loadSpeech()
     const tag = RECOGNIZER_LOCALE[lang] ?? RECOGNIZER_LOCALE.English
     if (!mod || !mod.isRecognitionAvailable()) return
@@ -77,12 +81,20 @@ export function useVoiceInput({ lang, getText, onText }) {
         if (['not-allowed', 'language-not-supported', 'service-not-allowed'].includes(e.error)) setAvailable(false)
       }),
     ]
-    return () => { alive = false; subs.forEach(s => s.remove()); mod.abort() }
+    return () => { alive = false; mod.abort(); subs.forEach(s => s.remove()); setListening(false) }
   }, [lang])
+
+  // OliSearchSheet stays mounted when closed (only the Modal's children unmount), so closing
+  // must stop the recognizer explicitly.
+  function abort() {
+    if (!listening) return
+    loadSpeech()?.abort()
+    setListening(false)
+  }
 
   async function toggle() {
     const mod = loadSpeech()
-    if (!mod) return
+    if (!mod || !session.current.locale) return
     if (listening) { mod.stop(); return }
     const perm = await mod.requestPermissionsAsync()
     if (!perm.granted) { setAvailable(false); return }
@@ -96,7 +108,7 @@ export function useVoiceInput({ lang, getText, onText }) {
     })
   }
 
-  return { available, listening, toggle }
+  return { available, listening, toggle, abort }
 }
 
 export function MicButton({ lang, listening, onPress }) {

@@ -56,7 +56,7 @@ export default function OliSearchSheet({ lang, userLocation, onNavigate, onOpenR
   const voice = useVoiceInput({ lang, getText: () => queryRef.current, onText: setQuery })
 
   const openSheet = () => { setQuery(''); setPicked(null); setSearch({ status: 'idle', rows: [] }); setOpen(true) }
-  const closeSheet = () => { Keyboard.dismiss(); reqId.current++; setOpen(false) }
+  const closeSheet = () => { Keyboard.dismiss(); voice.abort(); reqId.current++; setOpen(false) }
   if (openRef) openRef.current = openSheet
   if (closeRef) closeRef.current = closeSheet
 
