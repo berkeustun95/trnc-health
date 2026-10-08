@@ -641,3 +641,12 @@ export const CONNECTIVITY_LIVE = false
 // Needs the 1.2.0 binary: the native modules behind both buttons are absent from every
 // build before it, and runtimeVersion 1.2.0 is what keeps this JS off those installs.
 export const SOCIAL_AUTH_LIVE = true
+
+// ─── ASK OLI VOICE INPUT ────────────────────────────────────────────────────
+// ADA's own mic in the Ask Oli field (components/OliMic.js, expo-speech-recognition). Off =
+// the keyboard-mic hint, which is also the fallback when the language or permission is not
+// there. NEEDS A NATIVE BUILD: the module and RECORD_AUDIO / the iOS mic + speech strings
+// exist only in builds from feat/voice-input on; OliMic also checks the module is present,
+// so a flip reaching an older binary shows the hint instead of crashing. Before flipping:
+// privacy line on getadaapp.com/privacy + store Audio answers (vault 2026-10-08 note).
+export const VOICE_INPUT = false

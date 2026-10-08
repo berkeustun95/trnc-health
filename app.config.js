@@ -120,8 +120,19 @@ export default {
           // If image messaging is dropped, set this to false. See
           // ~/ObsidianVault/10-ada/2026-09-20_native-permission-strings-PARKED.md
           cameraPermission: 'ADA uses your camera so you can take photos for your messages.',
-          // false also puts RECORD_AUDIO in blockedPermissions. No audio anywhere in the app.
-          microphonePermission: false,
+          // microphonePermission deliberately UNSET: expo-speech-recognition below owns the
+          // mic string (one source). `false` here would block RECORD_AUDIO and delete it.
+        },
+      ],
+      [
+        'expo-speech-recognition',
+        {
+          // Ask Oli voice input (VOICE_INPUT). ADA keeps no audio (no recordingOptions.persist);
+          // the OS speech service may process it off-device where on-device is unavailable.
+          microphonePermission:
+            'ADA uses your microphone only when you tap the mic in Ask Oli, to turn what you say into text. ADA never records or stores audio.',
+          speechRecognitionPermission:
+            'ADA uses speech recognition to turn what you say into text in Ask Oli. Apple may process your speech to do this; ADA never records or stores audio.',
         },
       ],
       [

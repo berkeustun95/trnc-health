@@ -260,6 +260,9 @@ const EXPECTED_SCALARS = {
   // testing the email-only screen would ship a sign-in screen that has silently dropped
   // Google and Apple — and locked every social-only account out with it.
   SOCIAL_AUTH_LIVE:      true,
+  // Ask Oli voice input. Baselined because a flip turns the microphone on for every user of
+  // a build that has the module, and the privacy policy + store Audio answers must be live first.
+  VOICE_INPUT:           false,
 }
 
 const src = readFileSync(resolve(ROOT, FLAGS_FILE), 'utf8')

@@ -9,6 +9,7 @@ import { resolveOliQuery, getIntent } from '../constants/oliIntents'
 import { coarseCoord } from '../utils/facilityUtils'
 import { CHIPS } from './OliGuide'
 import { IconButton, CategoryIcon, ErrorState, RowSkeleton } from './ui'
+import { useVoiceInput, MicButton } from './OliMic'
 
 // ─── Oli + search, one sheet (redesign) ──────────────────────────────────────
 // Replaces OliGuide when REDESIGN is on, with the SAME interface (openRef / closeRef /
@@ -50,6 +51,9 @@ export default function OliSearchSheet({ lang, userLocation, onNavigate, onOpenR
   const [search, setSearch] = useState({ status: 'idle', rows: [] })   // idle | loading | ok | error
   const reqId = useRef(0)
   const inputRef = useRef(null)
+  const queryRef = useRef('')
+  queryRef.current = query
+  const voice = useVoiceInput({ lang, getText: () => queryRef.current, onText: setQuery })
 
   const openSheet = () => { setQuery(''); setPicked(null); setSearch({ status: 'idle', rows: [] }); setOpen(true) }
   const closeSheet = () => { Keyboard.dismiss(); reqId.current++; setOpen(false) }
@@ -158,20 +162,21 @@ export default function OliSearchSheet({ lang, userLocation, onNavigate, onOpenR
             style={s.input}
             value={query}
             onChangeText={setQuery}
-            placeholder={t('hrOliField', lang)}
+            placeholder={t(voice.listening ? 'oliListening' : 'hrOliField', lang)}
             placeholderTextColor={colors.textSecondary}
             returnKeyType="search"
             accessibilityLabel={t('hrOliField', lang)}
           />
-          {!!query && (
+          {!!query && !voice.listening && (
             <IconButton icon="close-circle" iconSize={18} color={colors.textSecondary}
               onPress={() => setQuery('')} accessibilityLabel={t('uiClear', lang)} />
           )}
+          {voice.available && <MicButton lang={lang} listening={voice.listening} onPress={voice.toggle} />}
         </View>
 
         {!q && !picked ? (
           <View style={s.home}>
-            <KeyboardMicHint lang={lang} />
+            {!voice.available && <KeyboardMicHint lang={lang} />}
             <Text style={s.greeting}>{t('oliGreeting', lang)}</Text>
             <View style={s.chips}>
               {CHIPS.map(c => (
