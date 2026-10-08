@@ -2,6 +2,8 @@
   "ios": {
     "NSLocationWhenInUseUsageDescription": "ADA verwendet deinen Standort, um Orte, Dienste und Apotheken im Bereitschaftsdienst in deiner Nähe anzuzeigen.",
     "NSPhotoLibraryUsageDescription": "ADA verwendet deine Fotomediathek, damit du Fotos zu deinem Profil und deinen Nachrichten hinzufügen kannst – und zu den Angeboten, Events, Orten und Unternehmensseiten, die du teilst.",
-    "NSCameraUsageDescription": "ADA verwendet deine Kamera, damit du Fotos für deine Nachrichten aufnehmen kannst."
+    "NSCameraUsageDescription": "ADA verwendet deine Kamera, damit du Fotos für deine Nachrichten aufnehmen kannst.",
+    "NSMicrophoneUsageDescription": "ADA verwendet dein Mikrofon nur, wenn du im Oli-Feld auf das Mikrofon tippst, um das Gesagte in Text umzuwandeln. ADA nimmt nie Audio auf und speichert keins.",
+    "NSSpeechRecognitionUsageDescription": "ADA verwendet die Spracherkennung, um das Gesagte im Oli-Feld in Text umzuwandeln. Apple kann deine Sprache dafür verarbeiten; ADA nimmt nie Audio auf und speichert keins."
   }
 }
