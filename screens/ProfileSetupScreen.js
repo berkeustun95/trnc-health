@@ -63,12 +63,15 @@ import {
   RESIDENT_STATUSES, STUDENT_LEVELS, INSTITUTION_REQUIRED_LEVELS, RESIDENT_STATUS_STUDENT,
   RESIDENT_STATUS_LABEL_KEY, STUDENT_LEVEL_LABEL_KEY,
   DISPLAY_NAME_MAX, STEP_TITLE_KEY, HELP_ROW_LABEL_KEY,
-  STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE,
+  STUDY_YEAR_MIN, STUDY_END_YEAR_IN_FUTURE, TRNC_NATIONALITY_CODE,
 } from '../constants/profileGate'
 import { subjectOptions, studyYearOptions, studyYearCeiling } from '../utils/studyFields'
 // The wizard writes ENROLMENTS now, not the five profiles columns. Same module and the
 // same rules ProfileScreen uses, so the two writers cannot drift apart.
 import { enrolmentRow, isInstitutionCouplingBlock, profilesAffiliationClear } from '../utils/education'
+import {
+  useCountryInstitutions, countryOptions, countryLabel, institutionLabel, OTHER_INSTITUTION_ID,
+} from '../utils/institutions'
 
 // TWO steps. What used to be Steps 1 and 2 — the six required identity fields — is now
 // one screen; the old Step 3 (region, status, the student conditional) became Step 2.
@@ -311,7 +314,9 @@ export default function ProfileSetupScreen({
   const [status, setStatus] = useState(profile?.resident_status ?? null)
   const [level, setLevel] = useState(profile?.student_level ?? null)
   const [institution, setInstitution] = useState(null)
-  const [institutions, setInstitutions] = useState([])
+  // The picker lists one country at a time (utils/institutions); the TRNC first.
+  const [instCountry, setInstCountry] = useState(TRNC_NATIONALITY_CODE)
+  const instList = useCountryInstitutions(instCountry)
 
   // Steps 3–4.
   //
@@ -345,14 +350,6 @@ export default function ProfileSetupScreen({
     if (match) { setCc(match.code); setPhone(stored.slice(match.code.length).trim()) }
     else setPhone(stored)
   }, [profile?.phone])
-
-  useEffect(() => {
-    supabase.from('institutions')
-      .select('id, name, short_name')
-      .eq('is_active', true)
-      .order('sort_order')
-      .then(({ data }) => setInstitutions(data ?? []))
-  }, [])
 
   useEffect(() => {
     if (!MODULE_FLAGS.studentHub) return
@@ -411,7 +408,7 @@ export default function ProfileSetupScreen({
     let cancelled = false
     supabase
       .from('student_education')
-      .select('id, institution_id, level, subject_id, study_start_year, study_end_year')
+      .select('id, institution_id, level, subject_id, study_start_year, study_end_year, institutions(name, short_name, country)')
       .eq('user_id', session.user.id)
       .is('study_end_year', null)
       .maybeSingle()
@@ -421,6 +418,7 @@ export default function ProfileSetupScreen({
         if (cancelled || !data) { seeded.current = true; return }
         setOpenEnrolment(data)
         setInstitution(data.institution_id ?? null)
+        setInstCountry(data.institutions?.country ?? TRNC_NATIONALITY_CODE)
         setSubjectId(data.subject_id ?? null)
         setStartYear(data.study_start_year ?? null)
         setEndYear(data.study_end_year ?? null)
@@ -792,7 +790,7 @@ export default function ProfileSetupScreen({
   const regionOptions = REGIONS.map(v => ({ value: v, label: t(REGION_LABEL_KEY[v], lang) }))
   const natOptions = NATIONALITIES.map(v => ({ value: v, label: getNatLabel(v, lang) }))
     .sort((a, b) => a.label.localeCompare(b.label))
-  const instOptions = institutions.map(i => ({ value: i.id, label: i.short_name ? `${i.name} (${i.short_name})` : i.name }))
+  const instOptions = (instList.rows ?? []).map(i => ({ value: i.id, label: institutionLabel(i) }))
   const ccOptions = COUNTRY_CODES.map(c => ({ value: c.code, label: `${c.code}  ${c.label}` }))
   // NATIVE names, never translated ones: somebody who cannot read the current language
   // has to be able to find their own in this list.
@@ -986,10 +984,19 @@ export default function ProfileSetupScreen({
                   label={t('pgInstitution', lang)}
                   hint={openEnrolment ? t('pgInstitutionLockedHint', lang) : undefined}
                 >
+                  <View style={s.instCountryRow}>
+                    <SelectField
+                      value={countryLabel(instCountry, lang)}
+                      placeholder={t('pgInstitutionCountry', lang)}
+                      onPress={() => { if (!openEnrolment) setPicker('instCountry') }}
+                      disabled={!!openEnrolment}
+                    />
+                  </View>
                   <SelectField
-                    value={instOptions.find(o => o.value === institution)?.label || ''}
+                    value={(openEnrolment ? institutionLabel(openEnrolment.institutions) : '')
+                      || instOptions.find(o => o.value === institution)?.label || ''}
                     placeholder={t('pgInstitutionSearch', lang)}
-                    onPress={() => { if (!openEnrolment) setPicker('inst') }}
+                    onPress={() => { if (openEnrolment) return; if (instList.failed) instList.retry(); setPicker('inst') }}
                     disabled={!!openEnrolment}
                   />
                 </Field>
@@ -1125,6 +1132,14 @@ export default function ProfileSetupScreen({
       <SearchModal lang={lang} visible={picker === 'cc'} searchable title={t('pgPhoneCountry', lang)}
         searchPlaceholder={t('pgNationalitySearch', lang)} options={ccOptions}
         value={cc} onSelect={v => { setCc(v); setPicker(null) }} onClose={() => setPicker(null)} />
+      <SearchModal lang={lang} visible={picker === 'instCountry'} title={t('pgInstitutionCountry', lang)}
+        options={countryOptions(lang)} value={instCountry}
+        // Other belongs to every country, so it survives a country change; a real university does not.
+        onSelect={v => {
+          if (v !== instCountry && institution !== OTHER_INSTITUTION_ID) setInstitution(null)
+          setInstCountry(v); setPicker(null)
+        }}
+        onClose={() => setPicker(null)} />
       <SearchModal lang={lang} visible={picker === 'inst'} searchable title={t('pgInstitution', lang)}
         searchPlaceholder={t('pgInstitutionSearch', lang)} options={instOptions}
         value={institution} onSelect={v => { setInstitution(v); setPicker(null) }} onClose={() => setPicker(null)} />
@@ -1231,6 +1246,7 @@ const legacyS = StyleSheet.create({
   selectPlaceholder: { color: colors.textSecondary },
   dobRow: { flexDirection: 'row', gap: 8 },
   phoneRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  instCountryRow: { marginBottom: 8 },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {

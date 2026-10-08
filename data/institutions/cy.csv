@@ -1,0 +1,13 @@
+source_key,name,city_name,website_url,source_url,note
+mesy:panepistimio-kiprou,University of Cyprus,Nicosia,https://www.ucy.ac.cy,https://www.highereducation.ac.cy/en/idrymata/panepistimio-kiprou,public
+mesy:tepak-en,Cyprus University of Technology,Limassol,https://www.cut.ac.cy,https://www.highereducation.ac.cy/en/idrymata/tepak-en,public
+mesy:anoichto-panepistimio-kyprou-en,Open University of Cyprus,Nicosia,https://www.ouc.ac.cy,https://www.highereducation.ac.cy/en/idrymata/anoichto-panepistimio-kyprou-en,public
+mesy:frederick-universities,Frederick University,,https://frederick.ac.cy,https://www.highereducation.ac.cy/en/idrymata/frederick-universities,private
+mesy:european-university-cyprus-en,European University Cyprus,Nicosia,https://www.euc.ac.cy,https://www.highereducation.ac.cy/en/idrymata/european-university-cyprus-en,private
+mesy:panepistimio-lefkosias-en,University of Nicosia,Nicosia,https://www.unic.ac.cy,https://www.highereducation.ac.cy/en/idrymata/panepistimio-lefkosias-en,private
+mesy:neapolis-university-cyprus,Neapolis University Pafos,Paphos,https://www.nup.ac.cy,https://www.highereducation.ac.cy/en/idrymata/neapolis-university-cyprus,private
+mesy:uclan-panepistimio-en,University of Central Lancashire Cyprus,Larnaca,https://www.uclancyprus.ac.cy,https://www.highereducation.ac.cy/en/idrymata/uclan-panepistimio-en,private
+mesy:philips-university-en,Philips University,Nicosia,https://philipsuni.ac.cy,https://www.highereducation.ac.cy/en/idrymata/philips-university-en,private
+mesy:aucy-university-en,American University of Cyprus,Larnaca,https://www.aucy.ac.cy,https://www.highereducation.ac.cy/en/idrymata/aucy-university-en,private
+mesy:panepistimio-limassol-en,University of Limassol,,https://www.uol.ac.cy,https://www.highereducation.ac.cy/en/idrymata/panepistimio-limassol-en,private
+mesy:panepistimio-american-university-of-beirut-en,American University of Beirut – Mediterraneo,Paphos,https://www.aubmed.ac.cy,https://www.highereducation.ac.cy/en/idrymata/panepistimio-american-university-of-beirut-en,private

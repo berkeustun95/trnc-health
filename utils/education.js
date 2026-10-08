@@ -30,8 +30,11 @@
 
 // Columns the editor reads. `mirror_owned` is read but never shown: it decides whether a
 // row is still the transition trigger's to touch, which changes what a write must do.
+// `institutions(...)` is an embed, read-only: the row's own university, whatever country
+// the picker has loaded, and whether it has a student list (active, not Other — 20261095).
 export const EDUCATION_SELECT =
-  'id, institution_id, level, subject_id, study_start_year, study_end_year, listing_opt_in, mirror_owned'
+  'id, institution_id, level, subject_id, study_start_year, study_end_year, listing_opt_in, mirror_owned, ' +
+  'institutions(name, short_name, country, is_active)'
 
 export const LEVELS = ['university', 'postgraduate']
 

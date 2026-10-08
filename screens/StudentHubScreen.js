@@ -22,21 +22,21 @@ import { colors, shadow, radius } from '../constants/theme'
 import { t } from '../constants/i18n'
 import { REGIONS, REGION_LABEL_KEY } from '../constants/regions'
 import { normalize } from '../constants/oliIntents'
+import { TRNC_NATIONALITY_CODE } from '../constants/profileGate'
+import { fetchInstitutions, INSTITUTION_COUNTRIES, countryLabel } from '../utils/institutions'
 import { readCachedTasks, fetchTasks, loadProgress, saveProgress } from '../utils/studentTasks'
 import {
   pickContent, linkOf, stepsOf, documentsOf, countDone, isTicked, toggleStep, resetTask,
 } from '../utils/studentTaskRules'
 
-// The profile wizard's escape hatch for students at an unlisted institution
-// (20261001 seed, sort_order 999). It is not a place, so it has no row in a directory.
-const OTHER_INSTITUTION_ID = '00000000-0000-4000-b000-0000000000ff'
-
 function SectionTitle({ text }) {
   return <Text style={s.sectionTitle}>{text}</Text>
 }
 
-const uniMeta = (uni, lang) =>
-  [uni.short_name, uni.city && t(REGION_LABEL_KEY[uni.city], lang)].filter(Boolean).join(' · ')
+// A TRNC row carries a region slug (translated); every other country a city as its source
+// gives it (20261095).
+const uniPlace = (uni, lang) => (uni.city ? t(REGION_LABEL_KEY[uni.city], lang) : uni.city_name)
+const uniMeta = (uni, lang) => [uni.short_name, uniPlace(uni, lang)].filter(Boolean).join(' · ')
 
 function UniversityRow({ uni, lang, onOpen }) {
   const meta = uniMeta(uni, lang)
@@ -277,35 +277,61 @@ function LoadError({ lang, onRetry }) {
 // The search text and region chip are the SCREEN's state, not this tab's: opening a
 // university replaces the whole screen, which unmounts this tab, and a filter that resets
 // on every back is a filter nobody can use to compare two universities.
-function UniversitiesTab({ lang, universities, failed, onRetry, onOpen, query, setQuery, region, setRegion }) {
+function UniversitiesTab({ lang, universities, failed, onRetry, onOpen, query, setQuery, region, setRegion, country, setCountry }) {
   const unisMem = useScrollMemory('hub:unis')
+  const isTrnc = country === TRNC_NATIONALITY_CODE
 
-  const regions = useMemo(
-    () => ['all', ...REGIONS.filter(r => universities?.some(u => u.city === r))],
-    [universities],
-  )
+  // TRNC: the region slugs (İlçe). Elsewhere: the cities the rows carry (Şehir), by count.
+  const places = useMemo(() => {
+    if (!universities) return []
+    if (isTrnc) return REGIONS.filter(r => universities.some(u => u.city === r))
+      .map(r => ({ value: r, label: t(REGION_LABEL_KEY[r], lang), count: universities.filter(u => u.city === r).length }))
+    const counts = new Map()
+    for (const u of universities) if (u.city_name) counts.set(u.city_name, (counts.get(u.city_name) ?? 0) + 1)
+    return [...counts].sort((a, b) => a[0].localeCompare(b[0], 'tr'))
+      .map(([c, n]) => ({ value: c, label: c, count: n }))
+  }, [universities, isTrnc, lang])
 
   const results = useMemo(() => {
     if (!universities) return []
     const q = normalize(query)
     return universities.filter(u => {
-      if (region !== 'all' && u.city !== region) return false
+      if (region !== 'all' && (isTrnc ? u.city : u.city_name) !== region) return false
       if (!q) return true
-      const blob = normalize([u.name, u.short_name].filter(Boolean).join(' '))
+      const blob = normalize([u.name, u.short_name, u.city_name].filter(Boolean).join(' '))
       return q.split(' ').every(tok => blob.includes(tok))
     })
-  }, [universities, query, region])
+  }, [universities, query, region, isTrnc])
+
+  // The country stays reachable in every state: a country that fails to load must not
+  // trap the student on it.
+  const countryDropdown = (
+    <FilterDropdown
+      label={t('ddCountry', lang)}
+      lang={lang}
+      allowAll={false}
+      options={INSTITUTION_COUNTRIES.map(c => ({ value: c, label: countryLabel(c, lang) }))}
+      value={country}
+      onChange={v => { if (v && v !== country) { setRegion('all'); setCountry(v) } }}
+    />
+  )
 
   if (failed) {
     return (
       <View style={s.tabContent}>
+        <View style={s.ddRow}>{countryDropdown}</View>
         <LoadError lang={lang} onRetry={onRetry} />
       </View>
     )
   }
 
   if (!universities) {
-    return <ActivityIndicator size="large" color={colors.primary} style={s.loading} />
+    return (
+      <View style={s.tabContent}>
+        <View style={s.ddRow}>{countryDropdown}</View>
+        <ActivityIndicator size="large" color={colors.primary} style={s.loading} />
+      </View>
+    )
   }
 
   return (
@@ -327,19 +353,19 @@ function UniversitiesTab({ lang, universities, failed, onRetry, onOpen, query, s
         ) : null}
       </View>
 
-      {/* İlçe dropdown (replacing the region chips): only regions that have universities,
+      {/* Ülke, then İlçe (TRNC) or Şehir (elsewhere): only places that have universities,
           with counts. 'all' is this tab's "Tümü" value; the dropdown speaks null. */}
       <View style={s.ddRow}>
-        <FilterDropdown
-          label={t('ddDistrict', lang)}
-          lang={lang}
-          options={regions.filter(r => r !== 'all').map(r => ({
-            value: r, label: t(REGION_LABEL_KEY[r], lang),
-            count: universities.filter(u => u.city === r).length,
-          }))}
-          value={region === 'all' ? null : region}
-          onChange={v => setRegion(v ?? 'all')}
-        />
+        {countryDropdown}
+        {places.length ? (
+          <FilterDropdown
+            label={t(isTrnc ? 'ddDistrict' : 'ddCity', lang)}
+            lang={lang}
+            options={places}
+            value={region === 'all' ? null : region}
+            onChange={v => setRegion(v ?? 'all')}
+          />
+        ) : null}
       </View>
 
       {results.length === 0 ? (
@@ -568,8 +594,13 @@ export default function StudentHubScreen({
   // each one's scroll and the inbox does not refetch with a spinner every time.
   const [visited, setVisited] = useState(() => new Set([snap?.tab ?? 'universities']))
   const showTab = t2 => { setVisited(v => (v.has(t2) ? v : new Set(v).add(t2))); setTab(t2) }
-  const [universities, setUniversities] = useState(null)
-  const [failed, setFailed] = useState(false)
+  // One country at a time (utils/institutions), cached per country so switching back does
+  // not refetch, and so an open university page survives a country change underneath it.
+  const [uniCountry, setUniCountry] = useState(snap?.uniCountry ?? TRNC_NATIONALITY_CODE)
+  const [unisByCountry, setUnisByCountry] = useState({})
+  const [failedCountry, setFailedCountry] = useState(null)
+  const universities = unisByCountry[uniCountry] ?? null
+  const failed = failedCountry === uniCountry
   // The viewer's OWN row, read here rather than passed down from App.js. App.js caches the
   // profile and has no callback for the listing toggle, so a prop would be stale exactly
   // once — right after the user turns the setting on and comes back, which is the moment
@@ -628,23 +659,22 @@ export default function StudentHubScreen({
   })
 
   // Loaded here rather than in the tab so switching tabs does not refetch.
-  const load = useCallback(() => {
-    setFailed(false)
-    setUniversities(null)
-    supabase.from('institutions')
-      .select('id, name, short_name, city, website_url')
-      .eq('is_active', true)
-      .neq('id', OTHER_INSTITUTION_ID)
-      .order('name')
-      .then(({ data, error }) => {
-        // Zero rows is a fault, not an empty directory: the table is seeded and cannot
-        // legitimately be empty, and a session RLS refuses gets [] with no error.
-        if (error || !data?.length) { setFailed(true); return }
-        setUniversities(data)
+  const load = useCallback((country, { force = false } = {}) => {
+    setFailedCountry(f => (f === country ? null : f))
+    if (force) setUnisByCountry(m => { const { [country]: _drop, ...rest } = m; return rest })
+    fetchInstitutions(country)
+      .then(data => {
+        // Zero rows is a fault, not an empty directory: every listed country is seeded and
+        // cannot legitimately be empty, and a session RLS refuses gets [] with no error.
+        if (!data.length) { setFailedCountry(country); return }
+        setUnisByCountry(m => ({ ...m, [country]: data }))
       })
+      .catch(() => setFailedCountry(country))
   }, [])
 
-  useEffect(() => { load() }, [load])
+  // Keyed on the country alone: the cache check stops a refetch, and a failed country
+  // waits for its retry button rather than looping.
+  useEffect(() => { if (!unisByCountry[uniCountry]) load(uniCountry) }, [uniCountry])
 
   // ─── THE RECIPROCITY GATE IS THE DATABASE'S, NOT THIS SCREEN'S ─────────────
   //
@@ -719,7 +749,7 @@ export default function StudentHubScreen({
   // back lands on the same scroll with no refetch (the student list and the inbox used to
   // reload with a spinner). Bottom → top: tabs · university page or task · profile ·
   // conversation. Module-internal overlays only (slice 7, 2026-09-28).
-  const openUni = openUniId ? universities?.find(u => u.id === openUniId) : null
+  const openUni = openUniId ? Object.values(unisByCountry).flat().find(u => u.id === openUniId) : null
   const openTask = openSlug ? tasks?.find(task => task.slug === openSlug) : null
   const overlays = (
     <>
@@ -781,7 +811,7 @@ export default function StudentHubScreen({
   )
 
   // Leaving for eSIM / the Welcome Guide unmounts the hub (App.js); remember where we were.
-  const leaveVia = go => () => { hubReturn = { tab, uniQuery, uniRegion }; hubLeavingVia = true; go?.() }
+  const leaveVia = go => () => { hubReturn = { tab, uniQuery, uniRegion, uniCountry }; hubLeavingVia = true; go?.() }
 
   return (
     <View style={s.root}>
@@ -832,12 +862,14 @@ export default function StudentHubScreen({
             lang={lang}
             universities={universities}
             failed={failed}
-            onRetry={load}
+            onRetry={() => load(uniCountry, { force: true })}
             onOpen={setOpenUniId}
             query={uniQuery}
             setQuery={setUniQuery}
             region={uniRegion}
             setRegion={setUniRegion}
+            country={uniCountry}
+            setCountry={setUniCountry}
           />
         </View>
       )}
@@ -874,7 +906,7 @@ export default function StudentHubScreen({
 }
 
 const s = StyleSheet.create({
-  ddRow: { flexDirection: 'row', marginBottom: 12 },
+  ddRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   root: { flex: 1, backgroundColor: colors.bg },
   layer: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 10, backgroundColor: colors.bg },
   tabPane: { flex: 1 },

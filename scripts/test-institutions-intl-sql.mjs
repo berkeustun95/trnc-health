@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { freshDb, applyFile, asRole } from './migration-harness.mjs'
+import { loadCountry, migration } from './gen-institution-seeds.mjs'
 
 const FILE = fileURLToPath(new URL('../supabase/migrations/20261095_institutions_country.sql', import.meta.url))
 const OTHER = '00000000-0000-4000-b000-0000000000ff'
@@ -266,6 +267,39 @@ const variant = (from, to) => {
   const db = await freshDb(SEED + `GRANT EXECUTE ON FUNCTION public.is_listed_student(uuid) TO anon;`)
   const r = await applyFile(db, FILE)
   check('RED: refuses when anon can execute is_listed_student', !r.ok && /EXECUTE grantees/.test(r.msg), r.msg)
+}
+
+// 4. The generated seeds (gen-institution-seeds.mjs) on top of 1095: all three countries,
+//    inactive, coexisting with the TRNC rows (ASBÜ's name in both XN and TR), re-runnable.
+{
+  const db = await freshDb(SEED)
+  check('seeds: 1095 applies first', (await applyFile(db, FILE)).ok)
+  const dir = mkdtempSync(join(tmpdir(), 'seed-'))
+  const want = {}
+  for (const c of ['TR', 'CY', 'GB']) {
+    const rows = loadCountry(c)
+    want[c] = rows.length
+    const { file, sql } = migration(c, '99999999', rows)
+    writeFileSync(join(dir, file), sql)
+    const r1 = await applyFile(db, join(dir, file))
+    const r2 = await applyFile(db, join(dir, file))
+    check(`seeds: ${c} applies (${rows.length} rows) and re-runs as a no-op`, r1.ok && r2.ok, [r1.msg, r2.msg])
+  }
+  const got = (await db.query(`SELECT country, count(*)::int n, count(*) FILTER (WHERE is_active)::int a
+                                 FROM institutions GROUP BY 1 ORDER BY 1`)).rows
+  const by = Object.fromEntries(got.map(r => [r.country ?? 'NULL', r]))
+  check('seeds: counts per country match the CSVs, all inactive',
+    ['TR', 'CY', 'GB'].every(c => by[c]?.n === want[c] && by[c]?.a === 0), got)
+  check('seeds: the TRNC rows are untouched (24 XN, 23 active)', by.XN?.n === 24 && by.XN?.a === 23, by.XN)
+  const asbu = (await db.query(`SELECT count(*)::int n FROM institutions WHERE name = 'Ankara Sosyal Bilimler Üniversitesi'`)).rows[0].n
+  check('seeds: ASBÜ exists in both XN and TR', asbu === 2, asbu)
+  // RED: a name already taken in the country under another id is refused by name.
+  await db.exec(`UPDATE institutions SET name = name || ' (x)' WHERE country = 'CY'`)
+  await db.exec(`INSERT INTO institutions (name, country) VALUES ('University of Cyprus', 'CY')`)
+  const cy = migration('CY', '99999998', loadCountry('CY'))
+  writeFileSync(join(dir, cy.file), cy.sql)
+  const r = await applyFile(db, join(dir, cy.file))
+  check('RED seeds: a same-country name under another id is refused by name', !r.ok && /already in CY under another id: University of Cyprus/.test(r.msg), r.msg)
 }
 
 const failed = results.filter(x => !x).length
