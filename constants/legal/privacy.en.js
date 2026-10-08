@@ -12,8 +12,8 @@
 //   scripts/check-privacy-parity.mjs re-asserts it on every run.
 //
 // sha256 of the source at generation: 22ce677e7f68e27fa6ee8fa823f9010e8c2a09d46f13b970cc84a20d56cd08db
-export default `Version: 2026-09-27
-Last updated: September 27, 2026
+export default `Version: 2026-10-08
+Last updated: October 8, 2026
 
 WHO WE ARE
 
@@ -35,7 +35,7 @@ Profile data. Each field is listed with what it is for. Where a field is marked 
 
 • First and last name — your real name. Held on your account; see section 3 for who can see it.
 • Display name (labelled “Username” in the app) — a name you choose, 3 to 20 characters. It does not have to be your real name. This is the name shown next to reviews, questions and answers you post, and it is the only name other users see.
-• Date of birth — to confirm you are 13 or over. This is checked when you enter it and the account cannot be completed without it. It is also used to determine whether you are under 18, which affects the advertising you are shown (see section 5).
+• Date of birth — to confirm you are 13 or over. This is checked when you enter it and the account cannot be completed without it. It is also used to determine whether you are under 18, which affects the advertising you are shown (see section 5) and whether your check-ins start hidden from other users (see section 3).
 • Nationality — so that we can tell which residency, permit and paperwork information applies to you, and which languages to offer first. Not used yet — nothing in the app reads it.
 • Phone number — optional. If you provide it, it is held on your account so that we can contact you about your account. It is not shown to other users and is not given to providers. You can use ADA fully without giving us a phone number.
 • Region within the TRNC — so that listings, duty pharmacy rotas and search results can be ordered for where you live rather than only for where your phone happens to be. Today it chooses the district name and photo at the top of the Home screen; nothing else in the app reads it yet.
@@ -56,7 +56,7 @@ Moderation data: content you report, and users you block. Your block list is pri
 
 Rejected submissions: if text you submit is rejected by our content filter, we keep a record of it, linked to your account, for 30 days. Section 7 describes it in full.
 
-Consent records: which version of our Terms of Service and Privacy Policy you accepted, in which language, and when. If you opt in to marketing messages, we record when you did so, and when you withdrew it if you later do.
+Consent records: which version of our Terms of Service and Privacy Policy you accepted, in which language, and when. If you opt in to marketing messages, we record when you did so, and when you withdrew it if you later do. If you use check-ins, we record when you were shown the check-in notice and which version of it.
 
 Location: ADA uses your device's location only if you allow it, and you can turn it off at any time in your device settings. The app works without it. We do not sell your location and we do not use it for advertising.
 • On your phone — ADA uses your location to sort listings by distance, show where you are on the map, choose your city on the Home screen, and follow a walking route. This happens on your phone and your location is not sent to us for it.
@@ -65,6 +65,10 @@ Location: ADA uses your device's location only if you allow it, and you can turn
 • Walking routes — when you follow a walking route with location on, your position and the next stop are sent to our server, which asks openrouteservice (run by HeiGIT in Heidelberg, Germany) for the walking path. HeiGIT only sees our server, never your phone, and keeps request coordinates rounded to about 1 km in its logs. We do not store your position.
 • Route badges — while you follow a walking route, your phone checks whether you come within about 50 metres of each stop. That check happens on your phone: your position is not sent to us or stored for it. When you have reached most of a route's stops, we store on your account that you completed that route and the date — never your position or which stops you visited. If you are using ADA as a guest, this is kept only on your phone, for 7 days, so that you can sign in and keep it. Your badges are deleted with your account.
 • Route completions — when a walking route is completed, we also record that it was completed and the route's district, with no account, device or position attached. We share these with the TRNC Ministry of Tourism only as monthly totals per route, counting completions rather than people; a route with fewer than 5 completions in a month is reported as "fewer than 5".
+• Check-ins — when you tap “Check in” on a place, your phone's position and how accurate it is are sent to our server once, only to check that you are within 150 metres of the place. We do not store them. If you are close enough, we save that you checked in, at which place, and the date and time, together with your display name as it was at that moment — never your position. If you are too far away, or your position is not accurate enough, nothing is saved.
+• Check-ins at places from Google — when you tap “Check in” in Explore → Check-ins, your position, rounded to about 10 metres, is sent to our server, which asks Google (Google Maps Platform) for the places within 100 metres. Google sees our server, never your phone, your account or your name. If you check in at a place from that list, our server asks Google for the place's position to check that you are within 150 metres, and we save Google's identifier for the place with your check-in — never the place's name or address, and never your position. Google receives these coordinates as an independent controller and may use and keep them under the Google Privacy Policy (https://policies.google.com/privacy).
+• Names of places from Google — wherever ADA shows a place that comes from Google — the check-in lists, the check-ins in your profile and the Explore map — its name is requested from Google through our server when it is shown, and ADA does not save it. These requests carry only the place's identifier, nothing about you. A place from Google appears as a pin on the Explore map once someone whose check-ins are visible has checked in there; we keep the pin's position for less than 30 days, and the pin shows no people.
+• Maps — the maps in ADA are Google Maps (on iPhone, Apple Maps in versions of ADA that do not yet include Google Maps). To draw a map, your phone connects to Google or Apple directly, which receives your device's internet address and the area being shown, under its own privacy policy.
 • Contact taps — when you tap a call, WhatsApp, website or directions button for a listed business or partner, we record that the tap happened, for which business, and one of the seven broad districts of the TRNC it relates to (for example Girne or Lefke): the district your location places you in, or the one you chose in the app. We never record your account, your device or your exact position with it, so it cannot be traced back to you. We use these counts to tell businesses how many people contacted them through ADA.
 • Places you submit — if you submit a place and use your current location for its pin, that position is saved as the place's location and shown publicly once the place is approved.
 
@@ -85,6 +89,9 @@ Usage data: we do not use analytics SDKs or third-party trackers. Section 5 desc
 • Count taps on businesses' contact buttons, with the district — To show businesses how many people contact them through ADA. Legal basis: Our legitimate interest in running and funding the service
 • Record the walking routes you complete and show your route badges — To give you the feature you use. Legal basis: Performance of a contract with you
 • Report monthly totals of completed walking routes to the Ministry of Tourism — To support the walking-routes programme we run with it. Legal basis: Our legitimate interest in running the service
+• Check that you are at a place when you check in, and show your check-ins to other signed-in users — To give you the feature you use. Legal basis: Performance of a contract with you
+• Keep the check-ins of under-18s hidden unless they choose to show them — To protect minors. Legal basis: Our legitimate interest in a safe service
+• Find the places near you through Google when you check in — To give you the feature you use. Legal basis: Performance of a contract with you
 
 We do not sell or rent your personal data, and we do not share it with third parties for their own marketing.
 
@@ -96,6 +103,7 @@ Other users can see:
 
 • Your display name, next to reviews, questions and answers you post.
 • The content of the reviews, questions and answers you post, and the ratings you give.
+• Your check-ins, while they are visible: your display name, your profile picture, the place, and how long ago you checked in. They appear in the place's list of recent check-ins and in Explore → Check-ins, and only to signed-in users — never to guests. There is no page that lists one person's check-ins. If you are 18 or over, your check-ins are visible unless you turn on “Hide my check-ins” in your profile; if you are under 18, or we do not know your date of birth, they are hidden unless you turn that setting off. This is decided once, when you first check in, and does not change by itself when you turn 18. Turning it on removes your check-ins from both lists at once. Users you have blocked, and users who have blocked you, do not see your check-ins. You can delete any of your check-ins in your profile at any time.
 
 Other users cannot see: your first and last name, your date of birth, your nationality, your phone number, your region, your resident status, or your email address.
 
@@ -136,7 +144,7 @@ If you opt in:
 
 7. DATA STORAGE AND RETENTION
 
-All data is stored on Supabase, in an EU region. Row-Level Security (RLS) policies ensure you can only access your own records. Your data is not visible to other users unless you choose to appear in your university's student list. If you turn that on, other listed users can see your display name, profile picture, universities, study level, field of study and study years, and can send you a message request. While your route-badge switch is on (it starts on, except for people who were already in a student list when badges were introduced, for whom it starts off), they can also see which walking routes you have completed, but never the dates. You can turn it off at any time.
+All data is stored on Supabase, in an EU region. Row-Level Security (RLS) policies ensure you can only access your own records. Other users can see only what section 3 lists. If you also choose to appear in your university's student list, other listed users can see your display name, profile picture, universities, study level, field of study and study years, and can send you a message request. While your route-badge switch is on (it starts on, except for people who were already in a student list when badges were introduced, for whom it starts off), they can also see which walking routes you have completed, but never the dates. You can turn it off at any time.
 
 Because we operate from the TRNC, our administrators access your data from outside the EU/EEA. We apply the same protections to that access as we do to the data at rest.
 
@@ -147,6 +155,7 @@ Different data is kept for different lengths of time.
 • Content you delete — 30 days: reviews, questions and messages you delete are hidden at once and permanently removed 30 days later. If one is part of a report that is still open, it is removed once the report has been dealt with. Deleting a question also removes the answers to it.
 • Content we have removed: content removed for breaching our community standards is retained internally so that we can identify repeat breaches by the same account. It is no longer visible to other users.
 • Route badges: retained for as long as your account is active, and deleted with it. A guest's badge is kept only on the phone, for 7 days.
+• Check-ins: retained for as long as your account is active, and deleted with it. A check-in you delete is removed at once.
 • Consent records: retained for as long as you hold an account, and for a reasonable period afterwards, because they are the record of what you agreed to.
 
 8. AGE AND CHILDREN
@@ -156,6 +165,8 @@ ADA is for people aged 13 and over, and is not directed at children under 13.
 When you set up your profile we ask for your date of birth. If the date you enter shows that you are under 13, we do not store that date. We record only that the account is not eligible, and the account cannot be used.
 
 Accounts held by people aged 13 to 17 are subject to the advertising restriction in section 5.
+
+Check-ins made by people aged 13 to 17 are hidden from other users unless they choose to show them (see section 3).
 
 If you believe a child under 13 has provided us with personal data, please contact us and we will delete it promptly.
 

@@ -52,7 +52,11 @@ import TERMS_TR   from './terms.tr.js'
 // check, route + date on the account, badges to other listed students with a switch, off
 // for those listed before badges), anonymous route completions reported to the Ministry of
 // Tourism as monthly totals (< 5 suppressed). Terms unchanged; the pair moves together.
-export const LEGAL_VERSION = '2026-09-27'
+// Bumped 2026-09-27 -> 2026-10-08 for check-ins (drafted 2026-10-02 on docs/checkins-privacy;
+// PUBLISHED 2026-10-08: web + docs that day, the in-app copies with the next production OTA): what a check-in saves (no coordinates), who sees it
+// (feeds only, signed-in users, blocks respected), under-18s hidden by default, the hide
+// switch, deletion, the one-off position check. Terms unchanged; the pair moves together.
+export const LEGAL_VERSION = '2026-10-08'
 // Student Hub's terms came in with 2026-09-20 (profiles, affiliation, messaging). A signed-in,
 // non-guest account whose recorded terms_version is older — or NULL, i.e. never recorded — is
 // shown the CURRENT terms the first time it opens Student Hub and must accept to continue
